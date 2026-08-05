@@ -1,0 +1,70 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1f36"/>
+      <stop offset="100%" stop-color="#0d1021"/>
+    </linearGradient>
+    <linearGradient id="faceGradLeft" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff5d8f"/>
+      <stop offset="100%" stop-color="#ff8a65"/>
+    </linearGradient>
+    <linearGradient id="faceGradRight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5b6ee1"/>
+      <stop offset="100%" stop-color="#39c5cf"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <circle cx="256" cy="256" r="248" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#ffffff22" stroke-width="2"/>
+
+  <!-- central dividing line -->
+  <line x1="256" y1="70" x2="256" y2="442" stroke="#ffffff33" stroke-width="1.5"/>
+
+  <!-- LEFT FACE: profile looking left -->
+  <g>
+    <path d="
+      M 256 130
+      C 200 130 168 168 160 216
+      C 156 240 158 252 148 258
+      C 140 262 140 270 150 272
+      C 156 273 158 278 158 284
+      C 158 300 168 312 182 318
+      C 182 330 178 340 170 348
+      C 200 356 224 350 238 336
+      C 250 340 256 340 256 340
+      Z"
+      fill="url(#faceGradLeft)"/>
+    <!-- eye -->
+    <circle cx="200" cy="228" r="6" fill="#1a1f36"/>
+    <!-- brow -->
+    <path d="M 182 214 Q 200 204 218 214" stroke="#1a1f36" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- RIGHT FACE: mirrored profile looking right -->
+  <g>
+    <path d="
+      M 256 130
+      C 312 130 344 168 352 216
+      C 356 240 354 252 364 258
+      C 372 262 372 270 362 272
+      C 356 273 354 278 354 284
+      C 354 300 344 312 330 318
+      C 330 330 334 340 342 348
+      C 312 356 288 350 274 336
+      C 262 340 256 340 256 340
+      Z"
+      fill="url(#faceGradRight)"/>
+    <!-- eye -->
+    <circle cx="312" cy="228" r="6" fill="#0d1021"/>
+    <!-- brow -->
+    <path d="M 294 214 Q 312 204 330 214" stroke="#0d1021" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- shared crown / laurel hint at top -->
+  <path d="M 210 128 Q 256 100 302 128" stroke="#ffffff55" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- wordmark -->
+  <text x="256" y="410" font-family="'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="1">pact-janus</text>
+  <text x="256" y="432" font-family="'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="400" fill="#ffffff99" text-anchor="middle" letter-spacing="3">CONTRACT TESTING, REBUILT</text>
+</svg>
