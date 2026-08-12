@@ -1,7 +1,7 @@
 # Spike 1.1 findings — Protocol IDL bake-off
 
-Status: **in progress** — survey done; WIT E1/E4 and E3 gauntlet legs run (results §3); still to
-do: protobuf gauntlet leg, document-schema leg, bindings round for the finalists. Method and change
+Status: **in progress** — survey done; WIT (E1/E4, E3) and protobuf (E1–E5) gauntlet legs run
+(results §3); still to do: document-schema leg, bindings round for the finalists. Method and change
 catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
 
 ## 1. Framing: two surfaces, one hard requirement
@@ -42,10 +42,10 @@ that predate it** (or loudly negotiable), in both directions of the gauntlet.
 ### protobuf (proto3)
 
 - **For**: evolution semantics are the strongest of any typed candidate and are battle-tested:
-  unknown fields are preserved, enums are open (unknown values are retained as integers), new
-  `oneof` alternatives surface to old readers as an unset/unknown field — old artifacts keep working
-  by design across E1–E5. Mature codegen everywhere (prost/Rust, protobuf-java, protobuf-es/TS).
-  pact-plugins compatibility is a bonus.
+  unknown fields are preserved (in protobuf-java/C++ — see finding 8 for prost), enums are open
+  (unknown values are retained as integers), new `oneof` alternatives surface to old readers as an
+  unset/unknown field — old artifacts keep working by design across E1–E5. Mature codegen
+  everywhere (prost/Rust, protobuf-java, protobuf-es/TS). pact-plugins compatibility is a bonus.
 - **Against**: its use in pact-plugins is historical, not an endorsement — and it shows: field-number
   bookkeeping, `oneof` ergonomics for errors-as-values are clunky, no resource/handle concept
   (sessions become integer handles by convention), and it drags a gRPC-shaped worldview. Wire-level
@@ -170,9 +170,38 @@ Findings, E3 leg:
    third-party WIT plugins therefore ends up hand-building the negotiation machinery the
    document-first hybrid has by construction, while still being unable to grow its variants.
 
-### protobuf — E1–E5 over serialized frames
+### protobuf — E1–E5 over serialized frames (prost 0.13, no gRPC)
 
-*pending — next after the WIT leg; prost-based encode/decode across schema versions, no gRPC.*
+Setup (`gauntlet/proto-evolution/`): the same proto package compiled at two schema versions into one
+binary — v1 is "the old plugin's view", v2 "the grown engine's view"; frames encoded under one view,
+decoded under the other, both directions.
+
+| Change | D-a (old reader, new frame) | D-b (new reader, old frame) |
+|---|---|---|
+| E1 enum value | **PASS (silent)** — decodes; raw `i32 = 5` survives (even round-trips through the old view, since the field itself is known); but the typed accessor reports `Unspecified` with no unknown-value signal. Detectable only if code hand-checks `try_from` on the raw value | PASS |
+| E2 optional field | **PASS** — invisible to the old view; **but prost drops unknown fields on re-encode**, so a Rust intermediary loses the new field in pass-through (protobuf-java/C++ preserve unknown fields; prost's omission is long-standing) | PASS — absent → `None` |
+| E3 new operation | **NEGOTIATED (explicit)** — old callee decodes `op = None` and can answer "unsupported operation"; the rejection is codeable, unlike a link error | PASS |
+| E4 event case | **PASS (silent-worst)** — `event = None`, indistinguishable from an empty event; a stream consumer just sees nothing | PASS |
+| E5 union alternative | **PASS (silent-worst)** — same `None` shape as E4 | PASS |
+
+Findings, protobuf leg:
+
+7. **Nothing ever breaks — and that is both the feature and the trap.** No change strands an old
+   artifact (no link-time coupling exists to strand it), but every D-a "pass" on vocabulary growth
+   is *silent by default*: unknown enum values masquerade as `Unspecified`, unknown event/union
+   cases as `None`. E3 is the only naturally loud case, and only because a request/response pairing
+   gives the old side somewhere to hang an explicit rejection. Making the silent cases loud requires
+   exactly the capability-negotiation/validation machinery the document-first hybrid needs anyway —
+   protobuf just makes the gap easy to not notice.
+8. **prost does not preserve unknown fields.** Confirmed: a new field vanishes when a frame
+   round-trips through a prost-compiled old view (unknown *enum values* survive, being known
+   fields). Any Rust intermediary — and the engine is Rust — is lossy for pass-through under
+   protobuf unless this is engineered around. The survey's textbook claim about unknown-field
+   preservation is implementation-dependent and false for the implementation Janus would use most.
+9. Scoring under the gauntlet: protobuf clears the plugin-surface bar (old artifacts keep working)
+   but with the *worst possible failure form* — silence — on the changes that matter most (E1, E4,
+   E5). The gauntlet's own scoring note applies: a loud failure beats a silent one within the same
+   grade.
 
 ## 4. Emerging picture (to be validated, not yet a recommendation)
 
@@ -182,6 +211,8 @@ cannot break** (closed control-flow shapes like `result`; never open vocabularie
 tool (schema diff in CI) doing the job that closed type systems fail at and open ones silently skip.
 WIT remains the plumbing of the WASM embedding either way, but E1/E4 BREAK plus gates-can't-gate-cases
 rules it out as the schema for anything that grows, and E3 shows even operation growth forces hosts
-into hand-built feature-detection — negotiation machinery the document model has by construction. protobuf remains the strongest *typed* fallback
-if document-schema tooling disappoints in the bindings round. The protobuf and document legs must
-still run before this hardens into the G1 ADR.
+into hand-built feature-detection — negotiation machinery the document model has by construction. protobuf remains the strongest *typed* fallback if document-schema tooling disappoints in the
+bindings round — its gauntlet leg confirms old artifacts never break, at the price of silent
+degradation on exactly the changes that matter (findings 7–9), plus a prost-specific pass-through
+loss the engine would have to engineer around. The document leg and bindings round must still run
+before this hardens into the G1 ADR.

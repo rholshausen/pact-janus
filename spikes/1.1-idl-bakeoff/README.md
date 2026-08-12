@@ -46,6 +46,6 @@ Missing (install if shortlisted): `jco`/`componentize-js` (TS↔WIT), `buf` (pro
 evolution-gauntlet.md   The change catalog and scoring rules
 slice/                  Protocol slice modeled per candidate (slice.wit, slice.proto, …)
 gauntlet/wit-evolution/ WIT legs: E1/E4 (variant/enum growth) and E3 (operation growth)
-gauntlet/proto-e1e4/    protobuf: same changes over serialized frames
+gauntlet/proto-evolution/ protobuf: E1–E5 over serialized frames (two schema views, prost)
 FINDINGS.md             Survey, gauntlet results, recommendation
 ```

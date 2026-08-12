@@ -1,0 +1,57 @@
+// Gauntlet baseline: the schema as the old plugin knew it.
+syntax = "proto3";
+
+package pact.engine.slice;
+
+message Document {
+  bytes json = 1;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_SPEC = 1;
+  ERROR_CODE_UNSUPPORTED_SPEC_VERSION = 2;
+  ERROR_CODE_SESSION_NOT_FOUND = 3;
+  ERROR_CODE_INTERNAL = 4;
+  // E1 adds: ERROR_CODE_COMPONENT_UNAVAILABLE = 5;
+}
+
+message EngineError {
+  ErrorCode code = 1;
+  string message = 2;
+  Document details = 3;
+  // E2 adds: optional bool retryable = 4;
+}
+
+message VerifyEvent {
+  oneof event {
+    Document started = 1;
+    Document interaction_result = 2;
+    Document finished = 3;
+    // E4 adds: Document hook_invoked = 4;
+  }
+}
+
+message InteractionPart {
+  oneof part {
+    Document request = 1;
+    Document response = 2;
+    // E5 adds: Document message = 3;
+  }
+}
+
+message AddInteraction {
+  uint64 session = 1;
+  Document spec = 2;
+}
+message Finalise {
+  uint64 session = 1;
+}
+
+message Request {
+  oneof op {
+    AddInteraction add_interaction = 1;
+    Finalise finalise = 2;
+    // E3 adds: Explain explain = 3;
+  }
+}

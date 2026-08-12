@@ -1,0 +1,15 @@
+# Standalone spike crate — deliberately NOT a member of the root workspace (spikes/README.md).
+[workspace]
+
+[package]
+name = "proto-evolution"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+prost = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"
