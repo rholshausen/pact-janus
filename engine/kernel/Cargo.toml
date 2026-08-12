@@ -1,0 +1,17 @@
+[package]
+name = "pact_janus_kernel"
+description = "Pact Janus engine kernel: session lifecycle, plan compiler, plan interpreter, pact model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Kernel crates must stay buildable for wasm32-wasip2: no tokio/reqwest/native-only
+# dependencies here except behind target-gated features.
+
+[dev-dependencies]
+
+[lints]
+workspace = true
