@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/slice/v1/verify-event",
+  "title": "VerifyEvent envelope (v1). Event kinds are an open vocabulary; the envelope is closed.",
+  "type": "object",
+  "required": ["type", "payload"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "x-known-values": ["started", "interaction-result", "finished"]
+    },
+    "payload": { "type": "object" }
+  }
+}

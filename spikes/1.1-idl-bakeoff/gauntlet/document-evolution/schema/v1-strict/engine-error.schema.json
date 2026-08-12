@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/slice/v1-strict/engine-error",
+  "title": "EngineError (v1, DELIBERATELY CLOSED — the counterexample). Closing the world is an authoring choice; this is what it costs under evolution.",
+  "type": "object",
+  "required": ["code", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "enum": ["invalid-spec", "unsupported-spec-version", "session-not-found", "internal"]
+    },
+    "message": { "type": "string" },
+    "details": { "type": "object" }
+  }
+}

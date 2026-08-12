@@ -47,5 +47,7 @@ evolution-gauntlet.md   The change catalog and scoring rules
 slice/                  Protocol slice modeled per candidate (slice.wit, slice.proto, …)
 gauntlet/wit-evolution/ WIT legs: E1/E4 (variant/enum growth) and E3 (operation growth)
 gauntlet/proto-evolution/ protobuf: E1–E5 over serialized frames (two schema views, prost)
+gauntlet/document-evolution/ document hybrid: E1–E5 over schema-governed JSON frames
+                             (open-world rules + strict counterexample)
 FINDINGS.md             Survey, gauntlet results, recommendation
 ```

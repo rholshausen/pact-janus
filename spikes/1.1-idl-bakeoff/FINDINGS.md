@@ -1,8 +1,9 @@
 # Spike 1.1 findings — Protocol IDL bake-off
 
-Status: **in progress** — survey done; WIT (E1/E4, E3) and protobuf (E1–E5) gauntlet legs run
-(results §3); still to do: document-schema leg, bindings round for the finalists. Method and change
-catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
+Status: **in progress** — survey done; all three gauntlet legs run: WIT (E1/E4, E3), protobuf
+(E1–E5), document-schema (E1–E5) — results §3. Remaining: the bindings round (schema-to-type
+generation quality for Rust/TS/JVM, and codegen comparison for the finalists), then the G1 ADR.
+Method and change catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
 
 ## 1. Framing: two surfaces, one hard requirement
 
@@ -203,16 +204,61 @@ Findings, protobuf leg:
    E5). The gauntlet's own scoring note applies: a loud failure beats a silent one within the same
    grade.
 
-## 4. Emerging picture (to be validated, not yet a recommendation)
+### Document-schema hybrid — E1–E5 over JSON frames (jsonschema 0.26 + serde)
 
-The survey suggested — and the WIT gauntlet leg now supports — a split answer: a **document-first
-protocol** over frozen per-embedding pipes for both surfaces, with **typed structure only where it
-cannot break** (closed control-flow shapes like `result`; never open vocabularies), and a governance
-tool (schema diff in CI) doing the job that closed type systems fail at and open ones silently skip.
-WIT remains the plumbing of the WASM embedding either way, but E1/E4 BREAK plus gates-can't-gate-cases
-rules it out as the schema for anything that grows, and E3 shows even operation growth forces hosts
-into hand-built feature-detection — negotiation machinery the document model has by construction. protobuf remains the strongest *typed* fallback if document-schema tooling disappoints in the
-bindings round — its gauntlet leg confirms old artifacts never break, at the price of silent
-degradation on exactly the changes that matter (findings 7–9), plus a prost-specific pass-through
-loss the engine would have to engineer around. The document leg and bindings round must still run
-before this hardens into the G1 ADR.
+Setup (`gauntlet/document-evolution/`): versioned JSON Schemas with *authored* open-world rules —
+open vocabularies as strings with advisory `x-known-values` (not the closing `enum` keyword),
+must-ignore unknown members, discriminated envelopes with open discriminators. The "old plugin" is
+the v1 validator plus v1 serde structs using the flatten idiom for pass-through. A deliberately
+closed v1-strict schema (`enum` + `additionalProperties: false`) serves as the counterexample.
+
+| Change | D-a (old view, new frame) | D-b |
+|---|---|---|
+| E1 enum value | **PASS (named)** — validates; typed view sees `"component-unavailable"` *verbatim*; known-values check classifies it; policy (ignore/warn/reject) is the old side's choice | PASS |
+| E2 optional field | **PASS** — captured by the flatten map; **survives round-trip through the old view** and revalidates under v2 (where prost lost it) | PASS — absent → default |
+| E3 new operation | **NEGOTIATED (named)** — envelope validates; old callee rejects `unsupported operation 'explain'` with the op *named* | PASS |
+| E4 event kind | **PASS (named)** — envelope validates; consumer can log `skipping unknown event 'hook-invoked'` instead of receiving a bare `None` | PASS |
+| E5 union alternative | **PASS (named)** — identical open-discriminator mechanics to E4, by construction | PASS |
+| strict counterexample | **REJECT (loud, precise)** — `'/code': "component-unavailable" is not one of [...]` and `'retryable' was unexpected` | — |
+
+Findings, document leg:
+
+10. **Every unknown arrives named.** The three candidates line up exactly as the framing predicted:
+    WIT breaks (loud, unfixable), protobuf degrades (silent — `None`/`Unspecified`, identity lost),
+    documents degrade *with the unknown's name attached* — which is what turns degradation into
+    policy. This is the property neither type-system candidate can offer without extra machinery.
+11. **Pass-through preservation is idiomatic, not engineered**: the serde flatten pattern kept the
+    unknown field intact through the old view's round-trip and it revalidated under v2 — closing
+    the gap prost opened (finding 8).
+12. **The failure form is authored per field.** The same evolution against the strict schema fails
+    loudly with exact JSON paths. Open vocabularies + closed envelopes is a *choice the schema
+    author makes*, which means the discipline lives in schema governance — the open-world rules
+    must be enforced by review and a schema-compat checker in CI (the Smithy-diff-shaped gap noted
+    in §2), because nothing in the type system enforces them.
+13. Costs observed: no compile-time cross-boundary checking (the typed views here are hand-written;
+    whether schema-to-type generation is good enough per language is exactly the bindings round);
+    validation cost unmeasured (goes with benchmark 1.7); and the `jsonschema` crate pulls in
+    `reqwest` by default for remote `$ref` resolution — an engine validator must pin schemas as
+    embedded resources and disable remote resolution (also the right behaviour for a kernel).
+
+## 4. Emerging picture (supported by all three gauntlet legs; bindings round outstanding)
+
+The gauntlet is now unanimous in shape: the three candidates fail/degrade in strictly ordered ways
+on vocabulary growth — WIT **breaks** (loud, no mechanism can express the addition), protobuf
+**degrades silently** (unknowns lose their identity), documents **degrade with the unknown named**
+(degradation becomes policy). That supports the split answer the survey proposed:
+
+- **Both surfaces**: a document-first protocol — frozen byte-pipe interfaces per embedding
+  (minimal WIT world / stdio / C ABI), JSON frames governed by versioned schemas with authored
+  open-world rules, capability negotiation at session start.
+- **Typed structure only where it cannot break**: closed control-flow shapes (the envelope,
+  `result`-like pairings); never open vocabularies (event kinds, error codes, ops, matcher/action
+  names).
+- **Governance replaces the type system's job**: a schema-compat checker in CI (the
+  Smithy-diff-shaped gap) enforcing the open-world rules the gauntlet showed nothing else enforces.
+
+WIT remains the plumbing of the WASM embedding either way — as the frozen pipe, where its closed
+types are a feature. protobuf remains the typed fallback if the bindings round shows
+schema-to-type generation is not good enough across Rust/TS/JVM — accepting silent degradation
+(findings 7–9) and engineering around prost's pass-through loss. The bindings round is the last
+input before the G1 ADR.

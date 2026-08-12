@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/slice/v1/request",
+  "title": "Request envelope (v1). Operations are an open vocabulary.",
+  "type": "object",
+  "required": ["op", "body"],
+  "properties": {
+    "op": {
+      "type": "string",
+      "x-known-values": ["add-interaction", "finalise"]
+    },
+    "body": { "type": "object" }
+  }
+}

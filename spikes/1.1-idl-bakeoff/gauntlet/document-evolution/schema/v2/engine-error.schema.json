@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/slice/v2/engine-error",
+  "title": "EngineError (v2: E1 new known value, E2 new field)",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "x-known-values": [
+        "invalid-spec",
+        "unsupported-spec-version",
+        "session-not-found",
+        "internal",
+        "component-unavailable"
+      ]
+    },
+    "message": { "type": "string" },
+    "details": { "type": "object" },
+    "retryable": { "type": "boolean" }
+  }
+}
