@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/slice/v1/engine-error",
+  "title": "EngineError (v1, open-world)",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "x-known-values": ["invalid-spec", "unsupported-spec-version", "session-not-found", "internal"]
+    },
+    "message": { "type": "string" },
+    "details": { "type": "object" }
+  }
+}

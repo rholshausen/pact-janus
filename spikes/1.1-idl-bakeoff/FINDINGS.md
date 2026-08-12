@@ -1,9 +1,8 @@
 # Spike 1.1 findings — Protocol IDL bake-off
 
-Status: **in progress** — survey done; all three gauntlet legs run: WIT (E1/E4, E3), protobuf
-(E1–E5), document-schema (E1–E5) — results §3. Remaining: the bindings round (schema-to-type
-generation quality for Rust/TS/JVM, and codegen comparison for the finalists), then the G1 ADR.
-Method and change catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
+Status: **complete** — survey (§2), all three gauntlet legs (§3), bindings round (§5), and a draft
+recommendation for G1 (§6). The G1 ADR itself waits on the embedding spikes (1.2/1.3). Method and
+change catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
 
 ## 1. Framing: two surfaces, one hard requirement
 
@@ -262,3 +261,62 @@ types are a feature. protobuf remains the typed fallback if the bindings round s
 schema-to-type generation is not good enough across Rust/TS/JVM — accepting silent degradation
 (findings 7–9) and engineering around prost's pass-through loss. The bindings round is the last
 input before the G1 ADR.
+
+## 5. Bindings round — schema-to-type generation (`bindings/`)
+
+The document model's stated cost is losing compile-time cross-boundary types. This round measures
+how much generation gives back, per language, using the gauntlet's schemas.
+
+### Rust — typify (cargo-typify)
+
+Clean serde structs with builders; new frames decode; open `code` arrives verbatim as `String`.
+**But generated types DROP unknown members** — typify emits no flatten/extra map, so pass-through
+dies at the first typed hop (empirically: `retryable = None` after round-trip). Same gap as prost
+(finding 8), now on the document side.
+
+### TypeScript — json-schema-to-typescript
+
+Interfaces with `[k: string]: unknown` index signatures: unknown members stay accessible (typed
+`unknown`), pass-through is free because nothing re-materialises the document. `tsc --strict`
+passes, including `@ts-expect-error` on a missing required member — real compile-time envelope
+checking retained.
+
+### JVM — jsonschema2pojo + Jackson
+
+POJOs carry an `additionalProperties` map with `@JsonAnyGetter`/`@JsonAnySetter` **by default**;
+run confirmed: unknown members preserved through decode → re-encode. Class names come from
+filenames (dodging the title problem below).
+
+### Cross-cutting findings
+
+14. **Generation works everywhere; the evolution-critical property varies.** Pass-through is
+    preserved by default on the JVM, trivially in TS, and *missing in Rust* — the engine's own
+    language, ironically. Fixable by policy because the envelope set is small and project-owned:
+    generate types for payload documents, but hand-own (or custom-generate) the protocol envelope
+    types in Rust with an explicit extra-fields map, exactly as the document-evolution leg's
+    structs did. This becomes a rule in the protocol spec (2.1).
+15. **Schema `title` discipline is required**: two of three generators derive type names from
+    titles (`VerifyEventEnvelopeV1EventKindsAreAnOpenVocabulary…`); the schema authoring guide
+    must mandate short type-shaped titles.
+16. protobuf's codegen maturity for TS/JVM (protobuf-es, protobuf-java) is taken as known rather
+    than re-proven; prost was exercised in its gauntlet leg. Nothing there changes the
+    finding 7–9 trade-offs.
+
+## 6. Draft recommendation for G1 (ratify alongside 1.2/1.3 embedding evidence)
+
+1. **Document-first protocol on both surfaces** (SDK-facing and plugin-facing): JSON frames
+   governed by versioned schemas that are the specified, versioned surface; open-world authoring
+   rules (open vocabularies via `x-known-values`, must-ignore members, open discriminators, closed
+   envelopes); capability negotiation at session start; a schema-compat checker in CI as the
+   governance backstop.
+2. **Frozen pipes per embedding**: a minimal, never-growing WIT world for the WASM embedding
+   (closed types are a feature there), LSP-style stdio framing for the subprocess, the 3-function
+   C ABI as fallback — all carrying the same frames.
+3. **Typed views**: generated types for payload documents (typify / json-schema-to-typescript /
+   jsonschema2pojo all adequate); project-owned envelope types in Rust with explicit pass-through.
+4. **protobuf is not adopted** for the new protocol; it remains only at the retained pact-plugins
+   compatibility boundary (spike 8.3). WIT does not type the protocol; it carries it.
+
+Open risks going into G1: schema-compat checker needs selecting or building (Smithy-diff-shaped
+gap, finding 12); validation performance unmeasured (benchmark 1.7); WASM embedding ergonomics of
+byte-frame pipes to be confirmed by spike 1.2.
