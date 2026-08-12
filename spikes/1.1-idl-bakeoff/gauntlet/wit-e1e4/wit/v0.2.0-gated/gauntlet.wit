@@ -1,0 +1,34 @@
+/// E1 + E4 via a version bump with feature gates: new cases are annotated @since(0.2.0).
+/// Tests whether WIT's feature-gate mechanism lets artifacts compiled against 0.1.0
+/// coexist with a 0.2.0 counterpart.
+///
+/// RESULT (kept deliberately): this file DOES NOT PARSE — wasm-tools 1.239 rejects gates on
+/// enum/variant cases ("expected an identifier or string, found `@`"). Item-level gates
+/// (functions, types) parse fine. See FINDINGS.md §3.
+package pact:gauntlet@0.2.0;
+
+interface events {
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+    @since(version = 0.2.0)
+    component-unavailable,      // E1, gated
+  }
+
+  variant verify-event {
+    started(string),
+    interaction-result(string),
+    finished(string),
+    @since(version = 0.2.0)
+    hook-invoked(string),       // E4, gated
+  }
+
+  next-event: func(seq: u32) -> option<verify-event>;
+  last-error: func() -> error-code;
+}
+
+world plugin {
+  export events;
+}

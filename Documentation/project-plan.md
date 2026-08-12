@@ -64,8 +64,8 @@ Milestones (each is demo-able):
   matches captured values offline.
 - **M2** — The RFC's TypeScript example, expressed as a raw interaction-spec document, runs against the
   engine's mock server with the 12-variant space sampled, and a v5 pact file is written.
-- **M3** — The same engine binary verifies that v5 pact *and* an existing v4 pact against a sample
-  provider, with auth and state hooks.
+  - **M3** — The same engine binary verifies that v5 pact *and* an existing v4 pact against a sample
+    provider, with auth and state hooks.
 - **M4** — The RFC consumer example runs near-verbatim in TypeScript and on the JVM, both passing the
   seed conformance suite with identical behaviour.
 - **M5** — The RFC's "provider may produce SHIPPED, consumer only tested PENDING" scenario is reproduced
@@ -103,12 +103,33 @@ Goal: settle the two decisions everything else sits on (protocol IDL, embedding 
 and get a performance baseline before any architecture ossifies. Each spike is time-boxed and ends in a
 written finding even if the answer is "it doesn't work".
 
-- **1.1 [spike] IDL bake-off: WIT vs protobuf (vs both).** Model one representative protocol slice —
-  `add-interaction` with a structured error result, plus the `verify` event stream — in both WIT and
-  protobuf. Generate bindings for Rust, TypeScript, and JVM. Compare: expressiveness for
-  documents/streams/errors-as-values, codegen quality per language, versioning/evolution story, and how
-  each handles the "document in, documents and events out" shape. Feeds G1 and RFC unresolved question
-  "IDL choice".
+- **1.1 [spike] Protocol IDL bake-off — evolution first, and wider than WIT vs protobuf.** The RFC
+  names WIT and protobuf, but neither arrives with a mandate: protobuf's presence in pact-plugins is
+  historical rather than an endorsement, and WIT — despite working well in commercial use — has a known
+  sharp edge where adding a variant/enum case later breaks components compiled before the case existed.
+  That makes **compatibility under evolution** the deciding criterion, and it differs by surface:
+  - *SDK-facing engine protocol*: SDK and engine versions are pinned and negotiated; both ends move.
+  - *Plugin-facing component interfaces*: third-party components compiled long ago must keep loading as
+    the interface grows. "Add an enum variant" must never break an old plugin, and minting a new
+    interface version per addition is overhead that punishes evolution. The bake-off may legitimately
+    return different answers for the two surfaces.
+
+  Candidates: WIT (including whether `@since`/`@unstable` feature gates rescue additive evolution);
+  protobuf (open enums, unknown-field preservation); FlatBuffers and Cap'n Proto (numbered-field
+  evolution); Avro (reader/writer schema resolution); Smithy and TypeSpec (authoring IDLs with
+  evolution validators — `smithy-diff` can make "no breaking changes" CI-enforceable — emitting other
+  encodings); and the **document-first hybrid**: a tiny, frozen byte-pipe interface (minimal WIT world /
+  C ABI / stdio) carrying JSON or CBOR documents governed by a versioned schema (JSON Schema / CDDL)
+  with explicit open-world rules — must-ignore unknown fields, open enums, capability negotiation à la
+  LSP — moving evolution out of the type system and into document semantics the engine controls.
+
+  Method: (a) define an **evolution gauntlet** — add enum variant, add optional field, add operation,
+  add event type, widen a union; old artifact against new interface and the reverse; (b) shortlist on
+  paper against the gauntlet and tooling reality; (c) model the protocol slice (`add-interaction` with
+  structured errors + the `verify` event stream) in the top 2–3 and generate Rust/TypeScript/JVM
+  bindings; (d) run the gauntlet for real on compiled artifacts. Compare expressiveness for
+  documents/streams/errors-as-values, codegen quality, and gauntlet results per surface. Feeds G1 and
+  RFC unresolved question "IDL choice".
 - **1.2 [spike] WASM component embedding matrix.** Compile a toy engine (echo + one real operation, e.g.
   a trivial matcher) as a WASM component. Host it in: Node (built-in), JVM (Chicory), Go (wazero),
   Python (wasmtime-py), .NET (wasmtime-dotnet if time allows). For each: does the component model work or

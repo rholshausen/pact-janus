@@ -1,0 +1,27 @@
+/// E1 + E4 without a version bump: the types grew in place ("the engine evolved,
+/// nobody minted a new interface version"). Same package id as the baseline.
+package pact:gauntlet@0.1.0;
+
+interface events {
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+    component-unavailable,      // E1
+  }
+
+  variant verify-event {
+    started(string),
+    interaction-result(string),
+    finished(string),
+    hook-invoked(string),       // E4
+  }
+
+  next-event: func(seq: u32) -> option<verify-event>;
+  last-error: func() -> error-code;
+}
+
+world plugin {
+  export events;
+}

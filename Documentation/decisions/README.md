@@ -24,7 +24,9 @@ superseding ADR instead.
 Known decisions waiting on evidence, seeded from the RFC's unresolved questions and the project plan.
 Each becomes a numbered ADR when its inputs are ready (feeding task in brackets):
 
-- Protocol IDL: WIT, protobuf, or hybrid (spike 1.1 → gate G1)
+- Protocol IDL: WIT, protobuf, an alternative (FlatBuffers/Cap'n Proto/Avro/Smithy/TypeSpec), or the
+  document-schema hybrid — possibly different answers for the SDK-facing protocol and plugin-facing
+  interfaces; evolution compatibility is the deciding criterion (spike 1.1 → gate G1)
 - Primary embedding per SDK language: WASM component vs subprocess (spikes 1.2, 1.3 → G1)
 - Kernel starting point: fork of pact-reference v2 matching engine vs rewrite (task 0.4 → G1)
 - Script-hook language and runtime (spike 1.6 → design 2.7)

@@ -1,0 +1,66 @@
+// Protocol slice for the IDL bake-off (spike 1.1). Mirrors slice.wit; see that file for
+// the modeling rationale and the gauntlet markers (E1–E4).
+syntax = "proto3";
+
+package pact.engine.slice.v1;
+
+// A JSON document, UTF-8 encoded.
+message Document {
+  bytes json = 1;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_SPEC = 1;
+  ERROR_CODE_UNSUPPORTED_SPEC_VERSION = 2;
+  ERROR_CODE_SESSION_NOT_FOUND = 3;
+  ERROR_CODE_INTERNAL = 4;
+  // E1 adds: ERROR_CODE_COMPONENT_UNAVAILABLE = 5;
+}
+
+message EngineError {
+  ErrorCode code = 1;
+  string message = 2;
+  Document details = 3;
+  // E2 adds: optional bool retryable = 4;
+}
+
+message CreateSessionRequest { Document config = 1; }
+message CreateSessionResponse { uint64 session = 1; }
+
+message AddInteractionRequest {
+  uint64 session = 1;
+  Document spec = 2;
+}
+message AddInteractionResponse {
+  oneof result {
+    uint32 handle = 1;
+    EngineError error = 2;
+  }
+}
+
+message FinaliseRequest { uint64 session = 1; }
+message FinaliseResponse {
+  oneof result {
+    Document results = 1;
+    EngineError error = 2;
+  }
+}
+
+message VerifyRequest { Document request = 1; }
+message VerifyEvent {
+  oneof event {
+    Document started = 1;
+    Document interaction_result = 2;
+    Document finished = 3;
+    // E4 adds: Document hook_invoked = 4;
+  }
+}
+
+service EngineSlice {
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc AddInteraction(AddInteractionRequest) returns (AddInteractionResponse);
+  rpc Finalise(FinaliseRequest) returns (FinaliseResponse);
+  // E3 adds: rpc Explain(AddInteractionRequest) returns (ExplainResponse);
+  rpc Verify(VerifyRequest) returns (stream VerifyEvent);
+}

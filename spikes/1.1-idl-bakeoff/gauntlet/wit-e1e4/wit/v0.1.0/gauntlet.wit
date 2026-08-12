@@ -1,0 +1,24 @@
+/// Gauntlet baseline: the interface as it existed when the old plugin was compiled.
+package pact:gauntlet@0.1.0;
+
+interface events {
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+  }
+
+  variant verify-event {
+    started(string),
+    interaction-result(string),
+    finished(string),
+  }
+
+  next-event: func(seq: u32) -> option<verify-event>;
+  last-error: func() -> error-code;
+}
+
+world plugin {
+  export events;
+}

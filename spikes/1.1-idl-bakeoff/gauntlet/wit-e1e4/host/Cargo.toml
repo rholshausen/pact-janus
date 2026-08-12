@@ -1,0 +1,13 @@
+# Standalone spike crate — deliberately NOT a member of the root workspace (spikes/README.md).
+# Three host binaries, identical except for which interface version their bindings target.
+[workspace]
+
+[package]
+name = "gauntlet-host"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+wasmtime = "35"

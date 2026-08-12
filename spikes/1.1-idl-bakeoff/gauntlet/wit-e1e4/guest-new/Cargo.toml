@@ -1,0 +1,20 @@
+# Standalone spike crate — deliberately NOT a member of the root workspace (spikes/README.md).
+[workspace]
+
+[package]
+name = "guest-new"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+wit-bindgen-rt = { version = "0.44.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "pact:gauntlet"
+
+[package.metadata.component.target]
+path = "../wit/v0.1.0-grown"

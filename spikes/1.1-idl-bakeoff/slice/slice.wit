@@ -1,0 +1,66 @@
+/// Protocol slice for the IDL bake-off (spike 1.1).
+///
+/// Deliberately models the evolution-sensitive constructs the gauntlet mutates:
+/// an enum (E1), a record (E2), an operation set (E3), an event variant (E4).
+/// Interaction specs and results are opaque documents (JSON, UTF-8) — the protocol is
+/// coarse-grained and document-oriented; typed structure appears only where the engine
+/// and its callers must agree on control flow.
+package pact:engine-slice@0.1.0;
+
+interface types {
+  /// A JSON document, UTF-8 encoded.
+  type document = list<u8>;
+
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+    // E1 adds: component-unavailable
+  }
+
+  record engine-error {
+    code: error-code,
+    message: string,
+    /// Structured detail (e.g. path into the offending spec), when available.
+    details: option<document>,
+    // E2 adds: retryable: option<bool>
+  }
+}
+
+interface consumer-session {
+  use types.{document, engine-error};
+
+  resource session {
+    /// config: session configuration document
+    constructor(config: document);
+    /// spec: interaction specification document; returns an interaction handle
+    add-interaction: func(spec: document) -> result<u32, engine-error>;
+    /// Returns per-interaction results and the pact file, as a document.
+    finalise: func() -> result<document, engine-error>;
+  }
+  // E3 adds: explain: func(spec: document) -> result<string, engine-error>
+}
+
+interface verification {
+  use types.{document, engine-error};
+
+  variant verify-event {
+    started(document),
+    interaction-result(document),
+    finished(document),
+    // E4 adds: hook-invoked(document)
+  }
+
+  resource verify-run {
+    constructor(request: document);
+    /// Pull-based event stream: none = run complete. (WASI P3 native streams noted
+    /// separately; pull keeps the slice on stable P2.)
+    next-event: func() -> option<verify-event>;
+  }
+}
+
+world engine-slice {
+  export consumer-session;
+  export verification;
+}
