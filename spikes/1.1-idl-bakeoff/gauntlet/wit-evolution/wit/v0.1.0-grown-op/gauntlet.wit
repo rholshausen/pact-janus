@@ -1,0 +1,26 @@
+/// E3 without a version bump: a new operation (explain) added in place. Types unchanged.
+/// Old plugins do not export explain; the question is whether that strands them.
+package pact:gauntlet@0.1.0;
+
+interface events {
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+  }
+
+  variant verify-event {
+    started(string),
+    interaction-result(string),
+    finished(string),
+  }
+
+  next-event: func(seq: u32) -> option<verify-event>;
+  last-error: func() -> error-code;
+  explain: func(spec: string) -> string;    // E3
+}
+
+world plugin {
+  export events;
+}

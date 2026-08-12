@@ -1,0 +1,29 @@
+/// E3 via version bump + feature gate: explain is @since(0.2.0). Unlike gates on
+/// enum/variant cases (rejected by the parser), item-level gates are legal WIT.
+/// The runtime question: does the gate help a 0.2.0 host load a 0.1.0 artifact?
+package pact:gauntlet@0.2.0;
+
+interface events {
+  enum error-code {
+    invalid-spec,
+    unsupported-spec-version,
+    session-not-found,
+    internal,
+  }
+
+  variant verify-event {
+    started(string),
+    interaction-result(string),
+    finished(string),
+  }
+
+  next-event: func(seq: u32) -> option<verify-event>;
+  last-error: func() -> error-code;
+
+  @since(version = 0.2.0)
+  explain: func(spec: string) -> string;    // E3, gated
+}
+
+world plugin {
+  export events;
+}

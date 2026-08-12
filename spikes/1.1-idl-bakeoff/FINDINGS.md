@@ -1,8 +1,8 @@
 # Spike 1.1 findings — Protocol IDL bake-off
 
-Status: **in progress** — survey done; WIT E1/E4 gauntlet run (results §3); still to do: WIT E3
-gated-operation runtime test, protobuf gauntlet leg, document-schema leg, bindings round for the
-finalists. Method and change catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
+Status: **in progress** — survey done; WIT E1/E4 and E3 gauntlet legs run (results §3); still to
+do: protobuf gauntlet leg, document-schema leg, bindings round for the finalists. Method and change
+catalog: [README.md](README.md), [evolution-gauntlet.md](evolution-gauntlet.md).
 
 ## 1. Framing: two surfaces, one hard requirement
 
@@ -105,7 +105,7 @@ session start (LSP's model, which evolved 3.x for a decade without breaking clie
 
 ### WIT — E1+E4 (variant/enum growth), wasmtime 35 / cargo-component 0.21
 
-Setup (`gauntlet/wit-e1e4/`): guest components compiled against `pact:gauntlet@0.1.0` (3-case
+Setup (`gauntlet/wit-evolution/`): guest components compiled against `pact:gauntlet@0.1.0` (3-case
 variant, 4-case enum) and against the grown view; hosts with bindings for the baseline, the
 in-place-grown view (same package version — "nobody bumped"), and a `@since`-gated 0.2.0 view.
 
@@ -133,6 +133,43 @@ Findings, WIT leg (wasm-tools 1.239 / wasmtime 35 / cargo-component 0.21):
    truly closed sets and moves everything open into documents or strings — which is precisely the
    document-first hybrid.
 
+### WIT — E3 (operation growth), same setup
+
+`explain: func(spec: string) -> string` added to the interface; the old guest predates it. Hosts:
+generated bindings against the in-place-grown view (`host-grown-op`), generated bindings against a
+`@since(0.2.0)`-gated view (`host-gated-op`), and a hand-rolled feature-detecting host using the
+untyped `Val` API (`host-probe`) that treats `explain` as an optional capability.
+
+| Leg | Host | Guest artifact | Result |
+|---|---|---|---|
+| **D-a, generated bindings** | grown-op view (@0.1.0) | old | **BREAK** — `instance export 'pact:gauntlet/events@0.1.0' does not have export 'explain'` at instantiation |
+| control | grown-op view | new (exports explain) | OK |
+| D-a, gated | gated view (@0.2.0) | old | **BREAK** — `no exported instance named 'pact:gauntlet/events@0.2.0'`; resolution fails on the versioned interface name before the gate is ever consulted |
+| **D-a, feature-detect** | probe (untyped API) | old | **NEGOTIATED** — baseline ops work; `explain` absence detected and degraded gracefully |
+| feature-detect control | probe | new | OK — probe finds and calls `explain` |
+| D-b | baseline bindings (@0.1.0) | new | **PASS** — extra export ignored |
+
+Findings, E3 leg:
+
+4. **Operation growth is survivable in WIT — but only by abandoning generated bindings.** The type
+   system is not the obstacle here (no types changed); *bindings discipline* is. wasmtime's
+   `bindgen!` resolves every export eagerly at instantiation, so an old plugin missing the new op
+   fails outright. The untyped-API probe host implements "new ops are optional capabilities"
+   cleanly — which is capability negotiation built by hand at the export-name level. If WIT is kept
+   for plugin interfaces, hosts must either probe like this or put every new operation in a new,
+   optionally-resolved interface.
+5. **Item-level gates are authoring-time, not runtime.** The gate never participates at runtime:
+   interface resolution matches versioned export names first (`events@0.1.0` ≠ `events@0.2.0`, and
+   0.x minors are not semver-compatible), and an old artifact's exports were fixed when it was
+   compiled. `@since` is a mechanism for publishing one WIT document that can be *viewed* at
+   several versions — useful for spec authoring (WASI uses it for that), useless for keeping an old
+   binary loadable.
+6. Combined with E1/E4: the export/expectation asymmetry means plugins may safely *offer* more than
+   the engine knows (D-b passes), but every engine-side expectation growth needs explicit optionality
+   handling — and for sum types there is no such handling at all. An engine that hosts long-lived
+   third-party WIT plugins therefore ends up hand-building the negotiation machinery the
+   document-first hybrid has by construction, while still being unable to grow its variants.
+
 ### protobuf — E1–E5 over serialized frames
 
 *pending — next after the WIT leg; prost-based encode/decode across schema versions, no gRPC.*
@@ -144,6 +181,7 @@ protocol** over frozen per-embedding pipes for both surfaces, with **typed struc
 cannot break** (closed control-flow shapes like `result`; never open vocabularies), and a governance
 tool (schema diff in CI) doing the job that closed type systems fail at and open ones silently skip.
 WIT remains the plumbing of the WASM embedding either way, but E1/E4 BREAK plus gates-can't-gate-cases
-rules it out as the schema for anything that grows. protobuf remains the strongest *typed* fallback
+rules it out as the schema for anything that grows, and E3 shows even operation growth forces hosts
+into hand-built feature-detection — negotiation machinery the document model has by construction. protobuf remains the strongest *typed* fallback
 if document-schema tooling disappoints in the bindings round. The protobuf and document legs must
 still run before this hardens into the G1 ADR.
