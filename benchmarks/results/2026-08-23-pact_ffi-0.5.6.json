@@ -1,0 +1,53 @@
+{
+  "arch": "x86_64",
+  "date": "2026-08-23",
+  "os": "linux",
+  "scenarios": {
+    "mock-server-latency-100k": {
+      "iterations": 500,
+      "median_us": 11038.2,
+      "min_us": 10565.0,
+      "p95_us": 11624.3
+    },
+    "mock-server-latency-mismatch": {
+      "iterations": 500,
+      "median_us": 139.4,
+      "min_us": 128.9,
+      "p95_us": 273.6
+    },
+    "mock-server-latency-small": {
+      "iterations": 5000,
+      "median_us": 133.6,
+      "min_us": 120.7,
+      "p95_us": 157.3
+    },
+    "mock-server-startup-cycle": {
+      "iterations": 20,
+      "median_us": 76.5,
+      "min_us": 70.5,
+      "p95_us": 99.9
+    },
+    "mock-server-throughput-4threads": {
+      "requests": 16510,
+      "rps": 8255.0,
+      "seconds": 2,
+      "threads": 4
+    },
+    "verify-corpus-100k": {
+      "interactions": 5,
+      "median_ms_per_interaction": 54.88,
+      "median_total_ms": 274.4,
+      "pacts": 1,
+      "runs": 3
+    },
+    "verify-corpus-small": {
+      "interactions": 50,
+      "median_ms_per_interaction": 6.48,
+      "median_total_ms": 324.2,
+      "pacts": 10,
+      "runs": 5
+    }
+  },
+  "schema": 1,
+  "stack": "pact_ffi-0.5.6"
+}

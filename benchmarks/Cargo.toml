@@ -1,0 +1,13 @@
+[package]
+name = "pact-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Benchmark baseline harness (plan task 1.7): measures today's pact_ffi stack; Janus results slot into the same scenario schema from Phase 4 on."
+
+[dependencies]
+# Pinned exactly: this version IS the baseline being measured.
+pact_ffi = "=0.5.6"
+serde_json = "1"
+
+[profile.release]
+debug = false

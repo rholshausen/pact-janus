@@ -4,8 +4,10 @@ members = [
   "engine/kernel",
   "cli",
 ]
-# Spikes are standalone projects, never workspace members.
-exclude = ["spikes"]
+# Spikes are standalone projects, never workspace members. The benchmark
+# harness is durable but standalone too — it drags the whole pact_ffi
+# dependency tree, which the main workspace should not pay for.
+exclude = ["spikes", "benchmarks"]
 
 [workspace.package]
 version = "0.0.0"

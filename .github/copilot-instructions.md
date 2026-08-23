@@ -21,6 +21,8 @@ sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration)
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
 spikes/          Time-boxed experiments — disposable code, durable findings
+benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
+                 (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
 Documentation/   Plan, ADRs, specs
 ```
 
