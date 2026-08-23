@@ -1,0 +1,13 @@
+package pact:toy-engine@0.1.0;
+
+/// The frozen byte-pipe (1.1 draft G1 recommendation #2): this interface never
+/// grows. All evolution happens inside the JSON frames it carries, governed by
+/// the protocol's versioned document schemas.
+interface pipe {
+  /// One request frame in, one response frame out.
+  call: func(request: list<u8>) -> list<u8>;
+}
+
+world engine {
+  export pipe;
+}

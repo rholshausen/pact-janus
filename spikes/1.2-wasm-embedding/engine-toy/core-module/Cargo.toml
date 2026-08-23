@@ -1,0 +1,10 @@
+[package]
+name = "toy-engine-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+toy-logic = { path = "../logic" }
+
+[lib]
+crate-type = ["cdylib"]
