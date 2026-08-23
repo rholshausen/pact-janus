@@ -1,0 +1,14 @@
+package pact:plugin@0.1.0;
+
+/// The frozen byte-pipe, plugin-facing (1.1 draft G1 recommendation #2): this
+/// interface never grows. Everything — capability discovery, action
+/// invocation, errors — travels as JSON frames governed by the protocol's
+/// versioned document schemas.
+interface pipe {
+  /// One request frame in, one response frame out.
+  call: func(request: list<u8>) -> list<u8>;
+}
+
+world plugin {
+  export pipe;
+}
