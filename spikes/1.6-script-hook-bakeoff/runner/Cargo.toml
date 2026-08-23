@@ -1,0 +1,24 @@
+[package]
+name = "hook-runner"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["rhai-engine", "boa", "lua", "quickjs"]
+rhai-engine = ["dep:rhai"]
+boa = ["dep:boa_engine"]
+lua = ["dep:mlua"]
+quickjs = ["dep:rquickjs"]
+v8-engine = ["dep:v8"]
+
+[dependencies]
+serde_json = "1"
+rhai = { version = "1", features = ["serde"], optional = true }
+boa_engine = { version = "0.20", optional = true }
+mlua = { version = "0.10", features = ["lua54", "vendored", "serialize"], optional = true }
+rquickjs = { version = "0.9", features = ["bindgen"], optional = true }
+v8 = { version = "130", optional = true }
+
+[profile.release]
+lto = true
+strip = true
