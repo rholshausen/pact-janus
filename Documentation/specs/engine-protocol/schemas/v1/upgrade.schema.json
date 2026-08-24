@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/upgrade",
+  "title": "UpgradeOps",
+  "description": "Request/result bodies for the upgrade/* operations (spec.md §8.4). Session-less: pure document-in, document-out.",
+  "$defs": {
+    "Pact": {
+      "title": "Pact",
+      "type": "object",
+      "required": ["pact"],
+      "properties": {
+        "pact": {
+          "type": "object",
+          "description": "A v1-v4 pact document to convert to v5 (rules in design 2.5)."
+        },
+        "options": { "type": "object" }
+      }
+    },
+    "PactResult": {
+      "title": "PactResult",
+      "type": "object",
+      "required": ["pact", "findings"],
+      "properties": {
+        "pact": {
+          "type": "object",
+          "description": "The converted v5 pact document."
+        },
+        "findings": {
+          "type": "array",
+          "description": "Lossy or judgement-call conversion spots, for 'pact upgrade' to show its work.",
+          "items": {
+            "title": "UpgradeFinding",
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "x-known-values": ["lossy-matching-rule", "example-became-variant", "unsupported-feature"]
+              },
+              "path": {
+                "type": "string",
+                "description": "JSON-path location in the source pact."
+              },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

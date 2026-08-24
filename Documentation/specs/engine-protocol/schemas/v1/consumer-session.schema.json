@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/consumer-session",
+  "title": "ConsumerSessionOps",
+  "description": "Request/result bodies for the consumer-session/* operations (spec.md §8.2). Interaction specifications, variant descriptors, endpoint descriptors and pact documents are governed by their own designs (spec.md §8.1) and are open objects here.",
+  "$defs": {
+    "Create": {
+      "title": "Create",
+      "type": "object",
+      "required": ["config"],
+      "properties": {
+        "config": {
+          "title": "SessionConfig",
+          "type": "object",
+          "required": ["consumer", "provider"],
+          "properties": {
+            "consumer": { "$ref": "#/$defs/PactParty" },
+            "provider": { "$ref": "#/$defs/PactParty" }
+          }
+        }
+      }
+    },
+    "CreateResult": {
+      "title": "CreateResult",
+      "type": "object",
+      "required": ["session"],
+      "properties": {
+        "session": { "type": "string", "minLength": 1 }
+      }
+    },
+    "AddInteraction": {
+      "title": "AddInteraction",
+      "type": "object",
+      "required": ["session", "interaction"],
+      "properties": {
+        "session": { "type": "string" },
+        "interaction": {
+          "type": "object",
+          "description": "One complete interaction specification (designs 2.2/3.2)."
+        }
+      }
+    },
+    "AddInteractionResult": {
+      "title": "AddInteractionResult",
+      "type": "object",
+      "required": ["handle"],
+      "properties": {
+        "handle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifies the interaction within this session; invalid after finalise."
+        }
+      }
+    },
+    "Variants": {
+      "title": "Variants",
+      "type": "object",
+      "required": ["session", "handle"],
+      "properties": {
+        "session": { "type": "string" },
+        "handle": { "type": "string" }
+      }
+    },
+    "VariantsResult": {
+      "title": "VariantsResult",
+      "type": "object",
+      "required": ["variants"],
+      "properties": {
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/VariantDescriptor" }
+        }
+      }
+    },
+    "VariantDescriptor": {
+      "title": "VariantDescriptor",
+      "description": "The protocol requires only 'id'; the rest belongs to design 2.3.",
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "StartTransport": {
+      "title": "StartTransport",
+      "type": "object",
+      "required": ["session", "transport"],
+      "properties": {
+        "session": { "type": "string" },
+        "transport": {
+          "type": "string",
+          "description": "Transport component name.",
+          "x-known-values": ["http"]
+        },
+        "options": {
+          "type": "object",
+          "description": "Transport-specific options (design 2.6)."
+        }
+      }
+    },
+    "StartTransportResult": {
+      "title": "StartTransportResult",
+      "type": "object",
+      "required": ["endpoint"],
+      "properties": {
+        "endpoint": {
+          "type": "object",
+          "description": "Open endpoint descriptor document — host/port for HTTP, broker/topic details for messaging (spike 1.5)."
+        }
+      }
+    },
+    "ServeVariant": {
+      "title": "ServeVariant",
+      "type": "object",
+      "required": ["session", "handle", "variant"],
+      "properties": {
+        "session": { "type": "string" },
+        "handle": { "type": "string" },
+        "variant": { "type": "string" }
+      }
+    },
+    "ServeVariantResult": {
+      "title": "ServeVariantResult",
+      "type": "object"
+    },
+    "Finalise": {
+      "title": "Finalise",
+      "type": "object",
+      "required": ["session"],
+      "properties": {
+        "session": { "type": "string" }
+      }
+    },
+    "FinaliseResult": {
+      "title": "FinaliseResult",
+      "type": "object",
+      "required": ["results"],
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InteractionResult" }
+        },
+        "pact": {
+          "type": "object",
+          "description": "The pact file document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business."
+        }
+      }
+    },
+    "InteractionResult": {
+      "title": "InteractionResult",
+      "type": "object",
+      "required": ["handle", "status"],
+      "properties": {
+        "handle": { "type": "string" },
+        "status": {
+          "type": "string",
+          "x-known-values": ["verified", "failed", "not-exercised"]
+        },
+        "variants": {
+          "type": "array",
+          "description": "Per-variant outcomes.",
+          "items": {
+            "title": "VariantResult",
+            "type": "object",
+            "required": ["variant", "status"],
+            "properties": {
+              "variant": { "type": "string" },
+              "status": {
+                "type": "string",
+                "x-known-values": ["verified", "failed", "not-exercised"]
+              },
+              "mismatches": {
+                "type": "array",
+                "description": "Mismatch documents in the plan grammar's result form (design 2.4).",
+                "items": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "PactParty": {
+      "title": "PactParty",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

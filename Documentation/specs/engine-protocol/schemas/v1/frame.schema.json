@@ -42,7 +42,17 @@
           "description": "Operation name, namespaced '<area>/<verb>'. Open vocabulary; unknown ops are answered with error 'operation-unsupported'.",
           "x-known-values": [
             "engine/hello",
-            "engine/shutdown"
+            "engine/shutdown",
+            "consumer-session/create",
+            "consumer-session/add-interaction",
+            "consumer-session/variants",
+            "consumer-session/start-transport",
+            "consumer-session/serve-variant",
+            "consumer-session/finalise",
+            "verification/verify",
+            "verification/explain",
+            "upgrade/pact",
+            "events/poll"
           ]
         },
         "body": {

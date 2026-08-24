@@ -292,13 +292,158 @@ capability the engine did not declare.
 
 ## 7. Sessions
 
-*Drafted in a later chunk: session model, the only-resource rule, per-session operation
-ordering, session kinds (consumer, verification), passive vs emissive interactions.*
+### 7.1 The only resource
+
+A **session** is the unit of engine-side state a host can hold: everything the engine
+allocates on a host's behalf — interaction handles, compiled plans, running transports,
+captured traffic, event streams — belongs to exactly one session and is released when that
+session ends. Consequences, normative:
+
+- No operation returns a resource that needs its own cleanup call. Handles, endpoints and
+  stream ids are plain identifiers scoped to their session; they become invalid when the
+  session ends, and there is no operation to release one individually.
+- A session ends in exactly one way per kind: a consumer session by
+  `consumer-session/finalise`; a verification session automatically when its run reaches a
+  terminal event (§9). `engine/shutdown` and stdin EOF end all sessions.
+- Session ids are engine-assigned opaque strings, unique within the life of the pipe.
+  Operations targeting a session carry it as the `session` member of `body`. An unknown or
+  already-ended session id is answered with error `session-not-found` — hosts holding stale
+  ids get a named error, never undefined behaviour.
+
+### 7.2 Ordering and concurrency
+
+Operations that target the same session are executed in submission order. Operations on
+different sessions, and session-less operations, MAY be processed concurrently and answered
+out of order (stdio pipelining, §3.2). A host that needs cross-session ordering sequences its
+own requests.
+
+### 7.3 Session kinds
+
+v1 defines two kinds:
+
+- **Consumer session** (§8.2): drives mock/stub endpoints and message emission during a
+  consumer test run, accumulates per-interaction verification status, and produces the pact
+  file document at finalisation.
+- **Verification session** (§8.3): one provider-verification run. Created by
+  `verification/verify`, reports progress as events, ends itself at the terminal event.
+
+New session kinds arrive as new operations plus capabilities, not as changes to existing
+ones.
+
+### 7.4 Passive and emissive interactions
+
+From spike 1.5: mocking is the inbound loop, driving is the outbound call, and the difference
+between an HTTP interaction and a message interaction is *direction, not kind*. Each
+interaction in a consumer session is, per its transport binding (design 2.2/2.5), either
+
+- **passive** — the engine arms the interaction and *waits for the application under test*
+  to initiate (HTTP request to a mock endpoint, sync message consumed from a topic the
+  engine serves); or
+- **emissive** — the engine *delivers on command*: `consumer-session/serve-variant` causes
+  the interaction's message to be produced now (message-consumer tests).
+
+The operation surface is identical in both modes; only the semantics of `serve-variant`
+differ (§8.2). The passive/emissive tag lives in the interaction specification's transport
+binding, not in the protocol envelope.
 
 ## 8. Operation set
 
-*Drafted in a later chunk: `consumer-session/*`, `verification/*`, `explain`, `upgrade/*`,
-`events/poll`; per-operation request/result schemas.*
+Operation names are namespaced `<area>/<verb>`, kebab-case. v1 defines the areas `engine`
+(§5–6), `consumer-session`, `verification`, `upgrade` and `events` (§9). The vocabulary is
+open: new operations may be added within a protocol version, gated by capability when a host
+must know in advance (§5.3); unknown operations are answered with `operation-unsupported`.
+
+Request and result body schemas: one schema file per area under
+[`schemas/v1/`](schemas/v1/), with per-operation `$defs` named `<Verb>` / `<Verb>Result`.
+
+### 8.1 Documents the protocol carries but does not define
+
+Several operation bodies embed documents whose shape is owned by other Phase 2 designs. The
+protocol treats them as objects governed elsewhere, and this spec MUST NOT constrain their
+interiors:
+
+| Document | Owner |
+|---|---|
+| interaction specification (with shapes) | designs 2.2 (shape language), and 3.2 (document model) |
+| variant descriptor | design 2.3 (variant semantics); protocol requires only `id` |
+| matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
+| pact file (v1–v4 read, v5 read/write) | design 2.5 |
+| endpoint descriptor, transport options | design 2.6 (component interfaces); open documents per spike 1.5 |
+
+### 8.2 Consumer sessions — `consumer-session/*`
+
+Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.schema.json).
+
+| Operation | Body → Result |
+|---|---|
+| `consumer-session/create` | `{ config }` → `{ session }` |
+| `consumer-session/add-interaction` | `{ session, interaction }` → `{ handle }` |
+| `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
+| `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
+| `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
+| `consumer-session/finalise` | `{ session }` → `{ results, pact? }` |
+
+- **`create`**: `config` names the consumer and provider (`{ "consumer": { "name": … },
+  "provider": { "name": … } }`) plus open, additive options. Returns the session id.
+- **`add-interaction`**: submits one complete interaction specification. The engine
+  validates it and compiles what it needs; a rejected spec is a structured error
+  (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
+  enough for an SDK user are a stated goal (plan 3.2). The returned `handle` identifies the
+  interaction within this session.
+- **`variants`**: the interaction's computed variant space (design 2.3), for variant-driven
+  test loops. Each variant descriptor carries at least `id`; everything else is 2.3's.
+- **`start-transport`**: starts a transport component instance for this session (`transport`
+  is an open vocabulary: `"http"`, …). The result `endpoint` is an **open descriptor
+  document** — host/port for HTTP, broker/topic details for messaging — never assumed to be
+  a URL (spike 1.5, finding 1). A session MAY start several transports.
+- **`serve-variant`**: for a **passive** interaction, arms the given variant: the next
+  matching inbound traffic on the session's transports is matched against it. For an
+  **emissive** interaction, delivers now: the engine produces the message for that variant
+  through the bound transport (or the hook path, design 2.7). Multiple interactions may be
+  armed concurrently; re-arming a handle with a different variant replaces the previous
+  arming.
+- **`finalise`**: ends the session unconditionally (transports stopped, all state
+  released — even if the result is all failures) and returns per-interaction, per-variant
+  results. The `pact` member — the pact file *document*; persistence is the host's business —
+  is present iff every interaction verified successfully on its required variants.
+  Unmatched-request and missed-interaction detail rides in `results`.
+
+### 8.3 Verification — `verification/*`
+
+Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.json).
+
+| Operation | Body → Result |
+|---|---|
+| `verification/verify` | `{ source, target, options? }` → `{ session, stream }` |
+| `verification/explain` | `{ interaction, options? }` → `{ text, plan? }` |
+
+- **`verify`** starts a verification session and returns immediately with its session id and
+  the id of the event stream on which the run reports (§9). Progress, hook activity,
+  per-interaction/per-variant results and the final summary are all events; the stream's
+  terminal event carries the summary document and ends the session. `source` is an open
+  descriptor of where the pacts come from — v1 defines kind `"inline"` (the pact documents
+  are in the request); fetching from files, URLs or a broker is host/CLI business in the
+  prototype, which also keeps I/O out of the WASM kernel. `target` describes the provider
+  under test: transport bindings (open descriptors again) plus open options such as state-
+  change configuration (design 2.7 owns hook config).
+- **`explain`** compiles one interaction (from a spec or a pact interaction — the body says
+  which) and returns the plan's pretty text form, optionally the structured plan document
+  (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain
+  of an *executed* plan is served by the event stream (§9), not by this operation.
+
+### 8.4 Upgrade — `upgrade/*`
+
+Schema: [`schemas/v1/upgrade.schema.json`](schemas/v1/upgrade.schema.json).
+
+| Operation | Body → Result |
+|---|---|
+| `upgrade/pact` | `{ pact, options? }` → `{ pact, findings }` |
+
+Converts a v1–v4 pact document to v5 per design 2.5's rules (matching rules become shapes;
+the single example becomes the sole variant). `findings` lists lossy or judgement-call spots
+(each with a code from an open vocabulary, a JSON-path location and prose) so the CLI's
+`upgrade` command can show its work. Session-less: conversion is pure document-in,
+document-out.
 
 ## 9. Events and streams
 

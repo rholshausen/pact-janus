@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/verification",
+  "title": "VerificationOps",
+  "description": "Request/result bodies for the verification/* operations (spec.md §8.3).",
+  "$defs": {
+    "Verify": {
+      "title": "Verify",
+      "type": "object",
+      "required": ["source", "target"],
+      "properties": {
+        "source": { "$ref": "#/$defs/PactSource" },
+        "target": { "$ref": "#/$defs/VerificationTarget" },
+        "options": {
+          "type": "object",
+          "description": "Open, additive verification options (filtering, publishing intent, etc.)."
+        }
+      }
+    },
+    "VerifyResult": {
+      "title": "VerifyResult",
+      "description": "The run has started; everything else arrives as events on 'stream' (spec.md §9). The terminal event carries the summary and ends the session.",
+      "type": "object",
+      "required": ["session", "stream"],
+      "properties": {
+        "session": { "type": "string", "minLength": 1 },
+        "stream": { "type": "string", "minLength": 1 }
+      }
+    },
+    "PactSource": {
+      "title": "PactSource",
+      "description": "Where the pacts come from. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-known-values": ["inline"]
+        },
+        "pacts": {
+          "type": "array",
+          "description": "For kind 'inline': the pact documents (any supported spec version).",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "VerificationTarget": {
+      "title": "VerificationTarget",
+      "description": "The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).",
+      "type": "object",
+      "required": ["transports"],
+      "properties": {
+        "transports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "title": "TransportBinding",
+            "type": "object",
+            "required": ["transport"],
+            "properties": {
+              "transport": {
+                "type": "string",
+                "x-known-values": ["http"]
+              },
+              "options": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "Explain": {
+      "title": "Explain",
+      "type": "object",
+      "required": ["interaction"],
+      "properties": {
+        "interaction": {
+          "title": "ExplainSubject",
+          "description": "What to compile: an interaction specification or one interaction from a pact document.",
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "x-known-values": ["spec", "pact-interaction"]
+            },
+            "spec": {
+              "type": "object",
+              "description": "For kind 'spec': the interaction specification."
+            },
+            "pact": {
+              "type": "object",
+              "description": "For kind 'pact-interaction': the pact document."
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "For kind 'pact-interaction': which interaction."
+            }
+          }
+        },
+        "options": { "type": "object" }
+      }
+    },
+    "ExplainResult": {
+      "title": "ExplainResult",
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The plan's pretty text form (design 2.4)."
+        },
+        "plan": {
+          "type": "object",
+          "description": "The structured plan document, when requested via options."
+        }
+      }
+    }
+  }
+}
