@@ -1,6 +1,6 @@
 # 0004 — Fork the pact-reference v2 matching engine as the kernel starting point
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-23
 - **Plan tasks**: 0.4, 1.8 (G1)
 - **Evidence**: [reuse inventory](../reuse-inventory.md) (task 0.4 — this ADR ratifies its

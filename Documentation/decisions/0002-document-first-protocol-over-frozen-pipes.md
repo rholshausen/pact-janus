@@ -1,6 +1,6 @@
 # 0002 — Define the protocol as schema-governed JSON documents over frozen byte-pipes
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-23
 - **Plan tasks**: 1.1, 1.8 (G1); evidence also from 1.2, 1.3, 1.4, 1.7
 - **Evidence**: [spike 1.1 findings](../../spikes/1.1-idl-bakeoff/FINDINGS.md) (gauntlet + bindings
