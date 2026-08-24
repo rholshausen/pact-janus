@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/frame",
+  "$id": "https://pact.io/janus/protocol/v1/frame.schema.json",
   "title": "Frame",
   "description": "One protocol frame: a single JSON object discriminated by 'type' (open discriminator; v1 defines request, response, event). See spec.md §4.",
   "type": "object",

@@ -16,6 +16,10 @@ serde_json = "1"
 
 [dev-dependencies]
 pretty_assertions = "1"
+# Validates the spec's worked-example frames against the schemas. No default
+# features: remote $ref resolution (and its reqwest tree) must stay off —
+# spec §2.2 rule 6.
+jsonschema = { version = "0.51", default-features = false }
 
 [lints]
 workspace = true

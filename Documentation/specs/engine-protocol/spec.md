@@ -27,11 +27,16 @@ passive/emissive interactions).
 4. [Frames: the protocol envelope](#4-frames-the-protocol-envelope)
 5. [Handshake, version and capability negotiation](#5-handshake-version-and-capability-negotiation)
 6. [Engine lifecycle: shutdown and liveness](#6-engine-lifecycle-shutdown-and-liveness)
-7. [Sessions](#7-sessions) *(drafted in a later chunk)*
-8. [Operation set](#8-operation-set) *(drafted in a later chunk)*
-9. [Events and streams](#9-events-and-streams) *(drafted in a later chunk; ADR 0005)*
-10. [Error taxonomy](#10-error-taxonomy) *(drafted in a later chunk)*
-11. [Compatibility policy](#11-compatibility-policy) *(drafted in a later chunk)*
+7. [Sessions](#7-sessions)
+8. [Operation set](#8-operation-set)
+9. [Events and streams](#9-events-and-streams)
+10. [Error taxonomy](#10-error-taxonomy)
+11. [Compatibility policy](#11-compatibility-policy)
+
+Worked frame-by-frame transcripts — a consumer HTTP session, a verification run with its
+event stream, and the failure paths — live under [`examples/`](examples/); every frame in
+them is validated against the schemas by `cargo test -p pact_janus_schema_compat`, so the
+examples are executable and cannot drift from the schemas.
 
 ---
 
@@ -425,7 +430,10 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   are in the request); fetching from files, URLs or a broker is host/CLI business in the
   prototype, which also keeps I/O out of the WASM kernel. `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
-  change configuration (design 2.7 owns hook config).
+  change configuration (design 2.7 owns hook config). For message interactions, matching is
+  parts-in wherever the parts come from: a wire-level transport binding and a
+  `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
+  MUST produce identical results for the same parts (spike 1.5, finding 6).
 - **`explain`** compiles one interaction (from a spec or a pact interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain

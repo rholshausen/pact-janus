@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/events",
+  "$id": "https://pact.io/janus/protocol/v1/events.schema.json",
   "title": "EventOps",
   "description": "The Event shape and the events/poll operation bodies (spec.md §9; delivery model per ADR 0005).",
   "$defs": {

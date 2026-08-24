@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/upgrade",
+  "$id": "https://pact.io/janus/protocol/v1/upgrade.schema.json",
   "title": "UpgradeOps",
   "description": "Request/result bodies for the upgrade/* operations (spec.md §8.4). Session-less: pure document-in, document-out.",
   "$defs": {

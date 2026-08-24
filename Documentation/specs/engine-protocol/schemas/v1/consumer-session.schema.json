@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/consumer-session",
+  "$id": "https://pact.io/janus/protocol/v1/consumer-session.schema.json",
   "title": "ConsumerSessionOps",
   "description": "Request/result bodies for the consumer-session/* operations (spec.md §8.2). Interaction specifications, variant descriptors, endpoint descriptors and pact documents are governed by their own designs (spec.md §8.1) and are open objects here.",
   "$defs": {

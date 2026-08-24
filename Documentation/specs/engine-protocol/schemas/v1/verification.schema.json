@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/verification",
+  "$id": "https://pact.io/janus/protocol/v1/verification.schema.json",
   "title": "VerificationOps",
   "description": "Request/result bodies for the verification/* operations (spec.md §8.3).",
   "$defs": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pact.io/janus/protocol/v1/engine-error",
+  "$id": "https://pact.io/janus/protocol/v1/engine-error.schema.json",
   "title": "EngineError",
   "description": "The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.",
   "type": "object",
