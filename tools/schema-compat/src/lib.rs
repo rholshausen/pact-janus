@@ -56,6 +56,10 @@ const FROZEN_KEYWORDS: &[&str] = &[
   "uniqueItems",
   "default",
   "$ref",
+  // §2.4: flipping a member between text and bytes is breaking in both
+  // directions, and no validator catches it — contentEncoding is
+  // annotation-only in draft 2020-12.
+  "contentEncoding",
 ];
 
 fn is_schema_object(v: &Value) -> bool {
@@ -138,6 +142,24 @@ fn lint_node(path: &str, node: &Value, out: &mut Vec<Violation>) {
       out.push(Violation {
         path: path.into(),
         message: "'x-known-values' belongs on a schema with type 'string' (spec §2.2 rule 1)".into(),
+      });
+    }
+  }
+  // §2.4: bytes members are declared exactly one way, so that every reader
+  // decodes them the same way.
+  if let Some(encoding) = obj.get("contentEncoding") {
+    if encoding.as_str() != Some("base64") {
+      out.push(Violation {
+        path: path.into(),
+        message: format!(
+          "contentEncoding {encoding} is not the specified bytes projection 'base64' (spec §2.4)"
+        ),
+      });
+    }
+    if obj.get("type").and_then(Value::as_str) != Some("string") {
+      out.push(Violation {
+        path: path.into(),
+        message: "a bytes member is a 'string' carrying base64 (spec §2.4)".into(),
       });
     }
   }
@@ -369,6 +391,45 @@ mod tests {
     });
     let out = messages(&lint_document(&doc));
     assert!(out.iter().any(|m| m.contains("type 'string'")), "{out:?}");
+  }
+
+  #[test]
+  fn lint_accepts_a_well_formed_bytes_member() {
+    let doc = json!({
+        "$id": "x", "title": "Example",
+        "properties": { "payload": { "type": "string", "contentEncoding": "base64" } }
+    });
+    assert_eq!(lint_document(&doc), vec![]);
+  }
+
+  #[test]
+  fn lint_rejects_other_encodings_and_non_string_bytes() {
+    let doc = json!({
+        "$id": "x", "title": "Example",
+        "properties": {
+            "a": { "type": "string", "contentEncoding": "base64url" },
+            "b": { "type": "array", "contentEncoding": "base64" }
+        }
+    });
+    let out = messages(&lint_document(&doc));
+    assert!(out.iter().any(|m| m.contains("base64url")), "{out:?}");
+    assert!(
+      out.iter().any(|m| m.contains("'string' carrying base64")),
+      "{out:?}"
+    );
+  }
+
+  #[test]
+  fn diff_rejects_the_text_bytes_flip() {
+    let base = json!({ "properties": { "body": { "type": "string" } } });
+    let head = json!({
+        "properties": { "body": { "type": "string", "contentEncoding": "base64" } }
+    });
+    let out = messages(&diff_documents(&base, &head));
+    assert!(out.iter().any(|m| m.contains("/body/contentEncoding")), "{out:?}");
+    // …and back the other way.
+    let out = messages(&diff_documents(&head, &base));
+    assert!(out.iter().any(|m| m.contains("/body/contentEncoding")), "{out:?}");
   }
 
   #[test]

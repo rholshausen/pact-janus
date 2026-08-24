@@ -23,6 +23,28 @@ decision made with the unknown's identity in hand.
              "details": { "supported": [1] } } }
 ```
 
+## Capability negotiation that cannot fail
+
+`→` a host that would prefer a binary encoding this engine has never heard of, and lists the
+baseline behind it (spec §3.4). The hello exchange itself is always JSON, whatever it asks for:
+
+```json
+{ "type": "request", "id": "r-1a", "op": "engine/hello",
+  "body": { "protocol-versions": [1], "host": { "name": "pact-js", "version": "2.0.0" },
+            "capabilities": { "encoding": { "accepts": ["cbor", "json"] },
+                              "push-events": { } } } }
+```
+
+`←` the unknown encoding name is simply not selected — JSON is mandatory for both parties, so
+there is no failure mode and no error code. `push-events` *is* known, so it is echoed and
+becomes effective (§9.4); an engine declaring neither would still be conformant:
+
+```json
+{ "type": "response", "id": "r-1a",
+  "ok": { "protocol-version": 1, "engine": { "name": "pact-engine", "version": "0.1.0" },
+          "capabilities": { "encoding": { "selected": "json" }, "push-events": { } } } }
+```
+
 ## Unknown operation
 
 `→` an operation this engine has never heard of (perhaps added in a later engine release):

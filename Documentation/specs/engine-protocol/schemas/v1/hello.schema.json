@@ -28,9 +28,31 @@
     },
     "Capabilities": {
       "title": "Capabilities",
-      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events.",
+      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding.",
       "type": "object",
+      "properties": {
+        "encoding": { "$ref": "#/$defs/EncodingCapability" }
+      },
       "additionalProperties": { "type": "object" }
+    },
+    "EncodingCapability": {
+      "title": "EncodingCapability",
+      "description": "Frame encoding negotiation (spec.md §3.4). The host sends 'accepts' in preference order; the engine answers with 'selected'. Absent on either side means json. The hello exchange itself is always JSON, and JSON is mandatory for both parties, so negotiation cannot fail.",
+      "type": "object",
+      "properties": {
+        "accepts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EncodingName" },
+          "description": "Encodings the host accepts, most preferred first."
+        },
+        "selected": { "$ref": "#/$defs/EncodingName" }
+      }
+    },
+    "EncodingName": {
+      "title": "EncodingName",
+      "description": "How a frame is written on the wire, as distinct from the document it encodes. Open vocabulary; v1 defines only 'json' (UTF-8, the mandatory baseline). A new encoding is an additive change (spec.md §11.2) and never bumps the protocol version.",
+      "type": "string",
+      "x-known-values": ["json"]
     },
     "HelloResult": {
       "title": "HelloResult",

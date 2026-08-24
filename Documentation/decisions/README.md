@@ -22,6 +22,7 @@ superseding ADR instead.
 | [0003](0003-embedding-priority-per-language.md) | Ship dual engine artifacts; set embedding priority per SDK language | accepted |
 | [0004](0004-fork-v2-engine-as-kernel.md) | Fork the pact-reference v2 matching engine as the kernel starting point | accepted |
 | [0005](0005-poll-based-event-delivery.md) | Poll-based event delivery on all pipes; push as a negotiated stdio capability | proposed |
+| [0006](0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md) | Model bytes explicitly; make frame encoding a negotiated axis with JSON as the baseline | proposed |
 
 ## Decision backlog
 
@@ -37,3 +38,5 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3)
 - OCI component distribution model (design 2.6, minimal build 8.2)
 - SDK conformance: what the suite must cover for an SDK to be called conformant (design 2.9, build 6.4)
+- Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
+  ADR 0006, waiting on benchmark evidence (task 1.7)

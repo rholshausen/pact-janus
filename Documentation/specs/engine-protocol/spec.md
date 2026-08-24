@@ -11,7 +11,9 @@ schema-governed JSON documents ("frames") carried over frozen, never-growing byt
 pipe per embedding ([ADR 0003](../../decisions/0003-embedding-priority-per-language.md)). The
 JSON Schemas under [`schemas/v1/`](schemas/v1/) are the **specified surface** — this prose
 defines their semantics; the schemas define their shapes. When prose and schema disagree, that
-is a bug in this specification; file it rather than inferring precedence.
+is a bug in this specification; file it rather than inferring precedence. The schemas govern
+each frame as a *document* (§2.4); UTF-8 JSON is how a frame is written unless the two parties
+negotiated otherwise (§3.4), and v1 defines no other encoding.
 
 Evidence and obligations feeding this design come from spikes
 [1.1](../../../spikes/1.1-idl-bakeoff/FINDINGS.md) (evolution gauntlet, bindings round),
@@ -116,6 +118,51 @@ exception, normative for the engine itself: the **Rust envelope types are projec
 carry an explicit extra-fields map (`#[serde(flatten)]`), because generated Rust types drop
 unknown members and would make the engine a lossy intermediary (spike 1.1, finding 14).
 
+### 2.4 The document model: JSON values plus bytes
+
+Frames are *documents*, and a document is a value in this model: `null`, boolean, number,
+string, array, object — the JSON types — plus one logical type the JSON **syntax** cannot
+carry, **bytes**: an arbitrary, possibly non-textual octet sequence.
+
+Bytes are not a convenience. A JSON string is a sequence of Unicode code points, so an
+arbitrary octet sequence has no representation as one, and contract testing is exactly the
+domain that must carry such sequences intact: protobuf and other binary content types,
+compressed or encrypted bodies, binary media, and — the case that decides it — payloads that
+are *deliberately* malformed, because a contract test asserts on what the provider actually
+sent, never on a repaired transcription of it. A protocol that can only carry well-formed
+text cannot express the failures it exists to detect.
+
+**The JSON projection.** A member carrying bytes is declared in the schema as
+
+```json
+{ "type": "string", "contentEncoding": "base64" }
+```
+
+and its JSON encoding is the octet sequence in base64 (RFC 4648 §4: standard alphabet, with
+padding). Writers MUST encode; readers MUST decode and MUST NOT interpret the member as text.
+The projection MUST be lossless in both directions — decode(encode(b)) == b for every octet
+sequence b. `contentEncoding` is annotation-only in draft 2020-12, so validators do not
+enforce any of this; the marker's meaning is normative *here*, and the compatibility checker
+enforces its stability (§11.2).
+
+**Text stays text.** A member whose value is genuinely a string remains a plain `string`, even
+when it holds a body. Whether a member is text or bytes is a per-member choice fixed for the
+life of the protocol version: changing it is breaking in both directions (§11.2).
+
+**One rule, protocol-wide.** Most payload bytes in v1 travel inside documents this
+specification deliberately does not define (§8.1) — interaction specifications, pact files,
+event payloads. Those documents MUST use this projection for their byte-valued members, so
+that a single decoding rule holds everywhere and the engine is never translating between
+per-design conventions. Design 2.5 inherits the pact v4 body shape (`content`, `contentType`,
+`contentTypeHint`, `encoded`), whose `encoded: "base64"` is this projection under an older
+name; alignment there is intended, not coincidental.
+
+Nothing above mentions how a frame is written on the wire. The model is the contract; the
+encoding is negotiable (§3.4), and the base64 projection is what the *JSON* encoding does with
+a bytes member — an encoding with a native byte-string type writes it directly, and the
+document is the same document either way. See
+[ADR 0006](../../decisions/0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md).
+
 ## 3. Byte-pipes and framing
 
 One protocol, three pipes (ADR 0002/0003). Each pipe carries the same frames (§4) and is
@@ -132,17 +179,20 @@ call: func(request: list<u8>) -> list<u8>;
 (with the equivalent three-function shim — create, call-with-buffer, free — on the zero-import
 core module and the C ABI; see ADR 0003.) One request frame in, exactly one response frame
 out, strictly serial per instance. Event frames never appear on this pipe; event delivery is
-by polling (§9). The bytes are one UTF-8 JSON document with no framing header.
+by polling (§9). The bytes are exactly one frame, in the pipe's negotiated encoding (§3.4) —
+UTF-8 JSON unless another was negotiated — with no framing header: the buffer length
+delimits the frame.
 
 ### 3.2 Subprocess (stdio)
 
 `pact-engine` speaks LSP-style framing on standard I/O:
 
 - Each frame is preceded by a header section: `Content-Length: <bytes>\r\n`, optionally other
-  headers, then `\r\n`. The body is exactly `Content-Length` bytes of UTF-8 JSON. Receivers
-  MUST ignore unknown headers. The declared length, not the JSON, delimits the stream — a
-  malformed body is reported in-band (§4.4) and the stream stays in sync (spike 1.3,
-  finding 6).
+  headers, then `\r\n`. The body is exactly `Content-Length` bytes in the frame's encoding —
+  `Content-Type: application/json; charset=utf-8` when the header is absent (§3.4). Receivers
+  MUST ignore unknown headers. The declared length, not the frame's own syntax, delimits the
+  stream — a malformed body is reported in-band (§4.4) and the stream stays in sync (spike
+  1.3, finding 6).
 - **stdout carries only protocol frames.** Logs and diagnostics go to stderr. The engine MUST
   ensure nothing else in its process writes to stdout (spike 1.3, finding 8).
 - **The engine treats stdin as its lease on life**: on stdin EOF the engine MUST release all
@@ -158,6 +208,43 @@ by polling (§9). The bytes are one UTF-8 JSON document with no framing header.
 
 The CLI links the kernel directly and calls the same dispatch entry point with the same
 frames. No additional rules; it is pipe 3.1 without the WASM boundary.
+
+### 3.4 Frame encoding
+
+The schemas govern the *document* (§2.4), not the bytes it is written as. How a frame is
+written is a separate, negotiated axis, and v1 defines exactly one value on it.
+
+- **JSON is the mandatory baseline.** Every engine and every host MUST implement UTF-8 JSON.
+  A pipe that negotiated nothing else carries JSON.
+- **The handshake is always JSON.** The `engine/hello` request and its response are UTF-8
+  JSON on every pipe whatever is negotiated, so a party can always start the conversation
+  without knowing anything about its peer.
+- **Negotiation.** The host declares the `encoding` capability (§5.3) listing what it
+  accepts, in preference order; the engine names its choice in `HelloResult`. The engine MUST
+  choose either an encoding the host offered *and* the engine implements, or `json`.
+  Negotiation therefore cannot fail and has no error code: both parties implement the
+  baseline by definition.
+- **Scope.** The selection governs every frame after the hello response, for the life of the
+  pipe. It is not per-frame and is not renegotiable.
+- **Naming the encoding on the wire.** On stdio, the `Content-Type` header names it
+  (`application/json; charset=utf-8` when absent), following the LSP precedent. The call
+  pipes (§3.1, §3.3) have no header, so the negotiated value governs unqualified. A party MAY
+  sniff the first byte to *diagnose* a mismatch — a JSON frame always begins `{` (0x7B) —
+  but MUST NOT use sniffing in place of negotiation.
+- **JSON is always sufficient.** An engine MUST be able to run any complete session in JSON.
+  This is not a courtesy: it is what makes a captured wire trace reproducible in text, keeps
+  the transcripts in [`examples/`](examples/) authoritative rather than illustrative, and
+  guarantees a debuggable path exists when a binary encoding misbehaves. Hosts SHOULD offer a
+  way to force JSON regardless of what they would otherwise negotiate.
+- **Semantics are encoding-independent.** Any observable behaviour that differs between two
+  encodings of the same document is a bug, not a feature of the encoding. An SDK offering
+  more than one MUST pass the conformance suite (design 2.9) in each.
+
+Encoding names are an open vocabulary. v1 defines `json`. Adding a second encoding is
+additive and capability-gated (§11.2) and does **not** bump the protocol version — which is
+why the axis is specified now and no binary encoding is adopted yet. The reasoning, the
+candidates, and the evidence that would settle it are in
+[ADR 0006](../../decisions/0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md).
 
 ## 4. Frames: the protocol envelope
 
@@ -254,7 +341,8 @@ Result (`HelloResult`):
 ```
 
 The engine picks the first version in `protocol-versions` it supports; all subsequent frames
-on the pipe are governed by that version's schemas. If it supports none, it MUST respond with
+on the pipe are governed by that version's schemas — and written in the encoding it selected
+(§3.4), the hello exchange itself always being JSON. If it supports none, it MUST respond with
 error code `protocol-version-unsupported` and list its supported versions in
 `details.supported` (spike 1.3 scenario), then keep the pipe usable so the host can report a
 good error — the host is expected to shut down after such a failure.
@@ -279,6 +367,7 @@ Capabilities defined in v1:
 | Name | Declared by | Meaning |
 |---|---|---|
 | `push-events` | both | On the stdio pipe: sender may deliver events as EventFrames instead of waiting to be polled (§9). Effective only when both sides declare it. |
+| `encoding` | both | Frame encoding negotiation (§3.4). Host: `{ "accepts": [name, …] }` in preference order. Engine: `{ "selected": name }`. Absent on either side means `json`. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -374,6 +463,11 @@ interiors:
 | matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
 | pact file (v1–v4 read, v5 read/write) | design 2.5 |
 | endpoint descriptor, transport options | design 2.6 (component interfaces); open documents per spike 1.5 |
+
+Two rules bind these documents even though their shapes do not belong here: they follow the
+open-world authoring rules (§2.2), since they cross the same boundary and face the same
+version skew; and their byte-valued members use the bytes projection of §2.4, so that
+decoding a payload never depends on which design authored the document around it.
 
 ### 8.2 Consumer sessions — `consumer-session/*`
 
@@ -593,13 +687,20 @@ Allowed (additive, no bump):
 - new *optional* members anywhere, including result documents (old readers ignore and
   preserve them, §2.2 rule 2);
 - new optional members in request bodies, provided the engine's behaviour without them is
-  the previous behaviour (defaults preserve old semantics).
+  the previous behaviour (defaults preserve old semantics);
+- **new frame encodings** (§3.4): an encoding is a way of writing the same document, so it
+  changes no schema and no semantics. It arrives as a name in the `encoding` capability's
+  vocabulary, is used only when both parties chose it, and JSON stays mandatory — a host that
+  never heard of it is unaffected.
 
 Never within a version:
 
 - removing or renaming a member, operation, event kind or error code (deprecate instead:
   mark `deprecated: true` in the schema, keep the semantics);
 - changing a member's type or narrowing its value space;
+- **changing a member between text and bytes** — adding or removing `contentEncoding` (§2.4).
+  It is a type change in any encoding with a native byte-string type, and in JSON it silently
+  reinterprets bytes already on the wire, which is worse than breaking loudly;
 - making an optional request member required, or otherwise changing what an existing
   well-formed frame means;
 - closing anything: introducing `enum`, `additionalProperties: false`, or shrinking
@@ -615,6 +716,7 @@ Never within a version:
 | unknown event `kind` | host | policy with the name in hand; honour `seq`/`last` (§9.2) |
 | unknown error `code` | host | category fallback (§10.2) |
 | unknown capability name | either | ignore (§5.3) |
+| unknown encoding name | engine | do not select it; fall back to JSON (§3.4) — negotiation cannot fail |
 | unknown object member | either | ignore, preserve where practical (§2.2) |
 
 The shared property: **every unknown arrives named** (spike 1.1, finding 10) — degradation
@@ -624,8 +726,10 @@ is a policy decision made with the unknown's identity in hand, never an accident
 
 The rules in §2.2 and §11.2 are enforced by a checker in CI, run on every change to
 `schemas/`: it lints each schema against the authoring rules (open vocabularies, no closing
-keywords, titles, no remote `$ref`) and diffs each schema against its version on the base
-branch, failing the build on any change §11.2 forbids. Governance does the job the type
+keywords, titles, no remote `$ref`, well-formed bytes markers) and diffs each schema against
+its version on the base branch, failing the build on any change §11.2 forbids — including the
+text/bytes flip, which no JSON Schema validator would catch because `contentEncoding` is
+annotation-only. Governance does the job the type
 system no longer does (ADR 0002); a schema change that fails the checker is either a mistake
 or a deliberate new protocol version, and the checker forces that choice to be explicit.
 
