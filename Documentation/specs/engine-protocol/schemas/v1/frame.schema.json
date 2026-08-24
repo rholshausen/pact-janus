@@ -91,8 +91,8 @@
       "properties": {
         "type": { "const": "event" },
         "event": {
-          "type": "object",
-          "description": "An Event object (spec.md §9). Push delivery only; under the poll model events travel inside 'ok' documents."
+          "$ref": "events.schema.json#/$defs/Event",
+          "description": "Push delivery only (negotiated 'push-events' capability); under the poll model the same Event objects travel inside 'ok' documents."
         }
       }
     }

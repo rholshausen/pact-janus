@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/events",
+  "title": "EventOps",
+  "description": "The Event shape and the events/poll operation bodies (spec.md §9; delivery model per ADR 0005).",
+  "$defs": {
+    "Event": {
+      "title": "Event",
+      "type": "object",
+      "required": ["stream", "seq", "kind", "payload"],
+      "properties": {
+        "stream": { "type": "string", "minLength": 1 },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-stream, starts at 1, increments by 1, no gaps."
+        },
+        "kind": {
+          "type": "string",
+          "description": "Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.",
+          "x-known-values": [
+            "verification/started",
+            "verification/interaction-started",
+            "verification/interaction-result",
+            "verification/hook",
+            "verification/executed-plan",
+            "verification/finished"
+          ]
+        },
+        "payload": { "type": "object" },
+        "last": {
+          "type": "boolean",
+          "default": false,
+          "description": "Structural termination: true on the final event of a stream, whatever its kind."
+        }
+      }
+    },
+    "Poll": {
+      "title": "Poll",
+      "type": "object",
+      "required": ["streams"],
+      "properties": {
+        "streams": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum events to return; default is the engine's choice."
+        },
+        "wait-ms": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Long-poll: the engine may hold the response up to this long when no events are pending."
+        }
+      }
+    },
+    "PollResult": {
+      "title": "PollResult",
+      "type": "object",
+      "required": ["events"],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Event" }
+        }
+      }
+    }
+  }
+}

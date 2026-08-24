@@ -447,8 +447,76 @@ document-out.
 
 ## 9. Events and streams
 
-*Drafted in a later chunk against ADR 0005 (event delivery model): the `Event` shape, stream
-identity, ordering and completion guarantees, event-kind vocabulary.*
+Delivery model fixed by [ADR 0005](../../decisions/0005-poll-based-event-delivery.md):
+**polling is the baseline on every pipe; push is a negotiated, stdio-only optimisation.**
+Schema: [`schemas/v1/events.schema.json`](schemas/v1/events.schema.json).
+
+### 9.1 Streams
+
+A **stream** is an ordered sequence of events produced by work inside one session (v1:
+the verification run; consumer-session transport events are a named future capability).
+Stream ids are engine-assigned opaque strings, scoped to their session and handed to the
+host in the result of the operation that started the work (`verification/verify`). A stream
+ends when its final event has been *delivered*; polling an unknown or ended stream is
+answered with error `stream-not-found`.
+
+### 9.2 The Event shape
+
+```json
+{ "stream": "s-1", "seq": 4, "kind": "verification/interaction-result", "payload": { … }, "last": false }
+```
+
+- `seq` (integer): starts at 1, increments by 1, no gaps — the host can detect its own
+  bookkeeping errors.
+- `kind` (string): open vocabulary, namespaced like operations. A host encountering an
+  unknown kind applies policy with the name in hand (skip, log, surface) — it MUST NOT
+  fail, and MUST still honour `seq` and `last`.
+- `payload` (object): kind-specific document.
+- `last` (boolean, default false): **termination is structural.** The final event of a
+  stream carries `last: true`, whatever its kind — so completion never depends on
+  recognising a vocabulary value. After it, the stream id is invalid, and a session that
+  ends with its work (§7.3) is closed.
+
+### 9.3 Ordering and delivery guarantees
+
+Within a stream, events are delivered in `seq` order, exactly once. Across streams there is
+no ordering guarantee. The engine buffers undelivered events and MUST NOT drop them; if a
+buffer cap is reached it applies backpressure by pausing the producing work until the host
+drains (loss is never the pressure valve).
+
+### 9.4 `events/poll`
+
+| Operation | Body → Result |
+|---|---|
+| `events/poll` | `{ streams, max?, wait-ms? }` → `{ events }` |
+
+Drains up to `max` (default: engine's choice) pending events from the given streams, in
+per-stream order. If none are pending and `wait-ms` is positive, the engine MAY hold the
+response up to that long (long-poll) and respond as soon as an event arrives; the default is
+`0` (return immediately). On the call pipes the pipe is serial, so hosts there SHOULD use
+short waits and interleave polls with their other requests; on stdio, long-polls pipeline
+freely (§3.2).
+
+### 9.5 Push delivery (`push-events` capability)
+
+When both parties declared `push-events` (§5.3; meaningful on the stdio pipe only), the
+engine MAY deliver events as EventFrames (§4.3) instead of holding them for poll. Every
+event still arrives exactly once — pushed events are never also returned by `events/poll` —
+and all §9.2–9.3 guarantees are unchanged. Hosts implement the poll model regardless and
+treat push as a latency upgrade, not a second semantics.
+
+### 9.6 Event kinds (v1)
+
+All on the verification stream; the vocabulary is open and grows without a version bump:
+
+| Kind | Payload | Notes |
+|---|---|---|
+| `verification/started` | run description (pact count, provider) | first event |
+| `verification/interaction-started` | interaction ref, variant | |
+| `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
+| `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
+| `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
+| `verification/finished` | the summary document | carries `last: true`; ends the session |
 
 ## 10. Error taxonomy
 
