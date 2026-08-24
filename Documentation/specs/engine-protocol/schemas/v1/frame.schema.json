@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/frame",
+  "title": "Frame",
+  "description": "One protocol frame: a single JSON object discriminated by 'type' (open discriminator; v1 defines request, response, event). See spec.md §4.",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "x-known-values": ["request", "response", "event"]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "request" } } },
+      "then": { "$ref": "#/$defs/RequestFrame" }
+    },
+    {
+      "if": { "properties": { "type": { "const": "response" } } },
+      "then": { "$ref": "#/$defs/ResponseFrame" }
+    },
+    {
+      "if": { "properties": { "type": { "const": "event" } } },
+      "then": { "$ref": "#/$defs/EventFrame" }
+    }
+  ],
+  "$defs": {
+    "RequestFrame": {
+      "title": "RequestFrame",
+      "type": "object",
+      "required": ["type", "id", "op", "body"],
+      "properties": {
+        "type": { "const": "request" },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Host-chosen correlation id, unique among the host's in-flight requests on this pipe. Opaque to the engine."
+        },
+        "op": {
+          "type": "string",
+          "description": "Operation name, namespaced '<area>/<verb>'. Open vocabulary; unknown ops are answered with error 'operation-unsupported'.",
+          "x-known-values": [
+            "engine/hello",
+            "engine/shutdown"
+          ]
+        },
+        "body": {
+          "type": "object",
+          "description": "The operation's request document, governed by the operation's schema."
+        }
+      }
+    },
+    "ResponseFrame": {
+      "title": "ResponseFrame",
+      "type": "object",
+      "required": ["type", "id"],
+      "oneOf": [
+        { "required": ["ok"], "not": { "required": ["error"] } },
+        { "required": ["error"], "not": { "required": ["ok"] } }
+      ],
+      "properties": {
+        "type": { "const": "response" },
+        "id": {
+          "type": "string",
+          "description": "Echo of the request id. Empty string means pipe-level (uncorrelatable), see spec.md §4.4."
+        },
+        "ok": {
+          "type": "object",
+          "description": "The operation's result document, governed by the operation's schema."
+        },
+        "error": {
+          "$ref": "engine-error.schema.json"
+        }
+      }
+    },
+    "EventFrame": {
+      "title": "EventFrame",
+      "type": "object",
+      "required": ["type", "event"],
+      "properties": {
+        "type": { "const": "event" },
+        "event": {
+          "type": "object",
+          "description": "An Event object (spec.md §9). Push delivery only; under the poll model events travel inside 'ok' documents."
+        }
+      }
+    }
+  }
+}

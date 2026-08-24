@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/hello",
+  "title": "Hello",
+  "description": "Request body of 'engine/hello', the mandatory first operation on every pipe. Result is HelloResult. See spec.md §5.",
+  "type": "object",
+  "required": ["protocol-versions"],
+  "properties": {
+    "protocol-versions": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "minItems": 1,
+      "description": "Protocol major versions the host can speak, in preference order."
+    },
+    "host": { "$ref": "#/$defs/PartyInfo" },
+    "capabilities": { "$ref": "#/$defs/Capabilities" }
+  },
+  "$defs": {
+    "PartyInfo": {
+      "title": "PartyInfo",
+      "description": "Identification for diagnostics only; protocol semantics never depend on it.",
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "Capabilities": {
+      "title": "Capabilities",
+      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events.",
+      "type": "object",
+      "additionalProperties": { "type": "object" }
+    },
+    "HelloResult": {
+      "title": "HelloResult",
+      "description": "Result document of 'engine/hello'.",
+      "type": "object",
+      "required": ["protocol-version"],
+      "properties": {
+        "protocol-version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The version the engine selected; all subsequent frames on this pipe are governed by it."
+        },
+        "engine": { "$ref": "#/$defs/PartyInfo" },
+        "capabilities": { "$ref": "#/$defs/Capabilities" }
+      }
+    }
+  }
+}

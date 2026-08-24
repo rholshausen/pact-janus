@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/engine-error",
+  "title": "EngineError",
+  "description": "The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy in spec.md §10.",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Machine-readable error code. Open vocabulary; unknown codes are handled by category fallback (spec.md §10).",
+      "x-known-values": [
+        "malformed-frame",
+        "handshake-required",
+        "protocol-version-unsupported",
+        "operation-unsupported",
+        "capability-required",
+        "engine-shut-down",
+        "internal"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable description, not intended for programmatic dispatch."
+    },
+    "details": {
+      "type": "object",
+      "description": "Code-specific structured details (e.g. 'supported' for protocol-version-unsupported, 'op' for operation-unsupported)."
+    }
+  }
+}
