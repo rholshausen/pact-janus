@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/protocol/v1/engine-error",
   "title": "EngineError",
-  "description": "The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy in spec.md §10.",
+  "description": "The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.",
   "type": "object",
   "required": ["code", "message"],
   "properties": {
     "code": {
       "type": "string",
-      "description": "Machine-readable error code. Open vocabulary; unknown codes are handled by category fallback (spec.md §10).",
+      "description": "Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md §10.2).",
       "x-known-values": [
         "malformed-frame",
         "handshake-required",
@@ -16,8 +16,22 @@
         "operation-unsupported",
         "capability-required",
         "engine-shut-down",
+        "session-not-found",
+        "handle-not-found",
+        "variant-not-found",
+        "stream-not-found",
+        "interaction-invalid",
+        "pact-invalid",
+        "pact-version-unsupported",
+        "component-unavailable",
+        "component-failed",
         "internal"
       ]
+    },
+    "category": {
+      "type": "string",
+      "description": "Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.",
+      "x-known-values": ["protocol", "session", "document", "component", "internal"]
     },
     "message": {
       "type": "string",
@@ -25,7 +39,7 @@
     },
     "details": {
       "type": "object",
-      "description": "Code-specific structured details (e.g. 'supported' for protocol-version-unsupported, 'op' for operation-unsupported)."
+      "description": "Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/pact-invalid), 'component' and opaque 'error' (component-*)."
     }
   }
 }

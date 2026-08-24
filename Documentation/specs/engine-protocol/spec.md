@@ -520,10 +520,99 @@ All on the verification stream; the vocabulary is open and grows without a versi
 
 ## 10. Error taxonomy
 
-*Drafted in a later chunk: `EngineError` structure, code vocabulary and categories,
-component-sourced errors. Schema:* [`schemas/v1/engine-error.schema.json`](schemas/v1/engine-error.schema.json).
+Schema: [`schemas/v1/engine-error.schema.json`](schemas/v1/engine-error.schema.json).
+
+### 10.1 Errors are values
+
+Every failure crosses the pipe as an `EngineError` in a ResponseFrame — never a panic, trap,
+exception or broken pipe. The engine's dispatch boundary MUST catch panics and convert them
+to code `internal` (with enough detail for a bug report; a panic reaching the pipe is itself
+a bug). An `EngineError` carries:
+
+- `code` (string, required): machine-readable, kebab-case, open vocabulary.
+- `category` (string): coarse classification enabling sane handling of *unknown* codes —
+  the category fallback. Open vocabulary; v1 defines the five below.
+- `message` (string, required): human-readable; never dispatch on it.
+- `details` (object): code-specific structure, specified with each code.
+
+### 10.2 Categories and codes (v1)
+
+| Category | Meaning / host fallback for unknown codes in it | v1 codes |
+|---|---|---|
+| `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
+| `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `pact-invalid`, `pact-version-unsupported` |
+| `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
+| `internal` | an engine bug; report upstream | `internal` |
+
+`details` conventions worth fixing now: `protocol-version-unsupported` carries
+`supported: [int]`; `operation-unsupported` carries `op`; `capability-required` carries
+`capability`; `interaction-invalid` and `pact-invalid` carry `problems: [{path, message}]`
+(positions a DSL can surface); `component-unavailable` and `component-failed` carry
+`component` (the component's identifier/requirement, e.g. `content/protobuf >= 2`) and, for
+failures, `error` — the component's own error document, passed through opaquely: the kernel
+does not understand component error interiors and MUST NOT translate them (design 2.6 owns
+their shape).
+
+A host encountering an unknown `code` applies its category's fallback; unknown `category`
+(or none) is treated as `internal`. Test-outcome information — mismatches, verification
+failures — is **not** an error: a verification that ran and found mismatches is a
+*successful operation* whose results report failures (§8.2 `finalise`, §9.6 events). Errors
+mean the machinery could not do its job.
 
 ## 11. Compatibility policy
 
-*Drafted in a later chunk: what an SDK pinned to protocol N can expect from engine N+1 and
-vice versa; the additive-evolution rules; the schema-compatibility checker.*
+### 11.1 The promise
+
+An SDK pinned to protocol version N can expect any engine that negotiates N — including
+every engine release k versions later — to speak N as specified here, verbatim: every v-N
+operation, event kind and error code keeps its specified semantics, and everything the
+engine has grown since arrives only through the open-world mechanisms below. Symmetrically,
+an engine can expect a host that negotiated N to tolerate vocabulary growth per §2.2. The
+protocol version bumps only for changes the rules below cannot absorb, and a bump is a
+design failure to be argued for, not a release habit.
+
+### 11.2 What may change within a version
+
+Allowed (additive, no bump):
+
+- new operations, event kinds, error codes/categories, capability names, `x-known-values`
+  entries — vocabulary growth is the designed-for common case;
+- new *optional* members anywhere, including result documents (old readers ignore and
+  preserve them, §2.2 rule 2);
+- new optional members in request bodies, provided the engine's behaviour without them is
+  the previous behaviour (defaults preserve old semantics).
+
+Never within a version:
+
+- removing or renaming a member, operation, event kind or error code (deprecate instead:
+  mark `deprecated: true` in the schema, keep the semantics);
+- changing a member's type or narrowing its value space;
+- making an optional request member required, or otherwise changing what an existing
+  well-formed frame means;
+- closing anything: introducing `enum`, `additionalProperties: false`, or shrinking
+  `x-known-values`;
+- changing the frame envelope's required member set (§2.2 rule 4).
+
+### 11.3 Unknown-value policy (summary)
+
+| Situation | Reader | Required behaviour |
+|---|---|---|
+| unknown `op` | engine | error `operation-unsupported`, op named |
+| unknown frame `type` | either | §4.5 — ignore (stdio) / `malformed-frame` (call pipes) |
+| unknown event `kind` | host | policy with the name in hand; honour `seq`/`last` (§9.2) |
+| unknown error `code` | host | category fallback (§10.2) |
+| unknown capability name | either | ignore (§5.3) |
+| unknown object member | either | ignore, preserve where practical (§2.2) |
+
+The shared property: **every unknown arrives named** (spike 1.1, finding 10) — degradation
+is a policy decision made with the unknown's identity in hand, never an accident.
+
+### 11.4 The schema-compatibility checker
+
+The rules in §2.2 and §11.2 are enforced by a checker in CI, run on every change to
+`schemas/`: it lints each schema against the authoring rules (open vocabularies, no closing
+keywords, titles, no remote `$ref`) and diffs each schema against its version on the base
+branch, failing the build on any change §11.2 forbids. Governance does the job the type
+system no longer does (ADR 0002); a schema change that fails the checker is either a mistake
+or a deliberate new protocol version, and the checker forces that choice to be explicit.
