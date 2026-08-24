@@ -149,13 +149,60 @@ enforces its stability (§11.2).
 when it holds a body. Whether a member is text or bytes is a per-member choice fixed for the
 life of the protocol version: changing it is breaking in both directions (§11.2).
 
+That freeze is cheaper than it sounds, because **bytes is the wider type**: base64 carries the
+octets of a text value perfectly well, so a member declared bytes that turns out to only ever
+hold text costs a little width and nothing else, while a member declared text can never carry
+the one stray non-UTF-8 payload that a contract test exists to catch. When a member's content
+is not certainly text for all time, declare it bytes.
+
+### 2.5 Tagged content: choosing the representation per call
+
+The static declaration above fixes a member's type in the schema. Some members instead carry
+*whichever* representation suits the value at hand, chosen per call and announced in the
+document — the pattern the pact file format already uses for bodies, and the one most payload
+members want. It exists because base64 is the wrong default for structured text: a JSON body
+stored as base64 makes a pact file unreadable to the humans who read pact files constantly,
+and forces a matcher to decode before it can address into a structure it would rather navigate
+directly.
+
+Such a member is declared with **`x-tagged-by`**, naming a sibling member that carries the
+representation tag:
+
+```json
+"content":  { "description": "…", "x-tagged-by": "encoded" },
+"encoded":  { "type": "string", "x-known-values": ["base64", "json"] }
+```
+
+Normative rules:
+
+- The tag member MUST be a sibling in the same object, an open string vocabulary (§2.2 rule 1),
+  and MUST include **`base64`** among its known values — that is what guarantees a tagged
+  member can always carry arbitrary octets, whatever else its vocabulary grows.
+- **`base64` means exactly §2.4's projection**, everywhere it appears: the member holds a
+  string, and its value is the base64 of an octet sequence. This is the single fixed point the
+  pattern buys; every other tag value is the defining design's business.
+- An **absent tag** means the member holds its natural JSON value, not bytes. The tag member is
+  therefore not `required`, and a reader that finds no tag MUST NOT attempt to decode.
+- A member MUST NOT carry both `x-tagged-by` and `contentEncoding`: it is either statically
+  bytes or tagged, never both.
+- Readers MUST apply the same open-discriminator policy as everywhere else (§2.2 rule 3): an
+  unrecognised tag value is surfaced by name, never coerced to a default and never assumed to
+  be text.
+
+What is frozen here is the *tag vocabulary*, not the per-call choice (§11.2): a tag value's
+meaning is fixed once published, the vocabulary only grows, and `x-tagged-by` itself cannot be
+added to or removed from an existing member. A document may freely send `content` as JSON in
+one interaction and as base64 in the next — that is the point of the pattern.
+
+### 2.6 Where these rules bind
+
 **One rule, protocol-wide.** Most payload bytes in v1 travel inside documents this
 specification deliberately does not define (§8.1) — interaction specifications, pact files,
-event payloads. Those documents MUST use this projection for their byte-valued members, so
-that a single decoding rule holds everywhere and the engine is never translating between
+event payloads. Those documents MUST carry their byte-valued members by one of these two forms,
+so that a single decoding rule holds everywhere and the engine is never translating between
 per-design conventions. Design 2.5 inherits the pact v4 body shape (`content`, `contentType`,
-`contentTypeHint`, `encoded`), whose `encoded: "base64"` is this projection under an older
-name; alignment there is intended, not coincidental.
+`contentTypeHint`, `encoded`), which is exactly the tagged form with `encoded` as its tag and
+`base64` carrying its specified meaning; the alignment is intended, not coincidental.
 
 Nothing above mentions how a frame is written on the wire. The model is the contract; the
 encoding is negotiable (§3.4), and the base64 projection is what the *JSON* encoding does with
@@ -466,8 +513,8 @@ interiors:
 
 Two rules bind these documents even though their shapes do not belong here: they follow the
 open-world authoring rules (§2.2), since they cross the same boundary and face the same
-version skew; and their byte-valued members use the bytes projection of §2.4, so that
-decoding a payload never depends on which design authored the document around it.
+version skew; and their byte-valued members use one of the two bytes forms of §2.4–2.5, so
+that decoding a payload never depends on which design authored the document around it.
 
 ### 8.2 Consumer sessions — `consumer-session/*`
 
@@ -688,6 +735,8 @@ Allowed (additive, no bump):
   preserve them, §2.2 rule 2);
 - new optional members in request bodies, provided the engine's behaviour without them is
   the previous behaviour (defaults preserve old semantics);
+- **new representation tag values** on a tagged member (§2.5) — the tag is an open vocabulary
+  like any other, and a reader that does not know a value surfaces it by name (§2.2 rule 3);
 - **new frame encodings** (§3.4): an encoding is a way of writing the same document, so it
   changes no schema and no semantics. It arrives as a name in the `encoding` capability's
   vocabulary, is used only when both parties chose it, and JSON stays mandatory — a host that
@@ -698,9 +747,13 @@ Never within a version:
 - removing or renaming a member, operation, event kind or error code (deprecate instead:
   mark `deprecated: true` in the schema, keep the semantics);
 - changing a member's type or narrowing its value space;
-- **changing a member between text and bytes** — adding or removing `contentEncoding` (§2.4).
-  It is a type change in any encoding with a native byte-string type, and in JSON it silently
-  reinterprets bytes already on the wire, which is worse than breaking loudly;
+- **changing a member between text and bytes** — adding or removing `contentEncoding`, or
+  adding or removing `x-tagged-by` (§2.4–2.5). It is a type change in any encoding with a
+  native byte-string type, and in JSON it silently reinterprets bytes already on the wire,
+  which is worse than breaking loudly;
+- **changing what a representation tag means**, or dropping one from a tag vocabulary (§2.5) —
+  the tag values are how a reader decides whether to decode at all, so a redefinition is a
+  silent misread rather than a caught error; `base64` in particular is fixed protocol-wide;
 - making an optional request member required, or otherwise changing what an existing
   well-formed frame means;
 - closing anything: introducing `enum`, `additionalProperties: false`, or shrinking
@@ -715,6 +768,7 @@ Never within a version:
 | unknown frame `type` | either | §4.5 — ignore (stdio) / `malformed-frame` (call pipes) |
 | unknown event `kind` | host | policy with the name in hand; honour `seq`/`last` (§9.2) |
 | unknown error `code` | host | category fallback (§10.2) |
+| unknown representation tag | either | surface by name; neither decode it nor assume text (§2.5) |
 | unknown capability name | either | ignore (§5.3) |
 | unknown encoding name | engine | do not select it; fall back to JSON (§3.4) — negotiation cannot fail |
 | unknown object member | either | ignore, preserve where practical (§2.2) |
@@ -726,12 +780,13 @@ is a policy decision made with the unknown's identity in hand, never an accident
 
 The rules in §2.2 and §11.2 are enforced by a checker in CI, run on every change to
 `schemas/`: it lints each schema against the authoring rules (open vocabularies, no closing
-keywords, titles, no remote `$ref`, well-formed bytes markers) and diffs each schema against
-its version on the base branch, failing the build on any change §11.2 forbids — including the
-text/bytes flip, which no JSON Schema validator would catch because `contentEncoding` is
-annotation-only. Governance does the job the type
-system no longer does (ADR 0002); a schema change that fails the checker is either a mistake
-or a deliberate new protocol version, and the checker forces that choice to be explicit.
+keywords, titles, no remote `$ref`, well-formed bytes markers and tag vocabularies) and diffs
+each schema against its version on the base branch, failing the build on any change §11.2
+forbids — including the text/bytes flip and a shrinking tag vocabulary, which no JSON Schema
+validator would catch: `contentEncoding` is annotation-only and `x-tagged-by` is ours.
+Governance does the job the type system no longer does (ADR 0002); a schema change that fails
+the checker is either a mistake or a deliberate new protocol version, and the checker forces
+that choice to be explicit.
 
 The checker is [`tools/schema-compat`](../../../tools/schema-compat/README.md) (built, not
 adopted — the README records why no existing differ fits); CI runs `lint` on every build and

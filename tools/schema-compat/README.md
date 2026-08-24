@@ -8,11 +8,19 @@ does. It enforces two rule sets from
 - **`schema-compat lint <dir>`** — the open-world authoring rules (spec §2.2) on every
   `*.schema.json` under `<dir>`: no `enum`, no `additionalProperties: false`,
   `x-known-values` only on open string vocabularies, short type-shaped titles, no remote
-  `$ref`, `$id` required.
+  `$ref`, `$id` required. Plus the bytes rules (spec §2.4–2.5): a static bytes member is a
+  `string` with `contentEncoding: "base64"`, a tagged member's `x-tagged-by` names a sibling
+  that is an open string vocabulary offering `base64`, and no member is both.
 - **`schema-compat diff <base-dir> <head-dir>`** — the additive-evolution rules (spec §11.2)
   between the published schemas and a proposed change: members and alternatives are never
-  removed, `required` sets and constraint keywords are frozen, `x-known-values` only grows.
-  New members, new `$defs`, new files and appended combinator alternatives pass.
+  removed, `required` sets and constraint keywords are frozen, `x-known-values` only grows,
+  and no member flips between text and bytes (`contentEncoding` and `x-tagged-by` are frozen
+  like any other constraint). New members, new `$defs`, new files and appended combinator
+  alternatives pass.
+
+The bytes rules matter here specifically because nothing else can enforce them:
+`contentEncoding` is annotation-only in JSON Schema draft 2020-12, and `x-tagged-by` is this
+project's own annotation, so a validator would accept either change silently.
 
 Exit code 1 with one violation per line (each citing the spec rule) when anything fails.
 CI runs `lint` on every build and `diff` against the PR base branch (`.github/workflows/ci.yml`).

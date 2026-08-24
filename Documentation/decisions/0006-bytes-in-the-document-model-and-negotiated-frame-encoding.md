@@ -33,12 +33,26 @@ different answers: what the document model contains (forced, now) and how a fram
 ## Decision
 
 **1. The document model is the JSON types plus `bytes`.** Bytes are an arbitrary octet
-sequence. Their JSON projection is base64 (RFC 4648 §4, standard alphabet, padded), declared in
-the schema as `{ "type": "string", "contentEncoding": "base64" }`, lossless in both directions.
-Whether a member is text or bytes is fixed for the life of the protocol version. Documents the
-protocol carries but does not define (§8.1) MUST use the same projection, so decoding never
-depends on which design authored the surrounding document — which also aligns design 2.5 with
-pact v4's `encoded: "base64"`, the same projection under an older name.
+sequence. Their JSON projection is base64 (RFC 4648 §4, standard alphabet, padded), lossless in
+both directions. Documents the protocol carries but does not define (§8.1) MUST use that
+projection, so decoding never depends on which design authored the surrounding document.
+
+A member reaches it one of two ways, and both are specified because bodies need the second.
+**Statically**, as `{ "type": "string", "contentEncoding": "base64" }` — the member is bytes,
+always. Or **tagged**, as `x-tagged-by` naming a sibling that announces the representation per
+call, the pattern pact v4 already uses for bodies (`content` read as base64 when
+`encoded: "base64"`, as a JSON value otherwise). The tagged form is not a concession: base64 is
+the wrong default for structured text, because a JSON body stored as base64 makes a pact file
+unreadable to the humans who read pact files constantly, and forces a matcher to decode before
+it can address into a structure it would rather navigate directly. What the tagged form fixes
+protocol-wide is the meaning of `base64` and the guarantee that every tag vocabulary offers it;
+everything else about a tag vocabulary belongs to the design that defines it.
+
+In both forms it is the *declaration* that is frozen for the life of the protocol version, not
+any per-call value — a tagged member is expected to vary call by call. The freeze is also
+cheaper than it looks, since bytes is the wider type: base64 carries the octets of a text value
+perfectly well, so declaring bytes and never needing them costs width alone, while declaring
+text forecloses the one malformed payload a contract test exists to catch.
 
 **2. Frame encoding is a negotiated axis, and v1 defines one value on it.** `json` is
 mandatory for both parties; the `engine/hello` exchange is always JSON so a party can always
@@ -51,11 +65,16 @@ session in JSON, so a captured trace is always reproducible in text.
 capability-gated, no schema change, no version bump — so the option costs nothing to hold open
 and the decision waits for evidence rather than for a release boundary.
 
-Spec text: Engine Protocol specification §2.4 (document model), §3.4 (frame encoding), §5.3
-(the `encoding` capability), §11.2–11.4 (evolution rules and the checker).
+Spec text: Engine Protocol specification §2.4–2.6 (document model, tagged content, where the
+rules bind), §3.4 (frame encoding), §5.3 (the `encoding` capability), §11.2–11.4 (evolution
+rules and the checker).
 
 ## Alternatives considered
 
+- **Normalising everything to base64** — one form, no tag, every payload opaque: rejected
+  because pact files are read by people, and a JSON body rendered as base64 destroys that
+  without buying anything the tagged form does not already give. It also pushes a decode step
+  in front of every structural matcher.
 - **Base64 only, no bytes in the model** (the status quo ante): rejected because it does not
   actually avoid the decision — it relocates it into three other designs — and because without
   a named bytes type there is nothing for a binary encoding to ever exploit, so it forecloses
@@ -89,9 +108,10 @@ previously could not; a binary encoding becomes a capability value rather than a
 version; JSON-always keeps the wire debuggable with a pipe and a text editor and keeps
 [`examples/`](../specs/engine-protocol/examples/) authoritative rather than illustrative.
 
-Harder: a member can never move between text and bytes, so the choice must be right per member
-— the compatibility checker enforces it, because `contentEncoding` is annotation-only in draft
-2020-12 and no validator would. Any SDK that later offers a second encoding owes the
+Harder: a member can never move between text and bytes, and a published tag value can never be
+redefined, so both choices must be right first time — the compatibility checker enforces them,
+because `contentEncoding` is annotation-only in draft 2020-12 and `x-tagged-by` is ours, so no
+validator would catch either. Any SDK that later offers a second encoding owes the
 conformance suite a run in each.
 
 Committed to: JSON as a permanent mandatory baseline on every pipe, and to encodings never

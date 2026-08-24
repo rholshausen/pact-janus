@@ -56,10 +56,11 @@ const FROZEN_KEYWORDS: &[&str] = &[
   "uniqueItems",
   "default",
   "$ref",
-  // §2.4: flipping a member between text and bytes is breaking in both
+  // §2.4–2.5: flipping a member between text and bytes is breaking in both
   // directions, and no validator catches it — contentEncoding is
-  // annotation-only in draft 2020-12.
+  // annotation-only in draft 2020-12 and x-tagged-by is ours.
   "contentEncoding",
+  "x-tagged-by",
 ];
 
 fn is_schema_object(v: &Value) -> bool {
@@ -161,6 +162,52 @@ fn lint_node(path: &str, node: &Value, out: &mut Vec<Violation>) {
         path: path.into(),
         message: "a bytes member is a 'string' carrying base64 (spec §2.4)".into(),
       });
+    }
+  }
+  // §2.5: a tagged member names a sibling that carries its representation
+  // tag. Checked here, at the node owning `properties`, because the rule is
+  // about siblings.
+  if let Some(props) = obj.get("properties").and_then(Value::as_object) {
+    for (name, member) in props {
+      let Some(tag_name) = member.get("x-tagged-by") else {
+        continue;
+      };
+      let member_path = format!("{path}/properties/{name}");
+      if member.get("contentEncoding").is_some() {
+        out.push(Violation {
+          path: member_path.clone(),
+          message: "a member is either statically bytes or tagged, never both (spec §2.5)".into(),
+        });
+      }
+      let Some(tag_name) = tag_name.as_str() else {
+        out.push(Violation {
+          path: member_path,
+          message: "'x-tagged-by' must name a sibling member (spec §2.5)".into(),
+        });
+        continue;
+      };
+      match props.get(tag_name) {
+        None => out.push(Violation {
+          path: member_path,
+          message: format!("'x-tagged-by' names '{tag_name}', which is not a sibling member (spec §2.5)"),
+        }),
+        Some(tag) => {
+          let known = string_set(tag.get("x-known-values"));
+          if tag.get("type").and_then(Value::as_str) != Some("string") || known.is_empty() {
+            out.push(Violation {
+              path: format!("{path}/properties/{tag_name}"),
+              message: "a representation tag is an open string vocabulary (spec §2.5, §2.2 rule 1)".into(),
+            });
+          } else if !known.contains("base64") {
+            out.push(Violation {
+              path: format!("{path}/properties/{tag_name}"),
+              message:
+                "a representation tag must offer 'base64' so the member can always carry octets (spec §2.5)"
+                  .into(),
+            });
+          }
+        }
+      }
     }
   }
   // §2.2 rule 5: titles are short and type-shaped.
@@ -430,6 +477,58 @@ mod tests {
     // …and back the other way.
     let out = messages(&diff_documents(&head, &base));
     assert!(out.iter().any(|m| m.contains("/body/contentEncoding")), "{out:?}");
+  }
+
+  #[test]
+  fn lint_accepts_a_well_formed_tagged_member() {
+    let doc = json!({
+        "$id": "x", "title": "Example",
+        "type": "object",
+        "properties": {
+            "content": { "description": "body, per its tag", "x-tagged-by": "encoded" },
+            "encoded": { "type": "string", "x-known-values": ["base64", "json"] }
+        }
+    });
+    assert_eq!(lint_document(&doc), vec![]);
+  }
+
+  #[test]
+  fn lint_rejects_malformed_tagged_members() {
+    let doc = json!({
+        "$id": "x", "title": "Example",
+        "properties": {
+            "a": { "x-tagged-by": "missing" },
+            "b": { "x-tagged-by": "closed" },
+            "closed": { "type": "string" },
+            "c": { "x-tagged-by": "textonly" },
+            "textonly": { "type": "string", "x-known-values": ["json"] },
+            "d": { "type": "string", "contentEncoding": "base64", "x-tagged-by": "textonly" }
+        }
+    });
+    let out = messages(&lint_document(&doc));
+    assert!(out.iter().any(|m| m.contains("not a sibling member")), "{out:?}");
+    assert!(
+      out.iter().any(|m| m.contains("open string vocabulary")),
+      "{out:?}"
+    );
+    assert!(out.iter().any(|m| m.contains("must offer 'base64'")), "{out:?}");
+    assert!(out.iter().any(|m| m.contains("never both")), "{out:?}");
+  }
+
+  #[test]
+  fn diff_rejects_tag_vocabulary_shrinking_and_retagging() {
+    let base = json!({
+        "properties": {
+            "content": { "x-tagged-by": "encoded" },
+            "encoded": { "type": "string", "x-known-values": ["base64", "json"] }
+        }
+    });
+    let mut head = base.clone();
+    head["properties"]["encoded"]["x-known-values"] = json!(["base64"]);
+    head["properties"]["content"]["x-tagged-by"] = json!("somethingElse");
+    let out = messages(&diff_documents(&base, &head));
+    assert!(out.iter().any(|m| m.contains("known values removed")), "{out:?}");
+    assert!(out.iter().any(|m| m.contains("/content/x-tagged-by")), "{out:?}");
   }
 
   #[test]
