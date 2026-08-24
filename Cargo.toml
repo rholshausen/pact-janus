@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "engine/kernel",
   "cli",
+  "tools/schema-compat",
 ]
 # Spikes are standalone projects, never workspace members. The benchmark
 # harness is durable but standalone too — it drags the whole pact_ffi

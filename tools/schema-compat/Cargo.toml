@@ -1,0 +1,21 @@
+[package]
+name = "pact_janus_schema_compat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "CI checker enforcing the Engine Protocol's open-world schema rules (spec §2.2) and additive-evolution policy (spec §11.2)"
+
+[[bin]]
+name = "schema-compat"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

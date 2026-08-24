@@ -32,6 +32,8 @@ corpora/         Golden corpora: (spec or pact, expected plan, expected result)
 spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
+tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
+                 for the Engine Protocol schemas' open-world rules
 Documentation/   Plan, ADRs, specs
 ```
 

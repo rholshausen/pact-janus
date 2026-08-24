@@ -616,3 +616,7 @@ keywords, titles, no remote `$ref`) and diffs each schema against its version on
 branch, failing the build on any change §11.2 forbids. Governance does the job the type
 system no longer does (ADR 0002); a schema change that fails the checker is either a mistake
 or a deliberate new protocol version, and the checker forces that choice to be explicit.
+
+The checker is [`tools/schema-compat`](../../../tools/schema-compat/README.md) (built, not
+adopted — the README records why no existing differ fits); CI runs `lint` on every build and
+`diff` against the base branch on every pull request.
