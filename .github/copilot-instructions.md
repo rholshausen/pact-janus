@@ -6,8 +6,10 @@ behind a coarse-grained versioned protocol, thin language SDKs, interaction spec
 inspectable matching plans, a shape language with variant testing, and plugins as first-class components.
 
 Source of truth: `Documentation/project-plan.md` (the phased plan; task numbers like "1.6"/"G1" refer to
-it) and `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them).
-Keep this file in sync with `CLAUDE.md`.
+it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
+`Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
+they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
+every frame crossing the engine boundary). Keep this file in sync with `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task
 > 0.3; trust the repo over this file as scaffolding lands, and update this file when it does.

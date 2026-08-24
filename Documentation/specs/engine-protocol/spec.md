@@ -410,7 +410,9 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 - **`finalise`**: ends the session unconditionally (transports stopped, all state
   released — even if the result is all failures) and returns per-interaction, per-variant
   results. The `pact` member — the pact file *document*; persistence is the host's business —
-  is present iff every interaction verified successfully on its required variants.
+  is present iff every interaction verified successfully on every variant design 2.3's
+  sampling requires it to exercise (an unexercised required variant is `not-exercised`, which
+  withholds the pact exactly as a failure does).
   Unmatched-request and missed-interaction detail rides in `results`.
 
 ### 8.3 Verification — `verification/*`
@@ -461,8 +463,10 @@ Schema: [`schemas/v1/events.schema.json`](schemas/v1/events.schema.json).
 
 ### 9.1 Streams
 
-A **stream** is an ordered sequence of events produced by work inside one session (v1:
-the verification run; consumer-session transport events are a named future capability).
+A **stream** is an ordered sequence of events produced by work inside one session. v1 defines
+exactly one producer, the verification run; surfacing consumer-session transport activity the
+same way is the obvious next stream and, being a new operation plus event kinds, needs no
+protocol-version bump when it arrives.
 Stream ids are engine-assigned opaque strings, scoped to their session and handed to the
 host in the result of the operation that started the work (`verification/verify`). A stream
 ends when its final event has been *delivered*; polling an unknown or ended stream is

@@ -21,6 +21,7 @@ superseding ADR instead.
 | [0002](0002-document-first-protocol-over-frozen-pipes.md) | Define the protocol as schema-governed JSON documents over frozen byte-pipes | accepted |
 | [0003](0003-embedding-priority-per-language.md) | Ship dual engine artifacts; set embedding priority per SDK language | accepted |
 | [0004](0004-fork-v2-engine-as-kernel.md) | Fork the pact-reference v2 matching engine as the kernel starting point | accepted |
+| [0005](0005-poll-based-event-delivery.md) | Poll-based event delivery on all pipes; push as a negotiated stdio capability | proposed |
 
 ## Decision backlog
 

@@ -11,11 +11,14 @@ Rust reference engine behind a coarse-grained versioned protocol, thin language 
 interaction specs compiled to inspectable matching plans, a shape language with variant testing, and
 plugins as first-class components.
 
-Two documents are the source of truth and take precedence over this file when they conflict:
+Three sources are the source of truth and take precedence over this file when they conflict:
 
 - `Documentation/project-plan.md` — the phased plan; task numbers like "1.6" or "G1" refer to it.
 - `Documentation/decisions/` — ADRs. Every gate and contested design choice lands here. Do not
   re-litigate an accepted ADR in code; propose a superseding ADR instead.
+- `Documentation/specs/` — the Phase 2 design specifications. Normative for the code that
+  implements them; the schemas they ship are the specified surface, not documentation of it.
+  `engine-protocol/` (task 2.1) governs every frame crossing the engine boundary.
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust
