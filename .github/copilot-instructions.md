@@ -9,7 +9,9 @@ Source of truth: `Documentation/project-plan.md` (the phased plan; task numbers 
 it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
 `Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
 they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
-every frame crossing the engine boundary). Keep this file in sync with `CLAUDE.md`.
+every frame crossing the engine boundary, and `shape-language/` from task 2.2 governs shapes — what
+they admit, how they compose, and the variant dimensions they contribute). Keep this file in sync with
+`CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task
 > 0.3; trust the repo over this file as scaffolding lands, and update this file when it does.
@@ -26,7 +28,8 @@ spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
-                 for the Engine Protocol schemas' open-world rules
+                 for the open-world rules every schema under Documentation/specs/ follows,
+                 and for the specs' worked examples
 Documentation/   Plan, ADRs, specs
 ```
 

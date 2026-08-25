@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/shape/v1/variant-space.schema.json",
+  "title": "VariantSpace",
+  "description": "The variant dimensions a shape tree contributes, in declaration order (spec.md §6). This document is what the shape language hands to design 2.3: which dimensions exist, what points each has, and which points gate which dimensions. Selecting, sampling and naming whole variants is 2.3's business, not this document's.",
+  "type": "object",
+  "required": ["dimensions"],
+  "properties": {
+    "dimensions": {
+      "type": "array",
+      "description": "Every dimension in the tree, parents before the dimensions they gate.",
+      "items": { "$ref": "#/$defs/Dimension" }
+    }
+  },
+  "$defs": {
+    "Dimension": {
+      "title": "Dimension",
+      "type": "object",
+      "required": ["id", "facet", "points", "default"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "'<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2)."
+        },
+        "path": {
+          "type": "string",
+          "description": "The location of the operator that contributes the dimension, without the facet suffix."
+        },
+        "facet": {
+          "type": "string",
+          "description": "Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.",
+          "x-known-values": ["presence", "nullability", "value", "alternative", "cardinality"]
+        },
+        "operator": {
+          "type": "string",
+          "description": "The shape operator that contributed the dimension."
+        },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "description": "The values this dimension can take. A dimension with fewer than two points is not a dimension (spec.md §6.1).",
+          "items": { "$ref": "#/$defs/Point" }
+        },
+        "default": {
+          "type": "string",
+          "description": "Name of the point the shape's own examples exercise — the base variant's assignment for this dimension."
+        },
+        "gated-by": {
+          "type": "array",
+          "description": "Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).",
+          "items": { "$ref": "#/$defs/Gate" }
+        }
+      }
+    },
+    "Point": {
+      "title": "Point",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable within the dimension: 'present'/'absent', 'null'/'non-null', an alternative name, a canonical literal rendering, or 'min'/'min+1'/'max'."
+        },
+        "value": {
+          "description": "The literal this point selects, for 'value' facets."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The cardinality this point selects, for 'cardinality' facets."
+        }
+      }
+    },
+    "Gate": {
+      "title": "Gate",
+      "type": "object",
+      "required": ["dimension", "point"],
+      "properties": {
+        "dimension": { "type": "string", "minLength": 1 },
+        "point": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

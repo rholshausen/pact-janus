@@ -18,7 +18,9 @@ Three sources are the source of truth and take precedence over this file when th
   re-litigate an accepted ADR in code; propose a superseding ADR instead.
 - `Documentation/specs/` — the Phase 2 design specifications. Normative for the code that
   implements them; the schemas they ship are the specified surface, not documentation of it.
-  `engine-protocol/` (task 2.1) governs every frame crossing the engine boundary.
+  `engine-protocol/` (task 2.1) governs every frame crossing the engine boundary;
+  `shape-language/` (task 2.2) governs shapes — what they admit, how they compose, and the
+  variant dimensions they contribute.
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust
@@ -36,7 +38,8 @@ spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
-                 for the Engine Protocol schemas' open-world rules
+                 for the open-world rules every schema under Documentation/specs/ follows,
+                 and for the specs' worked examples
 Documentation/   Plan, ADRs, specs
 ```
 

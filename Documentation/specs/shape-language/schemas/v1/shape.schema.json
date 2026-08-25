@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/shape/v1/shape.schema.json",
+  "title": "Shape",
+  "description": "One shape node: an object discriminated by its 'shape' member. The operator vocabulary is open — core operators are listed in x-known-values, component-contributed operators are namespaced '<component>:<name>'. Per-operator arity is specified in spec.md §4; the branches below cover the core operators only, because an unknown operator's members cannot be checked here (spec.md §3.7). Recursive: 'of', 'items', 'keys', 'values', and the members of 'members', 'entries' and 'alternatives' are themselves shape nodes.",
+  "type": "object",
+  "required": ["shape"],
+  "properties": {
+    "shape": {
+      "type": "string",
+      "description": "The operator. Open vocabulary; an unknown operator is a named failure, never an ignored constraint (spec.md §3.7).",
+      "x-known-values": [
+        "any",
+        "equality",
+        "type",
+        "string",
+        "number",
+        "integer",
+        "decimal",
+        "boolean",
+        "null",
+        "regex",
+        "datetime",
+        "date",
+        "time",
+        "include",
+        "content-type",
+        "semver",
+        "not-empty",
+        "object",
+        "array",
+        "each-like",
+        "each-entry",
+        "contains",
+        "optional",
+        "nullable",
+        "forbidden",
+        "any-of",
+        "one-of"
+      ]
+    },
+    "example": {
+      "description": "A value this shape admits, and the value produced for this node unless a variant point or generator selects another. For 'equality' it is also the operator's parameter: the shape admits exactly this value. Carries bytes when tagged (see 'encoded'); untagged it is the natural JSON value (Engine Protocol spec §2.5).",
+      "x-tagged-by": "encoded"
+    },
+    "encoded": {
+      "type": "string",
+      "description": "Representation tag for 'example'. Absent means the example is its natural JSON value; 'base64' means it is the base64 of an octet sequence (Engine Protocol spec §2.4).",
+      "x-known-values": ["base64"]
+    },
+    "of": {
+      "$ref": "#",
+      "description": "The wrapped shape ('optional', 'nullable')."
+    },
+    "members": {
+      "type": "object",
+      "description": "Member name -> shape ('object'). Members not named here are admitted and ignored unless a member is declared 'forbidden' (spec.md §4.3).",
+      "additionalProperties": { "$ref": "#" }
+    },
+    "entries": {
+      "type": "array",
+      "description": "Positional element shapes ('array'), or the shapes that must each be satisfied by some element ('contains').",
+      "items": { "$ref": "#" }
+    },
+    "items": {
+      "$ref": "#",
+      "description": "The shape every element must satisfy ('each-like')."
+    },
+    "keys": {
+      "$ref": "#",
+      "description": "The shape every key string must satisfy ('each-entry'). Absent means any key."
+    },
+    "values": {
+      "$ref": "#",
+      "description": "The shape every entry value must satisfy ('each-entry')."
+    },
+    "min": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Minimum cardinality ('each-like', 'each-entry'); default 1."
+    },
+    "max": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Maximum cardinality ('each-like', 'each-entry'); absent means unbounded."
+    },
+    "options": {
+      "type": "array",
+      "description": "The literal values admitted ('any-of'). Values, not shapes — a union of shapes is expressed with 'one-of' (spec.md §4.4).",
+      "minItems": 1
+    },
+    "discriminator": {
+      "type": "string",
+      "description": "Member name whose value selects the alternative ('one-of')."
+    },
+    "default": {
+      "type": "string",
+      "description": "Names the default variant point of this node: an alternative name ('one-of'). Absent, the default is the lexicographically first alternative — never JSON member order (spec.md §6.1)."
+    },
+    "alternatives": {
+      "type": "object",
+      "description": "Alternative name -> shape ('one-of'). Each alternative is an 'object' shape binding the discriminator to a distinct literal (spec.md §5.4).",
+      "additionalProperties": { "$ref": "#" }
+    },
+    "pattern": {
+      "type": "string",
+      "description": "Regular expression ('regex'), in the dialect fixed by spec.md §4.2."
+    },
+    "format": {
+      "type": "string",
+      "description": "Date/time format pattern ('datetime', 'date', 'time'), in the pattern language fixed by spec.md §4.2."
+    },
+    "substring": {
+      "type": "string",
+      "description": "Substring that must occur in the value ('include')."
+    },
+    "content-type": {
+      "type": "string",
+      "description": "Content type the value's octets must be detected as ('content-type')."
+    },
+    "generator": {
+      "type": "object",
+      "description": "Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "equality" } } },
+      "then": { "required": ["shape", "example"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "type" } } },
+      "then": { "required": ["shape", "example"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "regex" } } },
+      "then": { "required": ["shape", "pattern"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "datetime" } } },
+      "then": { "required": ["shape", "format"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "date" } } },
+      "then": { "required": ["shape", "format"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "time" } } },
+      "then": { "required": ["shape", "format"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "include" } } },
+      "then": { "required": ["shape", "substring"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "content-type" } } },
+      "then": { "required": ["shape", "content-type"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "object" } } },
+      "then": { "required": ["shape", "members"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "array" } } },
+      "then": { "required": ["shape", "entries"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "contains" } } },
+      "then": { "required": ["shape", "entries"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "each-like" } } },
+      "then": { "required": ["shape", "items"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "each-entry" } } },
+      "then": { "required": ["shape", "values"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "optional" } } },
+      "then": { "required": ["shape", "of"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "nullable" } } },
+      "then": { "required": ["shape", "of"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "any-of" } } },
+      "then": { "required": ["shape", "options"] }
+    },
+    {
+      "if": { "required": ["shape"], "properties": { "shape": { "const": "one-of" } } },
+      "then": { "required": ["shape", "discriminator", "alternatives"] }
+    }
+  ]
+}

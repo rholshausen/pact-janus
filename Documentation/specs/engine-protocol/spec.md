@@ -505,7 +505,7 @@ interiors:
 
 | Document | Owner |
 |---|---|
-| interaction specification (with shapes) | designs 2.2 (shape language), and 3.2 (document model) |
+| interaction specification (with shapes) | designs [2.2](../shape-language/spec.md) (shape language), and 3.2 (document model) |
 | variant descriptor | design 2.3 (variant semantics); protocol requires only `id` |
 | matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
 | pact file (v1–v4 read, v5 read/write) | design 2.5 |
