@@ -3,7 +3,10 @@
 The CI checker required by [ADR 0002](../../Documentation/decisions/0002-document-first-protocol-over-frozen-pipes.md)
 and specified by the Engine Protocol spec: governance does the job the type system no longer
 does. It enforces two rule sets from
-[`Documentation/specs/engine-protocol/spec.md`](../../Documentation/specs/engine-protocol/spec.md):
+[`Documentation/specs/engine-protocol/spec.md`](../../Documentation/specs/engine-protocol/spec.md)
+over **every schema under `Documentation/specs/`** — the protocol's own, the shape language's
+(task 2.2), and whatever later designs ship. They all cross the same boundary and face the same
+version skew, so they all follow the same rules:
 
 - **`schema-compat lint <dir>`** — the open-world authoring rules (spec §2.2) on every
   `*.schema.json` under `<dir>`: no `enum`, no `additionalProperties: false`,
@@ -24,6 +27,12 @@ project's own annotation, so a validator would accept either change silently.
 
 Exit code 1 with one violation per line (each citing the spec rule) when anything fails.
 CI runs `lint` on every build and `diff` against the PR base branch (`.github/workflows/ci.yml`).
+
+The crate's integration tests do a second job the binary does not: they validate the specs' worked
+examples against the shipped schemas — protocol frame transcripts (`tests/examples.rs`) and shape
+documents (`tests/shape_examples.rs`) — so a spec's examples cannot drift from its schemas. Every
+```json block in the shape-language spec and its examples must carry a marker (`shape`, `variants`,
+`value`, `sketch`); an unmarked block fails the test rather than silently skipping the check.
 
 Why hand-built rather than adopted: spike 1.1 called this the "Smithy-diff-shaped gap" —
 generic JSON Schema diff tools classify breaking changes for *closed-world* schemas, and

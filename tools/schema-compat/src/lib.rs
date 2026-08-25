@@ -531,20 +531,27 @@ mod tests {
     assert!(out.iter().any(|m| m.contains("/content/x-tagged-by")), "{out:?}");
   }
 
-  #[test]
-  fn shipped_v1_schemas_lint_clean() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-      .join("../../Documentation/specs/engine-protocol/schemas/v1");
-    let mut checked = 0;
+  /// The authoring rules are protocol-wide: every schema any Phase 2 design
+  /// ships is held to them, because they all cross the same boundary.
+  fn lint_shipped_schemas(dir: &std::path::Path, checked: &mut usize) {
     for entry in std::fs::read_dir(dir).expect("schemas dir") {
       let path = entry.expect("entry").path();
-      if path.extension().is_some_and(|e| e == "json") {
+      if path.is_dir() {
+        lint_shipped_schemas(&path, checked);
+      } else if path.to_string_lossy().ends_with(".schema.json") {
         let doc: Value = serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("parse");
         assert_eq!(lint_document(&doc), vec![], "in {}", path.display());
-        checked += 1;
+        *checked += 1;
       }
     }
-    assert!(checked >= 7, "expected the v1 schema set, found {checked}");
+  }
+
+  #[test]
+  fn shipped_v1_schemas_lint_clean() {
+    let specs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Documentation/specs");
+    let mut checked = 0;
+    lint_shipped_schemas(&specs, &mut checked);
+    assert!(checked >= 9, "expected the shipped schema set, found {checked}");
   }
 
   #[test]

@@ -28,19 +28,20 @@ jobs:
         run: cargo test
       - name: WASM build (kernel)
         run: cargo build --package pact_janus_kernel --target wasm32-wasip2
-      - name: Protocol schema lint
-        run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs/engine-protocol/schemas
+      - name: Spec schema lint
+        run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
 
   schema-compat:
-    # Enforces the Engine Protocol's additive-evolution rules (spec §11.2):
-    # any change to published schemas must pass `schema-compat diff` against
-    # the base branch. A failure means the change is breaking — fix it, or
-    # introduce a new protocol version directory (which this diff, keyed on
-    # existing files, permits).
+    # Enforces the Engine Protocol's additive-evolution rules (spec §11.2) on
+    # every schema any Phase 2 design ships — they all cross the same boundary,
+    # so they all follow the same rules. Any change to published schemas must
+    # pass `schema-compat diff` against the base branch. A failure means the
+    # change is breaking — fix it, or introduce a new version directory (which
+    # this diff, keyed on existing files, permits).
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     env:
-      SCHEMAS: Documentation/specs/engine-protocol/schemas
+      SCHEMAS: Documentation/specs
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
