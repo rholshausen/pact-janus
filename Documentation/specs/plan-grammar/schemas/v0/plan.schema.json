@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/plan/v0/plan.schema.json",
+  "title": "Plan",
+  "description": "A compiled matching plan (spec.md §2). The structured form; the text forms of §3 are what users read and what golden corpora record. A plan is a rendering, not a record — nothing outside this repo stores one, and an engine may compile a different plan for the same input across versions (spec.md §7).",
+  "type": "object",
+  "required": ["grammar", "root"],
+  "properties": {
+    "grammar": {
+      "type": "string",
+      "description": "The grammar version this plan is written against — the compatibility surface a component-contributed fragment targets (spec.md §7.1).",
+      "x-known-values": ["v0"]
+    },
+    "root": { "$ref": "#/$defs/Node" },
+    "variant": {
+      "type": "string",
+      "description": "The variant id this plan was compiled under, when it was compiled under one (design 2.3). Absent means the shape was compiled unpinned."
+    }
+  },
+  "$defs": {
+    "Node": {
+      "title": "Node",
+      "description": "One node. 'kind' decides which of the carrier members applies; the others are absent.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Open vocabulary; an unknown kind is a named failure, never an ignored node (spec.md §4.1).",
+          "x-known-values": [
+            "container",
+            "action",
+            "value",
+            "resolve",
+            "resolve-current",
+            "pipeline",
+            "splat",
+            "annotation"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "description": "For kind 'container': the group label a renderer prints."
+        },
+        "name": {
+          "type": "string",
+          "description": "For kind 'action': the action name. Unnamespaced names are reserved for this specification; '<component>:<name>' is contributed (spec.md §4.1)."
+        },
+        "path": {
+          "type": "string",
+          "description": "For kinds 'resolve' and 'resolve-current': the path resolved against the interaction context, or against the current iteration item."
+        },
+        "text": {
+          "type": "string",
+          "description": "For kind 'annotation': the prose. Annotations are not executable."
+        },
+        "value": {
+          "$ref": "#/$defs/Value"
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Node" }
+        },
+        "result": { "$ref": "#/$defs/Result" }
+      }
+    },
+    "Value": {
+      "title": "Value",
+      "description": "A literal carried by a 'value' node: any document-model value (protocol spec §2.4), or an entry (spec.md §2.2). Bytes use the protocol's bytes forms.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "description": "Which kind of value this is. 'entry' is the one plan-only kind.",
+          "x-known-values": [
+            "null",
+            "boolean",
+            "number",
+            "string",
+            "array",
+            "object",
+            "bytes",
+            "entry"
+          ]
+        },
+        "value": {
+          "description": "The value itself. Carries bytes when tagged (see 'encoded'); untagged it is the natural JSON value.",
+          "x-tagged-by": "encoded"
+        },
+        "encoded": {
+          "type": "string",
+          "description": "Representation tag for 'value'. Absent means the natural JSON value; 'base64' means the base64 of an octet sequence (protocol spec §2.4-2.5).",
+          "x-known-values": ["base64"]
+        },
+        "key": {
+          "type": "string",
+          "description": "For 'entry': the key its value is paired with."
+        }
+      }
+    },
+    "Result": {
+      "title": "Result",
+      "description": "What executing the node produced (spec.md §2.3). A node with no result was not executed — a lazy branch skipped, or an input that never became available.",
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "x-known-values": ["ok", "value", "error"]
+        },
+        "value": { "$ref": "#/$defs/Value" },
+        "message": {
+          "type": "string",
+          "description": "For status 'error': what failed, in the words a user reads."
+        },
+        "path": {
+          "type": "string",
+          "description": "For status 'error': the path that located the offending value."
+        }
+      }
+    }
+  }
+}

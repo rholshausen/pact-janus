@@ -11,7 +11,9 @@ it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in cod
 they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
 every frame crossing the engine boundary, `shape-language/` from task 2.2 governs shapes — what they
 admit, how they compose, and the variant dimensions they contribute — and `variant-semantics/` from
-task 2.3 governs variants — selection, naming, recording, and variant-bound provider state). Keep this file in sync with
+task 2.3 governs variants — selection, naming, recording, and variant-bound provider state — and
+`plan-grammar/` from task 2.4 governs plans: the node grammar, the action set, the text forms
+`explain` prints, and the golden-corpus format). Keep this file in sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/plan/v0/corpus-case.schema.json",
+  "title": "CorpusCase",
+  "description": "The 'case.json' manifest of one golden-corpus case (spec.md §6). The plan and executed-plan text snapshots sit beside it as plan.txt and executed.txt; this document holds the halves that are assertions rather than snapshots.",
+  "type": "object",
+  "required": ["description", "input", "values", "result"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this case is evidence for, in one line."
+    },
+    "input": { "$ref": "#/$defs/Input" },
+    "values": {
+      "type": "object",
+      "description": "The captured values the plan executes against, keyed by the paths a resolver would supply (spec.md §2.4). Offline: no transport runs."
+    },
+    "result": { "$ref": "#/$defs/ExpectedResult" },
+    "also-compiled-from": {
+      "$ref": "#/$defs/Input",
+      "description": "A second input that MUST reach the same verdicts as 'input' — the two-path agreement check of spec.md §4.4. Its plan may differ; its result may not."
+    }
+  },
+  "$defs": {
+    "Input": {
+      "title": "Input",
+      "description": "What is compiled. Open vocabulary of kinds so later designs can add their own.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-known-values": ["spec", "pact-interaction"]
+        },
+        "spec": {
+          "type": "object",
+          "description": "For kind 'spec': the interaction specification (designs 2.5, 3.2)."
+        },
+        "pact": {
+          "type": "object",
+          "description": "For kind 'pact-interaction': the pact document (any supported version)."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "For kind 'pact-interaction': which interaction."
+        },
+        "variant": {
+          "type": "string",
+          "description": "The variant id to compile under (design 2.3). Absent compiles the shape unpinned."
+        }
+      }
+    },
+    "ExpectedResult": {
+      "title": "ExpectedResult",
+      "description": "The assertion half of a case: a diff here is a behaviour change, never an acceptable optimisation (spec.md §6.2).",
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "x-known-values": ["matched", "mismatched"]
+        },
+        "mismatches": {
+          "type": "array",
+          "description": "Every expected mismatch, in the plan's result form. A case that expects a mismatch and gets a different one has failed.",
+          "items": { "$ref": "#/$defs/Mismatch" }
+        }
+      }
+    },
+    "Mismatch": {
+      "title": "Mismatch",
+      "type": "object",
+      "required": ["path", "message"],
+      "properties": {
+        "path": { "type": "string" },
+        "message": { "type": "string" },
+        "action": {
+          "type": "string",
+          "description": "The action whose node produced the error, when one did."
+        }
+      }
+    }
+  }
+}

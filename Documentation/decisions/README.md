@@ -26,6 +26,7 @@ superseding ADR instead.
 | [0007](0007-shapes-denote-value-sets.md) | Define a shape by the set of values it admits, over a domain that includes absence | proposed |
 | [0008](0008-deterministic-pairwise-variant-sampling.md) | Select variants by a named, deterministic pairwise algorithm, and fail rather than truncate | proposed |
 | [0009](0009-variant-bound-provider-state-parameters.md) | Bind provider-state parameters to variants in a separate member; an unproducible state fails | proposed |
+| [0010](0010-plans-are-renderings-the-grammar-is-the-record.md) | Treat plans as renderings and the grammar as the record; version them accordingly | proposed |
 
 ## Decision backlog
 
@@ -34,7 +35,6 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 
 - Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
 - Components on day one vs HTTP/JSON kernel-privileged (design 2.6, informed by 3.8, 4.2, 8.1)
-- Plan grammar versioning and stability policy (design 2.4, stressed by 8.4)
 - Pact v5 file format schema (design 2.5)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
   comparability classes it consumes are fixed by ADR 0007)

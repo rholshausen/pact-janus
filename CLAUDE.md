@@ -21,7 +21,9 @@ Three sources are the source of truth and take precedence over this file when th
   `engine-protocol/` (task 2.1) governs every frame crossing the engine boundary;
   `shape-language/` (task 2.2) governs shapes — what they admit, how they compose, and the
   variant dimensions they contribute; `variant-semantics/` (task 2.3) governs variants — which
-  ones get selected, how they are named and recorded, and how they drive provider state.
+  ones get selected, how they are named and recorded, and how they drive provider state;
+  `plan-grammar/` (task 2.4) governs plans — the node grammar, the action set, the text forms
+  `explain` prints, and the golden-corpus format.
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust
