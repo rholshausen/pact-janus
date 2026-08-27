@@ -131,16 +131,23 @@ verifying 'get an order' — 8 recorded variants
   8. payment=invoice                               state {id:42, shipped:true,  status:PENDING}   ✓
 ```
 
-**Grouping saves less than it looks like it should.** No two *consecutive* variants above resolve to
-the same state, so nothing collapses at all — even though variants 1, 3 and 8 are identical states,
-they are not adjacent, and reordering to make them adjacent is forbidden (spec §6.6): recorded order
-is the order. If only `shipped` were bound, the eight would run
-`true, false, true, true, false, true, false, true` and a single pair — variants 3 and 4 — would
-collapse, saving one setup call out of eight.
+**Eight variants, eight state setups** — including variants 1, 3 and 8, which resolve to exactly the
+same state and differ only in `items` and `payment`, dimensions no binding mentions.
 
-That is the sampler working as designed: pairwise selection exists to vary dimensions *together*, so
-consecutive variants rarely share a state. Grouping is worth implementing as an optimisation and worth
-nobody's architecture.
+Reusing a setup across them is forbidden, not merely discouraged (spec §6.6). Two of the three are not
+even adjacent, and reordering to make them so is forbidden on its own terms. But the deeper reason is
+that the verifier cannot establish what skipping would require: variants 1 and 2 issued real requests
+to a real provider between the setups, and whether `GET /orders/42` disturbed the order — a
+last-accessed timestamp, an audit row, a cache — is invisible from this side of the boundary. Nor can
+the verifier know whether this provider's handler is idempotent. Only whoever wrote it knows that.
+
+The saving that buys is tiny and the failure it risks is the worst kind. If only `shipped` were bound,
+the eight would run `true, false, true, true, false, true, false, true` and exactly one adjacent pair
+— variants 3 and 4 — could collapse: one setup call in eight. In exchange, a variant that fails
+because an earlier variant moved the data underneath it fails depending on what ran before it, and the
+report blames the wrong interaction. Pairwise selection exists to vary dimensions *together*, so
+consecutive variants rarely share a state anyway — the optimisation is small precisely where it is
+most dangerous.
 
 ## 6. The variant the provider cannot produce
 

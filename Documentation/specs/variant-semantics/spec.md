@@ -703,14 +703,39 @@ The fourth row is the one that only a design that took gating seriously would ca
 `payment@invoice.dueDate#presence` has no case to apply in any `card` variant, and without a `default`
 the state parameter would vanish for half the run.
 
-### 6.6 Grouping state setup
+### 6.6 State setup runs per variant
 
 Distinct variants often resolve to identical state parameters — in the order payload, every variant
-with `shippedAt = present` resolves `shipped` to `true` regardless of the other three dimensions. A
-verifier MAY run `state-setup` once for a run of consecutive variants whose resolved states are equal,
-provided the observable behaviour is identical to running it per variant. It MUST NOT reorder variants
-to create such runs: recorded order is the order (§5.1), and reordering to save setup calls trades a
-reproducible run for a faster one.
+with `shippedAt = present` resolves `shipped` to `true` regardless of the other three dimensions. It
+is tempting to run `state-setup` once for a run of consecutive variants whose resolved states are
+equal.
+
+**A verifier MUST NOT.** `state-setup` runs for every variant, including consecutive variants whose
+resolved parameters are identical, and a verifier MUST NOT reorder variants to create such runs:
+recorded order is the order (§5.1).
+
+The precondition such an optimisation needs is one the verifier cannot check. "Skip the setup, the
+state is already established" assumes nothing has disturbed it since — and the thing most likely to
+have disturbed it is the variant that just ran. An interaction is a real request against a real
+provider; it may create, mutate or consume the very data the state describes, and whether it does is
+invisible from this side of the boundary. The other half of the assumption is no better: the verifier
+cannot know whether a state handler is idempotent, only the author of the handler can.
+
+The trade is bad in both directions. What skipping buys is small — measured on the worked example,
+grouping consecutive equal states saves one setup call in eight when one parameter is bound and none
+at all when two are, because pairwise selection exists to vary dimensions *together*, so consecutive
+variants rarely share a state. What it costs is the worst failure mode a contract test has: a variant
+that fails only because an earlier variant moved the data underneath it fails *depending on what ran
+before it* — intermittent, order-dependent, and attributed to the wrong interaction.
+
+Re-running is also the semantics the ecosystem already has. Today's verifier invokes the state change
+for every interaction, so state handlers are written to be re-runnable; a handler that breaks when run
+twice with the same parameters is already broken, and nothing here should reward it.
+
+If setup cost ever does dominate a verification run, the thing to design is a **declaration** — a
+state its own author marks variant-independent, in hook configuration (design 2.7) — not an inference
+the verifier makes about code it cannot see. ADR 0009 carries that as a tripwire rather than a
+feature.
 
 ### 6.7 When the provider cannot produce the state
 

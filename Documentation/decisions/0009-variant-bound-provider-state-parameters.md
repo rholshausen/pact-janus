@@ -85,8 +85,10 @@ default) while the author is still looking at their DSL.
 Harder: providers must be able to reach every state the consumer's *sampled* variants need, which is a
 real new obligation — an order service that cannot produce a `SHIPPED` order without a timestamp now has
 to say so, and someone has to write the exclusion; state setup runs per variant, so a six-variant
-interaction is six setup calls (grouping consecutive equal states helps less than it sounds, because the
-sampler exists to vary dimensions together); and design 2.5 inherits a new member in the provider-state
+interaction is six setup calls, and reusing a setup across consecutive variants with identical
+parameters is forbidden rather than merely discouraged — the verifier cannot know whether the
+interaction that just ran disturbed the state, or whether the handler is idempotent, and the measured
+saving is one call in eight; and design 2.5 inherits a new member in the provider-state
 document.
 
 Committed to: `variant-params` as a separate member; resolution as a total function of assignment and
@@ -95,6 +97,6 @@ binding, computed identically on both sides; resolved dimension ids in recorded 
 
 **Tripwire** — revisit if any of these show up in Phase 5: waivers outnumber exclusions (teams are
 routing around the failure rather than fixing the contract); state setup dominates verification wall
-time (the grouping rule needs to become a scheduling rule, or states need to be declarable as
-variant-independent); or authors regularly want a state parameter that depends on *two* dimensions,
+time, at which point a state its own author declares variant-independent becomes worth designing —
+a declaration by the party that can actually know, never an inference by the verifier; or authors regularly want a state parameter that depends on *two* dimensions,
 which this design does not express and which would argue for a small, still-declarative combinator.
