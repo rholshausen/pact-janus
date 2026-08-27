@@ -551,7 +551,7 @@ mod tests {
     let specs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Documentation/specs");
     let mut checked = 0;
     lint_shipped_schemas(&specs, &mut checked);
-    assert!(checked >= 12, "expected the shipped schema set, found {checked}");
+    assert!(checked >= 14, "expected the shipped schema set, found {checked}");
   }
 
   #[test]
