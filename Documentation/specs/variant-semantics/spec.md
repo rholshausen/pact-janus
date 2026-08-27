@@ -176,34 +176,58 @@ The base variant is unconditional because it is the interaction the author actua
 is the one variant every upgraded v1–v4 pact has (§9), and because a run whose *first* failure is an
 exotic corner is a run whose failure nobody trusts.
 
-**The boundary variants.** The **minimal** and **maximal** variants put every dimension whose facet is
-*ordered* at its lowest and highest point respectively, every other dimension at its default, and let
-`complete` (§2.1) settle the rest. A facet is ordered when its points have a defined least and
-greatest element:
+**The boundary variants.** The **minimal** and **maximal** variants sit at the two ends of the width
+the shape declares — the least and the most the contract permits a provider to send. Each dimension
+takes its extreme point and `complete` (§2.1) settles the rest; what "extreme" means is fixed per
+facet:
 
-| Facet | Order |
-|---|---|
-| `presence` | `absent` < `present` |
-| `nullability` | `null` < `non-null` |
-| `cardinality` | by size |
-| `value`, `alternative` | **unordered** — no point is smaller than another |
-| a component facet | ordered iff the component declares an order |
+| Facet | Minimal … maximal | What the minimal point collapses |
+|---|---|---|
+| `presence` | `absent` … `present` | the member, and everything under it |
+| `nullability` | `null` … `non-null` | the subtree under the null |
+| `cardinality` | smallest … largest size | the elements |
+| `alternative` | fewest … most dimensions in the alternative | every alternative not taken |
+| `value` | — takes its default | nothing; no option is smaller than another |
+| a component facet | as the component declares | — |
+
+The unifying idea is **collapse**: at its minimal point a dimension produces the least structure it
+can, at its maximal point the most. For `presence` and `nullability` that is literally the gate —
+`absent` and `null` are the points that deactivate a subtree (§2.1) — so those two need no order
+declared beyond the gate that already exists. The other two do not gate, and their extremes are stated
+because a rule that only counted collapsed *dimensions* would get them wrong:
+
+- **`cardinality` does not gate at all** (shape spec §6.5): a collection's interior dimensions are
+  shared across elements and stay active whatever the count, so no point of it collapses a dimension.
+  The same blindness would hit `optional` over a scalar — nothing lives under
+  `optional(datetime(…))`, so neither of its points collapses anything, and yet `absent` is the
+  boundary the RFC's entire example turns on. Collapse is a property of the value produced, not a
+  count of dimensions.
+- **`alternative` collapses every alternative not taken**, so the minimal variant takes the
+  alternative contributing the fewest dimensions and the maximal the one contributing the most, ties
+  broken by point order. Taking the *default* alternative instead would be arbitrary — a default is
+  the author's chosen example, not an end of anything — and it would leave the maximal variant unable
+  to open the alternative that holds the extra structure, which is usually the whole reason that
+  alternative is interesting.
 
 They are in the selection for the same kind of reason the base variant is, and it is **not** coverage.
 Pairwise already covers every point and every pair of points, so `absent` and `max` each appear
 somewhere regardless; the extremes add only conjunctions of three or more, and an engine that wants
-those has `strength: 3`. What the extremes are for is that they are **the least and the most a
-provider is permitted to send** — the two ends of the width the contract declares. A pact that records
-six samples from the middle of its space and neither of its boundaries has recorded the wrong six.
+those has `strength: 3`. What the extremes are for is that they are the two ends of the declared
+width. A pact that records six samples from the middle of its space and neither of its boundaries has
+recorded the wrong six.
 
-Two limits, stated rather than papered over:
+Three limits, stated rather than papered over:
 
-- **There is no maximal variant when a `one-of` is in the tree.** Alternatives are mutually exclusive
-  by construction, so no single variant opens all of them. The maximal variant takes the *default*
-  alternative and is maximal only over the ordered facets — it is not the largest payload the shape
-  admits, and calling it that would be a lie the report would have to keep telling.
+- **No variant opens every alternative at once.** A `one-of` is exclusive by construction, so when
+  dimensions live in two of its alternatives the maximal variant activates as many as any variant can
+  and no more. Maximal is a maximum, not a totality, and the report does not claim otherwise.
+- **The maximal variant depends on subtree shape.** Adding a dimension deep inside one alternative can
+  change which alternative contributes the most, and so change the maximal variant and its id. Ids
+  remain derived from assignments and recorded beside them (§2.2), so nothing becomes uninterpretable
+  — but this is the one place where an edit in one part of a tree moves a seed somewhere else.
 - **A boundary variant is often already there**, and then it costs nothing: the maximal variant *is*
-  the base whenever every `optional` defaults to `present` and every collection to its largest point.
+  the base whenever every `optional` defaults to `present`, every collection to its largest point and
+  every `one-of` to its widest alternative.
 
 The cost is bounded and small, because they are seeds — the covering step works around them exactly as
 it does a pin:
@@ -211,7 +235,7 @@ it does a pin:
 | Shape | Covering array alone | With the base and boundary seeds |
 |---|---|---|
 | the RFC's order payload (2×2×2×3) | 6 | 8 |
-| the same with a gated `optional` inside `invoice` | 9 | 11 |
+| the same with a gated `optional` inside `invoice` | 9 | 10 |
 | eight `optional` members | 9 | 9 |
 | five optionals, three enumerations, one list | 12 | 13 |
 

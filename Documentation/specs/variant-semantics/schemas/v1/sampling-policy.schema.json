@@ -31,7 +31,7 @@
     "boundaries": {
       "type": "boolean",
       "default": true,
-      "description": "Seed the minimal and maximal variants — every ordered-facet dimension at its lowest and highest point, the rest at their defaults (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed."
+      "description": "Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed."
     },
     "algorithm": {
       "type": "string",

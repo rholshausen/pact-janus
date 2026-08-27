@@ -35,16 +35,21 @@ Six commitments, and they are the contested ones:
    combination did we not try. At 16 the gap is ten runs and at 24 it is eighteen, which is where
    sampling starts earning its keep. Both numbers come from running the algorithm, not from taste.
 2. **The base variant and the two boundaries are seeded, not sampled.** The minimal and maximal
-   variants put every *ordered*-facet dimension (`presence`, `nullability`, `cardinality`) at its
-   lowest and highest point and everything else at its default. The justification is deliberately not
-   coverage — pairwise already covers every point and every pair, so the extremes add only three-way
+   variants put each dimension at the point producing the least, respectively the most, structure:
+   `absent`/`present`, `null`/`non-null`, smallest/largest size, and the `one-of` alternative
+   contributing the fewest/most dimensions. The unifying idea is collapse, and for `presence` and
+   `nullability` it is literally the gate — but the measure is the *value produced*, not the count of
+   collapsed dimensions, because `optional` over a scalar collapses no dimension at all and yet
+   `absent` is the boundary the RFC's example turns on. The justification is deliberately not
+   coverage: pairwise already covers every point and every pair, so the extremes add only three-way
    conjunctions, and an engine that wants those has `strength: 3`. It is that these two variants are
    the least and the most a provider is permitted to send, and a contract that records six samples
    from the middle of its space and neither of its boundaries has recorded the wrong six. Measured
    cost: zero to two variants, smallest where the space is largest, because a seed is something the
-   covering step works around. Two limits are accepted rather than hidden: with a `one-of` in the tree
-   there is no maximal variant at all (alternatives are mutually exclusive), and `value` and
-   `alternative` facets have no order, so the extremes are silent about them.
+   covering step works around. Three limits are accepted rather than hidden: no variant opens every
+   `one-of` alternative at once, so maximal is a maximum rather than a totality; the maximal variant
+   depends on subtree shape, so a dimension added deep inside one alternative can move it; and the
+   `value` facet has no order, so the extremes are silent about enumerations.
 3. **No randomness, anywhere.** Every tie is broken by declaration order. Randomised generators (AETG
    and descendants) produce smaller arrays on average, and that is precisely the trade being refused: a
    sample that changes between runs turns every pact file into a diff and every flaky verification into
@@ -114,7 +119,8 @@ inside the WASM kernel.
 
 **Tripwire** — revisit if any of these show up in Phase 4/5: `boundaries` gets turned off routinely
 (two variants per interaction is too expensive, or the maximal variant is too obviously not maximal to
-be worth running); teams routinely raise `max-variants`
+be worth running); the maximal variant moves between alternatives often enough that boundary ids churn
+in pact diffs; teams routinely raise `max-variants`
 instead of narrowing shapes (the budget is teaching the wrong lesson); exclusions accumulate faster than
 dimensions (the shape language, not the sampler, is missing the ability to express dependence); pairwise
 misses defects that a strength-3 default would have caught (4.6 is where that would surface); or the

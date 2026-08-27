@@ -217,6 +217,6 @@ them (spec §6.5):
 ```
 
 The third is the one only a design that took gating seriously would catch. A binding on
-`payment@invoice.dueDate#presence` has no case to apply in any `card` variant — five of the eleven in
-§6 of the sampling example, the base and both boundaries among them — and without a `default` the state parameter would simply vanish for those variants.
+`payment@invoice.dueDate#presence` has no case to apply in any `card` variant — four of the ten in §6
+of the sampling example, the base and the minimal boundary among them — and without a `default` the state parameter would simply vanish for those variants.
 Requiring `default` on a gated dimension turns a silent hole into a message.

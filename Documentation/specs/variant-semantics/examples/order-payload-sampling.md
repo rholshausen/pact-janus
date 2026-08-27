@@ -122,10 +122,10 @@ the provider to send: nothing optional, one item; everything optional, two items
 `absent` and `min+1` anyway — it does, in rows 5 and 7 — but never in isolation, and a pact whose
 recorded evidence skips both ends of its own declared width has recorded the wrong samples.
 
-**Note what the maximal variant is not.** Row 3 has `payment = card`, because `alternative` is an
-unordered facet and the maximal variant takes the default (spec §3.1). It is the largest payload
-*among the card responses*, not among all of them — `one-of` alternatives are mutually exclusive, so
-no single variant can be the maximum, and the report does not claim one is.
+**Note what the maximal variant is not.** Row 3 has `payment = card`, and here that is a tie rather
+than a choice: neither alternative contains a dimension, so neither collapses more than the other and
+point order decides (spec §3.1). Give `invoice` an interior dimension and the maximal variant moves to
+it — §6 does exactly that.
 
 Three details of the algorithm are visible here:
 
@@ -217,14 +217,23 @@ weighs `1 + 2 = 3` — one way to be a card, two ways to be an invoice — so th
 
 Reachable pairs are 46, not 60: `dueDate` pairs with `items`, `shippedAt` and `status` freely (4 + 4 +
 6 = 14) but with `payment` only through `invoice` (2), because `(dueDate = present, payment = card)`
-is not a variant. The selection is **11** variants — 9 for the covering array, 2 for the boundaries —
-covering all 46. Five of them are `card` variants in which `dueDate` is inactive and therefore has no
-point at all in the assignment: not `null`, not `"absent"`, absent from the list (spec §2.1).
+is not a variant. The selection is **10** variants — 9 for the covering array, 1 more for the
+boundaries — covering all 46. Four of them are `card` variants in which `dueDate` is inactive and
+therefore has no point at all in the assignment: not `null`, not `"absent"`, absent from the list
+(spec §2.1).
 
-Both boundary variants are among those five, which is the `one-of` limit in practice. `dueDate` is
-gated on `invoice`, `alternative` is unordered, so the maximal variant takes `card` and never opens
-the alternative that contains the extra optional. The largest payload this shape admits is an invoice
-with a `dueDate` and two items, and no boundary variant is it.
+**The maximal variant moves to `invoice` here**, and this is the case the `alternative` rule exists
+for. `invoice` now contributes a dimension and `card` contributes none, so `invoice` is the wider
+alternative and the maximal variant is `(min+1, invoice, dueDate=present, present, PENDING)` — two
+items, an invoice with a due date, nothing absent. Under a rule that took the *default* alternative it
+would have stayed `card` and never opened the alternative holding the extra optional, and the seed
+would have covered fewer pairs: that selection is 11 variants, one more than this one.
+
+The minimal variant goes the other way for the same reason — `card` collapses `dueDate` entirely — so
+it stays `(min, card, absent, PENDING)` with `dueDate` inactive, unchanged from §2.
+
+What no variant can do is open both alternatives at once. `one-of` is exclusive by construction, so
+maximal here means *as wide as any variant can be*, not *as wide as the shape admits*.
 
 ## 7. When the budget bites
 
