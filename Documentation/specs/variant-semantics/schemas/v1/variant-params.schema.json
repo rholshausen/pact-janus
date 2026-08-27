@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/variant/v1/variant-params.schema.json",
+  "title": "VariantParams",
+  "description": "Provider-state parameters whose value depends on the running variant — the RFC's 'whenVariant', designed in spec.md §6. Carried in a state's own 'variant-params' member, never wrapped inside a parameter value: a parameter value is user data, so an in-band marker is ambiguous. The provider-state document around this is design 2.5's.",
+  "type": "object",
+  "required": ["variant-params"],
+  "properties": {
+    "variant-params": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Binding" }
+    }
+  },
+  "$defs": {
+    "Binding": {
+      "title": "Binding",
+      "description": "One state parameter, resolved from the variant's point for one dimension (spec.md §6.4).",
+      "type": "object",
+      "required": ["name", "dimension", "cases"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The state parameter this binds. MUST NOT also appear among the state's literal parameters."
+        },
+        "dimension": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3)."
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/Case" }
+        },
+        "default": {
+          "description": "The value when the dimension is inactive, or takes a point no case names. Required when the dimension is gated (spec.md §6.5). Absent with no matching case means the parameter is absent for that variant — not null."
+        }
+      }
+    },
+    "Case": {
+      "title": "Case",
+      "description": "The value this parameter takes when the dimension is at this point.",
+      "type": "object",
+      "required": ["point", "value"],
+      "properties": {
+        "point": { "type": "string", "minLength": 1 },
+        "value": { "description": "Any document value (protocol spec §2.4)." }
+      }
+    }
+  }
+}

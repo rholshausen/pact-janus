@@ -61,7 +61,7 @@ Out of scope, with owners:
 
 | Question | Owner |
 |---|---|
-| which variants to actually run: sampling, thresholds, caps, pinning, `whenVariant` | design 2.3 |
+| which variants to actually run: sampling, thresholds, caps, pinning, `whenVariant` | design [2.3](../variant-semantics/spec.md) |
 | how a shape becomes an executable plan; the node grammar and action set | design 2.4 |
 | how shapes and exercised examples are written into a pact file; v1–v4 → v5 conversion | design 2.5 |
 | how content components decode bodies; generator components | design 2.6 |
@@ -534,8 +534,8 @@ dimension, and an engine MUST NOT emit one.
 
 A **variant** is an assignment of one point to every active dimension. Computing the variant space is
 this specification's job; choosing which variants to run — pairwise sampling, exhaustive thresholds,
-caps, explicit pinning, provider-state linkage — belongs to design 2.3, which consumes the document in
-§6.6.
+caps, explicit pinning, provider-state linkage — belongs to
+[design 2.3](../variant-semantics/spec.md), which consumes the document in §6.6.
 
 ### 6.2 Dimension ids
 

@@ -506,7 +506,7 @@ interiors:
 | Document | Owner |
 |---|---|
 | interaction specification (with shapes) | designs [2.2](../shape-language/spec.md) (shape language), and 3.2 (document model) |
-| variant descriptor | design 2.3 (variant semantics); protocol requires only `id` |
+| variant descriptor, selection report, sampling policy | design [2.3](../variant-semantics/spec.md) (variant semantics); protocol requires only `id` |
 | matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
 | pact file (v1–v4 read, v5 read/write) | design 2.5 |
 | endpoint descriptor, transport options | design 2.6 (component interfaces); open documents per spike 1.5 |
@@ -536,8 +536,11 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
   enough for an SDK user are a stated goal (plan 3.2). The returned `handle` identifies the
   interaction within this session.
-- **`variants`**: the interaction's computed variant space (design 2.3), for variant-driven
-  test loops. Each variant descriptor carries at least `id`; everything else is 2.3's.
+- **`variants`**: the variants the engine has *selected* for this interaction (design 2.3),
+  in run order, for variant-driven test loops — the sample, not the whole space, with a
+  sibling `report` describing how it was chosen. An optional `policy` in the request
+  overrides the session's sampling policy for this call. Each variant descriptor carries at
+  least `id`; everything else is 2.3's.
 - **`start-transport`**: starts a transport component instance for this session (`transport`
   is an open vocabulary: `"http"`, …). The result `endpoint` is an **open descriptor
   document** — host/port for HTTP, broker/topic details for messaging — never assumed to be
@@ -694,7 +697,7 @@ a bug). An `EngineError` carries:
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
 | `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
-| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `pact-invalid`, `pact-version-unsupported` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `pact-invalid`, `pact-version-unsupported`, `variant-budget-exceeded` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
 

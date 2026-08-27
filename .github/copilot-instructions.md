@@ -9,8 +9,9 @@ Source of truth: `Documentation/project-plan.md` (the phased plan; task numbers 
 it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
 `Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
 they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
-every frame crossing the engine boundary, and `shape-language/` from task 2.2 governs shapes — what
-they admit, how they compose, and the variant dimensions they contribute). Keep this file in sync with
+every frame crossing the engine boundary, `shape-language/` from task 2.2 governs shapes — what they
+admit, how they compose, and the variant dimensions they contribute — and `variant-semantics/` from
+task 2.3 governs variants — selection, naming, recording, and variant-bound provider state). Keep this file in sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task

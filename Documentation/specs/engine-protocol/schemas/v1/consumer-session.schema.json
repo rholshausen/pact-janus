@@ -58,7 +58,11 @@
       "required": ["session", "handle"],
       "properties": {
         "session": { "type": "string" },
-        "handle": { "type": "string" }
+        "handle": { "type": "string" },
+        "policy": {
+          "type": "object",
+          "description": "Per-call sampling policy override (design 2.3), for a host offering an '--exhaustive'-style switch. The resolution order is spec-defaults, session config, interaction spec, then this."
+        }
       }
     },
     "VariantsResult": {
@@ -68,13 +72,18 @@
       "properties": {
         "variants": {
           "type": "array",
+          "description": "The selection, in run order — the variants the engine chose, not the whole space (design 2.3).",
           "items": { "$ref": "#/$defs/VariantDescriptor" }
+        },
+        "report": {
+          "type": "object",
+          "description": "How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3)."
         }
       }
     },
     "VariantDescriptor": {
       "title": "VariantDescriptor",
-      "description": "The protocol requires only 'id'; the rest belongs to design 2.3.",
+      "description": "The protocol requires only 'id'; the rest belongs to design 2.3, which defines the id, the assignment it derives from, the display label and the origin.",
       "type": "object",
       "required": ["id"],
       "properties": {

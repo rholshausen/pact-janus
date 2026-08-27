@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/variant/v1/sampling-policy.schema.json",
+  "title": "SamplingPolicy",
+  "description": "How an engine selects variants from a space (spec.md §3.8). Resolved in layers — specification defaults, session config, interaction spec, per-call override — with every member overriding, except 'pin' and 'exclude' which accumulate.",
+  "type": "object",
+  "properties": {
+    "strategy": {
+      "type": "string",
+      "description": "Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).",
+      "x-known-values": ["auto", "exhaustive", "t-wise", "base-only"]
+    },
+    "strength": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 2,
+      "description": "Covering strength for 't-wise'. 2 is pairwise, the default."
+    },
+    "exhaustive-threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 8,
+      "description": "Space size at or below which 'auto' selects every variant."
+    },
+    "max-variants": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 50,
+      "description": "Largest selection the engine will return for one interaction. Exceeding it is 'variant-budget-exceeded', never a truncated selection (spec.md §3.6)."
+    },
+    "algorithm": {
+      "type": "string",
+      "description": "The named selection algorithm (spec.md §3.7).",
+      "x-known-values": ["janus-ipog-v1"]
+    },
+    "pin": {
+      "type": "array",
+      "description": "Partial assignments the selection must extend, in order, after the base variant.",
+      "items": { "$ref": "#/$defs/Pin" }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).",
+      "items": { "$ref": "#/$defs/Exclusion" }
+    }
+  },
+  "$defs": {
+    "Pin": {
+      "title": "Pin",
+      "description": "A partial assignment. The sampler completes it with defaults and includes the result.",
+      "type": "object",
+      "required": ["assignment"],
+      "properties": {
+        "assignment": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/PointRef" }
+        },
+        "reason": { "type": "string" }
+      }
+    },
+    "Exclusion": {
+      "title": "Exclusion",
+      "description": "A conjunction of points that cannot occur together. A list of pairs, never an expression (spec.md §3.5).",
+      "type": "object",
+      "required": ["when", "reason"],
+      "properties": {
+        "when": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/PointRef" }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required: an excluded region is declared width that will never be demonstrated, and the contract records why."
+        }
+      }
+    },
+    "PointRef": {
+      "title": "PointRef",
+      "description": "A dimension reference (full id, full path, or a trailing run of whole path segments — spec.md §6.3) bound to one of its points.",
+      "type": "object",
+      "required": ["dimension", "point"],
+      "properties": {
+        "dimension": { "type": "string", "minLength": 1 },
+        "point": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -23,6 +23,7 @@
         "interaction-invalid",
         "pact-invalid",
         "pact-version-unsupported",
+        "variant-budget-exceeded",
         "component-unavailable",
         "component-failed",
         "internal"

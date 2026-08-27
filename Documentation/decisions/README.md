@@ -24,6 +24,8 @@ superseding ADR instead.
 | [0005](0005-poll-based-event-delivery.md) | Poll-based event delivery on all pipes; push as a negotiated stdio capability | proposed |
 | [0006](0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md) | Model bytes explicitly; make frame encoding a negotiated axis with JSON as the baseline | proposed |
 | [0007](0007-shapes-denote-value-sets.md) | Define a shape by the set of values it admits, over a domain that includes absence | proposed |
+| [0008](0008-deterministic-pairwise-variant-sampling.md) | Select variants by a named, deterministic pairwise algorithm, and fail rather than truncate | proposed |
+| [0009](0009-variant-bound-provider-state-parameters.md) | Bind provider-state parameters to variants in a separate member; an unproducible state fails | proposed |
 
 ## Decision backlog
 
@@ -32,8 +34,6 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 
 - Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
 - Components on day one vs HTTP/JSON kernel-privileged (design 2.6, informed by 3.8, 4.2, 8.1)
-- Variant sampling defaults: pairwise algorithm, exhaustive threshold, caps (design 2.3)
-- Provider-state/variant linkage (`whenVariant`) design (design 2.3)
 - Plan grammar versioning and stability policy (design 2.4, stressed by 8.4)
 - Pact v5 file format schema (design 2.5)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
