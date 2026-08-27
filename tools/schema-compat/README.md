@@ -29,10 +29,14 @@ Exit code 1 with one violation per line (each citing the spec rule) when anythin
 CI runs `lint` on every build and `diff` against the PR base branch (`.github/workflows/ci.yml`).
 
 The crate's integration tests do a second job the binary does not: they validate the specs' worked
-examples against the shipped schemas — protocol frame transcripts (`tests/examples.rs`) and shape
-documents (`tests/shape_examples.rs`) — so a spec's examples cannot drift from its schemas. Every
-```json block in the shape-language spec and its examples must carry a marker (`shape`, `variants`,
-`value`, `sketch`); an unmarked block fails the test rather than silently skipping the check.
+examples against the shipped schemas — protocol frame transcripts (`tests/examples.rs`), shape
+documents (`tests/shape_examples.rs`) and variant selections, policies and state bindings
+(`tests/variant_examples.rs`) — so a spec's examples cannot drift from its schemas. Every fenced JSON
+block in the shape-language and variant-semantics specs and their examples must carry a marker naming
+what it is (`shape`, `variants`, `value`, `selection`, `policy`, `params`, `sketch`); an unmarked block
+fails the test rather than silently skipping the check. `variant_examples.rs` also checks the worked
+selections against themselves — reported size against the list, base variant first, coverage complete,
+and every id derivable from the assignment it names.
 
 Why hand-built rather than adopted: spike 1.1 called this the "Smithy-diff-shaped gap" —
 generic JSON Schema diff tools classify breaking changes for *closed-world* schemas, and
