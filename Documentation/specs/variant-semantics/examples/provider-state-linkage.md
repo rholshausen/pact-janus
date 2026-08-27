@@ -7,8 +7,8 @@ given('an order exists', { shipped: whenVariant('shippedAt', 'present') })
 ```
 
 This file takes that line through to a verifier calling `state-setup`, on the same order payload the
-[sampling example](order-payload-sampling.md) selects six variants for. The interesting part is not
-the happy path — it is variant 4, which asks the provider for a state it cannot produce.
+[sampling example](order-payload-sampling.md) selects eight variants for. The interesting part is not
+the happy path — it is variant 5, which asks the provider for a state it cannot produce.
 
 Fenced blocks below carry a marker naming what they are: `params` blocks are validated against
 [`variant-params.schema.json`](../schemas/v1/variant-params.schema.json) and `policy` blocks against
@@ -75,16 +75,22 @@ the resolved id, so the verifier reading this pact resolves nothing and cannot r
 
 ## 3. Resolution, per variant
 
-The six selected variants resolve as follows (spec §6.4):
+The eight selected variants resolve as follows (spec §6.4):
 
-| # | shippedAt | status | → `shipped` | → `status` |
-|---|---|---|---|---|
-| 1 | present | PENDING | `true` | `"PENDING"` (default — no case names `PENDING`) |
-| 2 | absent | PENDING | `false` | `"PENDING"` |
-| 3 | present | SHIPPED | `true` | `"SHIPPED"` |
-| 4 | absent | SHIPPED | `false` | `"SHIPPED"` |
-| 5 | absent | DELIVERED | `false` | `"DELIVERED"` |
-| 6 | present | DELIVERED | `true` | `"DELIVERED"` |
+| # | origin | shippedAt | status | → `shipped` | → `status` |
+|---|---|---|---|---|---|
+| 1 | base | present | PENDING | `true` | `"PENDING"` (default — no case names `PENDING`) |
+| 2 | boundary | absent | PENDING | `false` | `"PENDING"` |
+| 3 | boundary | present | PENDING | `true` | `"PENDING"` |
+| 4 | covering | present | SHIPPED | `true` | `"SHIPPED"` |
+| 5 | covering | absent | SHIPPED | `false` | `"SHIPPED"` |
+| 6 | covering | present | DELIVERED | `true` | `"DELIVERED"` |
+| 7 | covering | absent | DELIVERED | `false` | `"DELIVERED"` |
+| 8 | covering | present | PENDING | `true` | `"PENDING"` |
+
+Variants 1, 3 and 8 resolve to the same state and differ only in dimensions no binding mentions —
+`items` and `payment`. A state binding is a function of the dimensions it names and nothing else, so
+identical states across variants are ordinary, not a sign that a variant is redundant.
 
 Resolution is a total function of the assignment and the binding, so the consumer computes these when
 recording an exercised variant and the verifier computes them again when replaying it, and the two
@@ -113,25 +119,32 @@ recorded request example, and matches the response against the shape *pinned to 
 (spec §5.2):
 
 ```text
-verifying 'get an order' — 6 recorded variants
-  1. base                                        state {id:42, shipped:true,  status:PENDING}   ✓
-  2. items=min+1;payment=invoice;shippedAt=absent state {id:42, shipped:false, status:PENDING}   ✓
-  3. payment=invoice;status=SHIPPED               state {id:42, shipped:true,  status:SHIPPED}   ✓
-  4. items=min+1;shippedAt=absent;status=SHIPPED  state {id:42, shipped:false, status:SHIPPED}   ✗
-  5. shippedAt=absent;status=DELIVERED            state {id:42, shipped:false, status:DELIVERED} ✓
-  6. items=min+1;payment=invoice;status=DELIVERED state {id:42, shipped:true,  status:DELIVERED} ✓
+verifying 'get an order' — 8 recorded variants
+  1. base                                          state {id:42, shipped:true,  status:PENDING}   ✓
+  2. shippedAt=absent                              state {id:42, shipped:false, status:PENDING}   ✓
+  3. items=min+1                                   state {id:42, shipped:true,  status:PENDING}   ✓
+  4. payment=invoice;status=SHIPPED                state {id:42, shipped:true,  status:SHIPPED}   ✓
+  5. items=min+1;shippedAt=absent;status=SHIPPED   state {id:42, shipped:false, status:SHIPPED}   ✗
+  6. status=DELIVERED                              state {id:42, shipped:true,  status:DELIVERED} ✓
+  7. items=min+1;payment=invoice;shippedAt=absent;status=DELIVERED
+                                                   state {id:42, shipped:false, status:DELIVERED} ✓
+  8. payment=invoice                               state {id:42, shipped:true,  status:PENDING}   ✓
 ```
 
-**Grouping saves less than it looks like it should.** If only `shipped` were bound, the six resolved
-states would run `true, false, true, false, false, true` and a verifier could collapse variants 5 and
-6 — one setup call saved out of six (spec §6.6). With both parameters bound, every variant's state is
-distinct and nothing collapses. That is the sampler working as designed: pairwise selection exists to
-vary dimensions *together*, so consecutive variants rarely share a state. Grouping is worth
-implementing as an optimisation and worth nobody's architecture.
+**Grouping saves less than it looks like it should.** No two *consecutive* variants above resolve to
+the same state, so nothing collapses at all — even though variants 1, 3 and 8 are identical states,
+they are not adjacent, and reordering to make them adjacent is forbidden (spec §6.6): recorded order
+is the order. If only `shipped` were bound, the eight would run
+`true, false, true, true, false, true, false, true` and a single pair — variants 3 and 4 — would
+collapse, saving one setup call out of eight.
+
+That is the sampler working as designed: pairwise selection exists to vary dimensions *together*, so
+consecutive variants rarely share a state. Grouping is worth implementing as an optimisation and worth
+nobody's architecture.
 
 ## 6. The variant the provider cannot produce
 
-Variant 4 asks for an order that is `SHIPPED` with no `shippedAt`. The order service sets the
+Variant 5 asks for an order that is `SHIPPED` with no `shippedAt`. The order service sets the
 timestamp whenever it sets the status, so its state handler cannot build one. It says so rather than
 silently building something else (design 2.7 owns the hook protocol):
 
@@ -140,10 +153,10 @@ silently building something else (design 2.7 owns the hook protocol):
   "reason": "an order cannot be SHIPPED without a shippedAt timestamp" }
 ```
 
-The verifier reports variant 4 as `state-unavailable`, and the run fails (spec §6.7):
+The verifier reports variant 5 as `state-unavailable`, and the run fails (spec §6.7):
 
 ```text
-✗ order-consumer / order-service — 1 of 6 variants not verified
+✗ order-consumer / order-service — 1 of 8 variants not verified
   'get an order', variant items=min+1;shippedAt=absent;status=SHIPPED
     state 'an order exists' {shipped: false, status: SHIPPED}: unsupported
     "an order cannot be SHIPPED without a shippedAt timestamp"
@@ -167,8 +180,8 @@ The fix is on the consumer side, and it is the exclusion from the
     "reason": "the order service sets shippedAt whenever it sets SHIPPED" } ] }
 ```
 
-The next consumer run selects six variants that do not include the combination, records the exclusion
-and its reason, and the verification passes — with the contract now saying, in writing, that this
+The next consumer run selects eight variants that do not include the combination, records the
+exclusion and its reason, and the verification passes — with the contract now saying, in writing, that this
 region was never demonstrated.
 
 **The waiver exists for the case where that loop is too slow.** A provider team blocked on a consumer
@@ -204,6 +217,6 @@ them (spec §6.5):
 ```
 
 The third is the one only a design that took gating seriously would catch. A binding on
-`payment@invoice.dueDate#presence` has no case to apply in any `card` variant — a third of the
-selection in §6 of the sampling example — and without a `default` the state parameter would simply vanish for those variants.
+`payment@invoice.dueDate#presence` has no case to apply in any `card` variant — five of the eleven in
+§6 of the sampling example, the base and both boundaries among them — and without a `default` the state parameter would simply vanish for those variants.
 Requiring `default` on a gated dimension turns a silent hole into a message.

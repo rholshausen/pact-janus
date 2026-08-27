@@ -203,6 +203,27 @@ fn worked_example_selections_are_internally_consistent() {
       coverage["covered"], coverage["targets"],
       "the worked example covers every reachable target"
     );
+    // Seeds come before the covering array, in the order spec §3.1 fixes.
+    let rank = |origin: &str| match origin {
+      "base" => 0,
+      "boundary" => 1,
+      "pinned" => 2,
+      _ => 3,
+    };
+    let origins: Vec<i32> = variants
+      .iter()
+      .map(|v| rank(v["origin"].as_str().unwrap_or("covering")))
+      .collect();
+    assert!(
+      origins.windows(2).all(|w| w[0] <= w[1]),
+      "selection is not ordered base, boundary, pinned, covering (spec §3.1): {origins:?}"
+    );
+    if report["boundaries"] == serde_json::Value::Bool(true) {
+      assert!(
+        origins.contains(&1),
+        "a selection with boundaries on must carry them"
+      );
+    }
     // Every id is derivable from its assignment (spec §2.2).
     for variant in variants {
       let derived: Vec<String> = variant["assignment"]

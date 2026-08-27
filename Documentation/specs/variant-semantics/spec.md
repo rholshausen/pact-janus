@@ -164,16 +164,58 @@ number anyone needs exactly, and computing it must never be the thing that fails
 ### 3.1 What a selection must contain
 
 A **selection** is an ordered list of variants drawn from the space, together with a report of how it
-was chosen (§3.9). Every selection MUST contain:
+was chosen (§3.9). Every selection MUST contain, in this order and deduplicated by assignment:
 
 1. **the base variant**, always, first;
-2. **one variant extending each pin**, in policy order (§3.8);
-3. **enough further variants to cover every reachable coverage target** at the configured strength
+2. **the minimal and maximal variants**, unless `boundaries` is turned off (§3.8);
+3. **one variant extending each pin**, in policy order (§3.8);
+4. **enough further variants to cover every reachable coverage target** at the configured strength
    (§3.3), or the honest report of which targets were not covered and why.
 
 The base variant is unconditional because it is the interaction the author actually wrote, because it
 is the one variant every upgraded v1–v4 pact has (§9), and because a run whose *first* failure is an
 exotic corner is a run whose failure nobody trusts.
+
+**The boundary variants.** The **minimal** and **maximal** variants put every dimension whose facet is
+*ordered* at its lowest and highest point respectively, every other dimension at its default, and let
+`complete` (§2.1) settle the rest. A facet is ordered when its points have a defined least and
+greatest element:
+
+| Facet | Order |
+|---|---|
+| `presence` | `absent` < `present` |
+| `nullability` | `null` < `non-null` |
+| `cardinality` | by size |
+| `value`, `alternative` | **unordered** — no point is smaller than another |
+| a component facet | ordered iff the component declares an order |
+
+They are in the selection for the same kind of reason the base variant is, and it is **not** coverage.
+Pairwise already covers every point and every pair of points, so `absent` and `max` each appear
+somewhere regardless; the extremes add only conjunctions of three or more, and an engine that wants
+those has `strength: 3`. What the extremes are for is that they are **the least and the most a
+provider is permitted to send** — the two ends of the width the contract declares. A pact that records
+six samples from the middle of its space and neither of its boundaries has recorded the wrong six.
+
+Two limits, stated rather than papered over:
+
+- **There is no maximal variant when a `one-of` is in the tree.** Alternatives are mutually exclusive
+  by construction, so no single variant opens all of them. The maximal variant takes the *default*
+  alternative and is maximal only over the ordered facets — it is not the largest payload the shape
+  admits, and calling it that would be a lie the report would have to keep telling.
+- **A boundary variant is often already there**, and then it costs nothing: the maximal variant *is*
+  the base whenever every `optional` defaults to `present` and every collection to its largest point.
+
+The cost is bounded and small, because they are seeds — the covering step works around them exactly as
+it does a pin:
+
+| Shape | Covering array alone | With the base and boundary seeds |
+|---|---|---|
+| the RFC's order payload (2×2×2×3) | 6 | 8 |
+| the same with a gated `optional` inside `invoice` | 9 | 11 |
+| eight `optional` members | 9 | 9 |
+| five optionals, three enumerations, one list | 12 | 13 |
+
+Between zero and two, and smallest where the space is largest.
 
 ### 3.2 Strategies and the default ladder
 
@@ -202,6 +244,9 @@ rather than asserted:
 | 2×2×2×3 (the RFC's order payload) | 24 | 6 |
 | 2^10 | 1 024 | 11 |
 | 2^20 | 1 048 576 | 14 |
+
+Those are covering-array sizes. A selection also carries the seeds of §3.1 — the base variant and,
+unless turned off, the two boundaries — which add between zero and two on top.
 
 The threshold of 8 comes out of the same table. Below it the sample and the space are close enough
 that exhaustive costs at most four extra runs and removes the only awkward question a sampled matrix
@@ -247,8 +292,10 @@ contract.
 
 Let `D` be the dimensions and `t` the strength.
 
-**Step 0 — seeds.** `S := [complete({})]`, then `complete(pin)` for each pin in policy order, skipping
-duplicates. Seeds are fixed: later steps read them for coverage and never modify them.
+**Step 0 — seeds.** `S := [complete({})]`; then the minimal and maximal variants (§3.1) unless
+`boundaries` is off; then `complete(pin)` for each pin in policy order. Duplicates are skipped, so a
+boundary that coincides with the base or a pin costs nothing. Seeds are fixed: later steps read them
+for coverage and never modify them.
 
 **Step 1 — targets.** `T :=` every reachable target (§3.3) at strength `t`, minus those removed by
 exclusions, minus those already covered by `S`.
@@ -376,6 +423,7 @@ Schema: [`schemas/v1/sampling-policy.schema.json`](schemas/v1/sampling-policy.sc
   "strength": 2,
   "exhaustive-threshold": 8,
   "max-variants": 50,
+  "boundaries": true,
   "algorithm": "janus-ipog-v1",
   "pin": [
     { "assignment": [ { "dimension": "status", "point": "SHIPPED" },
@@ -396,6 +444,11 @@ A policy resolves in layers, each overriding the one before it member by member:
 4. the `policy` member of the `consumer-session/variants` request, for a host that is offering a
    `--exhaustive` switch.
 
+`boundaries` turns the minimal and maximal seeds off (§3.1). It is the one reduction in what a
+selection demonstrates that costs nothing to reverse, which is why it is a boolean rather than a
+strategy: a suite that cannot afford two more runs per interaction says so once, in the session
+configuration, and the report says so on every interaction.
+
 `pin` and `exclude` are the exception: they **accumulate** across layers rather than overriding, so a
 session-wide exclusion is not silently lost when an interaction sets its strength. A pin is a *partial*
 assignment — pin `status = SHIPPED` and the sampler completes the rest, which is almost always what an
@@ -413,22 +466,23 @@ the document `consumer-session/variants` returns, and the input to a host's test
                       { "dimension": "response.body.payment#alternative", "point": "card" },
                       { "dimension": "response.body.shippedAt#presence", "point": "present" },
                       { "dimension": "response.body.status#value", "point": "PENDING" } ] },
-    { "id": "response.body.items#cardinality=min+1;response.body.payment#alternative=invoice;response.body.shippedAt#presence=absent",
-      "label": "items=min+1;payment=invoice;shippedAt=absent", "origin": "covering",
-      "assignment": [ { "dimension": "response.body.items#cardinality", "point": "min+1" },
-                      { "dimension": "response.body.payment#alternative", "point": "invoice" },
+    { "id": "response.body.shippedAt#presence=absent",
+      "label": "shippedAt=absent", "origin": "boundary",
+      "assignment": [ { "dimension": "response.body.items#cardinality", "point": "min" },
+                      { "dimension": "response.body.payment#alternative", "point": "card" },
                       { "dimension": "response.body.shippedAt#presence", "point": "absent" },
                       { "dimension": "response.body.status#value", "point": "PENDING" } ] } ],
   "report": {
     "space": { "size": 24, "exact": true, "dimensions": 4 },
     "strategy": "t-wise", "strength": 2, "algorithm": "janus-ipog-v1",
-    "selected": 6,
+    "selected": 8,
     "coverage": { "targets": 30, "covered": 30, "removed": 0, "dropped": 0 },
-    "budgets": { "exhaustive-threshold": 8, "max-variants": 50 } } }
+    "budgets": { "exhaustive-threshold": 8, "max-variants": 50 },
+    "boundaries": true } }
 ```
 
-`origin` says why each variant is in the list — `base`, `pinned` or `covering` — which is what lets a
-host explain a run, and what lets an author see that their pin survived. The report is not optional
+`origin` says why each variant is in the list — `base`, `boundary`, `pinned` or `covering` — which is
+what lets a host explain a run, and what lets an author see that their pin survived. The report is not optional
 decoration: §3.3 requires the coverage figures to be computed, and this is where they are stated.
 
 ## 4. The consumer loop
@@ -465,8 +519,8 @@ Statuses: `verified`, `failed`, `not-exercised`. Nothing distinguishes "the host
 
 ### 4.3 Run order
 
-The selection is ordered and hosts SHOULD run it in order: base first, then pins, then covering
-variants in the order the algorithm produced them. The first variant to run is therefore the one the
+The selection is ordered and hosts SHOULD run it in order: base first, then the boundary variants,
+then pins, then covering variants in the order the algorithm produced them. The first variant to run is therefore the one the
 author wrote by hand, so the first failure a user sees is the simplest one available. A host MAY run
 variants in parallel where its transports allow it (each variant is an independent exchange), but MUST
 report every variant's outcome.
@@ -482,8 +536,8 @@ For each exercised variant a pact file records (design 2.5 owns the encoding):
 
 For the interaction as a whole it records the shape once, the selection report (§3.9), and any
 exclusions with their reasons. Recording the report is what makes a pact file self-describing about its
-own coverage: a reader can see that a 24-variant space was covered pairwise by six variants under
-`janus-ipog-v1`, rather than inferring it from the length of a list.
+own coverage: a reader can see that a 24-variant space was covered pairwise under `janus-ipog-v1` by
+six variants, with two more at its boundaries, rather than inferring it from the length of a list.
 
 Variants that were not exercised are not recorded, in any form other than the report's counts. This is
 the RFC's honesty rule, and it is why a pact file cannot claim a variant that never ran.
@@ -674,10 +728,11 @@ never turned off.
 
 ```text
 interaction 'get an order' — 4 dimensions, space 24, pairwise (space > threshold 8)
-  selected 6 variants, covering 30 of 30 reachable pairs   [janus-ipog-v1]
+  selected 8 variants, covering 30 of 30 reachable pairs   [janus-ipog-v1]
     1. base                                        base
-    2. items=min+1;payment=invoice;shippedAt=absent covering
-    3. payment=invoice;status=SHIPPED               covering
+    2. shippedAt=absent                            boundary (minimal)
+    3. items=min+1                                 boundary (maximal)
+    4. payment=invoice;status=SHIPPED              covering
     …
   excluded 1 region: status=SHIPPED & shippedAt=absent
     "the order service sets shippedAt when it sets SHIPPED"

@@ -118,7 +118,8 @@ about list handling, and consumer code that breaks on a two-element list is exac
 variant testing exists to catch, so the dimension counts. The cost lands on design 2.3, not here —
 pairwise sampling over these four dimensions needs 6 variants, not 24, and 2.3 owns the thresholds and
 caps that keep it there. Those six are computed, and shown, in
-[2.3's worked example](../../variant-semantics/examples/order-payload-sampling.md).
+[2.3's worked example](../../variant-semantics/examples/order-payload-sampling.md) — which runs eight,
+adding the two variants that sit at the boundaries of the declared width.
 
 ## 4. Values produced for two variants
 

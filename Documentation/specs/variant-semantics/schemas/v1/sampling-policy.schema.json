@@ -28,6 +28,11 @@
       "default": 50,
       "description": "Largest selection the engine will return for one interaction. Exceeding it is 'variant-budget-exceeded', never a truncated selection (spec.md §3.6)."
     },
+    "boundaries": {
+      "type": "boolean",
+      "default": true,
+      "description": "Seed the minimal and maximal variants — every ordered-facet dimension at its lowest and highest point, the rest at their defaults (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed."
+    },
     "algorithm": {
       "type": "string",
       "description": "The named selection algorithm (spec.md §3.7).",

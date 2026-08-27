@@ -37,7 +37,7 @@
         "origin": {
           "type": "string",
           "description": "Why this variant is in the selection.",
-          "x-known-values": ["base", "pinned", "covering"]
+          "x-known-values": ["base", "boundary", "pinned", "covering"]
         },
         "states": {
           "type": "array",
@@ -85,6 +85,10 @@
         },
         "coverage": { "$ref": "#/$defs/Coverage" },
         "budgets": { "$ref": "#/$defs/Budgets" },
+        "boundaries": {
+          "type": "boolean",
+          "description": "Whether the minimal and maximal variants were seeded (spec.md §3.1)."
+        },
         "exclusions": {
           "type": "array",
           "description": "The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).",

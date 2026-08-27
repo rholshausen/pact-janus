@@ -27,28 +27,39 @@ is read by humans in a failure report, so "why is this variant here" needs an an
 **Selection is a pure function of the variant space and the policy, computed by a named algorithm, and
 a budget that would be exceeded is an error rather than a smaller sample.**
 
-Five commitments, and they are the contested ones:
+Six commitments, and they are the contested ones:
 
 1. **Pairwise by default, exhaustive at or below a space of 8.** Strength 2 is the default because most
    defects are single-parameter or two-parameter; the threshold is 8 because below it exhaustive costs
    at most four extra runs and removes the only awkward question a sampled matrix raises — which
    combination did we not try. At 16 the gap is ten runs and at 24 it is eighteen, which is where
    sampling starts earning its keep. Both numbers come from running the algorithm, not from taste.
-2. **No randomness, anywhere.** Every tie is broken by declaration order. Randomised generators (AETG
+2. **The base variant and the two boundaries are seeded, not sampled.** The minimal and maximal
+   variants put every *ordered*-facet dimension (`presence`, `nullability`, `cardinality`) at its
+   lowest and highest point and everything else at its default. The justification is deliberately not
+   coverage — pairwise already covers every point and every pair, so the extremes add only three-way
+   conjunctions, and an engine that wants those has `strength: 3`. It is that these two variants are
+   the least and the most a provider is permitted to send, and a contract that records six samples
+   from the middle of its space and neither of its boundaries has recorded the wrong six. Measured
+   cost: zero to two variants, smallest where the space is largest, because a seed is something the
+   covering step works around. Two limits are accepted rather than hidden: with a `one-of` in the tree
+   there is no maximal variant at all (alternatives are mutually exclusive), and `value` and
+   `alternative` facets have no order, so the extremes are silent about them.
+3. **No randomness, anywhere.** Every tie is broken by declaration order. Randomised generators (AETG
    and descendants) produce smaller arrays on average, and that is precisely the trade being refused: a
    sample that changes between runs turns every pact file into a diff and every flaky verification into
    archaeology.
-3. **The algorithm is named and frozen, not described.** `janus-ipog-v1` denotes the specified IPOG
+4. **The algorithm is named and frozen, not described.** `janus-ipog-v1` denotes the specified IPOG
    variant forever, and appears in the policy, the selection report and the pact file. A better sampler
    ships as `janus-ipog-v2` — an addition to an open vocabulary, never a redefinition. Same commitment
    ADR 0007 makes for operators, for the same reason: recorded artifacts outlive the code that wrote
    them.
-4. **Exceeding `max-variants` (default 50) fails the operation.** A truncated selection is a contract
+5. **Exceeding `max-variants` (default 50) fails the operation.** A truncated selection is a contract
    that silently demonstrates less than it claims, at the moment the shape is most complicated and the
    report least likely to be re-read. Failing puts the decision in front of the author, and all four
    ways out — narrow the shape, exclude a region, pin and drop to `base-only`, raise the budget — are
    visible in review.
-5. **Cross-dimension impossibility is an exclusion with a required reason, not a shape construct.** The
+6. **Cross-dimension impossibility is an exclusion with a required reason, not a shape construct.** The
    shape language's dimensions are independent by construction, and the RFC's own example needs
    `status = SHIPPED` tied to `shippedAt = present`. An exclusion removes a region from the *space*
    without narrowing `admits`, carries a mandatory reason, and is recorded in the pact — so an
@@ -58,7 +69,7 @@ Five commitments, and they are the contested ones:
 
 Two consequences of the same reasoning, recorded because they will be re-argued: the **base variant is
 always selected and always first**, so the first failure a user sees is the ordinary case the author
-wrote; and **the verifier never re-samples** — it replays exactly what the pact records, because
+wrote, with the boundaries immediately behind it; and **the verifier never re-samples** — it replays exactly what the pact records, because
 sampling again would test combinations the consumer never demonstrated and would make a green run
 depend on the verifier's policy rather than on the contract.
 
@@ -86,8 +97,8 @@ schemas `variant-selection.schema.json` and `sampling-policy.schema.json`.
 
 ## Consequences
 
-Easier: a sample of six covers the RFC's 24-variant order payload and 14 covers a space of a million,
-so declaring the real response space stays affordable; a pact file is self-describing about its own
+Easier: eight variants cover the RFC's 24-variant order payload — six for every pair, two for its
+boundaries — and 14 cover a space of a million, so declaring the real response space stays affordable; a pact file is self-describing about its own
 coverage (space, strategy, algorithm, pairs covered), so a reader can see what was demonstrated without
 re-running anything; failures are reproducible from the artifact alone.
 
@@ -101,7 +112,9 @@ and may be tuned, but the *shape* of the ladder (auto → exhaustive or t-wise, 
 decision; selection stays a pure function with no I/O, no clock and no RNG, which is also what keeps it
 inside the WASM kernel.
 
-**Tripwire** — revisit if any of these show up in Phase 4/5: teams routinely raise `max-variants`
+**Tripwire** — revisit if any of these show up in Phase 4/5: `boundaries` gets turned off routinely
+(two variants per interaction is too expensive, or the maximal variant is too obviously not maximal to
+be worth running); teams routinely raise `max-variants`
 instead of narrowing shapes (the budget is teaching the wrong lesson); exclusions accumulate faster than
 dimensions (the shape language, not the sampler, is missing the ability to express dependence); pairwise
 misses defects that a strength-3 default would have caught (4.6 is where that would surface); or the
