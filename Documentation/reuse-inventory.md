@@ -32,7 +32,8 @@ Core pact data structures, v1–v4 pact file reading/writing, matching-rule and 
 `wasm32-wasip2` (checked in pact-reference CI), which Janus's kernel requires. The v2 engine imports it
 pervasively (`matchingrules`, `path_exp`, `v4::http_parts`, `bodies::OptionalBody`), so forking the
 engine without taking `pact_models` would mean rewriting both at once — exactly the risk the plan
-avoids. Janus adds its own v5 model beside it (task 3.1); `pact_models` stays the v1–v4 door.
+avoids. Janus adds its own contract model beside it (task 3.1, ADR 0011); `pact_models` stays the
+v1–v4 door.
 Consume from crates.io; a git pin only if Janus needs unreleased fixes.
 
 ### v2 matching engine — fork as the kernel starting point

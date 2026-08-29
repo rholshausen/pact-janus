@@ -25,7 +25,7 @@ The RFC makes five big bets. Each phase below exists to test one or more of them
 **Prototype non-goals** (explicitly out of scope; noted as design-only where the RFC needs an answer):
 production hardening; the full SDK fleet (two SDKs only); broker/PactFlow server-side changes (subsumption
 runs locally/CI-side); full transport set (HTTP + one message-ish stretch; gRPC transport is a stretch
-goal); `pact upgrade` beyond a basic v3/v4→v5 conversion; the AI-assisted layer (design notes only);
+goal); `pact upgrade` beyond a basic v3/v4 pact → Janus contract conversion; the AI-assisted layer (design notes only);
 deprecation/migration timelines.
 
 ---
@@ -63,9 +63,9 @@ Milestones (each is demo-able):
 - **M1** — CLI compiles and `explain`s plans for both a v4 pact and a new-style interaction spec, and
   matches captured values offline.
 - **M2** — The RFC's TypeScript example, expressed as a raw interaction-spec document, runs against the
-  engine's mock server with the 12-variant space sampled, and a v5 pact file is written.
-  - **M3** — The same engine binary verifies that v5 pact *and* an existing v4 pact against a sample
-    provider, with auth and state hooks.
+  engine's mock server with the 12-variant space sampled, and a Janus contract is written.
+  - **M3** — The same engine binary verifies that Janus contract *and* an existing v4 pact against a
+    sample provider, with auth and state hooks.
 - **M4** — The RFC consumer example runs near-verbatim in TypeScript and on the JVM, both passing the
   seed conformance suite with identical behaviour.
 - **M5** — The RFC's "provider may produce SHIPPED, consumer only tested PENDING" scenario is reproduced
@@ -207,11 +207,18 @@ the "executable specification" — they graduate into it as golden corpora and s
   *versioning and stability policy* (RFC lists this as an implementation unknown — the prototype should
   propose one and stress it in Phase 8 when plugins contribute fragments). Define the golden-corpus
   format: (input spec or pact, expected plan, expected result against captured values).
-- **2.5 [design] Pact file format v5.** Schema: interaction description, typed provider-state parameters,
-  transport binding, parts with shape + exercised example variants, component requirements
-  (`content/protobuf >= 2`), metadata. Rules for v3/v4 → v5 conversion (matching rules become shapes;
-  the single example becomes the sole variant). Broker compatibility notes (self-contained JSON the
-  current broker can store even if it can't render it).
+- **2.5 [design] Janus contract format.** Not "pact v5":
+  [ADR 0011](decisions/0011-contracts-as-self-identifying-json-documents.md)
+  names this its own format so the Pact specification stays free to define v5 or v6, and settles the
+  serialisation (a single self-identifying JSON object), the identification rules, canonical writing,
+  the version line and the broker posture. What remains here is the **schema**: interaction description,
+  typed provider-state parameters, transport binding, parts with shape + exercised example variants,
+  component requirements (`content/protobuf >= 2`), metadata. Rules for v1–v4 pact → Janus contract
+  conversion (matching rules become shapes; the single example becomes the sole variant). Obeys ADR
+  0011's placement rule — anything affecting a verification run lives inside an interaction, provenance
+  lives in top-level `metadata`. Also specifies (implementation deferred) the lossless
+  exploded-directory projection. Broker compatibility is settled by ADR 0011 decision 6, with the
+  evidence in the [format review](contract-file-format-review.md).
 - **2.6 [design] Component interfaces.** The four interfaces (transport, content, matcher/generator,
   hook) in the chosen IDL, with the in-tree/out-of-tree symmetry rule from the RFC: built-ins implement
   exactly these. Decide the prototype's answer to "is everything a component on day one, or are HTTP/JSON
@@ -248,8 +255,9 @@ the "executable specification" — they graduate into it as golden corpora and s
 Goal: the heart of B2 — specs in, plans out, plans executable and inspectable — *before* any transport or
 process machinery, so matching is testable offline against corpora.
 
-- **3.1 [build] Pact model integration.** v1–v4 pact reading via the Phase 0.4 decision (likely
-  `pact_models` as a dependency). v5 model per design 2.5 (read and write).
+- **3.1 [build] Contract model integration.** v1–v4 pact reading via the Phase 0.4 decision (likely
+  `pact_models` as a dependency). Janus contract model per design 2.5 (read and write), including ADR
+  0011's canonical writing rules and its strict/tolerant identification modes.
 - **3.2 [build] Interaction-spec document model.** Parser/validator for the declarative interaction spec
   (description, states, parts, shapes per 2.2), with structured errors good enough to surface through the
   protocol to a DSL user.
@@ -286,8 +294,10 @@ speaks the protocol directly, proving the protocol is sufficient before DSLs exi
   from 2.6 — in-tree, but through the interface. JSON content component likewise.
 - **4.3 [build] Variant machinery.** Variant-space computation from compiled plans, pairwise sampler per
   2.3, `variants`/`serve-variant` operations, generators producing each variant's concrete payload.
-- **4.4 [build] v5 pact writing.** Shape once + concrete example per exercised variant; only exercised
-  variants recorded (the honesty rule).
+- **4.4 [build] Janus contract writing.** Shape once + concrete example per exercised variant; only
+  exercised variants recorded (the honesty rule). Writes canonically per ADR 0011 (deterministic bytes,
+  `$format` first) — worth a round-trip test, since determinism is what keeps broker dedup and git
+  diffs honest.
 - **4.5 [build] Protocol-level consumer test harness.** Rust/TS integration tests that play the SDK role
   over the protocol: submit the RFC order interaction, iterate variants, run a real HTTP client against
   the mock per variant, finalise, assert the pact file. Also exercises 1.2/1.3 embeddings against the
@@ -318,7 +328,9 @@ promise (old pacts verify).
 - **5.4 [build] v3/v4 verification.** Verify an existing real-world pact (e.g. from an example project)
   through the plan path from 3.5 — the "providers upgrade first at no cost" claim, demonstrated.
 - **5.5 [build] CLI.** `pact verify`, `pact explain` (incl. `--executed` after a failure), `pact upgrade`
-  (basic v3/v4→v5 per 2.5). Same engine, subprocess embedding — this doubles as the 1.3 result hardened.
+  (basic v3/v4 pact → Janus contract per 2.5). Same engine, subprocess embedding — this doubles as the
+  1.3 result hardened. Reading a contract identifies it per ADR 0011 rather than by guessing at
+  structure, so "this is not a Janus contract" is a clear error and not a misparse.
 - **5.6 [build] Sample provider.** A small order-service provider (any convenient stack) with deliberate
   variance and auth, used for M3, M5 and demos.
 
@@ -374,9 +386,12 @@ shape model, so 7.1 can start any time after Phase 3.
   subsumption findings into the RFC's `can-i-deploy`-style report, with `--policy warn|block` and
   exemption scoping per 2.8. Local/CI only — broker integration is design notes for the RFC, not
   prototype code.
-- **7.5 [design] Broker integration notes.** What the broker would need to store/render/decide for v5
-  artifacts, provider shapes and subsumption results (RFC implementation unknown "broker/PactFlow
-  handling of v5"). Written with the 7.1–7.4 experience in hand.
+- **7.5 [design] Broker integration notes.** What the broker would need to store/render/decide for
+  Janus contracts, provider shapes and subsumption results (RFC implementation unknown "broker/PactFlow
+  handling of v5"). Starts from the [format review](contract-file-format-review.md) §8.4, which already
+  scopes the OSS change set for storing and rendering contracts — including why widening the
+  `specification` allowlist alone would publish nothing — and adds what 7.1–7.4 teach about provider
+  shapes and subsumption results, which that review does not cover.
 
 **Milestone M5** closes this phase.
 
@@ -436,10 +451,10 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 | Subsumption warn/block default + exemption scoping | 2.8, 7.3, 7.4 |
 | Subsumption decidability limits | 2.8, 7.1 |
 | Plan grammar stability/versioning policy | 2.4, 8.4 |
-| Broker handling of v5 artifacts | 2.5, 7.5 |
+| Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), 7.5 |
 | Performance envelope WASM vs native FFI | 1.7, 9.1 |
 | Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype |
-| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4 |
+| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community |
 
 ---
 

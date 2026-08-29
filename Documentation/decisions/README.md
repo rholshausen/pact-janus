@@ -27,6 +27,7 @@ superseding ADR instead.
 | [0008](0008-deterministic-pairwise-variant-sampling.md) | Select variants by a named, deterministic pairwise algorithm, and fail rather than truncate | proposed |
 | [0009](0009-variant-bound-provider-state-parameters.md) | Bind provider-state parameters to variants in a separate member; an unproducible state fails | proposed |
 | [0010](0010-plans-are-renderings-the-grammar-is-the-record.md) | Treat plans as renderings and the grammar as the record; version them accordingly | proposed |
+| [0011](0011-contracts-as-self-identifying-json-documents.md) | Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification | proposed |
 
 ## Decision backlog
 
@@ -35,7 +36,10 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 
 - Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
 - Components on day one vs HTTP/JSON kernel-privileged (design 2.6, informed by 3.8, 4.2, 8.1)
-- Pact v5 file format schema (design 2.5)
+- Janus contract *schema* — members, conversion rules from v1–v4 (design 2.5). The file *format*,
+  naming and versioning line are settled by ADR 0011; what goes in the document is not.
+- Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
+  edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
   comparability classes it consumes are fixed by ADR 0007)
 - OCI component distribution model (design 2.6, minimal build 8.2)

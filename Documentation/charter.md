@@ -44,7 +44,8 @@ equally a success outcome. Undocumented abandonment is the only failure mode.
 Janus will **not** attempt: production hardening or API stability; more than two SDK languages; broker
 or PactFlow server-side changes (subsumption runs locally/CI-side; broker needs are design notes only);
 transports beyond HTTP plus at most one stretch (gRPC or message); a complete `pact upgrade` (basic
-v3/v4 → v5 only); the AI-assisted layer (design notes only); migration/deprecation timelines, naming,
+v1–v4 pact → Janus contract only); the AI-assisted layer (design notes only); migration/deprecation
+timelines, naming,
 governance or funding decisions (framed for the community, not decided here); Windows/exotic-platform
 coverage beyond what CI gives for free.
 
