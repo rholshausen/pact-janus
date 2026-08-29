@@ -13,7 +13,10 @@ every frame crossing the engine boundary, `shape-language/` from task 2.2 govern
 admit, how they compose, and the variant dimensions they contribute — and `variant-semantics/` from
 task 2.3 governs variants — selection, naming, recording, and variant-bound provider state — and
 `plan-grammar/` from task 2.4 governs plans: the node grammar, the action set, the text forms
-`explain` prints, and the golden-corpus format). Keep this file in sync with
+`explain` prints, and the golden-corpus format, and `contract-file/` from task 2.5 governs the Janus
+contract — the recorded artifact's identity, its interaction record, how shapes and exercised variants
+are written down, and v1–v4 pact conversion; it is *not* a "pact v5", see ADR 0011). Keep this file in
+sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task

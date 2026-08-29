@@ -278,9 +278,10 @@ raises — *which combination did we not try?*. At 16 the gap is ten runs and at
 is where "we tested every pair" stops being a compromise and starts being the point. An author who
 wants the whole space anyway says `exhaustive` and gets it, subject to the budget.
 
-`base-only` exists for two real cases: an upgraded v1–v4 pact, whose space has no dimensions at all and
-where `base-only` and `exhaustive` coincide; and a suite being migrated, where a team wants shapes
-recorded before it is ready to pay for variant runs. It is a deliberate, visible reduction in what the
+`base-only` exists for two real cases: an upgraded v1–v4 pact, which demonstrates exactly one example
+whatever size its converted shapes give the space (§9) — where the space has no dimensions at all,
+`base-only` and `exhaustive` coincide; and a suite being migrated, where a team wants shapes recorded
+before it is ready to pay for variant runs. It is a deliberate, visible reduction in what the
 contract demonstrates, and §7 requires it to be reported as such.
 
 ### 3.3 Coverage targets, reachability and gating
@@ -810,11 +811,26 @@ wants it pins it.
 
 ## 9. Evolution and compatibility
 
-**Upgraded pacts are the degenerate case, with no special rule.** A v1–v4 pact converted to v5 (design
-2.5) has matching rules turned into shapes and its single example as the sole variant, so its space has
-no dimensions: `size = 1`, the base variant is the only variant, every strategy agrees, and the
-selection is `[base]`. No branch in this specification exists for it — it falls out of the arithmetic,
-which is the test of whether the arithmetic was right.
+**Upgraded pacts are the degenerate case, with no special rule.** A v1–v4 pact converted to a Janus
+contract (design [2.5](../contract-file/spec.md#8-converting-v1v4-pacts); it is not a "pact v5" — [ADR
+0011](../../decisions/0011-contracts-as-self-identifying-json-documents.md)) has matching rules turned
+into shapes and its single example as the sole variant. Where none of the converted rules contributes a
+dimension, the space is fully degenerate: `size = 1`, the base variant is the only variant, every
+strategy agrees, and the selection is `[base]`.
+
+**The invariant is `selected = 1`, not `size = 1`.** Some rules do contribute dimensions — a `min` on
+an array becomes an `each-like` with a minimum, and shape spec §6.4 gives that operator a `cardinality`
+dimension with a `min+1` point whenever `max > min`, which an absent `max` satisfies — so a converted
+contract can have a space larger than its evidence. The pact demonstrated one
+example and §4.4's honesty rule permits recording exactly that, so the selection is `base` alone under
+strategy `base-only`, and the report says `selected: 1` against a `space.size` above 1. The contract is
+then honestly under-covered and its own report says by how much; running the consumer's suite under
+Janus is what closes the gap, which is the incentive the migration path wants.
+
+Neither case is a branch in this specification. `base-only` is a strategy the vocabulary already has
+(§3.2), the report's arithmetic is unchanged, and the degenerate space falls out of §2.3's product
+rather than being special-cased around it — which is the test of whether the arithmetic was right.
+Design 2.5 §8.3 states the same invariant from the conversion side.
 
 **The algorithm name is frozen; the vocabulary grows.** `janus-ipog-v1` denotes the algorithm of §3.4
 forever. Strategies, origins, algorithms and statuses are open string vocabularies that grow without a

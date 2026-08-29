@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/contract/v1/upgrade-findings.schema.json",
+  "title": "UpgradeFindings",
+  "description": "What a v1-v4 pact conversion could not carry across exactly, and what it decided on the author's behalf (spec.md §8.4). Returned by 'upgrade/pact' alongside the converted contract (protocol spec §8.4) so 'pact upgrade' can show its work. An empty list is the claim that the conversion was exact.",
+  "type": "object",
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Finding" }
+    }
+  },
+  "$defs": {
+    "Finding": {
+      "title": "Finding",
+      "description": "One spot in the source pact where the conversion lost something or made a judgement call.",
+      "type": "object",
+      "required": ["code", "kind", "path", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Open vocabulary; an unknown code is displayed, never dispatched on. Codes are listed in spec.md §8.4.",
+          "x-known-values": [
+            "example-frozen-as-equality",
+            "rule-unmapped",
+            "rule-combination-or",
+            "rule-narrowed",
+            "generator-dropped",
+            "content-type-inferred",
+            "body-not-parsed",
+            "state-params-untyped",
+            "duplicate-description",
+            "interaction-dropped"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "description": "'lossy' means the contract now says less than the pact did; 'judgement' means the converter chose between readings that the pact did not distinguish; 'note' means neither, and is worth reading anyway.",
+          "x-known-values": ["lossy", "judgement", "note"]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RFC 6901 JSON pointer into the *source pact*, not the converted contract — the author is looking at the file they wrote."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Prose, addressed to the author of the pact. Says what was decided and what to check, not what the converter's internals did."
+        },
+        "target": {
+          "type": "string",
+          "description": "RFC 6901 JSON pointer into the converted contract, where the source construct ended up, when there is such a place."
+        }
+      }
+    }
+  }
+}

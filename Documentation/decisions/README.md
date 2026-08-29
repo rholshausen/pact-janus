@@ -36,8 +36,6 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 
 - Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
 - Components on day one vs HTTP/JSON kernel-privileged (design 2.6, informed by 3.8, 4.2, 8.1)
-- Janus contract *schema* — members, conversion rules from v1–v4 (design 2.5). The file *format*,
-  naming and versioning line are settled by ADR 0011; what goes in the document is not.
 - Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
   edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator

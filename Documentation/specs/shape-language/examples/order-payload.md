@@ -255,11 +255,16 @@ language for.
 
 The shape travels inside an interaction specification on `consumer-session/add-interaction`, and the
 variant space comes back — as descriptors carrying at least `id` (protocol spec §8.2) — from
-`consumer-session/variants`. Interiors below belong to designs 2.5/3.2 and 2.3:
+`consumer-session/variants`. The interaction frame is design 2.5's; parts and their slots are per
+[contract spec §5.1](../../contract-file/spec.md#51-parts-slots-and-shapes), and each slot holds one of
+the shapes above:
 
 ```json sketch
 { "description": "a request for an order",
   "transport": { "kind": "http", "mode": "passive" },
-  "request": { "method": "GET", "path": "/orders/42" },
-  "response": { "status": 200, "body": { "content-type": "application/json" } } }
+  "parts": {
+    "request": { "method": { "shape": "equality", "example": "GET" },
+                 "path": { "shape": "equality", "example": "/orders/42" } },
+    "response": { "status": { "shape": "equality", "example": 200 },
+                  "body": { "shape": "object", "members": {} } } } }
 ```

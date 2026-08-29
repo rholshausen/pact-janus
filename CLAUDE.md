@@ -23,7 +23,9 @@ Three sources are the source of truth and take precedence over this file when th
   variant dimensions they contribute; `variant-semantics/` (task 2.3) governs variants — which
   ones get selected, how they are named and recorded, and how they drive provider state;
   `plan-grammar/` (task 2.4) governs plans — the node grammar, the action set, the text forms
-  `explain` prints, and the golden-corpus format.
+  `explain` prints, and the golden-corpus format; `contract-file/` (task 2.5) governs the Janus
+  contract — the recorded artifact's identity, its interaction record, how shapes and exercised
+  variants are written down, and v1–v4 pact conversion. It is **not** a "pact v5" (ADR 0011).
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust

@@ -209,16 +209,13 @@ the "executable specification" — they graduate into it as golden corpora and s
   format: (input spec or pact, expected plan, expected result against captured values).
 - **2.5 [design] Janus contract format.** Not "pact v5":
   [ADR 0011](decisions/0011-contracts-as-self-identifying-json-documents.md)
-  names this its own format so the Pact specification stays free to define v5 or v6, and settles the
-  serialisation (a single self-identifying JSON object), the identification rules, canonical writing,
-  the version line and the broker posture. What remains here is the **schema**: interaction description,
-  typed provider-state parameters, transport binding, parts with shape + exercised example variants,
-  component requirements (`content/protobuf >= 2`), metadata. Rules for v1–v4 pact → Janus contract
-  conversion (matching rules become shapes; the single example becomes the sole variant). Obeys ADR
-  0011's placement rule — anything affecting a verification run lives inside an interaction, provenance
-  lives in top-level `metadata`. Also specifies (implementation deferred) the lossless
-  exploded-directory projection. Broker compatibility is settled by ADR 0011 decision 6, with the
-  evidence in the [format review](contract-file-format-review.md).
+  names this its own format so the Pact specification stays free to define v5 or v6. Specification:
+  [`specs/contract-file/`](specs/contract-file/spec.md) — document identity and canonical writing, the
+  interaction record (description, transport binding, states, parts), how shapes and exercised variants
+  are written down, typed provider-state parameters, component requirements (`content/protobuf >= 2`),
+  metadata under the placement rule, v1–v4 pact conversion with its findings vocabulary, the broker
+  posture, and the exploded-directory projection (specified; implementation deferred on evidence).
+  Schemas `contract.schema.json` and `upgrade-findings.schema.json`; worked examples validated in CI.
 - **2.6 [design] Component interfaces.** The four interfaces (transport, content, matcher/generator,
   hook) in the chosen IDL, with the in-tree/out-of-tree symmetry rule from the RFC: built-ins implement
   exactly these. Decide the prototype's answer to "is everything a component on day one, or are HTTP/JSON

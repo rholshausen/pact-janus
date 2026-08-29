@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/contract/v1/contract.schema.json",
+  "title": "Contract",
+  "description": "A Janus contract: what a consumer demonstrated against a mock, recorded so a provider can be held to it (spec.md §2). Not a pact file — ADR 0011 names this its own format. Documents this schema treats as opaque objects are owned elsewhere and validated against their own schemas: shapes by design 2.2, the selection report by design 2.3, transport and endpoint descriptors by design 2.6.",
+  "type": "object",
+  "required": ["$format", "consumer", "provider", "interactions"],
+  "properties": {
+    "$format": {
+      "type": "string",
+      "description": "The format token. A writer MUST emit this as the document's first member, so a conformant file begins with the byte prefix '{\"$format\":' (spec.md §2.3). JSON Schema cannot express member order; the writer conformance test does.",
+      "x-known-values": ["janus-contract/1"]
+    },
+    "$schema": {
+      "type": "string",
+      "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it (spec.md §2.3)."
+    },
+    "consumer": { "$ref": "#/$defs/Pacticipant" },
+    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "interactions": {
+      "type": "array",
+      "description": "In the order the consumer submitted them. Every interaction here was exercised successfully on every variant its selection required (spec.md §2.2) — a contract is never written otherwise.",
+      "items": { "$ref": "#/$defs/Interaction" }
+    },
+    "metadata": { "$ref": "#/$defs/Metadata" }
+  },
+  "$defs": {
+    "Pacticipant": {
+      "title": "Pacticipant",
+      "description": "A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Interaction": {
+      "title": "Interaction",
+      "description": "One interaction: its shape recorded once, and the evidence of every variant that was exercised (spec.md §4). Identity is 'description' plus 'states' (spec.md §4.2).",
+      "type": "object",
+      "required": ["description", "parts", "selection"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2)."
+        },
+        "transport": { "$ref": "#/$defs/Transport" },
+        "states": {
+          "type": "array",
+          "description": "Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.",
+          "items": { "$ref": "#/$defs/State" }
+        },
+        "parts": {
+          "type": "object",
+          "description": "Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.",
+          "additionalProperties": { "$ref": "#/$defs/ShapePart" }
+        },
+        "requires": {
+          "type": "array",
+          "description": "Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.",
+          "items": { "$ref": "#/$defs/Requirement" }
+        },
+        "selection": { "$ref": "#/$defs/RecordedSelection" }
+      }
+    },
+    "Transport": {
+      "title": "Transport",
+      "description": "How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Open vocabulary; an unknown kind is 'component-unavailable' naming it, never a silent skip.",
+          "x-known-values": ["http", "https", "message"]
+        },
+        "mode": {
+          "type": "string",
+          "description": "Whether the consumer answers a request ('passive') or emits a message ('emissive') — protocol spec §8.2.",
+          "x-known-values": ["passive", "emissive"],
+          "default": "passive"
+        }
+      }
+    },
+    "State": {
+      "title": "State",
+      "description": "A provider state. 'params' holds literal parameters; 'variant-params' holds bindings whose value depends on the running variant (variant semantics §6.2, whose schema owns their contents).",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "params": {
+          "type": "object",
+          "description": "Literal parameters, as authored. A name appearing here MUST NOT also appear in 'variant-params' (variant semantics §6.2)."
+        },
+        "variant-params": {
+          "type": "array",
+          "description": "Variant-bound parameter bindings. Each item is design 2.3's binding document; 'dimension' is always the resolved dimension id, never the author's shorthand (variant semantics §6.3).",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "ShapePart": {
+      "title": "ShapePart",
+      "description": "One part's shapes: slot name -> shape node. Each value is design 2.2's shape document, opaque here.",
+      "type": "object",
+      "additionalProperties": { "type": "object" }
+    },
+    "Requirement": {
+      "title": "Requirement",
+      "description": "A component the interaction needs, at a major version or above (spec.md §7). Structured rather than an expression string, because a document that must be evaluated to be understood cannot be reviewed (ADR 0007's reasoning).",
+      "type": "object",
+      "required": ["component"],
+      "properties": {
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "description": "'<interface>/<name>', e.g. 'content/protobuf'. The interface half is an open vocabulary owned by design 2.6."
+        },
+        "min-version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Lowest acceptable major version. Majors only: the protocol is coarse-grained by ADR 0002, and a contract that pins a patch is a contract that breaks on a bug fix."
+        }
+      }
+    },
+    "RecordedSelection": {
+      "title": "RecordedSelection",
+      "description": "Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).",
+      "type": "object",
+      "required": ["variants", "report"],
+      "properties": {
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "description": "In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics §5.1). Only exercised variants appear — the honesty rule.",
+          "items": { "$ref": "#/$defs/RecordedVariant" }
+        },
+        "report": {
+          "type": "object",
+          "description": "Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage."
+        }
+      }
+    },
+    "RecordedVariant": {
+      "title": "RecordedVariant",
+      "description": "One exercised variant: its identity from design 2.3, and the concrete values it produced. 'parts' is this design's addition to design 2.3's variant document (variant semantics §4.4).",
+      "type": "object",
+      "required": ["id", "assignment", "parts"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics §2.2)."
+        },
+        "assignment": {
+          "type": "array",
+          "description": "The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.",
+          "items": { "type": "object" }
+        },
+        "states": {
+          "type": "array",
+          "description": "The interaction's states with this variant's parameters resolved (variant semantics §6.4). Resolved values only — bindings live on the interaction, never here.",
+          "items": { "$ref": "#/$defs/ResolvedState" }
+        },
+        "parts": {
+          "type": "object",
+          "description": "Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.",
+          "additionalProperties": { "$ref": "#/$defs/ValuePart" }
+        }
+      }
+    },
+    "ResolvedState": {
+      "title": "ResolvedState",
+      "description": "A state as this variant needs it. A parameter with no case and no default is absent — not null, not empty (variant semantics §6.4).",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "params": { "type": "object" }
+      }
+    },
+    "ValuePart": {
+      "title": "ValuePart",
+      "description": "One part's recorded values: slot name -> slot value.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/SlotValue" }
+    },
+    "SlotValue": {
+      "title": "SlotValue",
+      "description": "The value a slot carried, always wrapped. The wrapper is unconditional and never in-band: a bare value with a sibling tag would be ambiguous against user data that happens to have that member, which is the trap ADR 0007 and variant semantics §6.2 both refuse (spec.md §5.3).",
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "x-tagged-by": "encoded",
+          "description": "The value, represented as 'encoded' says. Absent means the slot was empty; null means the slot carried a null."
+        },
+        "encoded": {
+          "type": "string",
+          "description": "How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 §4 octets (ADR 0006).",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "content-type": {
+          "type": "string",
+          "description": "The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it."
+        }
+      }
+    },
+    "Metadata": {
+      "title": "Metadata",
+      "description": "How the file came to exist, and nothing that changes what a verifier does (spec.md §3.2). Deliberately outside the content-addressed identity, so an unchanged rebuild is not a new contract. MUST NOT carry 'pactSpecification' — a Janus contract conforms to no pact specification version (ADR 0011).",
+      "type": "object",
+      "properties": {
+        "writer": {
+          "type": "object",
+          "description": "What wrote the file: an open map of component name to version string.",
+          "additionalProperties": { "type": "string" }
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2)."
+        },
+        "build-url": { "type": "string" }
+      }
+    }
+  }
+}
