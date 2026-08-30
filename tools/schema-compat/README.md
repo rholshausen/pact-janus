@@ -31,16 +31,21 @@ CI runs `lint` on every build and `diff` against the PR base branch (`.github/wo
 The crate's integration tests do a second job the binary does not: they validate the specs' worked
 examples against the shipped schemas — protocol frame transcripts (`tests/examples.rs`), shape
 documents (`tests/shape_examples.rs`), variant selections, policies and state bindings
-(`tests/variant_examples.rs`) and plans and corpus cases (`tests/plan_examples.rs`) — so a spec's
-examples cannot drift from its schemas. Every fenced JSON block in those specs and their examples must
+(`tests/variant_examples.rs`), plans and corpus cases (`tests/plan_examples.rs`), contracts and their
+upgrade findings (`tests/contract_examples.rs`) and component frames (`tests/component_examples.rs`) —
+so a spec's examples cannot drift from its schemas. Every fenced JSON block in those specs and their examples must
 carry a marker naming what it is (`shape`, `variants`, `value`, `selection`, `policy`, `params`,
 `plan`, `corpus`, `sketch`); an unmarked block fails the test rather than silently skipping the check.
 
-Two of those tests do a job a schema cannot. `variant_examples.rs` checks the worked selections against
+Three of those tests do a job a schema cannot. `variant_examples.rs` checks the worked selections against
 themselves — reported size against the list, base variant first, coverage complete, seeds before the
 covering array, and every id derivable from the assignment it names. `plan_examples.rs` checks the plan
 text forms, which have no schema: parentheses balance in every whole plan, and every `%action` a worked
 example uses is one the specification actually names, so an example cannot quietly invent an action.
+`component_examples.rs` checks the documents design 2.6 hands to other designs against their owners'
+schemas — a contributed fragment is a plan node, a component's mismatch is a plan result, a contributed
+dimension is a variant-space dimension — and that every contributed operator or action is namespaced
+with its own component's name.
 
 Why hand-built rather than adopted: spike 1.1 called this the "Smithy-diff-shaped gap" —
 generic JSON Schema diff tools classify breaking changes for *closed-world* schemas, and
