@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/handshake.schema.json",
+  "title": "Handshake",
+  "description": "The component/hello exchange: the engine says what protocol versions and grants it offers, the component says who it is, which interfaces it implements and what it contributes. The handshake is the only source of truth about a component's contributions — there is no manifest to agree with it (ADR 0012). See spec.md §3.2–3.3.",
+  "$defs": {
+    "ComponentHello": {
+      "title": "ComponentHello",
+      "description": "Engine -> component, the first request on every component pipe.",
+      "type": "object",
+      "required": ["component-protocol-versions"],
+      "properties": {
+        "component-protocol-versions": {
+          "type": "array",
+          "description": "Component-protocol major versions the engine can speak, in preference order.",
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "engine": { "$ref": "#/$defs/Party" },
+        "grants": {
+          "$ref": "component-config.schema.json#/$defs/Grants",
+          "description": "What the component was actually granted, so it can fail its own handshake usefully rather than at first use (spec.md §3.2)."
+        },
+        "capabilities": { "$ref": "#/$defs/Capabilities" }
+      }
+    },
+    "ComponentHelloResult": {
+      "title": "ComponentHelloResult",
+      "description": "Component -> engine. Everything the engine indexes about a component comes from here.",
+      "type": "object",
+      "required": ["component-protocol-version", "component", "interfaces"],
+      "properties": {
+        "component-protocol-version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The version the component selected from the engine's list."
+        },
+        "component": { "$ref": "#/$defs/Party" },
+        "interfaces": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The interfaces this component implements. A component is a package, not a role, and may implement several (spec.md §2.1).",
+          "items": {
+            "type": "string",
+            "x-known-values": ["transport", "content", "matcher", "hook"]
+          }
+        },
+        "contributes": { "$ref": "#/$defs/Contributions" },
+        "capabilities": { "$ref": "#/$defs/Capabilities" }
+      }
+    },
+    "Party": {
+      "title": "Party",
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "For a component, its identity and its namespace for contributed operators and actions (spec.md §2.4)."
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semantic version. Only the major is contract-relevant; requirements compare against this, never against a tag (spec.md §2.3)."
+        }
+      }
+    },
+    "Capabilities": {
+      "title": "Capabilities",
+      "description": "Open capability map, as protocol spec §5.3. Member names are an open vocabulary; each value is an object, '{}' when presence is the signal. Both sides ignore names they do not know.",
+      "type": "object"
+    },
+    "Contributions": {
+      "title": "Contributions",
+      "description": "What the component adds to the engine's vocabularies. Every declared operator, action and generator name MUST be namespaced with the component's own name; the engine checks that at load rather than at first use (spec.md §2.4).",
+      "type": "object",
+      "properties": {
+        "transports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TransportContribution" }
+        },
+        "content-types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ContentTypeContribution" }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ActionContribution" }
+        },
+        "operators": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OperatorContribution" }
+        },
+        "generators": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/GeneratorContribution" }
+        },
+        "hook-points": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HookPointContribution" }
+        }
+      }
+    },
+    "TransportContribution": {
+      "title": "TransportContribution",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The transport kind this component serves. Open vocabulary.",
+          "x-known-values": ["http", "https", "message"]
+        },
+        "roles": {
+          "type": "array",
+          "description": "Which roles it supports: 'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1). A transport may support both.",
+          "items": {
+            "type": "string",
+            "x-known-values": ["serve", "drive"]
+          }
+        }
+      }
+    },
+    "ContentTypeContribution": {
+      "title": "ContentTypeContribution",
+      "type": "object",
+      "required": ["media-type"],
+      "properties": {
+        "media-type": {
+          "type": "string",
+          "description": "A media type, or a 'type/*' pattern."
+        },
+        "degradations": {
+          "type": "array",
+          "description": "Distinctions this content type cannot express, declared rather than pretended (shape spec §4.2, spec.md §6.4).",
+          "items": { "$ref": "#/$defs/Degradation" }
+        }
+      }
+    },
+    "Degradation": {
+      "title": "Degradation",
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "What was lost. Open vocabulary.",
+          "x-known-values": ["numeric-lexical", "no-null", "no-boolean", "string-only", "unordered-members"]
+        },
+        "message": { "type": "string" },
+        "path": {
+          "type": "string",
+          "description": "Where the loss occurred, for a per-decode degradation. Absent on a statically declared one."
+        }
+      }
+    },
+    "ActionContribution": {
+      "title": "ActionContribution",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+          "description": "Namespaced plan action, e.g. 'json:parse' (plan grammar §4.1). An unnamespaced name is reserved for the specification forever."
+        },
+        "lazy": {
+          "type": "boolean",
+          "description": "Whether the action evaluates its children lazily (plan grammar §2.4). Laziness is declared, never incidental.",
+          "default": false
+        }
+      }
+    },
+    "OperatorContribution": {
+      "title": "OperatorContribution",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+          "description": "Namespaced shape operator, e.g. 'http:status-class' (shape spec §3.5)."
+        },
+        "comparability": {
+          "type": "string",
+          "description": "What a subsumption checker may do with this operator (shape spec §8, spec.md §7.5). Absent means opaque: yes on identity, unknown otherwise.",
+          "x-known-values": ["exact", "conservative", "opaque"]
+        },
+        "variant-facet": {
+          "type": "string",
+          "description": "The facet name of the dimension this operator contributes, when it contributes one (spec.md §7.4). Absent means it contributes none, which is the common case."
+        }
+      }
+    },
+    "GeneratorContribution": {
+      "title": "GeneratorContribution",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+          "description": "Namespaced generator, referenced from a shape node's 'generator' member (shape spec §3.4)."
+        },
+        "produces": {
+          "type": "string",
+          "description": "Advisory note on what the generator produces. The binding rule is not advisory: its output must be admitted by the shape it generates for (spec.md §7.3)."
+        }
+      }
+    },
+    "HookPointContribution": {
+      "title": "HookPointContribution",
+      "type": "object",
+      "required": ["point"],
+      "properties": {
+        "point": {
+          "type": "string",
+          "description": "A lifecycle point from design 2.7's open vocabulary.",
+          "x-known-values": ["before-request", "state-setup", "produce-message", "consume-message", "after-verification"]
+        },
+        "changes": {
+          "type": "array",
+          "description": "Context members this hook may replace at this point. The engine applies only declared changes and rejects an undeclared one (spec.md §8.2). A hook that only observes declares none and can make none.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

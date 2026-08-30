@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/matcher.schema.json",
+  "title": "Matcher",
+  "description": "The matcher interface: contributed shape operators, plan actions, variant dimensions, comparability and generators. Matching and generating are one interface because a generator's output must be admitted by the shape it generates for (shape spec §3.4), and one declared authority is what lets the engine check that pair. See spec.md §7.",
+  "$defs": {
+    "Compile": {
+      "title": "Compile",
+      "description": "Turn one shape node carrying this component's operator into a plan fragment. A contributed operator is compiled and executed exactly as a core one is; nothing about it is special-cased in the interpreter (plan grammar §4.6).",
+      "type": "object",
+      "required": ["operator", "node", "path"],
+      "properties": {
+        "operator": { "type": "string" },
+        "node": {
+          "type": "object",
+          "description": "The shape node, owned by design 2.2."
+        },
+        "path": { "type": "string" }
+      }
+    },
+    "CompileResult": {
+      "title": "CompileResult",
+      "type": "object",
+      "required": ["fragment"],
+      "properties": {
+        "fragment": {
+          "type": "object",
+          "description": "A plan fragment in design 2.4's grammar. A fragment that uses only core actions needs no apply at all — the cheapest kind of component operator, and fully visible in explain (spec.md §7.1)."
+        },
+        "grammar-version": {
+          "type": "string",
+          "x-known-values": ["v0"]
+        }
+      }
+    },
+    "Apply": {
+      "title": "Apply",
+      "description": "Execute one of this component's actions against values. Batched from day one: spike 1.4 measured 1.4 microseconds per pipe call, fine per value at test scale and the obvious lever if it ever is not (spec.md §7.2).",
+      "type": "object",
+      "required": ["action", "values"],
+      "properties": {
+        "action": { "type": "string" },
+        "config": {
+          "type": "object",
+          "description": "The action's configuration, as the compiled plan node carries it."
+        },
+        "values": {
+          "type": "array",
+          "description": "The values to apply the action to. One entry unless the component declared the 'batch-apply' capability.",
+          "items": { "$ref": "#/$defs/MatchValue" }
+        }
+      }
+    },
+    "ApplyResult": {
+      "title": "ApplyResult",
+      "type": "object",
+      "required": ["results"],
+      "properties": {
+        "results": {
+          "type": "array",
+          "description": "One result per input value, in the same order. Each is a plan result document in design 2.4's result form, so a component mismatch is a mismatch and not a special case.",
+          "items": { "$ref": "#/$defs/PlanResult" }
+        }
+      }
+    },
+    "VariantSpace": {
+      "title": "VariantSpace",
+      "type": "object",
+      "required": ["operator", "node", "path"],
+      "properties": {
+        "operator": { "type": "string" },
+        "node": { "type": "object" },
+        "path": { "type": "string" }
+      }
+    },
+    "VariantSpaceResult": {
+      "title": "VariantSpaceResult",
+      "type": "object",
+      "required": ["dimensions"],
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "description": "Dimensions this operator contributes, as design 2.2's variant-space documents. Point order is minimal-to-maximal — that ordering is the declaration variant semantics §3.1 asks a component facet for. Gates must form a forest; an engine rejects a set that does not (spec.md §7.4). Empty is the common case.",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "Compare": {
+      "title": "Compare",
+      "description": "The containment procedure a subsumption checker calls for an operator declared 'exact' (shape spec §8, spec.md §7.5).",
+      "type": "object",
+      "required": ["operator", "provider", "consumer"],
+      "properties": {
+        "operator": { "type": "string" },
+        "provider": { "type": "object" },
+        "consumer": { "type": "object" }
+      }
+    },
+    "CompareResult": {
+      "title": "CompareResult",
+      "type": "object",
+      "required": ["verdict"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "description": "Whether admits(provider) is contained in admits(consumer). 'unknown' is a first-class answer; a component MUST answer it rather than guess, because a wrong 'yes' is how a checker loses its users.",
+          "x-known-values": ["yes", "no", "unknown"]
+        },
+        "reason": { "type": "string" }
+      }
+    },
+    "Generate": {
+      "title": "Generate",
+      "type": "object",
+      "required": ["generator"],
+      "properties": {
+        "generator": { "type": "string" },
+        "config": { "type": "object" },
+        "context": {
+          "type": "object",
+          "description": "What the generator is allowed to know — the variant assignment, values already produced in this interaction. Open vocabulary. Ambient state (a clock, randomness) comes from the component's own runtime under its grants, not from here."
+        }
+      }
+    },
+    "GenerateResult": {
+      "title": "GenerateResult",
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "$ref": "#/$defs/MatchValue" }
+      }
+    },
+    "MatchValue": {
+      "title": "MatchValue",
+      "description": "One value in the shape language's model, wrapped the same way a slot value is so that octets and text are unambiguous.",
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": { "x-tagged-by": "encoded" },
+        "encoded": {
+          "type": "string",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "path": {
+          "type": "string",
+          "description": "Where this value came from, for attributing a result."
+        }
+      }
+    },
+    "PlanResult": {
+      "title": "PlanResult",
+      "description": "Design 2.4's Result document, unchanged: status ('ok', 'value', 'error'), the value or the message and path. Deliberately not restated here — a component mismatch is a mismatch in the plan grammar's own result form, and two definitions of it would eventually disagree. The worked examples are validated against design 2.4's schema to prove the two agree.",
+      "type": "object"
+    }
+  }
+}

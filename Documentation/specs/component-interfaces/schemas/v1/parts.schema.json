@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/parts.schema.json",
+  "title": "Parts",
+  "description": "The abstract interaction parts a transport maps wire traffic to and from: part name -> slot name -> slot value. Part and slot names belong to the transport and content components, never to the kernel (shape spec §3.6, contract spec §5.1); this schema fixes only the nesting. See spec.md §4.",
+  "type": "object",
+  "additionalProperties": { "$ref": "#/$defs/Part" },
+  "$defs": {
+    "Part": {
+      "title": "Part",
+      "description": "One part: slot name -> slot value.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/SlotValue" }
+    },
+    "SlotValue": {
+      "title": "SlotValue",
+      "description": "The value a slot carries, always wrapped. This is design 2.5's SlotValue unchanged: the same document crosses both boundaries by intent, so nothing translates between them. The wrapper is unconditional because a bare value with a sibling tag would be ambiguous against user data carrying that member (contract spec §5.3).",
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "x-tagged-by": "encoded",
+          "description": "The value, represented as 'encoded' says. Absent means the slot was empty; null means the slot carried a null."
+        },
+        "encoded": {
+          "type": "string",
+          "description": "How to read 'content': 'json' is the value as it stands, 'text' is a string whose octets are its UTF-8 encoding, 'base64' is RFC 4648 §4 octets (ADR 0006). A transport carrying a body uses 'base64' — it carries octets, not documents (spec.md §4).",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "content-type": {
+          "type": "string",
+          "description": "The media type declared for this slot, when it had one. Carried so the content component is handed it rather than re-deriving it."
+        }
+      }
+    },
+    "EndpointDescriptor": {
+      "title": "EndpointDescriptor",
+      "description": "What a started transport is reachable at: host and port for HTTP, broker and topic details for messaging, whatever else a transport needs. An open document, never assumed to be a URL (spike 1.5 finding 1). Passed to the host unchanged as the 'endpoint' of consumer-session/start-transport.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The transport kind that produced this descriptor. Open vocabulary.",
+          "x-known-values": ["http", "https", "message"]
+        }
+      }
+    }
+  }
+}

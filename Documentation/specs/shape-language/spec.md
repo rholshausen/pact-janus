@@ -64,7 +64,7 @@ Out of scope, with owners:
 | which variants to actually run: sampling, thresholds, caps, pinning, `whenVariant` | design [2.3](../variant-semantics/spec.md) |
 | how a shape becomes an executable plan; the node grammar and action set | design 2.4 |
 | how shapes and exercised examples are written into a pact file; v1–v4 → v5 conversion | design 2.5 |
-| how content components decode bodies; generator components | design 2.6 |
+| how content components decode bodies; generator components | design [2.6](../component-interfaces/spec.md) |
 | the subsumption walk, finding severities, warn/block policy | design 2.8 |
 | the interaction-specification document that carries parts and shapes | designs 2.5, 3.2 |
 
@@ -95,7 +95,7 @@ well-formedness rule.
 ### 2.2 Bytes and decoded content
 
 A body arrives as octets. Whether a shape sees octets or a structured document is the content
-component's business (design 2.6): the component decodes the part's content into a document in this
+component's business (design [2.6](../component-interfaces/spec.md)): the component decodes the part's content into a document in this
 model, and the shape applies to *that document*. Two consequences, both normative:
 
 - A shape that addresses into structure (`object`, `array`, `each-like`, `each-entry`) requires a

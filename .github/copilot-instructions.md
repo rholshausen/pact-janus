@@ -15,8 +15,10 @@ task 2.3 governs variants — selection, naming, recording, and variant-bound pr
 `plan-grammar/` from task 2.4 governs plans: the node grammar, the action set, the text forms
 `explain` prints, and the golden-corpus format, and `contract-file/` from task 2.5 governs the Janus
 contract — the recorded artifact's identity, its interaction record, how shapes and exercised variants
-are written down, and v1–v4 pact conversion; it is *not* a "pact v5", see ADR 0011). Keep this file in
-sync with
+are written down, and v1–v4 pact conversion; it is *not* a "pact v5", see ADR 0011 — and
+`component-interfaces/` from task 2.6 governs the four interfaces the kernel loads behind it: the pipe
+components speak, what they contribute, the native/WASM/subprocess bindings, and how out-of-tree components
+are distributed, sandboxed and resolved). Keep this file in sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task

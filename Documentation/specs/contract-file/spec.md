@@ -65,7 +65,7 @@ What this specification owns, and what it hands off:
 | what a shape means, which operators exist, `admits` | design [2.2](../shape-language/spec.md) |
 | which variants are selected, how they are named, the selection report's contents | design [2.3](../variant-semantics/spec.md) |
 | plans — a contract contains none, and never should | design [2.4](../plan-grammar/spec.md) |
-| transport and endpoint descriptors, component naming | design 2.6 |
+| transport and endpoint descriptors, component naming | design [2.6](../component-interfaces/spec.md) |
 | the frames a contract travels in | design [2.1](../engine-protocol/spec.md) |
 
 The **interaction specification** an author writes is this document's interaction record minus the

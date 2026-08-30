@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/content.schema.json",
+  "title": "Content",
+  "description": "The content interface: octets to document and back, for one or more content types. This is the entire content of the rule that the kernel knows nothing about JSON — a shape applies to what a content component decoded, never to a guess (shape spec §2.2). See spec.md §6.",
+  "$defs": {
+    "Decode": {
+      "title": "Decode",
+      "type": "object",
+      "required": ["content-type", "value"],
+      "properties": {
+        "content-type": { "type": "string" },
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
+        "options": { "type": "object" }
+      }
+    },
+    "DecodeResult": {
+      "title": "DecodeResult",
+      "type": "object",
+      "required": ["document"],
+      "properties": {
+        "document": {
+          "x-tagged-by": "encoded",
+          "description": "The decoded document, in the shape language's value model (shape spec §2.1) — JSON values plus bytes. The shape applies to this."
+        },
+        "encoded": {
+          "type": "string",
+          "description": "How to read 'document'. Absent means the natural JSON value; 'base64' means octets, for content that decodes to a byte string rather than to structure.",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "degradations": {
+          "type": "array",
+          "description": "Value-dependent distinctions this decode could not preserve, each with the path where the loss occurred (spec.md §6.4). Static ones are declared in the handshake instead.",
+          "items": { "$ref": "handshake.schema.json#/$defs/Degradation" }
+        }
+      }
+    },
+    "Encode": {
+      "title": "Encode",
+      "description": "Decode's inverse, and how a selected variant's document becomes the octets a mock serves. decode(encode(d)) must equal d (spec.md §6.2).",
+      "type": "object",
+      "required": ["content-type", "document"],
+      "properties": {
+        "content-type": { "type": "string" },
+        "document": {
+          "x-tagged-by": "encoded",
+          "description": "The document to encode."
+        },
+        "encoded": {
+          "type": "string",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "options": { "type": "object" }
+      }
+    },
+    "EncodeResult": {
+      "title": "EncodeResult",
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" }
+      }
+    },
+    "Compile": {
+      "title": "Compile",
+      "type": "object",
+      "required": ["content-type", "shape", "path"],
+      "properties": {
+        "content-type": { "type": "string" },
+        "shape": {
+          "type": "object",
+          "description": "The slot's shape document, owned by design 2.2."
+        },
+        "path": {
+          "type": "string",
+          "description": "Where in the plan the returned fragment is spliced."
+        }
+      }
+    },
+    "CompileResult": {
+      "title": "CompileResult",
+      "type": "object",
+      "properties": {
+        "fragment": {
+          "type": "object",
+          "description": "A plan fragment in design 2.4's grammar, using core actions and this component's own namespaced actions and nothing else. Returning nothing is legitimate: the kernel then compiles the slot generically and calls decode at execution time (spec.md §6.3)."
+        },
+        "grammar-version": {
+          "type": "string",
+          "description": "The plan-grammar version the fragment was authored against. An engine whose grammar has moved on either accepts it or fails naming the skew; it never silently reinterprets (spec.md §12.3).",
+          "x-known-values": ["v0"]
+        }
+      }
+    },
+    "Detect": {
+      "title": "Detect",
+      "description": "Do these octets look like a type you handle? For the shape language's content-type operator, the one operator that inspects octets (shape spec §4.2). Optional; used to resolve an absent content type, never to override a declared one (spec.md §6.5).",
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
+        "hint": { "type": "string" }
+      }
+    },
+    "DetectResult": {
+      "title": "DetectResult",
+      "type": "object",
+      "properties": {
+        "media-type": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

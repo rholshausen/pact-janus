@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/component-error.schema.json",
+  "title": "ComponentError",
+  "description": "The structured error a component returns in a response frame's 'error' member. Deliberately the same shape as the protocol's EngineError, because the kernel passes it through verbatim (protocol spec §10.2) and a second error shape at that boundary would only need translating. See spec.md §11.",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Machine-readable error code. Open vocabulary; an unknown code is handled by its category (spec.md §11.1).",
+      "x-known-values": [
+        "malformed-frame",
+        "handshake-required",
+        "operation-unsupported",
+        "protocol-version-unsupported",
+        "unsupported-content-type",
+        "decode-failed",
+        "encode-failed",
+        "unknown-operator",
+        "unknown-action",
+        "invalid-config",
+        "transport-failed",
+        "hook-failed",
+        "capability-denied",
+        "unavailable",
+        "component-trapped",
+        "component-timeout",
+        "component-exited",
+        "internal"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "description": "Coarse classification, so an unknown code is still handled sanely. Absent or unknown is treated as 'internal'.",
+      "x-known-values": ["protocol", "document", "component", "internal"]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable description, never dispatched on."
+    },
+    "source": {
+      "type": "string",
+      "description": "Who produced this error. 'component' is the default; 'engine' marks an error the binding synthesised because the component trapped, timed out or exited (spec.md §11.2) — a distinction that sends a reader to a different place.",
+      "x-known-values": ["component", "engine"],
+      "default": "component"
+    },
+    "details": {
+      "type": "object",
+      "description": "Code-specific structure per spec.md §11.1 — e.g. 'op' (operation-unsupported), 'operator'/'action' (unknown-*), 'content-type' and 'path' (decode-failed), 'grant' (capability-denied)."
+    }
+  }
+}

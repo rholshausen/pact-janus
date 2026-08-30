@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/hook.schema.json",
+  "title": "Hook",
+  "description": "The hook interface: how a hook component is called, what it is handed, and what it may change. Which points exist, how they are ordered and configured, how failures are treated and how secrets reach them belong to design 2.7 — a hook component is one implementation of a hook point, not the only one. See spec.md §8.",
+  "$defs": {
+    "Invoke": {
+      "title": "Invoke",
+      "type": "object",
+      "required": ["point", "context"],
+      "properties": {
+        "point": {
+          "type": "string",
+          "description": "A lifecycle point from design 2.7's open vocabulary.",
+          "x-known-values": ["before-request", "state-setup", "produce-message", "consume-message", "after-verification"]
+        },
+        "context": {
+          "type": "object",
+          "description": "What the engine assembled for this point — typically the parts in play, the interaction reference, the variant assignment, the provider state and its parameters. An open document; design 2.7 owns its members per point."
+        },
+        "config": {
+          "type": "object",
+          "description": "The hook's own configuration from the project config, already interpolated. A component receives values, never templates (design 2.7 owns secret handling)."
+        }
+      }
+    },
+    "InvokeResult": {
+      "title": "InvokeResult",
+      "type": "object",
+      "required": ["outcome"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "description": "A 'failed' outcome is a hook failure; whether that aborts the run, fails the interaction or warns is design 2.7's ordering-and-failure semantics.",
+          "x-known-values": ["ok", "failed", "skipped"]
+        },
+        "changes": {
+          "type": "object",
+          "description": "Context member -> replacement value. The engine applies only changes the component declared for this point in its handshake, and rejects an undeclared one as component-failed naming the member (spec.md §8.2). Declaring mutation up front is what makes a hook chain reviewable from its configuration."
+        },
+        "data": {
+          "type": "object",
+          "description": "Opaque hook output, surfaced to the host in the verification/hook event (protocol spec §9.6)."
+        },
+        "error": {
+          "$ref": "component-error.schema.json",
+          "description": "Present when the outcome is 'failed' and the hook has more to say than the outcome."
+        }
+      }
+    }
+  }
+}

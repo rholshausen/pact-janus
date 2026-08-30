@@ -25,7 +25,10 @@ Three sources are the source of truth and take precedence over this file when th
   `plan-grammar/` (task 2.4) governs plans — the node grammar, the action set, the text forms
   `explain` prints, and the golden-corpus format; `contract-file/` (task 2.5) governs the Janus
   contract — the recorded artifact's identity, its interaction record, how shapes and exercised
-  variants are written down, and v1–v4 pact conversion. It is **not** a "pact v5" (ADR 0011).
+  variants are written down, and v1–v4 pact conversion. It is **not** a "pact v5" (ADR 0011);
+  `component-interfaces/` (task 2.6) governs the four interfaces the kernel loads behind it —
+  transport, content, matcher/generator, hook — the pipe they speak, what a component contributes,
+  the three bindings, and how out-of-tree components are distributed, sandboxed and resolved.
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust

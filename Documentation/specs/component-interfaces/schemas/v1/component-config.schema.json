@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/component-config.schema.json",
+  "title": "ComponentConfig",
+  "description": "How a project declares the components it uses. Components are declared, never discovered: an engine that goes looking for something to satisfy 'content/protobuf' is an engine whose runs are not reproducible (ADR 0013). Where this configuration lives and how it merges with hook configuration is design 2.7's business; this schema owns the component entries. See spec.md §10.",
+  "type": "object",
+  "properties": {
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ComponentDeclaration" }
+    }
+  },
+  "$defs": {
+    "ComponentDeclaration": {
+      "title": "ComponentDeclaration",
+      "type": "object",
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Must equal the name the component declares in its handshake. Two declared components with the same name is a configuration error, detected at resolution and never at first use (spec.md §2.4)."
+        },
+        "source": { "$ref": "#/$defs/Source" },
+        "grants": { "$ref": "#/$defs/Grants" },
+        "limits": { "$ref": "#/$defs/Limits" }
+      }
+    },
+    "Source": {
+      "title": "Source",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Where the component comes from. Open vocabulary: 'oci' is the distribution model, 'file' is a local .wasm for development, 'subprocess' is the out-of-process escape hatch — a command the engine spawns, speaking the same frames over the protocol's own stdio framing (spec.md §9.3).",
+          "x-known-values": ["oci", "file", "subprocess"]
+        },
+        "reference": {
+          "type": "string",
+          "description": "For 'oci', the artifact reference; for 'file', a path; for 'subprocess', the command the engine spawns."
+        },
+        "digest": {
+          "type": "string",
+          "description": "Expected manifest digest, e.g. 'sha256:...'. When present it MUST match before any bytes are instantiated. A tag is a name; a digest is the artifact — CI should pin (spec.md §10.3)."
+        }
+      }
+    },
+    "Grants": {
+      "title": "Grants",
+      "description": "Deny-by-default sandbox grants, per component. An engine must not grant what a declaration does not list, and must fail the load when a component's imports exceed its grants. Not enforceable for the subprocess binding, which runs with the engine user's authority — spec.md §9.3 says so rather than implying it.",
+      "type": "object",
+      "properties": {
+        "env": {
+          "type": "array",
+          "description": "Environment variable names the component may read. No wildcard in v1.",
+          "items": { "type": "string" }
+        },
+        "fs": {
+          "type": "array",
+          "description": "Directories preopened for the component.",
+          "items": { "$ref": "#/$defs/FsGrant" }
+        },
+        "network": {
+          "type": "boolean",
+          "description": "Whether outbound sockets are granted at all.",
+          "default": false
+        }
+      }
+    },
+    "FsGrant": {
+      "title": "FsGrant",
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "access": {
+          "type": "string",
+          "x-known-values": ["read", "read-write"],
+          "default": "read"
+        }
+      }
+    },
+    "Limits": {
+      "title": "Limits",
+      "type": "object",
+      "properties": {
+        "deadline-ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-call deadline. The engine bounds every component call in time and surfaces expiry as an error value; a hung component cannot hang a verification (spec.md §3.4, spike 1.4 finding 6)."
+        },
+        "instances": {
+          "type": "string",
+          "description": "Instance policy. 'per-session' is the default: state isolation between sessions for free. 'per-call' was measured at 5.8 microseconds and a component must behave identically either way.",
+          "x-known-values": ["per-session", "per-call"],
+          "default": "per-session"
+        }
+      }
+    }
+  }
+}

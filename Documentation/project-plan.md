@@ -216,12 +216,24 @@ the "executable specification" — they graduate into it as golden corpora and s
   metadata under the placement rule, v1–v4 pact conversion with its findings vocabulary, the broker
   posture, and the exploded-directory projection (specified; implementation deferred on evidence).
   Schemas `contract.schema.json` and `upgrade-findings.schema.json`; worked examples validated in CI.
-- **2.6 [design] Component interfaces.** The four interfaces (transport, content, matcher/generator,
-  hook) in the chosen IDL, with the in-tree/out-of-tree symmetry rule from the RFC: built-ins implement
-  exactly these. Decide the prototype's answer to "is everything a component on day one, or are HTTP/JSON
-  kernel-privileged initially" — the prototype should *try* full symmetry and report where it hurts
-  (that report is the evidence the RFC question needs). Include the out-of-process gRPC escape hatch
-  boundary and the OCI distribution model (design only; minimal implementation in Phase 8).
+- **2.6 [design] Component interfaces.** The four interfaces — transport, content, matcher/generator,
+  hook — are the engine protocol's frames turned around:
+  [ADR 0012](decisions/0012-one-interface-two-bindings.md) answers the RFC's day-one question with
+  **interface symmetry and two bindings** (built-ins implement exactly these interfaces through a
+  native binding; out-of-tree components go over the frozen byte-pipe), and makes the symmetry
+  falsifiable with a conformance corpus CI runs through both.
+  [ADR 0013](decisions/0013-component-hosting-is-an-embedding-capability.md) makes *hosting* a declared
+  embedding capability — an engine that is itself a WASM component can host nothing but in-tree
+  components — and settles OCI distribution, digest pinning and deny-by-default grants. Specification:
+  [`specs/component-interfaces/`](specs/component-interfaces/spec.md) — identity and the namespace rule,
+  the pipe and its handshake, the contribution vocabulary, the five transport primitives plus a
+  disposition (spike 1.5), the content bytes/document boundary with declared degradations, contributed
+  operators, actions, variant dimensions, comparability and generators, the hook invoke surface (2.7
+  owns the hook *system*), the three bindings, resolution and trust, and §13's "where full symmetry
+  hurts" — what 3.8, 4.2, 8.1 and 9.1 must measure so the RFC's report accumulates rather than being
+  reconstructed. Nine schemas; worked examples — the built-in HTTP transport and a third-party CSV
+  component — validated in CI, including against designs 2.2's and 2.4's schemas where this design
+  carries their documents.
 - **2.7 [design] Lifecycle hooks.** Named hook points (`before-request`, `state-setup`,
   `produce-message`, `consume-message`, `after-verification`, …), the declarative config schema
   (`verifier.pact.yaml` and its consumer-side equivalent), hook implementations (built-in components,
@@ -405,9 +417,15 @@ Goal: B3 beyond the in-tree case — the extension path as the well-trodden path
   finding.
 - **8.2 [build] OCI distribution, minimal.** Push/pull the 8.1 component as an OCI artifact; engine
   resolves, caches and integrity-checks it per the 2.6 design. Registry can be a local one.
-- **8.3 [spike] Out-of-process transport escape hatch.** A gRPC-based transport component out-of-process
-  (today's pact-plugins model as the retained escape hatch). Stretch: an actual gRPC *protocol* transport
-  reusing it. Scoped tightly — the goal is to prove the boundary exists, not to rebuild pact-protobuf.
+- **8.3 [spike] Out-of-process transport escape hatch.** A transport component running out-of-process
+  over the subprocess binding from design 2.6 — the protocol's own `Content-Length` framing, not gRPC
+  ([ADR 0013](decisions/0013-component-hosting-is-an-embedding-capability.md) explains why the RFC's
+  word was not inherited): today's pact-plugins architecture retained, with this project's wire. Also
+  the first real test of grants being unenforceable out of process, and of spike 1.3's Windows risk
+  applying to component processes. Stretch: an actual gRPC *protocol* transport reusing it — a
+  transport that speaks gRPC to a provider, which is a different thing from the pipe the component
+  itself is reached over, and the collision of words is worth keeping straight. Scoped tightly — the
+  goal is to prove the boundary exists, not to rebuild pact-protobuf.
 - **8.4 [explore] Plan-fragment stress test.** Have the 8.1 component contribute plan fragments and a
   custom action; check the 2.4 versioning policy holds up (what happens when the component targets plan
   grammar v0 and the engine moves to v0.1?).
@@ -442,7 +460,7 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 | RFC unresolved question | Addressed by |
 |---|---|
 | IDL choice (WIT vs protobuf) + WASM-host story per language | 1.1, 1.2, 1.3 → G1 (1.8) |
-| Components day-one vs HTTP/JSON kernel-privileged | 2.6, 3.8, 4.2, 8.1 |
+| Components day-one vs HTTP/JSON kernel-privileged | 2.6 (ADR 0012: interface symmetry, two bindings — packaging symmetry is impossible in the primary embedding, ADR 0013); evidence from 3.8, 4.2, 8.1, 9.1 |
 | Variant sampling defaults, caps, overrides | 2.3, 4.3, 4.6 |
 | Provider-state/variant linkage (`whenVariant`) | 2.3, 5.2 |
 | Subsumption warn/block default + exemption scoping | 2.8, 7.3, 7.4 |

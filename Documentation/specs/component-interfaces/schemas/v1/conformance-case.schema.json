@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/conformance-case.schema.json",
+  "title": "ConformanceCase",
+  "description": "One case in the component conformance corpus: a sequence of calls with their expected results, run through every binding the component supports and required to produce identical results. This is the mechanism that makes 'built-ins implement exactly these interfaces' a fact rather than an intention (ADR 0012 decision 4). A case that can only be expressed in one binding is not a case — it is a report that the interface has split. See spec.md §9.4.",
+  "type": "object",
+  "required": ["name", "component", "calls"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the case, used in failure output."
+    },
+    "component": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The component under test."
+    },
+    "interface": {
+      "type": "string",
+      "description": "Which interface the case exercises, when it exercises one.",
+      "x-known-values": ["transport", "content", "matcher", "hook"]
+    },
+    "bindings": {
+      "type": "array",
+      "description": "Bindings this case must run through. Absent means every binding the component supports — which is the normal case and the point of the corpus.",
+      "items": {
+        "type": "string",
+        "x-known-values": ["native", "wasm", "subprocess"]
+      }
+    },
+    "calls": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Call" }
+    }
+  },
+  "$defs": {
+    "Call": {
+      "title": "Call",
+      "type": "object",
+      "required": ["op", "body"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "description": "The operation name, '<area>/<verb>'. Open vocabulary.",
+          "x-known-values": [
+            "component/hello",
+            "component/shutdown",
+            "transport/start",
+            "transport/stop",
+            "transport/send",
+            "transport/poll-inbound",
+            "transport/reply",
+            "transport/dispose",
+            "content/decode",
+            "content/encode",
+            "content/compile",
+            "content/detect",
+            "matcher/compile",
+            "matcher/apply",
+            "matcher/variant-space",
+            "matcher/compare",
+            "generator/generate",
+            "hook/invoke"
+          ]
+        },
+        "body": {
+          "type": "object",
+          "description": "The operation's request document."
+        },
+        "expect": { "$ref": "#/$defs/Expected" }
+      }
+    },
+    "Expected": {
+      "title": "Expected",
+      "description": "What the call must produce, carrying exactly one of 'ok' or 'error'. Results are compared after canonicalisation; members the case does not mention are not constrained, so a case does not break when a result grows a member additively.",
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "object",
+          "description": "Expected result document, matched member-wise."
+        },
+        "error": {
+          "$ref": "component-error.schema.json",
+          "description": "Expected error. A case asserting an error asserts its 'code'; 'message' is never asserted."
+        }
+      }
+    }
+  }
+}

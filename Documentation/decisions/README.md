@@ -28,6 +28,8 @@ superseding ADR instead.
 | [0009](0009-variant-bound-provider-state-parameters.md) | Bind provider-state parameters to variants in a separate member; an unproducible state fails | proposed |
 | [0010](0010-plans-are-renderings-the-grammar-is-the-record.md) | Treat plans as renderings and the grammar as the record; version them accordingly | proposed |
 | [0011](0011-contracts-as-self-identifying-json-documents.md) | Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification | proposed |
+| [0012](0012-one-interface-two-bindings.md) | Define components as the engine protocol's frames turned around, and give the interface two bindings | proposed |
+| [0013](0013-component-hosting-is-an-embedding-capability.md) | Make component hosting a negotiated embedding capability, and distribute out-of-tree components as digest-pinned OCI artifacts | proposed |
 
 ## Decision backlog
 
@@ -35,12 +37,10 @@ Known decisions waiting on evidence, seeded from the RFC's unresolved questions 
 Each becomes a numbered ADR when its inputs are ready (feeding task in brackets):
 
 - Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
-- Components on day one vs HTTP/JSON kernel-privileged (design 2.6, informed by 3.8, 4.2, 8.1)
 - Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
   edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
   comparability classes it consumes are fixed by ADR 0007)
-- OCI component distribution model (design 2.6, minimal build 8.2)
 - SDK conformance: what the suite must cover for an SDK to be called conformant (design 2.9, build 6.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)

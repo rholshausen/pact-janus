@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/transport.schema.json",
+  "title": "Transport",
+  "description": "The transport interface: five role-neutral primitives plus a disposition, restated from the RFC's HTTP-accented sketch by spike 1.5 after finding that 'mock endpoint' and 'drive requests' do not survive messaging literally. Every scenario in that spike composes from these. See spec.md §5.",
+  "$defs": {
+    "Start": {
+      "title": "Start",
+      "type": "object",
+      "required": ["instance", "kind", "role"],
+      "properties": {
+        "instance": { "$ref": "#/$defs/InstanceId" },
+        "kind": {
+          "type": "string",
+          "description": "Which of the component's declared transport kinds to start. Open vocabulary.",
+          "x-known-values": ["http", "https", "message"]
+        },
+        "role": {
+          "type": "string",
+          "description": "'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1).",
+          "x-known-values": ["serve", "drive"]
+        },
+        "options": {
+          "type": "object",
+          "description": "Transport-specific configuration. An open document this specification deliberately does not describe."
+        }
+      }
+    },
+    "StartResult": {
+      "title": "StartResult",
+      "type": "object",
+      "required": ["endpoint"],
+      "properties": {
+        "endpoint": { "$ref": "parts.schema.json#/$defs/EndpointDescriptor" }
+      }
+    },
+    "Stop": {
+      "title": "Stop",
+      "type": "object",
+      "required": ["instance"],
+      "properties": { "instance": { "$ref": "#/$defs/InstanceId" } }
+    },
+    "StopResult": {
+      "title": "StopResult",
+      "type": "object"
+    },
+    "Send": {
+      "title": "Send",
+      "description": "Outbound traffic. The reply half is optional in both directions: fire-and-forget publication has no response to match (spike 1.5 finding 1).",
+      "type": "object",
+      "required": ["instance", "parts"],
+      "properties": {
+        "instance": { "$ref": "#/$defs/InstanceId" },
+        "parts": { "$ref": "parts.schema.json" },
+        "await-reply": {
+          "type": "boolean",
+          "description": "Wait for and return a reply. A transport whose kind cannot honour this answers 'operation-unsupported' rather than returning an empty reply — 'no reply expected' and 'reply expected but absent' are different observations (spec.md §5.2).",
+          "default": false
+        },
+        "timeout-ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How long to wait for the reply. The engine's own call deadline (spec.md §3.4) still applies on top."
+        }
+      }
+    },
+    "SendResult": {
+      "title": "SendResult",
+      "type": "object",
+      "properties": {
+        "reply": {
+          "$ref": "parts.schema.json",
+          "description": "The reply's parts, when one was awaited and arrived."
+        }
+      }
+    },
+    "PollInbound": {
+      "title": "PollInbound",
+      "description": "The engine drives; the transport never calls in. An exported poll is trivial for a WASM component, while an engine-callback import would re-enter component instances (spike 1.5 finding 4).",
+      "type": "object",
+      "required": ["instance"],
+      "properties": {
+        "instance": { "$ref": "#/$defs/InstanceId" },
+        "timeout-ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How long to wait for an arrival before returning nothing.",
+          "default": 0
+        }
+      }
+    },
+    "PollInboundResult": {
+      "title": "PollInboundResult",
+      "type": "object",
+      "properties": {
+        "inbound": { "$ref": "#/$defs/Inbound" }
+      }
+    },
+    "Inbound": {
+      "title": "Inbound",
+      "type": "object",
+      "required": ["event", "parts"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The transport's identifier for this arrival, opaque to the engine. The one piece of state this interface carries, so 'reply' and 'dispose' can address one arrival and results can be attributed to it (spike 1.5 finding 5)."
+        },
+        "parts": { "$ref": "parts.schema.json" },
+        "expects-reply": {
+          "type": "boolean",
+          "description": "Whether this arrival has a reply half at all. An HTTP request does; a consumed broker message does not.",
+          "default": false
+        }
+      }
+    },
+    "Reply": {
+      "title": "Reply",
+      "type": "object",
+      "required": ["instance", "event", "parts"],
+      "properties": {
+        "instance": { "$ref": "#/$defs/InstanceId" },
+        "event": { "type": "string", "minLength": 1 },
+        "parts": { "$ref": "parts.schema.json" }
+      }
+    },
+    "ReplyResult": {
+      "title": "ReplyResult",
+      "type": "object"
+    },
+    "Dispose": {
+      "title": "Dispose",
+      "description": "Complete an arrival, reply or no reply. Exists because a real broker must acknowledge, negative-acknowledge or release for redelivery where an in-memory one can silently drop (spike 1.5 finding 7b).",
+      "type": "object",
+      "required": ["instance", "event", "disposition"],
+      "properties": {
+        "instance": { "$ref": "#/$defs/InstanceId" },
+        "event": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "type": "string",
+          "description": "Open vocabulary. A transport whose kind has no such concept ignores it.",
+          "x-known-values": ["accept", "reject", "release"]
+        }
+      }
+    },
+    "DisposeResult": {
+      "title": "DisposeResult",
+      "type": "object"
+    },
+    "InstanceId": {
+      "title": "InstanceId",
+      "type": "string",
+      "minLength": 1,
+      "description": "Engine-assigned identifier for one live transport instance. The engine names instances; a component never invents an identifier (spec.md §3.4)."
+    }
+  }
+}

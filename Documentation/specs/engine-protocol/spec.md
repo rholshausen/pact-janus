@@ -66,7 +66,7 @@ throughout:
   cleanup call; everything a session allocates is released when the session ends (§7). There
   are no free/destroy/close operations other than session finalisation and engine `shutdown`.
 
-Out of scope here: the component interfaces behind the engine (design 2.6), the interaction
+Out of scope here: the component interfaces behind the engine (design [2.6](../component-interfaces/spec.md)), the interaction
 specification and shape language carried *inside* frames (designs 2.2/2.4 — this spec treats
 those documents as opaque objects with their own schemas), and the pact file format (2.5).
 
@@ -509,7 +509,7 @@ interiors:
 | variant descriptor, selection report, sampling policy | design [2.3](../variant-semantics/spec.md) (variant semantics); protocol requires only `id` |
 | matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
 | pact file (v1–v4 read, v5 read/write) | design 2.5 |
-| endpoint descriptor, transport options | design 2.6 (component interfaces); open documents per spike 1.5 |
+| endpoint descriptor, transport options | design [2.6](../component-interfaces/spec.md) (component interfaces); open documents per spike 1.5 |
 
 Two rules bind these documents even though their shapes do not belong here: they follow the
 open-world authoring rules (§2.2), since they cross the same boundary and face the same

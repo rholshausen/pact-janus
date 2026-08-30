@@ -52,7 +52,7 @@ Conformance roles:
   (matching rules) into a plan.
 - An **interpreter** executes a plan against resolved values and annotates it with results.
 - A **renderer** prints a plan, executed or not, in the text forms of §3.
-- A **component** contributes actions and plan fragments under its own namespace (design 2.6 owns the
+- A **component** contributes actions and plan fragments under its own namespace (design [2.6](../component-interfaces/spec.md) owns the
   interface; this document owns what an action *is*).
 
 In scope: the node grammar, the value model, the core action set, the text forms, the shape→plan
@@ -65,9 +65,9 @@ Out of scope, with owners:
 | the shapes a plan is compiled from, and `admits` | design [2.2](../shape-language/spec.md) |
 | which variant a plan is compiled under, and how variants are selected | design [2.3](../variant-semantics/spec.md) |
 | how a plan document crosses the engine boundary | design [2.1](../engine-protocol/spec.md) |
-| how a component ships an action or a fragment | design 2.6 |
+| how a component ships an action or a fragment | design [2.6](../component-interfaces/spec.md) |
 | the v1–v4 cascading and precedence semantics the legacy compiler implements | design 3.5 |
-| generators — producing a value rather than matching one | designs 2.6, 4.3 |
+| generators — producing a value rather than matching one | designs [2.6](../component-interfaces/spec.md), 4.3 |
 | what the CLI prints and which flags select it | design 5.5 |
 
 ## 2. Plans
