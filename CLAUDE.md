@@ -28,7 +28,11 @@ Three sources are the source of truth and take precedence over this file when th
   variants are written down, and v1–v4 pact conversion. It is **not** a "pact v5" (ADR 0011);
   `component-interfaces/` (task 2.6) governs the four interfaces the kernel loads behind it —
   transport, content, matcher/generator, hook — the pipe they speak, what a component contributes,
-  the three bindings, and how out-of-tree components are distributed, sandboxed and resolved.
+  the three bindings, and how out-of-tree components are distributed, sandboxed and resolved;
+  `lifecycle-hooks/` (task 2.7) governs the hook *system* the hook interface sits inside — the point
+  vocabulary and each point's context and mutable set, ordering and failure semantics, the
+  configuration document the loader resolves before the engine sees it (ADR 0014), the four
+  implementations, and the scripted-hook runtime and its API (ADR 0015).
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust

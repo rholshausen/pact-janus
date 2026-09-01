@@ -234,14 +234,28 @@ the "executable specification" — they graduate into it as golden corpora and s
   reconstructed. Nine schemas; worked examples — the built-in HTTP transport and a third-party CSV
   component — validated in CI, including against designs 2.2's and 2.4's schemas where this design
   carries their documents.
-- **2.7 [design] Lifecycle hooks.** Named hook points (`before-request`, `state-setup`,
-  `produce-message`, `consume-message`, `after-verification`, …), the declarative config schema
-  (`verifier.pact.yaml` and its consumer-side equivalent), hook implementations (built-in components,
-  `exec`, HTTP endpoint, scripted), ordering/failure semantics, and secret handling
-  (`${AUTH_URL}`-style interpolation). Includes the **scripted-hook ADR** from spike 1.6: the default
-  script language/runtime, the hook-context API scripts see (request/response/state objects, what is
-  mutable), and how a script hook is packaged and referenced from config — with "precompiled WASM
-  component" as the polyglot escape hatch alongside it.
+- **2.7 [design] Lifecycle hooks.** Eight named points across three scopes — run, exchange
+  (one interaction × one variant) and state — with `produce-message`/`consume-message` named by
+  *direction* so one point serves both roles (spike 1.5).
+  [ADR 0014](decisions/0014-hooks-are-resolved-configuration-not-callbacks.md) settles what the engine
+  receives: hooks are **configuration a loader resolves**, never host callbacks (the protocol has no
+  engine-to-host call and gains none), so interpolation, script inlining and path resolution happen
+  before the engine sees anything — two schemas, and the difference between them is exactly the
+  loader's job.
+  [ADR 0015](decisions/0015-quickjs-as-the-scripted-hook-runtime.md) takes spike 1.6's recommendation
+  after closing its one open item: rquickjs builds for `wasm32-wasip2` as a component, runs the hook
+  workload under wasmtime and honours an interrupt handler there (spike 1.6 §4), so the scripted hook
+  is the one implementation available in every embedding; Boa stays the tripwire fallback.
+  Specification: [`specs/lifecycle-hooks/`](specs/lifecycle-hooks/spec.md) — the point vocabulary with
+  each point's context, mutable set and default failure policy; ordering, chaining and the
+  declared-permitted-applied-recorded rule for changes; the configuration document in both forms;
+  interpolation, redaction and "hooks leave no trace in the contract"; the four implementations,
+  including `pact-state-change` so an existing v3 state endpoint verifies unchanged (B5), and the
+  embedding capability that says which are available; the scripted-hook runtime and its API; the hook
+  report that answers "which hook rewrote this header" by path and never by value. Four schemas plus
+  [`hook-api.d.ts`](specs/lifecycle-hooks/hook-api.d.ts); worked examples validated in CI, including
+  against design 2.6's hook-result schema — the check that keeps one interface behind four
+  implementations.
 - **2.8 [design] Subsumption check.** The `admits(provider) ⊆ admits(consumer)` walk; the asymmetric
   finding rules (extra fields OK unless `forbidden`; wider value spaces, broader types, weaker presence
   are findings); the *decidability degradation ladder* — which comparisons are exact (enums, presence,

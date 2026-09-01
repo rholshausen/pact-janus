@@ -2,8 +2,9 @@
 
 Status: **complete** — five engines benchmarked natively, three inside wasmtime, one definitive
 build failure, one maturity elimination; all engines that ran produced **byte-identical hook
-output** (the cross-engine correctness check held). Method: [README.md](README.md). Feeds the
-scripted-hook ADR in design 2.7.
+output** (the cross-engine correctness check held). Method: [README.md](README.md). Fed the
+scripted-hook ADR in design 2.7 ([ADR 0015](../../Documentation/decisions/0015-quickjs-as-the-scripted-hook-runtime.md));
+its one open item — the engine's own component build — is closed in §4 below.
 
 ## 1. The matrix
 
@@ -78,3 +79,27 @@ interrupt handler per invocation; hook capability surface defined entirely by th
 API (no ambient I/O). **Fallback: Boa** (pure Rust) if the QuickJS C-to-WASI build proves
 fragile inside the engine's component build — verify that build in 2.7 before the ADR is
 accepted. The polyglot escape hatch stays "bring your own WASM component" (1.4's plugin path).
+
+## 4. Addendum (design 2.7) — the `wasm32-wasip2` component build
+
+Finding 4 left one thing open: this spike compiled rquickjs for **wasip1**, and the engine's own
+component build targets **wasip2**. ADR 0015 could not be accepted on the wasip1 result alone, so
+the build was verified before it was written. [`wasip2-check/`](wasip2-check/) is that check —
+the same signing workload, the same rquickjs 0.9 with its bundled C QuickJS, built for the target
+the engine ships to:
+
+```
+cargo build --release --target wasm32-wasip2
+wasmtime target/wasm32-wasip2/release/wasip2-check.wasm
+```
+
+| Question | Result |
+|---|---|
+| does rquickjs's bundled C build reach `wasm32-wasip2` at all? | **yes**, no patches, no feature flags, ~31 s cold build |
+| is the artifact a component, or a core module needing adaptation? | **a component** — preamble `0061 736d 0d00 0100`, straight from `cargo build`, no `wasm-tools component new` step |
+| size | **1.0 MB** (release, LTO, stripped) — the wasip1 figure unchanged |
+| warm hook call, inside wasmtime 35 | **~9 µs**, including hook-context marshalling; §1's wasip1 number was 12.9 µs on a different harness, so read this as confirmation that wasip2 costs nothing extra, not as a precise delta |
+| the runaway-script gap (finding 6) | **closed in this build**: an `rquickjs` interrupt handler tripped by a 50 ms deadline stopped `while (true) {}` at 49 ms, inside the guest |
+
+So the recommendation stands as written, with the fallback demoted from "if the C-to-WASI build is
+fragile" to a genuine tripwire: the build is not fragile today, on the target that matters.

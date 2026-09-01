@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/hooks/v1/project-config.schema.json",
+  "title": "ProjectConfig",
+  "description": "The file a project writes — 'verifier.pact.yaml' on the provider side, 'consumer.pact.yaml' on the consumer side, the same document either way. It is a loader-side artifact: the loader interpolates its '${VAR}' references, reads the files it names and hands the engine a resolved HookConfig (ADR 0014). The difference between this schema and hook-config.schema.json is exactly the work the loader does, which is why the two are separate documents rather than one with optional members. See spec.md §6 and §7.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Configuration document version; 1 in this specification."
+    },
+    "components": {
+      "type": "array",
+      "description": "The components this project declares. Governed by design 2.6's ComponentConfig and deliberately not restated here — one member, one owner. Components and hooks share a file because they answer the same question ('what does this project load, and what may it do'), and splitting them would put a component's grants on a different page from the hook that needs them.",
+      "items": { "type": "object" }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle point -> the hooks declared at it, in the order they run.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/AuthoredHook" }
+      }
+    }
+  },
+  "$defs": {
+    "AuthoredHook": {
+      "title": "AuthoredHook",
+      "description": "A hook as written. Every string member may carry '${VAR}' references, which the loader replaces with environment values before the engine sees them; an unset variable fails the run at load, naming it, and never becomes an empty string (spec.md §7.2).",
+      "type": "object",
+      "required": ["name", "run"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "run": { "$ref": "#/$defs/AuthoredRun" },
+        "config": {
+          "type": "object",
+          "description": "The hook's own configuration, before interpolation. This is where '${JANUS_SIGNING_SECRET}' is written — the secret's name lives in the repository, its value never does."
+        },
+        "when": {
+          "type": "object",
+          "description": "Selector; the When of hook-config.schema.json, unchanged by resolution."
+        },
+        "changes": {
+          "type": "array",
+          "description": "Dotted context paths this hook may replace.",
+          "items": { "type": "string" }
+        },
+        "timeout-ms": { "type": "integer", "minimum": 1 },
+        "on-failure": {
+          "type": "string",
+          "x-known-values": ["abort-run", "fail-exchange", "warn"]
+        },
+        "report-data": { "type": "boolean", "default": false }
+      }
+    },
+    "AuthoredRun": {
+      "title": "AuthoredRun",
+      "description": "As written: the same kinds as the resolved Run, plus the one member resolution removes — 'path', a script file the loader reads and inlines.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-known-values": ["component", "script", "exec", "http"]
+        },
+        "component": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "path": {
+          "type": "string",
+          "description": "kind 'script': the script file, relative to the configuration file. The loader reads it, transpiles it when it is TypeScript (spec.md §9.6) and passes the result as 'source'; the engine never sees a path, because an engine that resolves paths is an engine whose runs depend on the directory it was started in."
+        },
+        "source": {
+          "type": "string",
+          "description": "kind 'script': the script inline, for a hook short enough to read in the configuration. Exactly one of 'path' and 'source' is present."
+        },
+        "entry": { "type": "string" },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "cwd": { "type": "string" },
+        "env": {
+          "type": "object",
+          "description": "The environment the spawned child gets, in full — typically written as '${...}' references, which is how a credential reaches a state handler without being written down.",
+          "additionalProperties": { "type": "string" }
+        },
+        "url": { "type": "string" },
+        "method": { "type": "string", "x-known-values": ["POST", "PUT", "GET"] },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "format": { "type": "string", "x-known-values": ["janus", "pact-state-change"] }
+      }
+    }
+  }
+}

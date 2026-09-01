@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/hooks/v1/hook-report.schema.json",
+  "title": "HookReport",
+  "description": "What a run records about its hooks: one entry per invocation, in the order they ran, plus the abort reason when a hook ended the run. This document is the answer to 'which hook rewrote this header' — the question that makes a hook chain debuggable or not — and it is why an entry carries the paths a hook changed rather than the values it wrote (spec.md §10). It rides in the run summary; the same entry shape is the payload of the verification/hook event.",
+  "type": "object",
+  "properties": {
+    "invocations": {
+      "type": "array",
+      "description": "Every invocation the run made, including the ones that changed nothing. A hook that ran and did nothing and a hook that never ran are different facts, and only one of them means the selector is wrong.",
+      "items": { "$ref": "#/$defs/HookInvocation" }
+    },
+    "aborted": { "$ref": "#/$defs/HookAbort" }
+  },
+  "$defs": {
+    "HookInvocation": {
+      "title": "HookInvocation",
+      "type": "object",
+      "required": ["point", "hook", "outcome"],
+      "properties": {
+        "point": {
+          "type": "string",
+          "description": "The lifecycle point. Open vocabulary (hook-context.schema.json).",
+          "x-known-values": [
+            "before-verification",
+            "state-setup",
+            "before-request",
+            "produce-message",
+            "consume-message",
+            "after-response",
+            "state-teardown",
+            "after-verification"
+          ]
+        },
+        "hook": {
+          "type": "string",
+          "description": "The configured hook's name — the same name the configuration file shows, which is what lets a reader move from this line to the entry that produced it."
+        },
+        "implementation": {
+          "type": "string",
+          "description": "Which kind answered. Recorded because the same hook can be moved between implementations and a report that hides the move hides the cause of the change.",
+          "x-known-values": ["component", "script", "exec", "http"]
+        },
+        "outcome": {
+          "type": "string",
+          "description": "What the hook answered, or what the engine concluded on its behalf when it did not answer at all. 'unsupported' is only meaningful at state points, where it means the provider cannot reach the state (variant semantics §6.7); 'timed-out', 'errored' and 'skipped' are distinct because they send a reader to three different places.",
+          "x-known-values": ["ok", "failed", "skipped", "unsupported", "timed-out", "errored"]
+        },
+        "exchange": { "type": "string", "description": "The exchange this invocation belonged to; absent at run points." },
+        "interaction": { "type": "string", "description": "The interaction's description; absent at run points." },
+        "variant": { "type": "string", "description": "The variant id; absent at run points." },
+        "state": { "type": "string", "description": "The provider state's name; present at state points." },
+        "changed": {
+          "type": "array",
+          "description": "The context paths this invocation actually replaced — names, never values. Values would put a signed header, a token or a body into every log that carries a summary; the path is what a reader needs and the value is what an attacker needs.",
+          "items": { "type": "string" }
+        },
+        "duration-ms": { "type": "integer", "minimum": 0 },
+        "data": {
+          "type": "object",
+          "description": "The hook's own output, present only when its entry set 'report-data' (spec.md §7.3)."
+        },
+        "effect": {
+          "type": "string",
+          "description": "What the outcome did to the run, after 'on-failure' was applied. Present when the outcome was not 'ok', so that a warning that was configured to be a warning is distinguishable from one that was silently treated as such.",
+          "x-known-values": ["none", "warned", "failed-exchange", "state-unavailable", "aborted-run"]
+        },
+        "error": {
+          "type": "object",
+          "description": "Why it failed: the protocol's error shape (code, category, message, details). For a component hook this is the component's own error, passed through verbatim — the kernel does not translate component error interiors (protocol spec §10.2)."
+        }
+      }
+    },
+    "HookAbort": {
+      "title": "HookAbort",
+      "description": "Present when a hook ended the run. A run that aborted still reports: the terminal event carries the summary with this member, because a verification that stopped early and a verification that failed are different results and a host that cannot tell them apart will publish one as the other.",
+      "type": "object",
+      "required": ["point", "hook"],
+      "properties": {
+        "point": { "type": "string", "x-known-values": ["before-verification", "state-setup", "before-request", "produce-message", "consume-message", "after-response", "state-teardown", "after-verification"] },
+        "hook": { "type": "string" },
+        "error": { "type": "object", "description": "The failure that aborted the run." },
+        "exchanges-not-run": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many interaction-and-variant exchanges never ran because of the abort. Reported as a count of things not done, never folded into the passed or failed tallies."
+        }
+      }
+    }
+  }
+}

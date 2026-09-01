@@ -540,16 +540,18 @@ Schema: [`schemas/v1/hook.schema.json`](schemas/v1/hook.schema.json).
 
 ### 8.1 What a hook is handed
 
-`point` is design 2.7's open vocabulary (`before-request`, `state-setup`, `produce-message`,
-`consume-message`, `after-verification`, …). `context` is an open document assembled by the engine for
-that point — typically the parts in play, the interaction reference, the variant assignment and the
-provider state with its parameters. `config` is the hook's own configuration from the project config,
+`point` is design [2.7](../lifecycle-hooks/spec.md)'s open vocabulary (`before-verification`,
+`state-setup`, `before-request`, `produce-message`, `consume-message`, `after-response`,
+`state-teardown`, `after-verification`, …). `context` is that design's `HookContext` — an open document
+assembled by the engine for the point, carrying the parts in play, the interaction reference, the
+variant assignment and the provider state with its parameters — and a component receives exactly what a
+script, a command or an HTTP endpoint receives at the same point. `config` is the hook's own configuration from the project config,
 already interpolated (2.7 owns interpolation and secret handling; a component receives values, never
 templates).
 
 ### 8.2 What a hook may change
 
-`outcome` is `ok`, `failed` or `skipped`. `changes` is a map of context slot to replacement value, and
+`outcome` is `ok`, `failed`, `skipped` or — at design 2.7's state points — `unsupported`. `changes` is a map of context slot to replacement value, and
 it is governed by declaration, not by trust:
 
 - A hook component declares in its handshake which context members it may change, per point.

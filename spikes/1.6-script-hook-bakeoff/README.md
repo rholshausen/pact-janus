@@ -42,5 +42,8 @@ interpreter).
 ```
 runner/       One crate, feature-gated engines, same workload everywhere;
               native + wasm32-wasip1 builds
+wasip2-check/ The follow-up design 2.7 needed before ADR 0015: the same workload on
+              rquickjs built for wasm32-wasip2 — the engine's own component target —
+              plus the interrupt-handler check (FINDINGS.md §4)
 FINDINGS.md   The matrix, the numbers, and the 2.7 recommendation
 ```

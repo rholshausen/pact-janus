@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/hooks/v1/hook-config.schema.json",
+  "title": "HookConfig",
+  "description": "The resolved hook configuration the engine receives: hooks keyed by lifecycle point, each entry naming one implementation, what it may change, how long it may take and what its failure means. This is the loader's output, never a file: interpolation is done, script sources are inline, and no member holds a template or a path (ADR 0014). The authored file form is project-config.schema.json. See spec.md §6.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Configuration document version. 1 is the only value v1 defines; an engine that does not know a version fails the run rather than guessing which members it understands."
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle point -> the hooks declared at it, in the order they run. A point with no entry is not a point that does nothing: it is a point at which the engine calls nobody.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/HookEntry" }
+      }
+    }
+  },
+  "$defs": {
+    "HookEntry": {
+      "title": "HookEntry",
+      "description": "One hook at one point. Order within a point is declaration order; each entry sees the changes the entries before it made (spec.md §4.2).",
+      "type": "object",
+      "required": ["name", "run"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Identifies this hook in events, in the run's hook report, in errors and in explain output. Unique within its point; a duplicate is hook-config-invalid. A hook that cannot be named in a failure message is a hook nobody can debug (spec.md §6.2)."
+        },
+        "run": { "$ref": "#/$defs/Run" },
+        "config": {
+          "type": "object",
+          "description": "The hook's own configuration, handed to it as context.config. Fully interpolated: a component, script, command or endpoint receives values, never templates (ADR 0014). The engine MUST NOT echo these values into events, reports, contracts or logs (spec.md §7.3)."
+        },
+        "when": { "$ref": "#/$defs/When" },
+        "changes": {
+          "type": "array",
+          "description": "Dotted paths into the hook context this entry may replace, e.g. 'parts.request.headers'. The engine applies a change only if it is declared here AND permitted at the point (spec.md §3), and rejects an undeclared change naming the path. For a component hook this narrows the handshake declaration and can never widen it. An entry with no 'changes' cannot change anything, which is what makes an observing hook auditable as one.",
+          "items": { "type": "string" }
+        },
+        "timeout-ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-invocation deadline. Defaults to 5000 at exchange and state points, 30000 at run points. Expiry is a hook failure, treated by 'on-failure'; the engine bounds every invocation in time, so a hung hook cannot hang a verification (spec.md §5.4)."
+        },
+        "on-failure": {
+          "type": "string",
+          "description": "What a failed invocation means. Defaults are per point (spec.md §5.2) and are chosen so that the default is never the quiet one: a hook whose failure would make a result misleading fails the exchange.",
+          "x-known-values": ["abort-run", "fail-exchange", "warn"]
+        },
+        "report-data": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this hook's 'data' is carried in the verification/hook event and the hook report. Off by default because a hook's scratch is where credentials naturally land; the data still reaches later hooks in the run either way (spec.md §7.3, §10.2)."
+        }
+      }
+    },
+    "Run": {
+      "title": "Run",
+      "description": "The implementation that answers this hook. Exactly one kind; the four kinds are four ways of carrying the same two documents — a context in, a result out (spec.md §8).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Which implementation. 'script' is the only kind available in every embedding, because the interpreter compiles with the engine (ADR 0015); the others depend on what the embedding can do and are refused by name when it cannot (spec.md §8.5).",
+          "x-known-values": ["component", "script", "exec", "http"]
+        },
+        "component": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "kind 'component': the name of a declared component implementing the hook interface (design 2.6 §8). The component is invoked through hook/invoke with this context and answers with this result."
+        },
+        "source": {
+          "type": "string",
+          "description": "kind 'script': the script's source text, inline. A path is a file the engine would have to read, and the engine reads no files (ADR 0014); the loader reads it, transpiles it if it was TypeScript, and puts the result here."
+        },
+        "entry": {
+          "type": "string",
+          "description": "kind 'script': the function the runtime calls, default 'hook'. One script may serve several points and branch on context.point (spec.md §9.2)."
+        },
+        "command": {
+          "type": "string",
+          "description": "kind 'exec': the executable to spawn. Spawned per invocation, handed the context on stdin, answering with a result on stdout (spec.md §8.3)."
+        },
+        "args": {
+          "type": "array",
+          "description": "kind 'exec': arguments, passed as given. Not a shell string: an argument vector cannot be re-parsed by a shell that quotes differently than the author expected.",
+          "items": { "type": "string" }
+        },
+        "cwd": {
+          "type": "string",
+          "description": "kind 'exec': working directory for the spawned process."
+        },
+        "env": {
+          "type": "object",
+          "description": "kind 'exec': the environment the child gets, in full. Deny-by-default like a component's grants (ADR 0013): the child inherits nothing that is not listed here, so a hook cannot pick up an ambient credential the configuration does not show.",
+          "additionalProperties": { "type": "string" }
+        },
+        "url": {
+          "type": "string",
+          "description": "kind 'http': the endpoint the context is POSTed to. This is today's provider-state endpoint, generalised to every point (spec.md §8.4)."
+        },
+        "method": {
+          "type": "string",
+          "description": "kind 'http': request method, default POST.",
+          "x-known-values": ["POST", "PUT", "GET"]
+        },
+        "headers": {
+          "type": "object",
+          "description": "kind 'http': headers sent with the request, values already interpolated — this is where an Authorization header for a state endpoint lives.",
+          "additionalProperties": { "type": "string" }
+        },
+        "format": {
+          "type": "string",
+          "description": "kind 'http': the body shape. 'janus' is this specification's context document. 'pact-state-change' is the v3/v4 provider-state body ({ state, params, action }) so an existing state-change endpoint keeps working unchanged — the migration case B5 exists for (spec.md §8.4).",
+          "x-known-values": ["janus", "pact-state-change"]
+        }
+      }
+    },
+    "When": {
+      "title": "When",
+      "description": "Which occurrences of the point this hook runs at. Members are exact string matches, AND-ed; an absent member matches everything. Deliberately not an expression language — the same refusal variant semantics §3.5 makes for exclusions, for the same reason: a selector that has to be evaluated to be understood cannot be reviewed (spec.md §6.3).",
+      "type": "object",
+      "properties": {
+        "interaction": {
+          "type": "string",
+          "description": "The interaction's description. With states, this is an interaction's identity (contract spec §4.2)."
+        },
+        "state": {
+          "type": "string",
+          "description": "A provider state's name. At state points this selects which state the hook handles; elsewhere it selects interactions carrying that state."
+        },
+        "transport": {
+          "type": "string",
+          "description": "The interaction's transport kind, e.g. 'http', 'message'. Open vocabulary owned by the transport components (design 2.6).",
+          "x-known-values": ["http", "https", "message"]
+        }
+      }
+    }
+  }
+}

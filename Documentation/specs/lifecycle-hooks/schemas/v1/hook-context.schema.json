@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/hooks/v1/hook-context.schema.json",
+  "title": "HookContext",
+  "description": "What the engine hands a hook, at every point and through every implementation. One document, four implementations: a component receives it as hook/invoke's 'context' (design 2.6 §8), a script as its argument, a command on stdin, an endpoint as a POST body — so a hook rewritten from one implementation to another sees the same thing. Which members are present, and which of them may be changed, is fixed per point by spec.md §3; 'mutable' says so in the document itself, so a hook can be written against what it was given rather than against a table.",
+  "type": "object",
+  "required": ["point", "role"],
+  "properties": {
+    "point": {
+      "type": "string",
+      "description": "The lifecycle point this invocation is for. Open vocabulary: an engine that grows a point does not break a hook that does not know it, and a hook that receives a point it does not know answers 'skipped' rather than guessing (spec.md §12.2).",
+      "x-known-values": [
+        "before-verification",
+        "state-setup",
+        "before-request",
+        "produce-message",
+        "consume-message",
+        "after-response",
+        "state-teardown",
+        "after-verification"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "description": "Which side of the contract this run is. Most points exist only on the provider side, because hooks are where the engine drives user code and on the consumer side the user drives the engine (spec.md §2.4).",
+      "x-known-values": ["provider", "consumer"]
+    },
+    "run": { "$ref": "#/$defs/RunContext" },
+    "interaction": { "$ref": "#/$defs/InteractionContext" },
+    "variant": { "$ref": "#/$defs/VariantContext" },
+    "state": { "$ref": "#/$defs/StateContext" },
+    "exchange": { "$ref": "#/$defs/ExchangeContext" },
+    "parts": {
+      "type": "object",
+      "description": "The interaction parts in play: design 2.6's Parts document, unchanged and deliberately not restated here — part name -> slot name -> wrapped slot value. Empty at 'produce-message', where producing them is the hook's job."
+    },
+    "endpoint": {
+      "type": "object",
+      "description": "Where the exchange is going or came from: design 2.6's EndpointDescriptor, an open document that is never assumed to be a URL."
+    },
+    "summary": {
+      "type": "object",
+      "description": "Present at 'after-verification': the run summary the terminal verification event carries (protocol spec §9.6). Handed to the hook so that a reporting hook reads the same document the host does."
+    },
+    "config": {
+      "type": "object",
+      "description": "This hook entry's own configuration, fully interpolated. A hook receives values, never templates (ADR 0014), and the engine never echoes them back out (spec.md §7.3)."
+    },
+    "mutable": {
+      "type": "array",
+      "description": "The dotted context paths this invocation may replace — the intersection of what the point permits and what the entry declared. A change outside it is refused naming the path, so 'declared' and 'applied' cannot drift apart (spec.md §4.3).",
+      "items": { "type": "string" }
+    },
+    "deadline-ms": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How long this invocation has. Carried so a hook that talks to something slow can choose its own timeout inside the engine's, rather than being killed mid-call."
+    }
+  },
+  "$defs": {
+    "RunContext": {
+      "title": "RunContext",
+      "description": "The run this invocation belongs to. Present at every point.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Engine-assigned, unique within the life of the pipe; the session id of protocol spec §7." },
+        "consumer": { "type": "object", "properties": { "name": { "type": "string" } } },
+        "provider": { "type": "object", "properties": { "name": { "type": "string" } } },
+        "data": {
+          "type": "object",
+          "description": "Hook name -> the 'data' that hook returned earlier in this run, from run-scope points only. This is how a token fetched once at 'before-verification' reaches every 'before-request' without being fetched again, and it is deliberately keyed by hook name: a scratchpad whose entries are anonymous is a scratchpad nobody can attribute."
+        }
+      }
+    },
+    "InteractionContext": {
+      "title": "InteractionContext",
+      "description": "The interaction being exercised. Absent at run points.",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "states": {
+          "type": "array",
+          "description": "The interaction's provider states with their parameters already resolved for this variant (variant semantics §6.4) — design 2.5's state records, not restated here.",
+          "items": { "type": "object" }
+        },
+        "transport": {
+          "type": "object",
+          "description": "The interaction's transport descriptor: 'kind' and 'mode' (passive or emissive), plus whatever the transport component put there (contract spec §4.3)."
+        }
+      }
+    },
+    "VariantContext": {
+      "title": "VariantContext",
+      "description": "Which variant this exchange is for. Absent at run points.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The variant id, stable and recorded (variant semantics §2.2)." },
+        "assignment": {
+          "type": "array",
+          "description": "The variant's assignment as design 2.3 writes it — an array of { dimension, point }, unchanged and not restated here. A hook that must set up data specific to a variant reads the assignment rather than parsing the id, and reads it in the shape the design that owns it uses, because a second shape for the same fact is a second thing to keep in step.",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "StateContext": {
+      "title": "StateContext",
+      "description": "Present at 'state-setup' and 'state-teardown': the one state this invocation is for. The engine invokes the point once per state in the interaction's recorded order, so a handler is never handed a list to loop over.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "params": {
+          "type": "object",
+          "description": "The state's parameters with variant bindings resolved (variant semantics §6.4). A parameter with no matching case and no default is absent, not null."
+        }
+      }
+    },
+    "ExchangeContext": {
+      "title": "ExchangeContext",
+      "description": "The interaction-and-variant attempt in flight — the unit a verification result reports on (protocol spec §9.6).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identifies this attempt in events and in the hook report." },
+        "data": {
+          "type": "object",
+          "description": "Hook name -> 'data' returned by an earlier hook in this exchange. Cleared when the exchange ends, so nothing leaks into the next variant by accident."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "Present at 'state-teardown': how the exchange went, so teardown can differ after a failure. Open vocabulary; 'state-unavailable' is variant semantics §6.7's status and not a synonym for failure.",
+          "x-known-values": ["passed", "failed", "state-unavailable", "not-run"]
+        }
+      }
+    }
+  }
+}

@@ -18,7 +18,10 @@ contract — the recorded artifact's identity, its interaction record, how shape
 are written down, and v1–v4 pact conversion; it is *not* a "pact v5", see ADR 0011 — and
 `component-interfaces/` from task 2.6 governs the four interfaces the kernel loads behind it: the pipe
 components speak, what they contribute, the native/WASM/subprocess bindings, and how out-of-tree components
-are distributed, sandboxed and resolved). Keep this file in sync with
+are distributed, sandboxed and resolved, and `lifecycle-hooks/` from task 2.7 governs the hook system
+around that interface — the points and what each is handed, ordering and failure semantics, the
+configuration a loader resolves before the engine sees it (ADR 0014), the four implementations, and the
+scripted-hook runtime (ADR 0015)). Keep this file in sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task

@@ -12,7 +12,7 @@
         "point": {
           "type": "string",
           "description": "A lifecycle point from design 2.7's open vocabulary.",
-          "x-known-values": ["before-request", "state-setup", "produce-message", "consume-message", "after-verification"]
+          "x-known-values": ["before-verification", "state-setup", "before-request", "produce-message", "consume-message", "after-response", "state-teardown", "after-verification"]
         },
         "context": {
           "type": "object",
@@ -31,8 +31,8 @@
       "properties": {
         "outcome": {
           "type": "string",
-          "description": "A 'failed' outcome is a hook failure; whether that aborts the run, fails the interaction or warns is design 2.7's ordering-and-failure semantics.",
-          "x-known-values": ["ok", "failed", "skipped"]
+          "description": "A 'failed' outcome is a hook failure; whether that aborts the run, fails the exchange or warns is design 2.7's ordering-and-failure semantics. 'unsupported' is meaningful only at design 2.7's state points, where it means the provider cannot reach the state (variant semantics §6.7).",
+          "x-known-values": ["ok", "failed", "skipped", "unsupported"]
         },
         "changes": {
           "type": "object",

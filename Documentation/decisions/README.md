@@ -30,13 +30,14 @@ superseding ADR instead.
 | [0011](0011-contracts-as-self-identifying-json-documents.md) | Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification | proposed |
 | [0012](0012-one-interface-two-bindings.md) | Define components as the engine protocol's frames turned around, and give the interface two bindings | proposed |
 | [0013](0013-component-hosting-is-an-embedding-capability.md) | Make component hosting a negotiated embedding capability, and distribute out-of-tree components as digest-pinned OCI artifacts | proposed |
+| [0014](0014-hooks-are-resolved-configuration-not-callbacks.md) | Declare hooks in configuration a loader resolves; the engine receives values, never callbacks, paths or templates | proposed |
+| [0015](0015-quickjs-as-the-scripted-hook-runtime.md) | Make QuickJS the scripted-hook runtime, with the hook context as a script's entire capability surface | proposed |
 
 ## Decision backlog
 
 Known decisions waiting on evidence, seeded from the RFC's unresolved questions and the project plan.
 Each becomes a numbered ADR when its inputs are ready (feeding task in brackets):
 
-- Script-hook language and runtime (spike 1.6 recommends QuickJS with Boa fallback → design 2.7)
 - Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
   edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
 - Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
