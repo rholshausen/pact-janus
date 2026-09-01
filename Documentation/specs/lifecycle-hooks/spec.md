@@ -240,8 +240,11 @@ comes from user code rather than from a transport. Context: `run`, `interaction`
 point where the whole parts document is the mutable member.
 
 This is the message-provider verification case: the verifier asks the provider's own producer for the
-message it would emit and matches it against the contract. On the consumer side it is the mirror: the
-application under test produces, and the engine matches.
+message it would emit and matches it against the contract. On the consumer side it is the same
+direction with the other party in it — a **passive** message interaction (protocol §7.4), where the
+application under test is what emits and the engine matches what it emitted. Not a mirror: the mirror
+is §3.5, where the engine produces and user code receives. That the roles swap and the direction does
+not is the whole reason these points are named for the direction.
 
 Normative, from spike 1.5 finding 6 and protocol §8.3: **a hook and a wire transport are interchangeable
 sources of the same parts and MUST produce identical results.** The engine matches the parts it was
