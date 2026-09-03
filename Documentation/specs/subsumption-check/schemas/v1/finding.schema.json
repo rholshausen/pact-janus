@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/subsumption/v1/finding.schema.json",
   "title": "Finding",
-  "description": "One place where admits(provider) is not decided to be a subset of admits(consumer) (spec.md §4). Only 'no' and 'unknown' verdicts are ever recorded here — a 'yes' is never a finding.",
+  "description": "One place where admits(provider) is not decided to be a subset of admits(consumer), or a passing node worth a caveat (spec.md §4-§5). 'yes' is recorded only for the advisory/excluded-combination case (spec.md §5); every other 'yes' is not a finding at all.",
   "type": "object",
   "required": ["path", "verdict", "severity", "kind"],
   "properties": {
@@ -13,13 +13,13 @@
     },
     "verdict": {
       "type": "string",
-      "description": "The walk's own three-valued answer at this node (shape spec §8) — always 'no' or 'unknown' here, since a 'yes' is not reported.",
-      "x-known-values": ["no", "unknown"]
+      "description": "The walk's own three-valued answer at this node (shape spec §8). 'yes' appears only alongside severity 'advisory' and a non-empty 'excluded-by' (spec.md §5) — every other finding is 'no' or 'unknown'.",
+      "x-known-values": ["yes", "no", "unknown"]
     },
     "severity": {
       "type": "string",
-      "description": "Computed once from 'verdict' and stored, so policy dispatch (spec.md §7) never re-walks the tree: 'finding' for 'no', 'review' for 'unknown'.",
-      "x-known-values": ["finding", "review"]
+      "description": "Computed once from 'verdict' and stored, so policy dispatch (spec.md §7) never re-walks the tree: 'finding' for 'no', 'review' for 'unknown', 'advisory' for a caveated 'yes'. Policy (spec.md §7.1) dispatches only on 'finding' and 'review' — 'advisory' is never blocked on.",
+      "x-known-values": ["finding", "review", "advisory"]
     },
     "kind": {
       "type": "string",
@@ -30,7 +30,8 @@
         "weaker-presence",
         "wider-cardinality",
         "undeclared-member",
-        "unreviewable"
+        "unreviewable",
+        "excluded-combination"
       ]
     },
     "provider": { "$ref": "#/$defs/Side" },

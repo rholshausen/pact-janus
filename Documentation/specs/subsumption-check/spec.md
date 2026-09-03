@@ -219,9 +219,10 @@ subsetting a union is what narrower means.
 A **finding** is recorded at the *shallowest* node whose verdict is not `yes` — a deeper explanation
 (the specific member, the specific array position) is where the reason lives, not every ancestor node on
 the path to it, the same discipline `explain`'s executed form uses for match failures (plan-grammar spec
-§3.2). `yes` verdicts are never findings, including the must-ignore case: an extra provider member is the
-RFC's own example of the asymmetry Postel's law preserves, and reporting it would teach a team to ignore
-the report.
+§3.2). A `yes` verdict is never a finding, including the must-ignore case — an extra provider member is
+the RFC's own example of the asymmetry Postel's law preserves, and reporting it would teach a team to
+ignore the report — **except** the one case §5 defines, where a `yes` carries a coverage caveat worth a
+human's attention despite being structurally correct.
 
 ### 4.2 The RFC's asymmetric rules, in this walk's terms
 
@@ -236,18 +237,24 @@ the report.
 | an opaque-class node (`contains`, an undeclared component operator) that is not identical | `unreviewable` | shape spec §8's opaque class |
 | extra provider member; provider using fewer `one-of` alternatives or `any-of` options than the consumer declared | *(not a finding — `yes`)* | must-ignore (§4.1), subsetting a union or enum |
 
+A seventh kind, `excluded-combination`, is not a shape difference at all — it is §5's `yes`-plus-caveat
+case, kept out of this table because it does not come from the walk deciding anything, only from a
+cross-reference to the consumer's recorded exclusions.
+
 `kind` is an open string vocabulary (§9): a component operator that declares a comparability class (
 component-interfaces spec §7.5) and answers `no`/`unknown` from its own `compare` contributes a finding
-too, and MAY name its own `kind` rather than being forced into this table's six.
+too, and MAY name its own `kind` rather than being forced into this table's seven.
 
 ### 4.3 Severity
 
 Every finding carries a **severity**, computed once from its verdict and stored rather than re-derived,
 so §7's policy dispatch never has to re-walk the tree: `finding` for a `no` verdict — a decided
-incompatibility — and `review` for an `unknown` verdict — an honest "a person must look at this." A
+incompatibility — `review` for an `unknown` verdict — an honest "a person must look at this" — and
+`advisory` for the §5 case, a `yes` verdict reported only because it carries an `excluded-by` caveat. A
 `review` finding is never silently escalated to `finding`, and never quietly dropped: shape spec §8's
-whole point is that `unknown` is a first-class answer, not a placeholder for one the checker was too
-lazy to compute.
+whole point is that `unknown` is a first-class answer, not a placeholder for one the checker was too lazy
+to compute. `advisory` is policy-inert by construction (§7.1 dispatches only on `finding` and `review`) —
+it exists to be read, not to gate anything.
 
 ### 4.4 What a finding says
 
@@ -277,13 +284,18 @@ This is the question variant semantics spec §1 defers here: **what does an unex
 `can-i-deploy`?** The answer this design gives is narrow on purpose. A checker MAY cross-reference the
 dimensions a finding's `path` touches against the consumer contract's recorded exclusions
 (`selection.report`, sampling-policy spec's `Exclusion` document) and, where an exclusion's `when` set
-covers the dimensions in play, attach it to the finding as `excluded-by` — a **caveat on a `yes` or a
-`review`, carrying the exclusion's own reason, never a fourth verdict value.** Shape spec §8 fixes the
-walk's output at exactly `yes` / `no` / `unknown`; this design does not widen it, because a provider shape
-is a per-field claim, not a per-combination one, and inferring which *joint* combination the provider's
-own evidence actually produced from a per-field shape would be exactly the guess §8 forbids. `excluded-by`
-is therefore always advisory: a reason for a human to look twice at a passing field, never grounds to
-change what the walk decided.
+covers the dimensions in play, attach it to the node as `excluded-by` — a **caveat, carrying the
+exclusion's own reason, that never changes what the walk decided.** Shape spec §8 fixes the walk's output
+at exactly `yes` / `no` / `unknown`; this design does not widen it, because a provider shape is a
+per-field claim, not a per-combination one, and inferring which *joint* combination the provider's own
+evidence actually produced from a per-field shape would be exactly the guess §8 forbids.
+
+A node whose verdict is already `no` or `unknown` simply carries `excluded-by` on the finding §4 already
+reports. A node whose verdict is `yes` — ordinarily not a finding at all — is reported anyway, as an
+`advisory`-severity finding with `kind: "excluded-combination"` (§4.3), specifically so that a passing
+field sitting over unexercised joint coverage does not vanish from the report the way every other `yes`
+does. `excluded-by` never manufactures a fourth verdict value; it manufactures a reason to show a `yes`
+that would otherwise, correctly, be silent.
 
 ## 6. The subsumption report
 
