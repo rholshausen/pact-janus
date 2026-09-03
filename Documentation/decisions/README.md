@@ -32,6 +32,7 @@ superseding ADR instead.
 | [0013](0013-component-hosting-is-an-embedding-capability.md) | Make component hosting a negotiated embedding capability, and distribute out-of-tree components as digest-pinned OCI artifacts | proposed |
 | [0014](0014-hooks-are-resolved-configuration-not-callbacks.md) | Declare hooks in configuration a loader resolves; the engine receives values, never callbacks, paths or templates | proposed |
 | [0015](0015-quickjs-as-the-scripted-hook-runtime.md) | Make QuickJS the scripted-hook runtime, with the hook context as a script's entire capability surface | proposed |
+| [0016](0016-subsumption-defaults-to-warn-with-mandatory-reason-exemptions.md) | Subsumption defaults to warn, not block; exemptions require a reason and are scoped by field, interaction or consumer | proposed |
 
 ## Decision backlog
 
@@ -40,8 +41,6 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
 
 - Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
   edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
-- Subsumption decidability ladder and warn/block default (design 2.8, informed by 7.3; the per-operator
-  comparability classes it consumes are fixed by ADR 0007)
 - SDK conformance: what the suite must cover for an SDK to be called conformant (design 2.9, build 6.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/subsumption/v1/provider-shape.schema.json",
+  "title": "ProviderShape",
+  "description": "What a provider publishes about the shapes it may produce (spec.md §2). Not a contract: no consumer name, no evidence, no variants. Documents this schema treats as opaque are owned elsewhere: a shape is design 2.2's document.",
+  "type": "object",
+  "required": ["$format", "provider", "interactions"],
+  "properties": {
+    "$format": {
+      "type": "string",
+      "description": "The format token (spec.md §2.4).",
+      "x-known-values": ["janus-provider-shape/1"]
+    },
+    "$schema": {
+      "type": "string",
+      "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it."
+    },
+    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "provenance": {
+      "type": "string",
+      "description": "Document-level default provenance, in the RFC's decreasing order of fidelity (spec.md §2.3). Overridable per interaction. Never changes what the walk decides — it is policy input, not verdict input.",
+      "x-known-values": ["recorded", "derived", "authored", "observed"],
+      "default": "authored"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "How the file came to exist. Open, following the same placement rule as contract spec §3.2.",
+      "properties": {
+        "writer": {
+          "type": "object",
+          "description": "What produced this document: an open map of component name to version string.",
+          "additionalProperties": { "type": "string" }
+        },
+        "created": { "type": "string", "format": "date-time" }
+      }
+    },
+    "interactions": {
+      "type": "array",
+      "description": "One entry per operation the provider publishes a shape for. An interaction with no entry here gets no subsumption result at all (spec.md §2.2, §6.3) — not a passing one.",
+      "items": { "$ref": "#/$defs/ProviderInteraction" }
+    }
+  },
+  "$defs": {
+    "Pacticipant": {
+      "title": "Pacticipant",
+      "description": "A named party. Mirrors contract spec §3.1 so a broker already reading 'provider.name' keeps working.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "StateRef": {
+      "title": "StateRef",
+      "description": "A provider state by name only — a provider shape does not know a given consumer's parameter values (spec.md §2.2).",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ProviderInteraction": {
+      "title": "ProviderInteraction",
+      "description": "One operation's published shape. Matched to a consumer contract's interaction by 'description' plus 'states' names (spec.md §2.2, contract spec §4.2).",
+      "type": "object",
+      "required": ["description", "parts"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MUST equal the consumer interaction's description for the two to be matched."
+        },
+        "states": {
+          "type": "array",
+          "description": "Names only, no params (spec.md §2.2).",
+          "items": { "$ref": "#/$defs/StateRef" }
+        },
+        "provenance": {
+          "type": "string",
+          "description": "Overrides the document-level 'provenance' for this interaction only.",
+          "x-known-values": ["recorded", "derived", "authored", "observed"]
+        },
+        "source": {
+          "type": "object",
+          "description": "Open provenance detail: a test-run reference for 'recorded', a type-schema location for 'derived', a verification-run window for 'observed'. Not interpreted by the walk."
+        },
+        "parts": {
+          "type": "object",
+          "description": "Part name -> slot name -> shape. Only the slots the provider produces belong here (spec.md §2.1) — this schema does not enforce that, since direction is the transport component's business, not the kernel's.",
+          "additionalProperties": { "$ref": "#/$defs/ShapePart" }
+        }
+      }
+    },
+    "ShapePart": {
+      "title": "ShapePart",
+      "description": "One part's shapes: slot name -> shape node. Each value is design 2.2's shape document, opaque here (contract spec §5.1's same nesting).",
+      "type": "object",
+      "additionalProperties": { "type": "object" }
+    }
+  }
+}

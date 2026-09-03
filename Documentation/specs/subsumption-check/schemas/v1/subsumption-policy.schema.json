@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/subsumption/v1/subsumption-policy.schema.json",
+  "title": "SubsumptionPolicy",
+  "description": "The warn/block surface and exemption scoping (spec.md §7). Resolved in layers — specification default, project config, per-run override — with 'exemptions' accumulating across layers rather than the last layer replacing the list (ADR 0016), the same treatment ADR 0008 gives 'exclude'.",
+  "type": "object",
+  "properties": {
+    "on-finding": {
+      "type": "string",
+      "description": "What a 'finding'-severity result does to the run (spec.md §7.1). ADR 0016: default 'warn'.",
+      "x-known-values": ["warn", "block"],
+      "default": "warn"
+    },
+    "on-review": {
+      "type": "string",
+      "description": "What a 'review'-severity result does to the run. ADR 0016: default 'warn' — 'unknown' is an honest answer, not a lesser finding, and blocking on it by default would punish exactly the operators §8's conservative/opaque classes exist to admit.",
+      "x-known-values": ["warn", "block"],
+      "default": "warn"
+    },
+    "exemptions": {
+      "type": "array",
+      "description": "Accepted gaps between what the provider may do and what the consumer has tested (spec.md §7.2).",
+      "items": { "$ref": "#/$defs/Exemption" }
+    }
+  },
+  "$defs": {
+    "Exemption": {
+      "title": "Exemption",
+      "description": "Every set selector must match for the exemption to apply; an unset selector matches every value on that axis (spec.md §7.2).",
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "consumer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Limits the exemption to findings for this consumer name."
+        },
+        "interaction": { "$ref": "#/$defs/InteractionRef" },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Limits the exemption to one field, in shape spec §6.2's path grammar."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required: an exemption is a team accepting a gap, and the policy document records why (ADR 0008's Exclusion.reason is the same discipline for a different axis)."
+        },
+        "expires": {
+          "type": "string",
+          "format": "date",
+          "description": "When the exemption should be revisited. Optional, since some gaps are permanent by design, but its absence SHOULD be surfaced by a report or dashboard (task 7.4/7.5)."
+        }
+      }
+    },
+    "InteractionRef": {
+      "title": "InteractionRef",
+      "description": "Identifies an interaction the same way contract spec §4.2 does — description plus state names.",
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "states": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

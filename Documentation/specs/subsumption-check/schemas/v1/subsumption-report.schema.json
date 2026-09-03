@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/subsumption/v1/subsumption-report.schema.json",
+  "title": "SubsumptionReport",
+  "description": "The result of walking one (consumer, provider) pair (spec.md §6). Findings are this schema's own Finding document (finding.schema.json), treated as opaque objects here and validated separately against that schema.",
+  "type": "object",
+  "required": ["$format", "consumer", "provider", "interactions"],
+  "properties": {
+    "$format": {
+      "type": "string",
+      "description": "The format token (spec.md §9).",
+      "x-known-values": ["janus-subsumption-report/1"]
+    },
+    "$schema": {
+      "type": "string",
+      "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it."
+    },
+    "consumer": { "$ref": "#/$defs/Pacticipant" },
+    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "metadata": {
+      "type": "object",
+      "description": "How the report came to exist. Open, same placement rule as contract spec §3.2.",
+      "properties": {
+        "writer": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "created": { "type": "string", "format": "date-time" }
+      }
+    },
+    "interactions": {
+      "type": "array",
+      "description": "Every consumer contract interaction the checker considered, whether or not a provider shape matched it (spec.md §6.3).",
+      "items": { "$ref": "#/$defs/InteractionResult" }
+    },
+    "summary": { "$ref": "#/$defs/Summary" }
+  },
+  "$defs": {
+    "Pacticipant": {
+      "title": "Pacticipant",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "InteractionResult": {
+      "title": "InteractionResult",
+      "description": "One interaction's outcome (spec.md §6.1-§6.3).",
+      "type": "object",
+      "required": ["description", "matched", "verdict", "findings"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": { "name": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "matched": {
+          "type": "boolean",
+          "description": "Whether a provider-shape entry was found for this interaction (spec.md §2.2). False means the interaction was never checked, distinct from a checked-and-passing interaction."
+        },
+        "verdict": {
+          "type": "string",
+          "description": "The Kleene conjunction of every part/slot root comparison (spec.md §6.2), or 'not-published' when 'matched' is false (spec.md §6.3) — a report-level state, not one of the walk's own three values.",
+          "x-known-values": ["yes", "no", "unknown", "not-published"]
+        },
+        "findings": {
+          "type": "array",
+          "description": "Design 2.8's own Finding documents (finding.schema.json), opaque to this schema.",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "Summary": {
+      "title": "Summary",
+      "description": "Counts across the whole report, so a reader sees coverage without counting the list (the same reasoning contract spec §5.2 gives for recording the selection report rather than leaving it to be inferred).",
+      "type": "object",
+      "properties": {
+        "interactions": { "type": "integer", "minimum": 0 },
+        "matched": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 },
+        "reviews": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

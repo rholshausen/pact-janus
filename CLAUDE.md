@@ -32,7 +32,11 @@ Three sources are the source of truth and take precedence over this file when th
   `lifecycle-hooks/` (task 2.7) governs the hook *system* the hook interface sits inside — the point
   vocabulary and each point's context and mutable set, ordering and failure semantics, the
   configuration document the loader resolves before the engine sees it (ADR 0014), the four
-  implementations, and the scripted-hook runtime and its API (ADR 0015).
+  implementations, and the scripted-hook runtime and its API (ADR 0015);
+  `subsumption-check/` (task 2.8) governs the `admits(provider) ⊆ admits(consumer)` walk — the
+  composition rules on top of the shape language's own comparability classes, the provider-shape
+  artifact, the finding vocabulary and report format, and the warn/block policy with exemption
+  scoping (ADR 0016).
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust

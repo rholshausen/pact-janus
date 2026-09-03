@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/subsumption/v1/finding.schema.json",
+  "title": "Finding",
+  "description": "One place where admits(provider) is not decided to be a subset of admits(consumer) (spec.md §4). Only 'no' and 'unknown' verdicts are ever recorded here — a 'yes' is never a finding.",
+  "type": "object",
+  "required": ["path", "verdict", "severity", "kind"],
+  "properties": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The node's address, in shape spec §6.2's dimension-path grammar (e.g. 'response.body.status', 'response.body.items[*].qty')."
+    },
+    "verdict": {
+      "type": "string",
+      "description": "The walk's own three-valued answer at this node (shape spec §8) — always 'no' or 'unknown' here, since a 'yes' is not reported.",
+      "x-known-values": ["no", "unknown"]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Computed once from 'verdict' and stored, so policy dispatch (spec.md §7) never re-walks the tree: 'finding' for 'no', 'review' for 'unknown'.",
+      "x-known-values": ["finding", "review"]
+    },
+    "kind": {
+      "type": "string",
+      "description": "The mechanical classification (spec.md §4.2). Open: a component operator with its own comparability declaration may contribute a kind not in the core list.",
+      "x-known-values": [
+        "wider-values",
+        "broader-type",
+        "weaker-presence",
+        "wider-cardinality",
+        "undeclared-member",
+        "unreviewable"
+      ]
+    },
+    "provider": { "$ref": "#/$defs/Side" },
+    "consumer": { "$ref": "#/$defs/Side" },
+    "reason": {
+      "type": "string",
+      "description": "Free text naming the specific comparison that produced this verdict, e.g. '4 options vs 3' or 'two different regexes: conservative class, no guessing'."
+    },
+    "excluded-by": {
+      "type": "array",
+      "description": "Advisory cross-reference to the consumer contract's recorded exclusions whose dimensions overlap this path (spec.md §5). Never changes 'verdict'. Each item is design 2.3's Exclusion document (sampling-policy schema), reproduced here and not otherwise interpreted.",
+      "items": { "type": "object" }
+    }
+  },
+  "$defs": {
+    "Side": {
+      "title": "Side",
+      "description": "One side's rendering of the node being compared, generated deterministically from its operator and parameters (spec.md §4.4) so two checkers agree on the text.",
+      "type": "object",
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "shape": {
+          "type": "object",
+          "description": "The raw shape node, for a reader who wants more than the summary. Design 2.2's document, opaque here."
+        }
+      }
+    }
+  }
+}
