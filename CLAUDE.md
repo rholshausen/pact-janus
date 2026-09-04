@@ -36,7 +36,10 @@ Three sources are the source of truth and take precedence over this file when th
   `subsumption-check/` (task 2.8) governs the `admits(provider) ⊆ admits(consumer)` walk — the
   composition rules on top of the shape language's own comparability classes, the provider-shape
   artifact, the finding vocabulary and report format, and the warn/block policy with exemption
-  scoping (ADR 0016).
+  scoping (ADR 0016); `sdk-specification/` (task 2.9) governs what a Janus SDK is — the canonical,
+  language-independent behavioural spec every idiomatic layer implements, the per-language
+  style-guide skeleton, the compatibility-facade classification for today's DSL, and what
+  "conformant" means (ADR 0017).
 
 > **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
 > structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust

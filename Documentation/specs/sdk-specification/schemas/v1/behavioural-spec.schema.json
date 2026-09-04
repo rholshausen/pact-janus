@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/sdk/v1/behavioural-spec.schema.json",
+  "title": "BehaviouralSpec",
+  "description": "The canonical, language-independent DSL specification every Janus SDK's idiomatic layer implements (spec.md §3). One document, shared by every language; the style guide (spec.md §5) and the compatibility facade (spec.md §6) are per-language and per-primitive additions to it, not replacements.",
+  "type": "object",
+  "required": ["$format", "primitives"],
+  "properties": {
+    "$format": {
+      "type": "string",
+      "description": "The format token (spec.md §10).",
+      "x-known-values": ["janus-sdk-behavioural-spec/1"]
+    },
+    "primitives": {
+      "type": "array",
+      "description": "One entry per user-facing DSL concept, language-independent.",
+      "items": { "$ref": "#/$defs/Primitive" }
+    }
+  },
+  "$defs": {
+    "Primitive": {
+      "title": "Primitive",
+      "description": "One DSL primitive, specified precisely enough to implement without reading another language's source (spec.md §3.3).",
+      "type": "object",
+      "required": ["id", "category", "summary", "produces", "semantics"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable kebab-case identifier, independent of any language's casing convention."
+        },
+        "category": {
+          "type": "string",
+          "description": "What kind of primitive this is (spec.md §3.1).",
+          "x-known-values": ["shape", "interaction", "session", "lifecycle"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line: what a user reaches for this to do."
+        },
+        "produces": {
+          "type": "array",
+          "minItems": 1,
+          "description": "What this primitive compiles to, structurally (spec.md §3.2) — an array because a primitive like 'execute' produces a sequence of protocol operations, not one document.",
+          "items": { "$ref": "#/$defs/Produces" }
+        },
+        "signature": {
+          "type": "array",
+          "description": "Parameters named by role, not by per-language type (spec.md §3.2) — the concrete type is the style guide's business.",
+          "items": { "$ref": "#/$defs/Param" }
+        },
+        "semantics": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Precise behavioural prose, citing the owning design by section rather than restating it. Must clear the bar spec.md §3.3 states: implementable by someone who has never read another language's idiomatic layer."
+        },
+        "errors": {
+          "type": "array",
+          "description": "Structured protocol errors (engine-protocol spec §10) this primitive's translation must surface, and how.",
+          "items": { "$ref": "#/$defs/ErrorSurface" }
+        },
+        "conformance": {
+          "type": "array",
+          "description": "Scenario ids in task 6.4's suite that exercise this primitive. Traceability only — this design does not define scenarios.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "facade": {
+          "type": "array",
+          "description": "Today's classic-DSL names this primitive replaces, and how (spec.md §6).",
+          "items": { "$ref": "#/$defs/FacadeMapping" }
+        }
+      }
+    },
+    "Produces": {
+      "title": "Produces",
+      "description": "One thing this primitive compiles to. 'kind' selects which of the other members apply, following the same open-tag pattern as every other design's tagged documents.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-known-values": ["shape-operator", "protocol-operation", "spec-member"]
+        },
+        "operator": {
+          "type": "string",
+          "description": "kind 'shape-operator': the shape-language operator name (design 2.2) this primitive emits a node for."
+        },
+        "operation": {
+          "type": "string",
+          "description": "kind 'protocol-operation': the engine-protocol operation name (design 2.1), e.g. 'consumer-session/add-interaction'."
+        },
+        "path": {
+          "type": "string",
+          "description": "kind 'spec-member': the member path within the interaction-spec document this primitive populates, e.g. 'parts.response.body'."
+        }
+      }
+    },
+    "Param": {
+      "title": "Param",
+      "description": "One parameter, named by its role rather than its per-language type (spec.md §3.2).",
+      "type": "object",
+      "required": ["name", "role"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": "string",
+          "description": "What the parameter becomes, structurally.",
+          "x-known-values": [
+            "example-value",
+            "example-value-list",
+            "nested-shape",
+            "options-bag",
+            "label",
+            "closure"
+          ]
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "ErrorSurface": {
+      "title": "ErrorSurface",
+      "description": "One structured protocol error this primitive's translation must not swallow (spec.md §3.2).",
+      "type": "object",
+      "required": ["code", "surfaced-as"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "An engine-protocol spec §10 error code, e.g. 'interaction-invalid'."
+        },
+        "surfaced-as": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the idiomatic layer turns this into a language-native failure. Prose, not a type — the concrete exception/error type is the style guide's business."
+        }
+      }
+    },
+    "FacadeMapping": {
+      "title": "FacadeMapping",
+      "description": "One classic-DSL name this primitive replaces (spec.md §6.1). A 'kept' mapping MUST NOT change behaviour for any input that was legal before; 'adapted' and 'dropped' require 'reason' to say why.",
+      "type": "object",
+      "required": ["from", "status", "reason"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The classic-DSL primitive (and its shape, if that disambiguates), e.g. 'term(generate, matcher)'."
+        },
+        "status": {
+          "type": "string",
+          "x-known-values": ["kept", "adapted", "dropped"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required even for 'kept', where it can be short: why this is a lossless mapping, what default an 'adapted' mapping supplies, or what a 'dropped' primitive's migration path is (spec.md §6.1)."
+        }
+      }
+    }
+  }
+}

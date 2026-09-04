@@ -24,7 +24,10 @@ configuration a loader resolves before the engine sees it (ADR 0014), the four i
 scripted-hook runtime (ADR 0015), and `subsumption-check/` from task 2.8 governs the
 `admits(provider) ⊆ admits(consumer)` walk — the composition rules on top of the shape language's
 comparability classes, the provider-shape artifact, the finding vocabulary and report format, and the
-warn/block policy with exemption scoping (ADR 0016)). Keep this file in sync with
+warn/block policy with exemption scoping (ADR 0016), and `sdk-specification/` from task 2.9 governs
+what a Janus SDK is — the canonical, language-independent behavioural spec every idiomatic layer
+implements, the per-language style-guide skeleton, the compatibility-facade classification for
+today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync with
 `CLAUDE.md`.
 
 > **Status**: plan/design phase. Layout and commands below are the intended structure from plan task
