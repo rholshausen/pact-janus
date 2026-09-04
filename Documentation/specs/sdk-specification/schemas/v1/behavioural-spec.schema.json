@@ -94,7 +94,21 @@
           "type": "string",
           "description": "kind 'spec-member': the member path within the interaction-spec document this primitive populates, e.g. 'parts.response.body'."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "shape-operator" } } },
+          "then": { "required": ["kind", "operator"] }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "protocol-operation" } } },
+          "then": { "required": ["kind", "operation"] }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "spec-member" } } },
+          "then": { "required": ["kind", "path"] }
+        }
+      ]
     },
     "Param": {
       "title": "Param",

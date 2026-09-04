@@ -263,8 +263,9 @@ A primitive's optional `facade` array names the old-DSL names it replaces:
   "errors": [],
   "conformance": [ "shape.any-of.literal-containment", "shape.any-of.value-dimension" ],
   "facade": [
-    { "from": "term(generate, matcher)", "status": "dropped",
-      "reason": "term paired one literal example with one regex and no declared alternative set; anyOf needs every alternative named up front to build a variant space, which a single regex cannot supply. Migrates to anyOf(...) if the values are enumerable, or regex(...) unchanged if they are not." } ] }
+    { "from": "like(v) with a custom generator function returning one of several fixed literals at random",
+      "status": "dropped",
+      "reason": "a random per-run generator defeats deterministic recording (ADR 0008's 'no randomness, anywhere' applies just as much to a consumer's own generators as to the sampler) and never declared its alternative set anywhere the engine could see. Migrates to anyOf(...) naming the same literals, now sampled deterministically per variant instead of chosen at random once." } ] }
 ```
 
 [`examples/compatibility-facade-mapping.md`](examples/compatibility-facade-mapping.md) works through a
