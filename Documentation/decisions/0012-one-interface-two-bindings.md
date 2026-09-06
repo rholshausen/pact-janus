@@ -1,6 +1,6 @@
 # 0012 — Define components as the engine protocol's frames turned around, and give the interface two bindings
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-30
 - **Plan tasks**: 2.6 (answers the RFC's day-one-components question; feeds 3.8, 4.2, 8.1, 8.4)
 - **Evidence**: [spike 1.4](../../spikes/1.4-engine-hosting-plugins/FINDINGS.md) (plugin-side byte-pipe,

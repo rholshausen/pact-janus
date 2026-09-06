@@ -1,6 +1,6 @@
 # 0009 — Bind provider-state parameters to variants in a separate member, and treat an unproducible state as a failure
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-27
 - **Plan tasks**: 2.3 (feeds 5.2, 5.3, 2.5, 2.7)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("Provider

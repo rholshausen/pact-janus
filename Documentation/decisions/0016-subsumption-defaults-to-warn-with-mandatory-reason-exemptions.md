@@ -1,6 +1,6 @@
 # 0016 — Subsumption defaults to warn, not block; exemptions require a reason and are scoped by field, interaction or consumer
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-09-04
 - **Plan tasks**: 2.8 (feeds 7.3, 7.4)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) (drawback "Subsumption

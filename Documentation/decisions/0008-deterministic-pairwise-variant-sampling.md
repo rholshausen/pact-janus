@@ -1,6 +1,6 @@
 # 0008 — Select variants by a named, deterministic pairwise algorithm, and fail rather than truncate
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-27
 - **Plan tasks**: 2.3 (feeds 4.3, 4.6, 5.2, 2.5, 2.8)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("A consumer test

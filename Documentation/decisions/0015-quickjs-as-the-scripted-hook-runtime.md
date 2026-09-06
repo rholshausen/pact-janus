@@ -1,6 +1,6 @@
 # 0015 — Make QuickJS the scripted-hook runtime, with the hook context as a script's entire capability surface
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-09-01
 - **Plan tasks**: 2.7, from spike 1.6 (feeds 4.2, 5.4, 6.2)
 - **Evidence**: [spike 1.6](../../spikes/1.6-script-hook-bakeoff/FINDINGS.md) (five engines benchmarked

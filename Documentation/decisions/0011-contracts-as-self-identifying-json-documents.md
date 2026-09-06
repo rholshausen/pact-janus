@@ -1,6 +1,6 @@
 # 0011 — Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-29
 - **Plan tasks**: 2.5 (feeds 3.1, 4.4, 5.5; constrains 2.8)
 - **Evidence**: [contract file format review](../contract-file-format-review.md) (candidate

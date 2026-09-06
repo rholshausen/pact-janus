@@ -1,6 +1,6 @@
 # 0005 — Poll-based event delivery on all pipes; push as a negotiated stdio capability
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-24
 - **Plan tasks**: 2.1
 - **Evidence**: [spike 1.3 findings](../../spikes/1.3-subprocess-embedding/FINDINGS.md)

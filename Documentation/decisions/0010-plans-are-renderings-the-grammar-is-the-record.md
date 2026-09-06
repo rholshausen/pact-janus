@@ -1,6 +1,6 @@
 # 0010 — Treat plans as renderings and the grammar as the record; version them accordingly
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-27
 - **Plan tasks**: 2.4 (feeds 3.3, 3.4, 3.6, 3.7, 8.4)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("Seeing what

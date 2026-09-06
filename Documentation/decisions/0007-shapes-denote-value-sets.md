@@ -1,6 +1,6 @@
 # 0007 — Define a shape by the set of values it admits, over a domain that includes absence
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-25
 - **Plan tasks**: 2.2 (feeds 2.3, 2.4, 2.5, 2.8, 3.2, 3.3)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("The shape

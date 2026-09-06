@@ -1,6 +1,6 @@
 # 0013 — Make component hosting a negotiated embedding capability, and distribute out-of-tree components as digest-pinned OCI artifacts
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-30
 - **Plan tasks**: 2.6 (design; minimal build in 8.2, escape hatch in 8.3)
 - **Evidence**: [spike 1.2](../../spikes/1.2-wasm-embedding/FINDINGS.md) (the engine as a WASM guest;

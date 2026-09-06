@@ -1,6 +1,6 @@
 # 0006 — Model bytes explicitly; make frame encoding a negotiated axis with JSON as the baseline
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-08-24
 - **Plan tasks**: 2.1 (feeds 2.5, 2.6, 2.9; tripwire measured by 1.7)
 - **Evidence**: [ADR 0002](0002-document-first-protocol-over-frozen-pipes.md) (JSON documents

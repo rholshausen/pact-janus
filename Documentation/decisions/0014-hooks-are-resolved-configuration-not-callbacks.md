@@ -1,6 +1,6 @@
 # 0014 — Declare hooks in configuration a loader resolves, and give the engine values rather than callbacks, paths or templates
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-09-01
 - **Plan tasks**: 2.7 (feeds 5.2, 5.4, 6.2, 6.3; tests benefit B5)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("Lifecycle hooks",

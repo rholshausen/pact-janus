@@ -1,6 +1,6 @@
 # 0017 — SDK conformance is defined by the shared suite passing against a pinned engine, not by matching another SDK's implementation
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-09-04
 - **Plan tasks**: 2.9 (feeds 6.3, 6.4, 6.5)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("An SDK is
