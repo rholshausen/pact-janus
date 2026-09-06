@@ -25,7 +25,7 @@ The RFC makes five big bets. Each phase below exists to test one or more of them
 **Prototype non-goals** (explicitly out of scope; noted as design-only where the RFC needs an answer):
 production hardening; the full SDK fleet (two SDKs only); broker/PactFlow server-side changes (subsumption
 runs locally/CI-side); full transport set (HTTP + one message-ish stretch; gRPC transport is a stretch
-goal); `pact upgrade` beyond a basic v3/v4 pact → Janus contract conversion; the AI-assisted layer (design notes only);
+goal); `janus upgrade` beyond a basic v3/v4 pact → Janus contract conversion; the AI-assisted layer (design notes only);
 deprecation/migration timelines.
 
 ---
@@ -345,12 +345,12 @@ promise (old pacts verify).
   replayed; responses matched with optional/`oneOf`/discriminator semantics; variant-pinned provider
   states (`whenVariant` per 2.3) passed to state setup.
 - **5.3 [build] Hooks.** `state-setup` (exec + HTTP endpoint) and `before-request` (an oauth2-shaped
-  built-in component + exec), configured from `verifier.pact.yaml` per 2.7. One scripted hook using the
+  built-in component + exec), configured from `verifier.janus.yaml` per 2.7. One scripted hook using the
   runtime chosen in 1.6/2.7 (e.g. a JS `before-request` that signs the request) as a stretch, to prove
   the third implementation kind end-to-end.
 - **5.4 [build] v3/v4 verification.** Verify an existing real-world pact (e.g. from an example project)
   through the plan path from 3.5 — the "providers upgrade first at no cost" claim, demonstrated.
-- **5.5 [build] CLI.** `pact verify`, `pact explain` (incl. `--executed` after a failure), `pact upgrade`
+- **5.5 [build] CLI.** `janus verify`, `janus explain` (incl. `--executed` after a failure), `janus upgrade`
   (basic v3/v4 pact → Janus contract per 2.5). Same engine, subprocess embedding — this doubles as the
   1.3 result hardened. Reading a contract identifies it per ADR 0011 rather than by guessing at
   structure, so "this is not a Janus contract" is a clear error and not a misparse.
@@ -371,7 +371,7 @@ Revisit this choice at G1 if the embedding matrix says otherwise.
 - **6.1 [build] Binding generation pipeline.** IDL → generated protocol bindings for TS and JVM, wired
   into CI so regeneration is a command, not a chore.
 - **6.2 [build] TypeScript SDK.** Idiomatic DSL reproducing the RFC consumer example (`optional`, `anyOf`,
-  `oneOf`, `eachLike`, `pact.execute` with the variant-aware closure), Jest/Vitest integration, WASM
+  `oneOf`, `eachLike`, `janus.execute` with the variant-aware closure), Jest/Vitest integration, WASM
   embedding with subprocess fallback.
 - **6.3 [build] JVM SDK.** Same behavioural surface, JUnit 5 integration, Chicory embedding with
   subprocess fallback. Deliberately written *from the 2.9 SDK spec* rather than by porting the TS code —
@@ -405,7 +405,7 @@ shape model, so 7.1 can start any time after Phase 3.
   reach; protobuf as the alternative if a gRPC stretch happens) — into provider shapes via a content
   component. Evaluate the RFC's over-broadness worry (everything-nullable ORM schemas) on a realistic
   spec and document how noisy the findings get; that finding directly informs the warn-vs-block default.
-- **7.4 [build] Compatibility CLI.** `pact check` (working name): combine verification results +
+- **7.4 [build] Compatibility CLI.** `janus check` (working name): combine verification results +
   subsumption findings into the RFC's `can-i-deploy`-style report, with `--policy warn|block` and
   exemption scoping per 2.8. Local/CI only — broker integration is design notes for the RFC, not
   prototype code.

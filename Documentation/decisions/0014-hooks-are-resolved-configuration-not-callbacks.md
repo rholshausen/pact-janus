@@ -4,7 +4,8 @@
 - **Date**: 2026-09-01
 - **Plan tasks**: 2.7 (feeds 5.2, 5.4, 6.2, 6.3; tests benefit B5)
 - **Evidence**: [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) ("Lifecycle hooks",
-  `verifier.pact.yaml`), [spike 1.2](../../spikes/1.2-wasm-embedding/FINDINGS.md) (the engine as a WASM
+  `verifier.pact.yaml` in the RFC's own naming — Janus's equivalent is `verifier.janus.yaml`, §Decision
+  1), [spike 1.2](../../spikes/1.2-wasm-embedding/FINDINGS.md) (the engine as a WASM
   guest: no ambient file system, no environment, no spawning),
   [spike 1.3](../../spikes/1.3-subprocess-embedding/FINDINGS.md) (what an out-of-process hop costs and
   what it buys), [ADR 0002](0002-document-first-protocol-over-frozen-pipes.md),
@@ -40,7 +41,7 @@ a closed document.**
 
 Four commitments:
 
-1. **Configuration, not callbacks.** Hooks are named entries in `verifier.pact.yaml` (and its
+1. **Configuration, not callbacks.** Hooks are named entries in `verifier.janus.yaml` (and its
    consumer-side twin), each naming one of four implementations — a component, a script, a command, an
    HTTP endpoint. No engine-to-host call exists, and none is added. An SDK that wants callback-shaped
    ergonomics builds them *on top*: a loopback `http` hook served by the test process is a callback in

@@ -19,7 +19,7 @@ and 2.7.
 ## 1. What the author writes
 
 ```typescript
-const getOrder = pact.interaction('get an order')
+const getOrder = janus.interaction('get an order')
   .given('an order exists', {
     id: '42',
     shipped: whenVariant('shippedAt', 'present'),

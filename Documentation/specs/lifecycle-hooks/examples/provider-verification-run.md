@@ -10,7 +10,7 @@ reports that as `state-unavailable` rather than as a failure or a pass.
 
 ## 1. What the project writes
 
-`verifier.pact.yaml`, shown here as JSON so it validates against
+`verifier.janus.yaml`, shown here as JSON so it validates against
 [`project-config.schema.json`](../schemas/v1/project-config.schema.json) (YAML is the usual file form,
 and the same document):
 

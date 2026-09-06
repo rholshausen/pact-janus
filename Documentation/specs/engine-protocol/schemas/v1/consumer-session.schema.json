@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/protocol/v1/consumer-session.schema.json",
   "title": "ConsumerSessionOps",
-  "description": "Request/result bodies for the consumer-session/* operations (spec.md §8.2). Interaction specifications, variant descriptors, endpoint descriptors and pact documents are governed by their own designs (spec.md §8.1) and are open objects here.",
+  "description": "Request/result bodies for the consumer-session/* operations (spec.md §8.2). Interaction specifications, variant descriptors, endpoint descriptors and contract documents are governed by their own designs (spec.md §8.1) and are open objects here.",
   "$defs": {
     "Create": {
       "title": "Create",
@@ -14,8 +14,8 @@
           "type": "object",
           "required": ["consumer", "provider"],
           "properties": {
-            "consumer": { "$ref": "#/$defs/PactParty" },
-            "provider": { "$ref": "#/$defs/PactParty" }
+            "consumer": { "$ref": "#/$defs/Pacticipant" },
+            "provider": { "$ref": "#/$defs/Pacticipant" }
           }
         }
       }
@@ -149,9 +149,9 @@
           "type": "array",
           "items": { "$ref": "#/$defs/InteractionResult" }
         },
-        "pact": {
+        "contract": {
           "type": "object",
-          "description": "The pact file document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business."
+          "description": "The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business."
         }
       }
     },
@@ -188,8 +188,8 @@
         }
       }
     },
-    "PactParty": {
-      "title": "PactParty",
+    "Pacticipant": {
+      "title": "Pacticipant",
       "type": "object",
       "required": ["name"],
       "properties": {

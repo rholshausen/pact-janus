@@ -448,7 +448,7 @@ incident is the one that outlives everyone who understood why.
 ### 6.1 One document, two file names
 
 A project writes [`project-config.schema.json`](schemas/v1/project-config.schema.json): conventionally
-`verifier.pact.yaml` on the provider side and `consumer.pact.yaml` on the consumer side, the same
+`verifier.janus.yaml` on the provider side and `consumer.janus.yaml` on the consumer side, the same
 document either way, in YAML or JSON (the schema governs the parsed document; design 5.5 owns which file
 names the CLI looks for).
 

@@ -21,8 +21,8 @@
         "variant-not-found",
         "stream-not-found",
         "interaction-invalid",
-        "pact-invalid",
-        "pact-version-unsupported",
+        "contract-invalid",
+        "contract-version-unsupported",
         "variant-budget-exceeded",
         "component-unavailable",
         "component-failed",
@@ -40,7 +40,7 @@
     },
     "details": {
       "type": "object",
-      "description": "Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/pact-invalid), 'component' and opaque 'error' (component-*)."
+      "description": "Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*)."
     }
   }
 }

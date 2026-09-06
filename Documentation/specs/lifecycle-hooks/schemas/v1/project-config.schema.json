@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/hooks/v1/project-config.schema.json",
   "title": "ProjectConfig",
-  "description": "The file a project writes — 'verifier.pact.yaml' on the provider side, 'consumer.pact.yaml' on the consumer side, the same document either way. It is a loader-side artifact: the loader interpolates its '${VAR}' references, reads the files it names and hands the engine a resolved HookConfig (ADR 0014). The difference between this schema and hook-config.schema.json is exactly the work the loader does, which is why the two are separate documents rather than one with optional members. See spec.md §6 and §7.",
+  "description": "The file a project writes — 'verifier.janus.yaml' on the provider side, 'consumer.janus.yaml' on the consumer side, the same document either way. It is a loader-side artifact: the loader interpolates its '${VAR}' references, reads the files it names and hands the engine a resolved HookConfig (ADR 0014). The difference between this schema and hook-config.schema.json is exactly the work the loader does, which is why the two are separate documents rather than one with optional members. See spec.md §6 and §7.",
   "type": "object",
   "properties": {
     "version": {

@@ -68,7 +68,7 @@ throughout:
 
 Out of scope here: the component interfaces behind the engine (design [2.6](../component-interfaces/spec.md)), the interaction
 specification and shape language carried *inside* frames (designs 2.2/2.4 — this spec treats
-those documents as opaque objects with their own schemas), and the pact file format (2.5).
+those documents as opaque objects with their own schemas), and the Janus contract format (2.5).
 
 ## 2. The schema regime
 
@@ -197,8 +197,8 @@ one interaction and as base64 in the next — that is the point of the pattern.
 ### 2.6 Where these rules bind
 
 **One rule, protocol-wide.** Most payload bytes in v1 travel inside documents this
-specification deliberately does not define (§8.1) — interaction specifications, pact files,
-event payloads. Those documents MUST carry their byte-valued members by one of these two forms,
+specification deliberately does not define (§8.1) — interaction specifications, contract
+documents, event payloads. Those documents MUST carry their byte-valued members by one of these two forms,
 so that a single decoding rule holds everywhere and the engine is never translating between
 per-design conventions. Design 2.5 inherits the pact v4 body shape (`content`, `contentType`,
 `contentTypeHint`, `encoded`), which is exactly the tagged form with `encoded` as its tag and
@@ -232,7 +232,7 @@ delimits the frame.
 
 ### 3.2 Subprocess (stdio)
 
-`pact-engine` speaks LSP-style framing on standard I/O:
+`janus-engine` speaks LSP-style framing on standard I/O:
 
 - Each frame is preceded by a header section: `Content-Length: <bytes>\r\n`, optionally other
   headers, then `\r\n`. The body is exactly `Content-Length` bytes in the frame's encoding —
@@ -368,7 +368,7 @@ Request body (`Hello`):
 ```json
 {
   "protocol-versions": [1],
-  "host": { "name": "pact-js", "version": "0.1.0" },
+  "host": { "name": "janus-ts", "version": "0.1.0" },
   "capabilities": { }
 }
 ```
@@ -382,7 +382,7 @@ Result (`HelloResult`):
 ```json
 {
   "protocol-version": 1,
-  "engine": { "name": "pact-engine", "version": "0.1.0" },
+  "engine": { "name": "janus-engine", "version": "0.1.0" },
   "capabilities": { }
 }
 ```
@@ -463,8 +463,8 @@ own requests.
 v1 defines two kinds:
 
 - **Consumer session** (§8.2): drives mock/stub endpoints and message emission during a
-  consumer test run, accumulates per-interaction verification status, and produces the pact
-  file document at finalisation.
+  consumer test run, accumulates per-interaction verification status, and produces the Janus
+  contract document at finalisation.
 - **Verification session** (§8.3): one provider-verification run. Created by
   `verification/verify`, reports progress as events, ends itself at the terminal event.
 
@@ -508,7 +508,7 @@ interiors:
 | interaction specification (with shapes) | designs [2.2](../shape-language/spec.md) (shape language), and 3.2 (document model) |
 | variant descriptor, selection report, sampling policy | design [2.3](../variant-semantics/spec.md) (variant semantics); protocol requires only `id` |
 | matching plan (pretty/`--executed` forms) | design 2.4 (plan grammar) |
-| pact file (v1–v4 read, v5 read/write) | design 2.5 |
+| Janus contract (v1–v4 pact read/convert, contract read/write) | design 2.5 |
 | endpoint descriptor, transport options | design [2.6](../component-interfaces/spec.md) (component interfaces); open documents per spike 1.5 |
 
 Two rules bind these documents even though their shapes do not belong here: they follow the
@@ -527,7 +527,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 | `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
 | `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
 | `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
-| `consumer-session/finalise` | `{ session }` → `{ results, pact? }` |
+| `consumer-session/finalise` | `{ session }` → `{ results, contract? }` |
 
 - **`create`**: `config` names the consumer and provider (`{ "consumer": { "name": … },
   "provider": { "name": … } }`) plus open, additive options. Returns the session id.
@@ -553,10 +553,10 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   arming.
 - **`finalise`**: ends the session unconditionally (transports stopped, all state
   released — even if the result is all failures) and returns per-interaction, per-variant
-  results. The `pact` member — the pact file *document*; persistence is the host's business —
-  is present iff every interaction verified successfully on every variant design 2.3's
+  results. The `contract` member — the Janus contract *document*; persistence is the host's
+  business — is present iff every interaction verified successfully on every variant design 2.3's
   sampling requires it to exercise (an unexercised required variant is `not-exercised`, which
-  withholds the pact exactly as a failure does).
+  withholds the contract exactly as a failure does).
   Unmatched-request and missed-interaction detail rides in `results`.
 
 ### 8.3 Verification — `verification/*`
@@ -572,15 +572,16 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   the id of the event stream on which the run reports (§9). Progress, hook activity,
   per-interaction/per-variant results and the final summary are all events; the stream's
   terminal event carries the summary document and ends the session. `source` is an open
-  descriptor of where the pacts come from — v1 defines kind `"inline"` (the pact documents
-  are in the request); fetching from files, URLs or a broker is host/CLI business in the
+  descriptor of where the contracts come from — v1 defines kind `"inline"` (the contract
+  documents — Janus contracts or v1–v4 pacts — are in the request); fetching from files, URLs
+  or a broker is host/CLI business in the
   prototype, which also keeps I/O out of the WASM kernel. `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
   change configuration (design 2.7 owns hook config). For message interactions, matching is
   parts-in wherever the parts come from: a wire-level transport binding and a
   `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
   MUST produce identical results for the same parts (spike 1.5, finding 6).
-- **`explain`** compiles one interaction (from a spec or a pact interaction — the body says
+- **`explain`** compiles one interaction (from a spec or a contract interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain
   of an *executed* plan is served by the event stream (§9), not by this operation.
@@ -591,9 +592,9 @@ Schema: [`schemas/v1/upgrade.schema.json`](schemas/v1/upgrade.schema.json).
 
 | Operation | Body → Result |
 |---|---|
-| `upgrade/pact` | `{ pact, options? }` → `{ pact, findings }` |
+| `upgrade/pact` | `{ pact, options? }` → `{ contract, findings }` |
 
-Converts a v1–v4 pact document to v5 per design 2.5's rules (matching rules become shapes;
+Converts a v1–v4 pact document to a Janus contract per design 2.5's rules (matching rules become shapes;
 the single example becomes the sole variant). `findings` lists lossy or judgement-call spots
 (each with a code from an open vocabulary, a JSON-path location and prose) so the CLI's
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
@@ -667,7 +668,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 
 | Kind | Payload | Notes |
 |---|---|---|
-| `verification/started` | run description (pact count, provider) | first event |
+| `verification/started` | run description (contract count, provider) | first event |
 | `verification/interaction-started` | interaction ref, variant | |
 | `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
@@ -697,13 +698,13 @@ a bug). An `EngineError` carries:
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
 | `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
-| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `pact-invalid`, `pact-version-unsupported`, `variant-budget-exceeded` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `variant-budget-exceeded` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
 
 `details` conventions worth fixing now: `protocol-version-unsupported` carries
 `supported: [int]`; `operation-unsupported` carries `op`; `capability-required` carries
-`capability`; `interaction-invalid` and `pact-invalid` carry `problems: [{path, message}]`
+`capability`; `interaction-invalid` and `contract-invalid` carry `problems: [{path, message}]`
 (positions a DSL can surface); `component-unavailable` and `component-failed` carry
 `component` (the component's identifier/requirement, e.g. `content/protobuf >= 2`) and, for
 failures, `error` — the component's own error document, passed through opaquely: the kernel

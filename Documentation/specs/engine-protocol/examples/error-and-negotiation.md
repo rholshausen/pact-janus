@@ -11,7 +11,7 @@ decision made with the unknown's identity in hand.
 
 ```json
 { "type": "request", "id": "r-1", "op": "engine/hello",
-  "body": { "protocol-versions": [99], "host": { "name": "pact-js", "version": "9.0.0" } } }
+  "body": { "protocol-versions": [99], "host": { "name": "janus-ts", "version": "9.0.0" } } }
 ```
 
 `←` the supported versions are *named*; the host can report precisely, then shut down:
@@ -30,7 +30,7 @@ baseline behind it (spec §3.4). The hello exchange itself is always JSON, whate
 
 ```json
 { "type": "request", "id": "r-1a", "op": "engine/hello",
-  "body": { "protocol-versions": [1], "host": { "name": "pact-js", "version": "2.0.0" },
+  "body": { "protocol-versions": [1], "host": { "name": "janus-ts", "version": "2.0.0" },
             "capabilities": { "encoding": { "accepts": ["cbor", "json"] },
                               "push-events": { } } } }
 ```
@@ -41,7 +41,7 @@ becomes effective (§9.4); an engine declaring neither would still be conformant
 
 ```json
 { "type": "response", "id": "r-1a",
-  "ok": { "protocol-version": 1, "engine": { "name": "pact-engine", "version": "0.1.0" },
+  "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" },
           "capabilities": { "encoding": { "selected": "json" }, "push-events": { } } } }
 ```
 

@@ -47,7 +47,7 @@ executed form is. A diagnosis tool that also narrates *why a provider stopped be
 same kind of document, not a different one.
 
 **What this means for 2.1–2.9**: nothing changes. A diagnosis tool is a new, additive consumer of an
-event and a text form that already exist for `pact explain --executed` and `pact can-i-deploy`-style
+event and a text form that already exist for `janus explain --executed` and `janus can-i-deploy`-style
 reporting. It needs no new engine operation, no new event kind, and no protocol version bump.
 
 **Deferred**: the prompt/summarization logic itself, evaluating diagnosis quality against real

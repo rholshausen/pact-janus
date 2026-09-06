@@ -11,7 +11,7 @@
       "properties": {
         "pact": {
           "type": "object",
-          "description": "A v1-v4 pact document to convert to v5 (rules in design 2.5)."
+          "description": "A v1-v4 pact document to convert to a Janus contract (rules in design 2.5)."
         },
         "options": { "type": "object" }
       }
@@ -19,15 +19,15 @@
     "PactResult": {
       "title": "PactResult",
       "type": "object",
-      "required": ["pact", "findings"],
+      "required": ["contract", "findings"],
       "properties": {
-        "pact": {
+        "contract": {
           "type": "object",
-          "description": "The converted v5 pact document."
+          "description": "The converted Janus contract document."
         },
         "findings": {
           "type": "array",
-          "description": "Lossy or judgement-call conversion spots, for 'pact upgrade' to show its work.",
+          "description": "Lossy or judgement-call conversion spots, for 'janus upgrade' to show its work.",
           "items": {
             "title": "UpgradeFinding",
             "type": "object",

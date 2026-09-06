@@ -101,7 +101,7 @@ per-language Pact implementations:
 - Deciding a match's pass/fail from raw request/response values instead of from the result
   `consumer-session/serve-variant` and `finalise` already return.
 - Retrying, coercing, or "helpfully" repairing a value before handing it to the engine — the engine's
-  `interaction-invalid`/`pact-invalid` errors exist precisely so a malformed document is reported, not
+  `interaction-invalid`/`contract-invalid` errors exist precisely so a malformed document is reported, not
   silently patched (engine-protocol spec §10).
 
 An idiomatic layer that passes this test end to end has no code path that could disagree with the engine
@@ -113,7 +113,7 @@ about whether a test passed, which is the property B1 is actually about.
 
 The canonical behavioural specification is **one document, one per DSL surface (not per language)**,
 naming every user-facing primitive — a shape helper (`optional`, `anyOf`), an interaction builder
-(`.given`, `.request`), a session/lifecycle call (`pact.execute`) — as a **primitive entry**:
+(`.given`, `.request`), a session/lifecycle call (`janus.execute`) — as a **primitive entry**:
 
 ```json primitive
 { "id": "optional",
@@ -175,17 +175,17 @@ the source of truth.
 
 [`examples/order-example-mapping.md`](examples/order-example-mapping.md) walks the RFC's own consumer
 test — the one CLAUDE.md's TypeScript conventions already name as the DSL's reference surface
-(`optional`, `anyOf`, `oneOf`, `eachLike`, `pact.execute(interaction, async (mock, variant) => …)`) — call
+(`optional`, `anyOf`, `oneOf`, `eachLike`, `janus.execute(interaction, async (mock, variant) => …)`) — call
 by call, from DSL text to the primitive entries it exercises to the protocol operations those entries
 resolve to at `execute` time:
 
 ```
-pact.interaction('get an order')     -- begins an interaction-spec document; no protocol call yet
+janus.interaction('get an order')    -- begins an interaction-spec document; no protocol call yet
   .given('an order exists', {...})   -- appends a `states` entry
   .request({...})                    -- populates parts.request, mapping shape helpers 1:1
   .response({...})                   -- populates parts.response, mapping shape helpers 1:1
 
-pact.execute(interaction, closure)
+janus.execute(interaction, closure)
   -> consumer-session/create          (once per session, not per interaction)
   -> consumer-session/add-interaction
   -> consumer-session/start-transport
@@ -295,7 +295,7 @@ Task 6.4's suite MUST cover, at minimum, the four categories the plan already co
 3. **Variant iteration** — the closure runs once per variant the engine selected (not once per
    *declared* variant, and never zero times because the SDK "optimised" a single-variant space), and a
    variant the closure cannot handle fails the build rather than being silently skipped.
-4. **Pact-output equivalence** — two SDKs given equivalent DSL usage produce contracts the engine
+4. **Contract-output equivalence** — two SDKs given equivalent DSL usage produce contracts the engine
    considers the **same interaction content**: identical `parts`, `states` and `selection` per contract
    spec §5–§6, under its canonical-writing rules (contract spec §2.4). This is deliberately *not*
    byte-identical files — `metadata.writer` legitimately differs by SDK name and version (contract spec

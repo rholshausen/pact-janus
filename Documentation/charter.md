@@ -22,7 +22,7 @@ The prototype is a success if all of the following are demonstrated (milestones 
    panics crossing the boundary, no bespoke async bridging, and no SDK-specific orchestration that could
    diverge (inspection against protocol spec 2.1, demonstrated at M2–M4).
 3. **Plans carry the semantics.** v1–v4 matching rules compile to plans whose verdicts agree with the
-   current implementation on the existing spec test corpus, and `pact explain` / `--executed` renders
+   current implementation on the existing spec test corpus, and `janus explain` / `--executed` renders
    every plan the prototype can produce (M1, M3).
 4. **Optionality is answered.** The RFC's order payload (12-variant space) is tested by one consumer
    test with a sampled matrix; a consumer that mishandles a variant fails the build with an
@@ -43,7 +43,7 @@ equally a success outcome. Undocumented abandonment is the only failure mode.
 
 Janus will **not** attempt: production hardening or API stability; more than two SDK languages; broker
 or PactFlow server-side changes (subsumption runs locally/CI-side; broker needs are design notes only);
-transports beyond HTTP plus at most one stretch (gRPC or message); a complete `pact upgrade` (basic
+transports beyond HTTP plus at most one stretch (gRPC or message); a complete `janus upgrade` (basic
 v1–v4 pact → Janus contract only); the AI-assisted layer (design notes only); migration/deprecation
 timelines, naming,
 governance or funding decisions (framed for the community, not decided here); Windows/exotic-platform

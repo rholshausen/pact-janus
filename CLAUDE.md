@@ -49,7 +49,7 @@ Three sources are the source of truth and take precedence over this file when th
 
 ```
 engine/          Rust workspace members: kernel + built-in component crates
-cli/             `pact` CLI (verify, explain, upgrade, check)
+cli/             `janus` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration)
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
@@ -120,7 +120,7 @@ JVM (from `sdks/jvm/`): `./gradlew build test`.
 - Tests with Vitest; lint with ESLint + Prettier defaults. Keep devDependencies lean — this is a
   prototype of a *thin* SDK, and every dependency is part of the story it tells.
 - The public DSL surface follows the RFC's consumer example (`optional`, `anyOf`, `oneOf`, `eachLike`,
-  `pact.execute(interaction, async (mock, variant) => …)`); changes to it belong in the SDK
+  `janus.execute(interaction, async (mock, variant) => …)`); changes to it belong in the SDK
   specification first, not directly in code.
 
 ## Commit messages

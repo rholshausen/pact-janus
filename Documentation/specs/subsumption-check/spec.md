@@ -60,7 +60,7 @@ Out of scope, with owners:
 |---|---|
 | what `admits` means, and the per-operator comparability classes the walk calls at each node | design [2.2](../shape-language/spec.md) §8 |
 | how a provider shape is produced — recorded from the provider's own tests, derived from types, authored, observed | tasks 7.1–7.3 |
-| combining a subsumption report with verification results into one `can-i-deploy` report, and the `pact check` CLI surface | task 7.4 |
+| combining a subsumption report with verification results into one `can-i-deploy` report, and the `janus check` CLI surface | task 7.4 |
 | broker storage and rendering of provider shapes and subsumption reports | task 7.5 |
 | property-testing the walk's verdicts against brute-force sampling | task 7.1 |
 
@@ -428,8 +428,8 @@ Codes are the protocol's (protocol spec §10, `engine-error.schema.json`).
 
 | Condition | Code |
 |---|---|
-| not a provider shape, or `$format` names a major this checker does not implement | `pact-invalid`, respectively `pact-version-unsupported` |
-| structurally invalid provider shape or policy document | `pact-invalid`, with `problems[]` positions |
+| not a provider shape, or `$format` names a major this checker does not implement | `contract-invalid`, respectively `contract-version-unsupported` |
+| structurally invalid provider shape or policy document | `contract-invalid`, with `problems[]` positions |
 | a provider-shape interaction names a part/slot the checker cannot parse as a shape | `interaction-invalid`, naming the path |
 | a component operator declaring a comparability class without an implementation `compare` requires (component-interfaces spec §7.5) | `component-failed`, naming the component |
 

@@ -9,7 +9,7 @@
       "type": "object",
       "required": ["source", "target"],
       "properties": {
-        "source": { "$ref": "#/$defs/PactSource" },
+        "source": { "$ref": "#/$defs/ContractSource" },
         "target": { "$ref": "#/$defs/VerificationTarget" },
         "options": {
           "type": "object",
@@ -27,9 +27,9 @@
         "stream": { "type": "string", "minLength": 1 }
       }
     },
-    "PactSource": {
-      "title": "PactSource",
-      "description": "Where the pacts come from. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.",
+    "ContractSource": {
+      "title": "ContractSource",
+      "description": "Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.",
       "type": "object",
       "required": ["kind"],
       "properties": {
@@ -37,9 +37,9 @@
           "type": "string",
           "x-known-values": ["inline"]
         },
-        "pacts": {
+        "contracts": {
           "type": "array",
-          "description": "For kind 'inline': the pact documents (any supported spec version).",
+          "description": "For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).",
           "items": { "type": "object" }
         }
       }
@@ -75,26 +75,26 @@
       "properties": {
         "interaction": {
           "title": "ExplainSubject",
-          "description": "What to compile: an interaction specification or one interaction from a pact document.",
+          "description": "What to compile: an interaction specification or one interaction from a contract document.",
           "type": "object",
           "required": ["kind"],
           "properties": {
             "kind": {
               "type": "string",
-              "x-known-values": ["spec", "pact-interaction"]
+              "x-known-values": ["spec", "contract-interaction"]
             },
             "spec": {
               "type": "object",
               "description": "For kind 'spec': the interaction specification."
             },
-            "pact": {
+            "contract": {
               "type": "object",
-              "description": "For kind 'pact-interaction': the pact document."
+              "description": "For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact)."
             },
             "index": {
               "type": "integer",
               "minimum": 0,
-              "description": "For kind 'pact-interaction': which interaction."
+              "description": "For kind 'contract-interaction': which interaction."
             }
           }
         },

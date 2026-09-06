@@ -35,7 +35,7 @@ names a body that would not parse.
 ```json component-hello
 {
   "component-protocol-versions": [1],
-  "engine": { "name": "pact-engine", "version": "0.1.0" },
+  "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "network": false },
   "capabilities": { }
 }

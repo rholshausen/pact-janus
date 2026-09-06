@@ -318,7 +318,7 @@ example does *not* make `type` recurse into members, because structure is declar
 inferred. This is a deliberate narrowing of today's `type` matcher, whose recursive behaviour is the
 single largest source of "why did this match?" questions; the compiler for v1–v4 pacts (design 3.5)
 expands the old recursive form into the explicit structural shape it means, which is exactly the
-transformation `pact upgrade` should be showing its work for (design 2.5).
+transformation `janus upgrade` should be showing its work for (design 2.5).
 
 **Kind predicates.** `string`, `boolean` and `null` are unambiguous. For numbers: `number` admits any
 JSON number, `integer` admits a number with no fractional part, `decimal` admits a number written with

@@ -232,7 +232,7 @@ native form.
   binary body is an actual binary file. C8 good. C5 good (a known manifest filename).
 - **Against**: C6 fails — it must be packed to publish, so there are two forms, a lossless
   deterministic packing rule, and a permanent obligation to keep them agreeing. It is also not a
-  *file* format, which costs CLI ergonomics ("which path do I pass to `pact verify`?") and makes every
+  *file* format, which costs CLI ergonomics ("which path do I pass to `janus verify`?") and makes every
   "attach the contract" workflow harder.
 - **Verdict: not the canonical form, but the strongest complement to §4.1.** Whether it is in scope
   for 2.5 or deferred is a real decision, listed in §7.

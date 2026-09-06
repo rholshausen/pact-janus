@@ -17,7 +17,7 @@ interface, two bindings".
 ```json component-hello
 {
   "component-protocol-versions": [1],
-  "engine": { "name": "pact-engine", "version": "0.1.0" },
+  "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "network": true },
   "capabilities": { }
 }

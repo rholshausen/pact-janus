@@ -11,14 +11,14 @@ arrive as EventFrames instead of PollResults.
 
 ```json
 { "type": "request", "id": "r-1", "op": "engine/hello",
-  "body": { "protocol-versions": [1], "host": { "name": "pact-cli", "version": "0.1.0" } } }
+  "body": { "protocol-versions": [1], "host": { "name": "janus-cli", "version": "0.1.0" } } }
 ```
 
 `←`
 
 ```json
 { "type": "response", "id": "r-1",
-  "ok": { "protocol-version": 1, "engine": { "name": "pact-engine", "version": "0.1.0" } } }
+  "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" } } }
 ```
 
 `→` start the run. The source is `inline` — the host fetched the pact itself (file, URL or

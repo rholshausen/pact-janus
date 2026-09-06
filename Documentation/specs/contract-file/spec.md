@@ -114,7 +114,7 @@ A reader identifies a contract in one of two modes:
 Both modes degrade to a clear "this is not a Janus contract", never to a misparse. Identification
 selects *which* schema to validate against; it never substitutes for validating. That split is the
 point: today's pact tooling infers a format from the shape of the content it finds, and the
-`pact-version-unsupported` cases that produces are the ones this rule exists to remove.
+`contract-version-unsupported` cases that produces are the ones this rule exists to remove.
 
 The choice of a `$`-prefixed name is not decoration. `$` is U+0024, below every digit and letter, so a
 tool that re-serialises with sorted keys — the Pact Broker's own content-hashing path does exactly this
@@ -236,7 +236,7 @@ this format can carry (§2.2).
 
 An interaction is identified by its **`description` together with its `states`** — the pair today's
 ecosystem already uses. A contract MUST NOT contain two interactions with the same description and the
-same state list; a writer that would produce one fails with `pact-invalid` naming both.
+same state list; a writer that would produce one fails with `contract-invalid` naming both.
 
 Uniqueness is required rather than merely recommended because other designs address interactions by
 name and cannot be ambiguous about which one they mean: variant semantics §6.7's `allow-state-unavailable`
@@ -401,7 +401,7 @@ consumer changes nothing. `upgrade/pact` is document-in, document-out and sessio
 
 Conversion is **not** required to be lossless, and pretending otherwise would be the failure mode here.
 It is required to be *honest*: every place the conversion lost something or chose between readings
-produces a finding (§8.4), and `pact upgrade` shows them.
+produces a finding (§8.4), and `janus upgrade` shows them.
 
 ### 8.2 Matching rules become shapes
 
@@ -541,15 +541,18 @@ nobody has written yet, with no negotiation and no shared library.
 
 ## 11. Errors
 
-Codes are the protocol's (protocol spec §10, `engine-error.schema.json`). Two of them predate the
-naming decision in ADR 0011 and keep their names: renaming a code in an open vocabulary breaks every
-reader that dispatches on it, for a cosmetic gain.
+Codes are the protocol's (protocol spec §10, `engine-error.schema.json`). These two used to be
+`pact-invalid`/`pact-version-unsupported`, predating the naming decision in ADR 0011; they are
+renamed here to `contract-invalid`/`contract-version-unsupported` while the prototype is still in its
+design phase and no engine implementation exists to dispatch on the old names (protocol spec §10.2) —
+the "renaming breaks every reader" cost this note used to weigh against is zero today and grows once
+Phase 3 starts, which is exactly why the fix belongs now rather than later.
 
 | Condition | Code |
 |---|---|
-| not a Janus contract, or unreadable as one | `pact-invalid` |
-| `$format` names a major this engine does not implement | `pact-version-unsupported` |
-| structurally invalid — missing required member, duplicate interaction identity (§4.2), a name in both `params` and `variant-params` (§6) | `pact-invalid`, with `problems[]` positions |
+| not a Janus contract, or unreadable as one | `contract-invalid` |
+| `$format` names a major this engine does not implement | `contract-version-unsupported` |
+| structurally invalid — missing required member, duplicate interaction identity (§4.2), a name in both `params` and `variant-params` (§6) | `contract-invalid`, with `problems[]` positions |
 | a shape operator the engine does not implement | `interaction-invalid`, naming the operator (shape spec §3.7) |
 | a required component missing or too old (§7) | `component-unavailable`, `details.component` naming the requirement |
 | a variant id that is not in the contract | `variant-not-found` |

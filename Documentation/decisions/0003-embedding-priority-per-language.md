@@ -28,7 +28,7 @@ remove, so "no native artifact to ship" weighs as heavily as latency.
 ## Decision
 
 1. **One engine build produces three artifacts**: the WASM component (canonical), the zero-import
-   core WASM module exposing the frozen C-ABI shim, and the `pact-engine` subprocess executable.
+   core WASM module exposing the frozen C-ABI shim, and the `janus-engine` subprocess executable.
    All speak the ADR-0002 frames; the per-host shim is written once per SDK and frozen.
 2. **Subprocess is a first-class embedding, not a fallback** — proven, cheap, and in some
    languages currently the fastest practical path. It is also the universal escape hatch for any

@@ -14,7 +14,7 @@ Fence marker: ```` ```json primitive ```` validates against
 ## 1. The DSL
 
 ```typescript
-const getOrder = pact.interaction('get an order')
+const getOrder = janus.interaction('get an order')
   .given('an order exists', { id: '42' })
   .request({ method: 'GET', path: '/orders/42' })
   .response({
@@ -31,7 +31,7 @@ const getOrder = pact.interaction('get an order')
     }),
   });
 
-await pact.execute(getOrder, async (mock, variant) => {
+await janus.execute(getOrder, async (mock, variant) => {
   const client = new OrderClient(mock.url);
   const order = await client.getOrder('42');
   expect(order.lineCount).toBeGreaterThan(0);
@@ -42,7 +42,7 @@ await pact.execute(getOrder, async (mock, variant) => {
 
 | DSL call | Primitive `id` | `produces` |
 |---|---|---|
-| `pact.interaction('get an order')` | `interaction` | spec-member `description` |
+| `janus.interaction('get an order')` | `interaction` | spec-member `description` |
 | `.given('an order exists', {...})` | `given` | spec-member `states` |
 | `.request({...})` | `request` | spec-member `parts.request` |
 | `.response({...})` | `response` | spec-member `parts.response` |
@@ -55,7 +55,7 @@ await pact.execute(getOrder, async (mock, variant) => {
 | `date('2026-08-30')` | `date` | shape-operator `date` |
 | `eachLike({...}, { min: 1 })` | `each-like` | shape-operator `each-like` |
 | `string('SKU-1')` | `string` | shape-operator `string` |
-| `pact.execute(interaction, closure)` | `execute` | protocol-operations (§4) |
+| `janus.execute(interaction, closure)` | `execute` | protocol-operations (§4) |
 
 An object literal (`{ type: 'card', last4: ... }`, the body of `json({...})` itself) needs no primitive of
 its own: the DSL's job is sugar, and an object literal maps directly to an `object` shape node with one
