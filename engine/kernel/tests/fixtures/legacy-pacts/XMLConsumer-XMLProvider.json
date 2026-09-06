@@ -1,0 +1,116 @@
+{
+  "consumer": {
+    "name": "XMLConsumer"
+  },
+  "interactions": [
+    {
+      "description": "a POST request with an XML message",
+      "request": {
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n<Message type=\"Request\">\n    <Head>\n        <Client name=\"WebCheck\">\n            <Version>2.2.8.2</Version>\n        </Client>\n        <Server>\n            <Name>SrvCheck</Name>\n            <Version>3.0</Version>\n        </Server>\n        <Authentication>\n            <User>user_name</User>\n            <Password>password</Password>\n        </Authentication>\n        <Token>1234567323211242144</Token>\n    </Head>\n    <Body>\n        <Call method=\"getInfo\" service=\"CheckRpcService\">\n            <Param name=\"exportId\">\n                <ExportId>1234567890</ExportId>\n            </Param>\n        </Call>\n    </Body>\n</Message>\n",
+        "headers": {
+          "Content-Type": "application/xml; charset=UTF-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$.Message.Body.Call.Param.ExportId.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d+"
+                }
+              ]
+            },
+            "$.Message.Body.Call.Param['@name']": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "exportId|mtpId"
+                }
+              ]
+            },
+            "$.Message.Head.Authentication.Password.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\w+"
+                }
+              ]
+            },
+            "$.Message.Head.Authentication.User.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\w+"
+                }
+              ]
+            },
+            "$.Message.Head.Client.Version.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d+\\.\\d+\\.\\d+\\.\\d+"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/message"
+      },
+      "response": {
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n<Message>\n    <Head>\n        <Server>\n            <Name>server_name</Name>\n            <Version>server_version</Version>\n            <Timestamp>server_timestamp</Timestamp>\n        </Server>\n    </Head>\n    <Body>\n        <Result state=\"SUCCESS\"/>\n    </Body>\n</Message>\n",
+        "headers": {
+          "Content-Type": "application/xml; charset=UTF-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$.Message.Head.Server.Name.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\w+"
+                }
+              ]
+            },
+            "$.Message.Head.Server.Timestamp.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": ".+"
+                }
+              ]
+            },
+            "$.Message.Head.Server.Version.#text": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": ".+"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.6"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "XMLProvider"
+  }
+}

@@ -1,6 +1,6 @@
 # 0011 — Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification
 
-- **Status**: accepted
+- **Status**: accepted (decision 4's indentation is superseded by [ADR 0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md); decisions 1–3 and 5–8 stand)
 - **Date**: 2026-08-29
 - **Plan tasks**: 2.5 (feeds 3.1, 4.4, 5.5; constrains 2.8)
 - **Evidence**: [contract file format review](../contract-file-format-review.md) (candidate

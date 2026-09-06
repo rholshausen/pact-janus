@@ -15,8 +15,8 @@
       "type": "string",
       "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it."
     },
-    "consumer": { "$ref": "#/$defs/Pacticipant" },
-    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "consumer": { "$ref": "#/$defs/Party" },
+    "provider": { "$ref": "#/$defs/Party" },
     "metadata": {
       "type": "object",
       "description": "How the report came to exist. Open, same placement rule as contract spec §3.2.",
@@ -36,8 +36,8 @@
     "summary": { "$ref": "#/$defs/Summary" }
   },
   "$defs": {
-    "Pacticipant": {
-      "title": "Pacticipant",
+    "Party": {
+      "title": "Party",
       "type": "object",
       "required": ["name"],
       "properties": {

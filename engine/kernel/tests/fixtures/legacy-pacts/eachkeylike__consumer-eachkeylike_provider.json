@@ -1,0 +1,81 @@
+{
+  "consumer": {
+    "name": "eachkeylike__consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.EachKeyLikeTest.runTest(MockServer)",
+        "text": [
+
+        ]
+      },
+      "description": "A request",
+      "key": "bf244182",
+      "pending": false,
+      "request": {
+        "body": {
+          "content": {
+            "a": {
+              "prop1": {
+                "value": "x"
+              }
+            }
+          },
+          "contentType": "application/json; charset=UTF-8",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=UTF-8"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.a": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachKey",
+                  "rules": [
+                    {
+                      "match": "regex",
+                      "regex": "prop\\d+"
+                    }
+                  ],
+                  "value": "prop1"
+                }
+              ]
+            },
+            "$.a.*.value": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/"
+      },
+      "response": {
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.6"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "eachkeylike_provider"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "consumer": {
+    "name": "consumer"
+  },
+  "interactions": [
+    {
+      "description": "first",
+      "key": "3fe32882",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "response": {
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "second",
+      "key": "adcc0bee",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "response": {
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.6"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "provider"
+  }
+}

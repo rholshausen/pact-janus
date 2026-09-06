@@ -15,8 +15,8 @@
       "type": "string",
       "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it (spec.md §2.3)."
     },
-    "consumer": { "$ref": "#/$defs/Pacticipant" },
-    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "consumer": { "$ref": "#/$defs/Party" },
+    "provider": { "$ref": "#/$defs/Party" },
     "interactions": {
       "type": "array",
       "description": "In the order the consumer submitted them. Every interaction here was exercised successfully on every variant its selection required (spec.md §2.2) — a contract is never written otherwise.",
@@ -25,8 +25,8 @@
     "metadata": { "$ref": "#/$defs/Metadata" }
   },
   "$defs": {
-    "Pacticipant": {
-      "title": "Pacticipant",
+    "Party": {
+      "title": "Party",
       "description": "A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.",
       "type": "object",
       "required": ["name"],

@@ -15,7 +15,7 @@
       "type": "string",
       "description": "Advisory: the schema this document claims to follow. Identifier only — a reader MUST NOT fetch it."
     },
-    "provider": { "$ref": "#/$defs/Pacticipant" },
+    "provider": { "$ref": "#/$defs/Party" },
     "provenance": {
       "type": "string",
       "description": "Document-level default provenance, in the RFC's decreasing order of fidelity (spec.md §2.3). Overridable per interaction. Never changes what the walk decides — it is policy input, not verdict input.",
@@ -41,8 +41,8 @@
     }
   },
   "$defs": {
-    "Pacticipant": {
-      "title": "Pacticipant",
+    "Party": {
+      "title": "Party",
       "description": "A named party. Mirrors contract spec §3.1 so a broker already reading 'provider.name' keeps working.",
       "type": "object",
       "required": ["name"],

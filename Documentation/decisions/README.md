@@ -27,13 +27,14 @@ superseding ADR instead.
 | [0008](0008-deterministic-pairwise-variant-sampling.md) | Select variants by a named, deterministic pairwise algorithm, and fail rather than truncate | accepted |
 | [0009](0009-variant-bound-provider-state-parameters.md) | Bind provider-state parameters to variants in a separate member; an unproducible state fails | accepted |
 | [0010](0010-plans-are-renderings-the-grammar-is-the-record.md) | Treat plans as renderings and the grammar as the record; version them accordingly | accepted |
-| [0011](0011-contracts-as-self-identifying-json-documents.md) | Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification | accepted |
+| [0011](0011-contracts-as-self-identifying-json-documents.md) | Record contracts as a single self-identifying JSON document, named and versioned independently of the Pact specification | accepted (decision 4 superseded by 0018) |
 | [0012](0012-one-interface-two-bindings.md) | Define components as the engine protocol's frames turned around, and give the interface two bindings | accepted |
 | [0013](0013-component-hosting-is-an-embedding-capability.md) | Make component hosting a negotiated embedding capability, and distribute out-of-tree components as digest-pinned OCI artifacts | accepted |
 | [0014](0014-hooks-are-resolved-configuration-not-callbacks.md) | Declare hooks in configuration a loader resolves; the engine receives values, never callbacks, paths or templates | accepted |
 | [0015](0015-quickjs-as-the-scripted-hook-runtime.md) | Make QuickJS the scripted-hook runtime, with the hook context as a script's entire capability surface | accepted |
 | [0016](0016-subsumption-defaults-to-warn-with-mandatory-reason-exemptions.md) | Subsumption defaults to warn, not block; exemptions require a reason and are scoped by field, interaction or consumer | accepted |
 | [0017](0017-sdk-conformance-is-suite-passing-not-prose-matching.md) | SDK conformance is defined by the shared suite passing against a pinned engine, not by matching another SDK's implementation | accepted |
+| [0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md) | Write Janus contracts as compact JSON; canonical form carries no formatting promise, and a reader must not assume one of its input | accepted |
 
 ## Decision backlog
 

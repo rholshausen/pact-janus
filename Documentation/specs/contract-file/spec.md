@@ -127,15 +127,30 @@ survives a copy.
 
 ### 2.4 Canonical writing
 
-A writer MUST produce: UTF-8 with no BOM; LF line endings; two-space indentation; one member per line
-for objects that do not fit on one; a trailing newline; no trailing whitespace. Members are emitted in
-the order this specification lists them, `$format` first. Arrays are emitted in their specified order —
-`interactions` as submitted, `variants` in recorded order, which is run order (variant semantics §4.3,
-§5.1).
+A writer MUST produce: UTF-8 with no BOM; LF only; **compact** — no insignificant whitespace, so no
+space after `:` or `,` and no newlines except the one trailing the document; a trailing newline; no
+trailing whitespace. Members are emitted in the order this specification lists them, `$format` first.
+Arrays are emitted in their specified order — `interactions` as submitted, `variants` in recorded order,
+which is run order (variant semantics §4.3, §5.1).
+
+Compact, not pretty-printed: [ADR 0018](../../decisions/0018-canonical-contract-bytes-are-compact-not-pretty-printed.md)
+found that a pretty form and §2.3's literal `{"$format":` byte prefix cannot both hold without a special
+case for exactly one member, and that the special case buys nothing a machine reader needs — a
+deserializer parses either form identically. `$format` first, with no whitespace inserted anywhere,
+makes the byte prefix fall out of ordinary compact serialisation with no splice required. A human who
+wants to read a contract reformats it with `jq`, an editor's format-on-save, or any JSON formatter;
+that reformatting is lossless and is a display concern, never a second canonical form.
 
 Determinism is not cosmetic. The same content written twice MUST produce the same bytes, because a
 broker deduplicates on a content hash and a repository diffs on lines: a writer that reorders freely
 turns every rebuild into a new contract version and every review into noise.
+
+A reader MUST NOT assume its input is canonically formatted. This specification's own writer emits
+compact bytes; a file that reached a reader by another path — round-tripped through a broker, a
+formatter, git, or a hand edit — is exactly as valid, and parses the same, regardless of whitespace,
+indentation or line breaks (§2.5's open-world rules already cover content; this is the same principle
+applied to layout). `IdentifyMode::Tolerant` (§2.3) exists precisely for input whose formatting is no
+longer this writer's own.
 
 ### 2.5 Reading
 

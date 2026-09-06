@@ -4,6 +4,9 @@
 //! It knows nothing about HTTP, JSON or any other transport/content type — those are components
 //! behind the component interfaces (see the component-interface design, plan task 2.6).
 
+pub mod contract;
+pub mod legacy_pact;
+
 /// The engine version, as reported over the engine protocol.
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 

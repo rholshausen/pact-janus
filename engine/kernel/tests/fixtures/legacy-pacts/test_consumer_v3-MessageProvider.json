@@ -1,0 +1,94 @@
+{
+  "consumer": {
+    "name": "test_consumer_v3"
+  },
+  "messages": [
+    {
+      "contents": {
+        "testParam1": "value3",
+        "testParam2": "value4"
+      },
+      "description": "a test message",
+      "metaData": {
+        "contentType": "application/json"
+      },
+      "providerStates": [
+        {
+          "name": "SomeProviderState2"
+        }
+      ]
+    },
+    {
+      "contents": {
+        "testParam1": "value1",
+        "testParam2": "value2"
+      },
+      "description": "a test message",
+      "matchingRules": {
+        "metadata": {
+          "destination": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "\\w+\\d+"
+              }
+            ]
+          }
+        }
+      },
+      "metaData": {
+        "contentType": "application/json",
+        "destination": "X001"
+      },
+      "providerStates": [
+        {
+          "name": "SomeProviderState"
+        }
+      ]
+    },
+    {
+      "contents": {
+        "testParam1": "value1",
+        "testParam2": "value2"
+      },
+      "description": "a test message with metadata",
+      "matchingRules": {
+        "metadata": {
+          "partitionKey": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "[A-Z]{3}\\d{2}"
+              }
+            ]
+          }
+        }
+      },
+      "metaData": {
+        "contentType": "application/json",
+        "metadata1": "metadataValue1",
+        "metadata2": "metadataValue2",
+        "metadata3": 10,
+        "partitionKey": "ABC01"
+      },
+      "providerStates": [
+        {
+          "name": "SomeProviderState"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.6"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "MessageProvider"
+  }
+}

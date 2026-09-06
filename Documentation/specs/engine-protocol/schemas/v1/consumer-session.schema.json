@@ -14,8 +14,8 @@
           "type": "object",
           "required": ["consumer", "provider"],
           "properties": {
-            "consumer": { "$ref": "#/$defs/Pacticipant" },
-            "provider": { "$ref": "#/$defs/Pacticipant" }
+            "consumer": { "$ref": "#/$defs/Party" },
+            "provider": { "$ref": "#/$defs/Party" }
           }
         }
       }
@@ -188,8 +188,8 @@
         }
       }
     },
-    "Pacticipant": {
-      "title": "Pacticipant",
+    "Party": {
+      "title": "Party",
       "type": "object",
       "required": ["name"],
       "properties": {
