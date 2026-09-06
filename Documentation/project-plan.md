@@ -483,6 +483,7 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 | Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), 7.5 |
 | Performance envelope WASM vs native FFI | 1.7, 9.1 |
 | Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype |
+| AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope |
 | Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community |
 
 ---
