@@ -1,6 +1,6 @@
-# Component interfaces specification (v1, draft)
+# Component interfaces specification (v1, final)
 
-Plan task: **2.6**. Status: **draft — under review**.
+Plan task: **2.6**. Status: **final**.
 
 This document specifies the four interfaces the kernel loads behind it — **transport**, **content**,
 **matcher** and **hook** — the pipe they speak, how a component declares what it contributes, how

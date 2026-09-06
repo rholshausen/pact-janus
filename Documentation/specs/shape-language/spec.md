@@ -1,6 +1,6 @@
-# Shape language specification (v1, draft)
+# Shape language specification (v1, final)
 
-Plan task: **2.2**. Status: **draft — under review**.
+Plan task: **2.2**. Status: **final**.
 
 This document specifies the shape language: the operator set, how shapes are written as JSON inside
 interaction specifications and pact files, what a shape *means* (`admits`), which variant dimension

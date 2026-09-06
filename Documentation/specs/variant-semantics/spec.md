@@ -1,6 +1,6 @@
-# Variant semantics and sampling specification (v1, draft)
+# Variant semantics and sampling specification (v1, final)
 
-Plan task: **2.3**. Status: **draft — under review**.
+Plan task: **2.3**. Status: **final**.
 
 The [shape language](../shape-language/spec.md) says where a declaration is deliberately wider than
 one case; this document says what is done about it. It specifies what a variant *is*, how variants are

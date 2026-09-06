@@ -1,6 +1,6 @@
-# Engine Protocol specification (v1, draft)
+# Engine Protocol specification (v1, final)
 
-Plan task: **2.1**. Status: **draft — under review**.
+Plan task: **2.1**. Status: **final**.
 
 This document specifies the protocol between a Pact Janus SDK (or the CLI, or any other host)
 and the Pact Janus engine: the session model, the operation set, event and stream semantics,

@@ -1,6 +1,6 @@
-# Plan grammar and core action set specification (v0, draft)
+# Plan grammar and core action set specification (v0, final)
 
-Plan task: **2.4**. Status: **draft — under review**.
+Plan task: **2.4**. Status: **final**.
 
 A shape says what a value must be; a **plan** is what the engine actually executes to find out, and
 what `explain` prints when someone asks why a match succeeded or failed. This document specifies the

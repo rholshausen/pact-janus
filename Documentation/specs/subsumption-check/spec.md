@@ -1,6 +1,6 @@
-# Subsumption check specification (v1, draft)
+# Subsumption check specification (v1, final)
 
-Plan task: **2.8**. Status: **draft — under review**.
+Plan task: **2.8**. Status: **final**.
 
 The [shape language](../shape-language/spec.md) defines `admits(S)` and, in its §8, exactly which
 comparisons a checker can decide about two *shapes of the same operator family* — the identity floor,

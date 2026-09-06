@@ -1,6 +1,6 @@
-# SDK specification template (v1, draft)
+# SDK specification template (v1, final)
 
-Plan task: **2.9**. Status: **draft — under review**.
+Plan task: **2.9**. Status: **final**.
 
 Every other Phase 2 design fixes what crosses the engine boundary. This one fixes what crosses a
 different boundary: the one between "an SDK maintainer knows what a Janus SDK must do" and "a Janus SDK

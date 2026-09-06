@@ -1,6 +1,6 @@
 # AI-layer design notes
 
-Plan task **2.10**. Status: **draft**. No build; no schema; no ADR — the task is explicitly scoped as
+Plan task **2.10**. Status: **final**. No build; no schema; no ADR — the task is explicitly scoped as
 "one short doc," and this is it.
 
 The RFC's [AI-assisted verification](../../roadmap/rfc/0000-pact-mkii.md) section sketches two optional

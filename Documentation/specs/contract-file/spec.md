@@ -1,6 +1,6 @@
-# Janus contract file specification (v1, draft)
+# Janus contract file specification (v1, final)
 
-Plan task: **2.5**. Status: **draft — under review**.
+Plan task: **2.5**. Status: **final**.
 
 A **Janus contract** is the record of what a consumer demonstrated against a mock, written so that a
 provider can be held to exactly that and no more. It carries each interaction's shape once and the

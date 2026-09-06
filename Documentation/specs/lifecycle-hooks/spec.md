@@ -1,6 +1,6 @@
-# Lifecycle hooks specification (v1, draft)
+# Lifecycle hooks specification (v1, final)
 
-Plan task: **2.7**. Status: **draft — under review**.
+Plan task: **2.7**. Status: **final**.
 
 This document specifies the **hook system**: the named points at which the engine calls out to user
 code, what it hands each one and what each may change, how hooks are configured and how that
