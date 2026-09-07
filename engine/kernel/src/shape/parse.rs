@@ -242,9 +242,9 @@ fn parse_core(
         "date" => TemporalKind::Date,
         _ => TemporalKind::Time,
       };
-      // `format` is optional (spec §4.2: absent means "any ISO-8601 string of this kind"),
-      // despite `shape.schema.json` currently marking it required — a schema/prose disagreement
-      // worth filing (spec header: "a disagreement between them is a bug to file").
+      // `format` is optional: absent means "any ISO-8601 string of this kind" (spec §4.2). This
+      // is what lets a standard-format author skip it every time, while a custom format is still
+      // expressible; `shape.schema.json` used to require it, which was a bug in the schema.
       let format = match obj.get("format") {
         None => None,
         Some(Value::String(format)) => Some(format.clone()),

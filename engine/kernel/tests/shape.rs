@@ -232,8 +232,8 @@ fn forbidden_at_a_parts_slot_root_is_rejected() {
 
 #[test]
 fn a_datetime_shape_may_omit_format() {
-  // Spec prose §4.2: format absent means "any ISO-8601 string of this kind" — even though
-  // shape.schema.json currently marks `format` required for `datetime`/`date`/`time`.
+  // Spec prose §4.2: format absent means "any ISO-8601 string of this kind", so a standard-format
+  // author never has to spell it out.
   let shape = json!({ "shape": "datetime", "example": "2026-07-30T10:00:00Z" });
   assert_ok(&shape);
 }

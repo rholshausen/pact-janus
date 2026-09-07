@@ -108,7 +108,7 @@
     },
     "format": {
       "type": "string",
-      "description": "Date/time format pattern ('datetime', 'date', 'time'), in the pattern language fixed by spec.md §4.2."
+      "description": "Date/time format pattern ('datetime', 'date', 'time'), in the pattern language fixed by spec.md §4.2. Optional: absent means the operator admits any string parsing as ISO-8601 for its kind."
     },
     "substring": {
       "type": "string",
@@ -135,18 +135,6 @@
     {
       "if": { "required": ["shape"], "properties": { "shape": { "const": "regex" } } },
       "then": { "required": ["shape", "pattern"] }
-    },
-    {
-      "if": { "required": ["shape"], "properties": { "shape": { "const": "datetime" } } },
-      "then": { "required": ["shape", "format"] }
-    },
-    {
-      "if": { "required": ["shape"], "properties": { "shape": { "const": "date" } } },
-      "then": { "required": ["shape", "format"] }
-    },
-    {
-      "if": { "required": ["shape"], "properties": { "shape": { "const": "time" } } },
-      "then": { "required": ["shape", "format"] }
     },
     {
       "if": { "required": ["shape"], "properties": { "shape": { "const": "include" } } },
