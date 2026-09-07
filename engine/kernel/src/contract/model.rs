@@ -13,6 +13,7 @@
 //! writer's determinism (§2.4) independent of whatever order the code that built the value
 //! happened to insert members in, rather than a property that depends on construction order.
 
+use crate::common::{Requirement, State, Transport};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -63,35 +64,6 @@ pub struct Interaction {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub requires: Option<Vec<Requirement>>,
   pub selection: RecordedSelection,
-}
-
-/// How the parts crossed the wire. An open descriptor: `kind`/`mode` are fixed here, everything
-/// else belongs to the transport component (component-interfaces spec, design 2.6).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Transport {
-  pub kind: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub mode: Option<String>,
-}
-
-/// A provider state. `params` holds literal parameters; `variant_params` holds bindings whose
-/// value depends on the running variant (variant-semantics spec §6.2, opaque here).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct State {
-  pub name: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub params: Option<BTreeMap<String, Value>>,
-  #[serde(rename = "variant-params", skip_serializing_if = "Option::is_none")]
-  pub variant_params: Option<Vec<Value>>,
-}
-
-/// A component this interaction cannot be matched without, at a major version or above
-/// (contract-file spec §7).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Requirement {
-  pub component: String,
-  #[serde(rename = "min-version", skip_serializing_if = "Option::is_none")]
-  pub min_version: Option<u64>,
 }
 
 /// Design 2.3's variant-selection document plus this design's evidence

@@ -5,18 +5,7 @@
 //! later protocol wiring lifts a `code()` straight into an `EngineError` frame (engine-protocol spec
 //! §10) without re-deriving the mapping.
 
-use serde::Serialize;
-
-/// One position where a document disagreed with what it claimed to be.
-///
-/// `pointer` is an RFC 6901 JSON pointer, so a reader can jump straight to the offending member
-/// instead of bisecting the file (contract-file spec §11: "an error that names a position is the
-/// difference between a fix and a bisect").
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Problem {
-  pub pointer: String,
-  pub message: String,
-}
+pub use crate::error::Problem;
 
 /// A structured failure reading or writing a contract-shaped document — a Janus contract or, via
 /// [`crate::legacy_pact`], a v1–v4 pact (engine protocol spec's `ContractSource` covers both).
