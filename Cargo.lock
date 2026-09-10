@@ -1160,10 +1160,13 @@ dependencies = [
 name = "pact_janus_kernel"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "jsonschema",
  "pact_models",
  "pretty_assertions",
+ "regex",
  "rstest",
+ "semver",
  "serde",
  "serde_json",
  "serde_path_to_error",
