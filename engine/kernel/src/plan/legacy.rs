@@ -144,6 +144,28 @@ pub fn compile_response(res: &LegacyResponse) -> super::model::Plan {
   }
 }
 
+/// A whole interaction — request and response together — as one plan, described the way
+/// [`super::compile::compile`] labels a shape-compiled interaction's root: mirrors
+/// [`compile_request`]/[`compile_response`]'s own root containers as its two children, so a v1–v4
+/// interaction's overall verdict (both sides, not just one) is one plan a golden-corpus case (plan
+/// task 3.7) or `explain` can render and execute in a single pass.
+pub fn compile_interaction(
+  description: &str,
+  request: &LegacyRequest,
+  response: &LegacyResponse,
+) -> super::model::Plan {
+  let request_plan = compile_request(request);
+  let response_plan = compile_response(response);
+  super::model::Plan {
+    grammar: super::model::GRAMMAR_VERSION,
+    root: Node::container(
+      Some(description.to_string()),
+      vec![request_plan.root, response_plan.root],
+    ),
+    variant: None,
+  }
+}
+
 // --- precedence: the weighted, deterministic rule lookup every category below calls ---
 
 /// `path_exp`'s `matches_token` (§module docs), plus header-name case-insensitivity.

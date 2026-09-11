@@ -1,0 +1,63 @@
+{
+  "description": "the RFC's order payload: every failure reported in one run, the untaken :card branch never executed",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": { "shape": "integer", "example": 42 },
+              "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED", "DELIVERED"], "example": "PENDING" },
+              "shippedAt": { "shape": "optional",
+                             "of": { "shape": "datetime", "format": "yyyy-MM-dd'T'HH:mm:ssX",
+                                     "example": "2026-07-30T10:00:00Z" } },
+              "payment": { "shape": "one-of", "discriminator": "type", "default": "card",
+                "alternatives": {
+                  "card": { "shape": "object", "members": {
+                    "type": { "shape": "equality", "example": "card" },
+                    "last4": { "shape": "regex", "pattern": "\\d{4}", "example": "1234" } } },
+                  "invoice": { "shape": "object", "members": {
+                    "type": { "shape": "equality", "example": "invoice" },
+                    "dueDate": { "shape": "date", "format": "yyyy-MM-dd", "example": "2026-08-30" } } } } },
+              "items": { "shape": "each-like", "min": 1,
+                         "items": { "shape": "object", "members": {
+                           "sku": { "shape": "string", "example": "SKU-1" },
+                           "qty": { "shape": "integer", "example": 1 } } } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "id": 42,
+      "status": "REFUNDED",
+      "payment": { "type": "invoice", "dueDate": "2026-08-30T00:00:00Z" },
+      "items": []
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.items",
+        "message": "Expected at least 1 item(s) but got 0",
+        "action": "expect:size"
+      },
+      {
+        "path": "$.response.body.payment.dueDate",
+        "message": "'2026-08-30T00:00:00Z' is not a date in format 'yyyy-MM-dd': Remaining data after applying pattern \"T00:00:00Z\"",
+        "action": "match:date"
+      },
+      {
+        "path": "$.response.body.status",
+        "message": "Expected 'REFUNDED' to be one of 'PENDING', 'SHIPPED', 'DELIVERED'",
+        "action": "match:any-of"
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+(
+  :"create an alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method
+          ),
+          %lower-case (
+            'POST'
+          )
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/alligators'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.request.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.alligator" (
+          :"$.alligator.name" (
+            %match:equality (
+              $.request.body.alligator.name,
+              'Mary'
+            )
+          ),
+          %expect:only-entries (
+            $.request.body.alligator,
+            'name'
+          )
+        ),
+        %expect:only-entries (
+          $.request.body,
+          'alligator'
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          201
+        )
+      ),
+      :headers ()
+    )
+  )
+)

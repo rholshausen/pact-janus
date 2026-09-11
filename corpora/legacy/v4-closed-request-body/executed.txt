@@ -1,0 +1,62 @@
+(
+  :"create an alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method => 'POST'
+          ) => 'post',
+          %lower-case (
+            'POST'
+          ) => 'post'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/alligators',
+          '/alligators'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.request.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.alligator" (
+          :"$.alligator.name" (
+            %match:equality (
+              $.request.body.alligator.name => 'Mary',
+              'Mary'
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:only-entries (
+            $.request.body.alligator => {'name': 'Mary', 'phoneNumber': '0415674567'},
+            'name'
+          ) => ERROR(Unexpected member(s): phoneNumber)
+        ) => BOOL(false),
+        %expect:only-entries (
+          $.request.body => {'alligator': {'name': 'Mary', 'phoneNumber': '0415674567'}},
+          'alligator'
+        ) => BOOL(true)
+      ) => BOOL(false)
+    ) => BOOL(false),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 201,
+          201
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers () => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(false)
+)

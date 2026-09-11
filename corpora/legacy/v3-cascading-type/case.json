@@ -1,0 +1,53 @@
+{
+  "description": "v3 cascading precedence: a wildcard type rule on every field of every array element is overridden by a more specific field rule, exactly where one is declared",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "add animals",
+          "request": {
+            "method": "POST",
+            "path": "/animals",
+            "headers": { "Content-Type": "application/json" },
+            "body": {
+              "animals": [ { "phoneNumber": "0415674567" } ]
+            },
+            "matchingRules": {
+              "body": {
+                "$.animals": { "matchers": [ { "min": 1, "match": "type" } ] },
+                "$.animals[*].*": { "matchers": [ { "match": "type" } ] },
+                "$.animals[*].phoneNumber": { "matchers": [ { "match": "regex", "regex": "\\d+" } ] }
+              }
+            }
+          },
+          "response": { "status": 200 }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/animals",
+    "$.request.query": {},
+    "$.request.headers.content-type": "application/json",
+    "$.request.body": {
+      "animals": [ { "phoneNumber": "333" }, { "phoneNumber": "abc" } ]
+    },
+    "$.response.status": 200
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "~>.phoneNumber",
+        "message": "Expected 'abc' to match '\\d+'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

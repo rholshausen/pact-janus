@@ -1,0 +1,17 @@
+(
+  :"an optionally-empty account balance" (
+    :response (
+      :body (
+        %if (
+          %check:null (
+            $.response.body
+          ),
+          %and (),
+          %match:integer (
+            $.response.body
+          )
+        )
+      )
+    )
+  )
+)

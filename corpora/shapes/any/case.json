@@ -1,0 +1,12 @@
+{
+  "description": "any admits any present value",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a health check",
+      "parts": { "response": { "body": { "shape": "any" } } }
+    }
+  },
+  "values": { "$.response.body": 42 },
+  "result": { "status": "matched" }
+}

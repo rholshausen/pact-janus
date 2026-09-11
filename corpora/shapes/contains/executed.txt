@@ -1,0 +1,17 @@
+(
+  :"an order's possible statuses" (
+    :response (
+      :body (
+        %match:contains (
+          $.response.body => ['SHIPPED', 'PENDING'],
+          :"$.response.body[0]" (
+            %match:equality (
+              ~> => 'PENDING',
+              'PENDING'
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

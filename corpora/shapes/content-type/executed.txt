@@ -1,0 +1,12 @@
+(
+  :"an uploaded file" (
+    :response (
+      :body (
+        %match:content-type (
+          $.response.body => '{"a":1}',
+          'application/json'
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

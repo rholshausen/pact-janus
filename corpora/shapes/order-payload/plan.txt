@@ -1,0 +1,104 @@
+(
+  :"get an order" (
+    :response (
+      :body (
+        :"$.id" (
+          %match:integer (
+            $.response.body.id
+          )
+        ),
+        :"$.items" (
+          %expect:size (
+            $.response.body.items,
+            1,
+            NULL
+          ),
+          %for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              :"$.items[*].qty" (
+                %match:integer (
+                  ~>.qty
+                )
+              ),
+              :"$.items[*].sku" (
+                %match:string (
+                  ~>.sku
+                )
+              )
+            )
+          )
+        ),
+        :"$.payment" (
+          %if (
+            %check:equals (
+              $.response.body.payment.type,
+              'card'
+            ),
+            :card (
+              :"$.response.body.payment@card.last4" (
+                %match:regex (
+                  $.response.body.payment.last4,
+                  '\\d{4}'
+                )
+              ),
+              :"$.response.body.payment@card.type" (
+                %match:equality (
+                  $.response.body.payment.type,
+                  'card'
+                )
+              )
+            ),
+            %if (
+              %check:equals (
+                $.response.body.payment.type,
+                'invoice'
+              ),
+              :invoice (
+                :"$.response.body.payment@invoice.dueDate" (
+                  %match:date (
+                    $.response.body.payment.dueDate,
+                    'yyyy-MM-dd'
+                  )
+                ),
+                :"$.response.body.payment@invoice.type" (
+                  %match:equality (
+                    $.response.body.payment.type,
+                    'invoice'
+                  )
+                )
+              ),
+              %error (
+                %join (
+                  'Expected type to be one of card, invoice but got ',
+                  $.response.body.payment.type
+                )
+              )
+            )
+          )
+        ),
+        :"$.shippedAt" (
+          %if (
+            %check:exists (
+              $.response.body.shippedAt
+            ),
+            %match:datetime (
+              $.response.body.shippedAt,
+              'yyyy-MM-dd\'T\'HH:mm:ssX'
+            )
+          )
+        ),
+        :"$.status" (
+          %match:any-of (
+            $.response.body.status,
+            'PENDING',
+            'SHIPPED',
+            'DELIVERED'
+          )
+        )
+      )
+    )
+  )
+)

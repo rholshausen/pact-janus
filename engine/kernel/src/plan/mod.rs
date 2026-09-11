@@ -14,8 +14,8 @@ mod value;
 pub use compile::{Assignment, compile, variant_space};
 pub use interpret::{Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, outcome};
 pub use legacy::{
-  LegacyRequest, LegacyResponse, compile_request as compile_legacy_request,
-  compile_response as compile_legacy_response,
+  LegacyRequest, LegacyResponse, compile_interaction as compile_legacy_interaction,
+  compile_request as compile_legacy_request, compile_response as compile_legacy_response,
 };
 pub use model::{DocumentKind, GRAMMAR_VERSION, Literal, Node, NodeKind, Plan};
 pub use render::{executed as render_executed, pretty as render_pretty};

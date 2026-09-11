@@ -1,0 +1,78 @@
+(
+  :"get an alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method => 'GET'
+          ) => 'get',
+          %lower-case (
+            'GET'
+          ) => 'get'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/alligator',
+          '/alligator'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers () => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.alligator" (
+          :"$.alligator.favouriteColours" (
+            %expect:count (
+              $.response.body.alligator.favouriteColours => ['red', 'blue'],
+              2
+            ) => BOOL(true),
+            :"$.alligator.favouriteColours[0]" (
+              %match:equality (
+                $.response.body.alligator.favouriteColours[0] => 'red',
+                'red'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.alligator.favouriteColours[1]" (
+              %match:equality (
+                $.response.body.alligator.favouriteColours[1] => 'blue',
+                'blue'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.alligator.feet" (
+            %match:regex (
+              $.response.body.alligator.feet => 7,
+              '[0-9]'
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.alligator.name" (
+            %match:equality (
+              $.response.body.alligator.name => 'Mary',
+              'Mary'
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

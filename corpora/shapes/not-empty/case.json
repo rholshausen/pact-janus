@@ -1,0 +1,12 @@
+{
+  "description": "not-empty admits a non-empty string, rejects an empty one",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a comment",
+      "parts": { "response": { "body": { "shape": "not-empty" } } }
+    }
+  },
+  "values": { "$.response.body": "hello" },
+  "result": { "status": "matched" }
+}

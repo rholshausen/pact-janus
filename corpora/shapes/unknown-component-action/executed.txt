@@ -1,0 +1,12 @@
+(
+  :"a protobuf-encoded status" (
+    :response (
+      :body (
+        %protobuf:enum (
+          $.response.body => 'SHIPPED',
+          {'extra': true}
+        ) => ERROR(unknown or unavailable action 'protobuf:enum')
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

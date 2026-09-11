@@ -1,0 +1,35 @@
+{
+  "description": "the six kind predicates, each checking only the resolved value's kind",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a mixed record",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "name": { "shape": "string" },
+              "count": { "shape": "number" },
+              "age": { "shape": "integer" },
+              "price": { "shape": "decimal" },
+              "active": { "shape": "boolean" },
+              "note": { "shape": "null" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "name": "Mary",
+      "count": 3,
+      "age": 42,
+      "price": 19.99,
+      "active": true,
+      "note": null
+    }
+  },
+  "result": { "status": "matched" }
+}

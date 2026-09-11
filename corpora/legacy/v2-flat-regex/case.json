@@ -1,0 +1,39 @@
+{
+  "description": "v2's flat matchingRules form: a regex on a nested response-body field lets the actual value differ from the example",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get an alligator",
+          "request": { "method": "GET", "path": "/alligator" },
+          "response": {
+            "status": 200,
+            "headers": { "Content-Type": "application/json" },
+            "body": {
+              "alligator": { "name": "Mary", "feet": 4, "favouriteColours": ["red", "blue"] }
+            },
+            "matchingRules": {
+              "$.body.alligator.feet": { "match": "regex", "regex": "[0-9]" }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "2.0.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/alligator",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "alligator": { "name": "Mary", "feet": 7, "favouriteColours": ["red", "blue"] }
+    }
+  },
+  "result": { "status": "matched" }
+}

@@ -1,0 +1,25 @@
+{
+  "description": "a component operator compiles to its own namespaced action, opaque to the kernel — with no protobuf component loaded, the engine reports the unknown action by name rather than silently ignoring the node (shape spec section 3.7)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a protobuf-encoded status",
+      "parts": {
+        "response": {
+          "body": { "shape": "protobuf:enum", "example": "SHIPPED", "extra": true }
+        }
+      }
+    }
+  },
+  "values": { "$.response.body": "SHIPPED" },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "",
+        "message": "unknown or unavailable action 'protobuf:enum'",
+        "action": "protobuf:enum"
+      }
+    ]
+  }
+}

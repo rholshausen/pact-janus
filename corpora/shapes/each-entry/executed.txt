@@ -1,0 +1,42 @@
+(
+  :"response headers" (
+    :response (
+      :body (
+        %expect:size (
+          $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'},
+          1,
+          NULL
+        ) => BOOL(true),
+        %for-each (
+          ** (
+            $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'}
+          ) => [{'cache-control': 'no-store'}, {'content-type': 'application/json'}],
+          :"$.response.body" (
+            :"$.response.body{key}" (
+              %match:string (
+                ~>.key => 'cache-control'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.response.body{*}" (
+              %match:string (
+                ~>.value => 'no-store'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.response.body" (
+            :"$.response.body{key}" (
+              %match:string (
+                ~>.key => 'content-type'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.response.body{*}" (
+              %match:string (
+                ~>.value => 'application/json'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

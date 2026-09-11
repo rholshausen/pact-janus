@@ -1,0 +1,22 @@
+{
+  "description": "array admits exactly entries.length elements, positionally matched",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a coordinate pair",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "array",
+            "entries": [
+              { "shape": "integer", "example": 1 },
+              { "shape": "string", "example": "a" }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "values": { "$.response.body": [7, "north"] },
+  "result": { "status": "matched" }
+}

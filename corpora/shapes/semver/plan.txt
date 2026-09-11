@@ -1,0 +1,11 @@
+(
+  :"an app version" (
+    :response (
+      :body (
+        %match:semver (
+          $.response.body
+        )
+      )
+    )
+  )
+)

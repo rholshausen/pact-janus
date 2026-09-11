@@ -1,0 +1,11 @@
+(
+  :"a comment" (
+    :response (
+      :body (
+        %expect:not-empty (
+          $.response.body
+        )
+      )
+    )
+  )
+)

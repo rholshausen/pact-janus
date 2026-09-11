@@ -1,0 +1,92 @@
+(
+  :"get an order" (
+    :response (
+      :body (
+        :"$.id" (
+          %match:integer (
+            $.response.body.id => 42
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.items" (
+          %expect:size (
+            $.response.body.items => [],
+            1,
+            NULL
+          ) => ERROR(Expected at least 1 item(s) but got 0),
+          %for-each (
+            ** (
+              $.response.body.items => []
+            ) => []
+          ) => BOOL(true)
+        ) => BOOL(false),
+        :"$.payment" (
+          %if (
+            %check:equals (
+              $.response.body.payment.type => 'invoice',
+              'card'
+            ) => BOOL(false),
+            :card (
+              :"$.response.body.payment@card.last4" (
+                %match:regex (
+                  $.response.body.payment.last4,
+                  '\\d{4}'
+                )
+              ),
+              :"$.response.body.payment@card.type" (
+                %match:equality (
+                  $.response.body.payment.type,
+                  'card'
+                )
+              )
+            ),
+            %if (
+              %check:equals (
+                $.response.body.payment.type => 'invoice',
+                'invoice'
+              ) => BOOL(true),
+              :invoice (
+                :"$.response.body.payment@invoice.dueDate" (
+                  %match:date (
+                    $.response.body.payment.dueDate => '2026-08-30T00:00:00Z',
+                    'yyyy-MM-dd'
+                  ) => ERROR('2026-08-30T00:00:00Z' is not a date in format 'yyyy-MM-dd': Remaining data after applying pattern "T00:00:00Z")
+                ) => BOOL(false),
+                :"$.response.body.payment@invoice.type" (
+                  %match:equality (
+                    $.response.body.payment.type => 'invoice',
+                    'invoice'
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(false),
+              %error (
+                %join (
+                  'Expected type to be one of card, invoice but got ',
+                  $.response.body.payment.type
+                )
+              )
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false),
+        :"$.shippedAt" (
+          %if (
+            %check:exists (
+              $.response.body.shippedAt => NULL
+            ) => BOOL(false),
+            %match:datetime (
+              $.response.body.shippedAt,
+              'yyyy-MM-dd\'T\'HH:mm:ssX'
+            )
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.status" (
+          %match:any-of (
+            $.response.body.status => 'REFUNDED',
+            'PENDING',
+            'SHIPPED',
+            'DELIVERED'
+          ) => ERROR(Expected 'REFUNDED' to be one of 'PENDING', 'SHIPPED', 'DELIVERED')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

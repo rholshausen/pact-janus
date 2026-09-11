@@ -1,0 +1,12 @@
+{
+  "description": "semver admits a Semantic Versioning 2.0.0 string",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an app version",
+      "parts": { "response": { "body": { "shape": "semver" } } }
+    }
+  },
+  "values": { "$.response.body": "1.2.3" },
+  "result": { "status": "matched" }
+}

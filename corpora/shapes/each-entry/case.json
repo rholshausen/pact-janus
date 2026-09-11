@@ -1,0 +1,26 @@
+{
+  "description": "each-entry admits objects whose every key and value are admitted, sized in [min, max]",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "response headers",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "each-entry",
+            "min": 1,
+            "keys": { "shape": "string", "example": "content-type" },
+            "values": { "shape": "string", "example": "application/json" }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "content-type": "application/json",
+      "cache-control": "no-store"
+    }
+  },
+  "result": { "status": "matched" }
+}

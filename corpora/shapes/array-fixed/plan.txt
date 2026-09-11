@@ -1,0 +1,22 @@
+(
+  :"a coordinate pair" (
+    :response (
+      :body (
+        %expect:count (
+          $.response.body,
+          2
+        ),
+        :"$.response.body[0]" (
+          %match:integer (
+            $.response.body[0]
+          )
+        ),
+        :"$.response.body[1]" (
+          %match:string (
+            $.response.body[1]
+          )
+        )
+      )
+    )
+  )
+)

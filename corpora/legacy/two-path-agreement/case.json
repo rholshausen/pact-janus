@@ -1,0 +1,42 @@
+{
+  "description": "a v3 type matcher on an integer body agrees whether compiled directly (design 3.5) or authored as the equivalent shape (design 2.2) — the migration promise plan-grammar spec section 4.4 requires",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get a count",
+          "request": { "method": "GET", "path": "/count" },
+          "response": {
+            "status": 200,
+            "body": 42,
+            "matchingRules": {
+              "body": { "$": { "matchers": [ { "match": "type" } ] } }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a count",
+      "parts": {
+        "response": { "body": { "shape": "integer", "example": 42 } }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/count",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": 7
+  },
+  "result": { "status": "matched" }
+}

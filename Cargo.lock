@@ -1158,6 +1158,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_corpus"
+version = "0.0.0"
+dependencies = [
+ "pact_janus_kernel",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pact_janus_kernel"
 version = "0.0.0"
 dependencies = [

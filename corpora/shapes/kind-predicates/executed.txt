@@ -1,0 +1,38 @@
+(
+  :"a mixed record" (
+    :response (
+      :body (
+        :"$.active" (
+          %match:boolean (
+            $.response.body.active => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.age" (
+          %match:integer (
+            $.response.body.age => 42
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.count" (
+          %match:number (
+            $.response.body.count => 3
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.name" (
+          %match:string (
+            $.response.body.name => 'Mary'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.note" (
+          %match:null (
+            $.response.body.note => NULL
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.price" (
+          %match:decimal (
+            $.response.body.price => 19.99
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

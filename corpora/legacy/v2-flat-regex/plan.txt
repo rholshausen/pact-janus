@@ -1,0 +1,78 @@
+(
+  :"get an alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method
+          ),
+          %lower-case (
+            'GET'
+          )
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/alligator'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      ),
+      :headers ()
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.alligator" (
+          :"$.alligator.favouriteColours" (
+            %expect:count (
+              $.response.body.alligator.favouriteColours,
+              2
+            ),
+            :"$.alligator.favouriteColours[0]" (
+              %match:equality (
+                $.response.body.alligator.favouriteColours[0],
+                'red'
+              )
+            ),
+            :"$.alligator.favouriteColours[1]" (
+              %match:equality (
+                $.response.body.alligator.favouriteColours[1],
+                'blue'
+              )
+            )
+          ),
+          :"$.alligator.feet" (
+            %match:regex (
+              $.response.body.alligator.feet,
+              '[0-9]'
+            )
+          ),
+          :"$.alligator.name" (
+            %match:equality (
+              $.response.body.alligator.name,
+              'Mary'
+            )
+          )
+        )
+      )
+    )
+  )
+)

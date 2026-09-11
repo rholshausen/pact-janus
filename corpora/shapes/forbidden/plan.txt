@@ -1,0 +1,18 @@
+(
+  :"a redacted record" (
+    :response (
+      :body (
+        :"$.internalId" (
+          %expect:absent (
+            $.response.body.internalId
+          )
+        ),
+        :"$.name" (
+          %match:string (
+            $.response.body.name
+          )
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,19 @@
+{
+  "description": "contains admits an array holding a distinct match for each entry, opaquely",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order's possible statuses",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "contains",
+            "entries": [ { "shape": "equality", "example": "PENDING" } ]
+          }
+        }
+      }
+    }
+  },
+  "values": { "$.response.body": ["SHIPPED", "PENDING"] },
+  "result": { "status": "matched" }
+}

@@ -1,0 +1,11 @@
+(
+  :"an app version" (
+    :response (
+      :body (
+        %match:semver (
+          $.response.body => '1.2.3'
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

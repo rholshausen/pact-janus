@@ -1,0 +1,16 @@
+{
+  "description": "nullable admits null in addition to the wrapped shape",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an optionally-empty account balance",
+      "parts": {
+        "response": {
+          "body": { "shape": "nullable", "of": { "shape": "integer", "example": 1 } }
+        }
+      }
+    }
+  },
+  "values": { "$.response.body": null },
+  "result": { "status": "matched" }
+}

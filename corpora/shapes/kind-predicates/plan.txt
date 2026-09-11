@@ -1,0 +1,38 @@
+(
+  :"a mixed record" (
+    :response (
+      :body (
+        :"$.active" (
+          %match:boolean (
+            $.response.body.active
+          )
+        ),
+        :"$.age" (
+          %match:integer (
+            $.response.body.age
+          )
+        ),
+        :"$.count" (
+          %match:number (
+            $.response.body.count
+          )
+        ),
+        :"$.name" (
+          %match:string (
+            $.response.body.name
+          )
+        ),
+        :"$.note" (
+          %match:null (
+            $.response.body.note
+          )
+        ),
+        :"$.price" (
+          %match:decimal (
+            $.response.body.price
+          )
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,22 @@
+{
+  "description": "forbidden asserts a member's absence",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "a redacted record",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "name": { "shape": "string", "example": "Mary" },
+              "internalId": { "shape": "forbidden" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": { "$.response.body": { "name": "Mary" } },
+  "result": { "status": "matched" }
+}

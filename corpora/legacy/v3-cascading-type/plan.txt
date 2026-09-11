@@ -1,0 +1,74 @@
+(
+  :"add animals" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method
+          ),
+          %lower-case (
+            'POST'
+          )
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/animals'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.request.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.animals" (
+          %match:min-type (
+            $.request.body.animals,
+            [{'phoneNumber': '0415674567'}],
+            1
+          ),
+          %for-each (
+            ** (
+              $.request.body.animals
+            ),
+            :"$.animals[*]" (
+              :"$.animals[*].phoneNumber" (
+                %match:regex (
+                  ~>.phoneNumber,
+                  '\\d+'
+                )
+              ),
+              %expect:only-entries (
+                ~>,
+                'phoneNumber'
+              )
+            )
+          )
+        ),
+        %expect:only-entries (
+          $.request.body,
+          'animals'
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers ()
+    )
+  )
+)

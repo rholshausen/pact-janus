@@ -1,0 +1,51 @@
+{
+  "description": "v1-v4's request/response asymmetry: a request body is closed by default (an unexpected actual member is a mismatch), unlike a response body's must-ignore default",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "create an alligator",
+          "key": "abc123",
+          "pending": false,
+          "type": "Synchronous/HTTP",
+          "request": {
+            "method": "POST",
+            "path": "/alligators",
+            "headers": { "Content-Type": ["application/json"] },
+            "body": {
+              "content": { "alligator": { "name": "Mary" } },
+              "contentType": "application/json",
+              "encoded": false
+            }
+          },
+          "response": { "status": 201 }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "4.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/alligators",
+    "$.request.query": {},
+    "$.request.headers.content-type": "application/json",
+    "$.request.body": {
+      "alligator": { "name": "Mary", "phoneNumber": "0415674567" }
+    },
+    "$.response.status": 201
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.body.alligator",
+        "message": "Unexpected member(s): phoneNumber",
+        "action": "expect:only-entries"
+      }
+    ]
+  }
+}

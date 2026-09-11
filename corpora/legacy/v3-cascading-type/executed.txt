@@ -1,0 +1,86 @@
+(
+  :"add animals" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method => 'POST'
+          ) => 'post',
+          %lower-case (
+            'POST'
+          ) => 'post'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/animals',
+          '/animals'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %match:header-value (
+            $.request.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.animals" (
+          %match:min-type (
+            $.request.body.animals => [{'phoneNumber': '333'}, {'phoneNumber': 'abc'}],
+            [{'phoneNumber': '0415674567'}],
+            1
+          ) => BOOL(true),
+          %for-each (
+            ** (
+              $.request.body.animals => [{'phoneNumber': '333'}, {'phoneNumber': 'abc'}]
+            ) => [{'phoneNumber': '333'}, {'phoneNumber': 'abc'}],
+            :"$.animals[*]" (
+              :"$.animals[*].phoneNumber" (
+                %match:regex (
+                  ~>.phoneNumber => '333',
+                  '\\d+'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %expect:only-entries (
+                ~> => {'phoneNumber': '333'},
+                'phoneNumber'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.animals[*]" (
+              :"$.animals[*].phoneNumber" (
+                %match:regex (
+                  ~>.phoneNumber => 'abc',
+                  '\\d+'
+                ) => ERROR(Expected 'abc' to match '\d+')
+              ) => BOOL(false),
+              %expect:only-entries (
+                ~> => {'phoneNumber': 'abc'},
+                'phoneNumber'
+              ) => BOOL(true)
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false),
+        %expect:only-entries (
+          $.request.body => {'animals': [{'phoneNumber': '333'}, {'phoneNumber': 'abc'}]},
+          'animals'
+        ) => BOOL(true)
+      ) => BOOL(false)
+    ) => BOOL(false),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers () => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(false)
+)

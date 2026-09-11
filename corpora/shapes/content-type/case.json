@@ -1,0 +1,12 @@
+{
+  "description": "content-type inspects octets, not a decoded document",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an uploaded file",
+      "parts": { "response": { "body": { "shape": "content-type", "content-type": "application/json" } } }
+    }
+  },
+  "values": { "$.response.body": "{\"a\":1}" },
+  "result": { "status": "matched" }
+}

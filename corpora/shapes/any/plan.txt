@@ -1,0 +1,11 @@
+(
+  :"a health check" (
+    :response (
+      :body (
+        %match:any (
+          $.response.body
+        )
+      )
+    )
+  )
+)

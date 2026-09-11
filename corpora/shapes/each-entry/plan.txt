@@ -1,0 +1,30 @@
+(
+  :"response headers" (
+    :response (
+      :body (
+        %expect:size (
+          $.response.body,
+          1,
+          NULL
+        ),
+        %for-each (
+          ** (
+            $.response.body
+          ),
+          :"$.response.body" (
+            :"$.response.body{key}" (
+              %match:string (
+                ~>.key
+              )
+            ),
+            :"$.response.body{*}" (
+              %match:string (
+                ~>.value
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)
