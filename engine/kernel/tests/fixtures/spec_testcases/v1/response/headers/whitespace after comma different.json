@@ -1,0 +1,14 @@
+{
+  "match": true,
+  "comment": "Whitespace between comma separated headers does not matter",
+  "expected": {
+    "headers": {
+      "Cache-Control": "alligators,hippos"
+    }
+  },
+  "actual": {
+    "headers": {
+      "Cache-Control": "alligators, hippos"
+    }
+  }
+}

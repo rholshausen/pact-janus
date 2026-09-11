@@ -304,8 +304,10 @@ one semantics. Where they differ is small and worth naming:
 
 | Action | Emitted by | Note |
 |---|---|---|
-| `expect:only-entries` | legacy only | v1–v4 strict mode (`allowUnexpectedKeys: false`). No shape compiles to it — ADR 0007 commitment 4 refuses closed objects, and §5.3 makes that a checkable rule rather than a convention. |
+| `expect:only-entries` | legacy only | v1–v4's request bodies are closed by default; response bodies (like every shape) are must-ignore — design 3.5 verified this asymmetry against the 803 specification test cases rather than assuming a single default, and only the request side ever emits this action. No shape compiles to it either way — ADR 0007 commitment 4 refuses closed objects, and §5.3 makes that a checkable rule rather than a convention. |
 | `match:array-contains` | legacy only | the old `arrayContains`; shapes reach it through the opaque `contains` operator |
+| `match:min-type`, `match:max-type`, `match:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a collection-size bound, enforced only when the resolved value is actually a collection (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
+| `match:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
 | `match:any-of`, `expect:absent` | shapes only | v1–v4 has no enumeration or absence assertion |
 
 This is why the forked action set is worth keeping rather than replacing: it is the legacy half of the

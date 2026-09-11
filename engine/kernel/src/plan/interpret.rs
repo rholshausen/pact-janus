@@ -689,7 +689,7 @@ fn dispatch(name: &str, children: &[Executed]) -> NodeResult {
     "match:regex" => {
       let value = value_of(&children[0]);
       let pattern = plain_text(&value_of(&children[1]));
-      match as_text(&value) {
+      match as_matchable_text(&value) {
         None => NodeResult::Error {
           message: format!("Expected a string but got {}", display(&value)),
           path: locus(children),
@@ -767,6 +767,18 @@ fn dispatch(name: &str, children: &[Executed]) -> NodeResult {
         }
       }
     }
+    "match:min-type" => {
+      match_type_with_bounds(children, Some(as_u64(&value_of(&children[2])).unwrap_or(0)), None)
+    }
+    "match:max-type" => {
+      match_type_with_bounds(children, None, Some(as_u64(&value_of(&children[2])).unwrap_or(0)))
+    }
+    "match:min-max-type" => match_type_with_bounds(
+      children,
+      Some(as_u64(&value_of(&children[2])).unwrap_or(0)),
+      Some(as_u64(&value_of(&children[3])).unwrap_or(0)),
+    ),
+
     "match:array-contains" => {
       // Legacy-only (spec §4.4): reachable once design 3.5's compiler emits it, not yet.
       let value = value_of(&children[0]);
@@ -786,10 +798,55 @@ fn dispatch(name: &str, children: &[Executed]) -> NodeResult {
       }
     }
 
+    "match:header-value" => {
+      let value = value_of(&children[0]);
+      let expected = plain_text(&value_of(&children[1]));
+      match as_text(&value) {
+        None => NodeResult::Error {
+          message: format!("Expected a string but got {}", display(&value)),
+          path: locus(children),
+        },
+        Some(actual) if header_values_match(&expected, &actual) => {
+          NodeResult::Value(RuntimeValue::Bool(true))
+        }
+        Some(actual) => NodeResult::Error {
+          message: format!("Expected '{actual}' to equal '{expected}'"),
+          path: locus(children),
+        },
+      }
+    }
+
     _ => NodeResult::Error {
       message: format!("unknown or unavailable action '{name}'"),
       path: None,
     },
+  }
+}
+
+/// `match:min-type`/`match:max-type`/`match:min-max-type` (legacy only, plan task 3.5's
+/// `MinType`/`MaxType`/`MinMaxType`): a `match:type` check, plus a collection-size bound enforced
+/// only when the resolved value actually is a collection. That guard is what lets a cascaded
+/// `MinType` (plan task 3.5's compiler reaches every descendant of the path it was declared on)
+/// pass through scalar descendants as a plain type check instead of wrongly re-applying an
+/// ancestor's own cardinality bound to them.
+fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u64>) -> NodeResult {
+  let (actual, expected) = (value_of(&children[0]), value_of(&children[1]));
+  if matches!(actual, RuntimeValue::Absent) || kind_of(&actual) != kind_of(&expected) {
+    return NodeResult::Error {
+      message: format!("Expected a {} but got {}", kind_of(&expected), display(&actual)),
+      path: locus(children),
+    };
+  }
+  match length_of_opt(&actual) {
+    Some(len) if min.is_some_and(|min| len < min) => NodeResult::Error {
+      message: format!("Expected at least {} item(s) but got {len}", min.unwrap_or(0)),
+      path: locus(children),
+    },
+    Some(len) if max.is_some_and(|max| len > max) => NodeResult::Error {
+      message: format!("Expected at most {} item(s) but got {len}", max.unwrap_or(0)),
+      path: locus(children),
+    },
+    _ => NodeResult::Value(RuntimeValue::Bool(true)),
   }
 }
 
@@ -852,6 +909,44 @@ fn detect_content_type(value: &RuntimeValue) -> Option<String> {
   }
 }
 
+/// `match:header-value` (legacy only, plan task 3.5): v1-v4's default header comparison is not
+/// plain string equality. A MIME-shaped value (`type/subtype; param=value; ...`) compares the base
+/// type case-insensitively and requires every parameter named in `expected` to be present in
+/// `actual` with a case-insensitively equal value — extra parameters on the actual side, or a
+/// different parameter order, don't fail it (spec test cases `matches content type with charset`,
+/// `... with parameters in different order`, `content type parameters do not match`). Otherwise, a
+/// comma-separated value tolerates whitespace around the commas (`whitespace after comma
+/// different`); anything else is exact, case-sensitive equality (`header value is different case`).
+fn header_values_match(expected: &str, actual: &str) -> bool {
+  if expected.contains(';') || actual.contains(';') {
+    let (expected_type, expected_params) = mime_parts(expected);
+    let (actual_type, actual_params) = mime_parts(actual);
+    return expected_type.eq_ignore_ascii_case(&actual_type)
+      && expected_params.iter().all(|(key, value)| {
+        actual_params
+          .iter()
+          .any(|(k, v)| k.eq_ignore_ascii_case(key) && v.eq_ignore_ascii_case(value))
+      });
+  }
+  if expected.contains(',') || actual.contains(',') {
+    fn split(s: &str) -> Vec<&str> {
+      s.split(',').map(str::trim).collect()
+    }
+    return split(expected) == split(actual);
+  }
+  expected == actual
+}
+
+fn mime_parts(value: &str) -> (String, Vec<(String, String)>) {
+  let mut parts = value.split(';').map(str::trim);
+  let base = parts.next().unwrap_or_default().to_string();
+  let params = parts
+    .filter_map(|p| p.split_once('='))
+    .map(|(k, v)| (k.trim().to_string(), v.trim().trim_matches('"').to_string()))
+    .collect();
+  (base, params)
+}
+
 fn is_empty(value: &RuntimeValue) -> bool {
   match value {
     RuntimeValue::String(s) => s.is_empty(),
@@ -889,6 +984,15 @@ fn as_text(value: &RuntimeValue) -> Option<String> {
     RuntimeValue::String(s) => Some(s.clone()),
     RuntimeValue::Bytes(bytes) => std::str::from_utf8(bytes).ok().map(str::to_string),
     _ => None,
+  }
+}
+
+/// [`as_text`], widened to numbers and booleans (v1-v4's `regex` matcher applies to a JSON number
+/// or boolean body value too — spec test case `body/matches with integers` regexes a bare `4`).
+fn as_matchable_text(value: &RuntimeValue) -> Option<String> {
+  match value {
+    RuntimeValue::Number(_) | RuntimeValue::Bool(_) => Some(plain_text(value)),
+    other => as_text(other),
   }
 }
 
