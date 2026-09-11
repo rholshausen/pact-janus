@@ -1,0 +1,29 @@
+//! Request bodies for `consumer-session/*` (engine-protocol spec §8.2). Result bodies are built
+//! directly as `Value` at the call site — they're small enough that a second set of typed
+//! structs would only restate the schema, not earn it.
+
+use crate::contract::Party;
+use serde::Deserialize;
+use serde_json::Value;
+
+#[derive(Debug, Deserialize)]
+pub struct Create {
+  pub config: SessionConfig,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SessionConfig {
+  pub consumer: Party,
+  pub provider: Party,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddInteraction {
+  pub session: String,
+  pub interaction: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Finalise {
+  pub session: String,
+}

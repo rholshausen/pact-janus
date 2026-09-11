@@ -10,16 +10,15 @@ pub mod error;
 pub mod interaction_spec;
 pub mod legacy_pact;
 pub mod plan;
+pub mod protocol;
 pub mod shape;
 
 /// The engine version, as reported over the engine protocol.
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The engine protocol version this kernel speaks.
-///
-/// Placeholder until the protocol is designed (plan task 2.1) and the IDL chosen (gate G1);
-/// version negotiation semantics are part of that design.
-pub const PROTOCOL_VERSION: u32 = 0;
+/// The engine protocol version this kernel speaks (engine-protocol spec, plan task 2.1;
+/// negotiated in the `engine/hello` handshake, spec §5).
+pub const PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(test)]
 mod tests {

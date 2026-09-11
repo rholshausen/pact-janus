@@ -596,7 +596,7 @@ Schema: [`schemas/v1/upgrade.schema.json`](schemas/v1/upgrade.schema.json).
 
 Converts a v1–v4 pact document to a Janus contract per design 2.5's rules (matching rules become shapes;
 the single example becomes the sole variant). `findings` lists lossy or judgement-call spots
-(each with a code from an open vocabulary, a JSON-path location and prose) so the CLI's
+(each with a code from an open vocabulary, a JSON pointer location and prose) so the CLI's
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
 document-out.
 
@@ -704,8 +704,9 @@ a bug). An `EngineError` carries:
 
 `details` conventions worth fixing now: `protocol-version-unsupported` carries
 `supported: [int]`; `operation-unsupported` carries `op`; `capability-required` carries
-`capability`; `interaction-invalid` and `contract-invalid` carry `problems: [{path, message}]`
-(positions a DSL can surface); `component-unavailable` and `component-failed` carry
+`capability`; `interaction-invalid` and `contract-invalid` carry `problems: [{pointer, message}]`,
+`pointer` an RFC 6901 JSON pointer (positions a DSL can surface — matches contract-file spec
+§11's finding-pointer convention); `component-unavailable` and `component-failed` carry
 `component` (the component's identifier/requirement, e.g. `content/protobuf >= 2`) and, for
 failures, `error` — the component's own error document, passed through opaquely: the kernel
 does not understand component error interiors and MUST NOT translate them (design 2.6 owns

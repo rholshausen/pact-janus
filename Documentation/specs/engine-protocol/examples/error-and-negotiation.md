@@ -88,13 +88,14 @@ delimits the stream, so the session continues in sync (spike 1.3, finding 6):
                              "response": { "body": { "shape": { "id": { "tpye": "integer" } } } } } } }
 ```
 
-`←` category `document`, with positions a DSL can surface to the test author:
+`←` category `document`, with positions a DSL can surface to the test author (`pointer` is an
+RFC 6901 JSON pointer, matching contract-file spec §11's finding-pointer convention):
 
 ```json
 { "type": "response", "id": "r-3",
   "error": { "code": "interaction-invalid", "category": "document",
              "message": "interaction specification is not valid",
-             "details": { "problems": [ { "path": "$.response.body.shape.id",
+             "details": { "problems": [ { "pointer": "/response/body/shape/id",
                                           "message": "unknown shape operator 'tpye' (did you mean 'type'?)" } ] } } }
 ```
 
