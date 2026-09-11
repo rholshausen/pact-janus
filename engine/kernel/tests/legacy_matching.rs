@@ -7,11 +7,15 @@
 //! these fixtures are pact-specification's own oracle, not Janus's — the two serve different jobs.
 //!
 //! **Known gaps, excluded rather than silently miscounted.** [`skip_reason`] names every case this
-//! compiler cannot yet be expected to pass, each traced to a scope decision recorded in
+//! compiler cannot yet be expected to pass. Most are a scope decision recorded in
 //! `engine/kernel/src/plan/legacy.rs`'s module docs: non-JSON bodies (XML — content components are
 //! design 2.6/plan task 4.2, not built yet), and the handful of matching rules with zero coverage in
 //! this corpus (`Values`, `EachKey`, `EachValue`, `ArrayContains`) that compile to a deliberate `error`
-//! node. A case that isn't skipped is expected to pass; the assertion at the bottom enforces that.
+//! node — these are excluded by a rule, since they cover every v2/v3/v4 duplicate of the same
+//! underlying case. The rest are a `janus:skip` attribute on the one fixture file it explains (not
+//! part of pact-specification's own schema — see the fixtures' `README.md`), for a disagreement
+//! specific to that single case rather than a category of them. A case that isn't skipped is
+//! expected to pass; the assertion at the bottom enforces that.
 
 use pact_janus_kernel::plan::{self, CapturedValues, LegacyRequest, LegacyResponse, RuntimeValue, Status};
 use serde_json::Value;
@@ -23,6 +27,10 @@ struct Case {
   expected_match: bool,
   expected: Value,
   actual: Value,
+  /// `janus:skip`, when the fixture carries one (module docs' "Known gaps") — a Janus-added
+  /// annotation, not part of the file's own pact-specification schema, so it stays legible as
+  /// "this one case, and here is why" instead of drifting from the case it was written against.
+  skip: Option<String>,
 }
 
 fn read_cases(dir: &Path, out: &mut Vec<Case>) {
@@ -53,33 +61,27 @@ fn read_cases(dir: &Path, out: &mut Vec<Case>) {
         .unwrap_or_else(|| panic!("{path:?} has no boolean 'match'")),
       expected: json["expected"].clone(),
       actual: json["actual"].clone(),
+      skip: json["janus:skip"].as_str().map(str::to_string),
     });
   }
 }
 
-/// Cases this compiler cannot yet be expected to pass (module docs). Matched by a substring of the
-/// case's path relative to `spec_testcases/`, which is enough to identify every content-type-driven
-/// exclusion without hand-listing hundreds of individual v2/v3/v4 duplicates of the same case.
-fn skip_reason(case: &Case) -> Option<&'static str> {
+/// Cases this compiler cannot yet be expected to pass (module docs). Two kinds: a `janus:skip`
+/// attribute on the fixture itself, for a single case that disagrees with this compiler for a
+/// reason specific to that one case (an annotation on the evidence, not a rule in the harness); and
+/// the content-type-driven exclusions below, applied by a rule because they cover every v2/v3/v4
+/// duplicate of the same underlying case rather than one file.
+fn skip_reason(case: &Case) -> Option<String> {
+  if let Some(reason) = &case.skip {
+    return Some(reason.clone());
+  }
   let is_xml = |v: Option<Value>| matches!(v, Some(Value::String(s)) if s.trim_start().starts_with('<'));
   if is_xml(body_of(&case.expected)) || is_xml(body_of(&case.actual)) {
-    return Some("XML body: content components are plan task 4.2, not built yet");
+    return Some("XML body: content components are plan task 4.2, not built yet".to_string());
   }
   let content_type = case.expected["headers"]["Content-Type"].as_str().unwrap_or("");
   if content_type.contains("xml") {
-    return Some("XML content type: content components are plan task 4.2, not built yet");
-  }
-  // Oniguruma's `is_match` (pact_matching's actual regex engine) disagrees with this corpus case's
-  // own recorded verdict on a plain unanchored regex over `.{4}` — every other regex case in the
-  // corpus passes, and this one's expected `false` doesn't follow from the same engine semantics
-  // used everywhere else (module docs' anchoring note). Flagged rather than chased further.
-  if case
-    .file
-    .contains("plain text regex matching that does not match")
-  {
-    return Some(
-      "disagrees with pact_matching's own unanchored regex semantics on this one case; flagged, not chased",
-    );
+    return Some("XML content type: content components are plan task 4.2, not built yet".to_string());
   }
   None
 }
