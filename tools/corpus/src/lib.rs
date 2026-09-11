@@ -11,6 +11,7 @@
 //! [-- accept]`) and `tests/corpus.rs` (`cargo test -p pact_janus_corpus`) call, so the two never
 //! drift into checking different things.
 
+use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::interaction_spec;
 use pact_janus_kernel::legacy_pact;
 use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, Status};
@@ -124,8 +125,9 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   };
 
   let resolver = CapturedValues::from_json(&case.values);
+  let json_content = JsonContent::new();
   if let Some(plan) = &plan {
-    let executed = plan::execute(plan, &resolver);
+    let executed = plan::execute_with_content(plan, &resolver, Some(&json_content));
     let (status, mismatches) = plan::outcome(&executed);
     if let Err(err) = check_result(status, &mismatches, &case.result) {
       problems.push(format!("result: {err}"));
@@ -147,7 +149,7 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   if let Some(other_input) = &case.also_compiled_from {
     match compile_input(other_input) {
       Ok((other_plan, _)) => {
-        let other_executed = plan::execute(&other_plan, &resolver);
+        let other_executed = plan::execute_with_content(&other_plan, &resolver, Some(&json_content));
         let (other_status, other_mismatches) = plan::outcome(&other_executed);
         if let Err(err) = check_result(other_status, &other_mismatches, &case.result) {
           problems.push(format!("also-compiled-from result: {err}"));

@@ -25,6 +25,23 @@ pub trait Resolver {
   fn resolve(&self, path: &str) -> RuntimeValue;
 }
 
+/// Where `match:content-type` (shape spec §4.2) actually gets its answer: a content component's
+/// `detect` operation (component-interfaces spec §6.5), narrowed to what the interpreter needs.
+/// "The kernel does not know what a header is; it knows how to ask" applies here too — the kernel
+/// does not know what JSON looks like, it knows how to ask a content component.
+///
+/// A single slot, not a registry: every caller today hands in one hardcoded component (there is
+/// only one, `engine/component-json`'s `JsonContent`). No resolution mechanism exists yet for
+/// component-interfaces spec §2.3's "collect requirements across interactions, resolve to loaded
+/// components" — tracked in `Documentation/kernel-boundary-review.md`'s finding-1 resolution as a
+/// gap for whoever adds a second content component (Phase 8 task 8.1).
+pub trait ContentDetector {
+  /// `None` means this detector doesn't recognise `value` as any type it handles — not "no
+  /// detector was available", which [`super::interpret::execute_with_content`] reports on its own
+  /// when `content` itself is `None`.
+  fn detect(&self, value: &RuntimeValue) -> Option<String>;
+}
+
 /// A resolver over a flat map of absolute path -> already-decoded value, keyed at whatever depth
 /// the caller captured it (a whole part, `"$.response.body"`, or a single field,
 /// `"$.response.status"`). A requested path resolves against the *longest* captured key that is a

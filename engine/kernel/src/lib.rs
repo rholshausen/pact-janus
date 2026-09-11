@@ -5,6 +5,7 @@
 //! behind the component interfaces (see the component-interface design, plan task 2.6).
 
 mod common;
+pub mod component;
 pub mod contract;
 pub mod error;
 pub mod interaction_spec;

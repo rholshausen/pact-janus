@@ -2,6 +2,8 @@
 resolver = "3"
 members = [
   "engine/kernel",
+  "engine/component-json",
+  "engine/component-http",
   "cli",
   "tools/schema-compat",
   "tools/corpus",

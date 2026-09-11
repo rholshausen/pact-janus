@@ -5,8 +5,8 @@
 
 use pact_janus_kernel::interaction_spec::{InteractionSpec, parse};
 use pact_janus_kernel::plan::{
-  Assignment, CapturedValues, Executed, ExecutedKind, NodeResult, RuntimeValue, Status, compile, execute,
-  outcome,
+  Assignment, CapturedValues, ContentDetector, Executed, ExecutedKind, NodeResult, RuntimeValue, Status,
+  compile, execute, execute_with_content, outcome,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -328,4 +328,65 @@ fn check_exists_yields_a_boolean_never_an_error() {
   let executed = execute(&plan, &resolver);
   let check = find_action(&executed, "check:exists").expect("optional compiles check:exists");
   assert_eq!(check.result, Some(NodeResult::Value(RuntimeValue::Bool(false))));
+}
+
+// --- match:content-type asks a component, plan task 4.2 (kernel-boundary-review.md finding 1) ---
+
+struct FakeDetector {
+  answer: Option<&'static str>,
+}
+
+impl ContentDetector for FakeDetector {
+  fn detect(&self, _value: &RuntimeValue) -> Option<String> {
+    self.answer.map(str::to_string)
+  }
+}
+
+fn content_type_body() -> Value {
+  json!({ "shape": "content-type", "content-type": "application/json" })
+}
+
+#[test]
+fn content_type_matches_via_a_real_detector() {
+  let plan = compile(&interaction(content_type_body()), &Assignment::new(), None);
+  let resolver = CapturedValues::from_json(&captured(&[("$.response.body", json!("{\"a\":1}"))]));
+  let detector = FakeDetector {
+    answer: Some("application/json"),
+  };
+  let executed = execute_with_content(&plan, &resolver, Some(&detector));
+  let (status, mismatches) = outcome(&executed);
+  assert_eq!(status, Status::Matched, "mismatches: {mismatches:?}");
+}
+
+#[test]
+fn content_type_reports_the_detectors_disagreement() {
+  let plan = compile(&interaction(content_type_body()), &Assignment::new(), None);
+  let resolver = CapturedValues::from_json(&captured(&[("$.response.body", json!("<a/>"))]));
+  let detector = FakeDetector {
+    answer: Some("application/xml"),
+  };
+  let executed = execute_with_content(&plan, &resolver, Some(&detector));
+  let (status, mismatches) = outcome(&executed);
+  assert_eq!(status, Status::Mismatched);
+  assert_eq!(
+    mismatches[0].message,
+    "Expected content type 'application/json' but detected 'application/xml'"
+  );
+}
+
+#[test]
+fn content_type_without_a_detector_is_a_distinct_error_not_a_guess() {
+  // Before plan task 4.2, this case's kernel-side guess happened to succeed on `{"a":1}` — the
+  // exact finding kernel-boundary-review.md's finding 1 flagged. `execute` (no detector) must now
+  // say plainly that nothing is loaded, not fall back to guessing.
+  let executed = run_body(
+    content_type_body(),
+    captured(&[("$.response.body", json!("{\"a\":1}"))]),
+  );
+  let (status, mismatches) = outcome(&executed);
+  assert_eq!(status, Status::Mismatched);
+  assert_eq!(
+    mismatches[0].message,
+    "no content component is loaded to detect content type"
+  );
 }

@@ -1,0 +1,22 @@
+[package]
+name = "pact_janus_component_http"
+description = "The built-in HTTP transport component, mock (serve-role) side (component-interfaces spec §5, plan task 4.2): a real mock HTTP server behind the transport interface, native binding."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+# Purely synchronous (blocking recv_timeout maps directly onto poll-inbound's timeout-ms), so this
+# component needs no async runtime at all.
+tiny_http = "0.12"
+serde_json = "1"
+base64 = "0.22"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

@@ -171,3 +171,43 @@ Checked and confirmed free of HTTP/JSON-specific knowledge:
   actually protocol-agnostic is the kind of thing that gets harder to rename the longer it sits in
   the corpus (`corpora/legacy/v3-cascading-type/plan.txt` already renders it), so it is worth
   resolving at or before 4.2 rather than after.
+
+## Resolution (task 4.2)
+
+Task 4.2 built the JSON content component and the HTTP transport component (native binding, plan
+task 2.6) and, in doing so, checked findings 2/4/5 against plan-grammar spec §4.4 — final, and more
+authoritative than this exploratory review — before acting on them.
+
+- **Finding 1 — fixed, with a tracked gap.** `plan::interpret`'s `detect_content_type` stand-in is
+  gone. `match:content-type` now calls a real `ContentDetector` (`plan::interpret::execute_with_content`),
+  backed by `engine/component-json`'s `detect`, which in turn uses `pact_models::content_types`'
+  detector rather than a one-line `{`/`[` guess. No detector loaded is now its own distinct
+  interpreter message rather than a silent guess. `corpora/shapes/content-type` is the proof:
+  unchanged expected output, now produced by the real component (`tools/corpus` wires it in).
+  **Gap**: `ContentDetector` is a single optional slot (`Option<&dyn ContentDetector>`), not a
+  registry — every caller (`tools/corpus`, kernel tests) hands in one hardcoded `JsonContent`
+  directly. There is no resolution mechanism yet answering component-interfaces spec §2.3
+  ("the engine MUST collect the union of requirements across all interactions... and resolve to
+  loaded components"), and no task currently owns building one. This is fine while exactly one
+  content component exists; it stops being fine at Phase 8 task 8.1, the first point a second
+  (third-party WASM) content component actually needs to coexist with this one — that task should
+  either build a real `ContentRegistry` or explicitly re-scope to keep deferring it.
+- **Finding 2 — not a defect; no change.** Plan-grammar spec §4.4's legacy-action table already lists
+  `match:header-value` as *legacy only*, deliberately core, in the same family as
+  `match:array-contains` and `match:min-type`/`max-type`: it encodes v1–v4's own *specified* default
+  header comparison (validated against the 803-case pact-reference suite), not a kernel guess. This
+  review's own finding 3/6 logic — "the legacy compiler is permanently HTTP-specific, and that's
+  correct" — applies here too; the review left this open ("a real design question, not decided
+  here") and §4.4 turns out to already have decided it. Separately, `header:parse` (§4.6, and the
+  component-interfaces worked example's "header-value syntax is its own small content component,
+  named `header`") is the *shape*-language's answer for matching header values with ordinary
+  operators — a genuinely different feature, with no compiler emitting it yet on either path, so
+  building a `header` component now would have no caller. Left for whichever task first needs it.
+- **Finding 4 — not a defect; no change**, same reasoning as finding 2: `legacy.rs`'s method
+  case-insensitivity compiles to *structure* over core actions (`match:equality`/`lower-case`), not
+  a bespoke action, encoding a v1–v4-specified default exactly as the legacy compiler is supposed to.
+- **Finding 5 — recorded, not changed.** v1–v4 pacts are JSON documents by the pact specification
+  itself, permanently — there is no future non-JSON v1–v4 pact this compiler will ever need to read.
+  Retyping the legacy body compiler over `RuntimeValue` would buy nothing a real caller needs.
+- Findings 3 and 6 (the legacy compiler is permanently HTTP-shaped; nothing marks that boundary in
+  the module tree) remain open, still feeding 2.6's day-one-components report rather than 4.2.

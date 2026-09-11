@@ -19,7 +19,7 @@
 //! from either compiler.
 
 use super::model::{Literal, Node, NodeKind, Plan};
-use super::resolve::Resolver;
+use super::resolve::{ContentDetector, Resolver};
 use super::value::{RuntimeValue, navigate};
 use serde_json::Number;
 
@@ -73,13 +73,29 @@ pub enum ExecutedKind {
 
 struct Ctx<'a> {
   resolver: &'a dyn Resolver,
+  content: Option<&'a dyn ContentDetector>,
   current: Vec<RuntimeValue>,
 }
 
-/// Execute a compiled plan against `resolver`.
+/// Execute a compiled plan against `resolver`, with no content component available for
+/// `match:content-type` — equivalent to `execute_with_content(plan, resolver, None)`. Every
+/// existing caller (golden corpora aside, see [`execute_with_content`]) that never exercises
+/// `content-type` shapes is unaffected by this distinction.
 pub fn execute(plan: &Plan, resolver: &dyn Resolver) -> Executed {
+  execute_with_content(plan, resolver, None)
+}
+
+/// Execute a compiled plan against `resolver`, answering `match:content-type` (shape spec §4.2)
+/// via `content` when one is given (component-interfaces spec §6.5, plan task 4.2) rather than
+/// guessing.
+pub fn execute_with_content(
+  plan: &Plan,
+  resolver: &dyn Resolver,
+  content: Option<&dyn ContentDetector>,
+) -> Executed {
   let mut ctx = Ctx {
     resolver,
+    content,
     current: Vec::new(),
   };
   run(&plan.root, &mut ctx)
@@ -297,7 +313,7 @@ fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
     "match:contains" => run_contains(children, ctx),
     _ => {
       let executed_children: Vec<Executed> = children.iter().map(|c| run(c, ctx)).collect();
-      let result = dispatch(name, &executed_children);
+      let result = dispatch(name, &executed_children, ctx.content);
       Executed {
         kind: ExecutedKind::Action {
           name: name.to_string(),
@@ -487,7 +503,7 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
 /// protocol's `interaction-invalid`/`component-unavailable`/`component-failed` taxonomy
 /// (plan-grammar spec §8) — that taxonomy is a protocol-boundary concern (design 2.1) this
 /// in-process interpreter does not yet sit behind.
-fn dispatch(name: &str, children: &[Executed]) -> NodeResult {
+fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetector>) -> NodeResult {
   match name {
     "and" => {
       if children.is_empty() {
@@ -728,15 +744,21 @@ fn dispatch(name: &str, children: &[Executed]) -> NodeResult {
     "match:content-type" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
-      match detect_content_type(&value) {
-        Some(detected) if detected == expected => NodeResult::Value(RuntimeValue::Bool(true)),
-        Some(detected) => NodeResult::Error {
-          message: format!("Expected content type '{expected}' but detected '{detected}'"),
+      match content {
+        None => NodeResult::Error {
+          message: "no content component is loaded to detect content type".to_string(),
           path: locus(children),
         },
-        None => NodeResult::Error {
-          message: format!("Could not detect a content type for {}", display(&value)),
-          path: locus(children),
+        Some(content) => match content.detect(&value) {
+          Some(detected) if detected == expected => NodeResult::Value(RuntimeValue::Bool(true)),
+          Some(detected) => NodeResult::Error {
+            message: format!("Expected content type '{expected}' but detected '{detected}'"),
+            path: locus(children),
+          },
+          None => NodeResult::Error {
+            message: format!("Could not detect a content type for {}", display(&value)),
+            path: locus(children),
+          },
         },
       }
     }
@@ -890,25 +912,6 @@ fn match_temporal(children: &[Executed], default_format: &str, kind_name: &str) 
   }
 }
 
-/// A minimal, in-kernel content-type sniffer, standing in for the real content component this
-/// operator's semantics belong to (design 2.6, plan task 4.2). Recognising it as a stand-in
-/// rather than a finished implementation is exactly the finding task 3.8's kernel-boundary review
-/// exists to make.
-fn detect_content_type(value: &RuntimeValue) -> Option<String> {
-  let text = match value {
-    RuntimeValue::Bytes(bytes) => std::str::from_utf8(bytes).ok().map(str::trim),
-    RuntimeValue::String(s) => Some(s.trim()),
-    _ => None,
-  }?;
-  if text.starts_with('{') || text.starts_with('[') {
-    Some("application/json".to_string())
-  } else if text.starts_with('<') {
-    Some("application/xml".to_string())
-  } else {
-    None
-  }
-}
-
 /// `match:header-value` (legacy only, plan task 3.5): v1-v4's default header comparison is not
 /// plain string equality. A MIME-shaped value (`type/subtype; param=value; ...`) compares the base
 /// type case-insensitively and requires every parameter named in `expected` to be present in
@@ -917,6 +920,12 @@ fn detect_content_type(value: &RuntimeValue) -> Option<String> {
 /// `... with parameters in different order`, `content type parameters do not match`). Otherwise, a
 /// comma-separated value tolerates whitespace around the commas (`whitespace after comma
 /// different`); anything else is exact, case-sensitive equality (`header value is different case`).
+///
+/// Deliberately an unnamespaced core action, not a component's: plan-grammar spec §4.4 lists it
+/// as *legacy only*, alongside `match:array-contains` and `match:min-type`/`max-type` — it encodes
+/// v1–v4's own specified default, the same way `expect:only-entries` encodes v1–v4's closed-body
+/// default, not a guess the kernel invented (kernel-boundary-review.md finding 2, resolved as
+/// "no change" in that doc's task-4.2 resolution section).
 fn header_values_match(expected: &str, actual: &str) -> bool {
   if expected.contains(';') || actual.contains(';') {
     let (expected_type, expected_params) = mime_parts(expected);
