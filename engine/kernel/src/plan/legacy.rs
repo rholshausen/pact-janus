@@ -100,7 +100,7 @@ pub fn compile_request(req: &LegacyRequest) -> super::model::Plan {
     ),
     Node::container(
       Some("query".to_string()),
-      compile_query(&req.query, &req.matching_rules),
+      compile_query(&req.query, &req.matching_rules, "request"),
     ),
     Node::container(
       Some("headers".to_string()),
@@ -364,7 +364,10 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
           vec![resolve, Node::value(Literal::from_json(&example))],
         ),
       };
-      Node::container(Some(format!("$.headers.{name}")), vec![node])
+      Node::container(
+        Some(format!("$.{}.{name}", path::root(part, "headers"))),
+        vec![node],
+      )
     })
     .collect()
 }
@@ -373,9 +376,9 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
 
 /// v1–v4's query default is closed, unlike headers' (spec test case `query/unexpected param`):
 /// every actual query parameter must be named in `expected`.
-fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules) -> Vec<Node> {
+fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, part: &str) -> Vec<Node> {
   let category = rules_for(rules, "query");
-  let base_path = "$.request.query".to_string();
+  let base_path = format!("$.{}", path::root(part, "query"));
   let mut nodes: Vec<Node> = query
     .iter()
     .map(|(name, values)| {
@@ -400,7 +403,7 @@ fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules) -
         };
         children.push(node);
       }
-      Node::container(Some(format!("$.query.{name}")), children)
+      Node::container(Some(format!("{base_path}.{name}")), children)
     })
     .collect();
   let names: Vec<Node> = query.keys().map(|k| Node::value(Literal::string(k))).collect();

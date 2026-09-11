@@ -1154,6 +1154,7 @@ name = "pact_janus_cli"
 version = "0.0.0"
 dependencies = [
  "pact_janus_kernel",
+ "serde_json",
 ]
 
 [[package]]
