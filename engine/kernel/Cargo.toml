@@ -29,9 +29,10 @@ pretty_assertions = "1"
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }
-# Installed by tests only, so `RUST_LOG=debug cargo test -- --nocapture` (CLAUDE.md) has
-# somewhere to send the kernel's own tracing output.
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# `#[test_log::test]` installs a tracing subscriber for the test, reading `RUST_LOG`, so
+# `RUST_LOG=debug cargo test -- --nocapture` (CLAUDE.md) has somewhere to send the kernel's own
+# tracing output without every test file rolling its own init helper.
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
 
 [lints]
 workspace = true
