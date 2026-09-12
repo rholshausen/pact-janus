@@ -797,6 +797,13 @@ fn is_covered(target: &Target, assignment: &Assignment) -> bool {
 
 /// Runs the `janus-ipog-v1` covering algorithm (spec §3.4) and returns the covering variants'
 /// partial assignments, in the order produced, plus the count of targets it had to drop.
+///
+/// Traced at `debug`/`trace` rather than left as ad-hoc `eprintln!`s: this is the one place a
+/// disagreement with the worked examples (`Documentation/specs/variant-semantics/examples/`) has
+/// actually shown up before, and re-deriving "what did the sampler see at dimension N" by hand
+/// each time is exactly what a span is for. `RUST_LOG=trace cargo test -p pact_janus_kernel
+/// --test variant_select -- --nocapture` replays it.
+#[tracing::instrument(level = "debug", skip(space, seeds, targets, exclusions), fields(dimensions = space.dimensions.len(), seeds = seeds.len(), targets = targets.len()))]
 fn ipog(
   space: &VariantSpace,
   t: usize,
@@ -807,16 +814,23 @@ fn ipog(
   // Targets already covered by a seed cost nothing.
   targets.retain(|target| !seeds.iter().any(|s| is_covered(target, s)));
   if targets.is_empty() || space.dimensions.is_empty() {
+    tracing::debug!("every target already covered by a seed; no covering variants needed");
     return (Vec::new(), 0);
   }
 
   let order = processing_order(space);
   let t = t.min(order.len()).max(1);
+  tracing::trace!(
+    order = ?order.iter().map(|&i| space.dimensions[i].id.as_str()).collect::<Vec<_>>(),
+    strength = t,
+    "dimension processing order (step 2)"
+  );
 
   // Step 3 — initial block over the first t dimensions.
   let mut ts: Vec<Assignment> = Vec::new();
   build_initial_block(space, &order[..t], &mut Assignment::new(), 0, exclusions, &mut ts);
   ts.retain(|tau| !seeds.iter().any(|s| covers_partial(tau, s)));
+  tracing::trace!(initial_block = ?ts, remaining_targets = targets.len(), "initial block (step 3)");
 
   // Dimensions decided by the initial block are already "processed" for the purposes of the
   // growth loop below.
@@ -829,6 +843,7 @@ fn ipog(
   for &dim_idx in &order[t..] {
     let dim = &space.dimensions[dim_idx];
     processed.insert(dim.id.as_str());
+    tracing::trace!(dim = %dim.id, ts = ?ts, remaining_targets = targets.len(), "growing dimension (step 4)");
 
     // Horizontal.
     for tau in ts.iter_mut() {
@@ -898,9 +913,17 @@ fn ipog(
   for tau in ts {
     match complete_avoiding_exclusions(space, &tau, exclusions) {
       Some(full) => result.push(full),
-      None => dropped += 1,
+      None => {
+        tracing::debug!(partial = ?tau, "target-dropped: no completion clears every exclusion");
+        dropped += 1;
+      }
     }
   }
+  tracing::debug!(
+    covering = result.len(),
+    dropped,
+    "covering array complete (step 5)"
+  );
   (result, dropped)
 }
 
@@ -973,6 +996,7 @@ fn complete_avoiding_exclusions(
 }
 
 /// Compute a variant space's selection (spec §3): the heart of plan task 4.3.
+#[tracing::instrument(level = "debug", skip_all, fields(dimensions = space.dimensions.len(), strategy = %policy.strategy))]
 pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected, VariantError> {
   let (pins, mut exclusions) = resolve_refs(space, policy).map_err(VariantError::InvalidPolicy)?;
   let labels = compute_labels(space);
@@ -994,6 +1018,15 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
       }]));
     }
   };
+  tracing::debug!(
+    space.size = size,
+    space.exact = exact,
+    resolved_strategy = strategy,
+    threshold = policy.exhaustive_threshold,
+    pins = pins.len(),
+    exclusions = exclusions.len(),
+    "resolved sampling strategy"
+  );
 
   let mut seen: HashSet<Assignment> = HashSet::new();
   let mut variants: Vec<Variant> = Vec::new();
@@ -1077,7 +1110,14 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
   if variants.len() as u64 > policy.max_variants {
     let mut by_points: Vec<&Dimension> = space.dimensions.iter().collect();
     by_points.sort_by_key(|d| std::cmp::Reverse(d.points.len()));
-    let dimensions = by_points.into_iter().take(3).map(|d| d.id.clone()).collect();
+    let dimensions: Vec<String> = by_points.into_iter().take(3).map(|d| d.id.clone()).collect();
+    tracing::warn!(
+      space.size = size,
+      selected = variants.len(),
+      budget = policy.max_variants,
+      dimensions = ?dimensions,
+      "variant-budget-exceeded"
+    );
     return Err(VariantError::BudgetExceeded {
       space: size,
       selected: variants.len(),
@@ -1131,6 +1171,14 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
     exclusions: applied_exclusions,
   };
 
+  tracing::debug!(
+    selected = report.selected,
+    coverage.targets = report.coverage.targets,
+    coverage.covered = report.coverage.covered,
+    coverage.dropped = report.coverage.dropped,
+    ids = ?variants.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(),
+    "selection complete"
+  );
   Ok(Selected { variants, report })
 }
 

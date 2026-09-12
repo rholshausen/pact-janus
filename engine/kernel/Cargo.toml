@@ -19,6 +19,9 @@ serde_path_to_error = "0.1"
 regex = "1"
 semver = "1"
 base64 = "0.22"
+# The facade only — pure Rust, wasm-safe. A subscriber (tracing-subscriber) is an application
+# concern, installed by whatever embeds the kernel (the CLI, a host process), never by this crate.
+tracing = "0.1"
 
 [dev-dependencies]
 rstest = "0.24"
@@ -26,6 +29,9 @@ pretty_assertions = "1"
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }
+# Installed by tests only, so `RUST_LOG=debug cargo test -- --nocapture` (CLAUDE.md) has
+# somewhere to send the kernel's own tracing output.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [lints]
 workspace = true

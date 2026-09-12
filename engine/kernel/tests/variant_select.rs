@@ -3,6 +3,8 @@
 //! worked example says plainly "if an implementation disagrees with them, one of the two is
 //! wrong and the test says which."
 
+mod support;
+
 use pact_janus_kernel::interaction_spec::{InteractionSpec, parse};
 use pact_janus_kernel::plan::variant_space;
 use pact_janus_kernel::variant::{Origin, SamplingPolicy, VariantError, select};
@@ -54,6 +56,7 @@ fn ids(variants: &[pact_janus_kernel::variant::Variant]) -> Vec<&str> {
 
 #[test]
 fn the_rfc_order_payload_selects_eight_variants_in_the_documented_order() {
+  support::init_tracing();
   let interaction = interaction_with(order_payload_body());
   let space = variant_space(&interaction);
   let policy = SamplingPolicy::default();
