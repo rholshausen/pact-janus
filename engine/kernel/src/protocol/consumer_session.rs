@@ -15,12 +15,32 @@ pub struct Create {
 pub struct SessionConfig {
   pub consumer: Party,
   pub provider: Party,
+  /// The session-wide sampling policy layer (variant-semantics spec §3.8 layer 2).
+  #[serde(default)]
+  pub policy: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AddInteraction {
   pub session: String,
   pub interaction: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Variants {
+  pub session: String,
+  pub handle: String,
+  /// Per-call sampling policy override (variant-semantics spec §3.8), for a host offering an
+  /// `--exhaustive`-style switch.
+  #[serde(default)]
+  pub policy: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ServeVariant {
+  pub session: String,
+  pub handle: String,
+  pub variant: String,
 }
 
 #[derive(Debug, Deserialize)]

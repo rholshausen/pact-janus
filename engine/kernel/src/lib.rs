@@ -13,6 +13,7 @@ pub mod legacy_pact;
 pub mod plan;
 pub mod protocol;
 pub mod shape;
+pub mod variant;
 
 /// The engine version, as reported over the engine protocol.
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");

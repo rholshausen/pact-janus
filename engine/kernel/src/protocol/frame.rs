@@ -125,6 +125,54 @@ impl EngineError {
     }
   }
 
+  /// `handle-not-found` (spec §10.2): a stale, unknown, or already-ended interaction handle.
+  pub fn handle_not_found(handle: &str) -> Self {
+    EngineError {
+      code: "handle-not-found".to_string(),
+      category: "session".to_string(),
+      message: format!("interaction handle '{handle}' does not exist in this session"),
+      details: Some(serde_json::json!({ "handle": handle })),
+    }
+  }
+
+  /// `variant-not-found` (variant-semantics spec §8): `serve-variant` named an id that is not in
+  /// this interaction's current selection.
+  pub fn variant_not_found(variant: &str, selection: &[String]) -> Self {
+    EngineError {
+      code: "variant-not-found".to_string(),
+      category: "session".to_string(),
+      message: format!("'{variant}' is not in this interaction's selection"),
+      details: Some(serde_json::json!({ "variant": variant, "selection": selection })),
+    }
+  }
+
+  /// `variant-budget-exceeded` (variant-semantics spec §3.6, §8): the selection would exceed
+  /// `max-variants`. Naming the space size, the selection size it would have been, the budget,
+  /// and the dimensions contributing the most points is what turns this into a decision the
+  /// author can act on rather than a bare rejection.
+  pub fn variant_budget_exceeded(space: u64, selected: usize, budget: u64, dimensions: &[String]) -> Self {
+    EngineError {
+      code: "variant-budget-exceeded".to_string(),
+      category: "document".to_string(),
+      message: format!("the selection would need {selected} variants, above the budget of {budget}"),
+      details: Some(serde_json::json!({
+        "space": space, "selected": selected, "budget": budget, "dimensions": dimensions,
+      })),
+    }
+  }
+
+  /// `interaction-invalid` (spec §8.2, §10.2), for a malformed sampling policy or an
+  /// unresolvable/ambiguous dimension reference within it (variant-semantics spec §8) — the same
+  /// code `add-interaction` uses, since both report the same shape of problem.
+  pub fn invalid_policy(problems: &[crate::error::Problem]) -> Self {
+    EngineError {
+      code: "interaction-invalid".to_string(),
+      category: "document".to_string(),
+      message: "sampling policy is not valid".to_string(),
+      details: Some(serde_json::json!({ "problems": problems })),
+    }
+  }
+
   /// `internal` (spec §10.1): the dispatch boundary's own panic-catch. A panic reaching this
   /// constructor is itself a bug — it exists so a panic never crosses the pipe.
   pub fn internal(message: impl Into<String>) -> Self {

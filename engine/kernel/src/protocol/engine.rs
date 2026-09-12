@@ -3,10 +3,11 @@
 //! additional rules" beyond the call pipe itself) — JSON bytes in, JSON bytes out — deliberately
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
-use super::consumer_session::{AddInteraction, Create, Finalise};
+use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, Variants};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
-use super::session::SessionStore;
+use super::session::{ServeVariantError, SessionStore, VariantsError};
+use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::panic::{self, AssertUnwindSafe};
@@ -87,6 +88,8 @@ impl Engine {
       "engine/hello" => self.handle_hello(id, body),
       "consumer-session/create" => self.handle_create(id, body),
       "consumer-session/add-interaction" => self.handle_add_interaction(id, body),
+      "consumer-session/variants" => self.handle_variants(id, body),
+      "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
     }
@@ -114,9 +117,11 @@ impl Engine {
       Ok(create) => create,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    let session = self
-      .sessions
-      .create(create.config.consumer, create.config.provider);
+    let session = self.sessions.create(
+      create.config.consumer,
+      create.config.provider,
+      create.config.policy,
+    );
     ResponseFrame::ok(id, json!({ "session": session }))
   }
 
@@ -131,6 +136,53 @@ impl Engine {
     match session.add_interaction(&req.interaction) {
       Ok(handle) => ResponseFrame::ok(id, json!({ "handle": handle })),
       Err(err) => ResponseFrame::err(id, EngineError::interaction_invalid(&err.problems)),
+    }
+  }
+
+  fn handle_variants(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: Variants = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.sessions.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    match session.variants(&req.handle, req.policy.as_ref()) {
+      Ok(result) => ResponseFrame::ok(id, result),
+      Err(VariantsError::HandleNotFound) => {
+        ResponseFrame::err(id, EngineError::handle_not_found(&req.handle))
+      }
+      Err(VariantsError::Variant(VariantError::InvalidPolicy(problems))) => {
+        ResponseFrame::err(id, EngineError::invalid_policy(&problems))
+      }
+      Err(VariantsError::Variant(VariantError::BudgetExceeded {
+        space,
+        selected,
+        budget,
+        dimensions,
+      })) => ResponseFrame::err(
+        id,
+        EngineError::variant_budget_exceeded(space, selected, budget, &dimensions),
+      ),
+    }
+  }
+
+  fn handle_serve_variant(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: ServeVariant = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.sessions.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    match session.serve_variant(&req.handle, &req.variant) {
+      Ok(()) => ResponseFrame::ok(id, json!({})),
+      Err(ServeVariantError::HandleNotFound) => {
+        ResponseFrame::err(id, EngineError::handle_not_found(&req.handle))
+      }
+      Err(ServeVariantError::VariantNotFound { selection }) => {
+        ResponseFrame::err(id, EngineError::variant_not_found(&req.variant, &selection))
+      }
     }
   }
 

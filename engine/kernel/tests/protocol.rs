@@ -1,8 +1,10 @@
-//! Plan task 4.1: the engine protocol's session lifecycle (`create`/`add-interaction`/
-//! `finalise`, engine-protocol spec §8.2) — frame dispatch, structured errors, per-interaction
+//! Plan tasks 4.1 and 4.3: the engine protocol's session lifecycle (`create`/`add-interaction`/
+//! `finalise`, engine-protocol spec §8.2) and variant machinery (`variants`/`serve-variant`,
+//! variant-semantics spec §3.9/§4.1) — frame dispatch, structured errors, per-interaction
 //! results. Scenarios are drawn from the spec's own worked examples
-//! (`examples/consumer-http-session.md`, `examples/error-and-negotiation.md`), trimmed to the
-//! operations 4.1 implements (`variants`/`start-transport`/`serve-variant` are 4.2/4.3).
+//! (`examples/consumer-http-session.md`, `examples/error-and-negotiation.md`). `start-transport`
+//! is not dispatched yet — no transport is bound to a consumer session (that gap is 4.2's
+//! component crate waiting on its own wiring, tracked for whoever picks it up next).
 
 use pact_janus_kernel::protocol::Engine;
 use serde_json::{Value, json};
@@ -264,4 +266,190 @@ fn sessions_are_the_only_resource_finalise_ends_it() {
     json!({ "session": session }),
   );
   assert_eq!(second["error"]["code"], "session-not-found");
+}
+
+fn create_session(engine: &mut Engine) -> String {
+  hello(engine);
+  let create = send(
+    engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  create["ok"]["session"].as_str().unwrap().to_string()
+}
+
+// A widened order interaction — one `optional` member — so its variant space has more than the
+// single degenerate `base` variant `order_interaction()` alone would give.
+fn order_interaction_with_optional_field() -> Value {
+  let mut interaction = order_interaction();
+  interaction["parts"]["response"]["body"] = json!({
+    "shape": "object",
+    "members": { "shippedAt": { "shape": "optional", "of": { "shape": "string", "example": "2026-07-30" } } }
+  });
+  interaction
+}
+
+#[test]
+fn variants_returns_the_selection_and_report_for_a_degenerate_space() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+
+  let variants = send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  assert_eq!(
+    variants["ok"]["variants"],
+    json!([ { "id": "base", "label": "base", "origin": "base", "assignment": [] } ])
+  );
+  assert_eq!(variants["ok"]["report"]["space"]["size"], 1);
+  assert_eq!(variants["ok"]["report"]["strategy"], "exhaustive");
+  assert_eq!(variants["ok"]["report"]["selected"], 1);
+
+  let finalised = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(
+    finalised["ok"]["results"],
+    json!([ { "handle": "i-1", "status": "not-exercised",
+              "variants": [ { "variant": "base", "status": "not-exercised" } ] } ])
+  );
+}
+
+#[test]
+fn variants_selects_more_than_one_variant_when_the_shape_has_width() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction_with_optional_field() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+
+  let variants = send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let ids: Vec<&str> = variants["ok"]["variants"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|v| v["id"].as_str().unwrap())
+    .collect();
+  assert_eq!(ids, vec!["base", "response.body.shippedAt#presence=absent"]);
+  assert_eq!(variants["ok"]["report"]["space"]["size"], 2);
+}
+
+#[test]
+fn serve_variant_arms_a_selected_variant() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+
+  let served = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": "base" }),
+  );
+  assert_eq!(served["ok"], json!({}));
+}
+
+#[test]
+fn serve_variant_with_an_id_not_in_the_selection_is_variant_not_found() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+
+  let served = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": "does-not-exist" }),
+  );
+  assert_eq!(served["error"]["code"], "variant-not-found");
+  assert_eq!(served["error"]["category"], "session");
+  assert_eq!(served["error"]["details"]["selection"], json!(["base"]));
+}
+
+#[test]
+fn variants_on_an_unknown_handle_is_handle_not_found() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+
+  let variants = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": "i-does-not-exist" }),
+  );
+  assert_eq!(variants["error"]["code"], "handle-not-found");
+  assert_eq!(variants["error"]["category"], "session");
+}
+
+#[test]
+fn a_per_call_policy_override_can_force_base_only() {
+  let mut engine = Engine::new();
+  let session = create_session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction_with_optional_field() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+
+  let variants = send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle, "policy": { "strategy": "base-only" } }),
+  );
+  assert_eq!(
+    variants["ok"]["variants"],
+    json!([ { "id": "base", "label": "base", "origin": "base",
+              "assignment": [ { "dimension": "response.body.shippedAt#presence", "point": "present" } ] } ])
+  );
+  assert_eq!(variants["ok"]["report"]["strategy"], "base-only");
 }

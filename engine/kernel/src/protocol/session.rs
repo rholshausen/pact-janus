@@ -5,19 +5,49 @@
 use crate::contract::Party;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
 use crate::plan::{self, Assignment, Plan};
+use crate::variant::{Selected, VariantError, generate, select};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
+
+/// The variant a `serve-variant` call has most recently armed for one interaction (variant-
+/// semantics spec §4.1): its id, and the concrete payload the generator produced for it, ready
+/// for whatever eventually drives a transport from it (no transport is bound to a consumer
+/// session yet — `start-transport` isn't wired into [`super::engine`]'s dispatch).
+pub struct Armed {
+  #[allow(dead_code)]
+  pub variant: String,
+  #[allow(dead_code)]
+  pub parts: BTreeMap<String, BTreeMap<String, Value>>,
+}
 
 /// One interaction as validated and compiled by `add-interaction`. Spec §8.2: "the engine
 /// validates it and compiles what it needs" — `plan::compile` is infallible once `spec` parsed
 /// (matching happens at execution, not compile time), so this always succeeds once parsing does.
-/// The compiled `plan` isn't consumed by anything in 4.1; it's here so 4.2/4.3 (transport,
-/// variants) have it without re-deriving session state layout.
+/// The compiled `plan` isn't consumed by anything in 4.1; it's here so 4.2 (transport) has it
+/// without re-deriving session state layout.
 pub(crate) struct InteractionEntry {
-  #[allow(dead_code)]
   pub spec: InteractionSpec,
   #[allow(dead_code)]
   pub plan: Plan,
+  /// The most recent selection computed for this interaction by `consumer-session/variants`
+  /// (variant-semantics spec §3.9). `None` until a host calls it — a host that never does gets
+  /// the honest, minimal `not-exercised` report 4.1's finalise already gave.
+  pub selection: Option<Selected>,
+  /// The variant `serve-variant` most recently armed (spec §4.1: at most one at a time; re-arming
+  /// replaces it).
+  pub armed: Option<Armed>,
+}
+
+/// `consumer-session/variants` (variant-semantics spec §3.9): a malformed policy vs. an unknown
+/// handle are different failures at the protocol boundary.
+pub enum VariantsError {
+  HandleNotFound,
+  Variant(VariantError),
+}
+
+pub enum ServeVariantError {
+  HandleNotFound,
+  VariantNotFound { selection: Vec<String> },
 }
 
 /// One `consumer-session/*` session: config plus the interactions added to it so far. `order`
@@ -30,16 +60,20 @@ pub(crate) struct ConsumerSession {
   pub consumer: Party,
   #[allow(dead_code)]
   pub provider: Party,
+  /// The session-wide sampling policy layer (variant-semantics spec §3.8 layer 2), from
+  /// `create`'s `config.policy`.
+  policy: Option<Value>,
   interactions: BTreeMap<String, InteractionEntry>,
   order: Vec<String>,
   next_handle: u64,
 }
 
 impl ConsumerSession {
-  fn new(consumer: Party, provider: Party) -> Self {
+  fn new(consumer: Party, provider: Party, policy: Option<Value>) -> Self {
     ConsumerSession {
       consumer,
       provider,
+      policy,
       interactions: BTreeMap::new(),
       order: Vec::new(),
       next_handle: 1,
@@ -53,22 +87,94 @@ impl ConsumerSession {
     let compiled = plan::compile(&spec, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
     self.next_handle += 1;
-    self
-      .interactions
-      .insert(handle.clone(), InteractionEntry { spec, plan: compiled });
+    self.interactions.insert(
+      handle.clone(),
+      InteractionEntry {
+        spec,
+        plan: compiled,
+        selection: None,
+        armed: None,
+      },
+    );
     self.order.push(handle.clone());
     Ok(handle)
   }
 
+  /// `consumer-session/variants` (variant-semantics spec §3.9): resolve the layered policy
+  /// (defaults, session config, this call's override — spec §3.8) against the interaction's
+  /// variant space, run the selection algorithm, cache it as this interaction's current
+  /// selection — what `serve-variant` and `finalise` read next — and return the result document
+  /// (spec §3.9's schema: `variants`, each with its id/label/origin/assignment, plus `report`).
+  pub fn variants(&mut self, handle: &str, call_policy: Option<&Value>) -> Result<Value, VariantsError> {
+    let Some(entry) = self.interactions.get(handle) else {
+      return Err(VariantsError::HandleNotFound);
+    };
+    let space = plan::variant_space(&entry.spec);
+    let layers = [self.policy.as_ref(), call_policy];
+    let policy = crate::variant::SamplingPolicy::resolve(&layers)
+      .map_err(|problem| VariantsError::Variant(VariantError::InvalidPolicy(vec![problem])))?;
+    let selected = select(&space, &policy).map_err(VariantsError::Variant)?;
+
+    let variants: Vec<Value> = selected.variants.iter().map(|v| v.to_json(&space)).collect();
+    let result = serde_json::json!({ "variants": variants, "report": selected.report.to_json() });
+
+    let entry = self.interactions.get_mut(handle).expect("checked above");
+    entry.selection = Some(selected);
+    Ok(result)
+  }
+
+  /// `consumer-session/serve-variant` (spec §4.1, §8.2): arm the named variant of a previously
+  /// selected interaction, generating its concrete payload now (plan task 4.3's generator). No
+  /// transport is bound to a session yet, so arming stops at recording the variant and its
+  /// payload — a future task wires this into an actual passive/emissive exchange.
+  pub fn serve_variant(&mut self, handle: &str, variant_id: &str) -> Result<(), ServeVariantError> {
+    let Some(entry) = self.interactions.get_mut(handle) else {
+      return Err(ServeVariantError::HandleNotFound);
+    };
+    let assignment = {
+      let Some(selection) = &entry.selection else {
+        return Err(ServeVariantError::VariantNotFound {
+          selection: Vec::new(),
+        });
+      };
+      match selection.variants.iter().find(|v| v.id == variant_id) {
+        Some(variant) => variant.assignment.clone(),
+        None => {
+          let selection = selection.variants.iter().map(|v| v.id.clone()).collect();
+          return Err(ServeVariantError::VariantNotFound { selection });
+        }
+      }
+    };
+    let parts = generate::interaction(&entry.spec, &assignment);
+    entry.armed = Some(Armed {
+      variant: variant_id.to_string(),
+      parts,
+    });
+    Ok(())
+  }
+
   /// `consumer-session/finalise`'s `results` (spec §8.2): one entry per interaction, in
-  /// submission order. Every 4.1-era interaction is `not-exercised` — no `serve-variant` exists
-  /// yet to have exercised any of them (4.3). Honest, not a placeholder: this is exactly what
-  /// the spec says an unexercised interaction reports.
+  /// submission order, with a `variants` breakdown once `variants` has been called for it
+  /// (variant-semantics spec §4.2: every selected variant is required, and honestly
+  /// `not-exercised` until something exercises it — no transport is wired up yet to do that).
   pub fn results(&self) -> Vec<Value> {
     self
       .order
       .iter()
-      .map(|handle| serde_json::json!({ "handle": handle, "status": "not-exercised" }))
+      .map(|handle| {
+        let entry = &self.interactions[handle];
+        match &entry.selection {
+          None => serde_json::json!({ "handle": handle, "status": "not-exercised" }),
+          Some(selected) => {
+            let variants: Vec<Value> = selected
+              .variants
+              .iter()
+              .map(|v| serde_json::json!({ "variant": v.id, "status": "not-exercised" }))
+              .collect();
+            serde_json::json!({ "handle": handle, "status": "not-exercised", "variants": variants })
+          }
+        }
+      })
       .collect()
   }
 }
@@ -83,12 +189,12 @@ pub(crate) struct SessionStore {
 
 impl SessionStore {
   /// `consumer-session/create` (spec §8.2). Returns the new session id.
-  pub fn create(&mut self, consumer: Party, provider: Party) -> String {
+  pub fn create(&mut self, consumer: Party, provider: Party, policy: Option<Value>) -> String {
     self.next_session += 1;
     let id = format!("cs-{}", self.next_session);
     self
       .sessions
-      .insert(id.clone(), ConsumerSession::new(consumer, provider));
+      .insert(id.clone(), ConsumerSession::new(consumer, provider, policy));
     id
   }
 
@@ -117,8 +223,8 @@ mod tests {
   #[test]
   fn session_ids_are_distinct_and_stable() {
     let mut store = SessionStore::default();
-    let a = store.create(party("web-app"), party("order-api"));
-    let b = store.create(party("web-app"), party("order-api"));
+    let a = store.create(party("web-app"), party("order-api"), None);
+    let b = store.create(party("web-app"), party("order-api"), None);
     assert_ne!(a, b);
     assert!(store.get_mut(&a).is_some());
     assert!(store.get_mut(&b).is_some());
@@ -126,7 +232,7 @@ mod tests {
 
   #[test]
   fn handles_are_allocated_in_submission_order() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"));
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
     let spec = serde_json::json!({
       "description": "a request for an order",
       "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
@@ -147,7 +253,7 @@ mod tests {
   #[test]
   fn end_removes_the_session() {
     let mut store = SessionStore::default();
-    let id = store.create(party("web-app"), party("order-api"));
+    let id = store.create(party("web-app"), party("order-api"), None);
     assert!(store.end(&id).is_some());
     assert!(store.get_mut(&id).is_none());
     assert!(store.end(&id).is_none());
