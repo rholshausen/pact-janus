@@ -173,6 +173,30 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` (spec §10.2, component-interfaces spec §11): no component answers
+  /// for the named transport/content kind at all — as distinct from `component-failed`, where one
+  /// exists but errored.
+  pub fn component_unavailable(component: &str) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!("no '{component}' component is loaded"),
+      details: Some(serde_json::json!({ "component": component })),
+    }
+  }
+
+  /// `component-failed` (spec §10.2): a loaded component answered with an error, passed through
+  /// opaquely (`details.error`) — the kernel does not understand a component error's interior and
+  /// MUST NOT translate it (design 2.6).
+  pub fn component_failed(component: &str, error: &crate::component::ComponentError) -> Self {
+    EngineError {
+      code: "component-failed".to_string(),
+      category: "component".to_string(),
+      message: format!("the '{component}' component failed: {}", error.message),
+      details: Some(serde_json::json!({ "component": component, "error": error })),
+    }
+  }
+
   /// `contract-invalid` (contract-file spec §11, §4.2): the session's own state could never
   /// validly produce a contract — currently only two interactions sharing a description and
   /// state list. `problems` carries RFC 6901 pointers into the contract that would have been

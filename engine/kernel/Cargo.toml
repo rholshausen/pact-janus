@@ -26,6 +26,12 @@ tracing = "0.1"
 [dev-dependencies]
 rstest = "0.24"
 pretty_assertions = "1"
+# Dev-only: the real transport/content components, for plan task 4.5's live-exchange integration
+# test. A dev-dependency cycle back to this crate is fine (Cargo builds it as a plain dependency
+# of the test binary, never of the library) and is the only way to test the kernel's own
+# `TransportComponent`/`ContentComponent` wiring against something that isn't a toy.
+pact_janus_component_http = { path = "../component-http" }
+pact_janus_component_json = { path = "../component-json" }
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }

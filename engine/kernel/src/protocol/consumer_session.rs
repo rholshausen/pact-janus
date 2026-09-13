@@ -37,6 +37,16 @@ pub struct Variants {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct StartTransport {
+  pub session: String,
+  /// Transport component name (component-interfaces spec, design 2.6): an open vocabulary,
+  /// `"http"` today.
+  pub transport: String,
+  #[serde(default)]
+  pub options: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ServeVariant {
   pub session: String,
   pub handle: String,

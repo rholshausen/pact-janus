@@ -84,7 +84,17 @@ pub struct DisposeResult {}
 /// Native binding (spec §9.1): one method per operation, taking that operation's request document
 /// and returning `Result<ResultDocument, ComponentError>` — the same documents a byte-pipe binding
 /// would carry, passed as in-memory values instead.
-pub trait TransportComponent {
+///
+/// `Send + Sync`: component-interfaces spec §3.4 — "the engine names instances, one component
+/// answers all of them" — is exactly the shape a live passive exchange needs (plan task 4.5): the
+/// engine polls a running instance for inbound traffic from a background thread while the
+/// protocol dispatch thread may concurrently arm a different interaction against it, so a
+/// component must be safely callable from more than one thread. `HttpTransport`'s own
+/// `Mutex<HashMap<...>>` is exactly this contract already; the bound just makes it a requirement
+/// rather than an accident.
+// `Send`/`Sync` qualified with `::std::marker` because this module's own `Send` request struct
+// (below) would otherwise shadow the auto trait of the same name.
+pub trait TransportComponent: ::std::marker::Send + ::std::marker::Sync {
   fn start(&self, req: Start) -> Result<StartResult, ComponentError>;
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError>;
   fn send(&self, req: Send) -> Result<SendResult, ComponentError>;

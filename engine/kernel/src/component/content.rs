@@ -68,8 +68,10 @@ pub struct DetectResult {
   pub confidence: Option<f64>,
 }
 
-/// Native binding (spec §9.1), same shape as [`super::transport::TransportComponent`].
-pub trait ContentComponent {
+/// Native binding (spec §9.1), same shape as [`super::transport::TransportComponent`] —
+/// including its `Send + Sync` bound, for the same reason (plan task 4.5's live exchange loop
+/// calls `decode`/`encode` from a background thread while the dispatch thread runs concurrently).
+pub trait ContentComponent: Send + Sync {
   fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError>;
   fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError>;
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError>;

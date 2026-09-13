@@ -1180,6 +1180,8 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 name = "pact_janus_cli"
 version = "0.0.0"
 dependencies = [
+ "pact_janus_component_http",
+ "pact_janus_component_json",
  "pact_janus_kernel",
  "serde_json",
 ]
@@ -1222,6 +1224,8 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "jsonschema",
+ "pact_janus_component_http",
+ "pact_janus_component_json",
  "pact_models",
  "pretty_assertions",
  "regex",

@@ -76,6 +76,13 @@ npm run lint         # ESLint
 
 JVM — from `sdks/jvm/`: `./gradlew build test`.
 
+`janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
+Rust commands above (`cargo build -p pact_janus_cli --bin janus-engine` targets it alone). Its
+protocol-level Node test client — plan task 4.5's "thin test client speaks the protocol directly,"
+not an SDK (`sdks/README.md` stays empty until Phase 6) — lives at `cli/tests/janus-engine-node/`:
+`npm install` once, then `npm test` (rebuilds the binary itself in a `beforeAll`, so it never runs
+against a stale one).
+
 ## Architecture rules
 
 - The kernel knows nothing about HTTP or JSON: transports, content handlers, matchers/generators and

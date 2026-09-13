@@ -3,18 +3,29 @@
 //! additional rules" beyond the call pipe itself) — JSON bytes in, JSON bytes out — deliberately
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
-use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, Variants};
+use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
+use crate::component::{ContentComponent, TransportComponent};
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::panic::{self, AssertUnwindSafe};
+use std::sync::Arc;
 
 pub struct Engine {
   hello_done: bool,
   sessions: SessionStore,
+  /// Transport components this embedding registered, by name (component-interfaces spec §3.4,
+  /// design 2.6) — empty for a plain [`Engine::new`], which is a legitimate engine that simply
+  /// answers `start-transport` with `component-unavailable` for anything named.
+  transports: HashMap<String, Arc<dyn TransportComponent>>,
+  /// The one content component this embedding registered, if any (plan task 4.5's exchange loop;
+  /// [`crate::plan::resolve`]'s own "single slot, not a registry" simplification, reused here).
+  content: Option<Arc<dyn ContentComponent>>,
+  next_transport: u64,
 }
 
 impl Default for Engine {
@@ -24,10 +35,33 @@ impl Default for Engine {
 }
 
 impl Engine {
+  /// An engine with no components registered — `start-transport` always answers
+  /// `component-unavailable`. What every test and the protocol skeleton used before plan task 4.5
+  /// needed, and still all `consumer-session/*` operations short of a live exchange need.
   pub fn new() -> Self {
     Engine {
       hello_done: false,
       sessions: SessionStore::default(),
+      transports: HashMap::new(),
+      content: None,
+      next_transport: 0,
+    }
+  }
+
+  /// An engine wired to real components (plan task 4.5) — what an embedding (the CLI's subprocess
+  /// binary, an SDK's native binding) builds so `start-transport` and the live exchange loop it
+  /// drives have something to call. The kernel never depends on `transports`/`content`'s own
+  /// crates (CLAUDE.md's B3); this is the injection point that keeps it that way.
+  pub fn with_components(
+    transports: HashMap<String, Arc<dyn TransportComponent>>,
+    content: Option<Arc<dyn ContentComponent>>,
+  ) -> Self {
+    Engine {
+      hello_done: false,
+      sessions: SessionStore::default(),
+      transports,
+      content,
+      next_transport: 0,
     }
   }
 
@@ -89,6 +123,7 @@ impl Engine {
       "consumer-session/create" => self.handle_create(id, body),
       "consumer-session/add-interaction" => self.handle_add_interaction(id, body),
       "consumer-session/variants" => self.handle_variants(id, body),
+      "consumer-session/start-transport" => self.handle_start_transport(id, body),
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
@@ -167,6 +202,31 @@ impl Engine {
     }
   }
 
+  fn handle_start_transport(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: StartTransport = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(component) = self.transports.get(&req.transport).cloned() else {
+      return ResponseFrame::err(id, EngineError::component_unavailable(&req.transport));
+    };
+    let Some(session) = self.sessions.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    self.next_transport += 1;
+    let instance = format!("t-{}", self.next_transport);
+    match session.start_transport(
+      &req.transport,
+      component,
+      self.content.clone(),
+      instance,
+      req.options,
+    ) {
+      Ok(endpoint) => ResponseFrame::ok(id, json!({ "endpoint": endpoint })),
+      Err(err) => ResponseFrame::err(id, EngineError::component_failed(&req.transport, &err)),
+    }
+  }
+
   fn handle_serve_variant(&mut self, id: String, body: Value) -> ResponseFrame {
     let req: ServeVariant = match parse_body(body) {
       Ok(req) => req,
@@ -191,9 +251,10 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    let Some(session) = self.sessions.end(&req.session) else {
+    let Some(mut session) = self.sessions.end(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
+    session.stop_transports();
     let results = session.results();
     match session.contract() {
       Ok(Some(contract)) => {

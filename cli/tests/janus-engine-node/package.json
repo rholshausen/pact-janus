@@ -1,0 +1,16 @@
+{
+  "name": "janus-engine-node-test",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Plan task 4.5: a thin Node test client speaking the engine protocol directly over the janus-engine subprocess binary's Content-Length stdio framing (engine-protocol spec Sec3.2) - not an SDK (sdks/README.md keeps that empty until Phase 6), the same 'prove the protocol is sufficient before DSLs exist' role the Rust integration test plays in-process.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.0",
+    "@types/node": "^22.10.0"
+  }
+}

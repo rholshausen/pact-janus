@@ -2,6 +2,8 @@
 //! Everything a session allocates — here, its interactions — is released when the session ends;
 //! there is no per-object cleanup call (spec §7.1).
 
+use super::exchange::{self, ArmedExchange, ExchangeState};
+use crate::component::{ComponentError, ContentComponent, Start, Stop, TransportComponent};
 use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
@@ -9,6 +11,9 @@ use crate::plan::{self, Assignment, Plan};
 use crate::variant::{Selected, SelectionReport, VariantError, generate, select};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
 
 /// The variant a `serve-variant` call has most recently armed for one interaction (variant-
 /// semantics spec §4.1): its id, and the concrete payload the generator produced for it, ready
@@ -42,9 +47,9 @@ pub(crate) struct InteractionEntry {
   /// replaces it).
   pub armed: Option<Armed>,
   /// Variants actually exercised (variant-semantics spec §4.2), keyed by variant id — what
-  /// `results` and `contract` read. Nothing populates this yet: driving it from a completed
-  /// transport exchange is plan task 4.5's gap, not this one's; until then only
-  /// [`ConsumerSession::record_exercised`]'s test callers do.
+  /// `results` and `contract` read. Populated by [`ConsumerSession::stop_transports`] draining
+  /// the live exchange loop's evidence (plan task 4.5), or directly by
+  /// [`ConsumerSession::record_exercised`]'s test callers for a session with no transport bound.
   pub exercised: BTreeMap<String, Exercised>,
 }
 
@@ -61,10 +66,19 @@ pub(crate) struct Exercised {
 /// "skipped" from "never got there", and nothing should.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ExchangeOutcome {
-  #[allow(dead_code)]
   Verified,
-  #[allow(dead_code)]
   Failed,
+}
+
+/// One transport instance bound to this session by `consumer-session/start-transport` (spec §8.2):
+/// the running background exchange loop ([`exchange::run`]), and what stops it cleanly.
+pub(crate) struct TransportRun {
+  pub instance: String,
+  pub kind: String,
+  component: Arc<dyn TransportComponent>,
+  stop: Arc<AtomicBool>,
+  state: Arc<Mutex<ExchangeState>>,
+  handle: Option<JoinHandle<()>>,
 }
 
 /// `consumer-session/variants` (variant-semantics spec §3.9): a malformed policy vs. an unknown
@@ -93,6 +107,9 @@ pub(crate) struct ConsumerSession {
   interactions: BTreeMap<String, InteractionEntry>,
   order: Vec<String>,
   next_handle: u64,
+  /// Transports bound by `start-transport` (spec §8.2), each driving its own background exchange
+  /// loop (plan task 4.5). A session MAY start several; `serve_variant` arms every `"http"` one.
+  transports: Vec<TransportRun>,
 }
 
 impl ConsumerSession {
@@ -104,6 +121,7 @@ impl ConsumerSession {
       interactions: BTreeMap::new(),
       order: Vec::new(),
       next_handle: 1,
+      transports: Vec::new(),
     }
   }
 
@@ -130,6 +148,75 @@ impl ConsumerSession {
     Ok(handle)
   }
 
+  /// `consumer-session/start-transport` (spec §8.2): starts `component` under engine-assigned
+  /// `instance`, then spawns the background exchange loop (plan task 4.5, [`exchange::run`]) that
+  /// actually drives it — `poll-inbound` blocks, so nothing on the dispatch thread can pump it.
+  /// Returns the transport's endpoint descriptor.
+  pub fn start_transport(
+    &mut self,
+    kind: &str,
+    component: Arc<dyn TransportComponent>,
+    content: Option<Arc<dyn ContentComponent>>,
+    instance: String,
+    options: Option<Value>,
+  ) -> Result<Value, ComponentError> {
+    let result = component.start(Start {
+      instance: instance.clone(),
+      kind: kind.to_string(),
+      role: "serve".to_string(),
+      options,
+    })?;
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let state = Arc::new(Mutex::new(ExchangeState::default()));
+    let thread_component = Arc::clone(&component);
+    let thread_stop = Arc::clone(&stop);
+    let thread_state = Arc::clone(&state);
+    let thread_instance = instance.clone();
+    let handle = thread::spawn(move || {
+      exchange::run(
+        thread_component,
+        content,
+        thread_instance,
+        thread_stop,
+        thread_state,
+      );
+    });
+
+    self.transports.push(TransportRun {
+      instance,
+      kind: kind.to_string(),
+      component,
+      stop,
+      state,
+      handle: Some(handle),
+    });
+    Ok(result.endpoint)
+  }
+
+  /// `consumer-session/finalise` (spec §7.1, §8.2): "transports stopped, all state released."
+  /// Signals every bound transport's exchange loop to stop, tells the component itself to stop
+  /// (which also unblocks a loop mid-`poll-inbound`, since the instance then stops existing),
+  /// joins each loop thread, and drains its recorded evidence into the interactions it belongs to
+  /// — after this, `results`/`contract` see exactly what really happened on the wire.
+  pub fn stop_transports(&mut self) {
+    for mut run in self.transports.drain(..) {
+      run.stop.store(true, Ordering::Relaxed);
+      let _ = run.component.stop(Stop {
+        instance: run.instance.clone(),
+      });
+      if let Some(handle) = run.handle.take() {
+        let _ = handle.join();
+      }
+      let outcomes = std::mem::take(&mut run.state.lock().expect("exchange state lock poisoned").outcomes);
+      for ((handle, variant_id), exercised) in outcomes {
+        if let Some(entry) = self.interactions.get_mut(&handle) {
+          entry.exercised.insert(variant_id, exercised);
+        }
+      }
+    }
+  }
+
   /// `consumer-session/variants` (variant-semantics spec §3.9): resolve the layered policy
   /// (defaults, session config, this call's override — spec §3.8) against the interaction's
   /// variant space, run the selection algorithm, cache it as this interaction's current
@@ -154,9 +241,11 @@ impl ConsumerSession {
   }
 
   /// `consumer-session/serve-variant` (spec §4.1, §8.2): arm the named variant of a previously
-  /// selected interaction, generating its concrete payload now (plan task 4.3's generator). No
-  /// transport is bound to a session yet, so arming stops at recording the variant and its
-  /// payload — a future task wires this into an actual passive/emissive exchange.
+  /// selected interaction, generating its concrete payload now (plan task 4.3's generator). For a
+  /// passive HTTP interaction with a transport bound, this also arms every `"http"` transport's
+  /// exchange loop (plan task 4.5) with the pinned request plan to match and the response to
+  /// answer with; an emissive interaction, or one with no transport bound, stops at recording the
+  /// arming, exactly as before.
   pub fn serve_variant(&mut self, handle: &str, variant_id: &str) -> Result<(), ServeVariantError> {
     let Some(entry) = self.interactions.get_mut(handle) else {
       return Err(ServeVariantError::HandleNotFound);
@@ -178,8 +267,26 @@ impl ConsumerSession {
     let parts = generate::interaction(&entry.spec, &assignment);
     entry.armed = Some(Armed {
       variant: variant_id.to_string(),
-      parts,
+      parts: parts.clone(),
     });
+
+    let is_passive_http = entry
+      .spec
+      .transport
+      .as_ref()
+      .is_some_and(|t| t.kind == "http" && t.mode.as_deref() != Some("emissive"));
+    if is_passive_http {
+      let request_plan = plan::compile(&entry.spec, &assignment, Some(variant_id));
+      for run in self.transports.iter().filter(|run| run.kind == "http") {
+        let mut state = run.state.lock().expect("exchange state lock poisoned");
+        state.armed = Some(ArmedExchange {
+          handle: handle.to_string(),
+          variant_id: variant_id.to_string(),
+          request_plan: request_plan.clone(),
+          response_parts: parts.clone(),
+        });
+      }
+    }
     Ok(())
   }
 
