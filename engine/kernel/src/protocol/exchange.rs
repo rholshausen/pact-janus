@@ -101,6 +101,10 @@ fn handle_inbound(
 ) {
   let armed = state.lock().expect("exchange state lock poisoned").armed.take();
   let Some(armed) = armed else {
+    // Plan task 4.6's own finding: this is the one line that names an arrival at all when
+    // nothing was armed for it — without it, a request that missed its `serve-variant` window
+    // entirely (a race, a typo'd variant id upstream) leaves no trace anywhere.
+    tracing::warn!(instance, event = %inbound.event, "inbound request arrived with nothing armed; answering unmatched");
     let _ = transport.dispose(Dispose {
       instance: instance.to_string(),
       event: inbound.event,
@@ -113,6 +117,18 @@ fn handle_inbound(
   let executed = execute(&armed.request_plan, &resolver);
   let request_subtree = find_container(&executed, "request").unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
+
+  // The one line plan task 4.6's report leans on: `RUST_LOG=debug` names the variant a failure
+  // belongs to, which nothing else on this loop's own thread does — a consumer's own crash
+  // handling this response has no way to ask the engine "which variant was that" after the fact.
+  match status {
+    Status::Matched => {
+      tracing::debug!(instance, handle = %armed.handle, variant = %armed.variant_id, "request matched the armed variant")
+    }
+    Status::Mismatched => {
+      tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, ?mismatches, "request did not match the armed variant")
+    }
+  }
 
   let reply_parts = match status {
     Status::Matched => response_parts(&armed.response_parts, content),

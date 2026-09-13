@@ -503,6 +503,19 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 
 ## 15. Immediate next steps
 
-1. Review/adjust this plan (especially the non-goals in §1 and the SDK language pair in the Phase 6 intro).
-2. Execute Phase 0: charter (0.1), ADR log (0.2), workspace scaffolding (0.3), reuse inventory (0.4).
-3. Kick off spikes 1.1 and 1.2 — everything downstream waits on G1.
+Phases 0–4 are done: foundations and reuse inventory (Phase 0); the de-risking spikes and gate G1
+(Phase 1); the full Phase 2 design round, every spec final and its ADRs accepted; the kernel's
+match-and-explain path (Phase 3, closing **M1**); and the consumer flow end-to-end with variants
+(Phase 4, tasks 4.1–4.6, closing **M2** — session lifecycle, the HTTP transport and JSON content
+components, variant machinery, Janus contract writing, the live passive exchange proven against the
+real engine over both an in-process and a subprocess embedding, and the variant-ergonomics report).
+
+Next: **Phase 5 — Provider verification** (§8), closing **M3**:
+
+1. 5.1 `verify` operation: source (pact file/dir) → target (running provider), the event stream
+   from design 2.1.
+2. 5.2 Request-variant replay and response shape matching, with variant-pinned provider states.
+3. 5.3 Hooks (`state-setup`, `before-request`) configured from `verifier.janus.yaml`.
+4. 5.4 v3/v4 verification through the plan path from 3.5 — providers upgrade first at no cost.
+5. 5.5 CLI: `janus verify`/`explain --executed`/`upgrade`.
+6. 5.6 Sample provider for M3/M5 and demos.
