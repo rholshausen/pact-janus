@@ -173,6 +173,19 @@ impl EngineError {
     }
   }
 
+  /// `contract-invalid` (contract-file spec §11, §4.2): the session's own state could never
+  /// validly produce a contract — currently only two interactions sharing a description and
+  /// state list. `problems` carries RFC 6901 pointers into the contract that would have been
+  /// written.
+  pub fn contract_invalid(problems: &[crate::error::Problem]) -> Self {
+    EngineError {
+      code: "contract-invalid".to_string(),
+      category: "document".to_string(),
+      message: "the session's interactions cannot produce a valid contract".to_string(),
+      details: Some(serde_json::json!({ "problems": problems })),
+    }
+  }
+
   /// `internal` (spec §10.1): the dispatch boundary's own panic-catch. A panic reaching this
   /// constructor is itself a bug — it exists so a panic never crosses the pipe.
   pub fn internal(message: impl Into<String>) -> Self {

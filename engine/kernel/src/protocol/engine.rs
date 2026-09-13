@@ -194,7 +194,15 @@ impl Engine {
     let Some(session) = self.sessions.end(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
-    ResponseFrame::ok(id, json!({ "results": session.results() }))
+    let results = session.results();
+    match session.contract() {
+      Ok(Some(contract)) => {
+        let contract = serde_json::to_value(&contract).expect("Contract always serializes");
+        ResponseFrame::ok(id, json!({ "results": results, "contract": contract }))
+      }
+      Ok(None) => ResponseFrame::ok(id, json!({ "results": results })),
+      Err(problems) => ResponseFrame::err(id, EngineError::contract_invalid(&problems)),
+    }
   }
 }
 

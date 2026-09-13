@@ -79,6 +79,10 @@ pub struct RecordedSelection {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecordedVariant {
   pub id: String,
+  /// Why this variant is in the selection (variant-semantics spec §3.9's own document); optional
+  /// there, but a writer that computed a selection always has it, so this format always records
+  /// it (contract-file spec examples §3).
+  pub origin: crate::variant::Origin,
   /// The assignment is the truth and `id` is its name (variant-semantics spec §2.2); opaque here.
   pub assignment: Vec<Value>,
   #[serde(skip_serializing_if = "Option::is_none")]

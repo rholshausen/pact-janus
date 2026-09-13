@@ -6,6 +6,7 @@ use pact_janus_kernel::contract::{
   Contract, FORMAT, Interaction, Party, RecordedSelection, RecordedVariant, SlotValue, Transport, ValuePart,
   identify_strict, identify_tolerant, read as read_contract, write_canonical,
 };
+use pact_janus_kernel::variant::Origin;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -84,6 +85,7 @@ fn sample_contract() -> Contract {
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),
+          origin: Origin::Base,
           assignment: vec![],
           states: None,
           parts: variant_parts,

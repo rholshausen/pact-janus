@@ -252,7 +252,7 @@ impl SamplingPolicy {
 // Selection and its report (spec §3.9, `schemas/v1/variant-selection.schema.json`).
 // ---------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Origin {
   Base,
@@ -270,18 +270,27 @@ pub struct Variant {
 }
 
 impl Variant {
-  pub fn to_json(&self, space: &VariantSpace) -> Value {
+  /// The assignment as design 2.3's own document represents it: one `{dimension, point}` entry
+  /// per active dimension, in variant-space order (spec §5.2). Shared by `to_json` (the
+  /// `variants` operation's result) and the contract writer (plan task 4.4, contract-file spec
+  /// §5.2's `RecordedVariant.assignment`) — both need exactly this rendering of the same
+  /// assignment.
+  pub fn assignment_json(&self, space: &VariantSpace) -> Vec<Value> {
     let mut assignment = Vec::new();
     for dim in &space.dimensions {
       if let Some(point) = self.assignment.get(&dim.id) {
         assignment.push(serde_json::json!({ "dimension": dim.id, "point": point }));
       }
     }
+    assignment
+  }
+
+  pub fn to_json(&self, space: &VariantSpace) -> Value {
     serde_json::json!({
       "id": self.id,
       "label": self.label,
       "origin": self.origin,
-      "assignment": assignment,
+      "assignment": self.assignment_json(space),
     })
   }
 }
