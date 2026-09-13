@@ -23,6 +23,11 @@ pact_janus_kernel = { path = "../engine/kernel" }
 pact_janus_component_http = { path = "../engine/component-http" }
 pact_janus_component_json = { path = "../engine/component-json" }
 serde_json = "1"
+# The CLI is where the kernel's `tracing` facade actually goes somewhere (CLAUDE.md: "a subscriber
+# is an application concern, installed by whatever embeds the kernel"). `janus-engine` installs it
+# so `RUST_LOG=trace` shows the frames `Engine::dispatch` traces on every call.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [lints]
 workspace = true

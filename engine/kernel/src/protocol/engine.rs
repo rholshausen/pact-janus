@@ -67,9 +67,18 @@ impl Engine {
 
   /// One frame in, one frame out (spec §4). Never panics: the dispatch boundary catches panics
   /// and converts them to `internal` (§10.1) — a panic reaching a caller would itself be a bug.
+  ///
+  /// Traced at `trace` rather than left to whatever byte-pipe binding wraps this (subprocess,
+  /// WASM, native): this is the one place every pipe's frames pass through regardless of
+  /// encoding, so it is the one place a `RUST_LOG=trace` capture of "what actually crossed the
+  /// wire" can live without instrumenting each binding separately. The embedding installs the
+  /// subscriber (this crate ships only the `tracing` facade); `janus-engine` is one such embedding.
   pub fn dispatch(&mut self, bytes: &[u8]) -> Vec<u8> {
+    tracing::trace!(frame = %String::from_utf8_lossy(bytes), "frame in");
     let response = self.dispatch_bytes(bytes);
-    serde_json::to_vec(&response).expect("ResponseFrame is always representable as JSON")
+    let out = serde_json::to_vec(&response).expect("ResponseFrame is always representable as JSON");
+    tracing::trace!(frame = %String::from_utf8_lossy(&out), "frame out");
+    out
   }
 
   fn dispatch_bytes(&mut self, bytes: &[u8]) -> ResponseFrame {

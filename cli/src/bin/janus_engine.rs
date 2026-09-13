@@ -11,6 +11,12 @@
 //! finding 2). A framing violation (a malformed `Content-Length` header, EOF mid-header) poisons
 //! the stream — there is no way to resynchronise a byte-counted protocol — so it is reported on
 //! stderr and the process exits non-zero rather than guessing at recovery.
+//!
+//! This binary is where the kernel's `tracing` facade actually goes somewhere (CLAUDE.md: "a
+//! subscriber is an application concern, installed by whatever embeds the kernel"): it installs
+//! one reading `RUST_LOG`, writing to stderr so stdout stays frames-only. `Engine::dispatch`
+//! itself already traces every frame at `trace` level, so `RUST_LOG=trace janus-engine` shows
+//! exactly what crossed the wire in both directions with no further wiring needed here.
 
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
@@ -19,12 +25,18 @@ use pact_janus_kernel::protocol::Engine;
 use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::sync::Arc;
+use tracing_subscriber::EnvFilter;
 
 fn main() {
-  eprintln!(
-    "janus-engine starting (pid {}, protocol version {})",
-    std::process::id(),
-    pact_janus_kernel::PROTOCOL_VERSION
+  tracing_subscriber::fmt()
+    .with_writer(std::io::stderr)
+    .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+    .init();
+
+  tracing::info!(
+    pid = std::process::id(),
+    protocol_version = pact_janus_kernel::PROTOCOL_VERSION,
+    "janus-engine starting"
   );
 
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
@@ -43,11 +55,11 @@ fn main() {
         write_frame(&mut writer, &response);
       }
       Ok(None) => {
-        eprintln!("janus-engine: stdin closed, exiting");
+        tracing::info!("stdin closed, exiting");
         std::process::exit(0);
       }
       Err(err) => {
-        eprintln!("janus-engine: framing error: {err}");
+        tracing::error!(%err, "framing error");
         write_frame(
           &mut writer,
           br#"{"type":"response","id":"","error":{"code":"malformed-frame","category":"protocol","message":"malformed Content-Length framing"}}"#,
@@ -114,7 +126,7 @@ fn write_frame(writer: &mut impl Write, frame: &[u8]) {
     .and_then(|_| writer.write_all(frame))
     .and_then(|_| writer.flush());
   if let Err(err) = result {
-    eprintln!("janus-engine: stdout write failed ({err}), exiting");
+    tracing::error!(%err, "stdout write failed, exiting");
     std::process::exit(1);
   }
 }

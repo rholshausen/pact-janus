@@ -93,7 +93,10 @@ normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin ja
 targets it alone). Its own protocol-level Node test client — plan task 4.5's "thin test client
 speaks the protocol directly," not an SDK (`sdks/README.md` stays empty until Phase 6) — lives at
 `cli/tests/janus-engine-node/`: `npm install` once, then `npm test` (rebuilds the binary itself
-via `cargo build` in a `beforeAll`, so it never runs against a stale one).
+via `cargo build` in a `beforeAll`, so it never runs against a stale one). It installs the
+`tracing-subscriber` the kernel's own `tracing` facade needs (CLAUDE.md's Rust conventions below);
+`RUST_LOG=trace janus-engine` logs every frame `Engine::dispatch` sees in both directions to
+stderr (stdout stays frames-only).
 
 ## Architecture rules
 
