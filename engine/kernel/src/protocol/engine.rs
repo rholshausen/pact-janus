@@ -10,7 +10,7 @@ use super::hello::{self, Hello};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
-use crate::hooks::{ConfigError, HookInvoker, HookRunner};
+use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -36,10 +36,11 @@ pub struct Engine {
   /// registry, not the buffer, is where an ended stream stops being findable.
   streams: HashMap<String, Arc<Stream>>,
   next_stream: u64,
-  /// Hook implementations this embedding can run, by kind (lifecycle-hooks spec §8.5: an
+  /// Hook implementations this engine can run, by kind (lifecycle-hooks spec §8.5: an
   /// implementation is an embedding capability, exactly as a component loader is — ADR 0013).
-  /// Empty means a configuration naming any hook at all is refused by name, which is the honest
-  /// answer for an engine that cannot spawn a process or open a socket.
+  /// `script` is always here because the interpreter compiles with the engine (ADR 0015); `exec`
+  /// and `http` are the embedding's to register, and an engine that was handed neither refuses a
+  /// configuration naming them by name.
   hook_invokers: HashMap<String, Arc<dyn HookInvoker>>,
   /// Hook components this embedding registered, by name (`run: { kind: component }`).
   hook_components: HashMap<String, Arc<dyn HookComponent>>,
@@ -70,7 +71,7 @@ impl Engine {
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
-      hook_invokers: HashMap::new(),
+      hook_invokers: builtin_hook_invokers(),
       hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
@@ -93,7 +94,7 @@ impl Engine {
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
-      hook_invokers: HashMap::new(),
+      hook_invokers: builtin_hook_invokers(),
       hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
@@ -519,6 +520,16 @@ fn verify_error(err: VerifyError) -> EngineError {
     VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
     VerifyError::ContractInvalid { problems } => EngineError::contract_invalid(&problems),
   }
+}
+
+/// The implementations every engine has, whatever embeds it: exactly one, `script`, and that is
+/// the property ADR 0015 chose QuickJS for — a scripted hook runs in the WASM component, the
+/// subprocess and the native embedding alike, so a project's hooks are not a function of how its
+/// engine happens to be hosted.
+fn builtin_hook_invokers() -> HashMap<String, Arc<dyn HookInvoker>> {
+  let mut invokers: HashMap<String, Arc<dyn HookInvoker>> = HashMap::new();
+  invokers.insert("script".to_string(), Arc::new(ScriptHooks::new()));
+  invokers
 }
 
 /// [`ConfigError`] as the protocol's taxonomy (lifecycle-hooks spec §11). Two different remedies:

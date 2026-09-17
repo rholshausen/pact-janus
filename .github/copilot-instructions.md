@@ -57,7 +57,9 @@ Documentation/   Plan, ADRs, specs
 
 ## Build, test, and lint commands
 
-Rust — the Cargo workspace root is the repo root:
+Rust — the Cargo workspace root is the repo root. One non-Rust build requirement: **libclang**,
+which `rquickjs`'s bindgen build needs — the kernel embeds QuickJS as the scripted-hook runtime
+(ADR 0015), including in the `wasm32-wasip2` build:
 
 ```bash
 cargo build                                  # build the workspace

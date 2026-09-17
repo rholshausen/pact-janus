@@ -28,9 +28,11 @@ pub mod invoke;
 pub mod points;
 pub mod report;
 pub mod runner;
+pub mod script;
 
 pub use config::{HookConfig, HookEntry, RunSpec, When};
 pub use invoke::{HookFailure, HookInvoker, InvokeResult, Outcome};
 pub use points::{Policy, Scope, point};
 pub use report::{HookReport, Invocation};
 pub use runner::{ConfigError, HookRunner, Occurrence, PointOutcome};
+pub use script::ScriptHooks;

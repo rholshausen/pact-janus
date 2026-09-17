@@ -1,0 +1,59 @@
+# The sample provider's own verifier configuration (lifecycle-hooks spec §6.1, plan task 5.3).
+#
+# Everything a run needs to talk to this provider, in one reviewable page: where its states come
+# from, how it is authenticated, and what else each request should carry. The loader resolves this
+# file — interpolating `${VAR}`, inlining the script, resolving paths against *this* directory —
+# and the engine receives a document with no templates and no file references in it (ADR 0014).
+#
+#   PROVIDER_URL=http://127.0.0.1:8080 janus verify --config samples/order-service/verifier.janus.yaml
+#
+# (`janus verify` is plan task 5.5; until it lands, `engine/kernel/tests/hooks.rs` drives exactly
+# this shape of document through the protocol.)
+
+version: 1
+
+hooks:
+  # Acquire the credential once for the whole run. At `before-request` this would run once per
+  # exchange, and a hundred-variant run would fetch a hundred tokens.
+  before-verification:
+    - name: auth
+      run: { kind: component, component: oauth2 }
+      config:
+        token-url: "${PROVIDER_URL}/oauth/token"
+        client-id: "${CLIENT_ID}"
+        client-secret: "${CLIENT_SECRET}"
+
+  # The provider's own v3 state endpoint, unchanged: `format: pact-state-change` sends it
+  # `{state, params, action}`, exactly what it received before Janus existed. This is B5 in one
+  # entry — the only integration a provider needs to be verifiable.
+  state-setup:
+    - name: fixtures
+      run:
+        kind: http
+        url: "${PROVIDER_URL}/_pact/provider-states"
+        format: pact-state-change
+
+  before-request:
+    # Spend the credential acquired above. `changes` is the declaration that makes this reviewable:
+    # this hook may replace the request's headers slot and nothing else.
+    - name: auth
+      run: { kind: component, component: oauth2 }
+      config:
+        token-url: "${PROVIDER_URL}/oauth/token"
+        client-id: "${CLIENT_ID}"
+        client-secret: "${CLIENT_SECRET}"
+      changes: ["parts.request.headers"]
+
+    # A few lines of JavaScript, for the thing that is genuinely this project's own. Runs in every
+    # embedding, because the interpreter compiles with the engine (ADR 0015).
+    - name: correlation-id
+      run: { kind: script, path: ./hooks/correlation-id.js }
+      config: { prefix: order-service }
+      changes: ["parts.request.headers"]
+
+  state-teardown:
+    - name: fixtures
+      run:
+        kind: http
+        url: "${PROVIDER_URL}/_pact/provider-states"
+        format: pact-state-change

@@ -22,6 +22,12 @@ base64 = "0.22"
 # The facade only — pure Rust, wasm-safe. A subscriber (tracing-subscriber) is an application
 # concern, installed by whatever embeds the kernel (the CLI, a host process), never by this crate.
 tracing = "0.1"
+# The scripted-hook runtime (ADR 0015, lifecycle-hooks spec §9). It compiles *with* the engine on
+# purpose: that is what makes `script` the one hook implementation available in every embedding,
+# including the WASM component (spike 1.6 §4 built rquickjs for wasm32-wasip2 and interrupted a
+# runaway script inside it). `bindgen` is what reaches the WASI targets, and needs libclang at
+# build time — the one non-Rust build requirement this workspace has.
+rquickjs = { version = "0.9", features = ["bindgen"] }
 
 [dev-dependencies]
 rstest = "0.24"

@@ -683,8 +683,9 @@ fn an_implementation_this_engine_cannot_run_is_refused_by_name_before_the_run() 
   assert_eq!(refused["error"]["details"]["hook"], "sign");
   assert_eq!(
     refused["error"]["details"]["implementations"],
-    json!([]),
-    "a degraded run that silently skipped a signing hook is worse than no run"
+    json!(["script"]),
+    "the answer names what this engine *can* run — `script` always, because the interpreter \
+     compiles with the engine (ADR 0015) — rather than skipping the hook and running anyway"
   );
 }
 
@@ -850,4 +851,104 @@ fn a_component_hook_that_was_never_registered_is_refused_before_the_run() {
   assert_eq!(refused["error"]["code"], "hook-unavailable");
   assert_eq!(refused["error"]["details"]["kind"], "component");
   assert_eq!(refused["error"]["details"]["hook"], "auth");
+}
+
+// ---------------------------------------------------------------------------------------------
+// The scripted implementation (plan task 5.3's stretch: the third kind, end to end)
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn a_scripted_hook_signs_every_replayed_request() {
+  let provider = provider_without_auth();
+  let mut engine = engine_with_hooks();
+  let contract = contract_with_two_variants(&mut engine);
+
+  // The script the sample project ships, loaded the way a project loads it: by path, inlined by
+  // the loader, so no file reference crosses the engine boundary.
+  let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .join("../../samples/order-service")
+    .canonicalize()
+    .expect("the sample provider's directory");
+  let config = format!(
+    r#"
+hooks:
+  state-setup:
+    - name: fixtures
+      run: {{ kind: http, url: "{}/_pact/provider-states", format: pact-state-change }}
+  before-request:
+    - name: correlation-id
+      run: {{ kind: script, path: ./hooks/correlation-id.js }}
+      config: {{ prefix: order-service }}
+      changes: ["parts.request.headers"]
+"#,
+    provider.base_url()
+  );
+  let resolved = loader::load_document(&config, &repo, &HashMap::new()).expect("the config resolves");
+  assert!(
+    resolved["hooks"]["before-request"][0]["run"]["source"]
+      .as_str()
+      .is_some_and(|source| source.contains("x-correlation-id")),
+    "the loader inlined the script: {resolved}"
+  );
+
+  let events = verify(&mut engine, contract, provider.base_url(), Some(resolved));
+  for result in results(&events) {
+    assert_eq!(result["status"], json!("verified"), "{result}");
+  }
+  let stamped: Vec<&Value> = summary(&events)["hooks"]["invocations"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .filter(|i| i["hook"] == json!("correlation-id"))
+    .collect();
+  assert_eq!(stamped.len(), 2, "once per exchange");
+  assert_eq!(stamped[0]["implementation"], json!("script"));
+  assert_eq!(stamped[0]["changed"], json!(["parts.request.headers"]));
+}
+
+#[test]
+fn a_scripted_hook_is_available_even_when_the_embedding_registered_nothing() {
+  // `script` needs no registration: the interpreter compiles with the engine, which is the whole
+  // reason ADR 0015 chose it over faster, native-only options.
+  let provider = provider_without_auth();
+  let mut engine = engine_without_hooks();
+  let contract = contract_with_two_variants(&mut engine);
+
+  let hooks = json!({
+    "hooks": { "before-request": [
+      { "name": "stamp",
+        "run": { "kind": "script",
+                 "source": "function hook(ctx) { const h = janus.json(ctx.parts.request.headers) || {};                             h['x-janus'] = [ctx.variant.id];                             return { outcome: 'ok', changes: { 'parts.request.headers': janus.slot(h) } }; }" },
+        "changes": ["parts.request.headers"] } ] }
+  });
+  let events = verify(&mut engine, contract, provider.base_url(), Some(hooks));
+  let invocations = summary(&events)["hooks"]["invocations"].as_array().unwrap();
+  assert_eq!(invocations.len(), 2);
+  assert_eq!(invocations[0]["outcome"], json!("ok"));
+  assert_eq!(invocations[0]["changed"], json!(["parts.request.headers"]));
+}
+
+#[test]
+fn a_runaway_script_is_stopped_by_its_deadline_and_fails_the_exchange() {
+  let provider = provider_without_auth();
+  let mut engine = engine_with_hooks();
+  let contract = contract_with_two_variants(&mut engine);
+
+  let hooks = json!({
+    "hooks": { "before-request": [
+      { "name": "spinner",
+        "run": { "kind": "script", "source": "function hook(ctx) { while (true) {} }" },
+        "timeout-ms": 50 } ] }
+  });
+  let events = verify(&mut engine, contract, provider.base_url(), Some(hooks));
+
+  let results = results(&events);
+  assert_eq!(results[0]["status"], json!("failed"));
+  let invocation = &summary(&events)["hooks"]["invocations"][0];
+  assert_eq!(
+    invocation["outcome"],
+    json!("timed-out"),
+    "a hook that spins must not hang a verification (spec §9.5)"
+  );
+  assert_eq!(invocation["effect"], json!("failed-exchange"));
 }

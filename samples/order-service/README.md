@@ -87,3 +87,18 @@ thing this endpoint says; a provider that never says it still verifies unchanged
 Every state request is recorded in the store's `state_log`, so a demo can show that setup ran once
 per variant — which a verifier MUST do, even for consecutive variants whose parameters are identical
 (variant-semantics spec §6.6).
+
+## Verifying it
+
+[`verifier.janus.yaml`](verifier.janus.yaml) is this provider's own hook configuration
+(lifecycle-hooks spec §6.1) and is the page a reviewer reads to know what a verification run will
+do to it: where its states come from, how it is authenticated, and what else each request carries.
+It uses three of the four implementation kinds — the `oauth2` **component** for the credential, an
+**http** hook in `pact-state-change` format for the states, and a few lines of **script** in
+[`hooks/correlation-id.js`](hooks/correlation-id.js) for the thing that is genuinely this project's
+own.
+
+The loader resolves `${PROVIDER_URL}`, `${CLIENT_ID}` and `${CLIENT_SECRET}` from the environment
+and inlines the script, so the engine receives a document with no templates and no file references
+in it (ADR 0014). `janus verify` is plan task 5.5; until it lands,
+`engine/kernel/tests/hooks.rs` drives exactly this shape of document through the protocol.

@@ -18,6 +18,12 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
+      # The kernel embeds QuickJS for scripted hooks (ADR 0015), and `rquickjs`'s bindgen build —
+      # the one that reaches the WASI targets — needs libclang. The only non-Rust build requirement
+      # this workspace has, installed explicitly so a failure here reads as "the toolchain" rather
+      # than as "the code".
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
