@@ -394,8 +394,9 @@ fn a_contract_this_engine_wrote_verifies_against_a_provider_variant_by_variant()
   assert_eq!(summary["status"], json!("verified"));
   assert_eq!(
     summary["variants"],
-    json!({ "total": 2, "verified": 2, "failed": 0 })
+    json!({ "total": 2, "verified": 2, "failed": 0, "skipped": 0 })
   );
+  assert_eq!(summary["filtered"], json!(false), "the whole recorded sample ran");
   assert_eq!(summary["failures"], json!([]));
 
   // Spec §7.1/§9.1: the run ended itself at the terminal event, and delivering it spent the
@@ -436,7 +437,7 @@ fn a_provider_that_answers_differently_fails_that_variant_with_its_mismatches() 
   assert_eq!(summary["status"], json!("failed"));
   assert_eq!(
     summary["variants"],
-    json!({ "total": 1, "verified": 0, "failed": 1 })
+    json!({ "total": 1, "verified": 0, "failed": 1, "skipped": 0 })
   );
   assert_eq!(
     summary["failures"].as_array().map(Vec::len),
@@ -631,7 +632,7 @@ fn a_run_with_nothing_to_verify_still_reports_a_summary() {
   );
   assert_eq!(
     summary["variants"],
-    json!({ "total": 0, "verified": 0, "failed": 0 })
+    json!({ "total": 0, "verified": 0, "failed": 0, "skipped": 0 })
   );
 }
 
@@ -746,5 +747,439 @@ fn the_sample_providers_auth_is_visible_as_a_failed_variant_until_a_hook_supplie
       .iter()
       .any(|m| m["path"].as_str().is_some_and(|p| p.contains("status"))),
     "a 401 where 200 was recorded is a mismatch on the status slot: {results:?}"
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Variant-bound provider state and filtering (plan task 5.2)
+// ---------------------------------------------------------------------------------------------
+
+/// The order interaction with `shippedAt` optional *and* a `whenVariant` binding on it: the RFC's
+/// `given('an order exists', { shipped: whenVariant('shippedAt', 'present') })`, written as the
+/// document design 2.3 specified for it (variant-semantics spec §6.2).
+fn order_interaction_with_a_bound_state() -> Value {
+  json!({
+    "description": "a request for an order",
+    "transport": { "kind": "http", "mode": "passive" },
+    "states": [{
+      "name": "an order exists",
+      "params": { "id": "66" },
+      "variant-params": [{
+        "name": "shipped",
+        "dimension": "shippedAt",
+        "cases": [ { "point": "present", "value": true }, { "point": "absent", "value": false } ]
+      }]
+    }],
+    "parts": {
+      "request": { "method": { "shape": "equality", "example": "GET" },
+                   "path": { "shape": "equality", "example": "/orders/66" } },
+      "response": { "status": { "shape": "equality", "example": 200 },
+                    "body": { "shape": "object", "members": {
+                      "id": { "shape": "string", "example": "o-1" },
+                      "shippedAt": { "shape": "optional",
+                                     "of": { "shape": "string", "example": "2026-07-30" } } } } }
+    }
+  })
+}
+
+/// Run one interaction through a consumer session against the engine's own mock and return the
+/// contract — the same helper as the round-trip test, parameterised by interaction.
+fn record(engine: &mut Engine, interaction: Value) -> Value {
+  let create = send(
+    engine,
+    "b-1",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  let session = create["ok"]["session"].as_str().unwrap().to_string();
+  let added = send(
+    engine,
+    "b-2",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  let handle = added["ok"]["handle"]
+    .as_str()
+    .unwrap_or_else(|| panic!("add-interaction failed: {added}"))
+    .to_string();
+  let variants = send(
+    engine,
+    "b-3",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let ids: Vec<String> = variants["ok"]["variants"]
+    .as_array()
+    .expect("a selection")
+    .iter()
+    .map(|v| v["id"].as_str().unwrap().to_string())
+    .collect();
+  let started = send(
+    engine,
+    "b-4",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!(
+    "{}:{}",
+    endpoint["host"].as_str().unwrap(),
+    endpoint["port"].as_u64().unwrap()
+  );
+  for (i, id) in ids.iter().enumerate() {
+    send(
+      engine,
+      &format!("b-1{i}"),
+      "consumer-session/serve-variant",
+      json!({ "session": session, "handle": handle, "variant": id }),
+    );
+    let (status, _) = http_get(&addr, "/orders/66");
+    assert_eq!(status, 200, "the mock served '{id}'");
+  }
+  let finalised = send(
+    engine,
+    "b-99",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let contract = finalised["ok"]["contract"].clone();
+  assert!(contract.is_object(), "every variant verified: {finalised}");
+  contract
+}
+
+#[test]
+fn a_bound_state_parameter_is_recorded_resolved_per_variant() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, order_interaction_with_a_bound_state());
+
+  let interaction = &contract["interactions"][0];
+  // The binding itself is recorded on the interaction, resolved to the dimension id — never the
+  // author's shorthand, so a verifier resolves nothing (variant-semantics spec §6.3).
+  assert_eq!(
+    interaction["states"][0]["variant-params"][0]["dimension"], "shippedAt",
+    "the interaction keeps the document as authored"
+  );
+
+  let variants = interaction["selection"]["variants"].as_array().expect("variants");
+  assert_eq!(variants.len(), 2);
+  let resolved: Vec<(&str, &Value)> = variants
+    .iter()
+    .map(|v| (v["id"].as_str().unwrap(), &v["states"][0]["params"]["shipped"]))
+    .collect();
+  // Two variants of one interaction, two different state parameters — the thing `whenVariant`
+  // exists for, recorded as evidence rather than left for the verifier to work out.
+  assert!(
+    resolved.iter().any(|(_, shipped)| *shipped == &json!(true))
+      && resolved.iter().any(|(_, shipped)| *shipped == &json!(false)),
+    "one variant resolves shipped=true and the other false: {resolved:?}"
+  );
+  for variant in variants {
+    assert_eq!(
+      variant["states"][0]["params"]["id"],
+      json!("66"),
+      "the literal parameter rides alongside the bound one, in every variant"
+    );
+  }
+}
+
+#[test]
+fn a_binding_whose_reference_matches_nothing_is_rejected_at_add_interaction() {
+  let mut engine = engine_with_real_components();
+  let create = send(
+    &mut engine,
+    "b-1",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  let session = create["ok"]["session"].as_str().unwrap().to_string();
+
+  let mut interaction = order_interaction_with_a_bound_state();
+  interaction["states"][0]["variant-params"][0]["dimension"] = json!("shipedAt");
+  let refused = send(
+    &mut engine,
+    "b-2",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  assert_eq!(refused["error"]["code"], "interaction-invalid");
+  assert_eq!(
+    refused["error"]["details"]["problems"][0]["pointer"], "/states/0/variant-params/0/dimension",
+    "caught while the author is looking at the DSL that produced it: {refused}"
+  );
+}
+
+#[test]
+fn the_verifier_resolves_the_states_each_variant_needs() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, order_interaction_with_a_bound_state());
+
+  // Two variants: one expects `shippedAt`, one expects it absent. Recorded order is base first.
+  let (base_url, _requests) = stub_provider(vec![
+    canned(200, r#"{"id":"o-1","shippedAt":"2026-07-30"}"#),
+    canned(200, r#"{"id":"o-1"}"#),
+  ]);
+  let started = verify(&mut engine, contract, &base_url);
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  let starts: Vec<&Value> = events
+    .iter()
+    .filter(|e| e["kind"] == json!("verification/interaction-started"))
+    .map(|e| &e["payload"])
+    .collect();
+  assert_eq!(starts.len(), 2);
+  let shipped: Vec<&Value> = starts
+    .iter()
+    .map(|payload| &payload["states"][0]["params"]["shipped"])
+    .collect();
+  assert!(
+    shipped.contains(&&json!(true)) && shipped.contains(&&json!(false)),
+    "the verifier resolved the binding itself, per variant: {shipped:?}"
+  );
+  assert!(
+    events.iter().all(|e| e["kind"] != json!("verification/warning")),
+    "both ends resolved the same binding the same way, so nothing to warn about"
+  );
+  for result in results(&events) {
+    assert_eq!(result["status"], json!("verified"), "{result}");
+  }
+}
+
+#[test]
+fn a_recorded_resolution_that_disagrees_with_this_engines_is_reported() {
+  let mut engine = engine_with_real_components();
+  let mut contract = record(&mut engine, order_interaction_with_a_bound_state());
+
+  // Doctor the recorded evidence: what a contract written by a different implementation of §6.4
+  // would look like. It is not the provider's fault, so it is a warning and not a failed variant —
+  // and it is visible, which is the entire reason resolved values are recorded.
+  contract["interactions"][0]["selection"]["variants"][0]["states"][0]["params"]["shipped"] =
+    json!("yes-definitely");
+
+  let (base_url, _requests) = stub_provider(vec![
+    canned(200, r#"{"id":"o-1","shippedAt":"2026-07-30"}"#),
+    canned(200, r#"{"id":"o-1"}"#),
+  ]);
+  let started = verify(&mut engine, contract, &base_url);
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  let warnings: Vec<&Value> = events
+    .iter()
+    .filter(|e| e["kind"] == json!("verification/warning"))
+    .map(|e| &e["payload"])
+    .collect();
+  assert_eq!(warnings.len(), 1, "one variant disagrees: {events:?}");
+  assert_eq!(warnings[0]["code"], json!("state-resolution-disagreement"));
+  assert_eq!(
+    warnings[0]["recorded"][0]["params"]["shipped"],
+    json!("yes-definitely")
+  );
+  assert_eq!(warnings[0]["resolved"][0]["params"]["shipped"], json!(true));
+  assert_eq!(
+    summary(&events)["status"],
+    json!("verified"),
+    "a disagreement about resolution is not a provider failure"
+  );
+}
+
+#[test]
+fn a_filtered_run_replays_only_what_was_asked_and_says_it_was_filtered() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, order_interaction_with_a_bound_state());
+  let wanted = contract["interactions"][0]["selection"]["variants"][1]["id"]
+    .as_str()
+    .expect("a second variant")
+    .to_string();
+
+  // One canned response only: if the filter did not hold, the run would drive the provider twice
+  // and the second request would hang until its own timeout.
+  let (base_url, requests) = stub_provider(vec![canned(200, r#"{"id":"o-1"}"#)]);
+  let started = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ] },
+      "options": { "variants": [wanted] },
+    }),
+  );
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  assert_eq!(results(&events).len(), 1, "one variant replayed");
+  assert!(
+    requests.recv_timeout(Duration::from_secs(10)).is_ok(),
+    "and the provider saw exactly that one"
+  );
+
+  let summary = summary(&events);
+  assert_eq!(
+    summary["filtered"],
+    json!(true),
+    "a partial run is not a pass, and the summary says so: {summary}"
+  );
+  assert_eq!(
+    summary["variants"],
+    json!({ "total": 2, "verified": 1, "failed": 0, "skipped": 1 }),
+    "the skipped variant is counted, never reported as verified"
+  );
+  assert_eq!(
+    events[0]["payload"]["filtered"],
+    json!(true),
+    "and the run says so from its first event, before any result"
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pinned response matching (plan task 5.2): optional, any-of, one-of
+// ---------------------------------------------------------------------------------------------
+
+/// Verify `contract` against a provider that answers `body` once, and return that variant's result.
+fn verify_one(engine: &mut Engine, contract: Value, variant: &str, body: &'static str) -> Value {
+  let (base_url, _requests) = stub_provider(vec![canned(200, body)]);
+  let started = send(
+    engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ] },
+      "options": { "variant": variant },
+    }),
+  );
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(engine, &stream);
+  results(&events)
+    .first()
+    .map(|payload| (*payload).clone())
+    .unwrap_or_else(|| panic!("no result for variant '{variant}': {events:?}"))
+}
+
+fn variant_ids(contract: &Value) -> Vec<String> {
+  contract["interactions"][0]["selection"]["variants"]
+    .as_array()
+    .expect("variants")
+    .iter()
+    .map(|v| v["id"].as_str().unwrap().to_string())
+    .collect()
+}
+
+#[test]
+fn an_optional_pinned_absent_refuses_a_provider_that_sends_it() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, order_interaction_with_a_bound_state());
+  let ids = variant_ids(&contract);
+  let absent = ids
+    .iter()
+    .find(|id| id.contains("absent"))
+    .unwrap_or_else(|| panic!("a boundary variant where shippedAt is absent: {ids:?}"))
+    .clone();
+
+  let result = verify_one(
+    &mut engine,
+    contract,
+    &absent,
+    r#"{"id":"o-1","shippedAt":"2026-07-30"}"#,
+  );
+  assert_eq!(
+    result["status"],
+    json!("failed"),
+    "pinned to `absent`, the shape admits only absence — a provider that sends the member has not \
+     verified this variant: {result}"
+  );
+}
+
+/// An `any-of` on `status`, which contributes a value dimension with one point per option.
+fn order_interaction_with_an_any_of() -> Value {
+  json!({
+    "description": "a request for an order",
+    "transport": { "kind": "http", "mode": "passive" },
+    "parts": {
+      "request": { "method": { "shape": "equality", "example": "GET" },
+                   "path": { "shape": "equality", "example": "/orders/66" } },
+      "response": { "status": { "shape": "equality", "example": 200 },
+                    "body": { "shape": "object", "members": {
+                      "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"],
+                                  "example": "PENDING" } } } }
+    }
+  })
+}
+
+#[test]
+fn an_any_of_pinned_to_one_option_refuses_the_other() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, order_interaction_with_an_any_of());
+  let ids = variant_ids(&contract);
+  let shipped = ids
+    .iter()
+    .find(|id| id.contains("SHIPPED"))
+    .unwrap_or_else(|| panic!("a variant pinning the SHIPPED option: {ids:?}"))
+    .clone();
+
+  let verified = verify_one(&mut engine, contract.clone(), &shipped, r#"{"status":"SHIPPED"}"#);
+  assert_eq!(verified["status"], json!("verified"));
+
+  let refused = verify_one(&mut engine, contract, &shipped, r#"{"status":"PENDING"}"#);
+  assert_eq!(
+    refused["status"],
+    json!("failed"),
+    "matching the whole any-of would accept PENDING where the consumer demonstrated SHIPPED, and \
+     the variant would have proved nothing: {refused}"
+  );
+}
+
+/// A `one-of` discriminated on `method`: each alternative is a point of the discriminator's own
+/// dimension, and the alternatives' inner dimensions are gated by it.
+fn interaction_with_a_one_of() -> Value {
+  json!({
+    "description": "a payment",
+    "transport": { "kind": "http", "mode": "passive" },
+    "parts": {
+      "request": { "method": { "shape": "equality", "example": "GET" },
+                   "path": { "shape": "equality", "example": "/orders/66" } },
+      "response": { "status": { "shape": "equality", "example": 200 },
+                    "body": { "shape": "one-of", "discriminator": "method",
+                              "alternatives": {
+                                "card": { "shape": "object", "members": {
+                                  "method": { "shape": "equality", "example": "card" },
+                                  "last4": { "shape": "string", "example": "4242" } } },
+                                "invoice": { "shape": "object", "members": {
+                                  "method": { "shape": "equality", "example": "invoice" },
+                                  "reference": { "shape": "string", "example": "INV-1" } } } } } }
+    }
+  })
+}
+
+#[test]
+fn a_one_of_pinned_to_one_alternative_refuses_the_other() {
+  let mut engine = engine_with_real_components();
+  let contract = record(&mut engine, interaction_with_a_one_of());
+  let ids = variant_ids(&contract);
+  let invoice = ids
+    .iter()
+    .find(|id| id.contains("invoice"))
+    .unwrap_or_else(|| panic!("a variant pinning the invoice alternative: {ids:?}"))
+    .clone();
+
+  let verified = verify_one(
+    &mut engine,
+    contract.clone(),
+    &invoice,
+    r#"{"method":"invoice","reference":"INV-1"}"#,
+  );
+  assert_eq!(verified["status"], json!("verified"));
+
+  let refused = verify_one(
+    &mut engine,
+    contract,
+    &invoice,
+    r#"{"method":"card","last4":"4242"}"#,
+  );
+  assert_eq!(
+    refused["status"],
+    json!("failed"),
+    "the discriminator decides which alternative must match, and this variant pinned invoice: {refused}"
   );
 }

@@ -23,10 +23,16 @@
 //! the subprocess binary, the integration tests) is native, so this is a documented gap rather
 //! than a silent one.
 //!
-//! What this task does not do, and 5.2 picks up: resolving `variant-params` provider-state
-//! bindings (`whenVariant`) and the `state-unavailable` status that goes with them, hooks (5.3),
-//! and v1–v4 pacts as a source (5.4 — a non-Janus document is refused by name here, never
-//! misparsed, per ADR 0011).
+//! Provider states are **resolved here, per variant** (variant-semantics spec §6.4, plan task
+//! 5.2) rather than read from the contract's recorded values: resolution is a total function of
+//! the assignment and the binding, so the verifier's own answer must equal the consumer's, and
+//! checking that is free. A disagreement is reported as a warning naming both — it means the two
+//! ends ran different implementations, which is worth knowing and is not the provider's fault.
+//!
+//! What this task does not do, and later ones pick up: running `state-setup` with those resolved
+//! states, and the `state-unavailable` status a hook's `unsupported` outcome produces (5.3, which
+//! is where a hook exists at all); v1–v4 pacts as a source (5.4 — a non-Janus document is refused
+//! by name here, never misparsed, per ADR 0011).
 
 use super::events::Stream;
 use super::wire::{find_container, mismatch_json, parts_resolver};
@@ -35,11 +41,54 @@ use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec};
 use crate::plan::{self, Assignment, Status, execute, outcome};
+use crate::variant::params;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+
+/// Which recorded variants a run replays (variant-semantics spec §5.1). The default is all of
+/// them; a host may narrow it for debugging, and a narrowed run **must be reported as filtered** —
+/// a partial run is not a pass, and a summary that did not say so would read like one.
+#[derive(Debug, Clone, Default)]
+struct Filter {
+  variants: Option<Vec<String>>,
+}
+
+impl Filter {
+  /// `options.variants` (a list) or `options.variant` (one), both naming recorded variant ids.
+  fn from_options(options: Option<&Value>) -> Filter {
+    let Some(options) = options else {
+      return Filter::default();
+    };
+    let listed = options.get("variants").and_then(Value::as_array).map(|ids| {
+      ids
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect::<Vec<_>>()
+    });
+    let single = options
+      .get("variant")
+      .and_then(Value::as_str)
+      .map(|id| vec![id.to_string()]);
+    Filter {
+      variants: listed.or(single),
+    }
+  }
+
+  fn admits(&self, id: &str) -> bool {
+    match &self.variants {
+      None => true,
+      Some(ids) => ids.iter().any(|wanted| wanted == id),
+    }
+  }
+
+  fn is_filtered(&self) -> bool {
+    self.variants.is_some()
+  }
+}
 
 /// How long one replayed request waits for the provider before it counts as a failure of that
 /// variant. A run must terminate even when a provider hangs; the host's own timeout would
@@ -176,10 +225,8 @@ pub(crate) struct Run {
 /// Start the run. Returns immediately (spec §8.3: "`verify` starts a verification session and
 /// returns immediately") — everything after this point is events on `stream`.
 ///
-/// `options` is accepted and carried no further yet: variant filtering and "a filtered run is
-/// reported as filtered" are variant-semantics spec §5.1's, which plan task 5.2 implements. An
-/// option a run ignores is logged rather than silently dropped, so a host is never left believing
-/// it narrowed a run that in fact replayed everything.
+/// `options.variants`/`options.variant` narrow the run (variant-semantics spec §5.1); everything
+/// else in `options` is ignored for now and logged rather than silently dropped.
 pub(crate) fn start(
   contracts: Vec<Contract>,
   targets: Vec<Target>,
@@ -187,11 +234,9 @@ pub(crate) fn start(
   options: Option<Value>,
   stream: Arc<Stream>,
 ) -> Run {
-  if let Some(options) = &options {
-    tracing::warn!(options = %options, "verification options are not honoured yet (plan task 5.2)");
-  }
+  let filter = Filter::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
-  let thread = thread::spawn(move || run(contracts, targets, content, thread_stream));
+  let thread = thread::spawn(move || run(contracts, targets, content, filter, thread_stream));
   Run { stream, thread }
 }
 
@@ -199,6 +244,7 @@ fn run(
   contracts: Vec<Contract>,
   targets: Vec<Target>,
   content: Option<Arc<dyn ContentComponent>>,
+  filter: Filter,
   stream: Arc<Stream>,
 ) {
   let interactions: usize = contracts.iter().map(|c| c.interactions.len()).sum();
@@ -215,6 +261,7 @@ fn run(
       "variants": variants,
       "providers": contracts.iter().map(|c| c.provider.name.clone()).collect::<Vec<_>>(),
       "transports": targets.iter().map(|t| t.kind.clone()).collect::<Vec<_>>(),
+      "filtered": filter.is_filtered(),
     }),
   );
 
@@ -225,9 +272,12 @@ fn run(
         contract,
         index,
         interaction,
-        &targets,
-        content.as_deref(),
-        &stream,
+        &RunContext {
+          targets: &targets,
+          content: content.as_deref(),
+          filter: &filter,
+          stream: &stream,
+        },
         &mut tally,
       );
     }
@@ -247,7 +297,7 @@ fn run(
 
   stream.finish(
     "verification/finished",
-    tally.summary(contracts.len(), interactions),
+    tally.summary(contracts.len(), interactions, &filter),
   );
 }
 
@@ -257,6 +307,9 @@ fn run(
 struct Tally {
   verified: usize,
   failed: usize,
+  /// Variants the filter excluded. Counted, never reported as anything else: an unreplayed variant
+  /// is not a passing one (variant-semantics spec §5.1).
+  skipped: usize,
   failures: Vec<Value>,
 }
 
@@ -272,30 +325,43 @@ impl Tally {
     }
   }
 
-  fn summary(&self, contracts: usize, interactions: usize) -> Value {
+  fn summary(&self, contracts: usize, interactions: usize, filter: &Filter) -> Value {
     json!({
       "status": if self.failed == 0 { "verified" } else { "failed" },
       "contracts": contracts,
       "interactions": interactions,
+      // `filtered` rides in the summary as well as in `started`, because the summary is the
+      // document a report is written from and "verified" without "filtered" beside it would be a
+      // lie of omission.
+      "filtered": filter.is_filtered(),
       "variants": {
-        "total": self.verified + self.failed,
+        "total": self.verified + self.failed + self.skipped,
         "verified": self.verified,
         "failed": self.failed,
+        "skipped": self.skipped,
       },
       "failures": self.failures,
     })
   }
 }
 
+/// Everything one run carries through every interaction and every variant: what it may drive,
+/// what decodes a slot, what it was asked to replay, and where it reports.
+struct RunContext<'a> {
+  targets: &'a [Target],
+  content: Option<&'a dyn ContentComponent>,
+  filter: &'a Filter,
+  stream: &'a Stream,
+}
+
 fn verify_interaction(
   contract: &Contract,
   index: usize,
   interaction: &contract::Interaction,
-  targets: &[Target],
-  content: Option<&dyn ContentComponent>,
-  stream: &Stream,
+  ctx: &RunContext<'_>,
   tally: &mut Tally,
 ) {
+  let (targets, content, filter, stream) = (ctx.targets, ctx.content, ctx.filter, ctx.stream);
   let reference = interaction_ref(contract, index, interaction);
 
   // A shape the engine cannot parse is the contract's problem, not the provider's, and it is
@@ -305,7 +371,12 @@ fn verify_interaction(
   let spec = match interaction_spec(interaction) {
     Ok(spec) => spec,
     Err(problems) => {
-      for variant in &interaction.selection.variants {
+      for variant in interaction
+        .selection
+        .variants
+        .iter()
+        .filter(|v| filter.admits(&v.id))
+      {
         let payload = json!({
           "interaction": reference, "variant": variant.id, "status": "failed",
           "error": { "code": "contract-invalid", "problems": problems },
@@ -325,7 +396,12 @@ fn verify_interaction(
   let Some(target) = targets.iter().find(|target| target.kind == kind) else {
     // Contract-file spec §4.3: an unknown kind is `component-unavailable` naming it, never a
     // silent skip — a verifier that cannot speak an interaction's transport has not verified it.
-    for variant in &interaction.selection.variants {
+    for variant in interaction
+      .selection
+      .variants
+      .iter()
+      .filter(|v| filter.admits(&v.id))
+    {
       let payload = json!({
         "interaction": reference, "variant": variant.id, "status": "failed",
         "error": { "code": "component-unavailable", "component": format!("transport/{kind}") },
@@ -336,16 +412,65 @@ fn verify_interaction(
     return;
   };
 
+  // The variant space is recomputed from the recorded shapes rather than read out of the
+  // contract, because §6.4's agreement claim is only worth anything if both ends derive it the
+  // same way from the same input.
+  let space = plan::variant_space(&spec);
+
   for variant in &interaction.selection.variants {
+    if !filter.admits(&variant.id) {
+      tally.skipped += 1;
+      tracing::debug!(variant = %variant.id, "variant excluded by the run's filter");
+      continue;
+    }
+    let assignment = assignment_of(variant);
+    let states = params::resolve_states(interaction.states.as_ref(), &space, &assignment);
+    if let Some(disagreement) = state_disagreement(states.as_ref(), variant) {
+      // Not a failure of the provider, so not a failed variant: the two ends resolved the same
+      // binding differently, which means they are not the same implementation. Naming both is the
+      // whole value of recording resolved states (§6.4).
+      stream.emit(
+        "verification/warning",
+        json!({
+          "code": "state-resolution-disagreement",
+          "interaction": reference, "variant": variant.id,
+          "resolved": disagreement.0, "recorded": disagreement.1,
+        }),
+      );
+    }
+
     stream.emit(
       "verification/interaction-started",
-      json!({ "interaction": reference, "variant": variant.id, "origin": variant.origin }),
+      json!({
+        "interaction": reference, "variant": variant.id, "origin": variant.origin,
+        // The states this variant needs, resolved (§6.4). Nothing sets them up yet — that is the
+        // `state-setup` hook, plan task 5.3 — so they are reported, which is how a host can see
+        // what a run would have asked for before the hook exists to ask it.
+        "states": states,
+      }),
     );
     let payload = verify_variant(&spec, &reference, variant, target, content);
     let verified = payload["status"] == "verified";
     stream.emit("verification/interaction-result", payload.clone());
     tally.record(verified, (!verified).then_some(payload));
   }
+}
+
+/// This engine's resolution against the one the contract recorded, when they differ (§6.4).
+/// `None` when they agree, or when the contract recorded none — an older writer that recorded no
+/// resolved states is not disagreeing with anything.
+fn state_disagreement(
+  resolved: Option<&Vec<contract::ResolvedState>>,
+  variant: &contract::RecordedVariant,
+) -> Option<(Value, Value)> {
+  let recorded = variant.states.as_ref()?;
+  let resolved = resolved?;
+  (resolved != recorded).then(|| {
+    (
+      serde_json::to_value(resolved).expect("ResolvedState always serializes"),
+      serde_json::to_value(recorded).expect("ResolvedState always serializes"),
+    )
+  })
 }
 
 /// One variant: replay the recorded request, match the reply against the shape pinned to that

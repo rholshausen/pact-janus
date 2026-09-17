@@ -8,7 +8,7 @@ use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
 use crate::plan::{self, Assignment, Plan};
-use crate::variant::{Selected, SelectionReport, VariantError, generate, select};
+use crate::variant::{Selected, SelectionReport, VariantError, generate, params, select};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -129,6 +129,15 @@ impl ConsumerSession {
   /// `InteractionSpecError` a caller maps to `interaction-invalid`.
   pub fn add_interaction(&mut self, interaction: &Value) -> Result<String, InteractionSpecError> {
     let spec = interaction_spec::parse(interaction)?;
+    // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
+    // §6.5): the reference resolves against this interaction's variant space, which does not exist
+    // until the shapes parse, and the author is looking at the DSL that produced it right now.
+    if let Some(states) = &spec.states {
+      let space = plan::variant_space(&spec);
+      if let Err(problems) = params::bind(states, &space, "/states") {
+        return Err(InteractionSpecError { problems });
+      }
+    }
     let compiled = plan::compile(&spec, &Assignment::new(), None);
     let raw_parts = raw_parts(interaction);
     let handle = format!("i-{}", self.next_handle);
@@ -389,7 +398,6 @@ impl ConsumerSession {
       }
 
       let space = plan::variant_space(&entry.spec);
-      let resolved_states = resolve_states(&entry.spec.states);
       let variants = selected
         .variants
         .iter()
@@ -399,7 +407,10 @@ impl ConsumerSession {
             id: v.id.clone(),
             origin: v.origin,
             assignment: v.assignment_json(&space),
-            states: resolved_states.clone(),
+            // Resolved per variant, not once per interaction (variant-semantics spec §6.4): that
+            // is the whole point of a binding, and recording the resolved values is what lets a
+            // verifier's own resolution be checked against this one rather than trusted.
+            states: params::resolve_states(entry.spec.states.as_ref(), &space, &v.assignment),
             parts: to_value_parts(&exercised.parts),
           }
         })
@@ -486,23 +497,6 @@ fn to_value_parts(
       (part.clone(), slots)
     })
     .collect()
-}
-
-/// An interaction's provider states, resolved for recording (contract-file spec §6). Only a
-/// state's literal `params` are handled: resolving a `variant-params` binding against a variant's
-/// assignment (variant-semantics spec §6.3–§6.4) is plan task 5.2's, a gap this function does not
-/// close — a state that carries one is recorded with its literal `params` only, same for every
-/// variant, until then.
-fn resolve_states(states: &Option<Vec<crate::common::State>>) -> Option<Vec<contract::ResolvedState>> {
-  states.as_ref().map(|states| {
-    states
-      .iter()
-      .map(|state| contract::ResolvedState {
-        name: state.name.clone(),
-        params: state.params.clone(),
-      })
-      .collect()
-  })
 }
 
 /// [`SelectionReport`] as the contract format's opaque `report` member (contract-file spec §5.2):

@@ -3,12 +3,12 @@
 //! deterministic sample — the `janus-ipog-v1` algorithm of spec §3.4 — plus the concrete payload
 //! each selected variant produces ([`generate`]).
 //!
-//! What is deliberately **not** here: variant-bound provider state (spec §6, `whenVariant`) is
-//! plan task 5.2's; actually driving a transport from an armed variant (spec §4.1) is wherever
-//! `start-transport` gets wired into [`crate::protocol`] (a gap this module does not close, since
-//! no transport is bound to a consumer session yet).
+//! Variant-bound provider state (spec §6, `whenVariant`) is [`params`], next door: it shares this
+//! module's dimension-reference resolution, which is the machinery a `whenVariant` reference and a
+//! policy pin both need.
 
 pub mod generate;
+pub mod params;
 
 use crate::error::Problem;
 use crate::plan::Assignment;
