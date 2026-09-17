@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_component_http"
-description = "The built-in HTTP transport component, mock (serve-role) side (component-interfaces spec §5, plan task 4.2): a real mock HTTP server behind the transport interface, native binding."
+description = "The built-in HTTP transport component (component-interfaces spec §5): a real mock HTTP server in the serve role (plan task 4.2) and a real HTTP client in the drive role (plan task 5.1), both behind the transport interface, native binding."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,6 +12,10 @@ pact_janus_kernel = { path = "../kernel" }
 # Purely synchronous (blocking recv_timeout maps directly onto poll-inbound's timeout-ms), so this
 # component needs no async runtime at all.
 tiny_http = "0.12"
+# The drive role's client. Blocking like the rest of this component (a `send` is one request and
+# its reply, which is exactly what the interface asks for), so no async runtime enters the tree —
+# `reqwest`'s blocking API would have brought tokio along for the same job.
+ureq = "3"
 serde_json = "1"
 base64 = "0.22"
 

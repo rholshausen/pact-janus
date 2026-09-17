@@ -8,7 +8,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_component_http::HttpTransport;
 use pact_janus_kernel::component::{
-  Dispose, Parts, PollInbound, Reply, Send, SlotValue, Start, Stop, TransportComponent,
+  Dispose, Parts, PollInbound, Reply, SlotValue, Start, Stop, TransportComponent,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -285,26 +285,7 @@ fn poll_inbound_times_out_with_no_arrival() {
     .unwrap();
 }
 
-#[test]
-fn drive_role_is_not_implemented_by_this_task() {
-  let transport = HttpTransport::new();
-  let err = transport
-    .start(Start {
-      instance: "t-5".to_string(),
-      kind: "http".to_string(),
-      role: "drive".to_string(),
-      options: None,
-    })
-    .expect_err("mock-side only (plan task 4.2); drive role is Phase 5");
-  assert_eq!(err.code, "operation-unsupported");
-
-  let err = transport
-    .send(Send {
-      instance: "t-5".to_string(),
-      parts: Parts::new(),
-      await_reply: false,
-      timeout_ms: None,
-    })
-    .expect_err("send is drive-only");
-  assert_eq!(err.code, "operation-unsupported");
-}
+// The drive role's own tests live in `http_drive.rs` (plan task 5.1). What this file used to
+// assert here — that `start`/`send` answer `operation-unsupported` for it — has been replaced by
+// the role-confusion cases there: a *served* instance still refuses `send` by name, which is the
+// part of that assertion that was about the interface rather than about the task order.
