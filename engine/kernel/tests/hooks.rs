@@ -53,6 +53,13 @@ fn engine_with_hooks() -> Engine {
   engine
 }
 
+/// The same, plus the built-in oauth2 hook component for `run: { kind: component }`.
+fn engine_with_the_oauth2_component() -> Engine {
+  let mut engine = engine_with_hooks();
+  engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
+  engine
+}
+
 fn engine_without_hooks() -> Engine {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert(
@@ -758,4 +765,89 @@ fn hook_activity_arrives_as_events_in_run_order() {
   // Every invocation is an event and every event is in the report — one shape, two places.
   let report = summary(&events)["hooks"]["invocations"].as_array().unwrap().len();
   assert_eq!(hook_events(&events).len(), report);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The component implementation (plan task 5.3's "oauth2-shaped built-in component")
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn a_component_hook_acquires_a_credential_once_and_presents_it_on_every_request() {
+  // Auth on, and no token anywhere in the configuration: the component fetches one from the
+  // provider's own token endpoint, at `before-verification`, and spends it at every exchange.
+  let provider = start_provider(ProviderConfig::default()).expect("the sample provider binds");
+  let mut engine = engine_with_the_oauth2_component();
+  let contract = contract_with_two_variants(&mut engine);
+
+  let credentials = json!({
+    "token-url": format!("{}/oauth/token", provider.base_url()),
+    "client-id": pact_janus_sample_order_service::DEFAULT_CLIENT_ID,
+    "client-secret": pact_janus_sample_order_service::DEFAULT_CLIENT_SECRET,
+  });
+  let hooks = json!({
+    "version": 1,
+    "hooks": {
+      "before-verification": [
+        { "name": "auth", "run": { "kind": "component", "component": "oauth2" },
+          "config": credentials } ],
+      "state-setup": [
+        { "name": "fixtures",
+          "run": { "kind": "http", "url": format!("{}/_pact/provider-states", provider.base_url()),
+                   "format": "pact-state-change" } } ],
+      "before-request": [
+        { "name": "auth", "run": { "kind": "component", "component": "oauth2" },
+          "config": credentials, "changes": ["parts.request.headers"] } ]
+    }
+  });
+
+  let events = verify(&mut engine, contract, provider.base_url(), Some(hooks));
+  for result in results(&events) {
+    assert_eq!(
+      result["status"],
+      json!("verified"),
+      "the component's credential got every request past the provider's auth: {result}"
+    );
+  }
+
+  let invocations = summary(&events)["hooks"]["invocations"].as_array().unwrap();
+  let auth: Vec<&Value> = invocations
+    .iter()
+    .filter(|i| i["hook"] == json!("auth"))
+    .collect();
+  assert_eq!(auth.len(), 3, "once at the run point, once per exchange");
+  assert_eq!(auth[0]["implementation"], json!("component"));
+  assert_eq!(auth[0]["point"], json!("before-verification"));
+  assert_eq!(auth[0]["changed"], json!([]), "acquiring changes nothing");
+  assert_eq!(auth[1]["changed"], json!(["parts.request.headers"]));
+
+  let rendered = serde_json::to_string(&summary(&events)["hooks"]).unwrap();
+  assert!(
+    !rendered.contains(DEFAULT_TOKEN) && !rendered.contains("janus-demo-secret"),
+    "neither the token nor the client secret reaches the report: {rendered}"
+  );
+}
+
+#[test]
+fn a_component_hook_that_was_never_registered_is_refused_before_the_run() {
+  let provider = provider_without_auth();
+  // `engine_with_hooks` registers the exec and http kinds but no components at all.
+  let mut engine = engine_with_hooks();
+  let contract = contract_with_two_variants(&mut engine);
+
+  let refused = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract] },
+      "target": {
+        "transports": [ { "transport": "http", "options": { "base-url": provider.base_url() } } ],
+        "hooks": { "hooks": { "before-request": [
+          { "name": "auth", "run": { "kind": "component", "component": "oauth2" } } ] } }
+      }
+    }),
+  );
+  assert_eq!(refused["error"]["code"], "hook-unavailable");
+  assert_eq!(refused["error"]["details"]["kind"], "component");
+  assert_eq!(refused["error"]["details"]["hook"], "auth");
 }

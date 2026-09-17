@@ -36,6 +36,13 @@ const ACCEPT_TIMEOUT: Duration = Duration::from_millis(200);
 /// secret: this is a sample, and a demo that cannot be copy-pasted is not a demo.
 pub const DEFAULT_TOKEN: &str = "janus-demo-token";
 
+/// The client credentials `POST /oauth/token` accepts. The provider has a token endpoint because a
+/// real one does: "acquire a credential, then present it on every request" is the shape plan task
+/// 5.3's oauth2 hook component exists for, and a provider that simply accepted a fixed string
+/// would let that component look simpler than it is.
+pub const DEFAULT_CLIENT_ID: &str = "janus-demo";
+pub const DEFAULT_CLIENT_SECRET: &str = "janus-demo-secret";
+
 #[derive(Debug, Clone)]
 pub struct Config {
   pub host: String,
@@ -202,15 +209,23 @@ fn handle(mut request: tiny_http::Request, store: &Mutex<Store>, token: Option<&
       .any(|header| header.field.equiv("Authorization") && header.value.as_str() == format!("Bearer {token}"))
   });
 
-  let (status, payload) = route(&method, &path, &body, store, authorized);
+  let (status, payload) = route(&method, &path, &body, store, authorized, token);
   respond(request, status, payload);
 }
 
-fn route(method: &str, path: &str, body: &[u8], store: &Mutex<Store>, authorized: bool) -> (u16, Value) {
+fn route(
+  method: &str,
+  path: &str,
+  body: &[u8],
+  store: &Mutex<Store>,
+  authorized: bool,
+  token: Option<&str>,
+) -> (u16, Value) {
   match (method, path) {
     // Unauthenticated on purpose: a health check a verification run can reach before it has a
     // credential is what makes "is the provider up" a different question from "is my auth right".
     ("GET", "/health") => (200, json!({ "status": "up" })),
+    ("POST", "/oauth/token") => oauth_token(body, token),
     ("POST", "/_pact/provider-states") => provider_state(body, store),
     (_, path) if path.starts_with("/orders") => {
       if !authorized {
@@ -223,6 +238,36 @@ fn route(method: &str, path: &str, body: &[u8], store: &Mutex<Store>, authorized
     }
     _ => (404, json!({ "error": "not-found", "path": path })),
   }
+}
+
+/// A client-credentials token endpoint, in the shape the grant actually has: form-encoded
+/// `grant_type`/`client_id`/`client_secret` in, `{access_token, token_type, expires_in}` out. It
+/// hands back whatever token this provider is configured to require, so a run that fetches one and
+/// presents it gets through — and one that presents the wrong credentials does not.
+fn oauth_token(body: &[u8], token: Option<&str>) -> (u16, Value) {
+  let form = String::from_utf8_lossy(body);
+  let mut fields: BTreeMap<&str, &str> = BTreeMap::new();
+  for pair in form.split('&').filter(|pair| !pair.is_empty()) {
+    if let Some((name, value)) = pair.split_once('=') {
+      fields.insert(name, value);
+    }
+  }
+  let id = fields.get("client_id").copied().unwrap_or_default();
+  let secret = fields.get("client_secret").copied().unwrap_or_default();
+  if id != DEFAULT_CLIENT_ID || secret != DEFAULT_CLIENT_SECRET {
+    return (
+      401,
+      json!({ "error": "invalid_client", "error_description": "unknown client credentials" }),
+    );
+  }
+  (
+    200,
+    json!({
+      "access_token": token.unwrap_or(DEFAULT_TOKEN),
+      "token_type": "Bearer",
+      "expires_in": 3600,
+    }),
+  )
 }
 
 fn orders(method: &str, path: &str, body: &[u8], store: &Mutex<Store>) -> (u16, Value) {

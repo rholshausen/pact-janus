@@ -1257,6 +1257,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_component_oauth2"
+version = "0.0.0"
+dependencies = [
+ "pact_janus_kernel",
+ "pact_janus_sample_order_service",
+ "serde_json",
+ "tracing",
+ "ureq",
+]
+
+[[package]]
 name = "pact_janus_corpus"
 version = "0.0.0"
 dependencies = [
@@ -1286,6 +1297,7 @@ dependencies = [
  "jsonschema",
  "pact_janus_component_http",
  "pact_janus_component_json",
+ "pact_janus_component_oauth2",
  "pact_janus_hooks_host",
  "pact_janus_sample_order_service",
  "pact_models",

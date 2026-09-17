@@ -1,0 +1,23 @@
+[package]
+name = "pact_janus_component_oauth2"
+description = "A built-in hook component (component-interfaces spec §8, plan task 5.3): acquires an OAuth2 client-credentials token once per run and presents it on every outbound request."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+# The token fetch. Blocking, like every other client in this prototype: a hook is synchronous by
+# specification (lifecycle-hooks spec §9.4), and the component that needs the network is the one
+# that declares it needs the network.
+ureq = "3"
+tracing = "0.1"
+
+[dev-dependencies]
+pact_janus_sample_order_service = { path = "../../samples/order-service" }
+
+[lints]
+workspace = true
