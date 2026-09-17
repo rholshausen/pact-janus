@@ -32,6 +32,10 @@ pretty_assertions = "1"
 # `TransportComponent`/`ContentComponent` wiring against something that isn't a toy.
 pact_janus_component_http = { path = "../component-http" }
 pact_janus_component_json = { path = "../component-json" }
+# The sample provider (plan task 5.6), embedded rather than spawned: a verification run needs a
+# real provider on a real socket to be worth anything, and the one the plan calls for is in this
+# repo. No cycle — the sample depends on nothing of ours.
+pact_janus_sample_order_service = { path = "../../samples/order-service" }
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }

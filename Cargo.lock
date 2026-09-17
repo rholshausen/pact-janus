@@ -1274,6 +1274,7 @@ dependencies = [
  "jsonschema",
  "pact_janus_component_http",
  "pact_janus_component_json",
+ "pact_janus_sample_order_service",
  "pact_models",
  "pretty_assertions",
  "regex",
@@ -1284,6 +1285,15 @@ dependencies = [
  "serde_path_to_error",
  "test-log",
  "tracing",
+]
+
+[[package]]
+name = "pact_janus_sample_order_service"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "tiny_http",
+ "ureq",
 ]
 
 [[package]]

@@ -5,6 +5,7 @@ members = [
   "engine/component-json",
   "engine/component-http",
   "cli",
+  "samples/order-service",
   "tools/schema-compat",
   "tools/corpus",
 ]

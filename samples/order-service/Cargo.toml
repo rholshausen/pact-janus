@@ -1,0 +1,27 @@
+[package]
+name = "pact_janus_sample_order_service"
+description = "The sample order-service provider (plan task 5.6): a small HTTP provider with deliberate variance, bearer auth and a v3-protocol provider-state endpoint, used for M3, M5 and demos."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "order-service"
+path = "src/main.rs"
+
+[dependencies]
+# The same blocking server the built-in HTTP transport's serve role uses: this provider exists to
+# be driven by a verification run, not to demonstrate a web framework, and a shared dependency
+# keeps the demo's build honest about what it costs.
+tiny_http = "0.12"
+serde_json = "1"
+
+[dev-dependencies]
+# Already in the tree via the HTTP component's drive role, so its own tests cost no new
+# dependencies — they just need an HTTP client that is not the thing under test.
+ureq = "3"
+
+[lints]
+workspace = true

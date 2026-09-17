@@ -634,3 +634,117 @@ fn a_run_with_nothing_to_verify_still_reports_a_summary() {
     json!({ "total": 0, "verified": 0, "failed": 0 })
   );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Against the sample provider (plan task 5.6)
+// ---------------------------------------------------------------------------------------------
+
+/// A contract for the sample provider's seeded order. The response shape deliberately declares
+/// *less* than the provider returns — no `channel`, no `shippedAt` — because the must-ignore rule
+/// is the consumer's side of the same coin as Phase 7's subsumption check: a consumer matches what
+/// it declared and tolerates the rest, and the *checker* is what later reports the difference.
+fn contract_for_the_sample_provider() -> Value {
+  json!({
+    "$format": "janus-contract/1",
+    "consumer": { "name": "web-app" },
+    "provider": { "name": "order-service" },
+    "interactions": [{
+      "description": "a request for an order",
+      "transport": { "kind": "http", "mode": "passive" },
+      "states": [ { "name": "an order exists", "params": { "id": "66" } } ],
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "equality", "example": "/orders/66" }
+        },
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": { "shape": "object", "members": {
+            "id": { "shape": "equality", "example": "66" },
+            "status": { "shape": "string", "example": "PENDING" },
+            "items": { "shape": "each-like", "min": 1,
+                       "items": { "shape": "object", "members": {
+                         "sku": { "shape": "string", "example": "sku-0" },
+                         "quantity": { "shape": "integer", "example": 1 } } } }
+          } }
+        }
+      },
+      "selection": {
+        "variants": [{
+          "id": "base",
+          "origin": "base",
+          "assignment": [],
+          "states": [ { "name": "an order exists", "params": { "id": "66" } } ],
+          "parts": {
+            "request": { "method": { "content": "GET" }, "path": { "content": "/orders/66" } },
+            "response": { "status": { "content": 200 },
+                          "body": { "content": { "id": "66", "status": "PENDING",
+                                                 "items": [ { "sku": "sku-0", "quantity": 1 } ] } } }
+          }
+        }],
+        "report": { "space": { "size": 1, "dimensions": 0 } }
+      }
+    }]
+  })
+}
+
+#[test]
+fn the_engine_verifies_the_sample_provider() {
+  use pact_janus_sample_order_service::{Config, start};
+
+  // Auth off for this run: presenting a credential is plan task 5.3's `before-request` hook, and
+  // wiring it by hand here would prove the hook unnecessary rather than prove the run works.
+  let provider = start(Config {
+    token: None,
+    ..Config::default()
+  })
+  .expect("the sample provider binds");
+
+  let mut engine = engine_with_real_components();
+  let started = verify(
+    &mut engine,
+    contract_for_the_sample_provider(),
+    provider.base_url(),
+  );
+  let stream = started["ok"]["stream"].as_str().expect("a stream id").to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  let results = results(&events);
+  assert_eq!(results.len(), 1);
+  assert_eq!(
+    results[0]["status"],
+    json!("verified"),
+    "the sample provider's seeded order satisfies the recorded shape: {results:?}"
+  );
+  assert_eq!(summary(&events)["status"], json!("verified"));
+}
+
+#[test]
+fn the_sample_providers_auth_is_visible_as_a_failed_variant_until_a_hook_supplies_it() {
+  use pact_janus_sample_order_service::{Config, start};
+
+  // Auth on, and nothing presents a token: the run must report that honestly rather than skip the
+  // interaction. This is the failure plan task 5.3's `before-request` hook exists to remove, and
+  // it is pinned here so that landing the hook has something to change.
+  let provider = start(Config::default()).expect("the sample provider binds");
+
+  let mut engine = engine_with_real_components();
+  let started = verify(
+    &mut engine,
+    contract_for_the_sample_provider(),
+    provider.base_url(),
+  );
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  let results = results(&events);
+  assert_eq!(results[0]["status"], json!("failed"));
+  assert!(
+    results[0]["mismatches"]
+      .as_array()
+      .expect("mismatches")
+      .iter()
+      .any(|m| m["path"].as_str().is_some_and(|p| p.contains("status"))),
+    "a 401 where 200 was recorded is a mismatch on the status slot: {results:?}"
+  );
+}
