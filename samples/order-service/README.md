@@ -73,12 +73,16 @@ Three answers, three different meanings (variant-semantics spec §6.7):
 
 | Status | Meaning |
 |---|---|
-| `200` | the provider is in the state |
-| `422` with `unsupported` and a reason | the provider **cannot reach** that state — the remedy is a contract change, not a code change |
+| `200`, empty or `{}` | the provider is in the state |
+| `200` with `{"outcome": "unsupported", "error": {...}}` | the provider **cannot reach** that state — the remedy is a contract change, not a code change |
 | `500` | the handler is broken, or the state is one this provider has never heard of |
 
-The `422` case is real rather than contrived: asking for `status: SHIPPED` with `shipped: false`
-describes an order that has shipped without a shipping date, and no amount of setup reaches it.
+The middle row is real rather than contrived: asking for `status: SHIPPED` with `shipped: false`
+describes an order that has shipped without a shipping date, and no amount of setup reaches it. It
+is `200` rather than a 4xx deliberately — the verifier reads a non-2xx as a *failed handler*
+(lifecycle-hooks spec §8.4), and the difference between "cannot reach it" and "my handler threw" is
+the difference between a contract change and a bug fix. That outcome body is the only Janus-shaped
+thing this endpoint says; a provider that never says it still verifies unchanged.
 
 Every state request is recorded in the store's `state_log`, so a demo can show that setup ran once
 per variant — which a verifier MUST do, even for consecutive variants whose parameters are identical

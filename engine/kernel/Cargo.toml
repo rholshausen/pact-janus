@@ -36,6 +36,10 @@ pact_janus_component_json = { path = "../component-json" }
 # real provider on a real socket to be worth anything, and the one the plan calls for is in this
 # repo. No cycle — the sample depends on nothing of ours.
 pact_janus_sample_order_service = { path = "../../samples/order-service" }
+# The host side of hooks (plan task 5.3): the `exec` and `http` implementations and the
+# configuration loader. Dev-only for the same reason as the components above — the kernel owns the
+# hook *system* and must not depend on anything that spawns a process or opens a socket.
+pact_janus_hooks_host = { path = "../hooks-host" }
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }

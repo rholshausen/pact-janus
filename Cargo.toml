@@ -4,6 +4,7 @@ members = [
   "engine/kernel",
   "engine/component-json",
   "engine/component-http",
+  "engine/hooks-host",
   "cli",
   "samples/order-service",
   "tools/schema-compat",

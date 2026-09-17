@@ -48,7 +48,9 @@ Three sources are the source of truth and take precedence over this file when th
 ## Intended repository layout
 
 ```
-engine/          Rust workspace members: kernel + built-in component crates
+engine/          Rust workspace members: kernel, built-in component crates, and hooks-host —
+                 the host side of hooks (loader, exec and http implementations), which lives
+                 outside the kernel because it needs a filesystem, a process and a socket
 cli/             `janus` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration)

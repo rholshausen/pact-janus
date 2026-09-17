@@ -317,12 +317,21 @@ fn provider_state(body: &[u8], store: &Mutex<Store>) -> (u16, Value) {
       // The contradiction this provider genuinely cannot produce, and the reason §6.7 exists: an
       // order that has shipped always has a shipping date, so "SHIPPED with no shippedAt" is not a
       // state any amount of setup reaches.
+      //
+      // Answered `200` with an `unsupported` outcome rather than a 4xx, because that is what the
+      // verifier reads as "cannot reach this state" (lifecycle-hooks spec §8.4): a non-2xx is a
+      // *failed* state handler, and the difference between the two is the whole point — one is a
+      // contract change, the other is a bug. This is the only Janus-shaped thing this endpoint
+      // says, and a provider that never says it still verifies unchanged.
       if status == "SHIPPED" && !shipped {
         return (
-          422,
+          200,
           json!({
-            "unsupported": "an order with status SHIPPED always carries shippedAt",
-            "state": state, "params": params,
+            "outcome": "unsupported",
+            "error": {
+              "code": "state-unreachable",
+              "message": "an order with status SHIPPED always carries shippedAt",
+            },
           }),
         );
       }

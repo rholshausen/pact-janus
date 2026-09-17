@@ -394,7 +394,7 @@ fn a_contract_this_engine_wrote_verifies_against_a_provider_variant_by_variant()
   assert_eq!(summary["status"], json!("verified"));
   assert_eq!(
     summary["variants"],
-    json!({ "total": 2, "verified": 2, "failed": 0, "skipped": 0 })
+    json!({ "total": 2, "verified": 2, "failed": 0, "state-unavailable": 0, "skipped": 0 })
   );
   assert_eq!(summary["filtered"], json!(false), "the whole recorded sample ran");
   assert_eq!(summary["failures"], json!([]));
@@ -437,7 +437,7 @@ fn a_provider_that_answers_differently_fails_that_variant_with_its_mismatches() 
   assert_eq!(summary["status"], json!("failed"));
   assert_eq!(
     summary["variants"],
-    json!({ "total": 1, "verified": 0, "failed": 1, "skipped": 0 })
+    json!({ "total": 1, "verified": 0, "failed": 1, "state-unavailable": 0, "skipped": 0 })
   );
   assert_eq!(
     summary["failures"].as_array().map(Vec::len),
@@ -632,7 +632,7 @@ fn a_run_with_nothing_to_verify_still_reports_a_summary() {
   );
   assert_eq!(
     summary["variants"],
-    json!({ "total": 0, "verified": 0, "failed": 0, "skipped": 0 })
+    json!({ "total": 0, "verified": 0, "failed": 0, "state-unavailable": 0, "skipped": 0 })
   );
 }
 
@@ -1022,7 +1022,7 @@ fn a_filtered_run_replays_only_what_was_asked_and_says_it_was_filtered() {
   );
   assert_eq!(
     summary["variants"],
-    json!({ "total": 2, "verified": 1, "failed": 0, "skipped": 1 }),
+    json!({ "total": 2, "verified": 1, "failed": 0, "state-unavailable": 0, "skipped": 1 }),
     "the skipped variant is counted, never reported as verified"
   );
   assert_eq!(

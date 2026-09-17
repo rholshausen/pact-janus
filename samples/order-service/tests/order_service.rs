@@ -138,10 +138,15 @@ fn a_state_the_provider_cannot_reach_is_unsupported_not_an_error() {
             "params": { "id": "66", "status": "SHIPPED", "shipped": false } }),
   );
   assert_eq!(
-    status, 422,
-    "SHIPPED-without-shippedAt is a state no setup reaches (variant-semantics spec §6.7)"
+    status, 200,
+    "'cannot reach that state' is an answer, not an error — a non-2xx would read as a broken \
+     handler (lifecycle-hooks spec §8.4)"
   );
-  assert!(body["unsupported"].is_string(), "with a reason: {body}");
+  assert_eq!(body["outcome"], json!("unsupported"));
+  assert!(
+    body["error"]["message"].is_string(),
+    "with a reason (variant-semantics spec §6.7): {body}"
+  );
 }
 
 #[test]

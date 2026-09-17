@@ -9,7 +9,8 @@ use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
 use super::verification::{self, Run, Target, Verify, VerifyError};
-use crate::component::{ContentComponent, Start, Stop, TransportComponent};
+use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
+use crate::hooks::{ConfigError, HookInvoker, HookRunner};
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -35,6 +36,13 @@ pub struct Engine {
   /// registry, not the buffer, is where an ended stream stops being findable.
   streams: HashMap<String, Arc<Stream>>,
   next_stream: u64,
+  /// Hook implementations this embedding can run, by kind (lifecycle-hooks spec §8.5: an
+  /// implementation is an embedding capability, exactly as a component loader is — ADR 0013).
+  /// Empty means a configuration naming any hook at all is refused by name, which is the honest
+  /// answer for an engine that cannot spawn a process or open a socket.
+  hook_invokers: HashMap<String, Arc<dyn HookInvoker>>,
+  /// Hook components this embedding registered, by name (`run: { kind: component }`).
+  hook_components: HashMap<String, Arc<dyn HookComponent>>,
   /// Verification sessions by id (spec §7.3): one entry per run in flight. A run ends itself at
   /// its terminal event, so nothing here is released by a host operation — [`Engine::handle_poll`]
   /// prunes an entry when its stream's last event is delivered, which is the same edge spec §7.1
@@ -62,6 +70,8 @@ impl Engine {
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
+      hook_invokers: HashMap::new(),
+      hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
     }
@@ -83,9 +93,23 @@ impl Engine {
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
+      hook_invokers: HashMap::new(),
+      hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
     }
+  }
+
+  /// Register a hook implementation this embedding can run (lifecycle-hooks spec §8.5). `exec` and
+  /// `http` arrive this way because spawning a process and opening a socket are things the
+  /// embedding can do and a kernel that must build for `wasm32-wasip2` cannot.
+  pub fn register_hook_invoker(&mut self, kind: impl Into<String>, invoker: Arc<dyn HookInvoker>) {
+    self.hook_invokers.insert(kind.into(), invoker);
+  }
+
+  /// Register a hook component, answering `run: { kind: component, component: <name> }`.
+  pub fn register_hook_component(&mut self, name: impl Into<String>, component: Arc<dyn HookComponent>) {
+    self.hook_components.insert(name.into(), component);
   }
 
   /// One frame in, one frame out (spec §4). Never panics: the dispatch boundary catches panics
@@ -333,10 +357,11 @@ impl Engine {
         options: binding.options.clone(),
       });
       match started {
-        Ok(_endpoint) => targets.push(Target {
+        Ok(started) => targets.push(Target {
           kind: binding.transport.clone(),
           component,
           instance,
+          endpoint: started.endpoint,
         }),
         Err(error) => {
           stop_targets(&targets);
@@ -350,8 +375,45 @@ impl Engine {
 
     self.next_verification += 1;
     let session = format!("vs-{}", self.next_verification);
+
+    // Hooks are resolved and checked **before** the run starts (lifecycle-hooks spec §5.3, §11):
+    // a configuration that could not be understood, or that names an implementation this embedding
+    // cannot run, has no run to report into. Everything after this point is an outcome.
+    let hooks = match &req.target.hooks {
+      None => None,
+      Some(document) => {
+        let run = json!({
+          "id": session,
+          // The parties as the first contract names them: a run over contracts with different
+          // parties is a host's decision to mix them, and a hook that needs to tell them apart
+          // reads `interaction` rather than this.
+          "consumer": contracts.first().map(|c| json!({ "name": c.consumer.name })),
+          "provider": contracts.first().map(|c| json!({ "name": c.provider.name })),
+        });
+        match HookRunner::new(
+          document,
+          self.hook_invokers.clone(),
+          self.hook_components.clone(),
+          run,
+        ) {
+          Ok(runner) => Some(runner),
+          Err(err) => {
+            stop_targets(&targets);
+            return ResponseFrame::err(id, hook_config_error(err));
+          }
+        }
+      }
+    };
+
     let stream = self.open_stream();
-    let run = verification::start(contracts, targets, self.content.clone(), req.options, stream);
+    let run = verification::start(
+      contracts,
+      targets,
+      self.content.clone(),
+      hooks,
+      req.options,
+      stream,
+    );
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
@@ -456,6 +518,19 @@ fn verify_error(err: VerifyError) -> EngineError {
     }
     VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
     VerifyError::ContractInvalid { problems } => EngineError::contract_invalid(&problems),
+  }
+}
+
+/// [`ConfigError`] as the protocol's taxonomy (lifecycle-hooks spec §11). Two different remedies:
+/// a document the author must fix, and an engine that cannot run what the document asks for.
+fn hook_config_error(err: ConfigError) -> EngineError {
+  match err {
+    ConfigError::Invalid(problems) => EngineError::hook_config_invalid(&problems),
+    ConfigError::Unavailable {
+      kind,
+      hook,
+      available,
+    } => EngineError::hook_unavailable(&kind, &hook, &available),
   }
 }
 

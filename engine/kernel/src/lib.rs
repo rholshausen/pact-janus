@@ -8,6 +8,7 @@ mod common;
 pub mod component;
 pub mod contract;
 pub mod error;
+pub mod hooks;
 pub mod interaction_spec;
 pub mod legacy_pact;
 pub mod plan;

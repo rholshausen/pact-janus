@@ -1,0 +1,26 @@
+[package]
+name = "pact_janus_hooks_host"
+description = "The host side of hooks (lifecycle-hooks spec §7–§8, plan task 5.3): the configuration loader, and the exec and http implementations — everything that needs a filesystem, a process or a socket, which is exactly what the kernel does not have."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+# The authored configuration is YAML or JSON (spec §6.1). serde_yaml_ng is the maintained fork of
+# the archived serde_yaml; the parsed document is a serde_json::Value either way, so nothing below
+# the loader knows which form the file was in.
+serde_yaml_ng = "0.10"
+# The `http` implementation's client — already in the tree for the HTTP transport's drive role, and
+# blocking for the same reason: an invocation is one request and its reply.
+ureq = "3"
+tracing = "0.1"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

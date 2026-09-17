@@ -157,6 +157,35 @@ impl EngineError {
     }
   }
 
+  /// `hook-config-invalid` (lifecycle-hooks spec §11): the resolved hook configuration is wrong
+  /// about itself — an unknown point, a duplicate name, a change the point does not permit. A
+  /// document the user authored, so it is reported with positions and before the first exchange:
+  /// a hook failure that happens during a run is an outcome, not an error (§5.3).
+  pub fn hook_config_invalid(problems: &[crate::error::Problem]) -> Self {
+    EngineError {
+      code: "hook-config-invalid".to_string(),
+      category: "document".to_string(),
+      message: "hook configuration is not valid".to_string(),
+      details: Some(serde_json::json!({ "problems": problems })),
+    }
+  }
+
+  /// `hook-unavailable` (lifecycle-hooks spec §11): an implementation kind this embedding cannot
+  /// run, or a `component` hook naming a component nobody registered. In the `component` category
+  /// because "this embedding cannot run that" is the same fact as an unsatisfiable component
+  /// requirement, and a host should handle it the same way — never by running anyway, because a
+  /// degraded run that silently skipped a signing hook is worse than no run.
+  pub fn hook_unavailable(kind: &str, hook: &str, available: &[String]) -> Self {
+    EngineError {
+      code: "hook-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!("hook '{hook}' needs implementation kind '{kind}', which this engine cannot run"),
+      details: Some(serde_json::json!({
+        "kind": kind, "hook": hook, "implementations": available,
+      })),
+    }
+  }
+
   /// `handle-not-found` (spec §10.2): a stale, unknown, or already-ended interaction handle.
   pub fn handle_not_found(handle: &str) -> Self {
     EngineError {
