@@ -20,13 +20,11 @@
 //! wasi-threads or a single-threaded poll model here, not this one unmodified.
 
 use super::session::{ExchangeOutcome, Exercised};
+use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
 use crate::component::{
-  ContentComponent, Decode, Dispose, Encode, Inbound, Part, Parts, PollInbound, Reply, SlotValue,
-  TransportComponent,
+  ContentComponent, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
-use crate::plan::{
-  CapturedValues, Executed, ExecutedKind, Mismatch, Plan, RuntimeValue, Status, execute, outcome,
-};
+use crate::plan::{Mismatch, Plan, Status, execute, outcome};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -113,7 +111,7 @@ fn handle_inbound(
     return;
   };
 
-  let resolver = request_resolver(&inbound.parts, content);
+  let resolver = parts_resolver(&inbound.parts, content);
   let executed = execute(&armed.request_plan, &resolver);
   let request_subtree = find_container(&executed, "request").unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
@@ -157,52 +155,6 @@ fn handle_inbound(
     );
 }
 
-/// The plan-executed tree's named part subtree (`"request"`/`"response"`) — the root
-/// [`execute`](crate::plan::execute) produces is always a container of part containers
-/// (`plan::compile`'s own shape), so this is a one-level lookup, not a general tree search.
-fn find_container<'a>(executed: &'a Executed, label: &str) -> Option<&'a Executed> {
-  let ExecutedKind::Container { children, .. } = &executed.kind else {
-    return None;
-  };
-  children
-    .iter()
-    .find(|child| matches!(&child.kind, ExecutedKind::Container { label: Some(l), .. } if l == label))
-}
-
-/// A resolver over an inbound arrival's wire-form parts (component-interfaces spec §4), decoded to
-/// the document model a plan resolves against — the same `$.<part>.<slot>` paths `plan::compile`
-/// roots every slot at (shape spec §6.2).
-fn request_resolver(parts: &Parts, content: Option<&dyn ContentComponent>) -> CapturedValues {
-  let mut resolver = CapturedValues::new();
-  for (part_name, slots) in parts {
-    for (slot_name, slot_value) in slots {
-      let path = format!("$.{part_name}.{slot_name}");
-      resolver = resolver.capture(path, decode_slot(slot_value, content));
-    }
-  }
-  resolver
-}
-
-/// A wire-form slot's document value: a content component decodes anything it tagged with a
-/// content type (component-interfaces spec §6); everything else — method, path, headers, an
-/// untyped body — is already the document model's own value (contract-file spec §5.3's `json`
-/// default), so it is taken as-is.
-fn decode_slot(slot: &SlotValue, content: Option<&dyn ContentComponent>) -> RuntimeValue {
-  match (&slot.content_type, content) {
-    (Some(content_type), Some(content)) => match content.decode(Decode {
-      content_type: content_type.clone(),
-      value: slot.clone(),
-      options: None,
-    }) {
-      Ok(result) => result.document,
-      // Undecodable is "not there", not a crash: the plan discovers it via `check:exists`/a
-      // failed match, same as any other absent value (plan-grammar spec §2.4).
-      Err(_) => RuntimeValue::Absent,
-    },
-    _ => RuntimeValue::from_json(&slot.content),
-  }
-}
-
 /// The generated `response` payload, wired for reply (component-interfaces spec §4).
 fn response_parts(
   response: &BTreeMap<String, BTreeMap<String, Value>>,
@@ -219,48 +171,12 @@ fn response_parts(
   parts
 }
 
-/// A generated document value, wired for reply: a scalar rides as the transport's plain wire form
-/// (component-http reads `status` this way, no content component involved); anything structured
-/// has no wire form except through a content component's encoding, so it gets one.
-///
-/// Which content type a slot actually wants is really a per-slot property of the interaction's
-/// declared shape (design 2.6) — this loop doesn't have that wiring (the same "single slot, not a
-/// registry" gap [`crate::plan::resolve`] already documents), so it infers structured-vs-scalar
-/// from the generated value instead. Correct for the RFC order interaction's JSON body; whoever
-/// adds a second content type resolves this properly.
-fn encode_slot(value: &Value, content: Option<&dyn ContentComponent>) -> SlotValue {
-  match (value, content) {
-    (Value::Object(_) | Value::Array(_), Some(content)) => match content.encode(Encode {
-      content_type: "application/json".to_string(),
-      document: RuntimeValue::from_json(value),
-      options: None,
-    }) {
-      Ok(result) => result.value,
-      Err(_) => plain_slot(value),
-    },
-    _ => plain_slot(value),
-  }
-}
-
-fn plain_slot(value: &Value) -> SlotValue {
-  SlotValue {
-    content: value.clone(),
-    encoded: None,
-    content_type: None,
-  }
-}
-
 /// The reply sent when the recorded request didn't match what was armed: a `500` naming every
 /// mismatch, so the consumer's own HTTP client sees a clear failure rather than a hang or the
 /// response it did not earn. Refining this into a real "why your request didn't match" experience
 /// is plan task 4.6's job, not this wiring's.
 fn mismatch_reply(mismatches: &[Mismatch], content: Option<&dyn ContentComponent>) -> Parts {
-  let body = Value::Array(
-    mismatches
-      .iter()
-      .map(|m| serde_json::json!({ "path": m.path, "message": m.message }))
-      .collect(),
-  );
+  let body = Value::Array(mismatches.iter().map(mismatch_json).collect());
   let mut part = Part::new();
   part.insert("status".to_string(), plain_slot(&Value::from(500)));
   part.insert("body".to_string(), encode_slot(&body, content));

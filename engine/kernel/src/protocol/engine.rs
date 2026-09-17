@@ -4,16 +4,19 @@
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
 use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
+use super::events::{Event, Poll, Stream};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
-use crate::component::{ContentComponent, TransportComponent};
+use super::verification::{self, Run, Target, Verify, VerifyError};
+use crate::component::{ContentComponent, Start, Stop, TransportComponent};
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct Engine {
   hello_done: bool,
@@ -26,6 +29,18 @@ pub struct Engine {
   /// [`crate::plan::resolve`]'s own "single slot, not a registry" simplification, reused here).
   content: Option<Arc<dyn ContentComponent>>,
   next_transport: u64,
+  /// Live event streams by id (spec §9.1), each belonging to the session whose work produces it.
+  /// Registered when that work starts and removed when its terminal event is *delivered* —
+  /// spec §9.1's "a stream ends when its final event has been delivered", which is why the
+  /// registry, not the buffer, is where an ended stream stops being findable.
+  streams: HashMap<String, Arc<Stream>>,
+  next_stream: u64,
+  /// Verification sessions by id (spec §7.3): one entry per run in flight. A run ends itself at
+  /// its terminal event, so nothing here is released by a host operation — [`Engine::handle_poll`]
+  /// prunes an entry when its stream's last event is delivered, which is the same edge spec §7.1
+  /// makes the session end on.
+  verifications: HashMap<String, Run>,
+  next_verification: u64,
 }
 
 impl Default for Engine {
@@ -45,6 +60,10 @@ impl Engine {
       transports: HashMap::new(),
       content: None,
       next_transport: 0,
+      streams: HashMap::new(),
+      next_stream: 0,
+      verifications: HashMap::new(),
+      next_verification: 0,
     }
   }
 
@@ -62,6 +81,10 @@ impl Engine {
       transports,
       content,
       next_transport: 0,
+      streams: HashMap::new(),
+      next_stream: 0,
+      verifications: HashMap::new(),
+      next_verification: 0,
     }
   }
 
@@ -135,6 +158,8 @@ impl Engine {
       "consumer-session/start-transport" => self.handle_start_transport(id, body),
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
+      "verification/verify" => self.handle_verify(id, body),
+      "events/poll" => self.handle_poll(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
     }
   }
@@ -274,10 +299,293 @@ impl Engine {
       Err(problems) => ResponseFrame::err(id, EngineError::contract_invalid(&problems)),
     }
   }
+
+  /// `verification/verify` (spec §8.3): start a run and answer with its session and stream. Every
+  /// failure *before* the run starts is an error here; everything after it is an event, which is
+  /// spec §10.2's line ("a verification that ran and found mismatches is a successful operation")
+  /// drawn in code.
+  fn handle_verify(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: Verify = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let contracts = match verification::read_source(&req.source) {
+      Ok(contracts) => contracts,
+      Err(err) => return ResponseFrame::err(id, verify_error(err)),
+    };
+
+    // Every target transport is started before the run begins, so an unreachable or
+    // misconfigured provider fails the *call* rather than arriving as a run that verified nothing.
+    let mut targets = Vec::with_capacity(req.target.transports.len());
+    for binding in &req.target.transports {
+      let Some(component) = self.transports.get(&binding.transport).cloned() else {
+        return ResponseFrame::err(
+          id,
+          EngineError::component_unavailable(&format!("transport/{}", binding.transport)),
+        );
+      };
+      self.next_transport += 1;
+      let instance = format!("t-{}", self.next_transport);
+      let started = component.start(Start {
+        instance: instance.clone(),
+        kind: binding.transport.clone(),
+        role: "drive".to_string(),
+        options: binding.options.clone(),
+      });
+      match started {
+        Ok(_endpoint) => targets.push(Target {
+          kind: binding.transport.clone(),
+          component,
+          instance,
+        }),
+        Err(error) => {
+          stop_targets(&targets);
+          return ResponseFrame::err(
+            id,
+            EngineError::component_failed(&format!("transport/{}", binding.transport), &error),
+          );
+        }
+      }
+    }
+
+    self.next_verification += 1;
+    let session = format!("vs-{}", self.next_verification);
+    let stream = self.open_stream();
+    let run = verification::start(contracts, targets, self.content.clone(), req.options, stream);
+    let stream_id = run.stream.id().to_string();
+    self.verifications.insert(session.clone(), run);
+    ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
+  }
+
+  /// Allocate and register a stream for work a session is about to start (spec §9.1: ids are
+  /// engine-assigned, opaque and scoped to their session). The caller keeps the returned handle to
+  /// emit on; the engine keeps its twin so `events/poll` can find it.
+  pub(crate) fn open_stream(&mut self) -> Arc<Stream> {
+    self.next_stream += 1;
+    let stream = Arc::new(Stream::new(format!("s-{}", self.next_stream)));
+    self.streams.insert(stream.id().to_string(), Arc::clone(&stream));
+    stream
+  }
+
+  /// `events/poll` (spec §9.4). Every named stream must be live: an unknown or ended id fails the
+  /// whole call with `stream-not-found` rather than being skipped, because a host that mixed a
+  /// stale id into its list would otherwise read "no events" as "not yet".
+  fn handle_poll(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: Poll = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let mut streams = Vec::with_capacity(req.streams.len());
+    for name in &req.streams {
+      match self.streams.get(name) {
+        Some(stream) => streams.push(Arc::clone(stream)),
+        None => return ResponseFrame::err(id, EngineError::stream_not_found(name)),
+      }
+    }
+
+    let max = req.max();
+    let mut events: Vec<Event> = Vec::new();
+    for stream in &streams {
+      if events.len() >= max {
+        break;
+      }
+      events.extend(stream.drain(max - events.len()));
+    }
+
+    // Long poll (spec §9.4: the engine MAY hold the response). Waiting on the first named stream
+    // rather than all of them keeps this a single wait: a host long-polling several streams at
+    // once still gets everything pending from all of them on the next pass below, and the wait is
+    // a latency optimisation, never a delivery guarantee.
+    if events.is_empty() && req.wait_ms > 0 {
+      if let Some(first) = streams.first() {
+        first.wait_for_event(Duration::from_millis(req.wait_ms));
+      }
+      for stream in &streams {
+        if events.len() >= max {
+          break;
+        }
+        events.extend(stream.drain(max - events.len()));
+      }
+    }
+
+    // Delivery is what ends a stream (spec §9.1), so the registry is pruned here and not by the
+    // producer — and spec §7.1's "a verification session ends automatically when its run reaches a
+    // terminal event" is the same edge, so the session goes with it. Joining the run's thread here
+    // is what makes "everything the session allocated is released" true rather than hopeful: by
+    // the time a host reads `finished`, the run has already stopped its transports.
+    let ended: Vec<String> = self
+      .streams
+      .iter()
+      .filter(|(_, stream)| stream.ended())
+      .map(|(id, _)| id.clone())
+      .collect();
+    for stream_id in &ended {
+      self.streams.remove(stream_id);
+      let sessions: Vec<String> = self
+        .verifications
+        .iter()
+        .filter(|(_, run)| run.stream.id() == stream_id)
+        .map(|(session, _)| session.clone())
+        .collect();
+      for session in sessions {
+        if let Some(run) = self.verifications.remove(&session)
+          && run.thread.join().is_err()
+        {
+          tracing::error!(session = %session, "the verification run's thread panicked");
+        }
+      }
+    }
+
+    ResponseFrame::ok(id, json!({ "events": events }))
+  }
 }
 
 /// An operation's request body, governed by the operation's schema (spec §4.1): a body that
 /// doesn't match it is `malformed-frame`, same as an envelope violation (§4.4).
 fn parse_body<T: DeserializeOwned>(body: Value) -> Result<T, EngineError> {
   serde_path_to_error::deserialize(body).map_err(|err| EngineError::malformed_frame(err.to_string()))
+}
+
+/// [`VerifyError`] as the protocol's own error taxonomy (spec §10.2). Each arm is a different
+/// remedy: a source the engine cannot read is the host using an operation it doesn't have, a
+/// document that is not a contract is a user/authoring problem, and a transport is a component.
+fn verify_error(err: VerifyError) -> EngineError {
+  match err {
+    VerifyError::SourceUnsupported(kind) => {
+      EngineError::operation_unsupported(&format!("verification/verify (source kind: {kind})"))
+    }
+    VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
+    VerifyError::ContractInvalid { problems } => EngineError::contract_invalid(&problems),
+  }
+}
+
+/// Stop whatever was already started when a later target fails to start: a `verify` that returns
+/// an error must leave nothing running (spec §7.1 — there is no session yet to release it).
+fn stop_targets(targets: &[Target]) {
+  for target in targets {
+    let _ = target.component.stop(Stop {
+      instance: target.instance.clone(),
+    });
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// `events/poll` at the dispatch boundary. The stream's own guarantees (ordering, `seq`,
+  /// backpressure) are [`super::events`]'s tests; these cover what only dispatch can show —
+  /// the handshake gate, `stream-not-found` on either reason, and a stream id going invalid at
+  /// the moment its terminal event is delivered.
+  fn send(engine: &mut Engine, op: &str, body: Value) -> Value {
+    let request = json!({ "type": "request", "id": "r-1", "op": op, "body": body });
+    let bytes = engine.dispatch(&serde_json::to_vec(&request).expect("a json! literal serializes"));
+    serde_json::from_slice(&bytes).expect("dispatch always returns valid JSON")
+  }
+
+  fn engine_after_hello() -> Engine {
+    let mut engine = Engine::new();
+    let ok = send(
+      &mut engine,
+      "engine/hello",
+      json!({ "protocol-versions": [1], "host": { "name": "t", "version": "0" }, "capabilities": {} }),
+    );
+    assert_eq!(ok["ok"]["protocol-version"], 1);
+    engine
+  }
+
+  #[test]
+  fn polling_before_the_handshake_is_a_protocol_error() {
+    let mut engine = Engine::new();
+    let err = send(&mut engine, "events/poll", json!({ "streams": ["s-1"] }));
+    assert_eq!(err["error"]["code"], "handshake-required");
+  }
+
+  #[test]
+  fn polling_an_unknown_stream_names_it() {
+    let mut engine = engine_after_hello();
+    let err = send(&mut engine, "events/poll", json!({ "streams": ["s-99"] }));
+    assert_eq!(err["error"]["code"], "stream-not-found");
+    assert_eq!(err["error"]["category"], "session");
+    assert_eq!(err["error"]["details"]["stream"], "s-99");
+  }
+
+  #[test]
+  fn one_stale_id_among_live_ones_fails_the_whole_call() {
+    let mut engine = engine_after_hello();
+    let stream = engine.open_stream();
+    stream.emit("verification/started", json!({}));
+    let id = stream.id().to_string();
+
+    let err = send(&mut engine, "events/poll", json!({ "streams": [id, "s-99"] }));
+    assert_eq!(err["error"]["code"], "stream-not-found");
+    assert_eq!(err["error"]["details"]["stream"], "s-99");
+  }
+
+  #[test]
+  fn events_are_drained_in_order_and_the_stream_id_dies_with_its_terminal_event() {
+    let mut engine = engine_after_hello();
+    let stream = engine.open_stream();
+    let id = stream.id().to_string();
+    stream.emit("verification/started", json!({ "contracts": 1 }));
+    stream.emit("verification/interaction-result", json!({ "status": "verified" }));
+    stream.finish("verification/finished", json!({ "status": "verified" }));
+
+    let first = send(&mut engine, "events/poll", json!({ "streams": [&id], "max": 2 }));
+    let events = first["ok"]["events"].as_array().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["seq"], 1);
+    assert_eq!(events[0]["kind"], "verification/started");
+    assert_eq!(events[1]["seq"], 2);
+    assert_eq!(events[0]["last"], false);
+
+    let second = send(&mut engine, "events/poll", json!({ "streams": [&id] }));
+    let events = second["ok"]["events"].as_array().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["kind"], "verification/finished");
+    assert_eq!(events[0]["last"], true);
+
+    // Delivered, therefore over (spec §9.1) — the same answer as an id that never existed.
+    let third = send(&mut engine, "events/poll", json!({ "streams": [&id] }));
+    assert_eq!(third["error"]["code"], "stream-not-found");
+  }
+
+  #[test]
+  fn an_empty_poll_is_success_not_an_error() {
+    let mut engine = engine_after_hello();
+    let stream = engine.open_stream();
+    let id = stream.id().to_string();
+    let ok = send(&mut engine, "events/poll", json!({ "streams": [id] }));
+    assert_eq!(ok["ok"]["events"], json!([]));
+  }
+
+  #[test]
+  fn a_long_poll_collects_what_a_producer_thread_emits_while_it_waits() {
+    let mut engine = engine_after_hello();
+    let stream = engine.open_stream();
+    let id = stream.id().to_string();
+    let producer = Arc::clone(&stream);
+    let thread = std::thread::spawn(move || {
+      std::thread::sleep(std::time::Duration::from_millis(20));
+      producer.finish("verification/finished", json!({ "status": "verified" }));
+    });
+
+    let ok = send(
+      &mut engine,
+      "events/poll",
+      json!({ "streams": [id], "wait-ms": 5_000 }),
+    );
+    thread.join().expect("producer thread panicked");
+    let events = ok["ok"]["events"].as_array().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["last"], true);
+  }
+
+  #[test]
+  fn stream_ids_are_distinct_within_the_pipe() {
+    let mut engine = engine_after_hello();
+    let first = engine.open_stream().id().to_string();
+    let second = engine.open_stream().id().to_string();
+    assert_ne!(first, second);
+  }
 }

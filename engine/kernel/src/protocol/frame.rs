@@ -125,6 +125,38 @@ impl EngineError {
     }
   }
 
+  /// `stream-not-found` (spec §9.1, §10.2): the stream id is unknown, or its terminal event has
+  /// already been delivered — a stream ends on delivery, and its id is spent from then on. Both
+  /// answer the same way, for the same reason `session-not-found` does: a host holding a stale id
+  /// gets a named error, never silence that reads as "no events yet".
+  pub fn stream_not_found(stream: &str) -> Self {
+    EngineError {
+      code: "stream-not-found".to_string(),
+      category: "session".to_string(),
+      message: format!("event stream '{stream}' does not exist or has ended"),
+      details: Some(serde_json::json!({ "stream": stream })),
+    }
+  }
+
+  /// `contract-version-unsupported` (spec §10.2): the source carried a document this engine does
+  /// not read as a contract. ADR 0011's whole point is that identification comes first, so this is
+  /// the answer for a v1–v4 pact (plan task 5.4 gives those their own path) and for anything else
+  /// that is simply not a contract — naming what was found, because "no `$format`" on its own
+  /// sends a reader looking in the wrong place.
+  pub fn not_a_contract(index: usize, found: Option<&str>) -> Self {
+    EngineError {
+      code: "contract-version-unsupported".to_string(),
+      category: "document".to_string(),
+      message: match found {
+        Some(found) => format!("contract {index} is not a Janus contract (found {found})"),
+        None => format!("contract {index} is not a Janus contract"),
+      },
+      details: Some(
+        serde_json::json!({ "index": index, "found": found, "expected": crate::contract::FORMAT }),
+      ),
+    }
+  }
+
   /// `handle-not-found` (spec §10.2): a stale, unknown, or already-ended interaction handle.
   pub fn handle_not_found(handle: &str) -> Self {
     EngineError {
