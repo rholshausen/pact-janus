@@ -19,8 +19,7 @@
         %expect:only-entries (
           $.request.query
         )
-      ),
-      :headers ()
+      )
     ),
     :response (
       :status (

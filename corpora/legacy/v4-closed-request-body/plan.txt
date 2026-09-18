@@ -53,8 +53,7 @@
           $.response.status,
           201
         )
-      ),
-      :headers ()
+      )
     )
   )
 )

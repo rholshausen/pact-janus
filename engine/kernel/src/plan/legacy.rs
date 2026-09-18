@@ -102,11 +102,8 @@ pub fn compile_request(req: &LegacyRequest) -> super::model::Plan {
       Some("query".to_string()),
       compile_query(&req.query, &req.matching_rules, "request"),
     ),
-    Node::container(
-      Some("headers".to_string()),
-      compile_headers(&req.headers, &req.matching_rules, "request"),
-    ),
   ];
+  slots.extend(compile_headers_slot(&req.headers, &req.matching_rules, "request"));
   if let Some(node) = compile_body_slot(req.body.as_ref(), &req.matching_rules, "request") {
     slots.push(node);
   }
@@ -130,9 +127,10 @@ pub fn compile_response(res: &LegacyResponse) -> super::model::Plan {
       &Value::from(res.status),
     )],
   ));
-  slots.push(Node::container(
-    Some("headers".to_string()),
-    compile_headers(&res.headers, &res.matching_rules, "response"),
+  slots.extend(compile_headers_slot(
+    &res.headers,
+    &res.matching_rules,
+    "response",
   ));
   if let Some(node) = compile_body_slot(res.body.as_ref(), &res.matching_rules, "response") {
     slots.push(node);
@@ -389,6 +387,18 @@ fn compile_scalar_slot(
 }
 
 // --- headers: scalar values, case-insensitive names, no cascading ---
+
+/// The `headers` slot, or nothing when the pact names no headers. v1–v4 headers are open — an
+/// unexpected actual header is never a mismatch — so an empty container would assert nothing and
+/// only add a line to every plan `explain` prints.
+fn compile_headers_slot(
+  headers: &BTreeMap<String, String>,
+  rules: &MatchingRules,
+  part: &str,
+) -> Option<Node> {
+  (!headers.is_empty())
+    .then(|| Node::container(Some("headers".to_string()), compile_headers(headers, rules, part)))
+}
 
 fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, part: &str) -> Vec<Node> {
   let category = rules_for(rules, "header");

@@ -19,8 +19,7 @@
         %expect:only-entries (
           $.request.query => {}
         ) => BOOL(true)
-      ) => BOOL(true),
-      :headers () => BOOL(true)
+      ) => BOOL(true)
     ) => BOOL(true),
     :response (
       :status (

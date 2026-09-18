@@ -19,8 +19,7 @@
         %expect:only-entries (
           $.request.query => {}
         ) => BOOL(true)
-      ) => BOOL(true),
-      :headers () => BOOL(true)
+      ) => BOOL(true)
     ) => BOOL(true),
     :response (
       :status (
@@ -29,7 +28,6 @@
           200
         ) => BOOL(true)
       ) => BOOL(true),
-      :headers () => BOOL(true),
       :body (
         %match:type (
           $.response.body => 7,

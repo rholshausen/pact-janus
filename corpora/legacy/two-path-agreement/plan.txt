@@ -19,8 +19,7 @@
         %expect:only-entries (
           $.request.query
         )
-      ),
-      :headers ()
+      )
     ),
     :response (
       :status (
@@ -29,7 +28,6 @@
           200
         )
       ),
-      :headers (),
       :body (
         %match:type (
           $.response.body,
