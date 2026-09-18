@@ -143,3 +143,63 @@ before any code, with the upgrade then writing `http:media-type` for any `Conten
 - Shape-language spec §3.5 (component operators), §4.3 (must-ignore); component-interfaces spec §7
   (matcher interface), §7.5 (comparability); plan-grammar spec §4.4 (legacy-only actions);
   contract-file spec §8.4 (findings).
+
+## 2. Does an array matcher admit the empty array by default?
+
+**Found:** 2026-09-18, fixing the upgrade of cascaded `min`/`max` rules (commit `e34d686`).
+**Status:** open by choice — the prototype needs only to be consistent. Resolve it when a real test
+framework is built from the prototype (task 9.4).
+
+### The question
+
+When a consumer author writes "an array whose elements are like this one" and says nothing about
+length, is `[]` a match? The Pact community has two long-standing answers:
+
+- **Implicitly bounded.** An `eachLike` promises at least one element — the example the author wrote
+  down is evidence the list is non-empty, and an empty list is a case the consumer never showed it
+  handles.
+- **Explicit bounds only.** A type matcher on an array constrains its elements and nothing else; a
+  length constraint is a separate thing the author states (`min: 1`) or does not.
+
+Pact-JVM answers both ways, with a different DSL operator for each. The disagreement is about what the
+DSL means, not about matching, which is why a prototype cannot settle it by testing.
+
+### Why it matters more in Janus
+
+In Pact, the default decides only what *matches*. In Janus it also decides what is *exercised*:
+`each-like`'s cardinality is a variant dimension (shape-language §5.5, §6.4), and `min: 0` puts the
+empty array into the variant space as a case the consumer must demonstrate it handles. So "admits
+`[]` by default" is also "every array the author writes generates an empty-list variant by default" —
+more variants, and more consumer tests, for every list in every contract. The two schools' positions
+land differently here than they did in Pact: the implicit bound keeps the variant space small; explicit
+bounds make the empty case something the author opts into, visibly.
+
+### Where the prototype stands
+
+| Path | A type rule on an array, no length stated | Admits `[]`? |
+|---|---|---|
+| Native Janus shape | `each-like`, `min` defaults to 1 (shape-language §4.3, §5.5); `min: 0` is explicit | no |
+| v1–v4 pact, verified where it stands (design 3.5 plan) | `match:type` on the array, then each element | yes |
+| Same pact, upgraded (contract-file §8.2) | `each-like` with the default `min: 1` | no |
+| A rule that only *cascades* to a nested array, upgraded | `each-like` with `min: 0` (commit `e34d686`) | yes |
+
+Native Janus is consistent with itself. The seam is the upgrade: a bare `type` on an array in a v1–v4
+pact accepts `[]` in the pact's own plan and rejects it in the contract the pact upgrades into, and the
+upgrade raises no finding for it (`engine/kernel/src/upgrade.rs`, `cardinality`, whose comment chose
+`min: 1` as "the same default `eachLike` has always had"). The contract is stricter, so this produces
+false failures rather than false passes, but it breaks plan-grammar §4.4's two-path agreement for an
+empty array. The cascaded row is not part of the question: no author wrote anything about the nested
+array, so there is no default to interpret, only v1–v4's behaviour to preserve.
+
+### What resolving it involves
+
+1. **The default of `each-like`'s `min`**, in shape-language §4.3/§5.5 — with the variant-space cost
+   above as part of the argument, not an afterthought.
+2. **Whether the SDK DSL offers one array operator or two** (sdk-specification): one with a default,
+   or Pact-JVM's route of separate operators so an author never relies on a default at all.
+3. **How the upgrade maps a bare `type` on an array** (contract-file §8.2): to whatever (1) decides,
+   and, if that differs from v1–v4's "any length", with a finding — `rule-narrowed` (`judgement`)
+   is the existing code that fits — so the two-path disagreement is reported rather than silent.
+
+Until then: leave `each-like`'s default at 1, and treat the upgrade's silent `min: 1` as the known
+inconsistency this entry records.
