@@ -212,10 +212,12 @@ fn a_converted_cardinality_makes_the_space_larger_than_the_selection() {
 // §8.4 — findings
 // ---------------------------------------------------------------------------------------------
 
-/// An empty `findings` list is a claim, and a strong one. This is the pact that earns it: a rule
-/// at every position, no headers, no generators, no request body.
+/// An empty `findings` list is a claim, and a strong one — one no HTTP request can earn, because
+/// its v1–v4 query is closed and a shape cannot close one (ADR 0007). This is the pact that comes
+/// closest: a rule at every position, no headers, no generators, no request body — and the opened
+/// query is the one thing standing between it and exact.
 #[test]
-fn an_empty_findings_list_is_a_claim_the_converter_can_actually_make() {
+fn a_fully_ruled_pact_loses_only_its_closed_query() {
   let pact = pact_with(
     json!({
       "method": "GET", "path": "/orders/66",
@@ -236,10 +238,10 @@ fn an_empty_findings_list_is_a_claim_the_converter_can_actually_make() {
     }),
   );
   let upgraded = upgrade(&pact);
-  assert!(
-    upgraded.findings.is_empty(),
-    "this conversion was exact, and said so: {:?}",
-    upgraded.findings
+  assert_eq!(
+    codes(&upgraded.findings),
+    vec!["request-query-opened"],
+    "everything else converted exactly, and said so"
   );
 }
 
@@ -305,6 +307,30 @@ fn an_opened_request_body_is_reported_because_the_contract_now_admits_more() {
     json!({ "status": 200 }),
   ));
   assert_eq!(find(&upgraded.findings, "request-body-opened").kind, "lossy");
+}
+
+/// The query is closed in v1–v4 whether or not the pact wrote one down: a request with no query
+/// admits none. Both open up in the contract, and both are reported — pointing at the query when
+/// there is one, and at the request when there is nothing else to point at.
+#[test]
+fn an_opened_request_query_is_reported_with_or_without_a_query_in_the_pact() {
+  let without = upgrade(&pact_with(get_slash(), json!({ "status": 200 })));
+  let finding = find(&without.findings, "request-query-opened");
+  assert_eq!(finding.kind, "lossy");
+  assert_eq!(finding.path, "/interactions/0/request");
+  assert_eq!(finding.target, None, "the contract has no query slot to point at");
+
+  let with = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/", "query": "status=open" }),
+    json!({ "status": 200 }),
+  ));
+  let finding = find(&with.findings, "request-query-opened");
+  assert_eq!(finding.kind, "lossy");
+  assert_eq!(finding.path, "/interactions/0/request/query");
+  assert_eq!(
+    finding.target.as_deref(),
+    Some("/interactions/0/parts/request/query")
+  );
 }
 
 /// Header values with no rule are where this conversion is least exact: v1–v4 compared them with

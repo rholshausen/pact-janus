@@ -6,8 +6,8 @@
 //! **Conversion is not required to be lossless, and pretending otherwise would be the failure mode
 //! here** (spec §8.1). The shape language and v1–v4's matcher vocabulary are not in bijection:
 //! there is no intersection operator for an `AND` of two unrelated rules, no way to name most
-//! disjunctions, and v1–v4's own header and closed-request-body defaults are *comparisons* rather
-//! than value sets. Each of those is reported rather than papered over, and an empty `findings`
+//! disjunctions, v1–v4's own header default is a *comparison* rather than a value set, and their
+//! closed request query and body are closures a shape refuses to make (ADR 0007). Each of those is reported rather than papered over, and an empty `findings`
 //! list is a claim — a strong one: this conversion was exact.
 //!
 //! **Why this is not how a pact gets verified.** Plan task 5.4 verifies a pact where it stands,
@@ -353,6 +353,31 @@ impl Conversion {
         &Where::slot(at, "request", "path"),
       ),
     );
+    // v1–v4 request queries are closed — every actual parameter must be one the pact named (spec
+    // test case `query/unexpected param`) — and that holds for a request with no query, which
+    // admits none. A shape can forbid a member it names but never the ones it does not (ADR 0007),
+    // so every converted request admits more than its pact did, and says so.
+    let query_where = Where::slot(at, "request", "query");
+    self.finding(match request.query.as_ref().filter(|query| !query.is_empty()) {
+      Some(_) => Finding::at(
+        "request-query-opened",
+        "lossy",
+        &query_where,
+        "v1–v4 request queries reject parameters the pact did not name; shapes are must-ignore \
+         by design (ADR 0007), so the converted contract admits extra parameters. Add `forbidden` \
+         members if any of them must stay out"
+          .to_string(),
+      ),
+      None => Finding::new(
+        "request-query-opened",
+        "lossy",
+        format!("{at}/request"),
+        "v1–v4 treat a request with no query as one that sends none; shapes are must-ignore by \
+         design (ADR 0007), so the converted contract admits a request with any query parameters \
+         at all. Add a `query` with `forbidden` members if any of them must stay out"
+          .to_string(),
+      ),
+    });
     if let Some(query) = &request.query
       && !query.is_empty()
     {
@@ -367,13 +392,7 @@ impl Conversion {
         .collect();
       part.insert(
         "query".to_string(),
-        self.multi_map_slot(
-          rules,
-          "query",
-          &query,
-          false,
-          &Where::slot(at, "request", "query"),
-        ),
+        self.multi_map_slot(rules, "query", &query, false, &query_where),
       );
     }
     if let Some(headers) = &request.headers

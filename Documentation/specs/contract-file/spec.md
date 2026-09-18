@@ -495,13 +495,17 @@ distinguish), and `note` (neither, and still worth reading).
 | `rule-combination-or` | `lossy` | `combine: "OR"` the shape language cannot name |
 | `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator |
 | `generator-dropped` | `lossy` | a generator with no shape equivalent |
+| `request-body-opened` | `lossy` | a request body was an object: v1–v4 close it to unnamed members, shapes cannot (ADR 0007) |
+| `request-query-opened` | `lossy` | every request: v1–v4 close its query to unnamed parameters — one with no query admits none — and shapes cannot (ADR 0007) |
 | `content-type-inferred` | `judgement` | the pact declared no content type and one was inferred from the body |
 | `body-not-parsed` | `judgement` | a body could not be parsed as its declared content type and was carried as bytes |
 | `state-params-untyped` | `note` | v3 state parameters carried across as-is; the format types them, the pact did not |
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
 | `interaction-dropped` | `lossy` | an interaction could not be converted at all |
 
-An empty `findings` list is a claim, and a strong one: the conversion was exact.
+An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an
+HTTP request can make it, because `request-query-opened` is raised for every one — the loss is real
+on every request, and a list that left it out would make "empty" a claim nobody could trust.
 
 ## 9. Publishing to a broker
 

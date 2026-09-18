@@ -27,6 +27,8 @@
             "rule-combination-or",
             "rule-narrowed",
             "generator-dropped",
+            "request-body-opened",
+            "request-query-opened",
             "content-type-inferred",
             "body-not-parsed",
             "state-params-untyped",

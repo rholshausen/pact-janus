@@ -116,6 +116,9 @@ degenerate case falling out of the arithmetic rather than being special-cased ar
     "path": "/interactions/0/response/generators/body/$.callbackUrl",
     "target": "/interactions/0/parts/response/body/members/callbackUrl",
     "message": "A MockServerURL generator describes the mock server, which a shape has no notion of. The recorded example is kept as an equality constraint; if the provider returns its own base URL there, this interaction will now fail on it." },
+  { "code": "request-query-opened", "kind": "lossy",
+    "path": "/interactions/0/request",
+    "message": "v1-v4 treat a request with no query as one that sends none; shapes are must-ignore by design (ADR 0007), so the converted contract admits a request with any query parameters at all. Add a query with forbidden members if any of them must stay out." },
   { "code": "example-frozen-as-equality", "kind": "note",
     "path": "/interactions/0/response/body/customer/name",
     "target": "/interactions/0/parts/response/body/members/customer/members/name",
@@ -128,10 +131,16 @@ degenerate case falling out of the arithmetic rather than being special-cased ar
 
 ## 4. What to notice
 
-**The two `lossy` findings are the whole value of the mechanism.** Both make the contract *weaker* than
-the pact, and both are the kind of change that would otherwise be discovered months later as a
+**The `lossy` findings are the whole value of the mechanism.** Each makes the contract *weaker* than
+the pact, and each is the kind of change that would otherwise be discovered months later as a
 verification that passes when it should not. `rule-unmapped` says so and names the fix; `generator-dropped`
-says so and names the failure it will cause instead. Neither is silent, and neither blocks the upgrade.
+says so and names the failure it will cause instead. None is silent, and none blocks the upgrade.
+
+**`request-query-opened` is on every converted request, and that is the point.** v1–v4 close a request's
+query — a request with none admits none — and shapes are must-ignore with no way to close an object
+([ADR 0007](../../../decisions/0007-shapes-denote-value-sets.md)). So no HTTP pact converts with an empty findings list: the one loss
+every request shares is still a loss, and saying so once per request is what keeps "empty" a claim
+worth believing.
 
 **`example-frozen-as-equality` is a `note`, not a finding to act on.** A position with no matching rule
 already meant equality in v1–v4; the conversion changed nothing, it only wrote down what was already

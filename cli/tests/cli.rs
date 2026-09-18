@@ -400,19 +400,21 @@ fn upgrade_writes_canonical_bytes_and_reports_its_findings() {
   );
   assert!(contract.ends_with('\n'));
 
-  // Findings are grouped by what they mean, not listed flat. This pact loses nothing, so there is
-  // no LOSSY group at all — the absence is the claim.
+  // Findings are grouped by what they mean, not listed flat. The one thing this pact loses is what
+  // every HTTP request loses — its closed query, which a shape cannot close (ADR 0007).
   let findings = stderr(&output);
+  assert!(findings.contains("LOSSY"), "{findings}");
+  assert!(findings.contains("request-query-opened"), "{findings}");
+  assert!(
+    !findings.contains("generator-dropped"),
+    "this pact has no generators to lose: {findings}"
+  );
   assert!(findings.contains("JUDGEMENT"), "{findings}");
   assert!(findings.contains("rule-narrowed"), "{findings}");
   assert!(findings.contains("NOTE"), "{findings}");
-  assert!(
-    !findings.contains("LOSSY"),
-    "nothing was lost converting this one: {findings}"
-  );
 
-  // One that does lose something says so under its own heading: this pact carries generators, and
-  // the contract format names a generator *component* nothing implements yet.
+  // One that loses more says so under the same heading: this pact carries generators, and the
+  // contract format names a generator *component* nothing implements yet.
   let lossy = janus(&[
     "upgrade",
     &repo("engine/kernel/tests/fixtures/legacy-pacts/V3Consumer-ProviderStateService.json"),
