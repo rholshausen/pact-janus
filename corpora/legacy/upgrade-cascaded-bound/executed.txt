@@ -1,0 +1,97 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          %upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders/66',
+          '/orders/66'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.items" (
+          %match:min-type (
+            $.response.body.items => [{'sku': '', 'tags': []}, {'sku': 'sku-1', 'tags': ['gift', 'fragile']}],
+            [{'sku': 'sku-0', 'tags': ['gift']}],
+            2
+          ) => BOOL(true),
+          %for-each (
+            ** (
+              $.response.body.items => [{'sku': '', 'tags': []}, {'sku': 'sku-1', 'tags': ['gift', 'fragile']}]
+            ) => [{'sku': '', 'tags': []}, {'sku': 'sku-1', 'tags': ['gift', 'fragile']}],
+            :"$.items[*]" (
+              :"$.items[*].sku" (
+                %match:type (
+                  ~>.sku => '',
+                  'sku-0'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[*].tags" (
+                %match:type (
+                  ~>.tags => [],
+                  ['gift']
+                ) => BOOL(true),
+                %for-each (
+                  ** (
+                    ~>.tags => []
+                  ) => []
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.items[*]" (
+              :"$.items[*].sku" (
+                %match:type (
+                  ~>.sku => 'sku-1',
+                  'sku-0'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[*].tags" (
+                %match:type (
+                  ~>.tags => ['gift', 'fragile'],
+                  ['gift']
+                ) => BOOL(true),
+                %for-each (
+                  ** (
+                    ~>.tags => ['gift', 'fragile']
+                  ) => ['gift', 'fragile'],
+                  :"$.items[*].tags[*]" (
+                    %match:type (
+                      ~> => 'gift',
+                      'gift'
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  :"$.items[*].tags[*]" (
+                    %match:type (
+                      ~> => 'fragile',
+                      'gift'
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

@@ -1,0 +1,128 @@
+{
+  "description": "a cascaded bound does not size a nested array, in the plan or in the contract the pact upgrades into: v1-v4 re-apply a min/max nowhere below the array that declared it, so both paths admit an empty nested array and still enforce the declaring array's own bound — plan-grammar spec section 4.4's two-path agreement",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get an order",
+          "request": {
+            "method": "GET",
+            "path": "/orders/66"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "sku": "sku-0",
+                  "tags": [
+                    "gift"
+                  ]
+                }
+              ]
+            },
+            "matchingRules": {
+              "body": {
+                "$.items": {
+                  "matchers": [
+                    {
+                      "min": 2,
+                      "match": "type"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders/66",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "items": {
+                "items": {
+                  "members": {
+                    "sku": {
+                      "example": "sku-0",
+                      "shape": "type"
+                    },
+                    "tags": {
+                      "items": {
+                        "example": "gift",
+                        "shape": "type"
+                      },
+                      "min": 0,
+                      "shape": "each-like"
+                    }
+                  },
+                  "shape": "object"
+                },
+                "min": 2,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders/66",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": {
+      "items": [
+        {
+          "sku": "",
+          "tags": []
+        },
+        {
+          "sku": "sku-1",
+          "tags": [
+            "gift",
+            "fragile"
+          ]
+        }
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

@@ -436,7 +436,7 @@ slot, this position, this constraint", which is where a shape node goes.
 | `semver` | `semver` | |
 | `notEmpty` | `not-empty` | |
 | `contentType` | `content-type` | |
-| `min`, `max`, `minmax` on an array | `each-like` with `min`/`max` | |
+| `min`, `max`, `minmax` on an array | `each-like` with `min`/`max` | the bound is the declaring array's own: a rule that only *cascades* to a nested array gives it `each-like` with `min: 0` and no `max`, because v1–v4 never re-apply a bound below the array that declared it |
 | `values` | `each-entry` over values | |
 | `eachKey`, `eachValue` | `each-entry` over keys / values | |
 | `arrayContains` | `contains` | |

@@ -134,6 +134,25 @@ fn a_min_matcher_on_an_array_becomes_each_likes_cardinality() {
   );
 }
 
+/// The bound belongs to the array that declared it. A nested array the rule only *cascades* to has
+/// no bound of its own in v1–v4 — any length, empty included — so it becomes `each-like` with
+/// `min: 0` and no `max`, rather than inheriting its ancestor's `min: 2`.
+#[test]
+fn a_cascaded_bound_does_not_size_a_nested_array() {
+  let response = json!({
+    "status": 200,
+    "body": { "items": [{ "sku": "a", "tags": ["gift"] }] },
+    "matchingRules": { "body": { "$.items": { "matchers": [{ "match": "type", "min": 2, "max": 5 }] } } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), response));
+  let items = &shape(&upgraded, 0, "response", "body")["members"]["items"];
+  assert_eq!((&items["min"], &items["max"]), (&json!(2), &json!(5)));
+  let tags = &items["items"]["members"]["tags"];
+  assert_eq!(tags["shape"], json!("each-like"));
+  assert_eq!(tags["min"], json!(0));
+  assert!(tags.get("max").is_none(), "no bound was declared here: {tags}");
+}
+
 /// An array with no rule asserted an exact list, and `array` is the operator that says so.
 #[test]
 fn an_array_with_no_rule_becomes_a_fixed_array() {

@@ -689,7 +689,7 @@ impl Conversion {
     list: Option<(RuleList, bool)>,
     ctx: &BodyCtx,
   ) -> Value {
-    let Some((list, _)) = list else {
+    let Some((list, cascaded)) = list else {
       let entries: Vec<Value> = items
         .iter()
         .enumerate()
@@ -705,7 +705,11 @@ impl Conversion {
         .collect();
       return json!({ "shape": "contains", "entries": entries });
     }
-    let (min, max) = cardinality(&list);
+    // A rule that cascaded here from a shallower path carries no bound for this array: `min`/`max`
+    // size the array that declared them, and v1–v4 never re-apply them below it (`pact_matching`
+    // checks the bound only when `!cascaded`) — nor does design 3.5's plan, which reduces a
+    // cascaded one to `match:type`, admitting any length. `min: 0` is what agrees with both.
+    let (min, max) = if cascaded { (0, None) } else { cardinality(&list) };
     let template = items.first().cloned().unwrap_or(Value::Null);
     let items_shape = self.body_shape(rules, &template, &ctx.template_item());
     let mut shape = json!({ "shape": "each-like", "items": items_shape, "min": min });
