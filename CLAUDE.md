@@ -57,7 +57,9 @@ sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration)
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
 samples/         Demo subjects (workspace members), e.g. samples/order-service — the sample
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
-                 endpoint, used by verification tests, M3 and M5
+                 endpoint, used by verification tests, M3 and M5. Its pacts/ holds the v3
+                 pact of a consumer that has not upgraded, which task 5.4 verifies against
+                 it unchanged
 spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)

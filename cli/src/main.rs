@@ -160,17 +160,17 @@ fn explain(args: &[String]) -> ExitCode {
 fn compile_pact(doc_path: &str, doc_json: &Value, index: usize) -> Result<plan::Plan, String> {
   let pact = legacy_pact::read(doc_path, doc_json).map_err(|err| err.to_string())?;
   let interactions = legacy_pact::http_interactions(pact.as_ref());
-  let (description, request, response) = interactions.get(index).ok_or_else(|| {
+  let interaction = interactions.get(index).ok_or_else(|| {
     format!(
       "no HTTP interaction at index {index} ({} has {})",
       doc_path,
       interactions.len()
     )
   })?;
-  let legacy_request = legacy_pact::legacy_request(request)?;
-  let legacy_response = legacy_pact::legacy_response(response)?;
+  let legacy_request = legacy_pact::legacy_request(&interaction.request).map_err(|err| err.to_string())?;
+  let legacy_response = legacy_pact::legacy_response(&interaction.response).map_err(|err| err.to_string())?;
   Ok(plan::compile_legacy_interaction(
-    description,
+    &interaction.description,
     &legacy_request,
     &legacy_response,
   ))

@@ -388,8 +388,8 @@ impl Engine {
           // The parties as the first contract names them: a run over contracts with different
           // parties is a host's decision to mix them, and a hook that needs to tell them apart
           // reads `interaction` rather than this.
-          "consumer": contracts.first().map(|c| json!({ "name": c.consumer.name })),
-          "provider": contracts.first().map(|c| json!({ "name": c.provider.name })),
+          "consumer": contracts.first().map(|source| json!({ "name": source.consumer() })),
+          "provider": contracts.first().map(|source| json!({ "name": source.provider() })),
         });
         match HookRunner::new(
           document,

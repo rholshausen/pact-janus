@@ -29,10 +29,19 @@
 //! checking that is free. A disagreement is reported as a warning naming both — it means the two
 //! ends ran different implementations, which is worth knowing and is not the provider's fault.
 //!
-//! What this task does not do, and later ones pick up: running `state-setup` with those resolved
-//! states, and the `state-unavailable` status a hook's `unsupported` outcome produces (5.3, which
-//! is where a hook exists at all); v1–v4 pacts as a source (5.4 — a non-Janus document is refused
-//! by name here, never misparsed, per ADR 0011).
+//! **A v1–v4 pact is a source too** (plan task 5.4), and it is deliberately *not* upgraded on the
+//! way in. Each of its interactions is compiled by design 3.5's own matching-rule compiler — the
+//! single home of v1–v4 cascading and precedence — and its recorded request is replayed verbatim.
+//! Nothing on that path invents a shape, so nothing on it can lose one, which is what "providers
+//! upgrade first at no cost" has to mean to be worth claiming. The two paths meet at [`Prepared`]:
+//! past that point there is one loop, one hook sequence and one result vocabulary, so "the same
+//! engine verifies both" is a property of the code rather than a claim about it. What differs is
+//! confined to the two preparers — where the plan comes from, where the request comes from, and
+//! how a reply's values are read back.
+//!
+//! What this module still does not do, and a later task picks up: `upgrade/pact` (5.5), which
+//! turns a pact's matching rules into *shapes*. That is a different and lossier operation than
+//! verifying the pact where it stands, and it is the reason this path exists at all.
 
 use super::events::Stream;
 use super::wire::{find_container, mismatch_json, parts_resolver};
@@ -41,7 +50,8 @@ use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::hooks::{HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
-use crate::plan::{self, Assignment, Status, execute, outcome};
+use crate::legacy_pact::{self, LegacyInteraction};
+use crate::plan::{self, Assignment, CapturedValues, Status, execute, outcome};
 use crate::variant::params;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -161,45 +171,175 @@ pub enum VerifyError {
 // Reading the source.
 // ---------------------------------------------------------------------------------------------
 
-/// Read the inline contracts, identifying each before parsing it (contract-file spec §2.3): a v4
-/// pact, a hand-written JSON blob or a truncated file becomes a named refusal, never a
-/// half-verified run. v1–v4 pacts get their own path in plan task 5.4; until then the refusal says
-/// which format was found so the message is actionable.
-pub(crate) fn read_source(source: &ContractSource) -> Result<Vec<Contract>, VerifyError> {
+/// One document a run verifies. Both arms are first-class: a contract this engine wrote, and a
+/// v1–v4 pact some other SDK wrote years ago (plan task 5.4).
+pub(crate) enum Source {
+  Janus(Contract),
+  Legacy(Box<LegacyPact>),
+}
+
+/// A v1–v4 pact, read once and held in the terms the run needs. `specification` is the version the
+/// document itself declared — carried into events because a report that says a run verified needs
+/// to say what it verified.
+pub(crate) struct LegacyPact {
+  consumer: String,
+  provider: String,
+  specification: String,
+  interactions: Vec<LegacyInteraction>,
+}
+
+impl Source {
+  pub(crate) fn consumer(&self) -> &str {
+    match self {
+      Source::Janus(contract) => &contract.consumer.name,
+      Source::Legacy(pact) => &pact.consumer,
+    }
+  }
+
+  pub(crate) fn provider(&self) -> &str {
+    match self {
+      Source::Janus(contract) => &contract.provider.name,
+      Source::Legacy(pact) => &pact.provider,
+    }
+  }
+
+  /// How this document identifies itself (ADR 0011): the contract format string, or
+  /// `pact/<version>`. It rides in every interaction reference, so no reader of a result has to
+  /// guess which kind of document produced it.
+  fn format(&self) -> String {
+    match self {
+      Source::Janus(_) => contract::FORMAT.to_string(),
+      Source::Legacy(pact) => format!("pact/{}", pact.specification),
+    }
+  }
+
+  fn interactions(&self) -> usize {
+    match self {
+      Source::Janus(contract) => contract.interactions.len(),
+      Source::Legacy(pact) => pact.interactions.len(),
+    }
+  }
+
+  /// How many results this document will produce. A contract's interaction has as many as it
+  /// recorded; a pact's interaction has exactly one, because a single example is a single variant
+  /// (contract-file spec §8.3) — the degenerate case of the same arithmetic, not a special case
+  /// beside it.
+  fn variants(&self) -> usize {
+    match self {
+      Source::Janus(contract) => contract
+        .interactions
+        .iter()
+        .map(|i| i.selection.variants.len())
+        .sum(),
+      Source::Legacy(pact) => pact.interactions.len(),
+    }
+  }
+
+  fn prepare(&self, index: usize) -> Prepared {
+    match self {
+      Source::Janus(contract) => prepare_janus(contract, index, &self.format()),
+      Source::Legacy(pact) => prepare_legacy(pact, index, &self.format()),
+    }
+  }
+}
+
+/// Read the inline documents, identifying each before parsing it (contract-file spec §2.3, ADR
+/// 0011). Three outcomes, and the middle one is the point of this task:
+///
+/// - `$format` names the Janus contract format: parse it as a contract;
+/// - no `$format`, but the document carries a pact file's own required members: read it as a v1–v4
+///   pact and verify it where it stands;
+/// - anything else — a hand-written blob, a truncated file, a `$format` from a future engine — is
+///   a refusal **naming what was found**, never a half-verified run.
+pub(crate) fn read_source(source: &ContractSource) -> Result<Vec<Source>, VerifyError> {
   if source.kind != "inline" {
     return Err(VerifyError::SourceUnsupported(source.kind.clone()));
   }
-  let mut contracts = Vec::with_capacity(source.contracts.len());
+  let mut sources = Vec::with_capacity(source.contracts.len());
   for (index, doc) in source.contracts.iter().enumerate() {
-    let format = doc.get("$format").and_then(Value::as_str);
-    match format {
-      Some(format) if format == contract::FORMAT => {}
-      other => {
+    match doc.get("$format").and_then(Value::as_str) {
+      Some(format) if format == contract::FORMAT => sources.push(Source::Janus(read_contract(index, doc)?)),
+      // A `$format` this engine does not know is never guessed at, even when the document also
+      // looks pact-shaped: the member exists precisely to stop a reader guessing.
+      Some(other) => {
         return Err(VerifyError::NotAContract {
           index,
-          found: other.map(str::to_string).or_else(|| legacy_hint(doc)),
+          found: Some(other.to_string()),
         });
       }
+      None => sources.push(Source::Legacy(Box::new(read_legacy(index, doc)?))),
     }
-    let parsed: Contract = serde_path_to_error::deserialize(doc).map_err(|err| {
-      let pointer = format!(
-        "/source/contracts/{index}{}",
-        crate::error::json_pointer(err.path())
-      );
-      VerifyError::ContractInvalid {
-        problems: vec![Problem {
-          pointer,
-          message: err.inner().to_string(),
-        }],
-      }
-    })?;
-    contracts.push(parsed);
   }
-  Ok(contracts)
+  Ok(sources)
 }
 
-/// What a non-Janus document looks like, for the refusal's message: a pact file says so in its own
-/// metadata, and naming "pactSpecification 3.0.0" is far more useful than "no `$format`".
+fn read_contract(index: usize, doc: &Value) -> Result<Contract, VerifyError> {
+  serde_path_to_error::deserialize(doc).map_err(|err| {
+    let pointer = format!(
+      "/source/contracts/{index}{}",
+      crate::error::json_pointer(err.path())
+    );
+    VerifyError::ContractInvalid {
+      problems: vec![Problem {
+        pointer,
+        message: err.inner().to_string(),
+      }],
+    }
+  })
+}
+
+/// A v1–v4 pact, identified before it is parsed. `pact_models` is deliberately lenient — it will
+/// happily read `{}` as an empty pact — so identification happens **here**, against the members the
+/// pact specification itself requires, rather than being delegated to a parser whose tolerance
+/// would turn "this is not a contract" into "a contract with nothing in it". A run that verified
+/// nothing and reported success is exactly the misparse ADR 0011 exists to prevent.
+fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
+  if !looks_like_a_pact(doc) {
+    return Err(VerifyError::NotAContract {
+      index,
+      found: legacy_hint(doc),
+    });
+  }
+  let pact =
+    crate::legacy_pact::read(&format!("source.contracts[{index}]"), doc).map_err(|err| match err {
+      contract::ContractError::Invalid { problems } => VerifyError::ContractInvalid {
+        problems: problems
+          .into_iter()
+          .map(|problem| Problem {
+            pointer: format!("/source/contracts/{index}{}", problem.pointer),
+            message: problem.message,
+          })
+          .collect(),
+      },
+      other => VerifyError::ContractInvalid {
+        problems: vec![Problem {
+          pointer: format!("/source/contracts/{index}"),
+          message: other.to_string(),
+        }],
+      },
+    })?;
+  Ok(LegacyPact {
+    consumer: pact.consumer().name,
+    provider: pact.provider().name,
+    specification: pact.specification_version().version_str(),
+    interactions: legacy_pact::http_interactions(pact.as_ref()),
+  })
+}
+
+/// The members every v1–v4 pact file has by its own specification: named parties and a body of
+/// interactions (or messages, for a pact this engine reads and then finds nothing HTTP in — which
+/// is a pact that verifies zero interactions, a different and honest answer from a misparse).
+fn looks_like_a_pact(doc: &Value) -> bool {
+  let has = |name: &str| doc.get(name).is_some_and(Value::is_object);
+  has("consumer")
+    && has("provider")
+    && (doc.get("interactions").is_some_and(Value::is_array)
+      || doc.get("messages").is_some_and(Value::is_array))
+}
+
+/// What a document that is neither a contract nor a readable pact looks like, for the refusal's
+/// message: a pact file says so in its own metadata, and naming "pactSpecification 3.0.0" is far
+/// more useful than "no `$format`".
 fn legacy_hint(doc: &Value) -> Option<String> {
   let metadata = doc.get("metadata")?;
   let version = metadata
@@ -238,7 +378,7 @@ pub(crate) struct Run {
 /// `options.variants`/`options.variant` narrow the run (variant-semantics spec §5.1); everything
 /// else in `options` is ignored for now and logged rather than silently dropped.
 pub(crate) fn start(
-  contracts: Vec<Contract>,
+  sources: Vec<Source>,
   targets: Vec<Target>,
   content: Option<Arc<dyn ContentComponent>>,
   hooks: Option<HookRunner>,
@@ -247,31 +387,30 @@ pub(crate) fn start(
 ) -> Run {
   let filter = Filter::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
-  let thread = thread::spawn(move || run(contracts, targets, content, hooks, filter, thread_stream));
+  let thread = thread::spawn(move || run(sources, targets, content, hooks, filter, thread_stream));
   Run { stream, thread }
 }
 
 fn run(
-  contracts: Vec<Contract>,
+  sources: Vec<Source>,
   targets: Vec<Target>,
   content: Option<Arc<dyn ContentComponent>>,
   hooks: Option<HookRunner>,
   filter: Filter,
   stream: Arc<Stream>,
 ) {
-  let interactions: usize = contracts.iter().map(|c| c.interactions.len()).sum();
-  let variants: usize = contracts
-    .iter()
-    .flat_map(|c| &c.interactions)
-    .map(|i| i.selection.variants.len())
-    .sum();
+  let interactions: usize = sources.iter().map(Source::interactions).sum();
+  let variants: usize = sources.iter().map(Source::variants).sum();
   stream.emit(
     "verification/started",
     json!({
-      "contracts": contracts.len(),
+      "contracts": sources.len(),
       "interactions": interactions,
       "variants": variants,
-      "providers": contracts.iter().map(|c| c.provider.name.clone()).collect::<Vec<_>>(),
+      "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
+      // Positionally parallel to `providers`: which format each source document was written in
+      // (plan task 5.4). A run over a mix of the two says so in its first event.
+      "formats": sources.iter().map(Source::format).collect::<Vec<_>>(),
       "transports": targets.iter().map(|t| t.kind.clone()).collect::<Vec<_>>(),
       "filtered": filter.is_filtered(),
       "hooks": hooks.is_some(),
@@ -295,12 +434,10 @@ fn run(
   );
 
   if aborted.is_none() {
-    'contracts: for contract in &contracts {
-      for (index, interaction) in contract.interactions.iter().enumerate() {
-        let flow = verify_interaction(
-          contract,
-          index,
-          interaction,
+    'sources: for source in &sources {
+      for index in 0..source.interactions() {
+        let flow = verify_prepared(
+          source.prepare(index),
           &mut RunContext {
             targets: &targets,
             content: content.as_deref(),
@@ -312,7 +449,7 @@ fn run(
         );
         if let Flow::Abort(abort) = flow {
           aborted = Some(abort);
-          break 'contracts;
+          break 'sources;
         }
       }
     }
@@ -331,14 +468,7 @@ fn run(
   // aborted** (spec §3.8) — and it is handed the same summary document the terminal event carries,
   // so a reporting hook reads what the host reads. Nothing is mutable: a hook cannot revise a
   // verdict that has already been reached.
-  let summary_for_hooks = summary(
-    &tally,
-    &contracts,
-    interactions,
-    &filter,
-    hooks.as_ref(),
-    &aborted,
-  );
+  let summary_for_hooks = summary(&tally, &sources, interactions, &filter, hooks.as_ref(), &aborted);
   if hooks
     .as_ref()
     .is_some_and(|runner| runner.has("after-verification"))
@@ -371,14 +501,7 @@ fn run(
 
   stream.finish(
     "verification/finished",
-    summary(
-      &tally,
-      &contracts,
-      interactions,
-      &filter,
-      hooks.as_ref(),
-      &aborted,
-    ),
+    summary(&tally, &sources, interactions, &filter, hooks.as_ref(), &aborted),
   );
 }
 
@@ -457,7 +580,7 @@ impl Tally {
 /// `after-verification` is handed, and the one a report is written from.
 fn summary(
   tally: &Tally,
-  contracts: &[Contract],
+  sources: &[Source],
   interactions: usize,
   filter: &Filter,
   hooks: Option<&HookRunner>,
@@ -469,7 +592,7 @@ fn summary(
   let failed = tally.failed + tally.state_unavailable;
   let mut summary = json!({
     "status": if failed == 0 && aborted.is_none() { "verified" } else { "failed" },
-    "contracts": contracts.len(),
+    "contracts": sources.len(),
     "interactions": interactions,
     // `filtered` rides in the summary as well as in `started`, because the summary is the
     // document a report is written from and "verified" without "filtered" beside it would be a
@@ -509,66 +632,93 @@ struct RunContext<'a> {
   hooks: Option<&'a mut HookRunner>,
 }
 
-fn verify_interaction(
-  contract: &Contract,
-  index: usize,
-  interaction: &contract::Interaction,
-  ctx: &mut RunContext<'_>,
-  tally: &mut Tally,
-) -> Flow {
-  let reference = interaction_ref(contract, index, interaction);
+/// One interaction, prepared for replay. **This is where the two source kinds stop differing**:
+/// a Janus contract's interaction and a v1–v4 pact's interaction both arrive here, and everything
+/// downstream — the hook sequence, the events, the result vocabulary, the tally — is one code
+/// path over this one type.
+struct Prepared {
+  /// How this interaction is named in every event of the run.
+  reference: Value,
+  /// Which transport kind drives it.
+  transport: String,
+  replays: Vec<Replay>,
+}
 
-  // A shape the engine cannot parse is the contract's problem, not the provider's, and it is
-  // reported against every variant rather than as one interaction-level event: the unit of a
-  // verification result is the interaction × variant (spec §9.6), and collapsing that here would
-  // make a summary's variant counts stop adding up.
-  let spec = match interaction_spec(interaction) {
-    Ok(spec) => spec,
-    Err(problems) => {
-      for variant in interaction
-        .selection
-        .variants
-        .iter()
-        .filter(|v| ctx.filter.admits(&v.id))
-      {
-        let payload = json!({
-          "interaction": reference, "variant": variant.id, "status": "failed",
-          "error": { "code": "contract-invalid", "problems": problems },
-        });
-        ctx
-          .stream
-          .emit("verification/interaction-result", payload.clone());
-        tally.record(&payload);
-      }
-      return Flow::Continue;
+/// One interaction × variant: the unit a verification result reports on (spec §9.6).
+enum Replay {
+  Ready(Box<Ready>),
+  /// The source document itself defeated preparation. Reported against **this variant** rather
+  /// than as one interaction-level event, because interaction × variant is the unit of a result
+  /// and collapsing it here would make a summary's variant counts stop adding up.
+  Broken {
+    variant: String,
+    error: Value,
+  },
+}
+
+impl Replay {
+  fn variant(&self) -> &str {
+    match self {
+      Replay::Ready(ready) => &ready.variant,
+      Replay::Broken { variant, .. } => variant,
     }
-  };
+  }
+}
 
-  let kind = interaction
+/// Everything one replay needs, with nothing left to decide: what to send, what scores the reply,
+/// how the reply's values are read back, and what the hooks are told.
+struct Ready {
+  variant: String,
+  origin: Value,
+  assignment: Value,
+  states: Vec<contract::ResolvedState>,
+  /// The bytes the consumer actually sent (variant-semantics spec §5.2) — a contract's recorded
+  /// variant or a pact's own request example. Never re-derived from a shape on either path.
+  request: Parts,
+  /// Pinned to this variant on the shape path, compiled from matching rules on the v1–v4 path.
+  plan: plan::Plan,
+  /// How the reply becomes the values `plan` resolves against. A function rather than a flag
+  /// because the difference *is* a different reading of the same parts: design 3.5's plans
+  /// address a header as one value per name (`legacy_pact::header_captures`), shapes address the
+  /// slot the transport actually produced.
+  resolve: fn(&Parts, Option<&dyn ContentComponent>) -> CapturedValues,
+  /// Emitted before this variant's exchange starts, so a warning precedes the result it qualifies.
+  warnings: Vec<Value>,
+  /// The `interaction` document a hook's occurrence carries (lifecycle-hooks spec §3.2), with this
+  /// variant's states already resolved.
+  interaction: Value,
+}
+
+/// A Janus contract's interaction (plan tasks 5.1–5.3): compiled from its recorded shapes, one
+/// replay per recorded variant.
+fn prepare_janus(contract: &Contract, index: usize, format: &str) -> Prepared {
+  let interaction = &contract.interactions[index];
+  let reference = interaction_ref(contract, index, interaction, format);
+  let transport = interaction
     .transport
     .as_ref()
     .map(|t| t.kind.as_str())
     .unwrap_or(DEFAULT_TRANSPORT_KIND)
     .to_string();
-  let Some(target) = ctx.targets.iter().find(|target| target.kind == kind) else {
-    // Contract-file spec §4.3: an unknown kind is `component-unavailable` naming it, never a
-    // silent skip — a verifier that cannot speak an interaction's transport has not verified it.
-    for variant in interaction
-      .selection
-      .variants
-      .iter()
-      .filter(|v| ctx.filter.admits(&v.id))
-    {
-      let payload = json!({
-        "interaction": reference, "variant": variant.id, "status": "failed",
-        "error": { "code": "component-unavailable", "component": format!("transport/{kind}") },
-      });
-      ctx
-        .stream
-        .emit("verification/interaction-result", payload.clone());
-      tally.record(&payload);
+
+  // A shape the engine cannot parse is the contract's problem, not the provider's.
+  let spec = match interaction_spec(interaction) {
+    Ok(spec) => spec,
+    Err(problems) => {
+      return Prepared {
+        reference,
+        transport,
+        replays: interaction
+          .selection
+          .variants
+          .iter()
+          .map(|variant| Replay::Broken {
+            variant: variant.id.clone(),
+            error: json!({ "code": "contract-invalid", "problems": problems }),
+          })
+          .collect(),
+      };
     }
-    return Flow::Continue;
   };
 
   // The variant space is recomputed from the recorded shapes rather than read out of the
@@ -576,36 +726,208 @@ fn verify_interaction(
   // same way from the same input.
   let space = plan::variant_space(&spec);
 
-  for variant in &interaction.selection.variants {
-    if !ctx.filter.admits(&variant.id) {
-      tally.skipped += 1;
-      tracing::debug!(variant = %variant.id, "variant excluded by the run's filter");
-      continue;
-    }
-    let assignment = assignment_of(variant);
-    let states = params::resolve_states(interaction.states.as_ref(), &space, &assignment);
-    if let Some(disagreement) = state_disagreement(states.as_ref(), variant) {
-      // Not a failure of the provider, so not a failed variant: the two ends resolved the same
-      // binding differently, which means they are not the same implementation. Naming both is the
-      // whole value of recording resolved states (§6.4).
-      ctx.stream.emit(
-        "verification/warning",
-        json!({
+  let replays = interaction
+    .selection
+    .variants
+    .iter()
+    .map(|variant| {
+      let assignment = assignment_of(variant);
+      let states = params::resolve_states(interaction.states.as_ref(), &space, &assignment);
+      let mut warnings = Vec::new();
+      if let Some(disagreement) = state_disagreement(states.as_ref(), variant) {
+        // Not a failure of the provider, so not a failed variant: the two ends resolved the same
+        // binding differently, which means they are not the same implementation. Naming both is
+        // the whole value of recording resolved states (§6.4).
+        warnings.push(json!({
           "code": "state-resolution-disagreement",
           "interaction": reference, "variant": variant.id,
           "resolved": disagreement.0, "recorded": disagreement.1,
+        }));
+      }
+      let Some(request) = recorded_request(variant) else {
+        return Replay::Broken {
+          variant: variant.id.clone(),
+          error: json!({ "code": "contract-invalid", "problems": [{
+            "pointer": "/parts/request",
+            "message": "the recorded variant has no request part to replay",
+          }] }),
+        };
+      };
+      let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+      Replay::Ready(Box::new(Ready {
+        variant: variant.id.clone(),
+        origin: json!(variant.origin),
+        assignment: json!(variant.assignment),
+        // Pinned to this variant (shape spec §7.1, variant-semantics spec §5.2 step 3): an
+        // `optional` pinned to `absent` admits only absence, an `any-of` pinned to `SHIPPED` only
+        // that. Matching against the unpinned shape would accept `PENDING` where the consumer
+        // demonstrated `SHIPPED`, and the variant would have proved nothing.
+        plan: plan::compile(&spec, &assignment, Some(&variant.id)),
+        resolve: parts_resolver,
+        states: states.unwrap_or_default(),
+        request,
+        warnings,
+        interaction: json!({
+          "description": interaction.description,
+          "states": states_json,
+          "transport": interaction.transport,
         }),
-      );
+      }))
+    })
+    .collect();
+
+  Prepared {
+    reference,
+    transport,
+    replays,
+  }
+}
+
+/// A v1–v4 pact's interaction (plan task 5.4): compiled by design 3.5's matching-rule compiler,
+/// replayed from the pact's own request example, **one** variant.
+///
+/// That single variant is the degenerate case of the same arithmetic, not a branch around it
+/// (contract-file spec §8.3, variant-semantics spec §9): one example is one variant, its id is
+/// `base` and its assignment is empty, so every count in the summary means what it means for a
+/// contract. What the pact under-covers it under-covers honestly — the fix for that is to run the
+/// consumer's suite under Janus, which is the incentive the migration path wants anyway.
+///
+/// Only the **response** is compiled. The request is replayed verbatim, so matching it against
+/// itself would assert nothing (the same rule the shape path follows, [`drive`]). That has a
+/// pleasant consequence: a request body in a content type design 3.5 cannot compile still replays,
+/// byte for byte, instead of failing an interaction whose response is perfectly checkable.
+fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
+  let interaction = &pact.interactions[index];
+  let states: Vec<contract::ResolvedState> = interaction
+    .provider_states
+    .iter()
+    .map(|state| contract::ResolvedState {
+      name: state.name.clone(),
+      // v3 state parameters travel as they stand — a `state-setup` hook in `pact-state-change`
+      // format hands the provider exactly the `{state, params, action}` it received before Janus
+      // existed (lifecycle-hooks spec §8.4). v1/v2's bare state string arrives here as a state
+      // with no parameters, which is what it is.
+      params: (!state.params.is_empty())
+        .then(|| state.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
+    })
+    .collect();
+  let reference = json!({
+    "contract": { "consumer": pact.consumer, "provider": pact.provider },
+    "index": index,
+    "description": interaction.description,
+    "states": states.iter().map(|state| state.name.clone()).collect::<Vec<_>>(),
+    "format": format,
+  });
+  // v1–v4 pacts are HTTP request/response documents by their own specification, so there is
+  // nothing to read a transport kind out of: the interaction has one.
+  let transport = DEFAULT_TRANSPORT_KIND.to_string();
+
+  let response = match legacy_pact::legacy_response(&interaction.response) {
+    Ok(response) => response,
+    Err(err) => {
+      return Prepared {
+        reference,
+        transport,
+        replays: vec![Replay::Broken {
+          variant: LEGACY_VARIANT.to_string(),
+          error: unsupported_body(&err, index, "response"),
+        }],
+      };
+    }
+  };
+
+  let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+  Prepared {
+    reference,
+    transport,
+    replays: vec![Replay::Ready(Box::new(Ready {
+      variant: LEGACY_VARIANT.to_string(),
+      origin: json!(crate::variant::Origin::Base),
+      assignment: json!([]),
+      plan: plan::compile_legacy_response(&response),
+      resolve: legacy_resolver,
+      states,
+      request: legacy_pact::request_parts(&interaction.request),
+      warnings: Vec::new(),
+      interaction: json!({
+        "description": interaction.description,
+        "states": states_json,
+        "transport": { "kind": DEFAULT_TRANSPORT_KIND },
+      }),
+    }))],
+  }
+}
+
+/// The sole variant of a converted interaction (contract-file spec §8.3).
+const LEGACY_VARIANT: &str = "base";
+
+/// A reply read the way design 3.5's plans address it: the generic slot captures, plus one string
+/// per header name ([`legacy_pact::header_captures`] documents why the two forms differ).
+fn legacy_resolver(parts: &Parts, content: Option<&dyn ContentComponent>) -> CapturedValues {
+  legacy_pact::header_captures(parts_resolver(parts, content), parts)
+}
+
+/// A v1–v4 body design 3.5 cannot compile, as the error a result carries. The two cases are
+/// genuinely different and get different codes: a content type the engine has no compiler for is
+/// a **missing component** (spec §10.2 — the identifier names what is missing, and a content
+/// component is exactly what would supply it), while a body that claimed to be JSON and was not is
+/// a **document** problem, carrying a pointer into the pact its author can act on.
+fn unsupported_body(err: &legacy_pact::Unsupported, index: usize, part: &str) -> Value {
+  match err {
+    legacy_pact::Unsupported::ContentType(content_type) => json!({
+      "code": "component-unavailable",
+      "component": format!("content/{content_type}"),
+      "message": err.to_string(),
+    }),
+    legacy_pact::Unsupported::Malformed(message) => json!({
+      "code": "contract-invalid",
+      "problems": [{ "pointer": format!("/interactions/{index}/{part}/body"), "message": message }],
+    }),
+  }
+}
+
+/// Replay one interaction's variants: the one loop both source kinds run through.
+fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tally) -> Flow {
+  let targets = ctx.targets;
+  let target = targets.iter().find(|target| target.kind == prepared.transport);
+  let reference = prepared.reference;
+
+  for replay in prepared.replays {
+    if !ctx.filter.admits(replay.variant()) {
+      tally.skipped += 1;
+      tracing::debug!(variant = %replay.variant(), "variant excluded by the run's filter");
+      continue;
     }
 
-    let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+    let ready = match replay {
+      Replay::Ready(ready) => ready,
+      Replay::Broken { variant, error } => {
+        report_failure(ctx, tally, &reference, &variant, error);
+        continue;
+      }
+    };
+
+    // Contract-file spec §4.3: an unknown kind is `component-unavailable` naming it, never a
+    // silent skip — a verifier that cannot speak an interaction's transport has not verified it.
+    let Some(target) = target else {
+      let error = json!({
+        "code": "component-unavailable",
+        "component": format!("transport/{}", prepared.transport),
+      });
+      report_failure(ctx, tally, &reference, &ready.variant, error);
+      continue;
+    };
+
+    for warning in &ready.warnings {
+      ctx.stream.emit("verification/warning", warning.clone());
+    }
     ctx.stream.emit(
       "verification/interaction-started",
       json!({
-        "interaction": reference, "variant": variant.id, "origin": variant.origin,
+        "interaction": reference, "variant": ready.variant, "origin": ready.origin,
         // The states this variant needs, resolved (§6.4) — what `state-setup` is about to be asked
         // for, visible whether or not a hook is configured to do the asking.
-        "states": states_json,
+        "states": ready.interaction["states"],
       }),
     );
 
@@ -615,15 +937,8 @@ fn verify_interaction(
         tally.verified + tally.failed + tally.state_unavailable + 1
       ),
       reference: &reference,
-      spec: &spec,
-      variant,
-      states: states.as_deref().unwrap_or_default(),
-      transport: &kind,
-      interaction: json!({
-        "description": interaction.description,
-        "states": states_json,
-        "transport": interaction.transport,
-      }),
+      ready: &ready,
+      transport: &prepared.transport,
     };
     let (payload, flow) = verify_exchange(&exchange, target, ctx);
     tally.record(&payload);
@@ -634,16 +949,25 @@ fn verify_interaction(
   Flow::Continue
 }
 
+/// A variant that failed before any exchange happened: emitted and tallied exactly like one that
+/// ran, because a result a host never saw is a variant a report would silently drop.
+fn report_failure(ctx: &RunContext<'_>, tally: &mut Tally, reference: &Value, variant: &str, error: Value) {
+  let payload = json!({
+    "interaction": reference, "variant": variant, "status": "failed", "error": error,
+  });
+  ctx
+    .stream
+    .emit("verification/interaction-result", payload.clone());
+  tally.record(&payload);
+}
+
 /// One interaction exercised at one variant — the unit a verification result reports on, and the
 /// unit a hook failure can fail without ending the run (lifecycle-hooks spec §2.2).
 struct Exchange<'a> {
   id: String,
   reference: &'a Value,
-  spec: &'a InteractionSpec,
-  variant: &'a contract::RecordedVariant,
-  states: &'a [contract::ResolvedState],
+  ready: &'a Ready,
   transport: &'a str,
-  interaction: Value,
 }
 
 /// The shape of an exchange (spec §4.1): state setup per state in recorded order, `before-request`,
@@ -653,10 +977,10 @@ struct Exchange<'a> {
 fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContext<'_>) -> (Value, Flow) {
   let mut exchange_data = Map::new();
   let base = Occurrence {
-    interaction: Some(exchange.interaction.clone()),
+    interaction: Some(exchange.ready.interaction.clone()),
     variant: Some(json!({
-      "id": exchange.variant.id,
-      "assignment": exchange.variant.assignment,
+      "id": exchange.ready.variant,
+      "assignment": exchange.ready.assignment,
     })),
     exchange: Some(json!({ "id": exchange.id })),
     endpoint: Some(target.endpoint.clone()),
@@ -669,7 +993,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
 
   // 1. state-setup, once per state, in recorded order — for **every** variant, including
   //    consecutive ones whose resolved parameters are identical (variant-semantics spec §6.6).
-  for state in exchange.states {
+  for state in &exchange.ready.states {
     if result.is_some() {
       break;
     }
@@ -701,22 +1025,9 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
     }
   }
 
-  // 2. before-request, then the exchange itself.
-  let mut parts = None;
-  if result.is_none() {
-    match recorded_request(exchange.variant) {
-      Some(request) => parts = Some(request),
-      None => {
-        result = Some(json!({
-          "interaction": exchange.reference, "variant": exchange.variant.id, "status": "failed",
-          "error": { "code": "contract-invalid", "problems": [{
-            "pointer": "/parts/request",
-            "message": "the recorded variant has no request part to replay",
-          }] },
-        }));
-      }
-    }
-  }
+  // 2. before-request, then the exchange itself. The request is the recorded one, cloned because
+  //    `before-request` may rewrite it and the recording must survive the run unchanged.
+  let mut parts = (result.is_none()).then(|| exchange.ready.request.clone());
 
   if let (None, Some(request)) = (&result, parts.as_mut()) {
     let (status, aborted) = hook_point(ctx, "before-request", &base, Some(request), &mut exchange_data);
@@ -761,7 +1072,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   }
 
   let payload = result.unwrap_or_else(
-    || json!({ "interaction": exchange.reference, "variant": exchange.variant.id, "status": "failed" }),
+    || json!({ "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed" }),
   );
 
   // The result is reported *before* teardown, not after: the exchange has its outcome by here —
@@ -777,7 +1088,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
     "verified" => "passed",
     other => other,
   };
-  for state in exchange.states.iter().rev() {
+  for state in exchange.ready.states.iter().rev() {
     let occurrence = Occurrence {
       state: Some(serde_json::to_value(state).unwrap_or(Value::Null)),
       exchange: Some(json!({ "id": exchange.id, "outcome": outcome })),
@@ -833,14 +1144,15 @@ fn hook_point(
 /// rewriting it into an engine code would lose the only thing it was carrying (spec §11).
 fn hook_failure_payload(exchange: &Exchange<'_>, status: &str, hook: &str, error: &Value) -> Value {
   json!({
-    "interaction": exchange.reference, "variant": exchange.variant.id, "status": status,
+    "interaction": exchange.reference, "variant": exchange.ready.variant, "status": status,
     "hook": hook, "error": error,
   })
 }
 
-/// Send the recorded request and match the reply against the shape pinned to this variant. `Ok`
-/// carries the result payload and the inbound parts (for `after-response`); `Err` carries a
-/// payload for the cases where nothing came back to match.
+/// Send the recorded request and score the reply against this replay's plan — pinned to the
+/// variant on the shape path, compiled from matching rules on the v1–v4 path, and by here just a
+/// plan either way. `Ok` carries the result payload and the inbound parts (for `after-response`);
+/// `Err` carries a payload for the cases where nothing came back to match.
 fn drive(
   exchange: &Exchange<'_>,
   request: Parts,
@@ -848,12 +1160,7 @@ fn drive(
   content: Option<&dyn ContentComponent>,
 ) -> Result<(Value, Option<Parts>), Value> {
   let reference = exchange.reference;
-  let variant = exchange.variant;
-  // Pinned to this variant (shape spec §7.1, variant-semantics spec §5.2 step 3): an `optional`
-  // pinned to `absent` admits only absence, an `any-of` pinned to `SHIPPED` admits only that.
-  // Matching against the unpinned shape would accept `PENDING` where the consumer demonstrated
-  // `SHIPPED`, and the variant would have proved nothing.
-  let plan = plan::compile(exchange.spec, &assignment_of(variant), Some(&variant.id));
+  let variant = &exchange.ready.variant;
 
   let sent = target.component.send(SendRequest {
     instance: target.instance.clone(),
@@ -864,9 +1171,9 @@ fn drive(
   let reply = match sent {
     Ok(result) => result.reply,
     Err(error) => {
-      tracing::warn!(variant = %variant.id, ?error, "the provider could not be driven for this variant");
+      tracing::warn!(%variant, ?error, "the provider could not be driven for this variant");
       return Err(json!({
-        "interaction": reference, "variant": variant.id, "status": "failed",
+        "interaction": reference, "variant": variant, "status": "failed",
         "error": { "code": "component-failed", "component": format!("transport/{}", target.kind), "error": error },
       }));
     }
@@ -876,28 +1183,31 @@ fn drive(
     // and this is the second one — a transport that answered a driven `send` with no reply cannot
     // be matched against a response shape.
     return Err(json!({
-      "interaction": reference, "variant": variant.id, "status": "failed",
+      "interaction": reference, "variant": variant, "status": "failed",
       "error": { "code": "component-failed", "component": format!("transport/{}", target.kind),
                  "error": { "code": "no-reply", "message": "the transport returned no reply to match" } },
     }));
   };
 
-  let resolver = parts_resolver(&reply, content);
-  let executed = execute(&plan, &resolver);
+  let resolver = (exchange.ready.resolve)(&reply, content);
+  let executed = execute(&exchange.ready.plan, &resolver);
   // Only the response half is scored. The request was replayed verbatim, so matching it against
   // itself would assert nothing; the provider answers for the response (variant-semantics §5.2).
+  // A shape-compiled plan carries both parts and the `response` subtree is picked out of it; a
+  // v1–v4 plan is compiled from the response alone, so its root already *is* that subtree and the
+  // fallback is the whole of it.
   let response = find_container(&executed, "response").unwrap_or(&executed);
   let (status, mismatches) = outcome(response);
 
   let payload = match status {
     Status::Matched => {
-      tracing::debug!(variant = %variant.id, "variant verified");
-      json!({ "interaction": reference, "variant": variant.id, "status": "verified" })
+      tracing::debug!(%variant, "variant verified");
+      json!({ "interaction": reference, "variant": variant, "status": "verified" })
     }
     Status::Mismatched => {
-      tracing::warn!(variant = %variant.id, count = mismatches.len(), "variant failed");
+      tracing::warn!(%variant, count = mismatches.len(), "variant failed");
       json!({
-        "interaction": reference, "variant": variant.id, "status": "failed",
+        "interaction": reference, "variant": variant, "status": "failed",
         "mismatches": mismatches.iter().map(mismatch_json).collect::<Vec<_>>(),
       })
     }
@@ -922,14 +1232,15 @@ fn state_disagreement(
   })
 }
 
-/// One variant: replay the recorded request, match the reply against the shape pinned to that
-/// variant. Returns the `verification/interaction-result` payload either way — a provider that
-/// cannot be reached is a failed variant with the component's own error attached, not a hole in
-/// the run.
 /// How an interaction is named in every event of the run: the contract it came from, its index,
 /// and its identity (description plus states — contract-file spec §4.2). Enough for a host to
 /// point a user at one line of one file without the engine assuming anything about file layout.
-fn interaction_ref(contract: &Contract, index: usize, interaction: &contract::Interaction) -> Value {
+fn interaction_ref(
+  contract: &Contract,
+  index: usize,
+  interaction: &contract::Interaction,
+  format: &str,
+) -> Value {
   json!({
     "contract": { "consumer": contract.consumer.name, "provider": contract.provider.name },
     "index": index,
@@ -937,6 +1248,10 @@ fn interaction_ref(contract: &Contract, index: usize, interaction: &contract::In
     "states": interaction.states.as_ref().map(|states| {
       states.iter().map(|state| state.name.clone()).collect::<Vec<_>>()
     }),
+    // Which document this interaction came from (ADR 0011). A run may mix a contract and a v1–v4
+    // pact, and a result that did not say which it came from would send its reader to the wrong
+    // file.
+    "format": format,
   })
 }
 

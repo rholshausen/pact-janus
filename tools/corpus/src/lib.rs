@@ -187,16 +187,19 @@ fn compile_input(input: &Input) -> Result<(Plan, String), String> {
       let pact = legacy_pact::read("corpus case", pact_json).map_err(|err| err.to_string())?;
       let interactions = legacy_pact::http_interactions(pact.as_ref());
       let index = input.index.unwrap_or(0);
-      let (description, request, response) = interactions.get(index).ok_or_else(|| {
+      let interaction = interactions.get(index).ok_or_else(|| {
         format!(
           "no HTTP interaction at index {index} (pact has {})",
           interactions.len()
         )
       })?;
-      let legacy_request = legacy_pact::legacy_request(request)?;
-      let legacy_response = legacy_pact::legacy_response(response)?;
-      let plan = plan::compile_legacy_interaction(description, &legacy_request, &legacy_response);
-      Ok((plan, description.clone()))
+      let legacy_request =
+        legacy_pact::legacy_request(&interaction.request).map_err(|err| err.to_string())?;
+      let legacy_response =
+        legacy_pact::legacy_response(&interaction.response).map_err(|err| err.to_string())?;
+      let plan =
+        plan::compile_legacy_interaction(&interaction.description, &legacy_request, &legacy_response);
+      Ok((plan, interaction.description.clone()))
     }
     other => Err(format!("unknown input kind '{other}'")),
   }

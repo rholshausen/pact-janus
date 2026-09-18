@@ -507,20 +507,34 @@ fn an_interaction_whose_transport_the_run_cannot_speak_is_named_never_skipped() 
 // Refusals before the run starts
 // ---------------------------------------------------------------------------------------------
 
+/// A v1–v4 pact is a *source*, not a refusal, since plan task 5.4 — `legacy_verification.rs` is
+/// where that path is tested. What still has to be refused by name is a document that is neither:
+/// a hand-written blob with no `$format` and none of a pact file's own required members must never
+/// be misparsed into a run that verifies nothing and reports success (ADR 0011).
 #[test]
-fn a_v3_pact_is_refused_by_name_rather_than_misparsed() {
+fn a_document_that_is_neither_a_contract_nor_a_pact_is_refused_by_name() {
   let mut engine = engine_with_real_components();
-  let pact = json!({
+  let blob = json!({ "consumer": { "name": "web-app" }, "notes": "a file someone hand-wrote" });
+  let refused = verify(&mut engine, blob, "http://127.0.0.1:1");
+  assert_eq!(refused["error"]["code"], "contract-version-unsupported");
+  assert_eq!(refused["error"]["category"], "document");
+  assert_eq!(refused["error"]["details"]["expected"], "janus-contract/1");
+}
+
+/// A `$format` this engine does not know is refused even when the rest of the document is
+/// pact-shaped: the member exists precisely so a reader never has to guess.
+#[test]
+fn an_unknown_format_is_refused_even_when_the_document_looks_pact_shaped() {
+  let mut engine = engine_with_real_components();
+  let doc = json!({
+    "$format": "janus-contract/99",
     "consumer": { "name": "web-app" },
     "provider": { "name": "order-api" },
     "interactions": [],
-    "metadata": { "pactSpecification": { "version": "3.0.0" } }
   });
-  let refused = verify(&mut engine, pact, "http://127.0.0.1:1");
+  let refused = verify(&mut engine, doc, "http://127.0.0.1:1");
   assert_eq!(refused["error"]["code"], "contract-version-unsupported");
-  assert_eq!(refused["error"]["category"], "document");
-  assert_eq!(refused["error"]["details"]["found"], "pactSpecification 3.0.0");
-  assert_eq!(refused["error"]["details"]["expected"], "janus-contract/1");
+  assert_eq!(refused["error"]["details"]["found"], "janus-contract/99");
 }
 
 #[test]

@@ -1,0 +1,92 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "interactions": [
+    {
+      "description": "a request for an order",
+      "providerStates": [
+        {
+          "name": "an order exists",
+          "params": {
+            "id": "66",
+            "shipped": true
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/66"
+      },
+      "response": {
+        "body": {
+          "id": "66",
+          "items": [
+            {
+              "quantity": 1,
+              "sku": "sku-0"
+            }
+          ],
+          "shippedAt": "2026-07-30T09:00:00Z",
+          "status": "SHIPPED"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.shippedAt": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request for an order that does not exist",
+      "providerStates": [
+        {
+          "name": "no orders exist"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/999"
+      },
+      "response": {
+        "body": {
+          "error": "not-found",
+          "id": "999"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 404
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "order-service"
+  }
+}
