@@ -3,12 +3,10 @@
     :request (
       :method (
         %match:equality (
-          %lower-case (
+          %upper-case (
             $.request.method => 'GET'
-          ) => 'get',
-          %lower-case (
-            'GET'
-          ) => 'get'
+          ) => 'GET',
+          'GET'
         ) => BOOL(true)
       ) => BOOL(true),
       :path (

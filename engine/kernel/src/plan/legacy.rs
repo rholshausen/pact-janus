@@ -370,13 +370,15 @@ fn compile_scalar_slot(
   match best_rule(category.as_ref(), &fragments, false) {
     Some((list, _cascaded)) => rule_list_node(&list, resolve, example),
     // Method is the one scalar slot v1-v4 compares case-insensitively by default (spec test case
-    // `method/method is different case`) — expressed with the existing `lower-case` core action
+    // `method/method is different case`) — expressed with the existing `upper-case` core action
     // rather than a new one, since `match:equality`'s own children may be any value-producing node.
+    // Upper, not lower: that is the method's canonical form, so a mismatch reads `'POST'` against
+    // `'GET'`. Only the actual needs it — `pact_models` upper-cases the example when it loads.
     None if category_name == "method" => Node::action(
       "match:equality",
       vec![
-        Node::action("lower-case", vec![resolve]),
-        Node::action("lower-case", vec![Node::value(Literal::from_json(example))]),
+        Node::action("upper-case", vec![resolve]),
+        Node::value(Literal::from_json(example)),
       ],
     ),
     None => Node::action(
