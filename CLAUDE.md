@@ -97,6 +97,21 @@ npm run lint         # ESLint
 
 JVM (from `sdks/jvm/`): `./gradlew build test`.
 
+The `janus` CLI (`cli/src/main.rs`, plan task 5.5) drives the engine **through the protocol** — it
+builds frames and reads frames back, never the kernel's Rust API, so anything a command cannot do
+is a finding about the protocol first:
+
+```bash
+janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus.yaml]
+             [--variant <id>] [--explain-failures] [--json]
+janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
+janus upgrade <pact.json> [--out <file>] [--json] [--quiet]
+```
+
+Exit codes are part of the surface: `0` the command did what it was asked, `1` the *subject* failed
+(a verification found mismatches — an answer, not an error), `2` the command could not run.
+`check` (design 2.8's subsumption) is Phase 7 and is deliberately absent rather than stubbed.
+
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
 normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`
 targets it alone). Its own protocol-level Node test client — plan task 4.5's "thin test client

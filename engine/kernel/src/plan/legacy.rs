@@ -228,6 +228,28 @@ fn rules_for(rules: &MatchingRules, category: &str) -> Option<MatchingRuleCatego
   rules.rules_for_category(category).filter(|c| c.is_not_empty())
 }
 
+/// The winning rule at one position, for a caller that is not compiling a plan — the v1–v4 → shape
+/// converter (contract-file spec §8.2, plan task 5.5), which has to resolve exactly the same
+/// question this module answers for plans: *which* declared rule governs this path, and did it
+/// cascade down from a shallower one.
+///
+/// Exported rather than reimplemented because plan-grammar spec §1 assigns v1–v4 cascading and
+/// precedence to **this module alone**. A converter that scored rules its own way could upgrade a
+/// pact into a contract that verifies differently from the pact — which is precisely the failure
+/// §4.4's two-path agreement rule exists to forbid.
+pub fn winning_rule(
+  rules: &MatchingRules,
+  category_name: &str,
+  fragments: &[String],
+  case_insensitive: bool,
+) -> Option<(RuleList, bool)> {
+  best_rule(
+    rules_for(rules, category_name).as_ref(),
+    fragments,
+    case_insensitive,
+  )
+}
+
 // --- a single rule -> a single match node ---
 
 /// One [`MatchingRule`] to one plan node. `example` is the expected value at this path, carried

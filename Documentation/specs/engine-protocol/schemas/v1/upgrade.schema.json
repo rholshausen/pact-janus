@@ -7,19 +7,26 @@
     "Pact": {
       "title": "Pact",
       "type": "object",
-      "required": ["pact"],
+      "required": [
+        "pact"
+      ],
       "properties": {
         "pact": {
           "type": "object",
           "description": "A v1-v4 pact document to convert to a Janus contract (rules in design 2.5)."
         },
-        "options": { "type": "object" }
+        "options": {
+          "type": "object"
+        }
       }
     },
     "PactResult": {
       "title": "PactResult",
       "type": "object",
-      "required": ["contract", "findings"],
+      "required": [
+        "contract",
+        "findings"
+      ],
       "properties": {
         "contract": {
           "type": "object",
@@ -27,22 +34,58 @@
         },
         "findings": {
           "type": "array",
-          "description": "Lossy or judgement-call conversion spots, for 'janus upgrade' to show its work.",
+          "description": "Lossy or judgement-call conversion spots, for 'janus upgrade' to show its work. An empty list is a claim: the conversion was exact.",
           "items": {
             "title": "UpgradeFinding",
             "type": "object",
-            "required": ["code", "message"],
+            "required": [
+              "code",
+              "kind",
+              "path",
+              "message"
+            ],
             "properties": {
               "code": {
                 "type": "string",
-                "x-known-values": ["lossy-matching-rule", "example-became-variant", "unsupported-feature"]
+                "description": "Open vocabulary; an unknown code is displayed, never dispatched on. Codes are listed in contract-file spec §8.4.",
+                "x-known-values": [
+                  "example-frozen-as-equality",
+                  "rule-unmapped",
+                  "rule-combination-or",
+                  "rule-narrowed",
+                  "generator-dropped",
+                  "content-type-inferred",
+                  "body-not-parsed",
+                  "state-params-untyped",
+                  "duplicate-description",
+                  "interaction-dropped"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "description": "'lossy' means the contract now says less than the pact did; 'judgement' means the converter chose between readings the pact did not distinguish; 'note' means neither, and is worth reading anyway.",
+                "x-known-values": [
+                  "lossy",
+                  "judgement",
+                  "note"
+                ]
               },
               "path": {
                 "type": "string",
-                "description": "JSON-path location in the source pact."
+                "minLength": 1,
+                "description": "RFC 6901 JSON pointer into the *source pact* — the file the author is looking at."
               },
-              "message": { "type": "string" }
-            }
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Prose, addressed to the author of the pact."
+              },
+              "target": {
+                "type": "string",
+                "description": "RFC 6901 JSON pointer into the converted contract, where the source construct ended up, when there is such a place."
+              }
+            },
+            "description": "One conversion finding. The normative definition is contract-file spec §8.4 (its schemas/v1/upgrade-findings.schema.json); this mirrors it so a host validating a frame against this file alone is checking the same document."
           }
         }
       }

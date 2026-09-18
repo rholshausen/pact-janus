@@ -1,0 +1,43 @@
+(
+  :"get a count" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method => 'GET'
+          ) => 'get',
+          %lower-case (
+            'GET'
+          ) => 'get'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/count',
+          '/count'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers () => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers () => BOOL(true),
+      :body (
+        %match:type (
+          $.response.body => 7,
+          42
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

@@ -196,3 +196,182 @@ impl Literal {
     }
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// The structured document form (`plan.schema.json`)
+// ---------------------------------------------------------------------------------------------
+
+/// A plan as the document `plan.schema.json` describes — what `verification/explain` returns when
+/// a caller asks for the structured form rather than the text (protocol spec §8.3).
+///
+/// Hand-written rather than derived, for the reason plan-grammar spec §2.1 gives: the schema's
+/// `Node` is one object whose `kind` decides which carrier member is present, and a derived
+/// tagged enum would emit the carriers as nested objects instead. The document is the specified
+/// surface; the Rust enum is one implementation of it.
+pub fn to_json(plan: &Plan) -> Value {
+  let mut document = serde_json::json!({ "grammar": plan.grammar, "root": node_json(&plan.root) });
+  if let Some(variant) = &plan.variant {
+    document["variant"] = Value::String(variant.clone());
+  }
+  document
+}
+
+fn node_json(node: &Node) -> Value {
+  let mut object = serde_json::Map::new();
+  match &node.kind {
+    NodeKind::Container { label, children } => {
+      object.insert("kind".to_string(), Value::String("container".to_string()));
+      if let Some(label) = label {
+        object.insert("label".to_string(), Value::String(label.clone()));
+      }
+      object.insert("children".to_string(), children_json(children));
+    }
+    NodeKind::Action { name, children } => {
+      object.insert("kind".to_string(), Value::String("action".to_string()));
+      object.insert("name".to_string(), Value::String(name.clone()));
+      object.insert("children".to_string(), children_json(children));
+    }
+    NodeKind::Value(literal) => {
+      object.insert("kind".to_string(), Value::String("value".to_string()));
+      object.insert("value".to_string(), literal_json(literal));
+    }
+    NodeKind::Resolve { path } => {
+      object.insert("kind".to_string(), Value::String("resolve".to_string()));
+      object.insert("path".to_string(), Value::String(path.clone()));
+    }
+    NodeKind::ResolveCurrent { path } => {
+      object.insert("kind".to_string(), Value::String("resolve-current".to_string()));
+      object.insert("path".to_string(), Value::String(path.clone()));
+    }
+    NodeKind::Pipeline { children } => {
+      object.insert("kind".to_string(), Value::String("pipeline".to_string()));
+      object.insert("children".to_string(), children_json(children));
+    }
+    NodeKind::Splat { children } => {
+      object.insert("kind".to_string(), Value::String("splat".to_string()));
+      object.insert("children".to_string(), children_json(children));
+    }
+    NodeKind::Annotation { text } => {
+      object.insert("kind".to_string(), Value::String("annotation".to_string()));
+      object.insert("text".to_string(), Value::String(text.clone()));
+    }
+  }
+  Value::Object(object)
+}
+
+fn children_json(children: &[Node]) -> Value {
+  Value::Array(children.iter().map(node_json).collect())
+}
+
+fn literal_json(literal: &Literal) -> Value {
+  let mut object = serde_json::Map::new();
+  object.insert(
+    "of".to_string(),
+    Value::String(
+      match literal.of {
+        DocumentKind::Null => "null",
+        DocumentKind::Boolean => "boolean",
+        DocumentKind::Number => "number",
+        DocumentKind::String => "string",
+        DocumentKind::Array => "array",
+        DocumentKind::Object => "object",
+        DocumentKind::Bytes => "bytes",
+        DocumentKind::Entry => "entry",
+      }
+      .to_string(),
+    ),
+  );
+  object.insert("value".to_string(), literal.value.clone());
+  if let Some(encoded) = &literal.encoded {
+    object.insert("encoded".to_string(), Value::String(encoded.clone()));
+  }
+  if let Some(key) = &literal.key {
+    object.insert("key".to_string(), Value::String(key.clone()));
+  }
+  Value::Object(object)
+}
+
+/// The inverse of [`to_json`]: a plan document back into a [`Plan`].
+///
+/// A plan is a rendering, not a record (spec §7) — nothing stores one — so this is not a
+/// persistence format. It exists because a *host* can be handed a plan document by the engine and
+/// want to do something with it (`janus explain --executed` executes one against captured values),
+/// and re-compiling from the source document instead would mean two compilers had to agree about
+/// what the user was shown.
+pub fn from_json(document: &Value) -> Result<Plan, String> {
+  let root = node_from_json(document.get("root").ok_or("a plan needs a 'root'")?)?;
+  Ok(Plan {
+    grammar: GRAMMAR_VERSION,
+    root,
+    variant: document
+      .get("variant")
+      .and_then(Value::as_str)
+      .map(str::to_string),
+  })
+}
+
+fn node_from_json(value: &Value) -> Result<Node, String> {
+  let kind = value
+    .get("kind")
+    .and_then(Value::as_str)
+    .ok_or("a node needs a 'kind'")?;
+  let children = || -> Result<Vec<Node>, String> {
+    value
+      .get("children")
+      .and_then(Value::as_array)
+      .map(|children| children.iter().map(node_from_json).collect())
+      .unwrap_or_else(|| Ok(Vec::new()))
+  };
+  let text = |member: &str| -> Result<String, String> {
+    value
+      .get(member)
+      .and_then(Value::as_str)
+      .map(str::to_string)
+      .ok_or_else(|| format!("a '{kind}' node needs a '{member}'"))
+  };
+  let node = match kind {
+    "container" => Node::container(
+      value.get("label").and_then(Value::as_str).map(str::to_string),
+      children()?,
+    ),
+    "action" => Node::action(text("name")?, children()?),
+    "value" => Node::value(literal_from_json(
+      value.get("value").ok_or("a 'value' node needs a 'value'")?,
+    )?),
+    "resolve" => Node::resolve(text("path")?),
+    "resolve-current" => Node::resolve_current(text("path")?),
+    "pipeline" => Node {
+      kind: NodeKind::Pipeline {
+        children: children()?,
+      },
+    },
+    "splat" => Node::splat(children()?),
+    "annotation" => Node {
+      kind: NodeKind::Annotation { text: text("text")? },
+    },
+    // Spec §4.1's rule, applied to reading as well as executing: an unknown kind is a named
+    // failure, never an ignored node.
+    other => return Err(format!("unknown plan node kind '{other}'")),
+  };
+  Ok(node)
+}
+
+fn literal_from_json(value: &Value) -> Result<Literal, String> {
+  let of = match value.get("of").and_then(Value::as_str).unwrap_or("null") {
+    "null" => DocumentKind::Null,
+    "boolean" => DocumentKind::Boolean,
+    "number" => DocumentKind::Number,
+    "string" => DocumentKind::String,
+    "array" => DocumentKind::Array,
+    "object" => DocumentKind::Object,
+    "bytes" => DocumentKind::Bytes,
+    "entry" => DocumentKind::Entry,
+    other => return Err(format!("unknown literal kind '{other}'")),
+  };
+  Ok(Literal {
+    of,
+    value: value.get("value").cloned().unwrap_or(Value::Null),
+    encoded: value.get("encoded").and_then(Value::as_str).map(str::to_string),
+    key: value.get("key").and_then(Value::as_str).map(str::to_string),
+  })
+}

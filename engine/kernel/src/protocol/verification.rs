@@ -67,6 +67,47 @@ struct Filter {
   variants: Option<Vec<String>>,
 }
 
+/// When a run emits `verification/executed-plan` (spec §9.6) — the event `explain --executed`
+/// reads. Off by default: an executed plan is the largest document a run produces, and a host
+/// that wanted one asks.
+///
+/// `on-failure` is the setting that matters, and the reason the event exists at all: the moment a
+/// user wants the executed plan is the moment something failed, and making them re-run the
+/// interaction by hand against a values file they had to write is exactly the diagnosis experience
+/// the RFC complains about.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum ExecutedPlans {
+  #[default]
+  Never,
+  OnFailure,
+  Always,
+}
+
+impl ExecutedPlans {
+  fn from_options(options: Option<&Value>) -> ExecutedPlans {
+    match options
+      .and_then(|options| options.get("executed-plan"))
+      .and_then(Value::as_str)
+    {
+      Some("always") => ExecutedPlans::Always,
+      Some("on-failure") => ExecutedPlans::OnFailure,
+      Some(other) => {
+        tracing::warn!(value = %other, "unknown 'executed-plan' option; no executed plans will be emitted");
+        ExecutedPlans::Never
+      }
+      None => ExecutedPlans::Never,
+    }
+  }
+
+  fn wants(&self, matched: bool) -> bool {
+    match self {
+      ExecutedPlans::Never => false,
+      ExecutedPlans::OnFailure => !matched,
+      ExecutedPlans::Always => true,
+    }
+  }
+}
+
 impl Filter {
   /// `options.variants` (a list) or `options.variant` (one), both naming recorded variant ids.
   fn from_options(options: Option<&Value>) -> Filter {
@@ -386,8 +427,19 @@ pub(crate) fn start(
   stream: Arc<Stream>,
 ) -> Run {
   let filter = Filter::from_options(options.as_ref());
+  let executed_plans = ExecutedPlans::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
-  let thread = thread::spawn(move || run(sources, targets, content, hooks, filter, thread_stream));
+  let thread = thread::spawn(move || {
+    run(
+      sources,
+      targets,
+      content,
+      hooks,
+      filter,
+      executed_plans,
+      thread_stream,
+    )
+  });
   Run { stream, thread }
 }
 
@@ -397,6 +449,7 @@ fn run(
   content: Option<Arc<dyn ContentComponent>>,
   hooks: Option<HookRunner>,
   filter: Filter,
+  executed_plans: ExecutedPlans,
   stream: Arc<Stream>,
 ) {
   let interactions: usize = sources.iter().map(Source::interactions).sum();
@@ -442,6 +495,7 @@ fn run(
             targets: &targets,
             content: content.as_deref(),
             filter: &filter,
+            executed_plans,
             stream: &stream,
             hooks: hooks.as_mut(),
           },
@@ -628,6 +682,7 @@ struct RunContext<'a> {
   targets: &'a [Target],
   content: Option<&'a dyn ContentComponent>,
   filter: &'a Filter,
+  executed_plans: ExecutedPlans,
   stream: &'a Stream,
   hooks: Option<&'a mut HookRunner>,
 }
@@ -1049,13 +1104,15 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   }
 
   let mut reply = None;
+  let mut executed_plan = None;
   if result.is_none()
     && let Some(request) = parts
   {
-    match drive(exchange, request, target, ctx.content) {
-      Ok((payload, inbound)) => {
-        result = Some(payload);
-        reply = inbound;
+    match drive(exchange, request, target, ctx.content, ctx.executed_plans) {
+      Ok(driven) => {
+        executed_plan = driven.executed;
+        result = Some(driven.payload);
+        reply = driven.reply;
       }
       Err(payload) => result = Some(payload),
     }
@@ -1081,6 +1138,13 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   ctx
     .stream
     .emit("verification/interaction-result", payload.clone());
+
+  // The evidence follows the verdict it produced (spec §9.6's `verification/executed-plan`, which
+  // is where `explain --executed` gets its input): a reader learns *that* a variant failed, then
+  // reads the tree showing where. The other order makes them scroll back.
+  if let Some(executed) = executed_plan {
+    ctx.stream.emit("verification/executed-plan", executed);
+  }
 
   // 4. state-teardown, reverse order, always.
   let outcome = payload["status"].as_str().unwrap_or("failed");
@@ -1153,12 +1217,21 @@ fn hook_failure_payload(exchange: &Exchange<'_>, status: &str, hook: &str, error
 /// variant on the shape path, compiled from matching rules on the v1–v4 path, and by here just a
 /// plan either way. `Ok` carries the result payload and the inbound parts (for `after-response`);
 /// `Err` carries a payload for the cases where nothing came back to match.
+/// What one driven exchange produced: the result payload, the inbound parts (for
+/// `after-response`), and the executed plan when the run was asked for one.
+struct Driven {
+  payload: Value,
+  reply: Option<Parts>,
+  executed: Option<Value>,
+}
+
 fn drive(
   exchange: &Exchange<'_>,
   request: Parts,
   target: &Target,
   content: Option<&dyn ContentComponent>,
-) -> Result<(Value, Option<Parts>), Value> {
+  executed_plans: ExecutedPlans,
+) -> Result<Driven, Value> {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
 
@@ -1199,6 +1272,7 @@ fn drive(
   let response = find_container(&executed, "response").unwrap_or(&executed);
   let (status, mismatches) = outcome(response);
 
+  let matched = status == Status::Matched;
   let payload = match status {
     Status::Matched => {
       tracing::debug!(%variant, "variant verified");
@@ -1212,7 +1286,24 @@ fn drive(
       })
     }
   };
-  Ok((payload, Some(reply)))
+
+  // The whole executed tree, not just the response subtree that was scored: `explain --executed`
+  // is a diagnosis tool, and what the request replayed as is part of the diagnosis.
+  let executed = executed_plans.wants(matched).then(|| {
+    json!({
+      "interaction": reference,
+      "variant": variant,
+      "status": if matched { "verified" } else { "failed" },
+      "text": plan::render_executed(&executed),
+      "plan": plan::plan_json(&exchange.ready.plan),
+    })
+  });
+
+  Ok(Driven {
+    payload,
+    reply: Some(reply),
+    executed,
+  })
 }
 
 /// This engine's resolution against the one the contract recorded, when they differ (§6.4).

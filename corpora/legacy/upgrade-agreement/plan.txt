@@ -1,0 +1,43 @@
+(
+  :"get a count" (
+    :request (
+      :method (
+        %match:equality (
+          %lower-case (
+            $.request.method
+          ),
+          %lower-case (
+            'GET'
+          )
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/count'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      ),
+      :headers ()
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (),
+      :body (
+        %match:type (
+          $.response.body,
+          42
+        )
+      )
+    )
+  )
+)

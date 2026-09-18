@@ -5,12 +5,14 @@
 
 use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
 use super::events::{Event, Poll, Stream};
+use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
+use crate::upgrade;
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -184,6 +186,8 @@ impl Engine {
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
+      "verification/explain" => self.handle_explain(id, body),
+      "upgrade/pact" => self.handle_upgrade(id, body),
       "events/poll" => self.handle_poll(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
     }
@@ -430,6 +434,57 @@ impl Engine {
     stream
   }
 
+  /// `verification/explain` (spec §8.3): compile one interaction and return the plan's pretty text
+  /// form, optionally the structured plan document.
+  ///
+  /// **A kernel operation precisely so no SDK builds its own** (the RFC). The three subjects a
+  /// host can name are the three documents a plan is ever compiled from — an interaction
+  /// specification, a Janus contract's interaction, a v1–v4 pact's interaction — and each is
+  /// compiled by the *same* compiler the matching path uses, never a rendering-only imitation of
+  /// it. `explain` of an *executed* plan is served by the event stream (spec §9), not here.
+  fn handle_explain(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: Explain = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let plan = match explain::compile(&req.interaction) {
+      Ok(plan) => plan,
+      Err(err) => return ResponseFrame::err(id, explain_error(err)),
+    };
+    let mut result = json!({ "text": crate::plan::render_pretty(&plan) });
+    if req
+      .options
+      .as_ref()
+      .and_then(|options| options.get("plan"))
+      .and_then(Value::as_bool)
+      .unwrap_or(false)
+    {
+      result["plan"] = crate::plan::plan_json(&plan);
+    }
+    ResponseFrame::ok(id, result)
+  }
+
+  /// `upgrade/pact` (spec §8.4): a v1–v4 pact in, a Janus contract and its findings out.
+  ///
+  /// **Session-less on purpose** — conversion is pure document-in, document-out, so there is
+  /// nothing to allocate and nothing to release. The findings are half the result, not a
+  /// diagnostic channel: contract-file spec §8.1 requires the conversion to be honest rather than
+  /// lossless, and a caller that ignored them would be reading only half of what it was told.
+  fn handle_upgrade(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: UpgradePact = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    match upgrade::pact("pact", &req.pact) {
+      Ok(upgraded) => {
+        let contract = serde_json::to_value(&upgraded.contract).expect("Contract always serializes");
+        let findings = serde_json::to_value(&upgraded.findings).expect("Findings always serialize");
+        ResponseFrame::ok(id, json!({ "contract": contract, "findings": findings }))
+      }
+      Err(err) => ResponseFrame::err(id, contract_error(err)),
+    }
+  }
+
   /// `events/poll` (spec §9.4). Every named stream must be live: an unknown or ended id fails the
   /// whole call with `stream-not-found` rather than being skipped, because a host that mixed a
   /// stale id into its list would otherwise read "no events" as "not yet".
@@ -507,6 +562,45 @@ impl Engine {
 /// doesn't match it is `malformed-frame`, same as an envelope violation (§4.4).
 fn parse_body<T: DeserializeOwned>(body: Value) -> Result<T, EngineError> {
   serde_path_to_error::deserialize(body).map_err(|err| EngineError::malformed_frame(err.to_string()))
+}
+
+/// `upgrade/pact`'s request body (spec §8.4, `schemas/v1/upgrade.schema.json`).
+#[derive(serde::Deserialize)]
+struct UpgradePact {
+  pact: Value,
+  #[allow(dead_code)]
+  #[serde(default)]
+  options: Option<Value>,
+}
+
+/// A document that could not be read at all. Everything a *conversion* could not carry is a
+/// finding, not an error (contract-file spec §8.1), so this covers exactly the window before the
+/// conversion starts.
+fn contract_error(err: crate::contract::ContractError) -> EngineError {
+  use crate::contract::ContractError;
+  match err {
+    ContractError::NotAContract => EngineError::not_a_contract(0, None),
+    ContractError::VersionUnsupported { format } => EngineError::not_a_contract(0, Some(&format)),
+    ContractError::Invalid { problems } => EngineError::contract_invalid(&problems),
+  }
+}
+
+/// [`ExplainError`] as the protocol's error taxonomy: a subject kind the engine does not know is
+/// an operation it does not have, and a document that will not parse is the user's to fix.
+fn explain_error(err: ExplainError) -> EngineError {
+  match err {
+    ExplainError::KindUnsupported(kind) => {
+      EngineError::operation_unsupported(&format!("verification/explain (subject kind: {kind})"))
+    }
+    ExplainError::Missing(member) => EngineError::malformed_frame(format!(
+      "verification/explain: '{member}' is required for this subject kind"
+    )),
+    ExplainError::NoSuchInteraction { index, count } => EngineError::malformed_frame(format!(
+      "verification/explain: no interaction at index {index}; the document has {count}"
+    )),
+    ExplainError::Invalid(problems) => EngineError::interaction_invalid(&problems),
+    ExplainError::NotReadable(message) => EngineError::malformed_frame(message),
+  }
 }
 
 /// [`VerifyError`] as the protocol's own error taxonomy (spec §10.2). Each arm is a different

@@ -18,8 +18,11 @@ pub use interpret::{
 pub use legacy::{
   LegacyRequest, LegacyResponse, compile_interaction as compile_legacy_interaction,
   compile_request as compile_legacy_request, compile_response as compile_legacy_response,
+  winning_rule as legacy_winning_rule,
 };
-pub use model::{DocumentKind, GRAMMAR_VERSION, Literal, Node, NodeKind, Plan};
+pub use model::{
+  DocumentKind, GRAMMAR_VERSION, Literal, Node, NodeKind, Plan, from_json, to_json as plan_json,
+};
 pub use render::{executed as render_executed, pretty as render_pretty};
 pub use resolve::{CapturedValues, ContentDetector, Resolver};
 pub use value::{RuntimeValue, navigate};

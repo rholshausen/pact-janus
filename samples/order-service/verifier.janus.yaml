@@ -5,10 +5,12 @@
 # file — interpolating `${VAR}`, inlining the script, resolving paths against *this* directory —
 # and the engine receives a document with no templates and no file references in it (ADR 0014).
 #
-#   PROVIDER_URL=http://127.0.0.1:8080 janus verify --config samples/order-service/verifier.janus.yaml
+#   PROVIDER_URL=http://127.0.0.1:8080 CLIENT_ID=janus-demo CLIENT_SECRET=janus-demo-secret \
+#     janus verify samples/order-service/pacts \
+#       --provider-url http://127.0.0.1:8080 --config samples/order-service/verifier.janus.yaml
 #
-# (`janus verify` is plan task 5.5; until it lands, `engine/kernel/tests/hooks.rs` drives exactly
-# this shape of document through the protocol.)
+# Nothing in here names the kind of document being verified: the same file verifies this repo's
+# Janus contracts and the v3 pact under `pacts/` (plan tasks 5.4 and 5.5).
 
 version: 1
 

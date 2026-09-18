@@ -239,6 +239,49 @@ pub fn request_parts(request: &HttpRequest) -> Parts {
   parts
 }
 
+/// The pact's own recorded response, in the same wire vocabulary [`request_parts`] uses — status,
+/// headers, body. What a contract's recorded variant carries alongside the request (contract-file
+/// spec §8.3: "its `parts` are the pact's request and response examples"), so an upgraded contract
+/// holds the same evidence the pact did.
+pub fn response_parts(response: &HttpResponse) -> Parts {
+  let mut part: Part = Part::new();
+  part.insert(
+    "status".to_string(),
+    SlotValue {
+      content: Value::from(response.status),
+      encoded: None,
+      content_type: None,
+    },
+  );
+  let headers: BTreeMap<String, Vec<String>> = response
+    .headers
+    .as_ref()
+    .map(|map| {
+      map
+        .iter()
+        .map(|(name, values)| (name.to_ascii_lowercase(), values.clone()))
+        .collect()
+    })
+    .unwrap_or_default();
+  if !headers.is_empty() {
+    part.insert("headers".to_string(), multi_map_slot(headers.into_iter()));
+  }
+  if let OptionalBody::Present(bytes, content_type, _) = &response.body {
+    part.insert(
+      "body".to_string(),
+      SlotValue {
+        content: Value::String(BASE64.encode(bytes)),
+        encoded: Some("base64".to_string()),
+        content_type: content_type.as_ref().map(ToString::to_string),
+      },
+    );
+  }
+
+  let mut parts: Parts = Parts::new();
+  parts.insert("response".to_string(), part);
+  parts
+}
+
 /// A reply's header slots as the single-valued captures design 3.5's compiled plans resolve
 /// against: `$.<part>.headers.<lower-cased name>`, one string per name.
 ///

@@ -8,8 +8,11 @@
 //! other way, replaying a contract's recorded variants at a provider — and the event streams it
 //! reports on ([`events`], spec §9), which is the delivery model every reporting operation shares.
 //!
-//! Not yet implemented — later tasks, not silently dropped: `verification/explain` and
-//! `upgrade/*` (plan task 5.5), `engine/shutdown`. Emissive (message) interactions and routing one inbound request
+//! Also here: `verification/explain` ([`explain`], plan task 5.5) — one interaction compiled to a
+//! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
+//! the session-less v1–v4 conversion ([`crate::upgrade`]).
+//!
+//! Not yet implemented — later tasks, not silently dropped: `engine/shutdown`. Emissive (message) interactions and routing one inbound request
 //! across several concurrently armed interactions (variant-semantics spec §4.1) are also not
 //! here — `start-transport` only drives passive HTTP today, one armed exchange at a time per
 //! transport instance, which is what a sequential `serve-variant` loop actually needs.
@@ -18,6 +21,7 @@ mod consumer_session;
 mod engine;
 mod events;
 mod exchange;
+mod explain;
 mod frame;
 mod hello;
 mod session;

@@ -22,12 +22,21 @@ path = "src/bin/janus_engine.rs"
 pact_janus_kernel = { path = "../engine/kernel" }
 pact_janus_component_http = { path = "../engine/component-http" }
 pact_janus_component_json = { path = "../engine/component-json" }
+# The capabilities the kernel deliberately lacks (lifecycle-hooks spec §8.5, ADR 0013): a
+# filesystem for `verifier.janus.yaml`, a process for `exec` hooks, a socket for `http` ones.
+pact_janus_hooks_host = { path = "../engine/hooks-host" }
+pact_janus_component_oauth2 = { path = "../engine/component-oauth2" }
 serde_json = "1"
 # The CLI is where the kernel's `tracing` facade actually goes somewhere (CLAUDE.md: "a subscriber
 # is an application concern, installed by whatever embeds the kernel"). `janus-engine` installs it
 # so `RUST_LOG=trace` shows the frames `Engine::dispatch` traces on every call.
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# A real provider on a real socket for the CLI's own tests: `janus verify` is only worth testing
+# against something that can actually answer, and the one the plan calls for is in this repo.
+pact_janus_sample_order_service = { path = "../samples/order-service" }
 
 [lints]
 workspace = true

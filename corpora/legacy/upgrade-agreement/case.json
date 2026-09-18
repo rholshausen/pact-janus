@@ -1,0 +1,49 @@
+{
+  "description": "a v3 pact and the shapes `janus upgrade` converts it into produce the same verdict over the same values — plan-grammar spec section 4.4's two-path agreement, for the conversion of design 2.5 rather than a hand-written equivalent",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get a count",
+          "request": { "method": "GET", "path": "/count" },
+          "response": {
+            "status": 200,
+            "body": 42,
+            "matchingRules": {
+              "body": { "$": { "matchers": [ { "match": "type" } ] } }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a count",
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "equality", "example": "/count" }
+        },
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": { "shape": "type", "example": 42 }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/count",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": 7
+  },
+  "result": { "status": "matched" }
+}
