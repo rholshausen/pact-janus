@@ -209,6 +209,7 @@ fn report(event: &Value) {
           payload["hook"].as_str().unwrap_or("?"),
           payload["point"].as_str().unwrap_or("?")
         );
+        print_error(&payload["error"]);
       }
     }
     // The result line that follows says everything these two carry; printing them as well would
@@ -227,25 +228,45 @@ fn print_error(error: &Value) {
 
 fn render_summary(summary: &Value) -> String {
   let variants = &summary["variants"];
+  // `variants.total` counts what the run reached. An aborted run reached less than it planned, and
+  // the rest is in the hook report as not run (lifecycle-hooks spec §10.2) — counted beside the
+  // tallies, never folded into them, so "of 0 variant(s)" does not read as a run with nothing in it.
+  let not_run = summary["hooks"]["aborted"]["exchanges-not-run"]
+    .as_u64()
+    .unwrap_or(0);
   let mut text = format!(
-    "{}: {} verified, {} failed, {} state-unavailable, {} skipped (of {} variant(s) across {} interaction(s))",
+    "{}: {} verified, {} failed, {} state-unavailable, {} skipped{} (of {} variant(s) across {} interaction(s))",
     summary["status"].as_str().unwrap_or("failed").to_uppercase(),
     variants["verified"],
     variants["failed"],
     variants["state-unavailable"],
     variants["skipped"],
-    variants["total"],
+    if not_run > 0 {
+      format!(", {not_run} not run")
+    } else {
+      String::new()
+    },
+    variants["total"].as_u64().unwrap_or(0) + not_run,
     summary["interactions"],
   );
   if summary["filtered"] == json!(true) {
     text.push_str("\nThis was a filtered run: unreplayed variants are not passing ones.");
   }
+  // The abort is the headline of a run that ended this way, so it carries its cause: "the auth
+  // hook failed" sends a reader to the logs for what the report already knows.
   if let Some(abort) = summary.get("aborted").filter(|a| !a.is_null()) {
     text.push_str(&format!(
-      "\nThe run was aborted by the '{}' hook at {}.",
+      "\nThe run was aborted by the '{}' hook at {}",
       abort["hook"].as_str().unwrap_or("?"),
       abort["point"].as_str().unwrap_or("?")
     ));
+    match abort.get("error").filter(|e| !e.is_null()) {
+      Some(error) => text.push_str(&format!(
+        ":\n  {}",
+        engine::render_error(error).replace('\n', "\n  ")
+      )),
+      None => text.push('.'),
+    }
   }
   text
 }

@@ -236,6 +236,47 @@ fn verify_json_prints_the_summary_document_a_script_can_read() {
   assert_eq!(summary["variants"]["verified"], json!(2));
 }
 
+/// A hook that aborts the run is the run's headline, so the text says *why* — here, the token
+/// endpoint of a provider nobody started — rather than only that the hook failed.
+#[test]
+fn a_run_aborted_by_a_hook_says_what_the_hook_hit() {
+  let port = std::net::TcpListener::bind("127.0.0.1:0")
+    .and_then(|listener| listener.local_addr())
+    .expect("a free port")
+    .port();
+  let url = format!("http://127.0.0.1:{port}");
+  let config = temp("verifier-unreachable.yaml");
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\nhooks:\n  before-verification:\n    - name: auth\n      run: {{ kind: component, component: oauth2 }}\n      config:\n        token-url: \"{url}/oauth/token\"\n        client-id: janus-demo\n        client-secret: janus-demo-secret\n"
+    ),
+  )
+  .expect("writing the config");
+  let output = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    &url,
+    "--config",
+    &config,
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 1, "{text}\nstderr: {}", stderr(&output));
+  assert!(
+    text.contains("hook    auth at before-verification: failed\n          token-endpoint-unreachable:"),
+    "the hook's line carries its error: {text}"
+  );
+  assert!(
+    text.contains("aborted by the 'auth' hook at before-verification:\n  token-endpoint-unreachable:"),
+    "the summary names the cause: {text}"
+  );
+  assert!(
+    text.contains("0 skipped, 2 not run (of 2 variant(s) across 2 interaction(s))"),
+    "what the abort left undone is counted, not dropped: {text}"
+  );
+}
+
 // ---------------------------------------------------------------------------------------------
 // explain
 // ---------------------------------------------------------------------------------------------
