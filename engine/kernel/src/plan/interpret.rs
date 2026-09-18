@@ -846,11 +846,11 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
 }
 
 /// `match:min-type`/`match:max-type`/`match:min-max-type` (legacy only, plan task 3.5's
-/// `MinType`/`MaxType`/`MinMaxType`): a `match:type` check, plus a collection-size bound enforced
-/// only when the resolved value actually is a collection. That guard is what lets a cascaded
-/// `MinType` (plan task 3.5's compiler reaches every descendant of the path it was declared on)
-/// pass through scalar descendants as a plain type check instead of wrongly re-applying an
-/// ancestor's own cardinality bound to them.
+/// `MinType`/`MaxType`/`MinMaxType`): a `match:type` check, plus a size bound enforced only when
+/// the resolved value is an **array** — v1–v4's own rule (`pact_matching`'s JSON matcher bounds
+/// only `(Array, Array)`). A string's characters and an object's members are not items: on either,
+/// these are a plain type check, so `''` under a `MinType` of 1 is a string, not a mismatch. A
+/// cascaded rule never reaches here bounded — the legacy compiler reduces it to `match:type`.
 fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u64>) -> NodeResult {
   let (actual, expected) = (value_of(&children[0]), value_of(&children[1]));
   if matches!(actual, RuntimeValue::Absent) || kind_of(&actual) != kind_of(&expected) {
@@ -859,7 +859,11 @@ fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u
       path: locus(children),
     };
   }
-  match length_of_opt(&actual) {
+  let len = match &actual {
+    RuntimeValue::Array(items) => Some(items.len() as u64),
+    _ => None,
+  };
+  match len {
     Some(len) if min.is_some_and(|min| len < min) => NodeResult::Error {
       message: format!("Expected at least {} item(s) but got {len}", min.unwrap_or(0)),
       path: locus(children),

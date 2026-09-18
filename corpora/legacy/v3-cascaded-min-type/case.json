@@ -1,0 +1,48 @@
+{
+  "description": "v3 cascading of a bounded type rule: `min` is the declaring array's own size, enforced there and nowhere below it — a cascaded MinType is a plain type check, so an empty string and an empty nested array under it are not mismatches",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get an order",
+          "request": { "method": "GET", "path": "/orders/66" },
+          "response": {
+            "status": 200,
+            "body": {
+              "items": [ { "sku": "sku-0", "tags": [ "gift" ] } ]
+            },
+            "matchingRules": {
+              "body": {
+                "$.items": { "matchers": [ { "min": 2, "match": "type" } ] }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders/66",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": {
+      "items": [ { "sku": "", "tags": [] } ]
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.items",
+        "message": "Expected at least 2 item(s) but got 1",
+        "action": "match:min-type"
+      }
+    ]
+  }
+}

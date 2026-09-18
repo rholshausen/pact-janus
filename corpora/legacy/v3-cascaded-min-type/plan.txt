@@ -1,0 +1,72 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          %upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders/66'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        :"$.items" (
+          %match:min-type (
+            $.response.body.items,
+            [{'sku': 'sku-0', 'tags': ['gift']}],
+            2
+          ),
+          %for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              :"$.items[*].sku" (
+                %match:type (
+                  ~>.sku,
+                  'sku-0'
+                )
+              ),
+              :"$.items[*].tags" (
+                %match:type (
+                  ~>.tags,
+                  ['gift']
+                ),
+                %for-each (
+                  ** (
+                    ~>.tags
+                  ),
+                  :"$.items[*].tags[*]" (
+                    %match:type (
+                      ~>,
+                      'gift'
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

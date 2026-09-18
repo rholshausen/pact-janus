@@ -1,0 +1,42 @@
+{
+  "description": "a bounded type rule declared directly on a string or an object is a plain type check: v1-v4 bound only arrays, so a string's characters and an object's members are never counted as items",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get a customer",
+          "request": { "method": "GET", "path": "/customers/7" },
+          "response": {
+            "status": 200,
+            "body": {
+              "name": "Ada Lovelace",
+              "address": { "city": "London" }
+            },
+            "matchingRules": {
+              "body": {
+                "$.name": { "matchers": [ { "min": 3, "match": "type" } ] },
+                "$.address": { "matchers": [ { "min": 2, "match": "type" } ] }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/customers/7",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": {
+      "name": "A",
+      "address": { "city": "Paris" }
+    }
+  },
+  "result": { "status": "matched" }
+}

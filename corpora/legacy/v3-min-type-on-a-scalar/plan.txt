@@ -1,0 +1,50 @@
+(
+  :"get a customer" (
+    :request (
+      :method (
+        %match:equality (
+          %upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/customers/7'
+        )
+      ),
+      :query (
+        %expect:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        :"$.address" (
+          :"$.address.city" (
+            %match:type (
+              $.response.body.address.city,
+              'London'
+            )
+          )
+        ),
+        :"$.name" (
+          %match:min-type (
+            $.response.body.name,
+            'Ada Lovelace',
+            3
+          )
+        )
+      )
+    )
+  )
+)

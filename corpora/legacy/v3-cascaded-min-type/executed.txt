@@ -1,0 +1,66 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          %upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders/66',
+          '/orders/66'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.items" (
+          %match:min-type (
+            $.response.body.items => [{'sku': '', 'tags': []}],
+            [{'sku': 'sku-0', 'tags': ['gift']}],
+            2
+          ) => ERROR(Expected at least 2 item(s) but got 1),
+          %for-each (
+            ** (
+              $.response.body.items => [{'sku': '', 'tags': []}]
+            ) => [{'sku': '', 'tags': []}],
+            :"$.items[*]" (
+              :"$.items[*].sku" (
+                %match:type (
+                  ~>.sku => '',
+                  'sku-0'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[*].tags" (
+                %match:type (
+                  ~>.tags => [],
+                  ['gift']
+                ) => BOOL(true),
+                %for-each (
+                  ** (
+                    ~>.tags => []
+                  ) => []
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

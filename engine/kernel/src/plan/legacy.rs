@@ -22,13 +22,10 @@
 //! because nothing more specific was declared closer to it — recomputing the winning rule fresh at
 //! every node (rather than threading a "current rule" down from the parent) is what makes a
 //! deeper, more specific rule automatically override a shallower one without this compiler ever
-//! having to notice the override happening. The one place cascading needs help from the
-//! interpreter rather than falling out for free: `MinType`/`MaxType`/`MinMaxType` carry a
-//! *collection* bound (an array or object's own size), and a cascaded rule reaches scalar
-//! descendants too — [`interpret`](super::interpret)'s `match:min-type`/`match:max-type`/
-//! `match:min-max-type` only enforce the bound when the resolved value is actually a collection,
-//! which is what keeps a `MinType` declared on an array from wrongly re-applying its count to
-//! every element several levels down.
+//! having to notice the override happening. The one place cascading does not fall out for free:
+//! `MinType`/`MaxType`/`MinMaxType` carry the declaring array's own size bound, and a cascaded rule
+//! reaches every descendant too. [`rule_list_node`] reduces a cascaded one to `Type`, so the bound
+//! is enforced once, on the array that declared it, and never re-applied several levels down.
 //!
 //! **Scope.** JSON bodies only (component-owned content types — XML, form, multipart — are out of
 //! scope until design 2.6's components exist, matching plan task 3.3's own JSON-first scope and
@@ -335,11 +332,21 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
 /// `RuleLogic::And`/`Or` (plan-grammar spec §4.2's `and`/`or` control actions — the interpreter
 /// already short-circuits `or` and conjoins `and`, so the combination needs no special handling
 /// here beyond picking the right wrapper).
-fn rule_list_node(list: &RuleList, resolve: Node, example: &Value) -> Node {
+/// One position's winning [`RuleList`] to its node. A `cascaded` list reached this position from a
+/// shallower path, and a cascaded `MinType`/`MaxType`/`MinMaxType` is reduced to `Type`: the bound
+/// is the declaring array's own size, and v1–v4 never re-apply it below that array — not to a
+/// scalar, and not to a nested array either (`pact_matching`'s JSON matcher checks the bound only
+/// when `!cascaded`). Emitting the bounded action would both misread in `explain` and misbehave.
+fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Value) -> Node {
   let mut nodes: Vec<Node> = list
     .rules
     .iter()
-    .map(|rule| rule_node(rule, resolve.clone(), example))
+    .map(|rule| match rule {
+      MatchingRule::MinType(_) | MatchingRule::MaxType(_) | MatchingRule::MinMaxType(_, _) if cascaded => {
+        rule_node(&MatchingRule::Type, resolve.clone(), example)
+      }
+      _ => rule_node(rule, resolve.clone(), example),
+    })
     .collect();
   match nodes.len() {
     1 => nodes.pop().expect("checked len == 1"),
@@ -366,7 +373,7 @@ fn compile_scalar_slot(
   let fragments = vec!["$".to_string()];
   let resolve = Node::resolve(format!("$.{}", path::root(part, slot)));
   match best_rule(category.as_ref(), &fragments, false) {
-    Some((list, _cascaded)) => rule_list_node(&list, resolve, example),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, example),
     // Method is the one scalar slot v1-v4 compares case-insensitively by default (spec test case
     // `method/method is different case`) — expressed with the existing `upper-case` core action
     // rather than a new one, since `match:equality`'s own children may be any value-producing node.
@@ -410,7 +417,7 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
       let resolve = Node::resolve(format!("$.{}.{lower_name}", path::root(part, "headers")));
       let example = Value::String(value.clone());
       let node = match best_rule(category.as_ref(), &fragments, true) {
-        Some((list, _cascaded)) => rule_list_node(&list, resolve, &example),
+        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
         // The v1-v4 default header comparison (module docs): not plain string equality — a
         // multi-valued (comma-separated) header tolerates whitespace around the commas, and a
         // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
@@ -451,7 +458,7 @@ fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, p
         let resolve = Node::resolve(format!("{base}[{index}]"));
         let example = Value::String(value.clone());
         let node = match best_rule(category.as_ref(), &fragments, false) {
-          Some((list, _cascaded)) => rule_list_node(&list, resolve, &example),
+          Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
           None => Node::action(
             "match:equality",
             vec![resolve, Node::value(Literal::from_json(&example))],
@@ -621,7 +628,7 @@ fn compile_body_value(value: &Value, ctx: &BodyCtx) -> Vec<Node> {
 
 fn compile_body_scalar(value: &Value, ctx: &BodyCtx) -> Node {
   match ctx.best() {
-    Some((list, _cascaded)) => rule_list_node(&list, ctx.resolve(), value),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), value),
     None => Node::action(
       "match:equality",
       vec![ctx.resolve(), Node::value(Literal::from_json(value))],
@@ -646,6 +653,7 @@ fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) 
   {
     return vec![rule_list_node(
       &list,
+      false,
       ctx.resolve(),
       &Value::Object(members.clone()),
     )];
@@ -682,9 +690,10 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 /// rule cascades into the template's own path.
 fn compile_body_array(items: &[Value], ctx: &BodyCtx) -> Vec<Node> {
   match ctx.best() {
-    Some((list, _cascaded)) => {
+    Some((list, cascaded)) => {
       let mut nodes = vec![rule_list_node(
         &list,
+        cascaded,
         ctx.resolve(),
         &Value::Array(items.to_vec()),
       )];

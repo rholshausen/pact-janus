@@ -1,0 +1,50 @@
+(
+  :"get a customer" (
+    :request (
+      :method (
+        %match:equality (
+          %upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/customers/7',
+          '/customers/7'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %expect:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.address" (
+          :"$.address.city" (
+            %match:type (
+              $.response.body.address.city => 'Paris',
+              'London'
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.name" (
+          %match:min-type (
+            $.response.body.name => 'A',
+            'Ada Lovelace',
+            3
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)
