@@ -1,0 +1,145 @@
+# Findings for Phase 9
+
+A running list of things found while *using* the prototype that belong to Phase 9's review (plan
+§12) rather than to the task that turned them up: gaps between what v1–v4 did and what Janus can say,
+design questions a fix would have to answer first, and anything else task 9.2's "what we learned" or
+task 9.4's staged plan should not have to rediscover. Each entry says what was observed, how to
+reproduce it, what the current code and specs do about it, and the options — not a decision. A
+decision that comes out of the review lands as an ADR, and the entry links to it.
+
+## 1. Media-type header values: a consumer's `application/json` must accept `; charset=utf-8`
+
+**Found:** 2026-09-18, comparing the plan of the order-service v3 pact with the plan of the contract
+`janus upgrade` produced from it. **Status:** open — reported by the upgrade as a `judgement` finding,
+not fixed.
+
+### What v1–v4 do, and why
+
+A consumer test author writes the content type they depend on:
+
+```json sketch
+"headers": { "Content-Type": "application/json" }
+```
+
+and the provider answers `content-type: application/json; charset=utf-8`. That must **pass**: the
+author said "JSON" and the provider sent JSON; the charset is a detail the author did not constrain,
+and a framework or proxy on the provider side adding it is not a contract break. But if the author
+*did* constrain it — `application/json; charset=utf-8` — then a provider sending
+`application/json; charset=iso-8859-1` must **fail**, because the author named that parameter and the
+provider sent a different value for it.
+
+v1–v4 encode exactly this as their default header comparison. The legacy compiler emits it as
+`match:header-value` (`engine/kernel/src/plan/legacy.rs`, `compile_headers`), a legacy-only core action
+(plan-grammar spec §4.4) implemented in `engine/kernel/src/plan/interpret.rs` (`header_values_match`):
+
+- a MIME-shaped value compares the base type case-insensitively, and every parameter named in the
+  **expected** value must be present in the actual one with a case-insensitively equal value. Extra
+  actual parameters, and a different parameter order, do not fail it (pact specification test cases
+  `matches content type with charset`, `... with parameters in different order`, `content type
+  parameters do not match`);
+- a comma-separated value tolerates whitespace around the commas (`whitespace after comma different`);
+- anything else is exact, case-sensitive equality (`header value is different case`).
+
+### What the upgraded contract does
+
+The shape language has no operator for that comparison, so the upgrade writes a header value with no
+matching rule as `equality` — and each header as a list of lines, because the HTTP transport keeps
+repeated header lines as separate entries. The same header compiles to:
+
+```text
+pact plan                                   janus plan
+:"$.Content-Type" (                         :"$.content-type" (
+  %match:header-value (                       %expect:count ( $.response.headers.content-type, 1 ),
+    $.response.headers.content-type,          :"$.content-type[0]" (
+    'application/json'                          %match:equality (
+  )                                               $.response.headers.content-type[0],
+)                                                 'application/json' ) ) )
+```
+
+Run against a provider response of `content-type: application/json; charset=utf-8`:
+
+```text
+pact:   %match:header-value (… 'application/json; charset=utf-8', 'application/json') => BOOL(true)
+janus:  %match:equality     (… 'application/json; charset=utf-8', 'application/json')
+          => ERROR(Expected 'application/json; charset=utf-8' to equal 'application/json')
+```
+
+The upgrade already says so — `rule-narrowed` (`judgement`) at the response headers, "the shape
+language has no operator for that comparison yet" (`engine/kernel/src/upgrade.rs`, `headers_slot`).
+It is `judgement` rather than `lossy` because the contract is *stricter* than the pact: it produces
+false failures, never false passes. That is the safe direction, and it is still wrong for the
+commonest header there is. Three differences, in decreasing order of how often they will bite:
+
+1. **Unconstrained parameters fail.** The charset case above. A provider whose framework appends
+   `; charset=utf-8` — most of them — fails every interaction that names a content type.
+2. **List whitespace fails.** `a, b` against `a,b`.
+3. **Repeated header lines fail.** `expect:count 1` rejects a provider that sends the header on two
+   lines, which v1–v4 would have seen as one comma-joined value.
+
+The sample provider happens to send exactly `application/json`, which is why the order-service
+verification passes both ways and the gap only showed up by reading the two plans side by side.
+
+### Reproduce
+
+```sh
+janus upgrade samples/order-service/pacts/web-app-order-service.json --out contract.janus.json
+# values files: the order-service response, with the header set to
+#   "application/json; charset=utf-8"                   (pact: a string)
+#   ["application/json; charset=utf-8"]                 (contract: a list of lines)
+janus explain samples/order-service/pacts/web-app-order-service.json --executed pact-values.json  # exit 0
+janus explain contract.janus.json --executed janus-values.json                                    # exit 1
+```
+
+### Why the fix is not just "use `match:header-value`"
+
+`match:header-value` exists only for the legacy compiler, and plan-grammar spec §4.4 keeps it there:
+it is v1–v4's specified default written down, not a shape. Giving the shape language an unnamespaced
+media-type operator would put HTTP knowledge in the core vocabulary, which shape-language spec §3.5
+forbids outright ("the kernel knows nothing about HTTP") and which kernel-boundary-review.md exists to
+catch. The rule the RFC and ADR 0007 both want is that a native Janus contract can say what a v1–v4
+pact said by default — here, "this media type, with at least these parameters" — as an explicit,
+reviewable shape.
+
+### Options
+
+- **A. `http:media-type`, contributed by the HTTP component** (shape spec §3.5; component-interfaces
+  spec §7). The same route §3.5 takes for `http:status-class`: a namespaced operator owned by the
+  component that knows what a media type is, with the requirement recorded on the interaction.
+  Semantics as the author states them: the type and subtype must match (case-insensitively); every
+  parameter the shape names must be present with that value; parameters it does not name are admitted
+  and ignored — which is shape-language §4.3's must-ignore default applied to parameters, so it fits
+  the language rather than bending it. Comparability can be declared `exact` (component-interfaces
+  §7.5): `admits(P) ⊆ admits(C)` iff the types match and C's named parameters are a subset of P's with
+  equal values, which the subsumption checker can decide. Costs: parsing needs a `matcher/apply`
+  action rather than a core-only fragment, and the HTTP component, today a transport only, gains a
+  matcher interface. Note that `http:status-class` is in the same position: the upgrade already writes
+  it into contracts, and no loaded component implements it yet.
+- **B. A generic, HTTP-free core operator** — a parameterised-token or "structured string with named
+  parameters" comparison general enough to be core. Avoids a component, but no second user of it is in
+  sight, and a core operator is forever (shape spec §3.5: unnamespaced names are reserved for the
+  specification). Likely to end up HTTP-shaped under a neutral name.
+- **C. Keep `equality` and make the upgrade write a looser shape** — e.g. a `regex` anchored on the
+  media type. Needs no spec change, but loses the "a named parameter must match" half: a regex that
+  admits any charset admits the wrong one too, which is exactly the case that must fail. Also leaves
+  native contracts with no way to say it, only upgraded ones.
+
+Differences 2 and 3 (list whitespace, repeated lines) are the same question for list-valued headers
+generally (RFC 9110 §5.3 lets a recipient combine repeated field lines with commas), and option A's
+component is the natural owner of that too — either the same operator family, or a transport-level
+normalisation the HTTP component applies when it builds the headers slot. Which of the two is a
+component-interfaces question: does the transport present a header as its lines or as its combined
+value?
+
+**Suggested for review:** option A, specified in shape-language §3.5 and component-interfaces §7
+before any code, with the upgrade then writing `http:media-type` for any `Content-Type` (and
+`Accept`-like) header without a matching rule, and dropping this `rule-narrowed` finding for them.
+
+### Pointers
+
+- `engine/kernel/src/plan/interpret.rs` — `header_values_match`, `mime_parts`: the v1–v4 semantics.
+- `engine/kernel/src/plan/legacy.rs` — `compile_headers`: where the legacy plan uses it.
+- `engine/kernel/src/upgrade.rs` — `headers_slot`: the `rule-narrowed` finding; `status_slot`: the
+  `http:status-class` precedent.
+- Shape-language spec §3.5 (component operators), §4.3 (must-ignore); component-interfaces spec §7
+  (matcher interface), §7.5 (comparability); plan-grammar spec §4.4 (legacy-only actions);
+  contract-file spec §8.4 (findings).
