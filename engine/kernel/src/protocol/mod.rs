@@ -12,7 +12,7 @@
 //! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
 //! the session-less v1–v4 conversion ([`crate::upgrade`]).
 //!
-//! Not yet implemented — later tasks, not silently dropped: `engine/shutdown`. Emissive (message) interactions and routing one inbound request
+//! Not yet implemented — later tasks, not silently dropped: emissive (message) interactions and routing one inbound request
 //! across several concurrently armed interactions (variant-semantics spec §4.1) are also not
 //! here — `start-transport` only drives passive HTTP today, one armed exchange at a time per
 //! transport instance, which is what a sequential `serve-variant` loop actually needs.

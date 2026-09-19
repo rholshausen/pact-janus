@@ -53,6 +53,12 @@ fn main() {
       Ok(Some(request)) => {
         let response = engine.dispatch(&request);
         write_frame(&mut writer, &response);
+        // engine-protocol spec §6: the shutdown response is written before exit, so a host can
+        // tell a clean shutdown from a crash.
+        if engine.is_shut_down() {
+          tracing::info!("engine/shutdown answered, exiting");
+          std::process::exit(0);
+        }
       }
       Ok(None) => {
         tracing::info!("stdin closed, exiting");

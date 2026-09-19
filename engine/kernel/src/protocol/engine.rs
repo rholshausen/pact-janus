@@ -23,6 +23,9 @@ use std::time::Duration;
 
 pub struct Engine {
   hello_done: bool,
+  /// Set by `engine/shutdown` (spec §6): every later call is `engine-shut-down`, and a subprocess
+  /// embedding exits once the shutdown response is written ([`Engine::is_shut_down`]).
+  shut_down: bool,
   sessions: SessionStore,
   /// Transport components this embedding registered, by name (component-interfaces spec §3.4,
   /// design 2.6) — empty for a plain [`Engine::new`], which is a legitimate engine that simply
@@ -67,6 +70,7 @@ impl Engine {
   pub fn new() -> Self {
     Engine {
       hello_done: false,
+      shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
       content: None,
@@ -90,6 +94,7 @@ impl Engine {
   ) -> Self {
     Engine {
       hello_done: false,
+      shut_down: false,
       sessions: SessionStore::default(),
       transports,
       content,
@@ -173,12 +178,16 @@ impl Engine {
   fn dispatch_frame(&mut self, request: RequestFrame) -> ResponseFrame {
     let RequestFrame { id, op, body, .. } = request;
 
+    if self.shut_down {
+      return ResponseFrame::err(id, EngineError::engine_shut_down());
+    }
     if op != "engine/hello" && !self.hello_done {
       return ResponseFrame::err(id, EngineError::handshake_required());
     }
 
     match op.as_str() {
       "engine/hello" => self.handle_hello(id, body),
+      "engine/shutdown" => self.handle_shutdown(id),
       "consumer-session/create" => self.handle_create(id, body),
       "consumer-session/add-interaction" => self.handle_add_interaction(id, body),
       "consumer-session/variants" => self.handle_variants(id, body),
@@ -208,6 +217,25 @@ impl Engine {
         EngineError::protocol_version_unsupported(&[crate::PROTOCOL_VERSION]),
       ),
     }
+  }
+
+  /// `engine/shutdown` (spec §6): release every session, answer `ok: {}`, and go inert. Consumer
+  /// sessions end with their transports stopped. A verification run in flight is left to finish on
+  /// its own thread with nothing left to deliver its events to — a subprocess embedding's exit ends
+  /// it, and a run has no host-visible resource to leak (spec §7.1).
+  fn handle_shutdown(&mut self, id: String) -> ResponseFrame {
+    self.sessions.end_all();
+    self.streams.clear();
+    self.verifications.clear();
+    self.shut_down = true;
+    tracing::info!("engine/shutdown: all sessions released");
+    ResponseFrame::ok(id, json!({}))
+  }
+
+  /// Whether `engine/shutdown` has been answered: a subprocess embedding exits once it has written
+  /// that response (spec §6: "respond `ok: {}`, and then exit").
+  pub fn is_shut_down(&self) -> bool {
+    self.shut_down
   }
 
   fn handle_create(&mut self, id: String, body: Value) -> ResponseFrame {
@@ -672,6 +700,36 @@ mod tests {
     );
     assert_eq!(ok["ok"]["protocol-version"], 1);
     engine
+  }
+
+  #[test]
+  fn shutdown_releases_every_session_answers_ok_and_leaves_the_engine_inert() {
+    let mut engine = engine_after_hello();
+    let created = send(
+      &mut engine,
+      "consumer-session/create",
+      json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" } } }),
+    );
+    let session = created["ok"]["session"].as_str().expect("session id").to_string();
+
+    let shutdown = send(&mut engine, "engine/shutdown", json!({}));
+    assert_eq!(
+      shutdown["ok"],
+      json!({}),
+      "spec §6: respond ok: {{}} before exiting"
+    );
+    assert!(engine.is_shut_down());
+
+    // Inert: every later call, the handshake included, is engine-shut-down — and the session it
+    // released is not reachable through it.
+    for (op, body) in [
+      ("consumer-session/finalise", json!({ "session": session })),
+      ("engine/hello", json!({ "protocol-versions": [1] })),
+      ("engine/shutdown", json!({})),
+    ] {
+      let err = send(&mut engine, op, body);
+      assert_eq!(err["error"]["code"], "engine-shut-down", "{op}");
+    }
   }
 
   #[test]

@@ -576,6 +576,14 @@ impl SessionStore {
   pub fn end(&mut self, session: &str) -> Option<ConsumerSession> {
     self.sessions.remove(session)
   }
+
+  /// `engine/shutdown` (spec §6): ends every session, stopping its transports, and reports none of
+  /// them — a host that wanted results would have finalised first.
+  pub fn end_all(&mut self) {
+    for (_, mut session) in self.sessions.drain() {
+      session.stop_transports();
+    }
+  }
 }
 
 #[cfg(test)]

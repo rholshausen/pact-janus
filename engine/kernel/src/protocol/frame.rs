@@ -73,6 +73,16 @@ impl EngineError {
     }
   }
 
+  /// `engine-shut-down` (spec §6): a call after `engine/shutdown` on a pipe that outlives it.
+  pub fn engine_shut_down() -> Self {
+    EngineError {
+      code: "engine-shut-down".to_string(),
+      category: "protocol".to_string(),
+      message: "the engine has been shut down (engine/shutdown); open a new engine".to_string(),
+      details: None,
+    }
+  }
+
   /// `operation-unsupported` (spec §4.1, §10.2): an unknown or unimplemented `op`, named.
   pub fn operation_unsupported(op: &str) -> Self {
     EngineError {
