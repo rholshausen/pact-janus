@@ -17,6 +17,20 @@ subprocess, named by `JANUS_ENGINE`; `npm test` builds one first. The WASM embed
 Node's primary cannot host a consumer test's mock server yet —
 [Phase 9 finding 3](../Documentation/phase-9-findings.md).
 
+## JVM (task 6.3)
+
+[`jvm/`](jvm/) is Java 17, written from the SDK specification alone, without reading the TypeScript
+SDK. That is plan task 6.3's test of whether the specification transmits behaviour. The result is
+[`Documentation/jvm-sdk-from-spec-report.md`](../Documentation/jvm-sdk-from-spec-report.md). The
+idiomatic layer is the Gradle project `jvm/sdk` (`io.pact.janus.sdk`), spelled as
+[`STYLE.md`](jvm/STYLE.md) records, with a JUnit Jupiter extension that finalises after each test class.
+The RFC's consumer example runs against the real engine in
+[`OrderConsumerTest`](jvm/sdk/src/test/java/io/pact/janus/sdk/OrderConsumerTest.java). It embeds the
+engine as the `janus-engine` subprocess, named by `JANUS_ENGINE`. `./gradlew build` (from `jvm/`) builds
+the engine with cargo before the tests run. Chicory, ADR 0003's primary JVM embedding, cannot host the
+mock server either ([Phase 9 finding 3](../Documentation/phase-9-findings.md)). The
+`io.pact.janus.sdk.engine.FramePipe` interface is where one would plug in.
+
 ## Generated bindings (task 6.1)
 
 Layer 1 of every SDK: typed views of the spec schemas [`bindings.json`](bindings.json) names — the
