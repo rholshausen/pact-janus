@@ -379,6 +379,18 @@ kind has no such concept ignores it.
 - **Matching is not the transport's.** It carries parts; the kernel matches them.
 - **Content is not the transport's** (§4).
 
+### 5.5 Which slots carry content
+
+Only the transport knows which of its slots hold content — octets a content component turns into and
+out of documents — and which hold plain values: an HTTP response's `body` is content; its `status` and
+its `headers` map are not, although `headers` is as structured a JSON value as any body. The kernel
+cannot tell them apart without learning the transport's slot vocabulary, which is exactly the
+knowledge B3 keeps out of it (plan task 3.8). So a transport **declares** it, as `content-slots` in its
+`TransportContribution` (part name → slot names; HTTP: `{ "request": ["body"], "response": ["body"] }`).
+When the engine produces parts for a transport — a reply, or a request it sends — it passes a declared
+content slot's value through the content component to encode it, and every other slot as its plain
+JSON value. A transport that declares no content slots is handed plain values only.
+
 ## 6. The content interface
 
 Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).

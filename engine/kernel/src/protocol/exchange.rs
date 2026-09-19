@@ -22,7 +22,7 @@
 use super::session::{ExchangeOutcome, Exercised};
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
 use crate::component::{
-  ContentComponent, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
+  ContentComponent, ContentSlots, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
 use crate::plan::{Mismatch, Plan, Status, execute, outcome};
 use serde_json::Value;
@@ -129,7 +129,7 @@ fn handle_inbound(
   }
 
   let reply_parts = match status {
-    Status::Matched => response_parts(&armed.response_parts, content),
+    Status::Matched => response_parts(&armed.response_parts, &transport.content_slots(), content),
     Status::Mismatched => mismatch_reply(&mismatches, content),
   };
   let delivered = transport.reply(Reply {
@@ -173,15 +173,26 @@ fn handle_inbound(
 }
 
 /// The generated `response` payload, wired for reply (component-interfaces spec §4).
+/// Only the slots the transport declares as content go through the content component
+/// (component-interfaces spec §5.5); every other slot — an HTTP response's `headers` map is as
+/// structured as any body — is handed over as its plain JSON value.
 fn response_parts(
   response: &BTreeMap<String, BTreeMap<String, Value>>,
+  content_slots: &ContentSlots,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
   let mut parts = Parts::new();
   if let Some(slots) = response.get("response") {
+    let declared = content_slots.get("response");
     let mut part = Part::new();
     for (slot_name, value) in slots {
-      part.insert(slot_name.clone(), encode_slot(value, content));
+      let is_content = declared.is_some_and(|names| names.contains(slot_name));
+      let wired = if is_content {
+        encode_slot(value, content)
+      } else {
+        plain_slot(value)
+      };
+      part.insert(slot_name.clone(), wired);
     }
     parts.insert("response".to_string(), part);
   }

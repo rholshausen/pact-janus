@@ -16,8 +16,8 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
-  ComponentError, Dispose, DisposeResult, Inbound, Part, Parts, PollInbound, PollInboundResult, Reply,
-  ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult, TransportComponent,
+  ComponentError, ContentSlots, Dispose, DisposeResult, Inbound, Part, Parts, PollInbound, PollInboundResult,
+  Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult, TransportComponent,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -329,6 +329,15 @@ fn reply_parts(mut response: ureq::http::Response<ureq::Body>) -> Result<Parts, 
 }
 
 impl TransportComponent for HttpTransport {
+  /// Bodies are content; method, path, query, status and the headers map are plain values
+  /// (component-interfaces spec §5.5).
+  fn content_slots(&self) -> ContentSlots {
+    ContentSlots::from([
+      ("request".to_string(), vec!["body".to_string()]),
+      ("response".to_string(), vec!["body".to_string()]),
+    ])
+  }
+
   fn start(&self, req: Start) -> Result<StartResult, ComponentError> {
     match req.role.as_str() {
       "serve" => self.start_serve(req),
@@ -445,22 +454,33 @@ impl TransportComponent for HttpTransport {
       .get("status")
       .and_then(|slot| slot.content.as_u64())
       .unwrap_or(200) as u16;
-    let body = match response_part.get("body") {
+    let body_slot = response_part.get("body");
+    let body = match body_slot {
       Some(slot) => slot_bytes(slot)?,
       None => Vec::new(),
     };
     let mut response = tiny_http::Response::from_data(body).with_status_code(status);
+    let mut declared_content_type = false;
 
     if let Some(headers_slot) = response_part.get("headers")
       && let Value::Object(headers) = &headers_slot.content
     {
       for (name, values) in headers {
+        declared_content_type |= name.eq_ignore_ascii_case("content-type");
         for value in values.as_array().into_iter().flatten().filter_map(Value::as_str) {
           if let Ok(header) = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes()) {
             response = response.with_header(header);
           }
         }
       }
+    }
+    // The body's own media type labels it unless the interaction declared a Content-Type itself —
+    // the same rule the drive side applies to a request body.
+    if !declared_content_type
+      && let Some(content_type) = body_slot.and_then(|slot| slot.content_type.as_deref())
+      && let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes())
+    {
+      response = response.with_header(header);
     }
 
     request

@@ -81,6 +81,9 @@ pub struct Dispose {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DisposeResult {}
 
+/// Part name -> the slot names in it that carry content (component-interfaces spec §5.5).
+pub type ContentSlots = std::collections::BTreeMap<String, Vec<String>>;
+
 /// Native binding (spec §9.1): one method per operation, taking that operation's request document
 /// and returning `Result<ResultDocument, ComponentError>` — the same documents a byte-pipe binding
 /// would carry, passed as in-memory values instead.
@@ -95,6 +98,12 @@ pub struct DisposeResult {}
 // `Send`/`Sync` qualified with `::std::marker` because this module's own `Send` request struct
 // (below) would otherwise shadow the auto trait of the same name.
 pub trait TransportComponent: ::std::marker::Send + ::std::marker::Sync {
+  /// Which slots of which parts carry content (component-interfaces spec §5.5), as part name ->
+  /// slot names: the ones the engine encodes through a content component when it produces parts
+  /// for this transport. Every other slot is handed over as its plain JSON value. The in-tree form
+  /// of `TransportContribution.content-slots` — required, so no transport is silently mistaken for
+  /// one whose slots are all plain.
+  fn content_slots(&self) -> ContentSlots;
   fn start(&self, req: Start) -> Result<StartResult, ComponentError>;
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError>;
   fn send(&self, req: Send) -> Result<SendResult, ComponentError>;

@@ -23,6 +23,6 @@ pub use error::ComponentError;
 pub use hook::{HookComponent, Invoke};
 pub use parts::{Part, Parts, SlotValue};
 pub use transport::{
-  Dispose, DisposeResult, Inbound, PollInbound, PollInboundResult, Reply, ReplyResult, Send, SendResult,
-  Start, StartResult, Stop, StopResult, TransportComponent,
+  ContentSlots, Dispose, DisposeResult, Inbound, PollInbound, PollInboundResult, Reply, ReplyResult, Send,
+  SendResult, Start, StartResult, Stop, StopResult, TransportComponent,
 };

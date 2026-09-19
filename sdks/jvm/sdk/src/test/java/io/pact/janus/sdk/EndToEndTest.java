@@ -221,8 +221,8 @@ class EndToEndTest {
   }
 
   @Test
-  @DisplayName("FINDING: the mock serves none of the response headers the interaction declares, and labels no JSON body application/json")
-  void declaredResponseHeadersAreNotServed() {
+  @DisplayName("the mock serves the response headers the interaction declares [session.response.header-names-lower-cased]")
+  void declaredResponseHeadersAreServed() {
     Janus janus = janus();
     Interaction labelled = janus.interaction("labelled")
         .request(r -> r.method("GET").path("/labelled"))
@@ -231,8 +231,9 @@ class EndToEndTest {
     janus.execute(labelled, (mock, variant) -> {
       HttpResponse<String> response = send(mock.uri("/labelled"), "GET", null);
       assertEquals(200, response.statusCode());
-      assertTrue(response.headers().firstValue("content-type").isEmpty(), response.headers().map().toString());
-      assertTrue(response.headers().firstValue("x-served").isEmpty(), response.headers().map().toString());
+      assertEquals("application/json", response.headers().firstValue("content-type").orElse(null),
+          response.headers().map().toString());
+      assertEquals("yes", response.headers().firstValue("x-served").orElse(null), response.headers().map().toString());
     });
     assertTrue(janus.finalise().isPresent());
   }

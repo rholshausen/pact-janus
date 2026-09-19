@@ -60,6 +60,12 @@ fn order_interaction() -> Value {
 /// (or a 2s safety timeout, in case it doesn't) rather than a real header parser, since a partial
 /// read still leaves everything read so far in `response` (`Read::read_to_end`'s own guarantee).
 fn http_get(addr: &str, path: &str) -> (u16, Value) {
+  let (status, _, body) = http_get_with_headers(addr, path);
+  (status, body)
+}
+
+/// As [`http_get`], with the response's header lines too (names lower-cased).
+fn http_get_with_headers(addr: &str, path: &str) -> (u16, Vec<(String, String)>, Value) {
   let mut stream =
     TcpStream::connect(addr).unwrap_or_else(|err| panic!("connecting to the mock at {addr}: {err}"));
   stream
@@ -94,7 +100,13 @@ fn http_get(addr: &str, path: &str) -> (u16, Value) {
   } else {
     serde_json::from_slice(body).unwrap_or_else(|err| panic!("parsing the response body as JSON: {err}"))
   };
-  (status, json)
+  let headers = head
+    .lines()
+    .skip(1)
+    .filter_map(|line| line.split_once(':'))
+    .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
+    .collect();
+  (status, headers, json)
 }
 
 #[test]
@@ -395,6 +407,9 @@ struct UndeliverableTransport {
 }
 
 impl TransportComponent for UndeliverableTransport {
+  fn content_slots(&self) -> component::ContentSlots {
+    component::ContentSlots::new()
+  }
   fn start(&self, _: component::Start) -> Result<component::StartResult, component::ComponentError> {
     Ok(component::StartResult {
       endpoint: json!({ "kind": "http", "base-url": "http://unused" }),
@@ -518,4 +533,67 @@ fn a_matched_request_whose_response_never_reached_the_consumer_is_not_verified()
     finalised["ok"].get("contract").is_none(),
     "no contract for an undelivered response"
   );
+}
+
+/// The declared response headers are served as headers, and the JSON body is labelled with its
+/// media type — the headers map is as structured as a body, and only the transport's declaration
+/// (component-interfaces spec §5.5) tells the engine which of the two is content.
+#[test]
+fn declared_response_headers_are_served_and_a_json_body_is_labelled() {
+  let mut engine = engine_with_real_components();
+  hello(&mut engine);
+  let created = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" } } }),
+  );
+  let session = created["ok"]["session"].as_str().unwrap().to_string();
+  let mut interaction = order_interaction();
+  interaction["parts"]["response"]["headers"] = json!({ "shape": "object", "members": {
+    "x-served": { "shape": "equality", "example": ["yes"] } } });
+  interaction["parts"]["response"]["body"] = json!({ "shape": "object", "members": {
+    "id": { "shape": "equality", "example": 66 } } });
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let started = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let base_url = started["ok"]["endpoint"]["base-url"].as_str().unwrap();
+  let addr = base_url.trim_start_matches("http://").to_string();
+  send(
+    &mut engine,
+    "r-6",
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": "base" }),
+  );
+
+  let (status, headers, body) = http_get_with_headers(&addr, "/orders/66");
+  assert_eq!(status, 200);
+  assert_eq!(body, json!({ "id": 66 }));
+  let header = |name: &str| headers.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str());
+  assert_eq!(header("x-served"), Some("yes"), "{headers:?}");
+  assert_eq!(header("content-type"), Some("application/json"), "{headers:?}");
+
+  let finalised = send(
+    &mut engine,
+    "r-7",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(finalised["ok"]["results"][0]["status"], "verified");
 }

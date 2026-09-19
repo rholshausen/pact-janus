@@ -111,6 +111,11 @@
           "description": "The transport kind this component serves. Open vocabulary.",
           "x-known-values": ["http", "https", "message"]
         },
+        "content-slots": {
+          "type": "object",
+          "description": "Which slots of which parts carry content — octets a content component encodes and decodes (spec.md §5.5) — as part name -> slot names. Every other slot carries a plain JSON value the engine passes through unencoded. Absent means no slot carries content.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
         "roles": {
           "type": "array",
           "description": "Which roles it supports: 'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1). A transport may support both.",
