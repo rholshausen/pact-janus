@@ -126,8 +126,7 @@ neither is a DSL call.
     { "kind": "protocol-operation", "operation": "consumer-session/add-interaction" },
     { "kind": "protocol-operation", "operation": "consumer-session/start-transport" },
     { "kind": "protocol-operation", "operation": "consumer-session/variants" },
-    { "kind": "protocol-operation", "operation": "consumer-session/serve-variant" },
-    { "kind": "protocol-operation", "operation": "consumer-session/finalise" } ],
+    { "kind": "protocol-operation", "operation": "consumer-session/serve-variant" } ],
   "signature": [
     { "name": "interaction", "role": "options-bag", "description": "The built interaction-spec document." },
     { "name": "closure", "role": "closure", "description": "Runs once per selected variant, receiving (mock, variant)." } ],
@@ -175,7 +174,7 @@ mapping, never matching logic (shape-language example order-payload.md §2).
     { "name": "example", "role": "example-value" },
     { "name": "format", "role": "label",
       "description": "Optional. Omitted means ISO-8601 (shape spec §4.2)." } ],
-  "semantics": "Compiles to a shape-language 'datetime' node (shape spec §4.2). When the DSL infers 'format' from 'example' rather than requiring it explicitly, the inference rule MUST be named in the style guide (spec.md §5) as a deviation, because two SDKs inferring differently would silently disagree about what the same DSL call means.",
+  "semantics": "Compiles to a shape-language 'datetime' node (shape spec §4.2), with 'format' only when given. The DSL never infers a format from the example: two SDKs inferring differently would silently disagree about what the same DSL call means.",
   "errors": [], "conformance": [ "shape.datetime.format-parses", "shape.datetime.default-is-iso8601" ] }
 ```
 
@@ -210,7 +209,7 @@ mapping, never matching logic (shape-language example order-payload.md §2).
     { "name": "items", "role": "nested-shape" },
     { "name": "options", "role": "options-bag", "description": "{ min, max } — min defaults to 1." } ],
   "semantics": "Compiles to a shape-language 'each-like' node (shape spec §4.1). Contributes one 'cardinality' variant dimension with points 'min' and, when 'max' is finite and greater than 'min', 'max' (shape spec §6.4) — the SDK emits the node; it does not compute the dimension itself (shape spec §6).",
-  "errors": [], "conformance": [ "shape.each-like.cardinality-dimension", "shape.each-like.min-default-1" ] }
+  "errors": [], "conformance": [ "shape.each-like.cardinality-dimension", "shape.each-like.bounds-only-when-given" ] }
 ```
 
 ```json primitive
@@ -250,7 +249,7 @@ mapping, never matching logic (shape-language example order-payload.md §2).
     { "name": "discriminator", "role": "label" },
     { "name": "alternatives", "role": "options-bag",
       "description": "Name -> object literal; each MUST bind 'discriminator' to a distinct literal (shape spec §5.4)." } ],
-  "semantics": "Compiles to a shape-language 'one-of' node with one alternative per key of 'alternatives', each compiled as an object shape whose 'discriminator' member is bound to an 'equality' node over that key's literal binding — the DSL does not require the user to write the discriminator's equality node explicitly; it derives it from which literal the alternative's own object binds at that member (mirroring shape-language example order-payload.md §2's DSL-to-shape mapping). Contributes one 'alternative' variant dimension, one point per alternative, in declaration order (shape spec §6.4). It is a compile-time error, not a runtime one, if two alternatives bind 'discriminator' to the same literal or if an alternative omits it.",
+  "semantics": "Compiles to a shape-language 'one-of' node with one alternative per key of 'alternatives', each compiled as an object shape whose 'discriminator' member is bound to an 'equality' node over that key's literal binding — the DSL does not require the user to write the discriminator's equality node explicitly; it derives it from which literal the alternative's own object binds at that member (mirroring shape-language example order-payload.md §2's DSL-to-shape mapping). Contributes one 'alternative' variant dimension, one point per alternative, in declaration order (shape spec §6.4). Two alternatives binding 'discriminator' to the same literal, or an alternative omitting it, is rejected by the engine with 'interaction-invalid' when the interaction is added (shape spec §5.4); the SDK does not check it first.",
   "errors": [ { "code": "interaction-invalid",
                 "surfaced-as": "thrown at 'execute' time naming the duplicate or missing discriminator literal" } ],
   "conformance": [ "shape.one-of.discriminator-binding", "shape.one-of.alternative-dimension" ] }
@@ -268,7 +267,8 @@ consumer-session/variants          { session, handle }  -> the engine's selectio
 -- for each selected variant --
 consumer-session/serve-variant     { session, handle, variant }
                                     closure(mock, variant) runs; `mock.url` serves the armed variant
-consumer-session/finalise          { session }  -> { results, pact? }
+-- once per session, after the suite's last execute (the 'finalise' primitive) --
+consumer-session/finalise          { session }  -> { results, contract? }
 ```
 
 No step here is a decision the idiomatic layer makes — every one is a direct call with this example's own

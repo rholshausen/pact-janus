@@ -71,8 +71,9 @@ What this specification owns, and what it hands off:
 The **interaction specification** an author writes is this document's interaction record minus the
 evidence: the same `description`, `transport`, `states`, `parts` and `requires`, with no `selection`.
 Plan task 3.2 builds its parser; the schema names it `$defs/InteractionSpec` (added by plan task 6.1,
-whose SDK bindings need the type an SDK actually builds). Keeping one document with one optional half is what stops an author's
-input and the engine's output drifting into two schemas that describe the same thing differently.
+whose SDK bindings need the type an SDK actually builds). Keeping one document with one optional half
+is what stops an author's input and the engine's output drifting into two schemas that describe the
+same thing differently.
 
 ## 2. The document
 
@@ -187,7 +188,7 @@ reproduces the canonical bytes of §2.4, exactly. A round-trip test is the confo
 it is the only one — an implementation that cannot round-trip has not implemented this.
 
 **The directory is a rendering, never a second canonical form.** The engine returns a document, not a
-directory: the contract crosses the boundary as the `pact` member of `consumer-session/finalise` and
+directory: the contract crosses the boundary as the `contract` member of `consumer-session/finalise` and
 inline in `verification/verify` (protocol spec §8.2–8.3), and the kernel has no filesystem on the WASM
 path. Anything that reads a contract reads the packed form; the directory exists between a writer and a
 code review and nowhere else.

@@ -32,7 +32,11 @@ marked `sketch` show documents owned by other designs.
 ## 2. The canonical shape the SDK sends
 
 The DSL's job is sugar; what crosses the pipe is node objects (spec §3.2). The SDK adds no matching
-logic — it maps `eachLike` to `each-like`, `anyOf` to `any-of`, and stops.
+logic — it maps `eachLike` to `each-like`, `anyOf` to `any-of`, and stops. Two members below are
+written out by hand to show them, and are *not* what §1's DSL produces: `payment`'s `default`, and the
+`format`s on `shippedAt` and `dueDate` — the SDK behavioural specification (`sdk-specification/
+behavioural-spec.json`) never infers a format and never adds a default, so §1 compiles to this shape
+without them, which means the same thing (ISO-8601, and the lexicographically first alternative).
 
 ```json shape
 { "shape": "object",

@@ -42,10 +42,14 @@ sketched here):
             "interaction": {
               "description": "a request for an order",
               "transport": { "kind": "http", "mode": "passive" },
-              "request": { "method": "GET", "path": "/orders/66" },
-              "response": { "status": 200,
-                            "body": { "shape": { "id": { "type": "integer" },
-                                                 "discount": { "optional": { "type": "number" } } } } } } } }
+              "parts": {
+                "request": { "method": { "shape": "equality", "example": "GET" },
+                             "path": { "shape": "equality", "example": "/orders/66" } },
+                "response": { "status": { "shape": "equality", "example": 200 },
+                              "body": { "shape": "object", "members": {
+                                "id": { "shape": "integer", "example": 66 },
+                                "discount": { "shape": "optional",
+                                              "of": { "shape": "number", "example": 0.1 } } } } } } } } }
 ```
 
 `←`
@@ -65,8 +69,11 @@ sketched here):
 
 ```json
 { "type": "response", "id": "r-4",
-  "ok": { "variants": [ { "id": "base", "dimensions": { "response.body.discount": "present" } },
-                        { "id": "discount-absent", "dimensions": { "response.body.discount": "absent" } } ] } }
+  "ok": { "variants": [
+            { "id": "base", "label": "base", "origin": "base",
+              "assignment": [ { "dimension": "response.body.discount#presence", "point": "present" } ] },
+            { "id": "response.body.discount#presence=absent", "label": "discount=absent", "origin": "boundary",
+              "assignment": [ { "dimension": "response.body.discount#presence", "point": "absent" } ] } ] } }
 ```
 
 `→` start the HTTP transport; the result is an open endpoint descriptor, not a URL:
@@ -80,7 +87,8 @@ sketched here):
 
 ```json
 { "type": "response", "id": "r-5",
-  "ok": { "endpoint": { "scheme": "http", "host": "127.0.0.1", "port": 8123 } } }
+  "ok": { "endpoint": { "kind": "http", "host": "127.0.0.1", "port": 8123,
+                        "base-url": "http://127.0.0.1:8123" } } }
 ```
 
 `→` arm the first variant (this interaction is **passive**: the engine now waits for the
@@ -104,7 +112,7 @@ the protocol)*
 
 ```json
 { "type": "request", "id": "r-7", "op": "consumer-session/serve-variant",
-  "body": { "session": "cs-1", "handle": "i-1", "variant": "discount-absent" } }
+  "body": { "session": "cs-1", "handle": "i-1", "variant": "response.body.discount#presence=absent" } }
 ```
 
 `←`
@@ -127,7 +135,7 @@ and — because everything verified — the Janus contract document (persistence
 { "type": "response", "id": "r-8",
   "ok": { "results": [ { "handle": "i-1", "status": "verified",
                          "variants": [ { "variant": "base", "status": "verified" },
-                                       { "variant": "discount-absent", "status": "verified" } ] } ],
+                                       { "variant": "response.body.discount#presence=absent", "status": "verified" } ] } ],
           "contract": { "$format": "janus-contract/1",
                     "consumer": { "name": "web-app" }, "provider": { "name": "order-api" },
                     "interactions": [ { "description": "a request for an order" } ] } } }
