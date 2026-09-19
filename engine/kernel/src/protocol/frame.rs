@@ -5,6 +5,7 @@
 //! make the engine a lossy intermediary (spike 1.1, finding 14).
 
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use serde_json::{Map, Value};
 
 /// An incoming `RequestFrame` (spec §4.1). `extra` preserves any member this kernel does not
@@ -25,18 +26,27 @@ pub struct ResponseFrame {
   #[serde(rename = "type")]
   pub frame_type: &'static str,
   pub id: String,
+  /// Pre-serialised, so a document built from a typed model keeps its model's member order — a
+  /// `Value` map would sort it, and a contract's order is specified (contract-file spec §2.4).
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub ok: Option<Value>,
+  pub ok: Option<Box<RawValue>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub error: Option<EngineError>,
 }
 
 impl ResponseFrame {
   pub fn ok(id: impl Into<String>, ok: Value) -> Self {
+    Self::ok_serialized(id, &ok)
+  }
+
+  /// A result document serialised as its own type does it, member order included.
+  pub fn ok_serialized(id: impl Into<String>, ok: &impl Serialize) -> Self {
     ResponseFrame {
       frame_type: "response",
       id: id.into(),
-      ok: Some(ok),
+      ok: Some(
+        serde_json::value::to_raw_value(ok).expect("a result document is always representable as JSON"),
+      ),
       error: None,
     }
   }

@@ -348,9 +348,21 @@ impl Engine {
     session.stop_transports();
     let results = session.results();
     match session.contract() {
+      // Serialised from the model, not via `Value`: a `Value` map sorts members, and the contract's
+      // order is specified (contract-file spec §2.4 — `$format` first, then schema order).
       Ok(Some(contract)) => {
-        let contract = serde_json::to_value(&contract).expect("Contract always serializes");
-        ResponseFrame::ok(id, json!({ "results": results, "contract": contract }))
+        #[derive(serde::Serialize)]
+        struct Finalised<'a> {
+          results: &'a [Value],
+          contract: &'a crate::contract::Contract,
+        }
+        ResponseFrame::ok_serialized(
+          id,
+          &Finalised {
+            results: &results,
+            contract: &contract,
+          },
+        )
       }
       Ok(None) => ResponseFrame::ok(id, json!({ "results": results })),
       Err(problems) => ResponseFrame::err(id, EngineError::contract_invalid(&problems)),

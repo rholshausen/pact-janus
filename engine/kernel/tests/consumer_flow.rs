@@ -170,12 +170,10 @@ fn a_real_http_client_drives_every_variant_through_the_mock_to_a_written_contrac
     );
   }
 
-  let finalised = send(
-    &mut engine,
-    "r-99",
-    "consumer-session/finalise",
-    json!({ "session": session }),
-  );
+  let request = json!({ "type": "request", "id": "r-99", "op": "consumer-session/finalise",
+                        "body": { "session": session } });
+  let frame = engine.dispatch(&serde_json::to_vec(&request).unwrap());
+  let finalised: Value = serde_json::from_slice(&frame).unwrap();
   assert_eq!(
     finalised["ok"]["results"],
     json!([ { "handle": "i-1", "status": "verified",
@@ -203,6 +201,19 @@ fn a_real_http_client_drives_every_variant_through_the_mock_to_a_written_contrac
   assert_eq!(
     recorded_variants[0]["parts"]["response"]["status"]["content"], 200,
     "the recorded evidence is what the mock actually sent back, not a re-derivation"
+  );
+
+  // The frame carries the contract exactly as the canonical writer writes it — members in the
+  // specified order, `$format` first (contract-file spec §2.4) — so a host that writes the bytes
+  // it received writes a canonical contract.
+  let model: pact_janus_kernel::contract::Contract = serde_json::from_value(contract.clone()).unwrap();
+  let canonical = pact_janus_kernel::contract::write_canonical(&model).unwrap();
+  let canonical = std::str::from_utf8(&canonical).unwrap().trim_end();
+  assert!(
+    std::str::from_utf8(&frame)
+      .unwrap()
+      .contains(&format!("\"contract\":{canonical}")),
+    "finalise carries the canonical bytes:\n{canonical}"
   );
 }
 
