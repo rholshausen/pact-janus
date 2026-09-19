@@ -33,9 +33,7 @@ final class OrderClient {
   }
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  // HTTP/1.1, not the JDK's default: the engine's mock never answers a request that offers the
-  // HTTP/2 cleartext upgrade (see EndToEndTest's FINDING test and the 6.3 report).
-  private static final HttpClient HTTP = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+  private static final HttpClient HTTP = HttpClient.newHttpClient();
   private final URI baseUrl;
   private final boolean careless;
 

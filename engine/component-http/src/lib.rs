@@ -21,6 +21,7 @@ use pact_janus_kernel::component::{
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
+use std::io::Read;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -157,8 +158,21 @@ fn request_parts(request: &mut tiny_http::Request) -> Parts {
     Names::AsSent,
   );
 
+  // A client offering a protocol upgrade (`Connection: Upgrade` — curl's `--http2`, the JDK's
+  // default HttpClient) gets tiny_http's raw socket as its body reader, so reading "to the end"
+  // would wait for the client to hang up while the client waits for the response. The mock never
+  // accepts an upgrade — answering HTTP/1.1 and ignoring the offer is what RFC 9110 §7.8 allows —
+  // so only the body the request declared is read.
+  let upgrade_offered = headers.iter().any(|(name, value)| {
+    name.eq_ignore_ascii_case("connection") && value.to_ascii_lowercase().contains("upgrade")
+  });
   let mut body = Vec::new();
-  let _ = request.as_reader().read_to_end(&mut body);
+  if upgrade_offered {
+    let declared = request.body_length().unwrap_or(0) as u64;
+    let _ = request.as_reader().take(declared).read_to_end(&mut body);
+  } else {
+    let _ = request.as_reader().read_to_end(&mut body);
+  }
   let content_type = headers
     .iter()
     .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))

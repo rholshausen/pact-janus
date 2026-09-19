@@ -301,3 +301,44 @@ fn poll_inbound_times_out_with_no_arrival() {
 // assert here — that `start`/`send` answer `operation-unsupported` for it — has been replaced by
 // the role-confusion cases there: a *served* instance still refuses `send` by name, which is the
 // part of that assertion that was about the interface rather than about the task order.
+
+/// A client offering an upgrade (`curl --http2`, the JDK's default HttpClient) sends no body and no
+/// Content-Length, and waits for an answer. The mock must read nothing more, and answer HTTP/1.1.
+#[test]
+fn an_upgrade_offer_is_answered_over_http_1_1_without_waiting_for_the_client_to_hang_up() {
+  let transport = HttpTransport::new();
+  let (host, port) = start_serve(&transport, "t-upgrade");
+
+  let client = std::thread::spawn(move || {
+    let mut stream = TcpStream::connect((host.as_str(), port)).expect("mock server is listening");
+    let request = format!(
+      "GET /orders/1 HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: h2c\r\nHTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA\r\nConnection: Upgrade, HTTP2-Settings\r\n\r\n"
+    );
+    stream.write_all(request.as_bytes()).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let mut status_line = String::new();
+    BufReader::new(stream)
+      .read_line(&mut status_line)
+      .expect("an answer, not a hang");
+    status_line
+  });
+
+  let polled = transport
+    .poll_inbound(PollInbound {
+      instance: "t-upgrade".to_string(),
+      timeout_ms: 2000,
+    })
+    .unwrap()
+    .inbound
+    .expect("the request arrives while the client is still waiting");
+  assert_eq!(polled.parts["request"]["path"].content, json!("/orders/1"));
+  transport
+    .reply(Reply {
+      instance: "t-upgrade".to_string(),
+      event: polled.event,
+      parts: response_parts(200, "application/json", b"{}"),
+    })
+    .expect("the reply is delivered");
+
+  assert!(client.join().unwrap().starts_with("HTTP/1.1 200"));
+}

@@ -143,11 +143,9 @@ Interaction getOrder = janus.interaction("get an order")
   WASM call pipe's shape (engine-protocol spec §3.1).
 - **Protocol version.** Pinned to protocol 1. `engine/hello` offers `[1]` and declares no
   capabilities, so frames are always JSON and events are never pushed.
-- **HTTP clients against the mock.** The engine's mock server never answers a request that offers
-  the HTTP/2 cleartext upgrade, and the JDK's `HttpClient.newHttpClient()` offers it by default.
-  Consumer code under test must use `HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)`
-  (or any HTTP/1.1 client). This is an engine defect, recorded in the 6.3 report. The SDK cannot fix
-  it.
+- **HTTP clients against the mock.** Any HTTP/1.1 client works, including the JDK's
+  `HttpClient.newHttpClient()`: the mock declines its HTTP/2 cleartext upgrade offer and answers
+  over HTTP/1.1. (It did not answer at all until the fix following the 6.3 report.)
 
 ## Deviations from the behavioural specification
 

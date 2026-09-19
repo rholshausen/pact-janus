@@ -11,7 +11,7 @@
 
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
-use pact_janus_kernel::component::TransportComponent;
+use pact_janus_kernel::component::{self, TransportComponent};
 use pact_janus_kernel::protocol::Engine;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -373,5 +373,138 @@ fn a_request_that_does_not_match_the_armed_variant_fails_it_and_withholds_the_co
   assert!(
     finalised["ok"].get("contract").is_none(),
     "the honesty rule withholds the contract for a failed variant"
+  );
+}
+
+/// A transport whose one arrival matches, but whose reply can never be delivered — the client gave
+/// up, or the connection was unusable (as it was for an HTTP/2-upgrade offer before the HTTP
+/// transport learnt to answer one).
+struct UndeliverableTransport {
+  released: std::sync::Mutex<bool>,
+}
+
+impl TransportComponent for UndeliverableTransport {
+  fn start(&self, _: component::Start) -> Result<component::StartResult, component::ComponentError> {
+    Ok(component::StartResult {
+      endpoint: json!({ "kind": "http", "base-url": "http://unused" }),
+    })
+  }
+  fn stop(&self, _: component::Stop) -> Result<component::StopResult, component::ComponentError> {
+    Ok(component::StopResult {})
+  }
+  fn send(&self, _: component::Send) -> Result<component::SendResult, component::ComponentError> {
+    Err(component::ComponentError::transport_failed("no drive role here"))
+  }
+  fn poll_inbound(
+    &self,
+    req: component::PollInbound,
+  ) -> Result<component::PollInboundResult, component::ComponentError> {
+    let mut released = self.released.lock().unwrap();
+    if !*released {
+      drop(released);
+      std::thread::sleep(Duration::from_millis(req.timeout_ms.min(20)));
+      return Ok(component::PollInboundResult { inbound: None });
+    }
+    *released = false;
+    let slot = |v: Value| component::SlotValue {
+      content: v,
+      encoded: None,
+      content_type: None,
+    };
+    let mut request = component::Part::new();
+    request.insert("method".to_string(), slot(json!("GET")));
+    request.insert("path".to_string(), slot(json!("/orders/66")));
+    let mut parts = component::Parts::new();
+    parts.insert("request".to_string(), request);
+    Ok(component::PollInboundResult {
+      inbound: Some(component::Inbound {
+        event: "e-1".to_string(),
+        parts,
+        expects_reply: true,
+      }),
+    })
+  }
+  fn reply(&self, _: component::Reply) -> Result<component::ReplyResult, component::ComponentError> {
+    Err(component::ComponentError::transport_failed(
+      "connection reset by peer",
+    ))
+  }
+  fn dispose(&self, _: component::Dispose) -> Result<component::DisposeResult, component::ComponentError> {
+    Ok(component::DisposeResult {})
+  }
+}
+
+#[test]
+fn a_matched_request_whose_response_never_reached_the_consumer_is_not_verified() {
+  let transport = Arc::new(UndeliverableTransport {
+    released: std::sync::Mutex::new(false),
+  });
+  let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
+  transports.insert("http".to_string(), transport.clone());
+  let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  hello(&mut engine);
+
+  let created = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" } } }),
+  );
+  let session = created["ok"]["session"].as_str().unwrap().to_string();
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  send(
+    &mut engine,
+    "r-5",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  send(
+    &mut engine,
+    "r-6",
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": "base" }),
+  );
+
+  *transport.released.lock().unwrap() = true;
+  let deadline = std::time::Instant::now() + Duration::from_secs(5);
+  while *transport.released.lock().unwrap() {
+    assert!(
+      std::time::Instant::now() < deadline,
+      "the exchange loop never polled the arrival"
+    );
+    std::thread::sleep(Duration::from_millis(10));
+  }
+  std::thread::sleep(Duration::from_millis(100)); // let the loop finish replying and recording
+
+  let finalised = send(
+    &mut engine,
+    "r-7",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let variant = &finalised["ok"]["results"][0]["variants"][0];
+  assert_eq!(variant["status"], "failed", "{finalised}");
+  assert!(
+    variant["mismatches"][0]["message"]
+      .as_str()
+      .unwrap()
+      .contains("could not be delivered"),
+    "{variant}"
+  );
+  assert!(
+    finalised["ok"].get("contract").is_none(),
+    "no contract for an undelivered response"
   );
 }

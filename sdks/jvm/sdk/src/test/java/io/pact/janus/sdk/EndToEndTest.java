@@ -41,8 +41,8 @@ import org.junit.platform.engine.TestExecutionResult;
  */
 class EndToEndTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  // HTTP/1.1: see the FINDING test below.
-  private static final HttpClient HTTP = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+  // The JDK's default client, which offers an HTTP/2 cleartext upgrade the mock declines.
+  private static final HttpClient HTTP = HttpClient.newHttpClient();
   @TempDir Path contracts;
 
   private Janus janus() {
@@ -238,24 +238,16 @@ class EndToEndTest {
   }
 
   @Test
-  @DisplayName("FINDING: the engine's mock never answers the JDK HttpClient's default request, which offers an HTTP/2 cleartext upgrade; the engine still counts the variant verified")
-  void defaultJdkHttpClientIsNeverAnswered() throws Exception {
+  @DisplayName("the JDK HttpClient's default request, which offers an HTTP/2 cleartext upgrade, is answered over HTTP/1.1 and verified")
+  void defaultJdkHttpClientIsAnswered() throws Exception {
     Janus janus = janus();
     Interaction ping = janus.interaction("ping").request(r -> r.method("GET").path("/ping")).response(r -> r.status(204));
     HttpClient jdkDefault = HttpClient.newHttpClient();
-    List<Throwable> outcomes = new ArrayList<>();
-    janus.execute(ping, (mock, variant) -> {
-      try {
-        jdkDefault.send(HttpRequest.newBuilder(mock.uri("/ping")).timeout(Duration.ofSeconds(2)).GET().build(),
-            HttpResponse.BodyHandlers.ofString());
-        outcomes.add(null);
-      } catch (java.net.http.HttpTimeoutException e) {
-        outcomes.add(e);
-      }
-    });
-    assertEquals(1, outcomes.size());
-    assertInstanceOf(java.net.http.HttpTimeoutException.class, outcomes.get(0));
-    // the consumer never saw a response, yet the exchange verified and a contract is produced
+    List<Integer> statuses = new ArrayList<>();
+    janus.execute(ping, (mock, variant) -> statuses.add(
+        jdkDefault.send(HttpRequest.newBuilder(mock.uri("/ping")).timeout(Duration.ofSeconds(5)).GET().build(),
+            HttpResponse.BodyHandlers.ofString()).statusCode()));
+    assertEquals(List.of(204), statuses);
     assertTrue(janus.finalise().isPresent());
   }
 

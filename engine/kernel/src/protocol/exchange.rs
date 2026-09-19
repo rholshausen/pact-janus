@@ -132,15 +132,31 @@ fn handle_inbound(
     Status::Matched => response_parts(&armed.response_parts, content),
     Status::Mismatched => mismatch_reply(&mismatches, content),
   };
-  let _ = transport.reply(Reply {
+  let delivered = transport.reply(Reply {
     instance: instance.to_string(),
     event: inbound.event,
     parts: reply_parts,
   });
 
-  let exchange_outcome = match status {
-    Status::Matched => ExchangeOutcome::Verified,
-    Status::Mismatched => ExchangeOutcome::Failed,
+  // A variant is verified only if the consumer actually got the response it was armed with: a
+  // request that matched but whose reply never reached the client (the client gave up, or the
+  // connection was unusable) exercised nothing the consumer could have handled.
+  let (exchange_outcome, recorded) = match (status, delivered) {
+    (Status::Matched, Ok(_)) => (ExchangeOutcome::Verified, Vec::new()),
+    (Status::Matched, Err(err)) => {
+      tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, error = %err.message, "the matched request's response could not be delivered");
+      (
+        ExchangeOutcome::Failed,
+        vec![serde_json::json!({
+          "message": format!("the request matched, but its response could not be delivered to the consumer: {}", err.message),
+          "action": "transport:reply",
+        })],
+      )
+    }
+    (Status::Mismatched, _) => (
+      ExchangeOutcome::Failed,
+      mismatches.iter().map(mismatch_json).collect(),
+    ),
   };
   state
     .lock()
@@ -151,7 +167,7 @@ fn handle_inbound(
       Exercised {
         outcome: exchange_outcome,
         parts: armed.response_parts,
-        mismatches: mismatches.iter().map(mismatch_json).collect(),
+        mismatches: recorded,
       },
     );
 }
