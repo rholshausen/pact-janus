@@ -202,7 +202,14 @@ fn query_and_repeated_headers_are_grouped() {
   let (host, port) = start_serve(&transport, "t-2");
 
   let client = std::thread::spawn(move || {
-    raw_http_request(&host, port, "GET", "/orders?status=new&status=open", &[], b"")
+    raw_http_request(
+      &host,
+      port,
+      "GET",
+      "/orders?status=new&status=open&customerId=a%20b%26c",
+      &[],
+      b"",
+    )
   });
 
   let polled = transport
@@ -215,7 +222,12 @@ fn query_and_repeated_headers_are_grouped() {
     .unwrap();
   let request = &polled.parts["request"];
   assert_eq!(request["path"].content, json!("/orders"));
-  assert_eq!(request["query"].content, json!({ "status": ["new", "open"] }));
+  // Names keep their case (query parameters are case-sensitive, unlike headers); values arrive
+  // decoded, as a pact records them.
+  assert_eq!(
+    request["query"].content,
+    json!({ "customerId": ["a b&c"], "status": ["new", "open"] })
+  );
 
   transport
     .reply(Reply {

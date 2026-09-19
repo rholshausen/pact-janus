@@ -159,6 +159,7 @@ fn send_puts_the_recorded_request_on_the_wire_and_returns_the_reply_as_parts() {
   headers.insert("authorization".to_string(), json!(["Bearer token-1"]));
   let mut query = BTreeMap::new();
   query.insert("expand".to_string(), json!(["items"]));
+  query.insert("customerId".to_string(), json!(["a b&c"]));
 
   let reply = send(
     &transport,
@@ -196,9 +197,13 @@ fn send_puts_the_recorded_request_on_the_wire_and_returns_the_reply_as_parts() {
   .expect("await-reply: true returns the reply");
 
   let sent = received.recv_timeout(Duration::from_secs(5)).unwrap();
-  // Method upper-cased, query re-encoded from the slot, and the body's own content type applied
-  // from the slot rather than requiring the author to repeat it in `headers`.
-  assert_eq!(sent.request_line, "POST /orders?expand=items HTTP/1.1");
+  // Method upper-cased, query re-encoded from the slot (names as written, values encoded), and the
+  // body's own content type applied from the slot rather than requiring the author to repeat it in
+  // `headers`.
+  assert_eq!(
+    sent.request_line,
+    "POST /orders?customerId=a+b%26c&expand=items HTTP/1.1"
+  );
   assert!(
     sent
       .headers

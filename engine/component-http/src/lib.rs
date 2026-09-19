@@ -90,16 +90,26 @@ fn text_slot(text: impl Into<String>) -> SlotValue {
   }
 }
 
+/// How a `{name: [values...]}` slot treats names. HTTP header names are case-insensitive, so
+/// they are folded to lower case — the one spelling a shape can name them by (shape spec §3.6).
+/// Query parameter names are case-sensitive, in HTTP and in every v1–v4 pact, so they keep theirs.
+#[derive(Clone, Copy)]
+enum Names {
+  FoldCase,
+  AsSent,
+}
+
 /// Build a `{name: [values...]}` slot (headers, query — spec's own worked example shape, and
 /// `legacy.rs`'s existing `query`/`headers` slot vocabulary) from possibly-repeated name/value
-/// pairs, grouping and lower-casing names as it goes.
-fn multi_map_slot<'a>(entries: impl Iterator<Item = (&'a str, &'a str)>) -> SlotValue {
+/// pairs, grouping names as it goes.
+fn multi_map_slot<'a>(entries: impl Iterator<Item = (&'a str, &'a str)>, names: Names) -> SlotValue {
   let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
   for (name, value) in entries {
-    grouped
-      .entry(name.to_ascii_lowercase())
-      .or_default()
-      .push(value.to_string());
+    let name = match names {
+      Names::FoldCase => name.to_ascii_lowercase(),
+      Names::AsSent => name.to_string(),
+    };
+    grouped.entry(name).or_default().push(value.to_string());
   }
   let content = grouped
     .into_iter()
@@ -133,17 +143,19 @@ fn request_parts(request: &mut tiny_http::Request) -> Parts {
       )
     })
     .collect();
-  let headers_slot = multi_map_slot(headers.iter().map(|(n, v)| (n.as_str(), v.as_str())));
+  let headers_slot = multi_map_slot(
+    headers.iter().map(|(n, v)| (n.as_str(), v.as_str())),
+    Names::FoldCase,
+  );
 
-  let query_pairs: Vec<(String, String)> = query
-    .split('&')
-    .filter(|pair| !pair.is_empty())
-    .map(|pair| match pair.split_once('=') {
-      Some((name, value)) => (name.to_string(), value.to_string()),
-      None => (pair.to_string(), String::new()),
-    })
+  // Decoded, as a pact records them and as `query_string` encodes them on the way out.
+  let query_pairs: Vec<(String, String)> = form_urlencoded::parse(query.as_bytes())
+    .map(|(name, value)| (name.into_owned(), value.into_owned()))
     .collect();
-  let query_slot = multi_map_slot(query_pairs.iter().map(|(n, v)| (n.as_str(), v.as_str())));
+  let query_slot = multi_map_slot(
+    query_pairs.iter().map(|(n, v)| (n.as_str(), v.as_str())),
+    Names::AsSent,
+  );
 
   let mut body = Vec::new();
   let _ = request.as_reader().read_to_end(&mut body);
@@ -239,13 +251,13 @@ fn query_string(slot: &SlotValue) -> String {
   let Value::Object(query) = &slot.content else {
     return slot.content.as_str().unwrap_or_default().to_string();
   };
-  let mut pairs = Vec::new();
+  let mut pairs = form_urlencoded::Serializer::new(String::new());
   for (name, values) in query {
     for value in values.as_array().into_iter().flatten().filter_map(Value::as_str) {
-      pairs.push(format!("{name}={value}"));
+      pairs.append_pair(name, value);
     }
   }
-  pairs.join("&")
+  pairs.finish()
 }
 
 /// The provider's response as a `response` part — the same slot vocabulary the mock side records,
@@ -283,7 +295,10 @@ fn reply_parts(mut response: ureq::http::Response<ureq::Body>) -> Result<Parts, 
   );
   response_part.insert(
     "headers".to_string(),
-    multi_map_slot(headers.iter().map(|(n, v)| (n.as_str(), v.as_str()))),
+    multi_map_slot(
+      headers.iter().map(|(n, v)| (n.as_str(), v.as_str())),
+      Names::FoldCase,
+    ),
   );
   response_part.insert(
     "body".to_string(),
