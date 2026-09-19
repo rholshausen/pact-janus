@@ -187,8 +187,8 @@ class EndToEndTest {
   }
 
   @Test
-  @DisplayName("FINDING: a shape helper as a header value becomes each-like, so the engine adds a request cardinality dimension the consumer must satisfy by sending the header twice")
-  void helperHeaderValueAddsACardinalityDimension() {
+  @DisplayName("a shape helper as a header value means exactly one value, so a client sending the header once gets a contract [session.request.shape-value-is-exactly-one]")
+  void helperHeaderValueIsExactlyOneValue() {
     Janus janus = janus();
     Interaction traced = janus.interaction("traced ping")
         .request(r -> r.method("GET").path("/ping").header("X-Trace", regex("^[0-9a-f]+$", "abc123")))
@@ -199,9 +199,9 @@ class EndToEndTest {
       // a client that sends the header once, as nearly every client would
       send(mock.uri("/ping"), "GET", null, "X-Trace", "abc123");
     });
-    assertEquals(List.of("base", "request.headers.x-trace#cardinality=min+1"), ids);
-    ContractWithheldException withheld = assertThrows(ContractWithheldException.class, janus::finalise);
-    assertTrue(withheld.getMessage().contains("x-trace"), withheld.getMessage());
+    // Bounded at one, the each-like's cardinality has a single point: no request-side variant.
+    assertEquals(List.of("base"), ids);
+    assertTrue(janus.finalise().isPresent());
   }
 
   @Test

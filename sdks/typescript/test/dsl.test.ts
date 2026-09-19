@@ -103,7 +103,7 @@ describe("request and response parts", () => {
     });
   });
 
-  it("lower-cases header names, keeps query names, and carries every value as a list (session.request.header-names-lower-cased, session.request.query-names-as-written, session.request.multi-value-slots)", () => {
+  it("lower-cases header names, keeps query names, and carries every value as a list (session.request.header-names-lower-cased, session.request.query-names-as-written, session.request.multi-value-slots, session.request.shape-value-is-exactly-one)", () => {
     const spec = janus
       .interaction("x")
       .request({
@@ -124,7 +124,7 @@ describe("request and response parts", () => {
         shape: "object",
         members: {
           accept: { shape: "equality", example: ["application/json"] },
-          "x-trace": { shape: "each-like", items: { shape: "regex", pattern: "^t-", example: "t-1" } },
+          "x-trace": { shape: "each-like", items: { shape: "regex", pattern: "^t-", example: "t-1" }, min: 1, max: 1 },
         },
       },
     });

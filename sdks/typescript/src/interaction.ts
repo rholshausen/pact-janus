@@ -5,7 +5,7 @@
 import type { contract, shape } from "./generated/index.js";
 import { compile, type Shape, type Template } from "./shapes.js";
 
-/** A header or query parameter: one value, several values, or a shape each value must match. */
+/** A header or query parameter: one value, several values, or a shape its one value must match. */
 export type MultiValue = string | readonly string[] | Shape;
 
 export interface RequestParts {
@@ -92,8 +92,9 @@ function slots(members: Record<string, Template | undefined>): Record<string, sh
 
 /**
  * A `{ name: [values…] }` slot (shape spec §3.6): a string is the one-element list, a list is
- * itself, a shape describes each value. Header names are lower-cased, the only spelling the HTTP
- * transport presents them under; query names are kept as written.
+ * itself, a shape describes the one value — bounded at exactly one, since an unbounded `each-like`
+ * would add a request variant sending the header twice. Header names are lower-cased, the only
+ * spelling the HTTP transport presents them under; query names are kept as written.
  */
 function multiValueSlot(
   slot: string,
@@ -110,7 +111,7 @@ function multiValueSlot(
         ? { shape: "equality", example: [value] }
         : Array.isArray(value)
           ? { shape: "equality", example: [...value] }
-          : { shape: "each-like", items: compile(value as Shape) };
+          : { shape: "each-like", items: compile(value as Shape), min: 1, max: 1 };
   }
   return { [slot]: { shape: "object", members: compiled } };
 }

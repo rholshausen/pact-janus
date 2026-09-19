@@ -90,7 +90,7 @@ SDK (plan task 6.3); what that turned up is in
   shape helper. Maps with no defined order are written in key order (see Deviations).
 - Headers and query parameters use the name-to-list rule exactly as specified: a `String` →
   `equality` over `[value]`, a `List<String>` → `equality` over the list, a `ShapeNode` → `each-like`
-  of it. Header names are lower-cased with `Locale.ROOT`. Query names are kept as written.
+  of it, bounded at exactly one value (`min` 1, `max` 1). Header names are lower-cased with `Locale.ROOT`. Query names are kept as written.
 
 ```java
 Interaction getOrder = janus.interaction("get an order")

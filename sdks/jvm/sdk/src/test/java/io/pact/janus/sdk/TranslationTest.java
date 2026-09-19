@@ -183,7 +183,7 @@ class TranslationTest {
           { 'request': { 'headers': { 'shape': 'object', 'members': {
                 'accept': { 'shape': 'equality', 'example': ['application/json'] },
                 'x-many': { 'shape': 'equality', 'example': ['a', 'b'] },
-                'x-trace-id': { 'shape': 'each-like', 'items': { 'shape': 'regex', 'pattern': '^[0-9a-f]+$', 'example': 'abc123' } } } } },
+                'x-trace-id': { 'shape': 'each-like', 'items': { 'shape': 'regex', 'pattern': '^[0-9a-f]+$', 'example': 'abc123' }, 'min': 1, 'max': 1 } } } },
             'response': { 'headers': { 'shape': 'object', 'members': {
                 'content-type': { 'shape': 'equality', 'example': ['application/json'] } } } } }"""), parts);
     }
@@ -198,7 +198,7 @@ class TranslationTest {
           { 'shape': 'object', 'members': {
               'Page': { 'shape': 'equality', 'example': ['1'] },
               'tag': { 'shape': 'equality', 'example': ['a', 'b'] },
-              'q': { 'shape': 'each-like', 'items': { 'shape': 'string', 'example': 'shoes' } } } }"""), query);
+              'q': { 'shape': 'each-like', 'items': { 'shape': 'string', 'example': 'shoes' }, 'min': 1, 'max': 1 } } }"""), query);
     }
 
     @Test

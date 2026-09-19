@@ -25,8 +25,9 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
   /**
    * One header. Its name is lower-cased — the only spelling the HTTP transport presents header
    * names under. A string value is an {@code equality} over the one-element list {@code [value]};
-   * a list of strings an {@code equality} over that list; a shape helper's result describes each
-   * value and becomes an {@code each-like} whose {@code items} is that shape.
+   * a list of strings an {@code equality} over that list; a shape helper's result describes the one
+   * value and becomes an {@code each-like} whose {@code items} is that shape, bounded at exactly one
+   * (an unbounded one would add a request variant sending the header twice).
    */
   public SELF header(String name, Object value) {
     Objects.requireNonNull(name, "header name");
@@ -71,6 +72,8 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
     if (value instanceof ShapeNode node) {
       Shape each = Literals.node(ShapeShape.EACH_LIKE);
       each.setItems(node.binding());
+      each.setMin(1L);
+      each.setMax(1L);
       return each;
     }
     if (value instanceof String s) {
