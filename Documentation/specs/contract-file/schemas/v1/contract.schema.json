@@ -64,6 +64,35 @@
         "selection": { "$ref": "#/$defs/RecordedSelection" }
       }
     },
+    "InteractionSpec": {
+      "title": "InteractionSpec",
+      "description": "The interaction specification an author writes and a host submits to 'consumer-session/add-interaction': this document's interaction record minus the evidence — the same members as 'Interaction', with no 'selection' (spec.md §1). Not a member of a contract; it is defined here so the author's input and the engine's output stay one document with one optional half.",
+      "type": "object",
+      "required": ["description", "parts"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the interaction is, in the author's words (spec.md §4.2)."
+        },
+        "transport": { "$ref": "#/$defs/Transport" },
+        "states": {
+          "type": "array",
+          "description": "Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).",
+          "items": { "$ref": "#/$defs/State" }
+        },
+        "parts": {
+          "type": "object",
+          "description": "Part name -> slot name -> shape (shape spec §3.6).",
+          "additionalProperties": { "$ref": "#/$defs/ShapePart" }
+        },
+        "requires": {
+          "type": "array",
+          "description": "Components this interaction cannot be matched without (spec.md §7).",
+          "items": { "$ref": "#/$defs/Requirement" }
+        }
+      }
+    },
     "Transport": {
       "title": "Transport",
       "description": "How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).",

@@ -323,3 +323,65 @@ fn contract_blocks_lead_with_the_format_member() {
     }
   }
 }
+
+/// Every interaction specification the golden corpora submit, by case name.
+fn corpus_interaction_specs() -> Vec<(String, Value)> {
+  fn walk(dir: &Path, out: &mut Vec<(String, Value)>) {
+    for entry in std::fs::read_dir(dir).expect("corpora dir") {
+      let path = entry.expect("entry").path();
+      if path.is_dir() {
+        walk(&path, out);
+      } else if path.file_name().is_some_and(|n| n == "case.json") {
+        let case: Value =
+          serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("parse");
+        if case["input"]["kind"] == "spec" {
+          out.push((path.display().to_string(), case["input"]["spec"].clone()));
+        }
+      }
+    }
+  }
+  let mut out = Vec::new();
+  walk(
+    &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpora"),
+    &mut out,
+  );
+  out.sort_by(|a, b| a.0.cmp(&b.0));
+  out
+}
+
+/// The interaction specification an author writes is the contract's interaction record minus its
+/// evidence (spec §1), and `$defs/InteractionSpec` says so for the SDK bindings (plan task 6.1).
+/// Two checks keep that true: every interaction spec the kernel is already run against in the
+/// corpora is one, and every worked-example interaction with its `selection` removed is one.
+#[test]
+fn interaction_specs_are_contract_interactions_without_their_evidence() {
+  let schemas = load_schemas();
+  let spec = jsonschema::options()
+    .with_retriever(InMemory(schemas.clone()))
+    .build(
+      &json!({ "$ref": "https://pact.io/janus/contract/v1/contract.schema.json#/$defs/InteractionSpec" }),
+    )
+    .expect("compiling InteractionSpec");
+
+  let corpus = corpus_interaction_specs();
+  assert!(!corpus.is_empty(), "no interaction specs found under corpora/");
+  for (case, interaction) in &corpus {
+    check(&spec, interaction, case);
+  }
+
+  for (context, contract) in contracts() {
+    for (i, interaction) in contract["interactions"]
+      .as_array()
+      .into_iter()
+      .flatten()
+      .enumerate()
+    {
+      let mut without_evidence = interaction.clone();
+      without_evidence
+        .as_object_mut()
+        .expect("interaction object")
+        .remove("selection");
+      check(&spec, &without_evidence, &format!("{context}, interaction {i}"));
+    }
+  }
+}

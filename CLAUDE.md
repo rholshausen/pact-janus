@@ -52,8 +52,11 @@ engine/          Rust workspace members: kernel, built-in component crates, and 
                  the host side of hooks (loader, exec and http implementations), which lives
                  outside the kernel because it needs a filesystem, a process and a socket
 cli/             `janus` CLI (verify, explain, upgrade, check)
-sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration)
-sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration)
+sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
+                 its protocol bindings (task 6.1)
+sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bindings` project
+                 holds its protocol bindings (task 6.1)
+sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
 samples/         Demo subjects (workspace members), e.g. samples/order-service — the sample
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
@@ -65,7 +68,8 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
-                 and for the specs' worked examples
+                 and for the specs' worked examples — and tools/bindings, the binding-generation
+                 pipeline (task 6.1)
 Documentation/   Plan, ADRs, specs
 ```
 
@@ -95,7 +99,17 @@ npm test             # run tests (Vitest)
 npm run lint         # ESLint
 ```
 
-JVM (from `sdks/jvm/`): `./gradlew build test`.
+JVM (from `sdks/jvm/`, JDK 17): `./gradlew build test`.
+
+Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
+`sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to
+those schemas (needs Node, with `npm ci` done in `sdks/typescript/`, and JDK 17); CI regenerates
+and fails on any diff:
+
+```bash
+cargo run -p pact_janus_bindings -- generate                    # both SDKs
+cargo run -p pact_janus_bindings -- generate --only typescript  # or --only jvm
+```
 
 The `janus` CLI (`cli/src/main.rs`, plan task 5.5) drives the engine **through the protocol** — it
 builds frames and reads frames back, never the kernel's Rust API, so anything a command cannot do
@@ -115,7 +129,7 @@ Exit codes are part of the surface: `0` the command did what it was asked, `1` t
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
 normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`
 targets it alone). Its own protocol-level Node test client — plan task 4.5's "thin test client
-speaks the protocol directly," not an SDK (`sdks/README.md` stays empty until Phase 6) — lives at
+speaks the protocol directly," not an SDK, and deliberately outside `sdks/` — lives at
 `cli/tests/janus-engine-node/`: `npm install` once, then `npm test` (rebuilds the binary itself
 via `cargo build` in a `beforeAll`, so it never runs against a stale one). It installs the
 `tracing-subscriber` the kernel's own `tracing` facade needs (CLAUDE.md's Rust conventions below);

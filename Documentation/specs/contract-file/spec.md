@@ -70,7 +70,8 @@ What this specification owns, and what it hands off:
 
 The **interaction specification** an author writes is this document's interaction record minus the
 evidence: the same `description`, `transport`, `states`, `parts` and `requires`, with no `selection`.
-Plan task 3.2 builds its parser. Keeping one document with one optional half is what stops an author's
+Plan task 3.2 builds its parser; the schema names it `$defs/InteractionSpec` (added by plan task 6.1,
+whose SDK bindings need the type an SDK actually builds). Keeping one document with one optional half is what stops an author's
 input and the engine's output drifting into two schemas that describe the same thing differently.
 
 ## 2. The document

@@ -37,6 +37,45 @@ jobs:
       - name: Spec schema lint
         run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
 
+  bindings:
+    # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from
+    # the schemas today. A schema change without regenerated bindings — or a hand edit to a
+    # generated file — fails here, not later as an SDK quietly disagreeing with the engine.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install TypeScript SDK dependencies
+        run: npm ci
+        working-directory: sdks/typescript
+      - name: Regenerate bindings
+        run: cargo run --package pact_janus_bindings -- generate
+      - name: Bindings match their schemas
+        run: |
+          if [ -n "$(git status --porcelain -- sdks)" ]; then
+            git status --porcelain -- sdks
+            git diff -- sdks | head -200
+            echo "::error::Generated bindings differ from the schemas. Run 'cargo run -p pact_janus_bindings -- generate' and commit the result."
+            exit 1
+          fi
+      - name: TypeScript SDK
+        working-directory: sdks/typescript
+        run: npm run lint && npm test && npm run build
+      - name: JVM SDK
+        working-directory: sdks/jvm
+        run: ./gradlew build
+
   schema-compat:
     # Enforces the Engine Protocol's additive-evolution rules (spec §11.2) on
     # every schema any Phase 2 design ships — they all cross the same boundary,

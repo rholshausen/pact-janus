@@ -1,0 +1,24 @@
+[package]
+name = "pact_janus_bindings"
+description = "Binding-generation pipeline (plan task 6.1): normalises the spec schemas an SDK is built from into one standalone schema per type, drives the per-language generators, and renders each schema's open vocabularies as constants"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "janus-bindings"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+expectest = "0.12"
+pretty_assertions = "1"
+rstest = "0.26"
+
+[lints]
+workspace = true

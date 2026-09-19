@@ -24,3 +24,8 @@ dist/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 .vscode/
+
+# Gradle (JVM SDK prototype)
+.gradle/
+sdks/jvm/**/build/
+sdks/jvm/build/
