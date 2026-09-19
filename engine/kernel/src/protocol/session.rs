@@ -59,6 +59,10 @@ pub(crate) struct InteractionEntry {
 pub(crate) struct Exercised {
   pub outcome: ExchangeOutcome,
   pub parts: BTreeMap<String, BTreeMap<String, Value>>,
+  /// Why a `Failed` exchange failed, as the protocol carries mismatches ([`super::wire::mismatch_json`]):
+  /// `finalise` reports them per variant (spec §8.2, "unmatched-request … detail rides in
+  /// `results`"), so a host can say what went wrong without reading the engine's log.
+  pub mismatches: Vec<Value>,
 }
 
 /// Statuses: `verified`, `failed`, `not-exercised` (variant-semantics spec §4.2). The third is
@@ -318,9 +322,14 @@ impl ConsumerSession {
       .assignment
       .clone();
     let parts = generate::interaction(&entry.spec, &assignment);
-    entry
-      .exercised
-      .insert(variant_id.to_string(), Exercised { outcome, parts });
+    entry.exercised.insert(
+      variant_id.to_string(),
+      Exercised {
+        outcome,
+        parts,
+        mismatches: Vec::new(),
+      },
+    );
   }
 
   /// `consumer-session/finalise`'s `results` (spec §8.2): one entry per interaction, in
@@ -342,7 +351,8 @@ impl ConsumerSession {
               .variants
               .iter()
               .map(|v| {
-                let status = match entry.exercised.get(&v.id).map(|e| e.outcome) {
+                let exercised = entry.exercised.get(&v.id);
+                let status = match exercised.map(|e| e.outcome) {
                   Some(ExchangeOutcome::Verified) => "verified",
                   Some(ExchangeOutcome::Failed) => {
                     any_failed = true;
@@ -354,7 +364,12 @@ impl ConsumerSession {
                     "not-exercised"
                   }
                 };
-                serde_json::json!({ "variant": v.id, "status": status })
+                match exercised.filter(|e| !e.mismatches.is_empty()) {
+                  Some(e) => {
+                    serde_json::json!({ "variant": v.id, "status": status, "mismatches": e.mismatches })
+                  }
+                  None => serde_json::json!({ "variant": v.id, "status": status }),
+                }
               })
               .collect();
             let status = if any_failed {

@@ -364,6 +364,12 @@ fn a_request_that_does_not_match_the_armed_variant_fails_it_and_withholds_the_co
   );
   assert_eq!(finalised["ok"]["results"][0]["status"], "failed");
   assert_eq!(finalised["ok"]["results"][0]["variants"][0]["status"], "failed");
+  // Why it failed rides in the result too (spec §8.2) — the same mismatches the reply named —
+  // so a host can report it without reading the engine's log.
+  assert_eq!(
+    finalised["ok"]["results"][0]["variants"][0]["mismatches"], body,
+    "finalise reports the mismatches the mock answered with"
+  );
   assert!(
     finalised["ok"].get("contract").is_none(),
     "the honesty rule withholds the contract for a failed variant"

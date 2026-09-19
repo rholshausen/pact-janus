@@ -151,6 +151,7 @@ fn handle_inbound(
       Exercised {
         outcome: exchange_outcome,
         parts: armed.response_parts,
+        mismatches: mismatches.iter().map(mismatch_json).collect(),
       },
     );
 }
