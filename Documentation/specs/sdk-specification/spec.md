@@ -128,7 +128,11 @@ naming every user-facing primitive — a shape helper (`optional`, `anyOf`), an 
   "conformance": [ "shape.optional.presence-dimension", "shape.optional.wraps-any-operator" ] }
 ```
 
-Schema: [`schemas/v1/behavioural-spec.schema.json`](schemas/v1/behavioural-spec.schema.json).
+Schema: [`schemas/v1/behavioural-spec.schema.json`](schemas/v1/behavioural-spec.schema.json). The
+document itself is [`behavioural-spec.json`](behavioural-spec.json), started by plan task 6.2 with the
+primitives the RFC's consumer example needs; the entries in this specification and its worked examples
+illustrate the format, and where one differs from the canonical document, the canonical document is the
+primitive's semantics.
 
 ### 3.2 Fields, and why each exists
 

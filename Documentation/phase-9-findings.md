@@ -203,3 +203,84 @@ array, so there is no default to interpret, only v1–v4's behaviour to preserve
 
 Until then: leave `each-like`'s default at 1, and treat the upgrade's silent `min: 1` as the known
 inconsistency this entry records.
+
+## 3. The WASM embedding cannot host a consumer test's mock server
+
+**Found:** 2026-09-19, starting plan task 6.2. **Status:** open — the TypeScript SDK ships the
+subprocess embedding only, behind a frame-pipe interface a WASM embedding can implement later.
+
+ADR 0003 makes the jco-transpiled WASM component Node's *primary* embedding, with the subprocess as
+fallback. For a consumer test that cannot work as things stand, for two independent reasons, both
+already written down but never put side by side:
+
+- **Sockets.** A consumer test needs a mock HTTP server. Spike 1.2 scoped the WASM guest to no
+  sockets at all ("1.3 remains motivated by native-transport needs (real sockets for mock servers)",
+  finding 8), and ADR 0013 says a WASM-guest engine hosts in-tree components only — but the in-tree
+  HTTP transport is itself the thing that needs ambient capability.
+- **Threads.** The exchange loop that answers the mock's requests runs on a thread of its own
+  (`engine/kernel/src/protocol/exchange.rs`, whose header already names this gap), and a plain
+  `wasm32-wasip2` guest has nothing to schedule a spawned thread onto.
+
+So for Node — the RFC's own example language — "WASM preferred" does not hold for the one thing an SDK
+does most. ADR 0003's tripwire ("If real projects routinely need a third-party component …") is about
+components; this is a stronger case, about the built-in transport.
+
+**Options:** (a) accept the subprocess as Node's primary for consumer tests and amend ADR 0003's row;
+(b) run the engine component in a Node worker thread with WASI sockets through jco's preview2-shim,
+and rework the exchange loop into a single-threaded poll the host drives — a kernel change, and
+unproven; (c) host the mock transport on the SDK side of the pipe — ADR 0013's rejected "trampoline"
+alternative, which puts transport code in every SDK.
+
+## 4. A consumer's test verdict has no way into the engine
+
+**Found:** 2026-09-19, plan task 6.2. **Status:** open — the TypeScript SDK withholds the contract
+itself (behavioural spec `finalise`).
+
+The engine verifies each *exchange*: the request the consumer sent matched the armed variant. It
+cannot know whether the consumer then *handled* the response — that is the closure's verdict, and it
+lives only in the SDK. So for task 4.6's careless client, which crashes whenever `shippedAt` is absent,
+every exchange verifies and `finalise` returns a contract claiming the consumer exercised the
+`shippedAt=absent` variants — the ones its own test failed on. Writing it would break the honesty rule
+(contract spec §2.2) from the other side.
+
+The TypeScript SDK therefore refuses to write the contract when any `execute` in the suite failed, and
+says so. That is correct, but it is the one verdict an SDK holds that the engine does not, so every
+SDK must reimplement it identically, and a host that forgets gets a dishonest contract with no error.
+
+**Options:** a `consumer-session/report-variant { session, handle, variant, status, reason? }`
+operation (or a `failed` member on the next `serve-variant`) so the engine records the closure's
+verdict and withholds the contract itself — protocol-additive, and it moves the decision back where
+B1 wants it.
+
+## 5. Engine-side failures are only attributable at the end of a suite
+
+**Found:** 2026-09-19, plan task 6.2. **Status:** open.
+
+`consumer-session` has no per-interaction result before `finalise`, and no events. With one session
+per suite (SDK spec §4's SHOULD, and the only arrangement that writes one contract for a suite without
+the SDK merging contracts), a request the mock could not match — or a variant the closure never
+exercised — surfaces in the suite's `afterAll`, not in the test that caused it. The mock's 500 usually
+makes the test fail anyway, but a client that swallows errors, or a closure that never calls the mock
+for one variant, fails the suite rather than the test.
+
+**Options:** results per interaction on demand (`consumer-session/results { session, handle }`), or
+consumer-session events on the existing poll stream (engine-protocol spec §9), either of which lets
+`execute` fail the test that caused the failure.
+
+## 6. An SDK writes contract bytes it can only reconstruct
+
+**Found:** 2026-09-19, plan task 6.2. **Status:** open — documented in the TypeScript SDK's STYLE.md.
+
+`finalise` returns the contract as a document inside a JSON frame, and persistence is the host's
+business (engine-protocol spec §8.2) — so the SDK parses it with the frame and re-serialises it, and
+the canonical bytes (contract spec §2.4, ADR 0018) are whatever the SDK's JSON writer makes of the
+parsed value. For TypeScript that matches the engine's writer except where JavaScript cannot help it:
+integer-like member names (`"10"`, `"9"` in a shape's `members`) are enumerated first in ascending
+numeric order, whatever order the engine wrote, and a few number spellings differ. Two SDKs recording
+the same content can therefore write different bytes, which is what ADR 0011's determinism argument
+(broker dedup, clean diffs) exists to prevent — and SDK conformance deliberately compares content, not
+bytes (ADR 0017), so the suite would not notice.
+
+**Options:** carry the contract as canonical text (a tagged `encoded: "text"` member, protocol §2.5)
+so the SDK writes the engine's bytes verbatim; or make the engine write the file itself for hosts
+that ask it to (it has a filesystem in the subprocess embedding, not in WASM).

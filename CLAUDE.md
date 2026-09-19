@@ -99,6 +99,11 @@ npm test             # run tests (Vitest)
 npm run lint         # ESLint
 ```
 
+`npm test` drives a real `janus-engine`: its Vitest global setup builds one with `cargo build` unless
+`JANUS_ENGINE` already names the executable. The SDK's DSL is the canonical behavioural specification,
+`Documentation/specs/sdk-specification/behavioural-spec.json` — change it there first; `STYLE.md`
+records how the TypeScript spelling expresses it.
+
 JVM (from `sdks/jvm/`, JDK 17): `./gradlew build test`.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas

@@ -9,6 +9,8 @@
     "node": ">=22.6"
   },
   "exports": {
+    ".": "./dist/index.js",
+    "./vitest": "./dist/vitest.js",
     "./bindings": "./dist/generated/index.js"
   },
   "scripts": {
@@ -25,5 +27,13 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.1"
+  },
+  "peerDependencies": {
+    "vitest": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   }
 }

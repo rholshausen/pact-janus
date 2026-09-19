@@ -37,15 +37,19 @@ jobs:
       - name: Spec schema lint
         run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
 
-  bindings:
+  sdks:
     # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from
     # the schemas today. A schema change without regenerated bindings — or a hand edit to a
-    # generated file — fails here, not later as an SDK quietly disagreeing with the engine.
+    # generated file — fails here, not later as an SDK quietly disagreeing with the engine. Then
+    # each SDK's own lint, tests and build; the TypeScript SDK's tests drive a real janus-engine
+    # (plan task 6.2), which its Vitest global setup builds — hence libclang, as in the rust job.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*

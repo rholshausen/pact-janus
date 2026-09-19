@@ -10,5 +10,11 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test", "scripts"]
+  "include": [
+    "src",
+    "test",
+    "scripts",
+    "vitest.config.ts",
+    "eslint.config.ts"
+  ]
 }

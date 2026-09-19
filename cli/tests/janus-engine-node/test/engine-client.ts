@@ -1,6 +1,6 @@
 // A minimal client for the engine protocol's Content-Length stdio framing (engine-protocol spec
-// §3.2, §3.4) over the `janus-engine` subprocess (plan task 4.5) — deliberately not an SDK
-// (sdks/README.md: those stay empty until Phase 6). This is the "thin test client speaks the
+// §3.2, §3.4) over the `janus-engine` subprocess (plan task 4.5) — deliberately not an SDK; the
+// TypeScript SDK (sdks/typescript, plan task 6.2) has its own embedding. This is the "thin test client speaks the
 // protocol directly" Phase 4's own goal names, ported to TypeScript.
 
 import { spawn, type ChildProcessByStdio } from "node:child_process";

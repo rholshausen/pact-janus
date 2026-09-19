@@ -211,3 +211,29 @@ fn non_kept_facade_mappings_name_a_way_forward() {
     "expected 'adapted'/'dropped' facade mappings to check, found {checked}"
   );
 }
+
+/// The canonical behavioural specification (spec §3.1) — the one document every SDK's idiomatic
+/// layer is written from — validates as a whole, and names each primitive once: two entries with
+/// one id would be two semantics for one DSL call, which is the divergence the document exists to
+/// prevent.
+#[test]
+fn the_canonical_behavioural_specification_validates_and_names_each_primitive_once() {
+  let schemas = load_schemas();
+  let validator = validator_for(
+    "https://pact.io/janus/sdk/v1/behavioural-spec.schema.json",
+    &schemas,
+  );
+  let path = specs_dir().join("sdk-specification/behavioural-spec.json");
+  let document: Value = serde_json::from_str(&std::fs::read_to_string(&path).expect("read"))
+    .expect("behavioural-spec.json is JSON");
+  check(&validator, &document, "behavioural-spec.json");
+
+  let mut seen = std::collections::BTreeSet::new();
+  for primitive in document["primitives"].as_array().expect("primitives") {
+    let id = primitive["id"].as_str().expect("id");
+    assert!(
+      seen.insert(id.to_string()),
+      "behavioural-spec.json names '{id}' twice"
+    );
+  }
+}
