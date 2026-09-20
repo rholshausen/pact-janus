@@ -287,7 +287,8 @@ that ask it to (it has a filesystem in the subprocess embedding, not in WASM).
 
 ## 7. "This header must not be sent" is unreachable from the DSL
 
-**Found:** 2026-09-20, plan task 6.5's regeneration trial. **Status:** open.
+**Found:** 2026-09-20, plan task 6.5's regeneration trial. **Status:** closed the same day —
+option (a) below was taken, and it turned out to cover `optional` as well as `forbidden`.
 
 A `forbidden` helper written as a header or query value builds a document the engine refuses, and the
 document the author meant has no spelling. Behavioural spec `request` compiles a header or query map
@@ -323,3 +324,29 @@ exactly one thing, and this is the only option that makes the useful assertion e
 SDK refuses it at the call — but that refuses something the shape language permits. (c) Record it as
 deliberately undecided, per `conformance/README.md` §7. A conformance case should follow whichever is
 chosen; there is none today, which is why both SDKs could ship the gap without the suite noticing.
+
+### Resolution
+
+**Option (a), stated generally.** Implementing it showed the defect was not `forbidden`'s: `optional`
+in a header is broken the same way and for the same reason — `optional(string())` also admits absence,
+so the rule wrapped it into an `each-like`'s `items` and the engine refused that too. A
+`forbidden`-only exception would have left the commoner case (an optional auth or trace header) still
+building an invalid document, and would have made the rule read as a special case rather than a
+consequence.
+
+The rule `request` now states: **a helper whose node admits absence applies to the member, and the
+list treatment goes inside the modifier.** `forbidden` becomes the member's shape directly; there is
+nothing to carry a list. `optional(of)` becomes an `optional` whose `of` is the `each-like` the rule
+would otherwise have built — which leaves the presence dimension on the header name itself
+(`request.headers.x-trace#presence`), where an author who wrote "this header may be absent" means it.
+Verified against the engine: both forms are accepted, and the `optional` form yields exactly that
+dimension.
+
+Both SDKs name the two operators rather than asking a node whether it admits absence, because that
+question belongs to the shape language and its answer for a component operator is opaque to an SDK
+(shape spec §3.5) — an SDK that guessed would hold a second copy of §5.1.
+
+Covered by `session.request.absence-applies-to-the-member`, and three cases:
+`translation/absence-in-a-multi-value-slot` (both operators, in headers and query),
+`live/forbidden-header-accepted` (the round trip through the mock, which is what the wrapped form
+failed) and `live/optional-header-presence` (the dimension lands on the header name).

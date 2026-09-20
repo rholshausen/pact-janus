@@ -155,13 +155,21 @@ max: 1 }`; shape spec §5.1 forbids a node admitting absence as an `each-like`'s
 `headers: { "x-trace": forbidden() }` builds a document the engine refuses, pointing at a node the
 author never wrote — while the document the author meant (`forbidden` as the member itself) is
 already legal and has no spelling. Both SDKs have the gap; neither is wrong, because the
-specification does not say what the composition means. Recorded as **Phase 9 finding 7** with three
-options, and deliberately *not* fixed here: the fix changes `request`'s semantics, which is a design
-decision and not task 6.5's to make.
+specification does not say what the composition means. Recorded as **Phase 9 finding 7**, and then
+decided: option (a), the `request` rule gains an exception for a helper whose node admits absence.
+Implementing it showed the defect was wider than the agent's report — `optional` in a header is
+broken identically, and more commonly written — so the rule is stated generally (absence applies to
+the member; the list treatment goes inside the modifier) rather than as a `forbidden` special case.
+Both SDKs implement it, under `session.request.absence-applies-to-the-member` and three new cases.
 
 Finding (b) is the trial's best result. It is not a bug an agent introduced — it is a specification
 gap an agent *found*, in the seam between two entries, which is exactly where a one-document-per-
-language process loses things.
+language process loses things. It is worth noting what the agent did *not* find: that the same seam
+had already swallowed `optional`, which has been in the DSL since task 6.2 and whose header form has
+never built a valid document. The agent found the gap by reading the entry it had just been given
+against its neighbour; nobody had reason to read `optional` against that neighbour, and no case
+existed to notice. That is an argument for conformance cases at every composition point, not only at
+every primitive.
 
 ## 8. What this does not show
 

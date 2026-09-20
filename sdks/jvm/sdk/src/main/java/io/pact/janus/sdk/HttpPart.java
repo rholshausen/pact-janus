@@ -76,11 +76,7 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
 
   private static Shape valueList(Object value, String where) {
     if (value instanceof ShapeNode node) {
-      Shape each = Literals.node(ShapeShape.EACH_LIKE);
-      each.setItems(node.binding());
-      each.setMin(1L);
-      each.setMax(1L);
-      return each;
+      return listed(node.binding());
     }
     if (value instanceof List<?> list) {
       List<String> values = new ArrayList<>(list.size());
@@ -91,6 +87,31 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
       return Literals.equality(values, where);
     }
     return Literals.equality(List.of(text(value, where)), where);
+  }
+
+  /**
+   * The one-element list treatment, applied where the value actually is (behavioural spec
+   * {@code request}). A shape that admits absence is a fact about the member, not about the value in
+   * it, so the list goes inside the modifier: {@code forbidden} stands as the member's shape — there
+   * is no value to carry a list — and {@code optional} keeps the {@code each-like} as its {@code of}.
+   *
+   * <p>The two are named rather than detected by asking whether a node admits absence, because that
+   * question belongs to the shape language and its answer for a component operator is opaque to an
+   * SDK (shape spec §3.5); an SDK that guessed would hold a second copy of §5.1.
+   */
+  private static Shape listed(Shape node) {
+    if (ShapeShape.FORBIDDEN.equals(node.getShape())) {
+      return node;
+    }
+    if (ShapeShape.OPTIONAL.equals(node.getShape())) {
+      node.setOf(listed(node.getOf()));
+      return node;
+    }
+    Shape each = Literals.node(ShapeShape.EACH_LIKE);
+    each.setItems(node);
+    each.setMin(1L);
+    each.setMax(1L);
+    return each;
   }
 
   /**

@@ -1,0 +1,54 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/absence-in-a-multi-value-slot",
+  "category": "translation",
+  "title": "A header or query shape that admits absence applies to the member, outside the one-element list.",
+  "covers": ["session.request.absence-applies-to-the-member"],
+  "why": "behavioural spec 'request': a helper whose node admits absence is the exception to the name-to-list rule, because absence is a fact about the member and not about the value in it — the list treatment applies inside the modifier, never to it. 'forbidden' becomes the member's shape directly; 'optional(of)' becomes an 'optional' whose 'of' is the 'each-like' the rule would otherwise have built. Wrapping instead would put a node admitting absence in an 'each-like's 'items', which shape spec §5.1 refuses, so the natural spelling would build a document the engine rejects.",
+  "interaction": {
+    "description": "a request whose trace header may be absent and whose tax file number must be",
+    "request": {
+      "method": "GET",
+      "path": "/orders/42",
+      "headers": {
+        "X-Trace": { "$": "optional", "args": [{ "$": "string", "args": ["abc123"] }] },
+        "X-TFN": { "$": "forbidden" },
+        "X-Region": { "$": "string", "args": ["au"] }
+      },
+      "query": {
+        "since": { "$": "optional", "args": [{ "$": "date", "args": ["2026-08-30"] }] },
+        "debug": { "$": "forbidden" }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/request/headers": {
+        "shape": "object",
+        "members": {
+          "x-trace": {
+            "shape": "optional",
+            "of": { "shape": "each-like", "items": { "shape": "string", "example": "abc123" }, "min": 1, "max": 1 }
+          },
+          "x-tfn": { "shape": "forbidden" },
+          "x-region": {
+            "shape": "each-like",
+            "items": { "shape": "string", "example": "au" },
+            "min": 1,
+            "max": 1
+          }
+        }
+      },
+      "/parts/request/query": {
+        "shape": "object",
+        "members": {
+          "since": {
+            "shape": "optional",
+            "of": { "shape": "each-like", "items": { "shape": "date", "example": "2026-08-30" }, "min": 1, "max": 1 }
+          },
+          "debug": { "shape": "forbidden" }
+        }
+      }
+    }
+  }
+}

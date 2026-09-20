@@ -1,0 +1,26 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/optional-header-presence",
+  "category": "live",
+  "title": "An 'optional' header puts the presence dimension on the header name, not on the value inside it.",
+  "covers": ["session.request.absence-applies-to-the-member"],
+  "why": "behavioural spec 'request': 'optional(of)' in a header map becomes an 'optional' whose 'of' is the 'each-like' the rule would otherwise have built, leaving the presence dimension on the header name itself (shape spec §6.4). The dimension id is the observable difference — 'request.headers.x-trace#presence' is a statement about whether the header is sent, which is what the author wrote, and no dimension at all is what the wrapped form produced by being rejected outright.",
+  "note": "No exchange: a case's closure sends one fixed request on every variant, so it cannot both send and omit a header. What this case pins is the space the engine derived from the document the SDK built; 'live/forbidden-header-accepted' covers the round trip through the mock.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order request whose trace header may be absent",
+          "request": {
+            "method": "GET",
+            "path": "/orders/42",
+            "headers": { "X-Trace": { "$": "optional", "args": [{ "$": "string", "args": ["abc123"] }] } }
+          },
+          "response": { "status": 200 }
+        }
+      },
+      "expect": { "outcome": "ok" }
+    }
+  ],
+  "expect": { "variant-count": 2, "dimensions": ["request.headers.x-trace#presence"] }
+}

@@ -96,9 +96,13 @@ function slots(members: Record<string, Template | undefined>): Record<string, sh
 /**
  * A `{ name: [values…] }` slot (shape spec §3.6): a value is the one-element list, a list is itself,
  * a shape describes the one value — bounded at exactly one, since an unbounded `each-like` would add
- * a request variant sending the header twice. Header names are lower-cased, the only spelling the
- * HTTP transport presents them under; query names are kept as written. Two names that collide once
- * spelled are refused, rather than one of them being dropped where nobody can see it (ADR 0019).
+ * a request variant sending the header twice. A shape that admits absence is the exception: absence
+ * is a fact about the member, not about the value in it, so the list goes *inside* the modifier —
+ * `forbidden` is the member's shape as written, and `optional(of)` keeps the `each-like` as its `of`.
+ * Wrapping those instead would put a node admitting absence in an `each-like`'s `items`, which shape
+ * spec §5.1 refuses. Header names are lower-cased, the only spelling the HTTP transport presents them
+ * under; query names are kept as written. Two names that collide once spelled are refused, rather
+ * than one of them being dropped where nobody can see it (ADR 0019).
  */
 function multiValueSlot(
   slot: string,
@@ -120,13 +124,31 @@ function multiValueSlot(
     }
     compiled[spelled] =
       value instanceof Shape
-        ? { shape: "each-like", items: compile(value), min: 1, max: 1 }
+        ? listed(compile(value))
         : {
             shape: "equality",
             example: (Array.isArray(value) ? value : [value]).map((one) => text(one, `${slot}.${spelled}`)),
           };
   }
   return { [slot]: { shape: "object", members: compiled } };
+}
+
+/**
+ * The one-element list treatment, applied where the value actually is. `forbidden` admits only
+ * absence, so there is no value to carry a list and the node stands as the member's shape;
+ * `optional` carries the treatment into its `of`. The two are named rather than detected by asking
+ * whether a node admits absence, because that question belongs to the shape language and its answer
+ * for a component operator is opaque to an SDK (shape spec §3.5) — an SDK that guessed would be
+ * holding a second copy of §5.1.
+ */
+function listed(node: shape.Shape): shape.Shape {
+  if (node.shape === "forbidden") {
+    return node;
+  }
+  if (node.shape === "optional") {
+    return { ...node, of: listed(node.of as shape.Shape) };
+  }
+  return { shape: "each-like", items: node, min: 1, max: 1 };
 }
 
 /**
