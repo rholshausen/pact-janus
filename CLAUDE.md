@@ -73,8 +73,9 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation
-                 pipeline (task 6.1), and tools/conformance, the conformance suite's checker
-                 (task 6.4)
+                 pipeline (task 6.1), tools/conformance, the conformance suite's checker
+                 (task 6.4), and tools/thinness, the SDK thinness audit (task 6.5) — it reads
+                 sdks/thinness.json, counts each SDK by layer and budgets the hand-written ones
 Documentation/   Plan, ADRs, specs
 ```
 
@@ -124,6 +125,18 @@ cargo run -p pact_janus_conformance -- check target/conformance/*.json   # did e
 A conformance id in `behavioural-spec.json` with no case fails the lint, and a case that fails in
 either language fails CI. When a case and an SDK disagree and the specification does not settle it,
 change `behavioural-spec.json` first — `conformance/README.md` §7.
+
+The thinness audit (plan task 6.5) is the other claim made into a command: every SDK source file
+must be classified into a layer in `sdks/thinness.json`, and the hand-written layers stay inside a
+budget, so matching logic or orchestration creeping back into an SDK fails the build:
+
+```bash
+cargo run -p pact_janus_thinness              # the table, by layer, per SDK
+cargo run -p pact_janus_thinness -- check     # the same, as an exit code (CI runs this)
+```
+
+A new SDK source file with no layer is an error, not a default — say which layer it belongs to.
+Raising a budget is a decision that belongs in the commit message.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to

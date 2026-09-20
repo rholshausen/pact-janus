@@ -191,7 +191,7 @@ public final class Shapes {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // optional, nullable, each-like
+  // optional, nullable, forbidden, each-like
 
   /** {@code optional}: may be absent. Wraps {@code of} compiled by the literal rules. */
   public static ShapeNode optional(Object of) {
@@ -201,6 +201,18 @@ public final class Shapes {
   /** {@code nullable}: may be null. Wraps {@code of} compiled by the literal rules. */
   public static ShapeNode nullable(Object of) {
     return wrapper(ShapeShape.NULLABLE, of);
+  }
+
+  /**
+   * {@code forbidden}: the member must be absent. It takes no nested shape and no example — a
+   * constraint on a value that must not exist is not a thing to write — so it takes no arguments.
+   *
+   * <p>Where it may be written is not checked here: a {@code forbidden} node belongs in a slot and
+   * may not be wrapped by {@code optional} or {@code nullable} (shape spec §5.1, §5.2), and the
+   * engine refuses a misplaced one with {@code interaction-invalid} when the interaction is added.
+   */
+  public static ShapeNode forbidden() {
+    return new ShapeNode(Literals.node(ShapeShape.FORBIDDEN));
   }
 
   private static ShapeNode wrapper(String operator, Object of) {

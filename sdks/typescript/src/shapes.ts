@@ -99,6 +99,14 @@ export function oneOf(discriminator: string, alternatives: { readonly [name: str
 export const optional = (of: Template): Shape => new Shape({ shape: "optional", of: compile(of) });
 export const nullable = (of: Template): Shape => new Shape({ shape: "nullable", of: compile(of) });
 
+/**
+ * A member that must be absent. Takes no argument — a constraint on a value that must not exist is
+ * not a thing to write — and carries no example, so the node is bare. Where it may be written is the
+ * engine's to check, not this helper's: a `forbidden` belongs in a slot and is never wrapped by
+ * `optional` or `nullable`, and a misplaced one comes back from `execute` as a `JanusError`.
+ */
+export const forbidden = (): Shape => new Shape({ shape: "forbidden" });
+
 /** An array of elements like `items`; `min` and `max` only when given (absent: 1 and unbounded). */
 export function eachLike(items: Template, options: { min?: number; max?: number } = {}): Shape {
   const node: shape.Shape = { shape: "each-like", items: compile(items) };

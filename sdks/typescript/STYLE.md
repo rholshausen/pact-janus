@@ -12,6 +12,9 @@ specification disagree, the behavioural specification wins and this file has a b
   and `finalise` are its methods; `given`, `request` and `response` are methods of the builder
   `interaction` returns. The `literal` primitive is not a function — it is what happens to a plain
   value written where a shape is expected.
+- A primitive whose `signature` is empty is still a function, called with no arguments —
+  `forbidden()`, not a `forbidden` constant. Every shape helper is then written the same way, and a
+  call is a fresh node rather than one document fragment shared by every use of it.
 - Layout, by SDK layer (SDK spec §2):
   - `src/generated/` — layer 1, the generated bindings (task 6.1). Never edited, never linted.
   - `src/engine/` — the embedding: `pipe.ts` (the frozen frame pipe), `subprocess.ts` (the

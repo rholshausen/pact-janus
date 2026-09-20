@@ -1,0 +1,30 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/forbidden-bare-node",
+  "category": "translation",
+  "title": "'forbidden' compiles to a bare node — no nested shape, no example, no arguments.",
+  "covers": ["shape.forbidden.bare-node"],
+  "why": "behavioural spec 'forbidden': compiles to a 'forbidden' node (shape spec §4.4), which admits absence and nothing else; it takes no nested shape and no example, so the helper takes no arguments. The node a helper with nothing to carry emits is the whole of what this case pins — an 'of' or an 'example' here would be the SDK inventing a member the operator does not have.",
+  "interaction": {
+    "description": "an order that must not carry the customer's tax file number",
+    "response": {
+      "body": {
+        "id": { "$": "integer", "args": [42] },
+        "tfn": { "$": "forbidden" },
+        "notes": { "$": "optional", "args": [{ "$": "string", "args": ["gift wrap"] }] }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "id": { "shape": "integer", "example": 42 },
+          "tfn": { "shape": "forbidden" },
+          "notes": { "shape": "optional", "of": { "shape": "string", "example": "gift wrap" } }
+        }
+      }
+    }
+  }
+}

@@ -61,7 +61,8 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation
-                 pipeline (task 6.1), and tools/conformance, the conformance suite's checker
+                 pipeline (task 6.1), tools/conformance, the conformance suite's checker, and
+                 tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK by layer
                  (task 6.4)
 Documentation/   Plan, ADRs, specs
 ```
@@ -104,6 +105,11 @@ SDKs run as part of those test commands, each writing a report to `target/confor
 `cargo run -p pact_janus_conformance -- lint` checks the corpus (a conformance id in
 `behavioural-spec.json` with no case fails), and `-- check target/conformance/*.json` checks that
 each SDK accounted for every case and passed it. See `conformance/README.md`.
+
+The thinness audit (plan task 6.5) makes the "SDKs are thin" claim a command:
+`cargo run -p pact_janus_thinness` prints each SDK's lines by layer, and `-- check` (which CI runs)
+fails if a hand-written layer exceeds its budget in `sdks/thinness.json`, or if any SDK source file
+belongs to no layer. A new file needs a layer; raising a budget belongs in the commit message.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to

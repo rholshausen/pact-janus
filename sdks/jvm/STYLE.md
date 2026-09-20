@@ -13,6 +13,12 @@ SDK (plan task 6.3); what that turned up is in
 
 - **Case.** Primitive ids become lowerCamelCase Java methods: `each-like` → `eachLike`, `any-of` →
   `anyOf`, `one-of` → `oneOf`. `boolean` is a Java keyword, so it is `bool` (see Deviations).
+- **A primitive with an empty `signature`** is a no-argument static method, not a constant —
+  `Shapes.forbidden()`, never a `Shapes.FORBIDDEN` field. SDK spec §3.2 requires the style guide to
+  say which, because no conformance case can see the difference. Two reasons for the method here:
+  every shape helper then reads the same way at a call site, and a call returns a fresh `ShapeNode`,
+  where a shared constant would be an aliasing hazard — `ShapeNode` is documented as immutable but
+  is not defensively copied.
 - **Where each primitive lives.**
 
   | Primitive(s) | Java |
@@ -23,7 +29,7 @@ SDK (plan task 6.3); what that turned up is in
   | `execute` | `janus.execute(interaction, (mock, variant) -> ...)` |
   | `finalise` | `janus.finalise()`; run for you by `JanusExtension` |
   | `literal` | no call site: any plain value where a shape is expected |
-  | `json`, `integer`, `number`, `decimal`, `string`, `boolean`, `datetime`, `date`, `time`, `regex`, `any-of`, `one-of`, `optional`, `nullable`, `each-like` | static methods on `io.pact.janus.sdk.Shapes`, for `import static io.pact.janus.sdk.Shapes.*` |
+  | `json`, `integer`, `number`, `decimal`, `string`, `boolean`, `datetime`, `date`, `time`, `regex`, `any-of`, `one-of`, `optional`, `nullable`, `forbidden`, `each-like` | static methods on `io.pact.janus.sdk.Shapes`, for `import static io.pact.janus.sdk.Shapes.*` |
 
 - **Modules.** Gradle project `:bindings` (package `io.pact.janus.bindings.<set>.v1`) is generated and
   never edited. Project `:sdk` is the idiomatic layer: package `io.pact.janus.sdk` (the DSL, `Janus`,

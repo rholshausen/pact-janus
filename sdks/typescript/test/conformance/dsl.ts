@@ -11,6 +11,7 @@ import {
   datetime,
   decimal,
   eachLike,
+  forbidden,
   integer,
   json,
   nullable,
@@ -45,6 +46,7 @@ const helpers: Record<string, (args: unknown[], options: Record<string, number>)
     oneOf(args[0] as string, mapValues(args[1] as Record<string, Record<string, unknown>>, alternative)),
   optional: (args) => optional(template(args[0])),
   nullable: (args) => nullable(template(args[0])),
+  forbidden: () => forbidden(),
   "each-like": (args, options) => eachLike(template(args[0]), options),
 };
 

@@ -11,6 +11,7 @@ members = [
   "tools/schema-compat",
   "tools/corpus",
   "tools/conformance",
+  "tools/thinness",
   "tools/bindings",
 ]
 # Spikes are standalone projects, never workspace members. The benchmark

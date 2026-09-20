@@ -284,3 +284,42 @@ bytes (ADR 0017), so the suite would not notice.
 **Options:** carry the contract as canonical text (a tagged `encoded: "text"` member, protocol §2.5)
 so the SDK writes the engine's bytes verbatim; or make the engine write the file itself for hosts
 that ask it to (it has a filesystem in the subprocess embedding, not in WASM).
+
+## 7. "This header must not be sent" is unreachable from the DSL
+
+**Found:** 2026-09-20, plan task 6.5's regeneration trial. **Status:** open.
+
+A `forbidden` helper written as a header or query value builds a document the engine refuses, and the
+document the author meant has no spelling. Behavioural spec `request` compiles a header or query map
+to an `object` node whose members are lists, so a shape helper written as a value becomes
+`each-like { items: <shape>, min: 1, max: 1 }` — bounded at one precisely so it contributes no
+cardinality dimension. But shape spec §5.1 says a node admitting absence may appear only in a slot,
+and an `each-like`'s `items` is not one. So:
+
+```
+headers: { "x-trace": forbidden() }        →  each-like { items: forbidden, min: 1, max: 1 }
+```
+
+which the engine rejects at `add-interaction`, pointing at `/parts/request/headers/members/x-trace/items`
+— a pointer into a node the author never wrote. Meanwhile the shape the author meant is *already
+legal*: a headers map is an `object` node, its members are slots, and
+`{ "x-trace": { "shape": "forbidden" } }` is accepted by the engine today. Only the DSL cannot say it.
+
+Both SDKs have the rule and both have the gap; neither is wrong, because the behavioural
+specification does not say what `forbidden` composed with `request`'s name-to-list rule means. The
+TypeScript regenerating agent found it by reading the two entries against each other, and it is
+recorded here rather than fixed because the fix is a change to `request`'s semantics, which is a
+design decision and not a task-6.5 one.
+
+**Reproduce:** `headers: { "x-trace": forbidden() }` in either SDK, or send the wrapped document to
+`consumer-session/add-interaction` directly; compare with the bare `forbidden` member, which is
+accepted.
+
+**Options:** (a) `request`'s name-to-list rule gains an exception — a `forbidden` helper in a header
+or query map becomes that member's shape directly, unwrapped. The rule's stated reason for wrapping
+(an unbounded `each-like` would contribute a cardinality dimension) does not apply to a node admitting
+exactly one thing, and this is the only option that makes the useful assertion expressible. (b)
+`forbidden`'s entry states that a header or query map is not a position it may be written in, and the
+SDK refuses it at the call — but that refuses something the shape language permits. (c) Record it as
+deliberately undecided, per `conformance/README.md` §7. A conformance case should follow whichever is
+chosen; there is none today, which is why both SDKs could ship the gap without the suite noticing.

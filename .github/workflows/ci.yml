@@ -88,6 +88,11 @@ jobs:
       # passed it — the claim a build makes, rather than one a maintainer asserts.
       - name: SDKs are conformant
         run: cargo run --package pact_janus_conformance -- check target/conformance/typescript.json target/conformance/jvm.json
+      # Plan task 6.5: "SDKs are thin" as an exit code. Every SDK source file must be classified into
+      # a layer, and the hand-written layers must stay inside their budgets — so matching logic or
+      # orchestration creeping back into an SDK shows up as a failing build, not as a stale number.
+      - name: SDKs are thin
+        run: cargo run --package pact_janus_thinness -- check
 
   schema-compat:
     # Enforces the Engine Protocol's additive-evolution rules (spec §11.2) on

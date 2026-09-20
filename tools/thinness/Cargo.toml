@@ -1,0 +1,21 @@
+[package]
+name = "pact_janus_thinness"
+description = "The SDK thinness audit (plan task 6.5): counts each SDK's source by layer from sdks/thinness.json, and holds the hand-written layers to a budget"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "thinness"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

@@ -83,6 +83,7 @@ final class Dsl {
       case "one-of" -> Shapes.oneOf(args.path(0).asText(), alternatives(args.path(1)));
       case "optional" -> Shapes.optional(template(args.path(0)));
       case "nullable" -> Shapes.nullable(template(args.path(0)));
+      case "forbidden" -> Shapes.forbidden();
       case "each-like" -> Shapes.eachLike(template(args.path(0)), cardinality(options));
       default -> throw new IllegalArgumentException(
           "the case names a shape primitive this SDK does not implement: '" + primitive + "'");

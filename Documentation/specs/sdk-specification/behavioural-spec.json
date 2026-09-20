@@ -247,6 +247,16 @@
       "conformance": [ "shape.nullable.wraps-any-operator" ]
     },
     {
+      "id": "forbidden",
+      "category": "shape",
+      "summary": "Asserts that a member is absent.",
+      "produces": [ { "kind": "shape-operator", "operator": "forbidden" } ],
+      "signature": [],
+      "semantics": "Compiles to a 'forbidden' node (shape spec §4.4), which admits absence and nothing else. It takes no nested shape and no example — a constraint on a value that must not exist is not a thing to write — so the helper takes no arguments. Contributes no variant dimension: what it admits has one point, and only width earns a dimension (shape spec §6.1). The SDK does not check where it was written: a 'forbidden' node belongs in a slot and MUST NOT be wrapped by 'optional' or 'nullable' (shape spec §5.1, §5.2), and the engine rejects a misplaced one with 'interaction-invalid' when the interaction is added.",
+      "errors": [ { "code": "interaction-invalid", "surfaced-as": "thrown from 'execute', naming the misplaced node in the engine's own words" } ],
+      "conformance": [ "shape.forbidden.bare-node", "shape.forbidden.no-dimension", "shape.forbidden.engine-rejects-misplacement" ]
+    },
+    {
       "id": "each-like",
       "category": "shape",
       "summary": "An array of like elements, with a cardinality.",

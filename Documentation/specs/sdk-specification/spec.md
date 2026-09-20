@@ -145,7 +145,12 @@ primitive's semantics.
   `nested-shape`, `options-bag`, `label`. A role is deliberately coarser than a type, because the concrete
   type (a `string` in TypeScript, a `String` in Java, a builder object in either) is the idiomatic layer's
   and the style guide's business (§5), not this document's — fixing types here would make the format
-  prescribe an API shape rather than a behaviour.
+  prescribe an API shape rather than a behaviour. An **empty** `signature` is normative and means the
+  primitive takes no arguments — not that its parameters were left unwritten. How a language spells
+  "no arguments" is still the style guide's business, and because a language that can spell it two
+  ways (a nullary call or a constant) has a choice no conformance case can see, the style guide MUST
+  record which one it made. Task 6.5's regeneration trial found this the hard way: it was the only
+  question both regenerating agents had to guess at, and they agreed by luck.
 - **`semantics`** is the load-bearing field, and §3.3 states the bar it must clear.
 - **`errors`** names which of engine-protocol spec §10's structured error codes this primitive's
   translation must surface, and how it becomes a language-native failure. This exists because "no

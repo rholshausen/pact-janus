@@ -21,6 +21,7 @@ export {
   oneOf,
   optional,
   nullable,
+  forbidden,
   eachLike,
 } from "./shapes.js";
 export { JanusError, VariantsFailedError, ContractWithheldError, type Problem, type VariantFailure } from "./errors.js";

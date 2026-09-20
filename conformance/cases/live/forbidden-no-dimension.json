@@ -1,0 +1,29 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/forbidden-no-dimension",
+  "category": "live",
+  "title": "A 'forbidden' member adds no variant: the engine selects one variant for an interaction whose only operator is 'forbidden'.",
+  "covers": ["shape.forbidden.no-dimension"],
+  "why": "behavioural spec 'forbidden': contributes no variant dimension — what it admits has one point, and only width earns a dimension (shape spec §6.1). 'optional' and 'forbidden' are near neighbours in the language and it is 'optional' that carries a presence dimension, so the case is the count the engine comes back with: a lone 'forbidden' leaves the space one point wide, and the base variant is the only one there is.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order that must not carry the customer's tax file number",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [{ "id": { "$": "integer", "args": [42] }, "tfn": { "$": "forbidden" } }]
+            }
+          }
+        },
+        "closure": { "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 } }
+      },
+      "expect": { "outcome": "ok" }
+    },
+    { "finalise": {}, "expect": { "outcome": "ok", "contract": { "written": true } } }
+  ],
+  "expect": { "variant-count": 1 }
+}

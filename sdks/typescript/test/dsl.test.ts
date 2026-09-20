@@ -12,6 +12,7 @@ import {
   datetime,
   decimal,
   eachLike,
+  forbidden,
   integer,
   json,
   nullable,
@@ -198,6 +199,14 @@ describe("shape helpers", () => {
   it("keeps a regex unanchored and verbatim, and refuses flags it cannot carry (shape.regex.unanchored, shape.regex.pattern-verbatim)", () => {
     expect(regex(/\d{4}/, "1234").toJSON()).toEqual({ shape: "regex", pattern: "\\d{4}", example: "1234" });
     expect(() => regex(/abc/i, "ABC")).toThrow(/flags \('i'\) cannot be carried/);
+  });
+
+  it("compiles forbidden to a bare node, wherever it is written (shape.forbidden.bare-node)", () => {
+    expect(forbidden().toJSON()).toEqual({ shape: "forbidden" });
+    // Placement is the engine's to check (shape spec §5.1), so the builder accepts this root.
+    expect(janus.interaction("x").response({ body: forbidden() }).build().parts.response?.body).toEqual({
+      shape: "forbidden",
+    });
   });
 
   it("writes each-like bounds only when given (shape.each-like.bounds-only-when-given)", () => {

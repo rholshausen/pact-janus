@@ -1,0 +1,20 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/forbidden-engine-rejects-misplacement",
+  "category": "live",
+  "title": "A 'forbidden' written where absence has no slot is rejected by the engine, not by the SDK.",
+  "covers": ["shape.forbidden.engine-rejects-misplacement"],
+  "why": "behavioural spec 'forbidden': the SDK does not check where it was written — a 'forbidden' node belongs in a slot (shape spec §5.1) and the engine rejects a misplaced one with 'interaction-invalid' when the interaction is added. A part's body root is not a slot, so the case is that the DSL accepts the call and the refusal arrives from the engine, carrying its own words. An SDK that refused this itself would be holding a copy of §5.1 that can drift.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "a body that is nothing at all",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": { "status": 200, "body": { "$": "forbidden" } }
+        }
+      },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    }
+  ]
+}

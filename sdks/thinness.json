@@ -1,0 +1,58 @@
+{
+  "$comment": "How each SDK's source divides into layers, for the thinness audit (plan task 6.5). Every source file under an SDK's root must be claimed by exactly one layer — the tool fails on one that is not, so a new file is a classification decision somebody makes on purpose rather than a line that quietly lands in whichever bucket flatters the claim. Budgets apply to the hand-written layers only: 'generated' is not a cost an SDK maintainer pays, and 'tests' is not part of the surface a user installs. Measure with `cargo run -p pact_janus_thinness`.",
+  "sdks": [
+    {
+      "name": "pact-janus-typescript",
+      "language": "TypeScript",
+      "root": "sdks/typescript",
+      "extensions": [".ts"],
+      "ignore": ["node_modules", "dist", "build", "eslint.config.ts", "vitest.config.ts", "scripts"],
+      "layers": {
+        "generated": ["src/generated"],
+        "idiomatic": ["src/index.ts", "src/janus.ts", "src/interaction.ts", "src/shapes.ts", "src/errors.ts"],
+        "embedding": ["src/engine"],
+        "integration": ["src/vitest.ts"],
+        "tests": ["test"]
+      },
+      "budgets": { "idiomatic": 700, "embedding": 250, "integration": 60 }
+    },
+    {
+      "name": "pact-janus-jvm",
+      "language": "Java",
+      "root": "sdks/jvm",
+      "extensions": [".java"],
+      "ignore": ["build", ".gradle", "gradle"],
+      "layers": {
+        "generated": ["bindings/src/main"],
+        "idiomatic": [
+          "sdk/src/main/java/io/pact/janus/sdk/Janus.java",
+          "sdk/src/main/java/io/pact/janus/sdk/JanusOptions.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Interaction.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Shapes.java",
+          "sdk/src/main/java/io/pact/janus/sdk/ShapeNode.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Cardinality.java",
+          "sdk/src/main/java/io/pact/janus/sdk/HttpPart.java",
+          "sdk/src/main/java/io/pact/janus/sdk/RequestParts.java",
+          "sdk/src/main/java/io/pact/janus/sdk/ResponseParts.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Literals.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Json.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Mock.java",
+          "sdk/src/main/java/io/pact/janus/sdk/Variant.java",
+          "sdk/src/main/java/io/pact/janus/sdk/VariantFailure.java",
+          "sdk/src/main/java/io/pact/janus/sdk/EngineClient.java",
+          "sdk/src/main/java/io/pact/janus/sdk/ContractWithheldException.java",
+          "sdk/src/main/java/io/pact/janus/sdk/ExecuteFailedException.java",
+          "sdk/src/main/java/io/pact/janus/sdk/JanusEngineException.java",
+          "sdk/src/main/java/io/pact/janus/sdk/JanusEmbeddingException.java"
+        ],
+        "embedding": ["sdk/src/main/java/io/pact/janus/sdk/engine"],
+        "integration": [
+          "sdk/src/main/java/io/pact/janus/sdk/JanusExtension.java",
+          "sdk/src/main/java/io/pact/janus/sdk/VariantTest.java"
+        ],
+        "tests": ["sdk/src/test", "bindings/src/test"]
+      },
+      "budgets": { "idiomatic": 2000, "embedding": 300, "integration": 140 }
+    }
+  ]
+}
