@@ -39,7 +39,9 @@ export class ScriptedPipe implements FramePipe {
     this.ops.push(frame.op);
     this.bodies.push(frame.body);
     const scripted = this.#script.errors?.[frame.op];
-    if (scripted) {
+    // `after` answers that many calls the default way first: the engine that dies mid-loop.
+    const before = this.ops.filter((op) => op === frame.op).length - 1;
+    if (scripted && before >= (scripted.after ?? 0)) {
       const { code, message, problems, details } = scripted as Record<string, unknown> & { code: string };
       return {
         type: "response",

@@ -116,7 +116,7 @@ SDKs run as part of the test commands above, each writing a report to `target/co
 corpus is checked in; the reports are build artifacts:
 
 ```bash
-cargo test -p pact_janus_conformance          # the corpus against its schema and the 53 ids
+cargo test -p pact_janus_conformance          # the corpus against its schema and the spec's ids
 cargo run -p pact_janus_conformance -- lint   # the same, with a coverage summary
 cargo run -p pact_janus_conformance -- check target/conformance/*.json   # did each SDK pass it
 ```

@@ -58,7 +58,9 @@ final class ScriptedPipe implements Embedding, FramePipe {
     response.put("type", "response");
     response.put("id", frame.path("id").asText());
     JsonNode error = script.path("errors").path(op);
-    if (error.isObject()) {
+    // `after` answers that many calls the default way first: the engine that dies mid-loop.
+    long before = ops.stream().filter(op::equals).count() - 1;
+    if (error.isObject() && before >= error.path("after").asLong(0)) {
       ObjectNode document = response.putObject("error");
       document.put("code", error.path("code").asText());
       document.put("message", error.path("message").asText(error.path("code").asText()));

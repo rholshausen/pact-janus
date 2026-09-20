@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -209,9 +210,34 @@ class TranslationTest {
     }
 
     @Test
-    @DisplayName("a header value that is neither a string, a list of strings nor a shape is refused")
-    void headerValueKinds() {
-      assertThrows(IllegalArgumentException.class, () -> janus.interaction("x").request(r -> r.header("X-Count", 3)));
+    @DisplayName("a whole number or a boolean is written as the one string that spells it "
+        + "[session.request.value-written-as-one-string]")
+    void spellableValues() {
+      JsonNode headers = tree(janus.interaction("x")
+          .request(r -> r.header("X-Count", 3).header("X-Whole", 3.0d).header("X-Debug", false).query("page", 2))
+          .toDocument()).at("/parts/request/headers");
+      assertEquals(parse("""
+          { 'shape': 'object', 'members': {
+              'x-count': { 'shape': 'equality', 'example': ['3'] },
+              'x-whole': { 'shape': 'equality', 'example': ['3'] },
+              'x-debug': { 'shape': 'equality', 'example': ['false'] } } }"""), headers);
+    }
+
+    @Test
+    @DisplayName("a value with no spelling every SDK agrees on is refused "
+        + "[session.request.unspellable-value-refused]")
+    void unspellableValues() {
+      // A fractional number is spelled differently language by language, Long.MAX_VALUE is past the
+      // largest integer JavaScript spells exactly, and an Instant has no format the SDK may choose
+      // for the author (ADR 0019).
+      assertThrows(IllegalArgumentException.class,
+          () -> janus.interaction("x").request(r -> r.header("X-Ratio", 1.5)));
+      assertThrows(IllegalArgumentException.class,
+          () -> janus.interaction("x").request(r -> r.header("X-Big", Long.MAX_VALUE)));
+      assertThrows(IllegalArgumentException.class,
+          () -> janus.interaction("x").request(r -> r.header("X-When", Instant.EPOCH)));
+      assertThrows(IllegalArgumentException.class,
+          () -> janus.interaction("x").request(r -> r.header("X-Nothing", (Object) null)));
     }
   }
 

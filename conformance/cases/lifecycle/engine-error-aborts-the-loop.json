@@ -1,0 +1,45 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/engine-error-aborts-the-loop",
+  "category": "lifecycle",
+  "title": "An engine error inside the variant loop ends the run at once, and is not recorded as a variant's failure.",
+  "covers": ["session.execute.engine-error-aborts-the-loop"],
+  "why": "behavioural spec 'execute' (ADR 0019): an engine error is not a closure's verdict and is not recorded as one — when any operation 'execute' sends answers with an error, including a 'serve-variant' inside the loop, 'execute' fails at once with that error and the variants after it do not run. The every-variant-runs guarantee is about what a test decided; an engine that cannot arm this variant cannot arm the next one either.",
+  "note": "'session-not-found' is what a lost session looks like from the SDK, which owns that session's lifetime end to end: reaching a user means the engine lost it, never that the caller did anything wrong.",
+  "engine": {
+    "variants": [
+      { "id": "base", "label": "base" },
+      { "id": "status=SHIPPED", "label": "status SHIPPED" },
+      { "id": "shippedAt=absent", "label": "shippedAt absent" }
+    ],
+    "errors": {
+      "consumer-session/serve-variant": {
+        "code": "session-not-found",
+        "message": "no such session: s-1",
+        "after": 1
+      }
+    }
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } }
+      },
+      "expect": {
+        "outcome": { "error": "engine-error", "code": "session-not-found" },
+        "closure-calls": ["base"]
+      }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/serve-variant"
+    ]
+  }
+}

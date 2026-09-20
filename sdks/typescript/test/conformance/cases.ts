@@ -15,7 +15,8 @@ export interface HelperCall {
   options?: Record<string, number>;
 }
 
-export type MultiValue = string | string[] | HelperCall;
+/** What a case may write as a header or query value — including one the rule refuses. */
+export type MultiValue = unknown;
 
 export interface InteractionScript {
   description: string;
@@ -65,7 +66,7 @@ export interface ScriptedEngine {
   contract?: Record<string, unknown>;
   "withhold-contract"?: boolean;
   results?: Record<string, unknown>[];
-  errors?: Record<string, { code: string; message?: string; details?: Record<string, unknown> }>;
+  errors?: Record<string, { code: string; message?: string; after?: number; details?: Record<string, unknown> }>;
 }
 
 export interface Case {
@@ -82,6 +83,7 @@ export interface Case {
   expect?: {
     spec?: Record<string, unknown>;
     at?: Record<string, unknown>;
+    refused?: boolean;
     ops?: string[];
     frames?: Record<string, Record<string, unknown>>;
     "engine-closed"?: boolean;

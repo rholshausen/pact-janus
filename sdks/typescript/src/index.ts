@@ -3,7 +3,7 @@
 // behavioural-spec.json), spelled the TypeScript way (STYLE.md).
 
 export { Janus, type JanusConfig, type Mock, type Variant, type Closure, type Finalised } from "./janus.js";
-export { InteractionBuilder, type RequestParts, type ResponseParts, type MultiValue } from "./interaction.js";
+export { InteractionBuilder, type RequestParts, type ResponseParts, type MultiValue, type Spellable } from "./interaction.js";
 export {
   Shape,
   type Template,

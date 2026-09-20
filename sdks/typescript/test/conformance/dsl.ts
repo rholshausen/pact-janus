@@ -97,12 +97,13 @@ export function buildInteraction(janus: Janus, script: InteractionScript): Inter
   return interaction;
 }
 
-/** A header or query value: one string, several strings, or a shape describing its one value. */
+/**
+ * A header or query value. Only a helper call is resolved here; everything else is handed to the
+ * SDK exactly as the case wrote it — including a value the rule refuses, because deciding that is
+ * the SDK's job and a driver that filtered first would be answering the case on its behalf.
+ */
 function multiValue(value: MultiValue): SdkMultiValue {
-  if (typeof value === "string" || Array.isArray(value)) {
-    return value;
-  }
-  return call(value) as Shape;
+  return isCall(value) ? (call(value) as Shape) : (value as SdkMultiValue);
 }
 
 /** A `one-of` alternative: a plain map, each member compiled by the literal rules. */

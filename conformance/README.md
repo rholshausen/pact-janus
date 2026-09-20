@@ -40,7 +40,7 @@ Each SDK runs the corpus as part of its own test suite and writes a report; the 
 reports.
 
 ```sh
-cargo test -p pact_janus_conformance          # the corpus against its schema and the 53 ids
+cargo test -p pact_janus_conformance          # the corpus against its schema and the spec's ids
 cargo run -p pact_janus_conformance -- lint   # the same checks, with a coverage summary
 
 cd sdks/typescript && npm test                # writes target/conformance/typescript.json
@@ -89,8 +89,9 @@ Two rules for a case author, both because a case must mean the same thing in eve
 **Against a scripted engine** (`lifecycle`, `variants`): the case's `engine` member is the whole
 engine. `variants` is what `consumer-session/variants` returns, `contract` what `finalise` returns,
 `withhold-contract` makes it return none, `results` replaces the default results, and `errors` maps
-an operation to the error document it answers with instead. Everything unset is answered the default
-way: `engine/hello` agrees protocol version 1, `create` returns session `s-1`, `add-interaction`
+an operation to the error document it answers with instead — with `after: n` on that error, the
+operation answers `n` calls the default way first, which is how a case writes an engine that dies
+partway through the variant loop. Everything unset is answered the default way: `engine/hello` agrees protocol version 1, `create` returns session `s-1`, `add-interaction`
 returns `i-1`, `i-2`, …, `start-transport` returns an HTTP endpoint, `variants` returns one variant
 `base`, and `finalise` returns one verified result per interaction and a small contract. Every SDK
 runs as consumer `web-app` and provider `orders-api`, so the contract file is always
@@ -109,10 +110,14 @@ Per step (`expect` inside a step):
 | `closure-calls` | the variant ids the closure ran on, in call order |
 | `contract` | `written`, the file's exact `text`, or its `content` |
 
-Per case (`expect` at the top level): `spec` (the whole built document) or `at` (JSON pointer →
-value) for translation; `ops` (every operation sent, in order), `frames` (operation → members its
-request body must carry), `engine-closed`, `dimensions` (dimension ids the engine's variants must
-assign) and `variant-count`.
+Per case (`expect` at the top level): `spec` (the whole built document), `at` (JSON pointer → value)
+or `refused` (the chain never becomes a document, because the DSL refuses it at the call — ADR 0019)
+for translation; `ops` (every operation sent, in order), `frames` (operation → members its request
+body must carry), `engine-closed`, `dimensions` (dimension ids the engine's variants must assign)
+and `variant-count`.
+
+`refused` checks only that no document was produced. *How* a language refuses — a thrown error, a
+failed build, a compile-time type error backed by a runtime check — is the style guide's business.
 
 `outcome` is a vocabulary, not a type name: each language maps it to its own failure —
 `execute-failed` is `VariantsFailedError` in TypeScript and `ExecuteFailedException` on the JVM. A

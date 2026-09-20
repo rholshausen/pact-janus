@@ -59,7 +59,10 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   (behavioural spec `literal`).
 - Bare values follow the `literal` rule exactly; headers and query follow `request`'s name-to-list
   rule: `headers: { Accept: 'application/json' }` means `accept` with the one value
-  `application/json`. Note that this is an exact comparison — see
+  `application/json`. A value may be a string, a whole number (`{ 'X-Count': 3 }` sends
+  `X-Count: 3`), a boolean, a list of those, or a shape helper; `MultiValue` is that type, and
+  anything else — a fractional number, a `Date`, `null` — is refused at the call, as are two names
+  that collide once lower-cased (ADR 0019). Note that this is an exact comparison — see
   [Phase 9 finding 1](../../Documentation/phase-9-findings.md) for why a provider adding
   `; charset=utf-8` to a *response* header will fail it today.
 

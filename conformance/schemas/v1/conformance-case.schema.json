@@ -73,12 +73,8 @@
       "additionalProperties": false
     },
     "MultiValue": {
-      "description": "A header or query value: one string, several strings, or a shape its one value must match.",
-      "anyOf": [
-        { "type": "string" },
-        { "type": "array", "items": { "type": "string" } },
-        { "$ref": "#/$defs/HelperCall" }
-      ]
+      "description": "A header or query value: a string, an integral number or a boolean (each written as the one string that spells it), a list of those, or a shape helper describing its one value (behavioural spec 'request'; ADR 0019). A case may also write a value the rule refuses — a fractional number, a date, null, a map — to pin that refusal, so this is deliberately unconstrained: what a value may be is the specification's rule, not this schema's.",
+      "$comment": "Open for the same reason Template is: constraining it here would make the schema a second, quieter statement of the rule."
     },
     "InteractionScript": {
       "type": "object",
@@ -158,6 +154,11 @@
             "properties": {
               "code": { "type": "string" },
               "message": { "type": "string" },
+              "after": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Answer this many calls of the operation the default way first, and error from the next one on. Absent: error from the first call."
+              },
               "problems": { "type": "array", "items": { "type": "object" } },
               "details": { "type": "object" }
             },
@@ -250,6 +251,11 @@
           "type": "object",
           "description": "JSON pointer into the built document -> the value that must be there. For a case that pins one slot of a large chain.",
           "additionalProperties": true
+        },
+        "refused": {
+          "type": "boolean",
+          "description": "true: the DSL refuses this chain at the call, before any document is built (behavioural spec 'regex', 'request'; ADR 0019). How it refuses is the language's business — a thrown error, a failed build — so the case checks only that the document was never produced.",
+          "const": true
         },
         "ops": {
           "type": "array",

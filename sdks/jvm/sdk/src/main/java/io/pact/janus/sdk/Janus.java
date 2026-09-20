@@ -106,13 +106,15 @@ public final class Janus implements AutoCloseable {
    * selects, in the engine's order, with that variant armed on the mock.
    *
    * <p>A test that throws fails that variant only: every remaining variant still runs, and then
-   * {@code execute} throws one {@link ExecuteFailedException} naming every failed variant. Whether
-   * the mock saw what the interaction describes is the engine's verdict, not this method's —
-   * {@link #finalise()} reports it.
+   * {@code execute} throws one {@link ExecuteFailedException} naming every failed variant. An engine
+   * error is not a test's verdict and is not recorded as one: it ends the run at once, and the
+   * variants after it do not run (ADR 0019). Whether the mock saw what the interaction describes is
+   * the engine's verdict, not this method's — {@link #finalise()} reports it.
    *
    * @throws JanusEngineException before any variant runs, when the engine rejects the interaction
    *     ({@code interaction-invalid}, with its problems) or cannot select variants
-   *     ({@code variant-budget-exceeded}); from the first {@code execute}, when the handshake fails
+   *     ({@code variant-budget-exceeded}); from the first {@code execute}, when the handshake fails;
+   *     and from inside the loop, when the engine cannot arm a variant
    * @throws ExecuteFailedException when the test failed on one or more variants
    */
   public void execute(Interaction interaction, VariantTest test) {
@@ -280,7 +282,15 @@ public final class Janus implements AutoCloseable {
     }
   }
 
-  /** {@code serve-variant}, then the test. Returns the failure, or null when the variant passed. */
+  /**
+   * {@code serve-variant}, then the test. Returns the failure, or null when the variant passed.
+   *
+   * <p>Arming the variant is machinery, not a verdict: an engine error there ends the run at once
+   * (ADR 0019) rather than being recorded as this variant's failure, because an engine that cannot
+   * arm this variant cannot arm the next one either, and one failure per remaining variant would say
+   * the tests failed when the engine did. The interaction is still marked failed, so {@code finalise}
+   * withholds the contract.
+   */
   VariantFailure run(Execution run, Variant variant, VariantTest test) {
     try {
       synchronized (this) {
@@ -294,6 +304,15 @@ public final class Janus implements AutoCloseable {
         serve.setVariant(variant.id());
         engine.send(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve);
       }
+    } catch (RuntimeException machinery) {
+      synchronized (this) {
+        if (!failed.contains(run) && run.session.equals(session)) {
+          failed.add(run);
+        }
+      }
+      throw machinery;
+    }
+    try {
       test.run(run.mock, variant);
       return null;
     } catch (VirtualMachineError e) {

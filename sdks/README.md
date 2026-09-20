@@ -41,7 +41,7 @@ each writes a report `cargo run -p pact_janus_conformance -- check` reads. That,
 maintainer's assertion, is what "conformant" means ([ADR 0017](../Documentation/decisions/0017-sdk-conformance-is-suite-passing-not-prose-matching.md)).
 What the first run of it found is in
 [`Documentation/conformance-suite-report.md`](../Documentation/conformance-suite-report.md): both
-SDKs pass all 27 cases, including the same recorded interaction content for the RFC example.
+SDKs pass every case, including the same recorded interaction content for the RFC example.
 
 A driver knows only how its language spells a primitive; it never decides what one means. Adding a
 case means adding JSON to the corpus, not code to either SDK.

@@ -1,0 +1,46 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/variant-budget-exceeded",
+  "category": "lifecycle",
+  "title": "A variant space too large to sample fails execute before any variant runs, and withholds the contract.",
+  "covers": ["session.execute.variant-budget-exceeded"],
+  "why": "behavioural spec 'execute': 'variant-budget-exceeded' is thrown before any variant runs, from 'variants'. The SDK does not compute a variant space, a sample of one, or a fallback when the engine declines to (SDK spec §2.1's first failure) — it carries the engine's refusal across, and no closure runs.",
+  "engine": {
+    "errors": {
+      "consumer-session/variants": {
+        "code": "variant-budget-exceeded",
+        "message": "the variant space has 4096 points, over the budget of 50",
+        "details": { "size": 4096, "budget": 50 }
+      }
+    }
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": { "description": "an interaction that varies too many ways", "request": { "method": "GET", "path": "/orders" } }
+      },
+      "expect": {
+        "outcome": { "error": "engine-error", "code": "variant-budget-exceeded" },
+        "closure-calls": []
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "engine-withheld": false, "interactions": ["an interaction that varies too many ways"] },
+        "contract": { "written": false }
+      }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/finalise"
+    ],
+    "engine-closed": true
+  }
+}

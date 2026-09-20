@@ -35,6 +35,7 @@ superseding ADR instead.
 | [0016](0016-subsumption-defaults-to-warn-with-mandatory-reason-exemptions.md) | Subsumption defaults to warn, not block; exemptions require a reason and are scoped by field, interaction or consumer | accepted |
 | [0017](0017-sdk-conformance-is-suite-passing-not-prose-matching.md) | SDK conformance is defined by the shared suite passing against a pinned engine, not by matching another SDK's implementation | accepted |
 | [0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md) | Write Janus contracts as compact JSON; canonical form carries no formatting promise, and a reader must not assume one of its input | accepted |
+| [0019](0019-an-sdk-refuses-what-it-cannot-spell-and-stops-when-the-engine-does.md) | Refuse at the call what an SDK cannot spell the same way in every language, write what it can, and fail a run at once when the engine errors | accepted |
 
 ## Decision backlog
 

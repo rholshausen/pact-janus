@@ -1,0 +1,13 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/header-name-collision",
+  "category": "translation",
+  "title": "Two header names that are the same once lower-cased are refused at the call.",
+  "covers": ["session.request.colliding-header-names-refused"],
+  "why": "behavioural spec 'request' (ADR 0019): the SDK made the collision by lower-casing, the engine never sees the declaration that would be dropped, and an author who means one header with two values writes the list form. The same reason 'regex' refuses a flag its pattern text cannot carry: silently dropping what the author wrote would change what the interaction means.",
+  "interaction": {
+    "description": "one header declared twice under different spellings",
+    "request": { "headers": { "Accept": "application/json", "accept": "text/plain" } }
+  },
+  "expect": { "refused": true }
+}

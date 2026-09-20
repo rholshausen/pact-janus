@@ -59,8 +59,19 @@ final class CaseRunner {
   /** Category 1: what a DSL chain builds, with no engine anywhere. */
   private void translation() {
     Janus janus = Janus.of(CONSUMER, PROVIDER);
-    JsonNode built = Suite.MAPPER.valueToTree(Dsl.interaction(janus, testCase.path("interaction")).toDocument());
     JsonNode expect = testCase.path("expect");
+    if (expect.path("refused").asBoolean(false)) {
+      // The chain must not become a document. How it refuses is this language's business; that it
+      // refuses is the case's (ADR 0019).
+      try {
+        JsonNode document = Suite.MAPPER.valueToTree(Dsl.interaction(janus, testCase.path("interaction")).toDocument());
+        failures.add("the chain was accepted, and the case expects it refused: " + Suite.show(document));
+      } catch (RuntimeException refused) {
+        // Refused, as the case requires.
+      }
+      return;
+    }
+    JsonNode built = Suite.MAPPER.valueToTree(Dsl.interaction(janus, testCase.path("interaction")).toDocument());
     if (expect.has("spec") && !Suite.equal(expect.get("spec"), built)) {
       failures.add("the built interaction-spec document differs\n  expected: " + Suite.show(expect.get("spec"))
           + "\n  actual:   " + Suite.show(built));

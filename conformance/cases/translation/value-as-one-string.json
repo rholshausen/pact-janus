@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/value-as-one-string",
+  "category": "translation",
+  "title": "An integral number or a boolean header or query value is written as the one string that spells it.",
+  "covers": ["session.request.value-written-as-one-string"],
+  "why": "behavioural spec 'request' (ADR 0019): a value that is not a string is written as the one string that spells it, but only where every language spells it the same way — an integral number becomes its shortest decimal form (no exponent, no trailing zeros, no leading '+'), and a boolean becomes 'true' or 'false'. A header or query value reaches the transport as a string and nothing else (shape spec §3.6), which is why the rule already writes a bare string as a one-element list.",
+  "note": "This is what a test author means by `header(\"X-Count\", 3)`: X-Count: 3 on the wire. The negative half of the rule — what is refused rather than spelled — is translation/unspellable-value.",
+  "interaction": {
+    "description": "counts and flags as header and query values",
+    "request": {
+      "query": { "page": 2, "exact": true, "sizes": [10, 20] },
+      "headers": { "X-Count": 3, "X-Debug": false, "X-Retry": -1, "X-Big": 9007199254740991 }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/request/query": {
+        "shape": "object",
+        "members": {
+          "page": { "shape": "equality", "example": ["2"] },
+          "exact": { "shape": "equality", "example": ["true"] },
+          "sizes": { "shape": "equality", "example": ["10", "20"] }
+        }
+      },
+      "/parts/request/headers": {
+        "shape": "object",
+        "members": {
+          "x-count": { "shape": "equality", "example": ["3"] },
+          "x-debug": { "shape": "equality", "example": ["false"] },
+          "x-retry": { "shape": "equality", "example": ["-1"] },
+          "x-big": { "shape": "equality", "example": ["9007199254740991"] }
+        }
+      }
+    }
+  }
+}

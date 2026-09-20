@@ -3,10 +3,13 @@
 // call — `execute` submits it.
 
 import type { contract, shape } from "./generated/index.js";
-import { compile, type Shape, type Template } from "./shapes.js";
+import { compile, Shape, type Template } from "./shapes.js";
+
+/** A header or query value the rule can spell: a string, a whole number, or a boolean (ADR 0019). */
+export type Spellable = string | number | boolean;
 
 /** A header or query parameter: one value, several values, or a shape its one value must match. */
-export type MultiValue = string | readonly string[] | Shape;
+export type MultiValue = Spellable | readonly Spellable[] | Shape;
 
 export interface RequestParts {
   method?: Template;
@@ -91,10 +94,11 @@ function slots(members: Record<string, Template | undefined>): Record<string, sh
 }
 
 /**
- * A `{ name: [values…] }` slot (shape spec §3.6): a string is the one-element list, a list is
- * itself, a shape describes the one value — bounded at exactly one, since an unbounded `each-like`
- * would add a request variant sending the header twice. Header names are lower-cased, the only
- * spelling the HTTP transport presents them under; query names are kept as written.
+ * A `{ name: [values…] }` slot (shape spec §3.6): a value is the one-element list, a list is itself,
+ * a shape describes the one value — bounded at exactly one, since an unbounded `each-like` would add
+ * a request variant sending the header twice. Header names are lower-cased, the only spelling the
+ * HTTP transport presents them under; query names are kept as written. Two names that collide once
+ * spelled are refused, rather than one of them being dropped where nobody can see it (ADR 0019).
  */
 function multiValueSlot(
   slot: string,
@@ -106,12 +110,45 @@ function multiValueSlot(
   }
   const compiled: Record<string, shape.Shape> = {};
   for (const [name, value] of Object.entries(members)) {
-    compiled[spell(name)] =
-      typeof value === "string"
-        ? { shape: "equality", example: [value] }
-        : Array.isArray(value)
-          ? { shape: "equality", example: [...value] }
-          : { shape: "each-like", items: compile(value as Shape), min: 1, max: 1 };
+    const spelled = spell(name);
+    if (spelled in compiled) {
+      throw new TypeError(
+        `${slot}: '${name}' is already declared as '${spelled}' — HTTP header names are ` +
+          "case-insensitive, so the SDK writes them lower-cased; give one name a list of values " +
+          "instead of declaring it twice",
+      );
+    }
+    compiled[spelled] =
+      value instanceof Shape
+        ? { shape: "each-like", items: compile(value), min: 1, max: 1 }
+        : {
+            shape: "equality",
+            example: (Array.isArray(value) ? value : [value]).map((one) => text(one, `${slot}.${spelled}`)),
+          };
   }
   return { [slot]: { shape: "object", members: compiled } };
+}
+
+/**
+ * The one string that spells a header or query value (behavioural spec `request`, ADR 0019). A
+ * string is itself; a whole number within ±(2^53 - 1) is its shortest decimal form; a boolean is
+ * `true`/`false`. Everything else is refused here, at the call: a value whose spelling differs
+ * between languages would have two SDKs send different bytes for the same test, and a value that is
+ * not a string at all compiles to a shape the transport's values can never match.
+ */
+function text(value: unknown, where: string): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value)) {
+    return String(value);
+  }
+  throw new TypeError(
+    `${where}: ${JSON.stringify(value) ?? String(value)} has no spelling every Janus SDK agrees on; ` +
+      "a header or query value is a string, a whole number up to 2^53 - 1, a boolean, a list of " +
+      "those, or a shape helper — write the string you mean",
+  );
 }

@@ -128,17 +128,13 @@ final class Dsl {
     return interaction;
   }
 
-  /** A header or query value: one string, several strings, or a shape describing its one value. */
+  /**
+   * A header or query value. Only a helper call is resolved here; everything else is handed to the
+   * SDK exactly as the case wrote it — including a value the rule refuses, because deciding that is
+   * the SDK's job and a driver that converted first would be answering the case on its behalf.
+   */
   private static Object multiValue(JsonNode node) {
-    if (node.isTextual()) {
-      return node.asText();
-    }
-    if (node.isArray()) {
-      List<String> values = new ArrayList<>();
-      node.forEach(value -> values.add(value.asText()));
-      return values;
-    }
-    return call(node);
+    return isCall(node) ? call(node) : plain(node);
   }
 
   private static Cardinality cardinality(JsonNode options) {

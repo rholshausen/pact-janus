@@ -48,8 +48,21 @@ async function runTranslation(testCase: Case, failures: string[]): Promise<void>
   const janus = new Janus({ consumer: CONSUMER, provider: PROVIDER });
   // The schema requires an `interaction` of a translation case, and the corpus lints against it.
   const script = testCase.interaction as InteractionScript;
-  const built = buildInteraction(janus, script).build() as unknown as Record<string, unknown>;
   const expected = testCase.expect ?? {};
+
+  if (expected.refused) {
+    // The chain must not become a document. How it refuses is this language's business; that it
+    // refuses is the case's (ADR 0019).
+    try {
+      const document = buildInteraction(janus, script).build();
+      failures.push(`the chain was accepted, and the case expects it refused: ${show(document)}`);
+    } catch {
+      // Refused, as the case requires.
+    }
+    return;
+  }
+
+  const built = buildInteraction(janus, script).build() as unknown as Record<string, unknown>;
   if (expected.spec && !equal(expected.spec, built)) {
     failures.push(`the built interaction-spec document differs\n  expected: ${show(expected.spec)}\n  actual:   ${show(built)}`);
   }

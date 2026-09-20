@@ -1,0 +1,14 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/unspellable-value",
+  "category": "translation",
+  "title": "A header value with no single spelling every language agrees on is refused at the call.",
+  "covers": ["session.request.unspellable-value-refused"],
+  "why": "behavioural spec 'request' (ADR 0019): every value other than a string, an integral number or a boolean is refused at the call, before any document is built — because a value whose spelling differs by language ('1' or '1.0'; '1e+21' or '1.0E21') would make two SDKs send different bytes for the same test, and a date has no format the SDK may choose.",
+  "note": "A fractional number stands for the whole refused class here, because it is the one every language can write and none spell alike. The case is that no document is produced; how a language refuses — a thrown error, a failed build — is the style guide's business.",
+  "interaction": {
+    "description": "a header value the SDK cannot spell",
+    "request": { "headers": { "X-Ratio": 1.5 } }
+  },
+  "expect": { "refused": true }
+}

@@ -136,7 +136,7 @@ neither is a DSL call.
     { "code": "variant-budget-exceeded", "surfaced-as": "thrown before any variant runs, from variants" },
     { "code": "session-not-found", "surfaced-as": "an idiomatic-layer bug if it ever surfaces to a user — the SDK owns the session handle's lifetime end to end" } ],
   "conformance": [
-    "session.execute.full-call-sequence", "session.execute.finalise-always-runs",
+    "session.execute.full-call-sequence", "session.finalise.always-runs",
     "session.execute.closure-per-selected-variant", "session.execute.failing-variant-fails-build" ] }
 ```
 
