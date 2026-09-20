@@ -1,0 +1,41 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/failed-test-withholds-contract",
+  "category": "lifecycle",
+  "title": "finalise runs after a failed execute, and withholds the contract the engine did return.",
+  "covers": ["session.finalise.always-runs", "session.finalise.failed-test-withholds-contract"],
+  "why": "behavioural spec 'finalise': it writes nothing, and fails naming the interactions, when any 'execute' in the session failed — even though the engine returned a contract: only the closure knows whether the consumer handled what it was sent, and a contract must not claim a variant the consumer's own test failed on (Phase 9 finding 4). The integration MUST run 'finalise' after the suite's last 'execute', including when an 'execute' failed: sessions are the only resource (engine-protocol spec §7.1).",
+  "engine": { "variants": [{ "id": "base", "label": "base" }, { "id": "shippedAt=absent", "label": "shippedAt absent" }] },
+  "steps": [
+    {
+      "execute": {
+        "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } },
+        "closure": { "fail-on": ["shippedAt=absent"] }
+      },
+      "expect": {
+        "outcome": { "error": "execute-failed", "variants": ["shippedAt=absent"] },
+        "closure-calls": ["base", "shippedAt=absent"]
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "engine-withheld": false, "interactions": ["get an order"] },
+        "contract": { "written": false }
+      }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/serve-variant",
+      "consumer-session/finalise"
+    ],
+    "engine-closed": true
+  }
+}

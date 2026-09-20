@@ -1,0 +1,46 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/shape-dimensions",
+  "category": "live",
+  "title": "The engine derives a presence, value, alternative and cardinality dimension from the shapes the DSL emitted.",
+  "covers": ["shape.optional.presence-dimension", "shape.any-of.value-dimension", "shape.one-of.alternative-dimension", "shape.each-like.cardinality-dimension"],
+  "why": "behavioural spec 'optional', 'any-of', 'one-of', 'each-like': each contributes one variant dimension (shape spec §6.4) — computed by the engine, not the SDK. So the case is not what the SDK believes about dimensions; it is that the document the SDK emitted makes the engine derive them, and hand them back in the variants it selects (variant semantics spec §3.9).",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order whose payload varies four ways",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [
+                {
+                  "status": { "$": "any-of", "args": ["PENDING", "SHIPPED"] },
+                  "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] },
+                  "payment": {
+                    "$": "one-of",
+                    "args": ["type", { "card": { "type": "card" }, "invoice": { "type": "invoice" } }]
+                  },
+                  "items": { "$": "each-like", "args": [{ "$": "string", "args": ["SKU-1"] }], "options": { "min": 1 } }
+                }
+              ]
+            }
+          }
+        },
+        "closure": { "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 } }
+      },
+      "expect": { "outcome": "ok" }
+    },
+    { "finalise": {}, "expect": { "outcome": "ok", "contract": { "written": true } } }
+  ],
+  "expect": {
+    "dimensions": [
+      "response.body.status#value",
+      "response.body.shippedAt#presence",
+      "response.body.payment#alternative",
+      "response.body.items#cardinality"
+    ]
+  }
+}

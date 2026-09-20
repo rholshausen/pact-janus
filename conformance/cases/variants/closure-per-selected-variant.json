@@ -1,0 +1,33 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "variants/closure-per-selected-variant",
+  "category": "variants",
+  "title": "The closure runs once per variant the engine selected, in the order it returned them, each armed first.",
+  "covers": ["session.execute.closure-per-selected-variant"],
+  "why": "behavioural spec 'execute': for each variant in the order 'variants' returned them — 'serve-variant' with that variant's 'id', then the closure with (mock, variant). The closure runs once per selected variant, never once per declared variant.",
+  "engine": {
+    "variants": [
+      { "id": "base", "label": "base" },
+      { "id": "status=SHIPPED", "label": "status SHIPPED" },
+      { "id": "shippedAt=absent", "label": "shippedAt absent" }
+    ]
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base", "status=SHIPPED", "shippedAt=absent"] }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/serve-variant",
+      "consumer-session/serve-variant"
+    ]
+  }
+}

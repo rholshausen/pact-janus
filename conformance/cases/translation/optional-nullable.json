@@ -1,0 +1,35 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/optional-nullable",
+  "category": "translation",
+  "title": "'optional' and 'nullable' wrap whatever operator they were given, unchanged.",
+  "covers": ["shape.optional.wraps-any-operator", "shape.nullable.wraps-any-operator"],
+  "why": "behavioural spec 'optional' and 'nullable': compiles to the node (shape spec §4.4) wrapping 'of' compiled by the 'literal' rules, with no further transformation.",
+  "interaction": {
+    "description": "may-be-absent and may-be-null values",
+    "response": {
+      "body": {
+        "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] },
+        "lines": { "$": "optional", "args": [{ "$": "each-like", "args": [{ "$": "string", "args": ["a"] }] }] },
+        "cancelledAt": { "$": "nullable", "args": [{ "$": "date", "args": ["2026-08-30"] }] },
+        "note": { "$": "nullable", "args": ["a plain literal"] }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "shippedAt": { "shape": "optional", "of": { "shape": "datetime", "example": "2026-07-30T10:00:00Z" } },
+          "lines": {
+            "shape": "optional",
+            "of": { "shape": "each-like", "items": { "shape": "string", "example": "a" } }
+          },
+          "cancelledAt": { "shape": "nullable", "of": { "shape": "date", "example": "2026-08-30" } },
+          "note": { "shape": "nullable", "of": { "shape": "equality", "example": "a plain literal" } }
+        }
+      }
+    }
+  }
+}

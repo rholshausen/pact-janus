@@ -1400,6 +1400,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_conformance"
+version = "0.0.0"
+dependencies = [
+ "jsonschema",
+ "pretty_assertions",
+ "serde_json",
+]
+
+[[package]]
 name = "pact_janus_corpus"
 version = "0.0.0"
 dependencies = [

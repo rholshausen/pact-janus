@@ -1,0 +1,30 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/full-call-sequence",
+  "category": "lifecycle",
+  "title": "One execute sends hello, create, add-interaction, start-transport, variants and serve-variant, in that order.",
+  "covers": ["session.execute.full-call-sequence", "session.janus.hello-offers-v1"],
+  "why": "behavioural spec 'execute': in order — 'create', 'add-interaction', 'start-transport', 'variants', then 'serve-variant' per variant. 'janus': 'engine/hello' offers protocol version 1 (engine-protocol spec §5) when the first 'execute' needs the engine.",
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base"] }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant"
+    ],
+    "frames": {
+      "engine/hello": { "protocol-versions": [1] },
+      "consumer-session/create": { "config": { "consumer": { "name": "web-app" }, "provider": { "name": "orders-api" } } },
+      "consumer-session/start-transport": { "session": "s-1", "transport": "http" },
+      "consumer-session/serve-variant": { "session": "s-1", "handle": "i-1", "variant": "base" }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/response-parts",
+  "category": "translation",
+  "title": "The response part is treated exactly as the request part, and a member not given is no slot.",
+  "covers": ["session.response.bare-value-is-equality", "session.response.header-names-lower-cased"],
+  "why": "behavioural spec 'response': identical treatment to 'request' — 'status' and 'body' by the 'literal' rules, 'headers' by the name-to-list rule with names lower-cased. The interaction declares no request, so 'parts' carries no 'request' slot.",
+  "interaction": {
+    "description": "a response with a status and a header",
+    "response": {
+      "status": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "ok"
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "a response with a status and a header",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "headers": {
+            "shape": "object",
+            "members": { "content-type": { "shape": "equality", "example": ["application/json"] } }
+          },
+          "body": { "shape": "equality", "example": "ok" }
+        }
+      }
+    }
+  }
+}

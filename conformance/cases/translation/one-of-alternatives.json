@@ -1,0 +1,49 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/one-of-alternatives",
+  "category": "translation",
+  "title": "'one-of' compiles each alternative by the literal rules, and adds no 'default'.",
+  "covers": ["shape.one-of.discriminator-binding"],
+  "why": "behavioural spec 'one-of': one alternative per name, each compiled by the 'literal' rules — so the discriminator's literal becomes an 'equality' node like any other scalar. Adds no 'default': absent, the engine takes the lexicographically first alternative (shape spec §6.1).",
+  "interaction": {
+    "description": "a discriminated union",
+    "response": {
+      "body": {
+        "payment": {
+          "$": "one-of",
+          "args": [
+            "type",
+            {
+              "card": { "type": "card", "last4": { "$": "regex", "args": ["\\d{4}", "1234"] } },
+              "invoice": { "type": "invoice", "dueDate": { "$": "date", "args": ["2026-08-30"] } }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body/members/payment": {
+        "shape": "one-of",
+        "discriminator": "type",
+        "alternatives": {
+          "card": {
+            "shape": "object",
+            "members": {
+              "type": { "shape": "equality", "example": "card" },
+              "last4": { "shape": "regex", "pattern": "\\d{4}", "example": "1234" }
+            }
+          },
+          "invoice": {
+            "shape": "object",
+            "members": {
+              "type": { "shape": "equality", "example": "invoice" },
+              "dueDate": { "shape": "date", "example": "2026-08-30" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

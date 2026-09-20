@@ -1,0 +1,29 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/request-literals",
+  "category": "translation",
+  "title": "A bare request value becomes equality, a helper is used as authored, and nothing is repaired.",
+  "covers": ["session.request.bare-value-is-equality", "session.request.shape-used-as-authored"],
+  "why": "behavioural spec 'request': 'method', 'path' and 'body' are compiled by the 'literal' rules and are otherwise untouched — the method is not upper-cased and the path is not normalised, because repairing a value is the engine's call to reject, not the SDK's to make (SDK spec §2.1).",
+  "interaction": {
+    "description": "a request the SDK must not repair",
+    "request": {
+      "method": "get",
+      "path": { "$": "regex", "args": ["^/orders/\\d+$", "/orders/1"] },
+      "body": { "note": "unchanged" }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "a request the SDK must not repair",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "get" },
+          "path": { "shape": "regex", "pattern": "^/orders/\\d+$", "example": "/orders/1" },
+          "body": { "shape": "object", "members": { "note": { "shape": "equality", "example": "unchanged" } } }
+        }
+      }
+    }
+  }
+}

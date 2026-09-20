@@ -1,0 +1,15 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "variants/single-variant-still-runs",
+  "category": "variants",
+  "title": "A one-variant selection still runs the closure once.",
+  "covers": ["session.execute.single-variant-still-runs"],
+  "why": "behavioural spec 'execute': never zero times — a one-variant selection still runs the closure once. An SDK that 'optimises' a single-variant space away has already failed conformance.",
+  "engine": { "variants": [{ "id": "base", "label": "base" }] },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "an interaction with no variance", "request": { "method": "GET", "path": "/health" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base"] }
+    }
+  ]
+}

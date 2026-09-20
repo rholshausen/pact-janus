@@ -1,0 +1,775 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/rfc-order-contract",
+  "category": "live",
+  "title": "The RFC's consumer example, run end to end, records the same interaction content whatever language ran it.",
+  "covers": [
+    "session.finalise.writes-contract-when-verified"
+  ],
+  "why": "SDK spec §7 category 4, ADR 0017: two SDKs given equivalent DSL usage must produce contracts the engine treats as the same demonstrated interaction — the same 'parts', 'states' and 'selection' (contract spec §5–§6). This case is that comparison, made one SDK at a time: the content below is the engine's own record of the exercised interaction, captured once and reviewed, so an SDK is compared against the engine's answer rather than against another SDK's output.",
+  "note": "'metadata' and the parties are not compared. 'metadata.writer' names the SDK and version that wrote the file, by design (contract spec §3.2), and ADR 0017 places it outside content identity: a suite demanding byte-identical files would be grading a fact this project never asked two SDKs to agree on.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "get an order",
+          "given": [
+            {
+              "name": "an order exists",
+              "params": {
+                "id": "42"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "path": "/orders/42"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [
+                {
+                  "id": {
+                    "$": "integer",
+                    "args": [
+                      42
+                    ]
+                  },
+                  "status": {
+                    "$": "any-of",
+                    "args": [
+                      "PENDING",
+                      "SHIPPED",
+                      "DELIVERED"
+                    ]
+                  },
+                  "shippedAt": {
+                    "$": "optional",
+                    "args": [
+                      {
+                        "$": "datetime",
+                        "args": [
+                          "2026-07-30T10:00:00Z"
+                        ]
+                      }
+                    ]
+                  },
+                  "payment": {
+                    "$": "one-of",
+                    "args": [
+                      "type",
+                      {
+                        "card": {
+                          "type": "card",
+                          "last4": {
+                            "$": "regex",
+                            "args": [
+                              "\\d{4}",
+                              "1234"
+                            ]
+                          }
+                        },
+                        "invoice": {
+                          "type": "invoice",
+                          "dueDate": {
+                            "$": "date",
+                            "args": [
+                              "2026-08-30"
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "items": {
+                    "$": "each-like",
+                    "args": [
+                      {
+                        "sku": {
+                          "$": "string",
+                          "args": [
+                            "SKU-1"
+                          ]
+                        },
+                        "qty": {
+                          "$": "integer",
+                          "args": [
+                            1
+                          ]
+                        }
+                      }
+                    ],
+                    "options": {
+                      "min": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "closure": {
+          "exchange": {
+            "method": "GET",
+            "path": "/orders/42",
+            "expect-status": 200
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok"
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "content": {
+            "interactions": [
+              {
+                "description": "get an order",
+                "states": [
+                  {
+                    "name": "an order exists",
+                    "params": {
+                      "id": "42"
+                    }
+                  }
+                ],
+                "parts": {
+                  "request": {
+                    "method": {
+                      "example": "GET",
+                      "shape": "equality"
+                    },
+                    "path": {
+                      "example": "/orders/42",
+                      "shape": "equality"
+                    }
+                  },
+                  "response": {
+                    "body": {
+                      "members": {
+                        "id": {
+                          "example": 42,
+                          "shape": "integer"
+                        },
+                        "items": {
+                          "items": {
+                            "members": {
+                              "qty": {
+                                "example": 1,
+                                "shape": "integer"
+                              },
+                              "sku": {
+                                "example": "SKU-1",
+                                "shape": "string"
+                              }
+                            },
+                            "shape": "object"
+                          },
+                          "min": 1,
+                          "shape": "each-like"
+                        },
+                        "payment": {
+                          "alternatives": {
+                            "card": {
+                              "members": {
+                                "last4": {
+                                  "example": "1234",
+                                  "pattern": "\\d{4}",
+                                  "shape": "regex"
+                                },
+                                "type": {
+                                  "example": "card",
+                                  "shape": "equality"
+                                }
+                              },
+                              "shape": "object"
+                            },
+                            "invoice": {
+                              "members": {
+                                "dueDate": {
+                                  "example": "2026-08-30",
+                                  "shape": "date"
+                                },
+                                "type": {
+                                  "example": "invoice",
+                                  "shape": "equality"
+                                }
+                              },
+                              "shape": "object"
+                            }
+                          },
+                          "discriminator": "type",
+                          "shape": "one-of"
+                        },
+                        "shippedAt": {
+                          "of": {
+                            "example": "2026-07-30T10:00:00Z",
+                            "shape": "datetime"
+                          },
+                          "shape": "optional"
+                        },
+                        "status": {
+                          "example": "PENDING",
+                          "options": [
+                            "PENDING",
+                            "SHIPPED",
+                            "DELIVERED"
+                          ],
+                          "shape": "any-of"
+                        }
+                      },
+                      "shape": "object"
+                    },
+                    "status": {
+                      "example": 200,
+                      "shape": "equality"
+                    }
+                  }
+                },
+                "selection": {
+                  "variants": [
+                    {
+                      "id": "base",
+                      "origin": "base",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "card"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "present"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "PENDING"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "last4": "1234",
+                                "type": "card"
+                              },
+                              "shippedAt": "2026-07-30T10:00:00Z",
+                              "status": "PENDING"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.shippedAt#presence=absent",
+                      "origin": "boundary",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "card"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "absent"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "PENDING"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "last4": "1234",
+                                "type": "card"
+                              },
+                              "status": "PENDING"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.items#cardinality=min+1",
+                      "origin": "boundary",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min+1"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "card"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "present"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "PENDING"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                },
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "last4": "1234",
+                                "type": "card"
+                              },
+                              "shippedAt": "2026-07-30T10:00:00Z",
+                              "status": "PENDING"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.payment#alternative=invoice;response.body.status#value=SHIPPED",
+                      "origin": "covering",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "invoice"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "present"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "SHIPPED"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "dueDate": "2026-08-30",
+                                "type": "invoice"
+                              },
+                              "shippedAt": "2026-07-30T10:00:00Z",
+                              "status": "SHIPPED"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.items#cardinality=min+1;response.body.shippedAt#presence=absent;response.body.status#value=SHIPPED",
+                      "origin": "covering",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min+1"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "card"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "absent"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "SHIPPED"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                },
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "last4": "1234",
+                                "type": "card"
+                              },
+                              "status": "SHIPPED"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.status#value=DELIVERED",
+                      "origin": "covering",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "card"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "present"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "DELIVERED"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "last4": "1234",
+                                "type": "card"
+                              },
+                              "shippedAt": "2026-07-30T10:00:00Z",
+                              "status": "DELIVERED"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.items#cardinality=min+1;response.body.payment#alternative=invoice;response.body.shippedAt#presence=absent;response.body.status#value=DELIVERED",
+                      "origin": "covering",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min+1"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "invoice"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "absent"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "DELIVERED"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                },
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "dueDate": "2026-08-30",
+                                "type": "invoice"
+                              },
+                              "status": "DELIVERED"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "response.body.payment#alternative=invoice",
+                      "origin": "covering",
+                      "assignment": [
+                        {
+                          "dimension": "response.body.items#cardinality",
+                          "point": "min"
+                        },
+                        {
+                          "dimension": "response.body.payment#alternative",
+                          "point": "invoice"
+                        },
+                        {
+                          "dimension": "response.body.shippedAt#presence",
+                          "point": "present"
+                        },
+                        {
+                          "dimension": "response.body.status#value",
+                          "point": "PENDING"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists",
+                          "params": {
+                            "id": "42"
+                          }
+                        }
+                      ],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "items": [
+                                {
+                                  "qty": 1,
+                                  "sku": "SKU-1"
+                                }
+                              ],
+                              "payment": {
+                                "dueDate": "2026-08-30",
+                                "type": "invoice"
+                              },
+                              "shippedAt": "2026-07-30T10:00:00Z",
+                              "status": "PENDING"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "report": {
+                    "algorithm": "janus-ipog-v1",
+                    "boundaries": true,
+                    "budgets": {
+                      "exhaustive-threshold": 8,
+                      "max-variants": 50
+                    },
+                    "coverage": {
+                      "covered": 30,
+                      "dropped": 0,
+                      "removed": 0,
+                      "targets": 30
+                    },
+                    "selected": 8,
+                    "space": {
+                      "dimensions": 4,
+                      "exact": true,
+                      "size": 24
+                    },
+                    "strategy": "t-wise",
+                    "strength": 2
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": {}
+}

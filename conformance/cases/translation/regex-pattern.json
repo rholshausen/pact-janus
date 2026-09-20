@@ -1,0 +1,29 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/regex-pattern",
+  "category": "translation",
+  "title": "A regex pattern is carried verbatim and is never anchored by the SDK.",
+  "covers": ["shape.regex.unanchored", "shape.regex.pattern-verbatim"],
+  "why": "behavioural spec 'regex': matching is unanchored (shape spec §4.2), so the SDK MUST NOT anchor the pattern; an author who means a full match writes '^...$'.",
+  "note": "How a language spells a pattern — a string, or a compiled pattern object carrying flags the pattern text cannot hold — is the style guide's business; the entry's refusal of out-of-band flags is a per-language test, not a case here.",
+  "interaction": {
+    "description": "an unanchored and an anchored pattern",
+    "response": {
+      "body": {
+        "last4": { "$": "regex", "args": ["\\d{4}", "1234"] },
+        "id": { "$": "regex", "args": ["^ORD-[A-Z0-9]+$", "ORD-42"] }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "last4": { "shape": "regex", "pattern": "\\d{4}", "example": "1234" },
+          "id": { "shape": "regex", "pattern": "^ORD-[A-Z0-9]+$", "example": "ORD-42" }
+        }
+      }
+    }
+  }
+}

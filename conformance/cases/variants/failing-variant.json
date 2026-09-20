@@ -1,0 +1,28 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "variants/failing-variant",
+  "category": "variants",
+  "title": "A variant the closure cannot handle fails the build, after every remaining variant has run.",
+  "covers": ["session.execute.failing-variant-fails-build", "session.execute.every-variant-runs-after-a-failure"],
+  "why": "behavioural spec 'execute': a closure that throws or rejects fails that variant only — every remaining variant still runs, and 'execute' then fails once, naming every failed variant by label and id with its cause. A variant the closure cannot handle fails the build rather than being silently skipped (SDK spec §7 category 3).",
+  "engine": {
+    "variants": [
+      { "id": "base", "label": "base" },
+      { "id": "status=SHIPPED", "label": "status SHIPPED" },
+      { "id": "shippedAt=absent", "label": "shippedAt absent" },
+      { "id": "items=2", "label": "two items" }
+    ]
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } },
+        "closure": { "fail-on": ["status=SHIPPED", "items=2"] }
+      },
+      "expect": {
+        "outcome": { "error": "execute-failed", "variants": ["status=SHIPPED", "items=2"] },
+        "closure-calls": ["base", "status=SHIPPED", "shippedAt=absent", "items=2"]
+      }
+    }
+  ]
+}

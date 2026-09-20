@@ -1,0 +1,19 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/no-call-until-execute",
+  "category": "lifecycle",
+  "title": "Configuring the SDK and building an interaction sends nothing.",
+  "covers": ["session.janus.no-call-until-execute", "session.interaction.no-call-until-execute"],
+  "why": "behavioural spec 'janus': makes no protocol call when constructed; the engine is started, and 'engine/hello' sent, when the first 'execute' needs it. 'interaction': no protocol call happens; the document is submitted by 'execute'.",
+  "steps": [
+    {
+      "build": {
+        "description": "an interaction nobody executes",
+        "given": [{ "name": "an order exists" }],
+        "request": { "method": "GET", "path": "/orders/42" },
+        "response": { "status": 200 }
+      }
+    }
+  ],
+  "expect": { "ops": [] }
+}

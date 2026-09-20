@@ -1,0 +1,30 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/each-like-bounds",
+  "category": "translation",
+  "title": "'each-like' writes 'min' and 'max' only when they were given.",
+  "covers": ["shape.each-like.bounds-only-when-given"],
+  "why": "behavioural spec 'each-like': 'min' and 'max' only when given — absent, 'min' means 1 and 'max' unbounded in the shape itself, so the SDK does not write the defaults.",
+  "interaction": {
+    "description": "arrays with and without bounds",
+    "response": {
+      "body": {
+        "items": { "$": "each-like", "args": [{ "$": "string", "args": ["SKU-1"] }], "options": { "min": 1 } },
+        "tags": { "$": "each-like", "args": [{ "$": "string", "args": ["new"] }] },
+        "slots": { "$": "each-like", "args": [{ "$": "integer", "args": [1] }], "options": { "min": 2, "max": 4 } }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "items": { "shape": "each-like", "items": { "shape": "string", "example": "SKU-1" }, "min": 1 },
+          "tags": { "shape": "each-like", "items": { "shape": "string", "example": "new" } },
+          "slots": { "shape": "each-like", "items": { "shape": "integer", "example": 1 }, "min": 2, "max": 4 }
+        }
+      }
+    }
+  }
+}

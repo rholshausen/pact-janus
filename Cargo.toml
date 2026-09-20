@@ -10,6 +10,7 @@ members = [
   "samples/order-service",
   "tools/schema-compat",
   "tools/corpus",
+  "tools/conformance",
   "tools/bindings",
 ]
 # Spikes are standalone projects, never workspace members. The benchmark

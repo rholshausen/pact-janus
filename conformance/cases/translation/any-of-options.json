@@ -1,0 +1,21 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/any-of-options",
+  "category": "translation",
+  "title": "'any-of' carries its options in the order given, with the first as the example.",
+  "covers": ["shape.any-of.literal-containment"],
+  "why": "behavioural spec 'any-of': compiles to an 'any-of' node (shape spec §4.1, §5.3) with 'options' as its literal set, in the order given, and the first option as its example.",
+  "interaction": {
+    "description": "a field with an enumerated set of values",
+    "response": { "body": { "status": { "$": "any-of", "args": ["PENDING", "SHIPPED", "DELIVERED"] } } }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body/members/status": {
+        "shape": "any-of",
+        "options": ["PENDING", "SHIPPED", "DELIVERED"],
+        "example": "PENDING"
+      }
+    }
+  }
+}

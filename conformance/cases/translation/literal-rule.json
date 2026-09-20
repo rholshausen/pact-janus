@@ -1,0 +1,62 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/literal-rule",
+  "category": "translation",
+  "title": "Scalars become equality, maps become object, lists become array, and a helper is used as authored.",
+  "covers": ["shape.literal.scalar-is-equality", "shape.literal.map-is-object", "shape.literal.list-is-array", "shape.literal.helper-used-as-authored"],
+  "why": "behavioural spec 'literal': a string, number, boolean or null becomes an 'equality' node with the value as its example; a plain map becomes an 'object' node with one member per key; a list becomes an 'array' node with one positional entry per element; a helper's result is used as authored. Nothing else is inferred.",
+  "note": "The 'shape' member on 'plain' is the case's point: a plain map that happens to carry a 'shape' member is still a plain map, and an SDK MUST NOT tell a helper's result from a map by looking for that member (behavioural spec 'literal').",
+  "interaction": {
+    "description": "every literal form in one body",
+    "response": {
+      "body": {
+        "count": 1,
+        "name": "order",
+        "paid": true,
+        "note": null,
+        "tags": [true, "s", 2],
+        "nested": { "deep": { "deeper": "value" } },
+        "plain": { "shape": "not a helper" },
+        "helper": { "$": "integer", "args": [42] }
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "every literal form in one body",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "count": { "shape": "equality", "example": 1 },
+              "name": { "shape": "equality", "example": "order" },
+              "paid": { "shape": "equality", "example": true },
+              "note": { "shape": "equality", "example": null },
+              "tags": {
+                "shape": "array",
+                "entries": [
+                  { "shape": "equality", "example": true },
+                  { "shape": "equality", "example": "s" },
+                  { "shape": "equality", "example": 2 }
+                ]
+              },
+              "nested": {
+                "shape": "object",
+                "members": {
+                  "deep": { "shape": "object", "members": { "deeper": { "shape": "equality", "example": "value" } } }
+                }
+              },
+              "plain": {
+                "shape": "object",
+                "members": { "shape": { "shape": "equality", "example": "not a helper" } }
+              },
+              "helper": { "shape": "integer", "example": 42 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

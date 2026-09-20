@@ -1,0 +1,24 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/interaction-shape",
+  "category": "translation",
+  "title": "An interaction is a passive HTTP interaction with the description it was opened with.",
+  "covers": ["session.interaction.description-set", "session.interaction.http-passive-transport"],
+  "why": "behavioural spec 'interaction': the document has 'description' set and 'transport' { kind: 'http', mode: 'passive' } — 'request' and 'response' describe an exchange the consumer initiates.",
+  "interaction": {
+    "description": "get an order",
+    "request": { "method": "GET", "path": "/orders/42" }
+  },
+  "expect": {
+    "spec": {
+      "description": "get an order",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "equality", "example": "/orders/42" }
+        }
+      }
+    }
+  }
+}

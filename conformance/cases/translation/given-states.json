@@ -1,0 +1,23 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/given-states",
+  "category": "translation",
+  "title": "Provider states are appended in call order, and params are omitted when not given.",
+  "covers": ["session.given.appends-state", "session.given.multiple-states", "session.given.params-omitted-when-absent"],
+  "why": "behavioural spec 'given': appends { name, params } in call order; 'params' is omitted from the entry when not given, never written as null or {}.",
+  "interaction": {
+    "description": "an interaction with two states",
+    "given": [{ "name": "an order exists" }, { "name": "the customer is known", "params": { "id": "42", "tier": "gold" } }]
+  },
+  "expect": {
+    "spec": {
+      "description": "an interaction with two states",
+      "transport": { "kind": "http", "mode": "passive" },
+      "states": [
+        { "name": "an order exists" },
+        { "name": "the customer is known", "params": { "id": "42", "tier": "gold" } }
+      ],
+      "parts": {}
+    }
+  }
+}

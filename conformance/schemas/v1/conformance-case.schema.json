@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/schemas/conformance-case/v1/conformance-case.schema.json",
+  "title": "Janus SDK conformance case",
+  "description": "One case of the SDK conformance suite (plan task 6.4, SDK spec §7, ADR 0017): a language-independent scenario every Janus SDK runs, in its own language, against a pinned engine. A case is data — the DSL usage a driver replays through its own surface, and what must come of it.",
+  "type": "object",
+  "required": ["$format", "id", "category", "title", "covers"],
+  "properties": {
+    "$format": { "const": "janus-conformance-case/1" },
+    "id": {
+      "type": "string",
+      "description": "Unique case id, '<category>/<name>', matching the file's path under cases/.",
+      "pattern": "^(translation|lifecycle|variants|live)/[a-z0-9-]+$"
+    },
+    "category": {
+      "enum": ["translation", "lifecycle", "variants", "live"],
+      "description": "translation: what a DSL chain builds, no engine. lifecycle and variants: what the SDK sends and does, against the case's own scripted engine. live: against the real pinned engine."
+    },
+    "title": { "type": "string", "description": "One line, in the present tense: what the SDK must do." },
+    "covers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "The behavioural-spec conformance ids this case is the scenario for (behavioural-spec.json, a primitive's 'conformance' list).",
+      "uniqueItems": true
+    },
+    "why": {
+      "type": "string",
+      "description": "The specification sentence this case pins, and where it is written."
+    },
+    "note": {
+      "type": "string",
+      "description": "What this case deliberately does not decide — an open finding, or a fact ADR 0017 places outside conformance."
+    },
+    "interaction": { "$ref": "#/$defs/InteractionScript" },
+    "engine": { "$ref": "#/$defs/ScriptedEngine" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Step" },
+      "description": "For 'lifecycle', 'variants' and 'live': what the test does, in order."
+    },
+    "expect": { "$ref": "#/$defs/CaseExpectation" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "category": { "const": "translation" } }, "required": ["category"] },
+      "then": { "required": ["interaction", "expect"] }
+    },
+    {
+      "if": { "properties": { "category": { "enum": ["lifecycle", "variants"] } }, "required": ["category"] },
+      "then": { "required": ["steps"] }
+    },
+    {
+      "if": { "properties": { "category": { "const": "live" } }, "required": ["category"] },
+      "then": { "required": ["steps"] }
+    }
+  ],
+  "$defs": {
+    "Template": {
+      "description": "A value where the DSL expects a shape. Plain JSON is written as itself and compiles by the behavioural spec's 'literal' rule. An object carrying a '$' member is a shape-helper call instead: '$' is the helper's primitive id in behavioural-spec.json, 'args' its arguments in signature order, 'options' its options bag. '{ \"$\": \"literal\", \"args\": [ … ] }' escapes a plain object that would otherwise be read as a call.",
+      "$comment": "Deliberately unconstrained: a template is any JSON document, and the '$' convention is a reading of it, not a restriction on it.",
+      "anyOf": [{ "type": "object" }, { "type": "array" }, { "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" }]
+    },
+    "HelperCall": {
+      "type": "object",
+      "required": ["$"],
+      "properties": {
+        "$": { "type": "string", "description": "A behavioural-spec shape primitive's id: 'integer', 'each-like', 'one-of', … or 'literal' to escape." },
+        "args": { "type": "array", "items": { "$ref": "#/$defs/Template" } },
+        "options": { "type": "object", "description": "The helper's options bag, e.g. each-like's { min, max }." }
+      },
+      "additionalProperties": false
+    },
+    "MultiValue": {
+      "description": "A header or query value: one string, several strings, or a shape its one value must match.",
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } },
+        { "$ref": "#/$defs/HelperCall" }
+      ]
+    },
+    "InteractionScript": {
+      "type": "object",
+      "description": "A DSL chain, as data: the driver replays it through its own surface, one call per member, in this order — interaction, given*, request, response.",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string" },
+        "given": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "params": { "type": "object" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "request": {
+          "type": "object",
+          "properties": {
+            "method": { "$ref": "#/$defs/Template" },
+            "path": { "$ref": "#/$defs/Template" },
+            "query": { "type": "object", "additionalProperties": { "$ref": "#/$defs/MultiValue" } },
+            "headers": { "type": "object", "additionalProperties": { "$ref": "#/$defs/MultiValue" } },
+            "body": { "$ref": "#/$defs/Template" }
+          },
+          "additionalProperties": false
+        },
+        "response": {
+          "type": "object",
+          "properties": {
+            "status": { "$ref": "#/$defs/Template" },
+            "headers": { "type": "object", "additionalProperties": { "$ref": "#/$defs/MultiValue" } },
+            "body": { "$ref": "#/$defs/Template" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ScriptedEngine": {
+      "type": "object",
+      "description": "The engine a 'lifecycle' or 'variants' case runs against: a frame pipe the driver implements, answering from this script. Every operation the SDK sends is recorded; an operation with no entry here is answered the default way (README §3).",
+      "properties": {
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": { "id": { "type": "string" }, "label": { "type": "string" } },
+            "additionalProperties": true
+          },
+          "description": "What 'consumer-session/variants' returns, in this order. Default: one variant, 'base'."
+        },
+        "contract": {
+          "type": "object",
+          "description": "The contract document 'consumer-session/finalise' returns. Absent: a small verified contract. Null is written as 'withhold-contract'."
+        },
+        "withhold-contract": {
+          "type": "boolean",
+          "description": "true: 'finalise' returns results and no contract — the engine itself withheld it."
+        },
+        "results": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "The 'results' member of the finalise result. Default: one verified result per interaction added."
+        },
+        "errors": {
+          "type": "object",
+          "description": "Operation name -> the engine error that operation answers with instead (an engine-protocol §10 error document).",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "problems": { "type": "array", "items": { "type": "object" } },
+              "details": { "type": "object" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Step": {
+      "type": "object",
+      "description": "One thing the test does. Exactly one of 'build', 'execute' or 'finalise'.",
+      "properties": {
+        "build": { "$ref": "#/$defs/InteractionScript" },
+        "execute": {
+          "type": "object",
+          "required": ["interaction"],
+          "properties": {
+            "interaction": { "$ref": "#/$defs/InteractionScript" },
+            "closure": { "$ref": "#/$defs/Closure" }
+          },
+          "additionalProperties": false
+        },
+        "finalise": { "type": "object", "additionalProperties": false },
+        "expect": { "$ref": "#/$defs/StepExpectation" }
+      },
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["build"] }, { "required": ["execute"] }, { "required": ["finalise"] }]
+    },
+    "Closure": {
+      "type": "object",
+      "description": "What the 'execute' closure does on each variant. Default: nothing, successfully.",
+      "properties": {
+        "fail-on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Variant ids the closure fails on — '*' for every one. It fails the way the language fails a test."
+        },
+        "exchange": {
+          "$ref": "#/$defs/Exchange",
+          "description": "'live' cases: the request the consumer sends to the mock, once per variant."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Exchange": {
+      "type": "object",
+      "description": "An HTTP request a 'live' case's consumer sends to the mock, written as values, not shapes.",
+      "required": ["method", "path"],
+      "properties": {
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "query": { "type": "string", "description": "The query string, without '?'." },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "body": { "description": "A JSON body, sent as application/json." },
+        "expect-status": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "StepExpectation": {
+      "type": "object",
+      "properties": {
+        "outcome": { "$ref": "#/$defs/Outcome" },
+        "closure-calls": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The variant ids the closure ran on, in call order."
+        },
+        "contract": {
+          "type": "object",
+          "description": "What 'finalise' did with the contract file.",
+          "properties": {
+            "written": { "type": "boolean" },
+            "text": { "type": "string", "description": "The file's exact content, including the trailing LF." },
+            "content": { "$ref": "#/$defs/ContractContent" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaseExpectation": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "description": "The whole interaction-spec document the chain builds (contract.schema.json#/$defs/InteractionSpec)."
+        },
+        "at": {
+          "type": "object",
+          "description": "JSON pointer into the built document -> the value that must be there. For a case that pins one slot of a large chain.",
+          "additionalProperties": true
+        },
+        "ops": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Every protocol operation the SDK sent, in order, across the whole case."
+        },
+        "frames": {
+          "type": "object",
+          "description": "Operation name -> members the SDK's request frame body must carry (a subset; members not named are not checked). The first frame of that operation.",
+          "additionalProperties": { "type": "object" }
+        },
+        "engine-closed": {
+          "type": "boolean",
+          "description": "Whether the SDK ended the engine by the end of the case (engine-protocol spec §6)."
+        },
+        "dimensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "'live' cases: dimension ids the engine's selected variants must between them assign (variant semantics spec §3.9)."
+        },
+        "variant-count": {
+          "type": "integer",
+          "description": "'live' cases: how many variants the engine must select."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Outcome": {
+      "description": "How a step ended. 'ok', or the failure — a kind every language maps onto its own type (README §4).",
+      "anyOf": [
+        { "const": "ok" },
+        {
+          "type": "object",
+          "required": ["error"],
+          "properties": {
+            "error": {
+              "enum": ["execute-failed", "contract-withheld", "engine-error"],
+              "description": "execute-failed: the closure failed on one or more variants. contract-withheld: finalise wrote no contract. engine-error: the engine answered an operation with an error document."
+            },
+            "code": { "type": "string", "description": "engine-error: the error document's code." },
+            "variants": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "execute-failed: the variant ids the failure must name."
+            },
+            "interactions": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "contract-withheld: the interaction descriptions the failure must name."
+            },
+            "engine-withheld": {
+              "type": "boolean",
+              "description": "contract-withheld: whether the engine returned no contract (true) or the SDK withheld one it returned (false)."
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContractContent": {
+      "type": "object",
+      "description": "A contract compared by interaction content only (ADR 0017, contract spec §5–§6): 'interactions' by description, each by its 'states', 'parts' and 'selection'. 'metadata' and the parties are never compared — they are facts about the SDK, deliberately outside content identity.",
+      "properties": {
+        "interactions": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

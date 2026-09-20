@@ -1,0 +1,33 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/one-of-engine-validates",
+  "category": "live",
+  "title": "A one-of whose alternatives do not bind the discriminator is rejected by the engine, not by the SDK.",
+  "covers": ["shape.one-of.engine-validates"],
+  "why": "behavioural spec 'one-of': the SDK does not check that the alternatives bind distinct discriminator literals, or bind one at all — the engine rejects both with 'interaction-invalid' when the interaction is added (shape spec §5.4), and a second check here could only disagree with it. So the case is that the DSL accepts the call and the failure arrives from the engine, carrying its own words.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "a union whose alternatives bind no discriminator",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [
+                {
+                  "payment": {
+                    "$": "one-of",
+                    "args": ["type", { "card": { "last4": "1234" }, "invoice": { "dueDate": "2026-08-30" } }]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    }
+  ]
+}

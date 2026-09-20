@@ -69,8 +69,15 @@ export class ContractWithheldError extends Error {
   readonly results: protocol.InteractionResult[];
   /** Descriptions of the interactions whose `execute` failed in this suite. */
   readonly failedTests: string[];
+  /** Whether the engine itself returned no contract, as against the SDK withholding one it did. */
+  readonly engineWithheld: boolean;
 
-  constructor(results: protocol.InteractionResult[], descriptions: Map<string, string>, failedTests: string[]) {
+  constructor(
+    results: protocol.InteractionResult[],
+    descriptions: Map<string, string>,
+    failedTests: string[],
+    engineWithheld: boolean,
+  ) {
     const lines: string[] = [];
     for (const result of results.filter((r) => r.status !== "verified")) {
       lines.push(`  ${descriptions.get(result.handle) ?? result.handle}: ${result.status}`);
@@ -91,6 +98,7 @@ export class ContractWithheldError extends Error {
     this.name = "ContractWithheldError";
     this.results = results;
     this.failedTests = failedTests;
+    this.engineWithheld = engineWithheld;
   }
 }
 

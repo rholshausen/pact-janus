@@ -1,0 +1,23 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/json-sugar",
+  "category": "translation",
+  "title": "A body wrapped in 'json' compiles exactly as the same body written without it.",
+  "covers": ["shape.json.compiles-as-literal"],
+  "why": "behavioural spec 'json': compiles 'document' by the 'literal' rules and adds nothing — there is no node for it to emit today. It is sugar, and a body written without it compiles identically.",
+  "interaction": {
+    "description": "a json body",
+    "response": { "body": { "$": "json", "args": [{ "id": { "$": "integer", "args": [42] }, "name": "order" }] } }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "id": { "shape": "integer", "example": 42 },
+          "name": { "shape": "equality", "example": "order" }
+        }
+      }
+    }
+  }
+}

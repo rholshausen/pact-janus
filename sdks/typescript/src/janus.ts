@@ -122,7 +122,7 @@ export class Janus {
       }
       const { results, contract } = await engine.call(Op.ConsumerSessionFinalise, { session });
       if (!contract || failedTests.length > 0) {
-        throw new ContractWithheldError(results, this.#descriptions, failedTests);
+        throw new ContractWithheldError(results, this.#descriptions, failedTests, !contract);
       }
       return { results, contractFile: await this.#write(contract) };
     } finally {

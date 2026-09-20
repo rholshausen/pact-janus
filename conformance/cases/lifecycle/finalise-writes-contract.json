@@ -1,0 +1,52 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/finalise-writes-contract",
+  "category": "lifecycle",
+  "title": "finalise writes the engine's contract as compact JSON and one LF, in the engine's member order, and ends the engine.",
+  "covers": ["session.finalise.writes-contract-when-verified", "session.finalise.contract-bytes-unaltered"],
+  "why": "behavioural spec 'finalise': when the result carries 'contract', writes it to '<contract directory>/<consumer>-<provider>.janus.json' as compact UTF-8 JSON followed by one LF (contract spec §2.4), members in the order the engine returned them; the SDK never reorders, merges or edits a contract. Then ends the engine (engine-protocol spec §6).",
+  "note": "The engine's members here are deliberately not in alphabetical order, and the strings carry non-ASCII and characters a writer may escape: what is checked is that the SDK reordered, re-indented and re-escaped nothing. It is not a test of number spellings — an SDK that parses the frame can only reconstruct those (Phase 9 finding 6), and ADR 0017 compares content, not bytes.",
+  "engine": {
+    "contract": {
+      "$format": "janus-contract/1",
+      "consumer": { "name": "web-app" },
+      "provider": { "name": "orders-api" },
+      "interactions": [
+        {
+          "description": "get an order",
+          "transport": { "kind": "http", "mode": "passive" },
+          "parts": { "response": { "body": { "shape": "equality", "example": "läuft \"quoted\" / ok" } } },
+          "selection": { "variants": [{ "id": "base" }] }
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "text": "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[{\"description\":\"get an order\",\"transport\":{\"kind\":\"http\",\"mode\":\"passive\"},\"parts\":{\"response\":{\"body\":{\"shape\":\"equality\",\"example\":\"läuft \\\"quoted\\\" / ok\"}}},\"selection\":{\"variants\":[{\"id\":\"base\"}]}}]}\n"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/finalise"
+    ],
+    "engine-closed": true
+  }
+}

@@ -31,6 +31,21 @@ the engine with cargo before the tests run. Chicory, ADR 0003's primary JVM embe
 mock server either ([Phase 9 finding 3](../Documentation/phase-9-findings.md)). The
 `io.pact.janus.sdk.engine.FramePipe` interface is where one would plug in.
 
+## Conformance (task 6.4)
+
+Layer 3 of every SDK, and the only one that can fail a build for the right reason: both SDKs run the
+shared corpus under [`conformance/`](../conformance) as part of their own tests — TypeScript in
+[`test/conformance.test.ts`](typescript/test/conformance.test.ts), the JVM in
+[`ConformanceTest`](jvm/sdk/src/test/java/io/pact/janus/sdk/conformance/ConformanceTest.java) — and
+each writes a report `cargo run -p pact_janus_conformance -- check` reads. That, and not a
+maintainer's assertion, is what "conformant" means ([ADR 0017](../Documentation/decisions/0017-sdk-conformance-is-suite-passing-not-prose-matching.md)).
+What the first run of it found is in
+[`Documentation/conformance-suite-report.md`](../Documentation/conformance-suite-report.md): both
+SDKs pass all 27 cases, including the same recorded interaction content for the RFC example.
+
+A driver knows only how its language spells a primitive; it never decides what one means. Adding a
+case means adding JSON to the corpus, not code to either SDK.
+
 ## Generated bindings (task 6.1)
 
 Layer 1 of every SDK: typed views of the spec schemas [`bindings.json`](bindings.json) names — the

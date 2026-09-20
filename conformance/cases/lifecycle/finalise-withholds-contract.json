@@ -1,0 +1,38 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/finalise-withholds-contract",
+  "category": "lifecycle",
+  "title": "When the engine returns no contract, finalise fails the build and writes nothing.",
+  "covers": ["session.finalise.withheld-contract-fails-build"],
+  "why": "behavioural spec 'finalise': the contract is present iff every interaction verified on every variant it required (engine-protocol spec §8.2); when it is not, 'finalise' fails, naming every interaction and variant whose status is not 'verified' with the engine's mismatches, and writes nothing.",
+  "engine": {
+    "withhold-contract": true,
+    "results": [
+      {
+        "handle": "i-1",
+        "status": "mismatched",
+        "variants": [
+          {
+            "variant": "base",
+            "status": "mismatched",
+            "mismatches": [{ "path": "$.request.path", "expected": "/orders/42", "actual": "/orders/7", "message": "path does not match" }]
+          }
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "engine-withheld": true },
+        "contract": { "written": false }
+      }
+    }
+  ],
+  "expect": { "engine-closed": true }
+}

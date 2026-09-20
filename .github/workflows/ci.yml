@@ -36,6 +36,10 @@ jobs:
         run: cargo build --package pact_janus_kernel --target wasm32-wasip2
       - name: Spec schema lint
         run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
+      # Plan task 6.4: the conformance corpus against its own schema, and against the behavioural
+      # specification's conformance ids — an id with no case is a hole in what "conformant" means.
+      - name: Conformance corpus lint
+        run: cargo run --package pact_janus_conformance -- lint
 
   sdks:
     # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from
@@ -79,6 +83,11 @@ jobs:
       - name: JVM SDK
         working-directory: sdks/jvm
         run: ./gradlew build
+      # Plan task 6.4, ADR 0017: each SDK's test run above also ran the shared conformance suite and
+      # wrote its report. Conformance is that both accounted for every case in the corpus, and
+      # passed it — the claim a build makes, rather than one a maintainer asserts.
+      - name: SDKs are conformant
+        run: cargo run --package pact_janus_conformance -- check target/conformance/typescript.json target/conformance/jvm.json
 
   schema-compat:
     # Enforces the Engine Protocol's additive-evolution rules (spec §11.2) on

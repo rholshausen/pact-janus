@@ -46,6 +46,10 @@ sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bind
                  holds its protocol bindings (task 6.1)
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
+conformance/     The SDK conformance suite (task 6.4): one corpus of cases every SDK runs, in its
+                 own language, against a pinned engine — ADR 0017's definition of "conformant".
+                 Each SDK's driver lives with its tests; `tools/conformance` checks the corpus
+                 and the reports a run writes
 samples/         Demo subjects (workspace members), e.g. samples/order-service — the sample
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
                  endpoint, used by verification tests, M3 and M5. Its pacts/ holds the v3
@@ -56,8 +60,9 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
-                 and for the specs' worked examples — and tools/bindings, the binding-generation
-                 pipeline (task 6.1)
+                 and for the specs' worked examples — tools/bindings, the binding-generation
+                 pipeline (task 6.1), and tools/conformance, the conformance suite's checker
+                 (task 6.4)
 Documentation/   Plan, ADRs, specs
 ```
 
@@ -93,6 +98,12 @@ npm run lint         # ESLint
 records how the TypeScript spelling expresses it.
 
 JVM — from `sdks/jvm/` (JDK 17): `./gradlew build test`.
+
+The SDK conformance suite (plan task 6.4, ADR 0017) is one corpus under `conformance/` that both
+SDKs run as part of those test commands, each writing a report to `target/conformance/`:
+`cargo run -p pact_janus_conformance -- lint` checks the corpus (a conformance id in
+`behavioural-spec.json` with no case fails), and `-- check target/conformance/*.json` checks that
+each SDK accounted for every case and passed it. See `conformance/README.md`.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to
@@ -137,7 +148,9 @@ stderr (stdout stays frames-only).
   resource (no per-object cleanup calls).
 - SDKs are thin: no matching logic or orchestration beyond the protocol operations. Generated protocol
   bindings are never hand-edited — regenerate them.
-- Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit.
+- Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit,
+  and any change to what an SDK's DSL does belongs in the behavioural specification and
+  `conformance/`, which every SDK runs (ADR 0017).
 - Spike code under `spikes/` is disposable and exempt from the conventions below, but every spike
   directory must contain a `FINDINGS.md`. Never depend on spike code from `engine/`, `cli/` or `sdks/`.
 

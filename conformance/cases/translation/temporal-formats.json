@@ -1,0 +1,32 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/temporal-formats",
+  "category": "translation",
+  "title": "A temporal helper writes 'format' only when it was given, and never infers one from the example.",
+  "covers": ["shape.datetime.format-when-given", "shape.datetime.default-is-iso8601", "shape.date.format-when-given", "shape.time.format-when-given"],
+  "why": "behavioural spec 'datetime': the node carries 'format' when given; when it is not given the node has none — which means ISO-8601 (shape spec §4.2) — and the SDK does not infer one from the example. 'date' and 'time' are identical treatment.",
+  "interaction": {
+    "description": "temporal helpers with and without a format",
+    "response": {
+      "body": {
+        "createdAt": { "$": "datetime", "args": ["2026-07-30T10:00:00Z"] },
+        "shippedAt": { "$": "datetime", "args": ["30/07/2026 10:00", "dd/MM/yyyy HH:mm"] },
+        "dueDate": { "$": "date", "args": ["2026-08-30", "yyyy-MM-dd"] },
+        "openedAt": { "$": "time", "args": ["10:00:00", "HH:mm:ss"] }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/response/body": {
+        "shape": "object",
+        "members": {
+          "createdAt": { "shape": "datetime", "example": "2026-07-30T10:00:00Z" },
+          "shippedAt": { "shape": "datetime", "example": "30/07/2026 10:00", "format": "dd/MM/yyyy HH:mm" },
+          "dueDate": { "shape": "date", "example": "2026-08-30", "format": "yyyy-MM-dd" },
+          "openedAt": { "shape": "time", "example": "10:00:00", "format": "HH:mm:ss" }
+        }
+      }
+    }
+  }
+}

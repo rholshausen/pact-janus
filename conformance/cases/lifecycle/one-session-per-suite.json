@@ -1,0 +1,31 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/one-session-per-suite",
+  "category": "lifecycle",
+  "title": "A second execute reuses the session and the transport, and creates neither again.",
+  "covers": ["session.execute.one-session-per-suite"],
+  "why": "behavioural spec 'execute': 'create' happens if this configured object has no open session yet — one session per suite, because sessions amortise state and transport setup and 'finalise' writes all of a suite's interactions into one contract; 'start-transport' if the session has not started one.",
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "execute": { "interaction": { "description": "list orders", "request": { "method": "GET", "path": "/orders" } } },
+      "expect": { "outcome": "ok" }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/add-interaction",
+      "consumer-session/variants",
+      "consumer-session/serve-variant"
+    ]
+  }
+}
