@@ -1,0 +1,19 @@
+[package]
+name = "spike_type_derived_shapes"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike code: excluded from the workspace, not held to its conventions, allowed to rot. It depends
+# on the kernel (and the sample provider) on purpose — the measurement has to be made with the real
+# checker and the real recorder, or it measures a reimplementation of them. The prohibition runs
+# the other way: nothing in engine/, cli/ or sdks/ depends on this.
+[dependencies]
+serde_json = "1"
+pact_janus_kernel = { path = "../../../engine/kernel" }
+pact_janus_sample_order_service = { path = "../../../samples/order-service" }
+ureq = "3"
+
+[[bin]]
+name = "derive"
+path = "src/main.rs"

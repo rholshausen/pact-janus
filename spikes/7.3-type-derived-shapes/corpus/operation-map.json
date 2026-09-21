@@ -1,0 +1,7 @@
+{
+  "$comment": "operationId -> the consumer's own interaction identity. See FINDINGS.md §2: needing this file at all is a finding, not a feature. An OpenAPI document knows its operationIds; design 2.8 §2.2 matches on the consumer's interaction description plus state names, and nothing in the spec bridges the two.",
+  "getOrder": {
+    "description": "a request for an order",
+    "states": ["an order exists"]
+  }
+}

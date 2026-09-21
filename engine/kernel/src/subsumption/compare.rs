@@ -242,20 +242,28 @@ impl<'a> Walk<'a> {
     let consumer = decompose(c);
     let mut out = Out::yes();
 
-    if provider.absent && !consumer.absent {
+    // `⊥` and `null` are two containments, and a node can fail both — but they are one *finding*,
+    // because §4.2's table has one `weaker-presence` row and a reader looking at one path wants
+    // one answer. Reporting them separately doubles the count for every field of a provider shape
+    // that marks everything nullable and nothing required, which is precisely the shape of
+    // document the RFC's over-broadness worry is about (spike 7.3's measurement found this).
+    let widened_absence = provider.absent && !consumer.absent;
+    let widened_null = provider.null && !consumer.null;
+    if widened_absence || widened_null {
+      let reason = match (widened_absence, widened_null) {
+        (true, true) => "the provider admits absence and null; the consumer's shape admits neither",
+        (true, false) => "the provider admits absence (optional); the consumer's shape does not",
+        _ => "the provider admits null; the consumer's shape does not",
+      };
       out = out.and(Out::no(Finding::weaker_presence(
         at,
         Side::new(phrases::describe(p)),
-        Side::new(phrases::describe_present(c)),
-        "the provider admits absence (optional); the consumer's shape does not",
-      )));
-    }
-    if provider.null && !consumer.null {
-      out = out.and(Out::no(Finding::weaker_presence(
-        at,
-        Side::new(phrases::describe(p)),
-        Side::new(phrases::describe(c)),
-        "the provider admits null; the consumer's shape does not",
+        Side::new(if widened_absence {
+          phrases::describe_present(c)
+        } else {
+          phrases::describe(c)
+        }),
+        reason,
       )));
     }
 

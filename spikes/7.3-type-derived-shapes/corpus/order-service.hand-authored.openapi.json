@@ -1,0 +1,47 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "order-service", "version": "1.0.0" },
+  "x-note": "Written the way an author who knows the API writes one: enums declared, required lists accurate, nullability used where it is real and nowhere else. The upper bound on how good a derived shape gets.",
+  "paths": {
+    "/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "the order",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Order" } }
+            }
+          },
+          "404": { "description": "no such order" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "required": ["id", "status", "items", "channel"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "SHIPPED", "CANCELLED"] },
+          "shippedAt": { "type": "string", "format": "date-time" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItem" } },
+          "channel": { "type": "string", "enum": ["web", "mobile"] }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "required": ["sku", "quantity"],
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer", "format": "int32" }
+        }
+      }
+    }
+  }
+}

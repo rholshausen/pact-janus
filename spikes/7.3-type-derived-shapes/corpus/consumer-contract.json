@@ -1,0 +1,40 @@
+{
+  "$format": "janus-contract/1",
+  "consumer": { "name": "web-app" },
+  "provider": { "name": "order-service" },
+  "$comment": "The same consumer contract task 7.2's demonstration uses: what the web-app declared, which is narrower than what the provider can do.",
+  "interactions": [
+    {
+      "description": "a request for an order",
+      "states": [ { "name": "an order exists" } ],
+      "parts": {
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": { "shape": "string", "example": "66" },
+              "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" },
+              "shippedAt": {
+                "shape": "optional",
+                "of": { "shape": "string", "example": "2026-07-30T10:00:00Z" }
+              },
+              "items": {
+                "shape": "each-like",
+                "min": 1,
+                "items": {
+                  "shape": "object",
+                  "members": {
+                    "sku": { "shape": "string", "example": "sku-0" },
+                    "quantity": { "shape": "integer", "example": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "selection": { "variants": [], "report": {} }
+    }
+  ]
+}

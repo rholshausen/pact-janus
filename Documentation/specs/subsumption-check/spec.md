@@ -230,7 +230,7 @@ human's attention despite being structurally correct.
 |---|---|---|
 | provider enum/union wider than consumer's | `wider-values` | `any-of` literal-set containment, or `one-of` §3.3's unmatched discriminator |
 | provider type broader (`number` where consumer tested `integer`) | `broader-type` | the kind lattice, exact class |
-| provider `nullable`/optional where consumer tested only non-null/present | `weaker-presence` | Rule 1's `⊥`/`null` containment on `optional`/`nullable` |
+| provider `nullable`/optional where consumer tested only non-null/present | `weaker-presence` | Rule 1's `⊥`/`null` containment on `optional`/`nullable` — **one** finding, not two, when a node widens both: the two containments are one row here, and a reader looking at one path wants one answer (spike 7.3 §7) |
 | a member the provider's object shape does not name, that the consumer's does | `undeclared-member` | Rule 2 (§3.2) |
 | wider cardinality (e.g. `min: 0` where the consumer declared `min: 1`) | `wider-cardinality` | the interval-containment child of `each-like`/`each-entry` |
 | two conservative-class nodes that are not identical and not exactly-nested (two regexes, two datetime formats) | `unreviewable` | shape spec §8's conservative class |

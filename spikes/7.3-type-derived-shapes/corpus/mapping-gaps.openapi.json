@@ -1,0 +1,77 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "gap-service", "version": "1.0.0" },
+  "x-note": "Not part of the noise measurement. One operation per construct that the mapping cannot carry across exactly, so FINDINGS §3's table has something to point at.",
+  "paths": {
+    "/discriminated": {
+      "get": {
+        "operationId": "discriminated",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "oneOf": [ { "$ref": "#/components/schemas/Card" }, { "$ref": "#/components/schemas/Invoice" } ],
+          "discriminator": { "propertyName": "type" } } } } } }
+      }
+    },
+    "/undiscriminated": {
+      "get": {
+        "operationId": "undiscriminated",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "oneOf": [ { "$ref": "#/components/schemas/Card" }, { "$ref": "#/components/schemas/Invoice" } ] } } } } }
+      }
+    },
+    "/closed": {
+      "get": {
+        "operationId": "closed",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id"], "properties": { "id": { "type": "string" } } } } } } }
+      }
+    },
+    "/untyped": {
+      "get": {
+        "operationId": "untyped",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "type": "object", "required": ["payload", "anything"],
+          "properties": { "payload": { "type": "object" }, "anything": { } } } } } } }
+      }
+    },
+    "/unions-31": {
+      "get": {
+        "operationId": "unions31",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "type": "object", "required": ["maybe", "either"],
+          "properties": {
+            "maybe": { "type": ["string", "null"] },
+            "either": { "anyOf": [ { "type": "string" }, { "type": "null" } ] } } } } } } }
+      }
+    },
+    "/composed": {
+      "get": {
+        "operationId": "composed",
+        "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {
+          "allOf": [ { "$ref": "#/components/schemas/Card" },
+                     { "type": "object", "required": ["region"],
+                       "properties": { "region": { "type": "string", "enum": ["AU", "NZ"] } } } ] } } } } }
+      }
+    },
+    "/no-json": {
+      "get": {
+        "operationId": "noJson",
+        "responses": { "200": { "description": "ok", "content": { "text/csv": { "schema": { "type": "string" } } } } }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Card": {
+        "type": "object",
+        "required": ["type", "last4"],
+        "properties": { "type": { "type": "string" }, "last4": { "type": "string", "pattern": "[0-9]{4}" } }
+      },
+      "Invoice": {
+        "type": "object",
+        "required": ["type", "dueDate"],
+        "properties": { "type": { "type": "string" }, "dueDate": { "type": "string", "format": "date" } }
+      }
+    }
+  }
+}
