@@ -577,6 +577,21 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         }
       }
     }
+    "expect:object" | "expect:array" => {
+      let value = value_of(&children[0]);
+      let (wanted, holds) = match name {
+        "expect:object" => ("an object", matches!(value, RuntimeValue::Object(_))),
+        _ => ("an array", matches!(value, RuntimeValue::Array(_))),
+      };
+      if holds {
+        NodeResult::Ok
+      } else {
+        NodeResult::Error {
+          message: format!("Expected {wanted} but got {}", display(&value)),
+          path: locus(children),
+        }
+      }
+    }
     "expect:not-empty" => {
       let value = value_of(&children[0]);
       if is_empty(&value) {

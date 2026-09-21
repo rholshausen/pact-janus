@@ -2,6 +2,9 @@
   :"a mixed record" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'active': true, 'age': 42, 'count': 3, 'name': 'Mary', 'note': NULL, 'price': 19.99}
+        ) => BOOL(true),
         :"$.active" (
           %match:boolean (
             $.response.body.active => BOOL(true)

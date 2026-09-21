@@ -355,7 +355,7 @@ failed) and `live/optional-header-presence` (the dimension lands on the header n
 
 **Found:** 2026-09-21, by task 7.1's property test (`engine/kernel/tests/subsumption_properties.rs`),
 which brute-forces `admits` through the plan compiler and interpreter and compares the result with
-the subsumption checker's verdict. **Status:** open — worked around in the test, not fixed.
+the subsumption checker's verdict. **Status:** fixed the same day, by option (a) below.
 
 ### What was observed
 
@@ -402,6 +402,23 @@ result of upgrading a v1–v4 pact whose body matchers were all `type` with casc
   is trying to avoid: a shape that says "object" and a matcher that does not check it is the kind of
   quiet divergence design 2.4 exists to make visible.
 
-Recommendation: (a), sized as a task 3.3 follow-up rather than folded into whatever finds it. Until
-then, task 7.1's property test corrects the oracle for this one gap and names this finding where it
-does, so the workaround is visible rather than load-bearing.
+### Resolution
+
+**Option (a), with the action in the `expect:` family rather than `match:`.** The new actions are
+`expect:object` and `expect:array` — structural assertions, alongside `expect:count` and
+`expect:size`, which is what a kind assertion is. That placement also keeps plan-grammar spec §4.3's
+rule intact ("the structural and dimensional operators have no action of their own"): two actions
+serve five operators, and neither one names the operator that emitted it.
+
+`object` and `each-entry` emit `expect:object`; `array`, `each-like` and `contains` emit
+`expect:array`; all five emit it first, so a wrong-kind value is reported as itself rather than as a
+cascade of missing members. Nothing else moved: no verdict in the corpus changed, only the plan
+snapshots, which grew a node each.
+
+Two things make the fix checkable rather than asserted. `corpora/shapes/structural-kind-guard` is the
+negative case the corpus did not have — an object whose only member is `optional` given the number
+`7`, and an `each-like` with `min: 0` given a string, which is exactly the pair that used to pass;
+its `executed.txt` still shows `%expect:size` answering `BOOL(true)` on that string, which is the
+finding preserved as evidence. And task 7.1's property test now runs against the **uncorrected**
+oracle: the compiler and the subsumption checker agree on `admits` for every pair of the exact-class
+vocabulary, which is what the workaround was standing in for.

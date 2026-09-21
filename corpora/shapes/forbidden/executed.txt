@@ -2,6 +2,9 @@
   :"a redacted record" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'name': 'Mary'}
+        ) => BOOL(true),
         :"$.internalId" (
           %expect:absent (
             $.response.body.internalId => NULL

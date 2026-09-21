@@ -214,7 +214,10 @@ fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<N
       min,
       max,
     } => compile_each_entry(keys.as_deref(), values, *min, *max, ctx),
-    CoreShape::Contains { entries } => vec![compile_contains(entries, ctx)],
+    CoreShape::Contains { entries } => vec![
+      Node::action("expect:array", vec![ctx.resolve()]),
+      compile_contains(entries, ctx),
+    ],
     CoreShape::Optional { of } => vec![compile_optional(of, ctx)],
     CoreShape::Forbidden => vec![Node::action("expect:absent", vec![ctx.resolve()])],
     CoreShape::Nullable { of } => vec![compile_nullable(of, ctx)],
@@ -227,28 +230,31 @@ fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<N
   }
 }
 
-/// `object` (spec §5.2): a container per named member; nothing about unnamed ones (the
-/// must-ignore default, spec §4.3, is this absence — no assertion is emitted for a member nobody
-/// named).
+/// `object` (spec §5.2): `expect:object` for the kind it admits, then a container per named
+/// member; nothing about unnamed ones (the must-ignore default, spec §4.3, is this absence — no
+/// assertion is emitted for a member nobody named, and the kind assertion says nothing about them
+/// either).
 fn compile_object(members: &BTreeMap<String, ShapeNode>, ctx: &Ctx) -> Vec<Node> {
-  members
-    .iter()
-    .map(|(name, member)| {
-      let member_ctx = ctx.member(name);
-      let children = compile_shape(member, &member_ctx);
-      Node::container(Some(member_ctx.label()), children)
-    })
-    .collect()
+  let mut nodes = vec![Node::action("expect:object", vec![ctx.resolve()])];
+  nodes.extend(members.iter().map(|(name, member)| {
+    let member_ctx = ctx.member(name);
+    let children = compile_shape(member, &member_ctx);
+    Node::container(Some(member_ctx.label()), children)
+  }));
+  nodes
 }
 
-/// `array` (spec §5.2): `expect:count` for the fixed length, plus a container per index — extra
-/// elements are not ignored (spec §4.3's deliberate asymmetry with `object`), which is exactly
-/// what asserting the count achieves.
+/// `array` (spec §5.2): `expect:array` for the kind, `expect:count` for the fixed length, plus a
+/// container per index — extra elements are not ignored (spec §4.3's deliberate asymmetry with
+/// `object`), which is exactly what asserting the count achieves.
 fn compile_array(entries: &[ShapeNode], ctx: &Ctx) -> Vec<Node> {
-  let mut nodes = vec![Node::action(
-    "expect:count",
-    vec![ctx.resolve(), Node::value(Literal::number(entries.len() as u64))],
-  )];
+  let mut nodes = vec![
+    Node::action("expect:array", vec![ctx.resolve()]),
+    Node::action(
+      "expect:count",
+      vec![ctx.resolve(), Node::value(Literal::number(entries.len() as u64))],
+    ),
+  ];
   for (index, entry) in entries.iter().enumerate() {
     let entry_ctx = ctx.array_index(index);
     let children = compile_shape(entry, &entry_ctx);
@@ -257,18 +263,23 @@ fn compile_array(entries: &[ShapeNode], ctx: &Ctx) -> Vec<Node> {
   nodes
 }
 
-/// `each-like` (spec §5.2): `expect:size` for the cardinality (narrowed to `expect:count` when
-/// the cardinality dimension is pinned), plus `for-each` over a `splat` of the elements, the item
-/// shape compiled once against `resolve-current`.
+/// `each-like` (spec §5.2): `expect:array` for the kind, `expect:size` for the cardinality
+/// (narrowed to `expect:count` when the cardinality dimension is pinned), plus `for-each` over a
+/// `splat` of the elements, the item shape compiled once against `resolve-current`.
 fn compile_each_like(items: &ShapeNode, min: u64, max: Option<u64>, ctx: &Ctx) -> Vec<Node> {
   let item_ctx = ctx.iteration_item(path::each_like_item(&ctx.at));
   let item_node = Node::container(Some(item_ctx.label()), compile_shape(items, &item_ctx));
   let for_each = Node::action("for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
   let size_assertion = cardinality_assertion(ctx, min, max);
-  vec![size_assertion, for_each]
+  vec![
+    Node::action("expect:array", vec![ctx.resolve()]),
+    size_assertion,
+    for_each,
+  ]
 }
 
-/// `each-entry` (spec §5.2): the same over entries, with the key shape (if any) and the value
+/// `each-entry` (spec §5.2): `expect:object` for the kind, then the same over entries, with the
+/// key shape (if any) and the value
 /// shape each checked against the current entry's `.key`/`.value` (spec §2.2's `entry` value
 /// kind is what a `resolve-current` here is understood to address).
 fn compile_each_entry(
@@ -303,7 +314,11 @@ fn compile_each_entry(
   let item_node = Node::container(Some(ctx.label()), item_children);
   let for_each = Node::action("for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
   let size_assertion = cardinality_assertion(ctx, min, max);
-  vec![size_assertion, for_each]
+  vec![
+    Node::action("expect:object", vec![ctx.resolve()]),
+    size_assertion,
+    for_each,
+  ]
 }
 
 fn cardinality_assertion(ctx: &Ctx, min: u64, max: Option<u64>) -> Node {
@@ -332,7 +347,8 @@ fn pinned_cardinality(dim_id: &str, min: u64, max: Option<u64>, assignment: &Ass
     .map(|p| p.size)
 }
 
-/// `contains` (spec §5.2): opaque — each entry shape is checked existentially against the array,
+/// `contains` (spec §5.2, emitted under an `expect:array`): opaque — each entry shape is checked
+/// existentially against the array,
 /// which this compiler represents with a relative cursor per entry rather than an addressed
 /// position (there is none to give it; spec §8 already marks `contains`'s comparability opaque).
 fn compile_contains(entries: &[ShapeNode], ctx: &Ctx) -> Node {

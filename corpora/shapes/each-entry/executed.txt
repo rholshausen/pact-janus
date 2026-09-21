@@ -2,6 +2,9 @@
   :"response headers" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'}
+        ) => BOOL(true),
         %expect:size (
           $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'},
           1,

@@ -255,7 +255,7 @@ explicit about which is which.
 |---|---|---|
 | control | `and`, `or`, `if`, `error`, `apply`, `for-each`, `tee` | `or`, `if` |
 | value | `join`, `join-with`, `length`, `lower-case`, `upper-case`, `to-string` | |
-| structural assertions | `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:only-entries`, `expect:absent` | |
+| structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:only-entries`, `expect:absent` | |
 | checks | `check:exists`, `check:equals`, `check:null` | |
 | matching | `match:*`, one per shape operator (§4.3) | |
 
@@ -267,6 +267,16 @@ or `expect:` action ever appears in one; an assertion in a condition position wo
 interaction while deciding a branch, which is not a thing a reader could be expected to predict.
 
 `expect:count` asserts an exact size and `expect:size` a range, with `NULL` for an unbounded end.
+
+`expect:object` and `expect:array` assert the *kind* a structural operator admits (§5.2). They are
+assertions rather than matches because that is what they are — a structural property of the value,
+like its size — and they are not per-operator actions of the sort §4.3 rules out: `object` and
+`each-entry` both emit `expect:object`, `array`, `each-like` and `contains` all emit `expect:array`,
+and neither action tells a reader which operator produced it. Without them a structural operator's
+plan asserts nothing about a value of the wrong kind, which §5.1's obligation does not allow: an
+`object` all of whose members are `optional` would otherwise accept the number `7`, and an
+`each-like` with `min: 0` would accept a string, because a string has a length and splats to
+nothing.
 
 ### 4.3 The matching family
 
@@ -357,20 +367,27 @@ are two plans.
 | Operator | Compiles to |
 |---|---|
 | value operators | the matching action of §4.3, applied to the resolved value |
-| `object` | a `container` per named member, each holding the member's compiled shape; no assertion about unnamed members |
-| `array` | a `container` per index, plus `expect:count` |
-| `each-like` | `expect:size` for the cardinality, plus `for-each` over a `splat` of the elements, with the item shape compiled once and applied to `resolve-current` |
-| `each-entry` | the same over entries, with `entry` values (§2.2) feeding key and value shapes |
+| `object` | `expect:object`, then a `container` per named member, each holding the member's compiled shape; no assertion about unnamed members |
+| `array` | `expect:array`, `expect:count`, then a `container` per index |
+| `each-like` | `expect:array`, `expect:size` for the cardinality, plus `for-each` over a `splat` of the elements, with the item shape compiled once and applied to `resolve-current` |
+| `each-entry` | `expect:object`, then the same over entries, with `entry` values (§2.2) feeding key and value shapes |
 | `optional` | `if` on `check:exists`: present branch compiles `of`, absent branch is `ok` |
 | `forbidden` | `expect:absent` |
 | `nullable` | `if` on `check:null`: null branch is `ok`, otherwise compile `of` |
 | `one-of` | nested `if` on `check:equals` of the discriminator, one branch per alternative, `error` on no match naming the value read |
 | `any-of` | `match:any-of` with the options as `value` children |
-| `contains` | `match:contains` — opaque, per shape spec §4.1 |
+| `contains` | `expect:array`, then `match:contains` — opaque, per shape spec §4.1 |
+
+Every structural operator leads with the kind it admits (shape spec §4.3: "`object` admits objects",
+"`each-like` admits arrays whose length is in `[min, max]`"). Emitting it is not belt-and-braces: the
+operators below it address *members* and *elements*, and a value of the wrong kind has neither, so
+without the assertion they have nothing to fail on. §5.1's obligation is the reason, and corpus case
+`shapes/structural-kind-guard` is where it stops being a claim.
 
 The must-ignore default (shape spec §4.3) is visible here as an *absence*: `object` compiles no
 assertion about members nobody named. Extra fields are admitted because nothing in the plan looks at
-them, which is the most inspectable form the guarantee could take.
+them, which is the most inspectable form the guarantee could take. The kind assertion does not touch
+that — it says what the value *is*, never what members it may carry.
 
 ### 5.3 What the shape compiler may not emit
 

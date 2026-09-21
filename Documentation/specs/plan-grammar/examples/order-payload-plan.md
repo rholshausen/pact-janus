@@ -19,6 +19,9 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
     :response (
       :body (
         #{'decoded by the content component for application/json'},
+        %expect:object (
+          $.response.body
+        ),
         :"$.id" (
           %match:integer (
             $.response.body.id
@@ -50,6 +53,9 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
               'card'
             ),
             :card (
+              %expect:object (
+                $.response.body.payment
+              ),
               :"$.payment.last4" (
                 %match:regex (
                   $.response.body.payment.last4,
@@ -63,6 +69,9 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
                 'invoice'
               ),
               :invoice (
+                %expect:object (
+                  $.response.body.payment
+                ),
                 :"$.payment.dueDate" (
                   %match:date (
                     $.response.body.payment.dueDate,
@@ -80,6 +89,9 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
           )
         ),
         :"$.items" (
+          %expect:array (
+            $.response.body.items
+          ),
           %expect:size (
             $.response.body.items,
             1,
@@ -90,6 +102,9 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
               $.response.body.items
             ),
             :"$.items[*]" (
+              %expect:object (
+                ~>
+              ),
               :"$.items[*].sku" (
                 %match:string (
                   ~>.sku
@@ -173,6 +188,9 @@ subtrees that matter:
               'card'
             ) => BOOL(false),
             :card (
+              %expect:object (
+                $.response.body.payment
+              ),
               :"$.payment.last4" (
                 %match:regex (
                   $.response.body.payment.last4,
@@ -186,6 +204,9 @@ subtrees that matter:
                 'invoice'
               ) => BOOL(true),
               :invoice (
+                %expect:object (
+                  $.response.body.payment => {'type': 'invoice', 'dueDate': '2026-08-30T00:00:00Z'}
+                ) => BOOL(true),
                 :"$.payment.dueDate" (
                   %match:date (
                     $.response.body.payment.dueDate => '2026-08-30T00:00:00Z',
@@ -197,6 +218,9 @@ subtrees that matter:
           ) => BOOL(false)
         ) => BOOL(false),
         :"$.items" (
+          %expect:array (
+            $.response.body.items => []
+          ) => BOOL(true),
           %expect:size (
             $.response.body.items => [],
             1,

@@ -2,6 +2,9 @@
   :"an order's possible statuses" (
     :response (
       :body (
+        %expect:array (
+          $.response.body => ['SHIPPED', 'PENDING']
+        ) => BOOL(true),
         %match:contains (
           $.response.body => ['SHIPPED', 'PENDING'],
           :"$.response.body[0]" (

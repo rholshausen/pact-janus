@@ -11,7 +11,9 @@ A case is a directory holding `case.json` (the input, the captured `values`, and
 readability:
 
 - `shapes/` — one case per core shape operator (design 2.2), plus `order-payload/`: the RFC's full
-  order response, every failure reported in one run, the untaken `:card` alternative never executed.
+  order response, every failure reported in one run, the untaken `:card` alternative never executed;
+  and `structural-kind-guard/`, a value of the wrong kind given to operators whose members and
+  elements would otherwise have nothing to fail on (phase-9 finding 8).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-

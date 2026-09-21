@@ -2,12 +2,18 @@
   :"get an order" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'id': 42, 'items': [], 'payment': {'dueDate': '2026-08-30T00:00:00Z', 'type': 'invoice'}, 'status': 'REFUNDED'}
+        ) => BOOL(true),
         :"$.id" (
           %match:integer (
             $.response.body.id => 42
           ) => BOOL(true)
         ) => BOOL(true),
         :"$.items" (
+          %expect:array (
+            $.response.body.items => []
+          ) => BOOL(true),
           %expect:size (
             $.response.body.items => [],
             1,
@@ -26,6 +32,9 @@
               'card'
             ) => BOOL(false),
             :card (
+              %expect:object (
+                $.response.body.payment
+              ),
               :"$.response.body.payment@card.last4" (
                 %match:regex (
                   $.response.body.payment.last4,
@@ -45,6 +54,9 @@
                 'invoice'
               ) => BOOL(true),
               :invoice (
+                %expect:object (
+                  $.response.body.payment => {'dueDate': '2026-08-30T00:00:00Z', 'type': 'invoice'}
+                ) => BOOL(true),
                 :"$.response.body.payment@invoice.dueDate" (
                   %match:date (
                     $.response.body.payment.dueDate => '2026-08-30T00:00:00Z',

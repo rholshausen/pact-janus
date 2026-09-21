@@ -1,0 +1,41 @@
+(
+  :"an order summary" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'items': 'SKU-1', 'totals': 7}
+        ) => BOOL(true),
+        :"$.items" (
+          %expect:array (
+            $.response.body.items => 'SKU-1'
+          ) => ERROR(Expected an array but got 'SKU-1'),
+          %expect:size (
+            $.response.body.items => 'SKU-1',
+            0,
+            NULL
+          ) => BOOL(true),
+          %for-each (
+            ** (
+              $.response.body.items => 'SKU-1'
+            ) => []
+          ) => BOOL(true)
+        ) => BOOL(false),
+        :"$.totals" (
+          %expect:object (
+            $.response.body.totals => 7
+          ) => ERROR(Expected an object but got 7),
+          :"$.totals.discount" (
+            %if (
+              %check:exists (
+                $.response.body.totals.discount => NULL
+              ) => BOOL(false),
+              %match:integer (
+                $.response.body.totals.discount
+              )
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

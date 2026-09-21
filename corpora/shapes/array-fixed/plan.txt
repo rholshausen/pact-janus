@@ -2,6 +2,9 @@
   :"a coordinate pair" (
     :response (
       :body (
+        %expect:array (
+          $.response.body
+        ),
         %expect:count (
           $.response.body,
           2

@@ -56,9 +56,20 @@ fn compile_field(field_shape: Value) -> Node {
 fn compile_field_under(field_shape: Value, assignment: &Assignment) -> Node {
   let body = json!({ "shape": "object", "members": { "field": field_shape } });
   let plan = compile(&interaction(body), assignment, None);
-  let member_container = only_child(&slot_child(&plan));
+  // The enclosing `object` leads with its kind assertion (spec §5.2), then the member container.
+  let member_container = children_of(&slot_child(&plan))[1].clone();
   assert_eq!(label_of(&member_container), Some("$.response.body.field"));
   only_child(&member_container)
+}
+
+/// Assert that a structural operator's first compiled node is the kind it admits (spec §5.2), and
+/// hand back the nodes that follow it.
+fn after_kind_assertion(slot: &Node, expected: &str) -> Vec<Node> {
+  let nodes = children_of(slot);
+  let (name, children) = action(&nodes[0]);
+  assert_eq!(name, expected, "a structural operator asserts its kind first");
+  assert_eq!(resolve_path(&children[0]), "$.response.body");
+  nodes[1..].to_vec()
 }
 
 fn children_of(node: &Node) -> &Vec<Node> {
@@ -252,7 +263,7 @@ fn object_compiles_to_one_container_per_named_member_and_ignores_nothing_else() 
     "members": {
       "id": { "shape": "integer", "example": 42 },
       "status": { "shape": "string", "example": "PENDING" } } }));
-  let members = children_of(&body);
+  let members = after_kind_assertion(&body, "expect:object");
   assert_eq!(
     members.len(),
     2,
@@ -266,13 +277,42 @@ fn object_compiles_to_one_container_per_named_member_and_ignores_nothing_else() 
   assert_eq!(resolve_path(&children[0]), "$.response.body.id");
 }
 
+#[test]
+fn every_structural_operator_asserts_the_kind_it_admits() {
+  // Shape spec §4.3 fixes the kind each structural operator admits, and §7.4 requires the plan to
+  // accept exactly `admits(S)` — which a plan that only walks members cannot do (phase-9 finding
+  // 8). One assertion per operator, at the front, is the whole of the fix.
+  for (shape, expected) in [
+    (json!({ "shape": "object", "members": { } }), "expect:object"),
+    (
+      json!({ "shape": "each-entry", "min": 1,
+              "values": { "shape": "string", "example": "a" } }),
+      "expect:object",
+    ),
+    (
+      json!({ "shape": "array", "entries": [ { "shape": "integer", "example": 1 } ] }),
+      "expect:array",
+    ),
+    (
+      json!({ "shape": "each-like", "min": 1, "items": { "shape": "integer", "example": 1 } }),
+      "expect:array",
+    ),
+    (
+      json!({ "shape": "contains", "entries": [ { "shape": "equality", "example": 1 } ] }),
+      "expect:array",
+    ),
+  ] {
+    after_kind_assertion(&compile_slot(shape), expected);
+  }
+}
+
 // --- array (plan-grammar spec §5.2) ---
 
 #[test]
 fn array_asserts_the_exact_count_and_compiles_one_container_per_index() {
   let body = compile_slot(json!({ "shape": "array",
     "entries": [ { "shape": "integer", "example": 1 }, { "shape": "string", "example": "a" } ] }));
-  let nodes = children_of(&body);
+  let nodes = after_kind_assertion(&body, "expect:array");
   assert_eq!(nodes.len(), 3, "expect:count, then one container per index");
   let (name, count_children) = action(&nodes[0]);
   assert_eq!(name, "expect:count");
@@ -298,7 +338,7 @@ fn each_like_body() -> Value {
 #[test]
 fn each_like_unpinned_asserts_size_and_for_eachs_over_a_splat() {
   let body = compile_slot(each_like_body());
-  let nodes = children_of(&body);
+  let nodes = after_kind_assertion(&body, "expect:array");
   assert_eq!(nodes.len(), 2);
 
   let (name, size_children) = action(&nodes[0]);
@@ -318,10 +358,15 @@ fn each_like_unpinned_asserts_size_and_for_eachs_over_a_splat() {
   let item = &for_each_children[1];
   assert_eq!(label_of(item), Some("$.response.body[*]"));
   let item_members = children_of(item);
+  // The item shape is an `object`, so it too asserts its kind first — against the element the
+  // iteration is currently on, not against the list.
+  let (name, kind_children) = action(&item_members[0]);
+  assert_eq!(name, "expect:object");
+  assert_eq!(resolve_current_path(&kind_children[0]), "~>");
   // `BTreeMap` iteration is lexicographic, so "qty" sorts before "sku".
-  assert_eq!(label_of(&item_members[0]), Some("$.response.body[*].qty"));
-  assert_eq!(label_of(&item_members[1]), Some("$.response.body[*].sku"));
-  let (name, sku_children) = action(&children_of(&item_members[1])[0]);
+  assert_eq!(label_of(&item_members[1]), Some("$.response.body[*].qty"));
+  assert_eq!(label_of(&item_members[2]), Some("$.response.body[*].sku"));
+  let (name, sku_children) = action(&children_of(&item_members[2])[0]);
   assert_eq!(name, "match:string");
   assert_eq!(resolve_current_path(&sku_children[0]), "~>.sku");
 }
@@ -331,7 +376,7 @@ fn each_like_pinned_to_min_plus_1_narrows_to_expect_count() {
   let mut assignment = Assignment::new();
   assignment.insert("response.body#cardinality".to_string(), "min+1".to_string());
   let body = compile_slot_under(each_like_body(), &assignment);
-  let nodes = children_of(&body);
+  let nodes = after_kind_assertion(&body, "expect:array");
   let (name, children) = action(&nodes[0]);
   assert_eq!(name, "expect:count");
   assert_eq!(literal_value(&children[1]), &json!(2));
@@ -342,7 +387,7 @@ fn each_like_pinned_to_an_unknown_point_falls_back_to_the_general_form() {
   let mut assignment = Assignment::new();
   assignment.insert("response.body#cardinality".to_string(), "bogus".to_string());
   let body = compile_slot_under(each_like_body(), &assignment);
-  let (name, _) = action(&children_of(&body)[0]);
+  let (name, _) = action(&after_kind_assertion(&body, "expect:array")[0]);
   assert_eq!(name, "expect:size");
 }
 
@@ -353,7 +398,7 @@ fn each_entry_checks_keys_and_values_against_the_current_entry() {
   let body = compile_slot(json!({ "shape": "each-entry", "min": 1,
     "keys": { "shape": "string", "example": "content-type" },
     "values": { "shape": "string", "example": "application/json" } }));
-  let nodes = children_of(&body);
+  let nodes = after_kind_assertion(&body, "expect:object");
   let (name, for_each_children) = action(&nodes[1]);
   assert_eq!(name, "for-each");
   let item = &for_each_children[1];
@@ -542,8 +587,8 @@ fn one_of_pinned_narrows_to_the_selected_alternative_only() {
   let members = children_of(&body);
   assert_eq!(
     members.len(),
-    2,
-    "the pinned alternative's own object, discriminator included"
+    3,
+    "the alternative's kind assertion, then its own object, discriminator included"
   );
 }
 
@@ -551,9 +596,11 @@ fn one_of_pinned_narrows_to_the_selected_alternative_only() {
 
 #[test]
 fn contains_compiles_to_an_opaque_match_action_with_one_container_per_entry() {
-  let body = compile_body(json!({ "shape": "contains",
+  let slot = compile_slot(json!({ "shape": "contains",
     "entries": [ { "shape": "equality", "example": "PENDING" } ] }));
-  let (name, children) = action(&body);
+  let nodes = after_kind_assertion(&slot, "expect:array");
+  assert_eq!(nodes.len(), 1);
+  let (name, children) = action(&nodes[0]);
   assert_eq!(name, "match:contains");
   assert_eq!(children.len(), 2, "resolve, then one container per entry");
   assert_eq!(resolve_path(&children[0]), "$.response.body");

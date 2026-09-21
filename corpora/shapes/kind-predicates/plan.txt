@@ -2,6 +2,9 @@
   :"a mixed record" (
     :response (
       :body (
+        %expect:object (
+          $.response.body
+        ),
         :"$.active" (
           %match:boolean (
             $.response.body.active

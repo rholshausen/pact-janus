@@ -67,21 +67,13 @@ fn candidates() -> Vec<Option<Value>> {
     .collect()
 }
 
-/// The set of candidates a shape admits, decided by the engine's own matcher (shape spec §7.1),
-/// with one correction.
-///
-/// **The correction.** A structural operator constrains the *kind* of the value it admits —
-/// "`object` admits objects", "`each-like` admits arrays" (shape spec §4.3) — but the plans they
-/// compile to today carry no kind guard, so the *compiler* admits a string where the
-/// *specification* does not (`Documentation/phase-9-findings.md` §2). The checker follows the
-/// specification, so the oracle has to as well, or this test would enshrine the gap instead of
-/// leaving it visible. Remove this when the compiler gains the guard.
+/// The set of candidates a shape admits, decided by the engine's own matcher (shape spec §7.1) and
+/// nothing else. It was not always uncorrected: this test's first run found that a structural
+/// operator's plan carried no kind assertion, so the compiler admitted a string where the
+/// specification did not (phase-9 finding 8, since fixed — plan-grammar spec §5.2's kind guard).
+/// Any correction here again would mean the oracle and the checker disagree about `admits`, which
+/// is the thing this file exists to detect rather than to paper over.
 fn admits(member: &Value) -> Vec<bool> {
-  let kind = match member.get("shape").and_then(Value::as_str) {
-    Some("object") | Some("each-entry") => Some("object"),
-    Some("array") | Some("each-like") | Some("contains") => Some("array"),
-    _ => None,
-  };
   let document = json!({
     "description": "property",
     "parts": { "response": { "body": { "shape": "object", "members": { "x": member } } } }
@@ -99,13 +91,7 @@ fn admits(member: &Value) -> Vec<bool> {
       let mut values = BTreeMap::new();
       values.insert("$.response.body".to_string(), body);
       let resolver = CapturedValues::from_json(&values);
-      let matched = outcome(&execute(&plan, &resolver)).0 == Status::Matched;
-      matched
-        && match (kind, candidate) {
-          (Some("object"), value) => matches!(value, Some(Value::Object(_))),
-          (Some("array"), value) => matches!(value, Some(Value::Array(_))),
-          _ => true,
-        }
+      outcome(&execute(&plan, &resolver)).0 == Status::Matched
     })
     .collect()
 }

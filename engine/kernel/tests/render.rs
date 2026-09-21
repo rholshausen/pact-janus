@@ -41,6 +41,9 @@ fn pretty_form_matches_corpus_case_plan_txt() {
   :"a request for an order" (
     :response (
       :body (
+        %expect:object (
+          $.response.body
+        ),
         :"$.id" (
           %match:integer (
             $.response.body.id
@@ -74,6 +77,9 @@ fn executed_form_matches_corpus_case_executed_txt() {
   :"a request for an order" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'id': 7, 'warehouse': 'AKL-1'}
+        ) => BOOL(true),
         :"$.id" (
           %match:integer (
             $.response.body.id => 7

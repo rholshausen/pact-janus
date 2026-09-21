@@ -43,6 +43,9 @@ guarantee no assertion in the plan can state, only the absence of one.
   :"a request for an order" (
     :response (
       :body (
+        %expect:object (
+          $.response.body
+        ),
         :"$.id" (
           %match:integer (
             $.response.body.id
@@ -72,6 +75,9 @@ guarantee no assertion in the plan can state, only the absence of one.
   :"a request for an order" (
     :response (
       :body (
+        %expect:object (
+          $.response.body => {'id': 7, 'warehouse': 'AKL-1'}
+        ) => BOOL(true),
         :"$.id" (
           %match:integer (
             $.response.body.id => 7

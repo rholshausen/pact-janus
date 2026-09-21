@@ -1,0 +1,59 @@
+{
+  "description": "a structural operator admits only values of the kind it names, even when nothing inside it objects",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order summary",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "totals": {
+                "shape": "object",
+                "members": {
+                  "discount": {
+                    "shape": "optional",
+                    "of": {
+                      "shape": "integer",
+                      "example": 0
+                    }
+                  }
+                }
+              },
+              "items": {
+                "shape": "each-like",
+                "min": 0,
+                "items": {
+                  "shape": "string",
+                  "example": "SKU-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "totals": 7,
+      "items": "SKU-1"
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.items",
+        "message": "Expected an array but got 'SKU-1'",
+        "action": "expect:array"
+      },
+      {
+        "path": "$.response.body.totals",
+        "message": "Expected an object but got 7",
+        "action": "expect:object"
+      }
+    ]
+  }
+}

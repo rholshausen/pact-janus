@@ -1,0 +1,46 @@
+(
+  :"an order summary" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$.items" (
+          %expect:array (
+            $.response.body.items
+          ),
+          %expect:size (
+            $.response.body.items,
+            0,
+            NULL
+          ),
+          %for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              %match:string (
+                ~>
+              )
+            )
+          )
+        ),
+        :"$.totals" (
+          %expect:object (
+            $.response.body.totals
+          ),
+          :"$.totals.discount" (
+            %if (
+              %check:exists (
+                $.response.body.totals.discount
+              ),
+              %match:integer (
+                $.response.body.totals.discount
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)
