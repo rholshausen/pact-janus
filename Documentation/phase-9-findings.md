@@ -350,3 +350,58 @@ Covered by `session.request.absence-applies-to-the-member`, and three cases:
 `translation/absence-in-a-multi-value-slot` (both operators, in headers and query),
 `live/forbidden-header-accepted` (the round trip through the mock, which is what the wrapped form
 failed) and `live/optional-header-presence` (the dimension lands on the header name).
+
+## 8. A structural shape's plan does not check the kind of the value it is given
+
+**Found:** 2026-09-21, by task 7.1's property test (`engine/kernel/tests/subsumption_properties.rs`),
+which brute-forces `admits` through the plan compiler and interpreter and compares the result with
+the subsumption checker's verdict. **Status:** open — worked around in the test, not fixed.
+
+### What was observed
+
+Shape spec §4.3 is explicit about kind: "**`object`** admits objects", "**`each-like`** admits arrays
+whose length is in `[min, max]`". The plans those operators compile to do not say so. `compile_object`
+(`engine/kernel/src/plan/compile.rs`) emits one container per named member and nothing else, and
+`compile_each_like` emits `expect:size` plus a `for-each` over a `splat`. So:
+
+- `{"shape":"object","members":{}}` compiles to an empty container, which matches **every** value —
+  a number, a string, `null`;
+- `{"shape":"each-like","min":0,"items":…}` matches any string, because `expect:size` reads a
+  string's length and `splat` yields no elements from it;
+- `{"shape":"object","members":{"a":{"shape":"optional",…}}}` matches the number `7`, because the
+  member resolves to `⊥` and `optional` admits that.
+
+Reproduce: compile any of those shapes at `response.body.x` and execute against a non-object,
+non-array value — `Status::Matched`. The same three shapes in the subsumption checker decide
+correctly, because it reads the specification rather than the plan.
+
+### Why it matters beyond this task
+
+Shape spec §7.4 constrains the compiler in exactly one way: "the plan compiled for a shape MUST
+accept exactly `admits(S)`". This is a case where it accepts more. Nothing in the corpora catches it,
+because every corpus case feeds a structural shape a value of the kind it expects — which is itself
+the finding's second half: a corpus of well-typed inputs cannot detect a missing type check.
+
+The practical exposure today is low (a provider that returns a number where the consumer's contract
+declares an object fails on the members) and is zero for the empty-members case only because nobody
+writes one. It stops being low the moment a shape's members are all optional, which is the ordinary
+result of upgrading a v1–v4 pact whose body matchers were all `type` with cascading rules.
+
+### Options
+
+- **(a) A kind guard per structural operator.** `object`/`each-entry` emit a kind check before their
+  members, `array`/`each-like`/`contains` before their elements. This needs a new core action in the
+  plan grammar (design 2.4 §4 — there is no `match:object`/`match:array` today), the compiler and
+  interpreter arms, the `explain` rendering, and a corpus case per operator asserting the negative.
+  It changes matching behaviour, so it is a corpora change in the same commit (CLAUDE.md).
+- **(b) Reuse `match:type` with a synthetic example.** No new action — `match:type` already compares
+  `kind_of`. Cheaper, but it puts a value in the plan that the shape never declared, which `explain`
+  would then print, and plan-grammar spec §3.1's "a rendering, not free prose" makes that a reader's
+  question ("where did `{}` come from?") rather than an implementation detail.
+- **(c) Leave it, and say so in shape spec §7.4.** Honest, and wrong in the direction the whole design
+  is trying to avoid: a shape that says "object" and a matcher that does not check it is the kind of
+  quiet divergence design 2.4 exists to make visible.
+
+Recommendation: (a), sized as a task 3.3 follow-up rather than folded into whatever finds it. Until
+then, task 7.1's property test corrects the oracle for this one gap and names this finding where it
+does, so the workaround is visible rather than load-bearing.

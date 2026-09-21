@@ -266,7 +266,8 @@ reader should not have to learn two addressing schemes. It carries a short human
 `SHIPPED` | `DELIVERED`" for the consumer — generated deterministically from the operator and its
 parameters, the same discipline that keeps `explain`'s pretty form a rendering rather than free prose
 (plan-grammar spec §3.1): two checkers comparing the same two shapes MUST produce the same summary text,
-so a diff between two report runs is a diff of substance, not of phrasing. §6.2 fixes the phrase table.
+so a diff between two report runs is a diff of substance, not of phrasing. §6.5 fixes the phrase
+table.
 
 Schema: [`schemas/v1/finding.schema.json`](schemas/v1/finding.schema.json).
 
@@ -360,6 +361,61 @@ convention rather than shown raw, because this text is read by people who know J
 necessarily this project's dimension-id grammar. Combining this block with verification-result lines into
 one `can-i-deploy` report is task 7.4's job; this specification fixes the block, not the page it appears
 on.
+
+### 6.5 The phrase table
+
+Two tables, because the example above uses both: §4.4's `summary` is what a *finding* records, and the
+rendered line is what a *reader* sees, and they are not the same words for the same node — the
+cardinality finding's summary is "0 to unbounded elements" while its rendered line is "provider may
+produce an empty list". Both are fixed here so that two checkers agree, and so that a renderer reading
+a report back from a file has a grammar to read rather than prose to parse.
+
+**Summaries**, by operator — the `summary` of a finding's `provider` and `consumer` sides:
+
+| Operator | `summary` |
+|---|---|
+| `any` | `any value` |
+| `equality` | `exactly <literal>` |
+| `type` | `any <kind>` — the kind of its example (`object`, `array`, `string`, …) |
+| `string` / `number` / `integer` / `decimal` / `boolean` / `null` | `any string` / `any number` / `a whole number` / `a number with a fractional part` / `any boolean` / `null` |
+| `not-empty` | `any non-empty value` |
+| `regex` | `strings matching '<pattern>'` |
+| `datetime` / `date` / `time` | `a datetime` / `a date` / `a time` — the format belongs in `reason`, where a reader comparing two of them needs it |
+| `include` | `strings containing '<substring>'` |
+| `content-type` | `octets detected as <type>` |
+| `semver` | `a semantic version` |
+| `object` | `an object` |
+| `array` | `an array of exactly <n> elements` |
+| `each-like` | `<min> to <max\|unbounded> elements` |
+| `each-entry` | `<min> to <max\|unbounded> entries` |
+| `contains` | `an array containing <n> matched elements` |
+| `optional` | `<summary of its `of`>, or absent` |
+| `forbidden` | `absent` |
+| `nullable` | `<summary of its `of`>, or null` |
+| `any-of` | `one of <literal> \| <literal> …` |
+| `one-of` | `one of the alternatives '<name>' \| '<name>' …` |
+| a component operator | `component operator '<operator>'` |
+
+A literal renders as its own text in single quotes when it is a string, and as its JSON text
+otherwise — the same rule shape spec §6.4 gives for `any-of` point names, so a point name and a
+summary agree. Two derived phrases exist for the sides of a presence comparison, because a bare
+summary would not say what the finding is about: the consumer side of a `weaker-presence` finding
+reads `<summary>, always present`, and the provider side of an `undeclared-member` finding, which has
+no node at all, reads `unconstrained: any value, or absent`.
+
+**Rendered lines**, by finding `kind` — the body under a finding's header line:
+
+| `kind` | Lines |
+|---|---|
+| `wider-values` | `provider may produce: <options>` / `consumer has only tested: <options>`, the summary with its leading `one of ` dropped |
+| `wider-cardinality` | the interval as prose: `an empty list` for `0 to unbounded`, `at least one item` for `1 to unbounded`, `at least <min> items`, `exactly <n> items`, `between <min> and <max> items` (`entry`/`entries` and `an empty map` for `each-entry`) |
+| `broader-type`, `weaker-presence`, `undeclared-member`, `excluded-combination` | `provider may produce <summary>` / `consumer has only tested <summary>` |
+| `unreviewable` | one line, not two: `provider pattern '<p>' cannot be compared against consumer pattern '<c>' — review manually` for two regexes, and `provider <summary> cannot be compared against consumer <summary> — review manually` otherwise |
+| a component-contributed `kind` | the `broader-type` row's two lines, since a `kind` this table does not name still has two summaries |
+
+A `review`-severity finding's header line is prefixed `? `, an `advisory` one `! `, and a `finding`
+one is unprefixed — the marker distinction §6.4's example shows. A finding carrying `excluded-by`
+adds one line per exclusion: `not exercised together: <reason>`.
 
 ## 7. Policy: warn, block and exemptions
 

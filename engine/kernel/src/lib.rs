@@ -14,6 +14,7 @@ pub mod legacy_pact;
 pub mod plan;
 pub mod protocol;
 pub mod shape;
+pub mod subsumption;
 pub mod upgrade;
 pub mod variant;
 

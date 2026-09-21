@@ -1,0 +1,36 @@
+//! The subsumption checker (design 2.8, plan task 7.1): `admits(provider) ⊆ admits(consumer)`,
+//! walked across a whole contract rather than one node at a time.
+//!
+//! The division of labour is the one design 2.8 §1 sets out. Shape-language spec §8 owns the
+//! alphabet — the identity floor, the three comparability classes, and the rule that `unknown` is
+//! never a guess — and this module never second-guesses it: [`compare`] calls a class's procedure
+//! at each node and composes the results. Design 2.8 owns the composition (§3.2's two rules), the
+//! finding vocabulary (§4), the report (§6) and the text rendering (§6.4), which are what this
+//! module implements.
+//!
+//! What is deliberately **not** here:
+//!
+//! - **Producing** a provider shape. This module reads one (§2); recording it from a provider's own
+//!   tests is task 7.2 and deriving one from types is task 7.3.
+//! - **Policy.** Design 2.8 §7's warn/block dispatch and exemption scoping turn a report into a
+//!   decision, which is the conformance role the spec calls a *policy* and the plan gives to task
+//!   7.4's `janus check`. The checker's job ends at the report — [`SubsumptionReport`] carries the
+//!   `severity` each finding was computed with (§4.3) precisely so that dispatch never has to
+//!   re-walk the tree.
+
+mod compare;
+mod phrases;
+mod provider_shape;
+mod render;
+mod report;
+
+pub use crate::contract::Party;
+pub use compare::{Verdict, compare};
+pub use provider_shape::{
+  FORMAT as PROVIDER_SHAPE_FORMAT, ProviderInteraction, ProviderShape, StateRef, read_provider_shape,
+};
+pub use render::render;
+pub use report::{
+  CheckError, FORMAT as REPORT_FORMAT, Finding, InteractionResult, NOT_PUBLISHED, Severity, Side,
+  SubsumptionReport, Summary, check,
+};
