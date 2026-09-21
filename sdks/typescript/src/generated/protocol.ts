@@ -284,16 +284,25 @@ export interface Hello {
 }
 
 /**
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording.
  */
 export interface Capabilities {
   encoding?: EncodingCapability;
+  "provider-shape-recording"?: ProviderShapeRecordingCapability;
   [k: string]:
     | {
         [k: string]: unknown;
       }
     | EncodingCapability
+    | ProviderShapeRecordingCapability
     | undefined;
+}
+
+/**
+ * Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.
+ */
+export interface ProviderShapeRecordingCapability {
+  [k: string]: unknown;
 }
 
 /**
@@ -332,6 +341,113 @@ export interface HelloResult {
 export interface PartyInfo {
   name: string;
   version: string;
+  [k: string]: unknown;
+}
+
+export interface FinaliseRecording {
+  session: string;
+  [k: string]: unknown;
+}
+
+/**
+ * The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed.
+ */
+export interface FinaliseRecordingResult {
+  /**
+   * Design 2.8's ProviderShape document, with provenance 'recorded'. Opaque here.
+   */
+  "provider-shape": {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.
+ */
+export interface ObserveResponse {
+  /**
+   * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+   */
+  description: string;
+  /**
+   * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+   */
+  parts: {
+    [k: string]: {
+      [k: string]: ObservedSlotValue;
+    };
+  };
+  session: string;
+  /**
+   * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
+   */
+  states?: string[];
+  [k: string]: unknown;
+}
+
+export interface ObserveResponseResult {
+  /**
+   * How many distinct interactions those responses covered.
+   */
+  interactions: number;
+  /**
+   * How many responses this session has recorded in total, so a host can report progress without holding its own counters.
+   */
+  observations: number;
+  [k: string]: unknown;
+}
+
+/**
+ * One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.
+ */
+export interface ObservedSlotValue {
+  /**
+   * The decoded value, any JSON value including null.
+   */
+  content: unknown;
+  /**
+   * Advisory: what the host believes the slot carried. Not interpreted.
+   */
+  "content-type"?: string;
+  /**
+   * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+   */
+  encoded?: string;
+  [k: string]: unknown;
+}
+
+export interface RecordedProvider {
+  name: string;
+  [k: string]: unknown;
+}
+
+/**
+ * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
+ */
+export interface RecordingPolicy {
+  /**
+   * Beyond this many distinct values, the position is an open domain whatever the repetition says.
+   */
+  "max-options"?: number;
+  /**
+   * Below this many observations, 'every value was new' is not evidence of an open domain.
+   */
+  "min-evidence"?: number;
+  [k: string]: unknown;
+}
+
+export interface StartRecording {
+  policy?: RecordingPolicy;
+  provider: RecordedProvider;
+  [k: string]: unknown;
+}
+
+export interface StartRecordingResult {
+  /**
+   * Engine-assigned session id (spec.md §7.1).
+   */
+  session: string;
   [k: string]: unknown;
 }
 

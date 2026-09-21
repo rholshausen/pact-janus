@@ -415,6 +415,7 @@ Capabilities defined in v1:
 |---|---|---|
 | `push-events` | both | On the stdio pipe: sender may deliver events as EventFrames instead of waiting to be polled (§9). Effective only when both sides declare it. |
 | `encoding` | both | Frame encoding negotiation (§3.4). Host: `{ "accepts": [name, …] }` in preference order. Engine: `{ "selected": name }`. Absent on either side means `json`. |
+| `provider-shape-recording` | engine | The `provider-shape-session/*` operations (§8.5) are available. Value `{}` — presence is the whole signal. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -460,16 +461,20 @@ own requests.
 
 ### 7.3 Session kinds
 
-v1 defines two kinds:
+v1 defines three kinds:
 
 - **Consumer session** (§8.2): drives mock/stub endpoints and message emission during a
   consumer test run, accumulates per-interaction verification status, and produces the Janus
   contract document at finalisation.
 - **Verification session** (§8.3): one provider-verification run. Created by
   `verification/verify`, reports progress as events, ends itself at the terminal event.
+- **Provider-shape session** (§8.5): accumulates what a provider's own tests produced into a
+  provider-shape document. Created by `provider-shape-session/create`, ended by its
+  `finalise`. It holds no transport and runs nothing — it is a place to put evidence.
 
 New session kinds arrive as new operations plus capabilities, not as changes to existing
-ones.
+ones: the provider-shape session is the worked example, behind the `provider-shape-recording`
+capability (§5.3) and adding nothing to the two kinds that came before it.
 
 ### 7.4 Passive and emissive interactions
 
@@ -599,6 +604,33 @@ the single example becomes the sole variant). `findings` lists lossy or judgemen
 (each with a code from an open vocabulary, a JSON pointer location and prose) so the CLI's
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
 document-out.
+
+### 8.5 Provider shapes — `provider-shape-session/*`
+
+Schema:
+[`schemas/v1/provider-shape-session.schema.json`](schemas/v1/provider-shape-session.schema.json).
+Behind the `provider-shape-recording` capability (§5.3); an engine that does not declare it
+answers these operations with `operation-unsupported`.
+
+| Operation | Body → Result |
+|---|---|
+| `provider-shape-session/create` | `{ provider, policy? }` → `{ session }` |
+| `provider-shape-session/observe` | `{ session, description, states?, parts }` → `{ observations, interactions }` |
+| `provider-shape-session/finalise` | `{ session }` → `{ provider-shape }` |
+
+This is the engine driven a third way: not producing a contract and not replaying one, but
+accumulating what a provider's own tests produced into the artifact
+[design 2.8](../subsumption-check/spec.md) §2 defines, with provenance `recorded`. What the
+document *means* — and the judgements a recorder makes to produce one — belong to that design
+and to task 7.2, not here; the protocol's contribution is that `observe` carries **decoded
+values**, wrapped exactly as a contract wraps them (contract spec §5.3), so the engine needs
+no opinion about how the provider was called and the architecture rule that keeps HTTP out of
+the kernel is not bent to record an HTTP response.
+
+`finalise` always produces the document. The honesty rule that makes a consumer session
+withhold a contract (contract spec §2.2) has no counterpart here, and importing it would be a
+category error: a contract claims a test passed, while a provider shape claims only that these
+responses were produced.
 
 ## 9. Events and streams
 

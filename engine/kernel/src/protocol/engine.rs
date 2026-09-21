@@ -8,6 +8,9 @@ use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
+use super::provider_shape_session::{
+  Create as CreateRecording, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
+};
 use super::session::{ServeVariantError, SessionStore, VariantsError};
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
@@ -55,6 +58,11 @@ pub struct Engine {
   /// makes the session end on.
   verifications: HashMap<String, Run>,
   next_verification: u64,
+  /// Provider-shape recording sessions by id (spec §7.3's third kind, plan task 7.2). Ended by
+  /// `provider-shape-session/finalise`, which is the only way one ends — there is nothing running
+  /// behind it to end it on its own the way a verification run does.
+  recordings: HashMap<String, RecordingSession>,
+  next_recording: u64,
 }
 
 impl Default for Engine {
@@ -81,6 +89,8 @@ impl Engine {
       hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
+      recordings: HashMap::new(),
+      next_recording: 0,
     }
   }
 
@@ -105,6 +115,8 @@ impl Engine {
       hook_components: HashMap::new(),
       verifications: HashMap::new(),
       next_verification: 0,
+      recordings: HashMap::new(),
+      next_recording: 0,
     }
   }
 
@@ -196,6 +208,9 @@ impl Engine {
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
       "verification/explain" => self.handle_explain(id, body),
+      "provider-shape-session/create" => self.handle_create_recording(id, body),
+      "provider-shape-session/observe" => self.handle_observe(id, body),
+      "provider-shape-session/finalise" => self.handle_finalise_recording(id, body),
       "upgrade/pact" => self.handle_upgrade(id, body),
       "events/poll" => self.handle_poll(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
@@ -227,6 +242,7 @@ impl Engine {
     self.sessions.end_all();
     self.streams.clear();
     self.verifications.clear();
+    self.recordings.clear();
     self.shut_down = true;
     tracing::info!("engine/shutdown: all sessions released");
     ResponseFrame::ok(id, json!({}))
@@ -510,6 +526,73 @@ impl Engine {
   /// nothing to allocate and nothing to release. The findings are half the result, not a
   /// diagnostic channel: contract-file spec §8.1 requires the conversion to be honest rather than
   /// lossless, and a caller that ignored them would be reading only half of what it was told.
+  /// `provider-shape-session/create` (spec §8.5): a recording session, which holds no transport,
+  /// runs nothing, and is released by `finalise`.
+  fn handle_create_recording(&mut self, id: String, body: Value) -> ResponseFrame {
+    let create: CreateRecording = match parse_body(body) {
+      Ok(create) => create,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let policy = create
+      .policy
+      .as_ref()
+      .map(|policy| policy.resolve())
+      .unwrap_or_default();
+    self.next_recording += 1;
+    let session = format!("r-{}", self.next_recording);
+    self
+      .recordings
+      .insert(session.clone(), RecordingSession::new(create.provider, policy));
+    ResponseFrame::ok(id, json!({ "session": session }))
+  }
+
+  /// `provider-shape-session/observe` (spec §8.5): one response the provider produced.
+  fn handle_observe(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: Observe = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.recordings.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    session.observe(&req);
+    let (observations, interactions) = session.progress();
+    ResponseFrame::ok(
+      id,
+      json!({ "observations": observations, "interactions": interactions }),
+    )
+  }
+
+  /// `provider-shape-session/finalise` (spec §8.5): the shape the evidence adds up to, and the
+  /// end of the session.
+  ///
+  /// Unlike a consumer session's `finalise` there is no honesty rule to apply (contract spec
+  /// §2.2): a contract is withheld when a variant failed because it is a claim about a passing
+  /// test, while a provider shape claims only that these responses were produced. A recorder that
+  /// withheld its document when something failed would be describing the tests, not the provider.
+  fn handle_finalise_recording(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: FinaliseRecording = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.recordings.remove(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    // Serialised from the model rather than via `Value`, for the reason `consumer-session/finalise`
+    // gives: a `Value` map sorts members, and the document's order is the schema's.
+    #[derive(serde::Serialize)]
+    struct Finalised<'a> {
+      #[serde(rename = "provider-shape")]
+      provider_shape: &'a crate::subsumption::ProviderShape,
+    }
+    ResponseFrame::ok_serialized(
+      id,
+      &Finalised {
+        provider_shape: &session.finish(),
+      },
+    )
+  }
+
   fn handle_upgrade(&mut self, id: String, body: Value) -> ResponseFrame {
     let req: UpgradePact = match parse_body(body) {
       Ok(req) => req,

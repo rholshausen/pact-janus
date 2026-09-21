@@ -10,8 +10,9 @@
 //!
 //! What is deliberately **not** here:
 //!
-//! - **Producing** a provider shape. This module reads one (§2); recording it from a provider's own
-//!   tests is task 7.2 and deriving one from types is task 7.3.
+//! - **Deriving** a provider shape from types (task 7.3). Recording one from the provider's own
+//!   tests is [`Recorder`] (task 7.2), which lives here because the artifact it writes is the one
+//!   the walk reads; nothing else about the walk changes by provenance (§2.3).
 //! - **Policy.** Design 2.8 §7's warn/block dispatch and exemption scoping turn a report into a
 //!   decision, which is the conformance role the spec calls a *policy* and the plan gives to task
 //!   7.4's `janus check`. The checker's job ends at the report — [`SubsumptionReport`] carries the
@@ -21,6 +22,7 @@
 mod compare;
 mod phrases;
 mod provider_shape;
+mod record;
 mod render;
 mod report;
 
@@ -29,6 +31,7 @@ pub use compare::{Verdict, compare};
 pub use provider_shape::{
   FORMAT as PROVIDER_SHAPE_FORMAT, ProviderInteraction, ProviderShape, StateRef, read_provider_shape,
 };
+pub use record::{Recorder, RecordingPolicy};
 pub use render::render;
 pub use report::{
   CheckError, FORMAT as REPORT_FORMAT, Finding, InteractionResult, NOT_PUBLISHED, Severity, Side,

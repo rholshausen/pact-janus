@@ -1452,6 +1452,7 @@ dependencies = [
  "serde_path_to_error",
  "test-log",
  "tracing",
+ "ureq",
 ]
 
 [[package]]

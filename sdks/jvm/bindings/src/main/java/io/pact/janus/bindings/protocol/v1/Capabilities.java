@@ -20,12 +20,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * Capabilities
  * <p>
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "encoding"
+    "encoding",
+    "provider-shape-recording"
 })
 public class Capabilities {
 
@@ -38,6 +39,15 @@ public class Capabilities {
     @JsonProperty("encoding")
     @JsonPropertyDescription("Frame encoding negotiation (spec.md \u00a73.4). The host sends 'accepts' in preference order; the engine answers with 'selected'. Absent on either side means json. The hello exchange itself is always JSON, and JSON is mandatory for both parties, so negotiation cannot fail.")
     private EncodingCapability encoding;
+    /**
+     * ProviderShapeRecordingCapability
+     * <p>
+     * Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("provider-shape-recording")
+    @JsonPropertyDescription("Declared by an engine that implements the provider-shape-session/* operations (spec.md \u00a78.5). Presence is the whole signal; the object carries nothing.")
+    private ProviderShapeRecordingCapability providerShapeRecording;
     @JsonIgnore
     private Map<java.lang.String, Map<String, Object>> additionalProperties = new LinkedHashMap<java.lang.String, Map<String, Object>>();
 
@@ -63,6 +73,28 @@ public class Capabilities {
         this.encoding = encoding;
     }
 
+    /**
+     * ProviderShapeRecordingCapability
+     * <p>
+     * Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("provider-shape-recording")
+    public ProviderShapeRecordingCapability getProviderShapeRecording() {
+        return providerShapeRecording;
+    }
+
+    /**
+     * ProviderShapeRecordingCapability
+     * <p>
+     * Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("provider-shape-recording")
+    public void setProviderShapeRecording(ProviderShapeRecordingCapability providerShapeRecording) {
+        this.providerShapeRecording = providerShapeRecording;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Map<String, Object>> getAdditionalProperties() {
         return this.additionalProperties;
@@ -81,6 +113,10 @@ public class Capabilities {
         sb.append('=');
         sb.append(((this.encoding == null)?"<null>":this.encoding));
         sb.append(',');
+        sb.append("providerShapeRecording");
+        sb.append('=');
+        sb.append(((this.providerShapeRecording == null)?"<null>":this.providerShapeRecording));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -96,8 +132,9 @@ public class Capabilities {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.encoding == null)? 0 :this.encoding.hashCode()));
+        result = ((result* 31)+((this.providerShapeRecording == null)? 0 :this.providerShapeRecording.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.encoding == null)? 0 :this.encoding.hashCode()));
         return result;
     }
 
@@ -110,7 +147,7 @@ public class Capabilities {
             return false;
         }
         Capabilities rhs = ((Capabilities) other);
-        return (((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))));
     }
 
 }

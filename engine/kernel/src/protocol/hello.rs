@@ -25,13 +25,20 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
     .find(|v| *v == crate::PROTOCOL_VERSION)
 }
 
-/// Result body of a successful `engine/hello` (spec §5.1). No capabilities declared: absence
-/// means `json` encoding and no push delivery, both conformant (spec's own worked example,
-/// `examples/error-and-negotiation.md`, "Capability negotiation that cannot fail").
+/// Result body of a successful `engine/hello` (spec §5.1).
+///
+/// `encoding` and `push-events` stay undeclared: absence means `json` encoding and no push
+/// delivery, both conformant (spec's own worked example, `examples/error-and-negotiation.md`,
+/// "Capability negotiation that cannot fail").
+///
+/// `provider-shape-recording` is declared, and is what spec §7.3 means by "new session kinds
+/// arrive as new operations plus capabilities": a host that wants to record a provider shape has
+/// to know before it builds a run whether this engine can, and §5.3's rule is that it MUST NOT
+/// rely on operations behind a capability the engine did not declare.
 pub fn result() -> Value {
   json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
-    "capabilities": {}
+    "capabilities": { "provider-shape-recording": {} }
   })
 }

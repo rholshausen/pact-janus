@@ -8,6 +8,10 @@
 //! other way, replaying a contract's recorded variants at a provider — and the event streams it
 //! reports on ([`events`], spec §9), which is the delivery model every reporting operation shares.
 //!
+//! Also here: the provider-shape recording session ([`provider_shape_session`], plan task 7.2) —
+//! the same engine in a third mode, accumulating what a provider's own tests produced into the
+//! artifact design 2.8's walk reads.
+//!
 //! Also here: `verification/explain` ([`explain`], plan task 5.5) — one interaction compiled to a
 //! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
 //! the session-less v1–v4 conversion ([`crate::upgrade`]).
@@ -24,6 +28,7 @@ mod exchange;
 mod explain;
 mod frame;
 mod hello;
+mod provider_shape_session;
 mod session;
 mod verification;
 mod wire;

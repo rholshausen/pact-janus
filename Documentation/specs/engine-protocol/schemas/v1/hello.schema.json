@@ -28,10 +28,15 @@
     },
     "Capabilities": {
       "title": "Capabilities",
-      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding.",
+      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording.",
       "type": "object",
       "properties": {
-        "encoding": { "$ref": "#/$defs/EncodingCapability" }
+        "encoding": { "$ref": "#/$defs/EncodingCapability" },
+        "provider-shape-recording": {
+          "title": "ProviderShapeRecordingCapability",
+          "description": "Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.",
+          "type": "object"
+        }
       },
       "additionalProperties": { "type": "object" }
     },

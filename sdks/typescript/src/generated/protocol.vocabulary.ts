@@ -98,6 +98,14 @@ export const InteractionResultStatus = {
 } as const;
 
 /**
+ * Known values of `ObservedSlotValue.encoded` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ObservedSlotValueEncoded = {
+  Base64: "base64",
+} as const;
+
+/**
  * Known values of `RequestFrame.op` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */

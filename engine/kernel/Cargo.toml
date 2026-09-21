@@ -53,6 +53,10 @@ pact_janus_component_oauth2 = { path = "../component-oauth2" }
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
 jsonschema = { version = "0.51", default-features = false }
+# Plan task 7.2's demonstration records what the sample provider answers over real HTTP, the way
+# a provider's own test suite does. Already in the tree via the HTTP component's drive role and
+# the sample's own tests, and deliberately not the thing under test.
+ureq = "3"
 # `#[test_log::test]` installs a tracing subscriber for the test, reading `RUST_LOG`, so
 # `RUST_LOG=debug cargo test -- --nocapture` (CLAUDE.md) has somewhere to send the kernel's own
 # tracing output without every test file rolling its own init helper.

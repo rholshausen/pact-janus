@@ -453,3 +453,199 @@ fn a_per_call_policy_override_can_force_base_only() {
   );
   assert_eq!(variants["ok"]["report"]["strategy"], "base-only");
 }
+
+// --- provider-shape sessions (plan task 7.2, spec §8.5) ----------------------------------------
+
+fn record(engine: &mut Engine, session: &str, description: &str, states: Value, body: Value) -> Value {
+  send(
+    engine,
+    "r-observe",
+    "provider-shape-session/observe",
+    json!({ "session": session, "description": description, "states": states,
+            "parts": { "response": { "body": { "content": body } } } }),
+  )
+}
+
+fn recording_session(engine: &mut Engine) -> String {
+  let created = send(
+    engine,
+    "r-create",
+    "provider-shape-session/create",
+    json!({ "provider": { "name": "order-service" } }),
+  );
+  created["ok"]["session"]
+    .as_str()
+    .expect("a session id")
+    .to_string()
+}
+
+#[test]
+fn recording_is_declared_as_a_capability_rather_than_assumed() {
+  // Spec §5.3: "a host MUST NOT rely on operations behind a capability the engine did not
+  // declare", which only works if an engine that has them says so.
+  let mut engine = Engine::new();
+  let response = hello(&mut engine);
+  assert_eq!(
+    response["ok"]["capabilities"]["provider-shape-recording"],
+    json!({}),
+    "presence is the whole signal"
+  );
+}
+
+#[test]
+fn a_recording_session_turns_observed_responses_into_a_provider_shape() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let session = recording_session(&mut engine);
+
+  let states = json!(["an order exists"]);
+  for status in ["PENDING", "SHIPPED", "PENDING", "CANCELLED"] {
+    let progress = record(
+      &mut engine,
+      &session,
+      "a request for an order",
+      states.clone(),
+      json!({ "id": "66", "status": status }),
+    );
+    assert_eq!(progress["ok"]["interactions"], json!(1));
+  }
+
+  let finalised = send(
+    &mut engine,
+    "r-finalise",
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  );
+  let recorded = &finalised["ok"]["provider-shape"];
+  assert_eq!(recorded["$format"], json!("janus-provider-shape/1"));
+  assert_eq!(recorded["provenance"], json!("recorded"));
+  assert_eq!(recorded["provider"]["name"], json!("order-service"));
+
+  let interaction = &recorded["interactions"][0];
+  assert_eq!(interaction["description"], json!("a request for an order"));
+  assert_eq!(interaction["states"], json!([{ "name": "an order exists" }]));
+  assert_eq!(interaction["source"]["observations"], json!(4));
+  assert_eq!(
+    interaction["parts"]["response"]["body"]["members"]["status"]["options"],
+    json!(["CANCELLED", "PENDING", "SHIPPED"])
+  );
+}
+
+#[test]
+fn a_host_may_set_the_recorders_judgements_per_session() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  // `min-evidence: 1` makes one non-repeating observation enough to call a position open, which
+  // is a host saying "my suite hits each endpoint once, do not read enums into that".
+  let created = send(
+    &mut engine,
+    "r-create",
+    "provider-shape-session/create",
+    json!({ "provider": { "name": "order-service" }, "policy": { "min-evidence": 1 } }),
+  );
+  let session = created["ok"]["session"]
+    .as_str()
+    .expect("a session id")
+    .to_string();
+  record(
+    &mut engine,
+    &session,
+    "get an order",
+    json!([]),
+    json!({ "id": "66" }),
+  );
+
+  let finalised = send(
+    &mut engine,
+    "r-finalise",
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(
+    finalised["ok"]["provider-shape"]["interactions"][0]["parts"]["response"]["body"]["members"]["id"]["shape"],
+    json!("string"),
+    "one value, seen once, never repeated: a sample of an open domain under this policy"
+  );
+}
+
+#[test]
+fn a_recording_session_ends_at_finalise_and_says_so_afterwards() {
+  // Spec §7.1: a session ends in exactly one way per kind, and a stale id gets a named error.
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let session = recording_session(&mut engine);
+  record(
+    &mut engine,
+    &session,
+    "get an order",
+    json!([]),
+    json!({ "id": "66" }),
+  );
+  send(
+    &mut engine,
+    "r-finalise",
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  );
+
+  let stale = record(
+    &mut engine,
+    &session,
+    "get an order",
+    json!([]),
+    json!({ "id": "67" }),
+  );
+  assert_eq!(stale["error"]["code"], json!("session-not-found"));
+  let refinalise = send(
+    &mut engine,
+    "r-finalise",
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(refinalise["error"]["code"], json!("session-not-found"));
+}
+
+#[test]
+fn recording_a_response_never_needs_the_engine_to_know_what_a_response_is() {
+  // The value arrives decoded and wrapped as a contract wraps one (contract spec §5.3). A slot
+  // that carried nothing is left out rather than given a special value, and a part the provider
+  // did not produce simply is not there.
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let session = recording_session(&mut engine);
+  let observed = send(
+    &mut engine,
+    "r-observe",
+    "provider-shape-session/observe",
+    json!({ "session": session, "description": "get an order",
+            "parts": { "response": { "status": { "content": 200 },
+                                     "body": { "content": { "id": "66" } } } } }),
+  );
+  assert_eq!(observed["ok"]["observations"], json!(1));
+
+  let finalised = send(
+    &mut engine,
+    "r-finalise",
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  );
+  let slots = &finalised["ok"]["provider-shape"]["interactions"][0]["parts"]["response"];
+  assert_eq!(slots["status"], json!({ "shape": "equality", "example": 200 }));
+  assert!(slots["body"].is_object());
+}
+
+#[test]
+fn a_malformed_observation_is_a_value_not_a_panic() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let session = recording_session(&mut engine);
+  let response = send(
+    &mut engine,
+    "r-observe",
+    "provider-shape-session/observe",
+    json!({ "session": session, "description": "get an order", "parts": "not an object" }),
+  );
+  // The same code every operation answers a body it cannot read with (spec §4.4) — a recording
+  // session adds no error vocabulary of its own.
+  assert_eq!(response["error"]["code"], json!("malformed-frame"));
+}

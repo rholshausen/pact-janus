@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/provider-shape-session.schema.json",
+  "title": "ProviderShapeSessionOps",
+  "description": "Request/result bodies for the provider-shape-session/* operations (spec.md §8.5): recording what a provider's own tests produced into a provider-shape document. Behind the 'provider-shape-recording' capability (spec.md §5.3). The document this session writes is design 2.8's, opaque here.",
+  "$defs": {
+    "StartRecording": {
+      "title": "StartRecording",
+      "type": "object",
+      "required": [
+        "provider"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/RecordedProvider",
+          "description": "The provider the recorded shape is about. There is no consumer: one provider shape is compared against every consumer that has a pact with it (design 2.8 §2.1)."
+        },
+        "policy": {
+          "$ref": "#/$defs/RecordingPolicy"
+        }
+      }
+    },
+    "StartRecordingResult": {
+      "title": "StartRecordingResult",
+      "type": "object",
+      "required": [
+        "session"
+      ],
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Engine-assigned session id (spec.md §7.1)."
+        }
+      }
+    },
+    "RecordingPolicy": {
+      "title": "RecordingPolicy",
+      "description": "How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.",
+      "type": "object",
+      "properties": {
+        "max-options": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Beyond this many distinct values, the position is an open domain whatever the repetition says."
+        },
+        "min-evidence": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Below this many observations, 'every value was new' is not evidence of an open domain."
+        }
+      }
+    },
+    "ObserveResponse": {
+      "title": "ObserveResponse",
+      "description": "One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.",
+      "type": "object",
+      "required": [
+        "session",
+        "description",
+        "parts"
+      ],
+      "properties": {
+        "session": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by."
+        },
+        "states": {
+          "type": "array",
+          "description": "Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "parts": {
+          "type": "object",
+          "description": "Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ObservedSlotValue"
+            }
+          }
+        }
+      }
+    },
+    "ObservedSlotValue": {
+      "title": "ObservedSlotValue",
+      "description": "One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.",
+      "type": "object",
+      "required": [
+        "content"
+      ],
+      "properties": {
+        "content": {
+          "description": "The decoded value, any JSON value including null.",
+          "x-tagged-by": "encoded"
+        },
+        "encoded": {
+          "type": "string",
+          "description": "Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.",
+          "x-known-values": [
+            "base64"
+          ]
+        },
+        "content-type": {
+          "type": "string",
+          "description": "Advisory: what the host believes the slot carried. Not interpreted."
+        }
+      }
+    },
+    "ObserveResponseResult": {
+      "title": "ObserveResponseResult",
+      "type": "object",
+      "required": [
+        "observations",
+        "interactions"
+      ],
+      "properties": {
+        "observations": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many responses this session has recorded in total, so a host can report progress without holding its own counters."
+        },
+        "interactions": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many distinct interactions those responses covered."
+        }
+      }
+    },
+    "FinaliseRecording": {
+      "title": "FinaliseRecording",
+      "type": "object",
+      "required": [
+        "session"
+      ],
+      "properties": {
+        "session": {
+          "type": "string"
+        }
+      }
+    },
+    "FinaliseRecordingResult": {
+      "title": "FinaliseRecordingResult",
+      "description": "The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed.",
+      "type": "object",
+      "required": [
+        "provider-shape"
+      ],
+      "properties": {
+        "provider-shape": {
+          "type": "object",
+          "description": "Design 2.8's ProviderShape document, with provenance 'recorded'. Opaque here."
+        }
+      }
+    },
+    "RecordedProvider": {
+      "title": "RecordedProvider",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
