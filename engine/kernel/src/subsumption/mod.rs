@@ -13,14 +13,16 @@
 //! - **Deriving** a provider shape from types (task 7.3). Recording one from the provider's own
 //!   tests is [`Recorder`] (task 7.2), which lives here because the artifact it writes is the one
 //!   the walk reads; nothing else about the walk changes by provenance (§2.3).
-//! - **Policy.** Design 2.8 §7's warn/block dispatch and exemption scoping turn a report into a
-//!   decision, which is the conformance role the spec calls a *policy* and the plan gives to task
-//!   7.4's `janus check`. The checker's job ends at the report — [`SubsumptionReport`] carries the
-//!   `severity` each finding was computed with (§4.3) precisely so that dispatch never has to
-//!   re-walk the tree.
+//! - **The decision.** Design 2.8 §7's policy document lives here ([`SubsumptionPolicy`]) because
+//!   its semantics are that specification's, but what a *run* does with one — combining a report
+//!   with verification results into the RFC's `can-i-deploy` answer — is [`crate::compatibility`]
+//!   (plan task 7.4), which design 2.8 §1 lists as out of its own scope. The checker's job still
+//!   ends at the report: [`SubsumptionReport`] carries the `severity` each finding was computed
+//!   with (§4.3) precisely so that dispatch never has to re-walk the tree.
 
 mod compare;
 mod phrases;
+mod policy;
 mod provider_shape;
 mod record;
 mod render;
@@ -28,11 +30,15 @@ mod report;
 
 pub use crate::contract::Party;
 pub use compare::{Verdict, compare};
+pub use policy::{Action, Exemption, InteractionRef, SubsumptionPolicy};
 pub use provider_shape::{
   FORMAT as PROVIDER_SHAPE_FORMAT, ProviderInteraction, ProviderShape, StateRef, read_provider_shape,
 };
 pub use record::{Recorder, RecordingPolicy};
 pub use render::render;
+// The page task 7.4 prints is this block under a decision, so [`crate::compatibility`] composes
+// the same lines rather than re-wording them (render's own module docs).
+pub(crate) use render::{finding_lines, header};
 pub use report::{
   CheckError, FORMAT as REPORT_FORMAT, Finding, InteractionResult, NOT_PUBLISHED, Severity, Side,
   SubsumptionReport, Summary, check,

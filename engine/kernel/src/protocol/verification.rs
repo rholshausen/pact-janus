@@ -370,7 +370,7 @@ fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
 /// The members every v1–v4 pact file has by its own specification: named parties and a body of
 /// interactions (or messages, for a pact this engine reads and then finds nothing HTTP in — which
 /// is a pact that verifies zero interactions, a different and honest answer from a misparse).
-fn looks_like_a_pact(doc: &Value) -> bool {
+pub(super) fn looks_like_a_pact(doc: &Value) -> bool {
   let has = |name: &str| doc.get(name).is_some_and(Value::is_object);
   has("consumer")
     && has("provider")
@@ -460,6 +460,7 @@ fn run(
       "contracts": sources.len(),
       "interactions": interactions,
       "variants": variants,
+      "consumers": sources.iter().map(|s| s.consumer().to_string()).collect::<Vec<_>>(),
       "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
       // Positionally parallel to `providers`: which format each source document was written in
       // (plan task 5.4). A run over a mix of the two says so in its first event.
@@ -647,6 +648,12 @@ fn summary(
   let mut summary = json!({
     "status": if failed == 0 && aborted.is_none() { "verified" } else { "failed" },
     "contracts": sources.len(),
+    // Who this run was about, positionally parallel, one entry per source document — the same
+    // pairing `started` announces. The summary is the document a report is written from (below),
+    // and plan task 7.4's decision is *per pair*: a run that said "verified" without saying which
+    // consumer and which provider it verified could not be read back as an answer about either.
+    "consumers": sources.iter().map(|s| s.consumer().to_string()).collect::<Vec<_>>(),
+    "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
     "interactions": interactions,
     // `filtered` rides in the summary as well as in `started`, because the summary is the
     // document a report is written from and "verified" without "filtered" beside it would be a

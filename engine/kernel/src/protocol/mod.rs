@@ -12,6 +12,9 @@
 //! the same engine in a third mode, accumulating what a provider's own tests produced into the
 //! artifact design 2.8's walk reads.
 //!
+//! Also here: the subsumption operations ([`subsumption`], plan task 7.4) — the walk design 2.8
+//! §3 defines, and the `can-i-deploy` decision over its reports — session-less, like `upgrade`.
+//!
 //! Also here: `verification/explain` ([`explain`], plan task 5.5) — one interaction compiled to a
 //! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
 //! the session-less v1–v4 conversion ([`crate::upgrade`]).
@@ -30,6 +33,7 @@ mod frame;
 mod hello;
 mod provider_shape_session;
 mod session;
+mod subsumption;
 mod verification;
 mod wire;
 

@@ -37,13 +37,16 @@ Exemption 1 has no `interaction` selector, so it silences the `wider-values` fin
 `response.body.status` appears — which today is the one interaction. Exemption 1 also carries `expires`;
 exemption 2 does not, because it records a belief that the two regexes are equivalent forever, not a
 temporary gap — the kind of permanent exemption spec.md §7.2 says should not be forced into carrying a
-meaningless date. A dashboard (task 7.5) is where "no `expires`" gets surfaced for review, not this
-document.
+meaningless date. Surfacing "no `expires`" for review is a *report's* job, not this document's:
+`janus check` raises it as `exemption-no-expiry` on the exemption's own entry (engine-protocol spec
+§8.6), and a dashboard (task 7.5) would do the same.
 
 ## 2. What `on-finding: "block"` would change
 
-Nothing in the documents above — `on-finding` and `on-review` are read at report time, by task 7.4's `pact
-check`, not baked into the report itself (spec.md §6.4). Raising `on-finding` to `"block"` after exemptions
+Nothing in the documents above — `on-finding` and `on-review` are read at decision time, by `janus check`
+and the `subsumption/decide` operation behind it ([engine-protocol spec
+§8.6](../../engine-protocol/spec.md#86-subsumption-and-the-compatibility-decision--subsumption)), not
+baked into the report itself (spec.md §6.4). Raising `on-finding` to `"block"` after exemptions
 1 and 3 are in place would still let `get an order` pass `can-i-deploy`: the `wider-values` finding is
 exempted, the `unreviewable` payment finding is a `review`-severity result governed by `on-review`, and
 `wider-cardinality`/`broader-type` on `items` remain live findings that a `block` policy would stop the

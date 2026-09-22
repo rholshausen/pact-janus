@@ -451,6 +451,294 @@ export interface StartRecordingResult {
   [k: string]: unknown;
 }
 
+export interface Check {
+  /**
+   * The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
+   */
+  contract: {
+    [k: string]: unknown;
+  };
+  options?: {
+    [k: string]: unknown;
+  };
+  /**
+   * A provider shape (design 2.8 §2), for the same provider the contract names.
+   */
+  "provider-shape": {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface CheckResult {
+  /**
+   * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
+   */
+  format: string;
+  /**
+   * The subsumption report (design 2.8 §6, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for.
+   */
+  report: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * The can-i-deploy answer for one run (spec.md §8.6): every pair asked about, why each decided the way it did, and what policy decided it. Owned by plan task 7.4 — design 2.8 §1 lists combining its report with verification results as out of its own scope.
+ */
+export interface CompatibilityReport {
+  /**
+   * 'janus-compatibility-report/1'.
+   */
+  $format: string;
+  /**
+   * The date exemption expiry was judged against, when the host supplied one.
+   */
+  "as-of"?: string;
+  decision: Decision;
+  pairs: PairResult[];
+  policy: PolicyView;
+  summary: CompatibilitySummary;
+  [k: string]: unknown;
+}
+
+export interface CompatibilitySummary {
+  blocked: number;
+  exempt: number;
+  findings: number;
+  pairs: number;
+  passed: number;
+  reviews: number;
+  warned: number;
+  [k: string]: unknown;
+}
+
+export interface Decide {
+  /**
+   * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
+   */
+  "as-of"?: string;
+  options?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
+   */
+  pairs: DecidePair[];
+  /**
+   * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
+   */
+  policy?: {
+    [k: string]: unknown;
+  }[];
+  /**
+   * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.
+   */
+  verification?: {
+    [k: string]: unknown;
+  }[];
+  [k: string]: unknown;
+}
+
+export interface DecidePair {
+  consumer: Party;
+  /**
+   * How the consumer document identified itself, as CheckResult reported it.
+   */
+  format?: string;
+  provider: Party;
+  /**
+   * This pair's subsumption report, when the host has one. Its absence is not an error: a provider that has published no shape gets replay-only semantics (design 2.8 §6.3), which is what makes the check adoptable per provider.
+   */
+  subsumption?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface DecideResult {
+  report: CompatibilityReport;
+  /**
+   * The page a person reads: design 2.8 §6.4's finding block per pair, under a decision. Rendered by the engine so that two hosts printing the same decision print the same words.
+   */
+  text: string;
+  [k: string]: unknown;
+}
+
+/**
+ * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
+ */
+export type Decision = string;
+
+/**
+ * The silencing exemption, quoted where the finding is — the reason a reader is looking for.
+ */
+export interface ExemptionRef {
+  expires?: string;
+  reason: string;
+  [k: string]: unknown;
+}
+
+/**
+ * One exemption's outcome, echoing the exemption itself (design 2.8 §7.2's selectors) so a reader of the report does not need the policy file open beside it.
+ */
+export interface ExemptionResult {
+  consumer?: string;
+  expires?: string;
+  interaction?: InteractionId;
+  matched: number;
+  path?: string;
+  reason: string;
+  /**
+   * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
+   */
+  status: string;
+  [k: string]: unknown;
+}
+
+export interface FindingEntry {
+  /**
+   * Whether policy left this finding live or an exemption silenced it.
+   */
+  disposition: string;
+  exemption?: ExemptionRef;
+  /**
+   * Design 2.8 §4's finding (its schemas/v1/finding.schema.json), carried through untouched.
+   */
+  finding: {
+    [k: string]: unknown;
+  };
+  interaction: InteractionId;
+  [k: string]: unknown;
+}
+
+/**
+ * An interaction by contract spec §4.2's identity: description plus state names.
+ */
+export interface InteractionId {
+  description: string;
+  states?: string[];
+  [k: string]: unknown;
+}
+
+export interface PairResult {
+  consumer: Party;
+  decision: Decision;
+  /**
+   * What became of each exemption the policy carried.
+   */
+  exemptions?: ExemptionResult[];
+  /**
+   * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
+   */
+  findings?: FindingEntry[];
+  /**
+   * How the consumer document identified itself.
+   */
+  format?: string;
+  provider: Party;
+  /**
+   * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
+   */
+  reasons: Reason[];
+  subsumption: SubsumptionView;
+  verification: VerificationView;
+  [k: string]: unknown;
+}
+
+/**
+ * What a subsumption severity does to the run (design 2.8 §7.1). Both default to 'warn' (ADR 0016).
+ */
+export type PolicyAction = string;
+
+/**
+ * The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.
+ */
+export interface PolicyView {
+  /**
+   * How many exemptions were in force across every layer.
+   */
+  exemptions: number;
+  "on-finding": PolicyAction;
+  "on-review": PolicyAction;
+  [k: string]: unknown;
+}
+
+export interface Reason {
+  /**
+   * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
+   */
+  action: string;
+  /**
+   * Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.
+   */
+  code: string;
+  message: string;
+  [k: string]: unknown;
+}
+
+/**
+ * What the subsumption report says about this pair, after policy.
+ */
+export interface SubsumptionView {
+  /**
+   * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+   */
+  advisories: number;
+  /**
+   * Results of either severity an exemption silenced.
+   */
+  exempt: number;
+  /**
+   * 'finding'-severity results no exemption silenced.
+   */
+  findings: number;
+  interactions: number;
+  /**
+   * Interactions with a published provider-shape entry (design 2.8 §2.2).
+   */
+  matched: number;
+  /**
+   * Interactions the provider published nothing for, which were therefore not checked (design 2.8 §6.3).
+   */
+  "not-published": number;
+  /**
+   * 'review'-severity results no exemption silenced.
+   */
+  reviews: number;
+  /**
+   * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
+   */
+  verdict: string;
+  [k: string]: unknown;
+}
+
+/**
+ * What the supplied verification results say about this pair. A missing result is never a pass.
+ */
+export interface VerificationView {
+  /**
+   * Whether any covering run was filtered: unreplayed variants are not passing ones.
+   */
+  filtered?: boolean;
+  /**
+   * How many supplied results covered this pair.
+   */
+  runs: number;
+  /**
+   * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
+   */
+  status: string;
+  /**
+   * The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.
+   */
+  variants?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
 export interface Pact {
   options?: {
     [k: string]: unknown;

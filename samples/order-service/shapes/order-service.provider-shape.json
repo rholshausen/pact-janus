@@ -1,0 +1,81 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "order-service"
+  },
+  "provenance": "recorded",
+  "interactions": [
+    {
+      "description": "a request for an order",
+      "states": [
+        {
+          "name": "an order exists"
+        }
+      ],
+      "source": {
+        "observations": 6
+      },
+      "parts": {
+        "response": {
+          "body": {
+            "members": {
+              "channel": {
+                "example": "web",
+                "shape": "equality"
+              },
+              "id": {
+                "example": "66",
+                "shape": "equality"
+              },
+              "items": {
+                "items": {
+                  "members": {
+                    "quantity": {
+                      "example": 1,
+                      "options": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "shape": "any-of"
+                    },
+                    "sku": {
+                      "example": "sku-0",
+                      "options": [
+                        "sku-0",
+                        "sku-1",
+                        "sku-2"
+                      ],
+                      "shape": "any-of"
+                    }
+                  },
+                  "shape": "object"
+                },
+                "max": 3,
+                "min": 0,
+                "shape": "each-like"
+              },
+              "shippedAt": {
+                "of": {
+                  "example": "2026-07-30T09:00:00Z",
+                  "shape": "equality"
+                },
+                "shape": "optional"
+              },
+              "status": {
+                "example": "CANCELLED",
+                "options": [
+                  "CANCELLED",
+                  "PENDING",
+                  "SHIPPED"
+                ],
+                "shape": "any-of"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

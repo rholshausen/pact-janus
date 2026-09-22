@@ -54,7 +54,8 @@ samples/         Demo subjects (workspace members), e.g. samples/order-service �
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
                  endpoint, used by verification tests, M3 and M5. Its pacts/ holds the v3
                  pact of a consumer that has not upgraded, which task 5.4 verifies against
-                 it unchanged
+                 it unchanged, and shapes/ the provider shape its own tests recorded
+                 (task 7.2) — the other half of M5, which `janus check` reads
 spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
@@ -128,13 +129,21 @@ is a finding about the protocol first:
 ```bash
 janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus.yaml]
              [--variant <id>] [--explain-failures] [--json]
+janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
+            [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
+            [--as-of <YYYY-MM-DD>] [--json]
 janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
 janus upgrade <pact.json> [--out <file>] [--json] [--quiet]
 ```
 
 Exit codes are part of the surface: `0` the command did what it was asked, `1` the *subject* failed
 (a verification found mismatches — an answer, not an error), `2` the command could not run.
-`check` (design 2.8's subsumption) is Phase 7 and is deliberately absent rather than stubbed.
+`check` (plan task 7.4) decides rather than tests: it reads documents that already exist — the
+consumer contracts or v1–v4 pacts, the shapes a provider published, and the summaries
+`janus verify --json` wrote — and answers `can-i-deploy` over them, so it needs no provider
+running. Its policy (design 2.8 §7) resolves in layers: the specification's defaults, then
+`--policy`'s document, then `--on-finding`/`--on-review`. `block` is exit 1 — the subject failed,
+not the command. Both severities default to `warn` (ADR 0016).
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
 Rust commands above (`cargo build -p pact_janus_cli --bin janus-engine` targets it alone). Its

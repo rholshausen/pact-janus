@@ -12,9 +12,13 @@ use super::provider_shape_session::{
   Create as CreateRecording, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
 };
 use super::session::{ServeVariantError, SessionStore, VariantsError};
+use super::subsumption::{
+  self as subsumption_ops, Check as SubsumptionCheck, Decide as SubsumptionDecide, SubsumptionError,
+};
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
+use crate::subsumption::CheckError;
 use crate::upgrade;
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
@@ -211,6 +215,8 @@ impl Engine {
       "provider-shape-session/create" => self.handle_create_recording(id, body),
       "provider-shape-session/observe" => self.handle_observe(id, body),
       "provider-shape-session/finalise" => self.handle_finalise_recording(id, body),
+      "subsumption/check" => self.handle_subsumption_check(id, body),
+      "subsumption/decide" => self.handle_subsumption_decide(id, body),
       "upgrade/pact" => self.handle_upgrade(id, body),
       "events/poll" => self.handle_poll(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
@@ -593,6 +599,40 @@ impl Engine {
     )
   }
 
+  /// `subsumption/check` (spec §8.6): one consumer contract against one provider shape. Errors
+  /// are the document category's throughout — both inputs are documents a person authored or a
+  /// tool wrote, and neither the walk nor the pairing has any machinery of its own to fail.
+  fn handle_subsumption_check(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: SubsumptionCheck = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    match subsumption_ops::check(&req) {
+      Ok((report, format)) => {
+        let report = serde_json::to_value(&report).expect("a report always serializes");
+        ResponseFrame::ok(id, json!({ "report": report, "format": format }))
+      }
+      Err(err) => ResponseFrame::err(id, subsumption_error(err)),
+    }
+  }
+
+  /// `subsumption/decide` (spec §8.6): the reports, the verification results and the policy, as
+  /// one `can-i-deploy` answer — and the text a person reads, rendered here so that two hosts
+  /// printing the same decision print the same words (design 2.8 §6.4).
+  fn handle_subsumption_decide(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: SubsumptionDecide = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    match subsumption_ops::decide(&req) {
+      Ok((report, text)) => {
+        let report = serde_json::to_value(&report).expect("a report always serializes");
+        ResponseFrame::ok(id, json!({ "report": report, "text": text }))
+      }
+      Err(err) => ResponseFrame::err(id, subsumption_error(err)),
+    }
+  }
+
   fn handle_upgrade(&mut self, id: String, body: Value) -> ResponseFrame {
     let req: UpgradePact = match parse_body(body) {
       Ok(req) => req,
@@ -705,6 +745,23 @@ fn contract_error(err: crate::contract::ContractError) -> EngineError {
     ContractError::NotAContract => EngineError::not_a_contract(0, None),
     ContractError::VersionUnsupported { format } => EngineError::not_a_contract(0, Some(&format)),
     ContractError::Invalid { problems } => EngineError::contract_invalid(&problems),
+  }
+}
+
+/// [`SubsumptionError`] as the protocol's error taxonomy (spec §10.2), following design 2.8 §8's
+/// own table. Every arm is the `document` category: a subsumption check has no session, no
+/// component and no run, so the only thing that can be wrong is one of the documents it was
+/// handed — including the policy, which §8 puts under `contract-invalid` with positions.
+fn subsumption_error(err: SubsumptionError) -> EngineError {
+  match err {
+    SubsumptionError::Document { member, error } => EngineError::document_error(member, &error),
+    SubsumptionError::Check(CheckError::InteractionInvalid { problems }) => {
+      EngineError::interaction_invalid(&problems)
+    }
+    SubsumptionError::MismatchedProvider { contract, shape } => {
+      EngineError::documents_mismatched(&contract, &shape)
+    }
+    SubsumptionError::Invalid { problems } => EngineError::contract_invalid(&problems),
   }
 }
 

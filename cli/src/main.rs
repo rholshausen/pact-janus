@@ -7,11 +7,15 @@
 //! the protocol and it shows up here first. `janus-engine`, the sibling binary, carries the
 //! identical frames over stdio for embeddings that want a subprocess (ADR 0003).
 //!
-//! `check` — the subsumption command (design 2.8) — belongs to Phase 7 and is deliberately absent
-//! rather than stubbed: a command that accepted arguments and did nothing would be worse than one
-//! that is not there.
+//! `check` (plan task 7.4) is the one command whose subject is not a provider but a *decision*:
+//! it reads documents that already exist — contracts, provider shapes, the summaries `verify`
+//! wrote — and answers the RFC's `can-i-deploy` question over them. Same rule as the rest: the
+//! walk, the policy and the page all live behind `subsumption/check` and `subsumption/decide`
+//! (engine-protocol spec §8.6), because a broker or a GitHub Action asking the same question has
+//! to get the same answer.
 
 mod args;
+mod check;
 mod engine;
 mod explain;
 mod io;
@@ -25,6 +29,7 @@ const USAGE: &str = "\
 usage: janus <command> [options]
 
   verify    replay a contract or a v1-v4 pact at a running provider
+  check     decide whether a consumer can deploy against a provider
   explain   print the plan the engine will execute for one interaction
   upgrade   convert a v1-v4 pact into a Janus contract
   version   print the engine and protocol versions
@@ -51,6 +56,7 @@ fn main() -> ExitCode {
 
   let (spec, usage): (&Spec, &str) = match command {
     "verify" => (&verify::SPEC, verify::USAGE),
+    "check" => (&check::SPEC, check::USAGE),
     "explain" => (&explain::SPEC, explain::USAGE),
     "upgrade" => (&upgrade::SPEC, upgrade::USAGE),
     "version" | "--version" => {
@@ -85,6 +91,7 @@ fn main() -> ExitCode {
 
   match command {
     "verify" => verify::run(&args),
+    "check" => check::run(&args),
     "explain" => explain::run(&args),
     "upgrade" => upgrade::run(&args),
     _ => unreachable!("the match above covers every command"),

@@ -4,11 +4,40 @@
  */
 
 /**
+ * Known values of `CheckResult.format` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const CheckResultFormat = {
+  JanusContract1: "janus-contract/1",
+  Pact200: "pact/2.0.0",
+  Pact300: "pact/3.0.0",
+  Pact40: "pact/4.0",
+} as const;
+
+/**
+ * Known values of `CompatibilityReport.$format` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const CompatibilityReportFormat = {
+  JanusCompatibilityReport1: "janus-compatibility-report/1",
+} as const;
+
+/**
  * Known values of `ContractSource.kind` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
 export const ContractSourceKind = {
   Inline: "inline",
+} as const;
+
+/**
+ * Known values of `Decision` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const Decision = {
+  Pass: "pass",
+  Warn: "warn",
+  Block: "block",
 } as const;
 
 /**
@@ -69,12 +98,31 @@ export const EventKind = {
 } as const;
 
 /**
+ * Known values of `ExemptionResult.status` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ExemptionResultStatus = {
+  Applied: "applied",
+  Unused: "unused",
+  Lapsed: "lapsed",
+} as const;
+
+/**
  * Known values of `ExplainSubject.kind` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
 export const ExplainSubjectKind = {
   Spec: "spec",
   ContractInteraction: "contract-interaction",
+} as const;
+
+/**
+ * Known values of `FindingEntry.disposition` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const FindingEntryDisposition = {
+  Live: "live",
+  Exempt: "exempt",
 } as const;
 
 /**
@@ -106,6 +154,46 @@ export const ObservedSlotValueEncoded = {
 } as const;
 
 /**
+ * Known values of `PolicyAction` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const PolicyAction = {
+  Warn: "warn",
+  Block: "block",
+} as const;
+
+/**
+ * Known values of `Reason.action` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ReasonAction = {
+  Note: "note",
+  Warn: "warn",
+  Block: "block",
+} as const;
+
+/**
+ * Known values of `Reason.code` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ReasonCode = {
+  VerificationFailed: "verification-failed",
+  VerificationIncomplete: "verification-incomplete",
+  VerificationMissing: "verification-missing",
+  VerificationFiltered: "verification-filtered",
+  ProviderShapeMissing: "provider-shape-missing",
+  InteractionsNotPublished: "interactions-not-published",
+  SubsumptionFindings: "subsumption-findings",
+  SubsumptionReviews: "subsumption-reviews",
+  SubsumptionExempt: "subsumption-exempt",
+  SubsumptionAdvisories: "subsumption-advisories",
+  ExemptionLapsed: "exemption-lapsed",
+  ExemptionNoExpiry: "exemption-no-expiry",
+  ExemptionUnused: "exemption-unused",
+  ExpiryNotEvaluated: "expiry-not-evaluated",
+} as const;
+
+/**
  * Known values of `RequestFrame.op` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -130,6 +218,17 @@ export const RequestFrameOp = {
  */
 export const StartTransportTransport = {
   Http: "http",
+} as const;
+
+/**
+ * Known values of `SubsumptionView.verdict` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const SubsumptionViewVerdict = {
+  Yes: "yes",
+  No: "no",
+  Unknown: "unknown",
+  NotChecked: "not-checked",
 } as const;
 
 /**
@@ -175,4 +274,15 @@ export const VariantResultStatus = {
   Verified: "verified",
   Failed: "failed",
   NotExercised: "not-exercised",
+} as const;
+
+/**
+ * Known values of `VerificationView.status` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const VerificationViewStatus = {
+  Verified: "verified",
+  Failed: "failed",
+  Incomplete: "incomplete",
+  Unknown: "unknown",
 } as const;

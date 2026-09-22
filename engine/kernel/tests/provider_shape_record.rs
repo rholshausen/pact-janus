@@ -445,6 +445,26 @@ fn the_recorded_shape_finds_the_undeclared_variance_in_the_consumers_contract() 
   );
 }
 
+/// The document `samples/order-service/shapes/` holds is *this* recording, not a hand-written
+/// approximation of it — checked in because `janus check` needs a file to read (plan task 7.4)
+/// and a reader needs something to look at, asserted here because a checked-in artifact nobody
+/// regenerates is a corpus entry that has quietly stopped being true (CLAUDE.md: corpora are
+/// load-bearing). Regenerate it from this recording if the recorder's judgements change.
+#[test]
+fn the_checked_in_sample_shape_is_what_the_recorder_produces() {
+  let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .join("../../samples/order-service/shapes/order-service.provider-shape.json");
+  let checked_in =
+    read_provider_shape(&std::fs::read(&path).unwrap_or_else(|err| panic!("reading {path:?}: {err}")))
+      .expect("the checked-in document is a provider shape");
+
+  assert_eq!(
+    checked_in,
+    record_the_sample_provider(),
+    "the checked-in provider shape and the recording have diverged; regenerate the file"
+  );
+}
+
 /// The consumer side of the sample provider's own pact, as a Janus contract: what the consumer
 /// declared, not what the provider can do.
 fn consumer_contract() -> pact_janus_kernel::contract::Contract {

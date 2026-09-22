@@ -14,6 +14,27 @@ import java.util.List;
 public final class Vocabulary {
   private Vocabulary() {}
 
+  /** Known values of {@code CheckResult.format}. */
+  public static final class CheckResultFormat {
+    private CheckResultFormat() {}
+
+    public static final String JANUS_CONTRACT_1 = "janus-contract/1";
+    public static final String PACT_2_0_0 = "pact/2.0.0";
+    public static final String PACT_3_0_0 = "pact/3.0.0";
+    public static final String PACT_4_0 = "pact/4.0";
+
+    public static final List<String> KNOWN = List.of(JANUS_CONTRACT_1, PACT_2_0_0, PACT_3_0_0, PACT_4_0);
+  }
+
+  /** Known values of {@code CompatibilityReport.$format}. */
+  public static final class CompatibilityReportFormat {
+    private CompatibilityReportFormat() {}
+
+    public static final String JANUS_COMPATIBILITY_REPORT_1 = "janus-compatibility-report/1";
+
+    public static final List<String> KNOWN = List.of(JANUS_COMPATIBILITY_REPORT_1);
+  }
+
   /** Known values of {@code ContractSource.kind}. */
   public static final class ContractSourceKind {
     private ContractSourceKind() {}
@@ -21,6 +42,17 @@ public final class Vocabulary {
     public static final String INLINE = "inline";
 
     public static final List<String> KNOWN = List.of(INLINE);
+  }
+
+  /** Known values of {@code Decision}. */
+  public static final class Decision {
+    private Decision() {}
+
+    public static final String PASS = "pass";
+    public static final String WARN = "warn";
+    public static final String BLOCK = "block";
+
+    public static final List<String> KNOWN = List.of(PASS, WARN, BLOCK);
   }
 
   /** Known values of {@code EncodingName}. */
@@ -84,6 +116,17 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(VERIFICATION_STARTED, VERIFICATION_INTERACTION_STARTED, VERIFICATION_INTERACTION_RESULT, VERIFICATION_HOOK, VERIFICATION_EXECUTED_PLAN, VERIFICATION_FINISHED);
   }
 
+  /** Known values of {@code ExemptionResult.status}. */
+  public static final class ExemptionResultStatus {
+    private ExemptionResultStatus() {}
+
+    public static final String APPLIED = "applied";
+    public static final String UNUSED = "unused";
+    public static final String LAPSED = "lapsed";
+
+    public static final List<String> KNOWN = List.of(APPLIED, UNUSED, LAPSED);
+  }
+
   /** Known values of {@code ExplainSubject.kind}. */
   public static final class ExplainSubjectKind {
     private ExplainSubjectKind() {}
@@ -92,6 +135,16 @@ public final class Vocabulary {
     public static final String CONTRACT_INTERACTION = "contract-interaction";
 
     public static final List<String> KNOWN = List.of(SPEC, CONTRACT_INTERACTION);
+  }
+
+  /** Known values of {@code FindingEntry.disposition}. */
+  public static final class FindingEntryDisposition {
+    private FindingEntryDisposition() {}
+
+    public static final String LIVE = "live";
+    public static final String EXEMPT = "exempt";
+
+    public static final List<String> KNOWN = List.of(LIVE, EXEMPT);
   }
 
   /** Known values of {@code Frame.type}. */
@@ -125,6 +178,49 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(BASE64);
   }
 
+  /** Known values of {@code PolicyAction}. */
+  public static final class PolicyAction {
+    private PolicyAction() {}
+
+    public static final String WARN = "warn";
+    public static final String BLOCK = "block";
+
+    public static final List<String> KNOWN = List.of(WARN, BLOCK);
+  }
+
+  /** Known values of {@code Reason.action}. */
+  public static final class ReasonAction {
+    private ReasonAction() {}
+
+    public static final String NOTE = "note";
+    public static final String WARN = "warn";
+    public static final String BLOCK = "block";
+
+    public static final List<String> KNOWN = List.of(NOTE, WARN, BLOCK);
+  }
+
+  /** Known values of {@code Reason.code}. */
+  public static final class ReasonCode {
+    private ReasonCode() {}
+
+    public static final String VERIFICATION_FAILED = "verification-failed";
+    public static final String VERIFICATION_INCOMPLETE = "verification-incomplete";
+    public static final String VERIFICATION_MISSING = "verification-missing";
+    public static final String VERIFICATION_FILTERED = "verification-filtered";
+    public static final String PROVIDER_SHAPE_MISSING = "provider-shape-missing";
+    public static final String INTERACTIONS_NOT_PUBLISHED = "interactions-not-published";
+    public static final String SUBSUMPTION_FINDINGS = "subsumption-findings";
+    public static final String SUBSUMPTION_REVIEWS = "subsumption-reviews";
+    public static final String SUBSUMPTION_EXEMPT = "subsumption-exempt";
+    public static final String SUBSUMPTION_ADVISORIES = "subsumption-advisories";
+    public static final String EXEMPTION_LAPSED = "exemption-lapsed";
+    public static final String EXEMPTION_NO_EXPIRY = "exemption-no-expiry";
+    public static final String EXEMPTION_UNUSED = "exemption-unused";
+    public static final String EXPIRY_NOT_EVALUATED = "expiry-not-evaluated";
+
+    public static final List<String> KNOWN = List.of(VERIFICATION_FAILED, VERIFICATION_INCOMPLETE, VERIFICATION_MISSING, VERIFICATION_FILTERED, PROVIDER_SHAPE_MISSING, INTERACTIONS_NOT_PUBLISHED, SUBSUMPTION_FINDINGS, SUBSUMPTION_REVIEWS, SUBSUMPTION_EXEMPT, SUBSUMPTION_ADVISORIES, EXEMPTION_LAPSED, EXEMPTION_NO_EXPIRY, EXEMPTION_UNUSED, EXPIRY_NOT_EVALUATED);
+  }
+
   /** Known values of {@code RequestFrame.op}. */
   public static final class RequestFrameOp {
     private RequestFrameOp() {}
@@ -152,6 +248,18 @@ public final class Vocabulary {
     public static final String HTTP = "http";
 
     public static final List<String> KNOWN = List.of(HTTP);
+  }
+
+  /** Known values of {@code SubsumptionView.verdict}. */
+  public static final class SubsumptionViewVerdict {
+    private SubsumptionViewVerdict() {}
+
+    public static final String YES = "yes";
+    public static final String NO = "no";
+    public static final String UNKNOWN = "unknown";
+    public static final String NOT_CHECKED = "not-checked";
+
+    public static final List<String> KNOWN = List.of(YES, NO, UNKNOWN, NOT_CHECKED);
   }
 
   /** Known values of {@code TransportBinding.transport}. */
@@ -201,5 +309,17 @@ public final class Vocabulary {
     public static final String NOT_EXERCISED = "not-exercised";
 
     public static final List<String> KNOWN = List.of(VERIFIED, FAILED, NOT_EXERCISED);
+  }
+
+  /** Known values of {@code VerificationView.status}. */
+  public static final class VerificationViewStatus {
+    private VerificationViewStatus() {}
+
+    public static final String VERIFIED = "verified";
+    public static final String FAILED = "failed";
+    public static final String INCOMPLETE = "incomplete";
+    public static final String UNKNOWN = "unknown";
+
+    public static final List<String> KNOWN = List.of(VERIFIED, FAILED, INCOMPLETE, UNKNOWN);
   }
 }

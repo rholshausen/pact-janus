@@ -1360,6 +1360,7 @@ dependencies = [
  "pact_janus_kernel",
  "pact_janus_sample_order_service",
  "serde_json",
+ "serde_yaml_ng",
  "tracing",
  "tracing-subscriber",
 ]

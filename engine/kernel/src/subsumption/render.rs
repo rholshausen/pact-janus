@@ -8,17 +8,15 @@
 //! rather than printing it verbatim. That is also what lets this run over a report read back from
 //! disk, which is what task 7.4 does when it combines this block with verification results.
 //!
-//! Two things here are this checker's choice rather than the spec's, and are marked as such below:
-//! the header line for a report with no `finding`-severity result (§6.4 leaves the `review`-only
-//! marker to task 7.4), and the line that names an interaction the provider published nothing for
-//! (§6.3 fixes the report state, not its rendering).
+//! Three pieces are exported to [`crate::compatibility`] rather than kept private, because task
+//! 7.4's `can-i-deploy` page is the same block under a decision: it needs the header line, the
+//! per-finding body, and the not-published line, composed differently — around exemptions, which
+//! the checker knows nothing about. Composing is all it does; the words are this module's.
 
-use super::report::{NOT_PUBLISHED, Severity, SubsumptionReport};
+use super::report::{Finding, NOT_PUBLISHED, Severity, SubsumptionReport};
 
 /// Render a report as the text a person reads.
 pub fn render(report: &SubsumptionReport) -> String {
-  let consumer = &report.consumer.name;
-  let provider = &report.provider.name;
   let has_findings = report.interactions.iter().any(|interaction| {
     interaction
       .findings
@@ -33,72 +31,102 @@ pub fn render(report: &SubsumptionReport) -> String {
   });
   let any_matched = report.interactions.iter().any(|interaction| interaction.matched);
 
-  let mut lines = Vec::new();
-  lines.push(if has_findings {
+  let mut lines = vec![header(
+    &report.consumer.name,
+    &report.provider.name,
+    has_findings,
+    has_reviews,
+    any_matched,
+  )];
+  for interaction in &report.interactions {
+    if interaction.verdict == NOT_PUBLISHED {
+      lines.push(not_published_line(&interaction.description));
+      continue;
+    }
+    for finding in &interaction.findings {
+      lines.extend(finding_lines(&interaction.description, finding, None));
+    }
+  }
+  lines.join("\n")
+}
+
+/// The header line (§6.4): the verdict, the two parties, and nothing else.
+///
+/// Two of its four forms are this checker's choice rather than the specification's, and are the
+/// ones §6.4 left to task 7.4: the `?` for a report with no decided finding but something to
+/// review, and the line for a pair where the provider published nothing at all (§6.3 fixes that
+/// report state, not its rendering). `?` is the per-finding marker the spec *does* fix, so a
+/// header and the lines under it cannot contradict each other.
+pub(crate) fn header(
+  consumer: &str,
+  provider: &str,
+  has_findings: bool,
+  has_reviews: bool,
+  any_matched: bool,
+) -> String {
+  if has_findings {
     format!("✗ {consumer} is not compatible with {provider}")
   } else if has_reviews {
-    // §6.4 leaves the `review`-only marker to task 7.4; `?` matches the per-finding marker the
-    // spec does fix, so the two do not contradict each other when 7.4 settles it.
     format!("? {consumer} needs review against {provider}")
   } else if any_matched {
     format!("✓ {consumer} is compatible with {provider}")
   } else {
     format!("? {consumer} was not checked against {provider}: no shapes published")
-  });
+  }
+}
 
-  for interaction in &report.interactions {
-    if interaction.verdict == NOT_PUBLISHED {
+pub(crate) fn not_published_line(description: &str) -> String {
+  format!("  interaction '{description}': the provider has published no shape for it")
+}
+
+/// One finding, as the two-or-one-line block §6.4 fixes: its header line, then a line per side.
+///
+/// `marker` overrides the severity marker — what plan task 7.4's page needs for a finding an
+/// exemption has silenced, which is neither a live finding nor a different severity. Everything
+/// else here is the specification's own grammar, read off the `summary` pair (§6.5), which is what
+/// lets this run over a report read back from a file.
+pub(crate) fn finding_lines(description: &str, finding: &Finding, marker: Option<&str>) -> Vec<String> {
+  let marker = marker.unwrap_or(match finding.severity {
+    Severity::Finding => "",
+    Severity::Review => "? ",
+    Severity::Advisory => "! ",
+  });
+  let mut lines = vec![format!(
+    "  {marker}interaction '{description}', {}:",
+    locate(&finding.path)
+  )];
+  let provider_summary = finding
+    .provider
+    .as_ref()
+    .map(|side| side.summary.as_str())
+    .unwrap_or_default();
+  let consumer_summary = finding
+    .consumer
+    .as_ref()
+    .map(|side| side.summary.as_str())
+    .unwrap_or_default();
+  match finding.kind.as_str() {
+    "unreviewable" => lines.push(format!(
+      "    {} — review manually",
+      uncomparable(provider_summary, consumer_summary)
+    )),
+    kind => {
       lines.push(format!(
-        "  interaction '{}': the provider has published no shape for it",
-        interaction.description
+        "    provider may produce{}",
+        side_phrase(kind, provider_summary)
       ));
-      continue;
-    }
-    for finding in &interaction.findings {
-      let marker = match finding.severity {
-        Severity::Finding => "",
-        Severity::Review => "? ",
-        Severity::Advisory => "! ",
-      };
       lines.push(format!(
-        "  {marker}interaction '{}', {}:",
-        interaction.description,
-        locate(&finding.path)
+        "    consumer has only tested{}",
+        side_phrase(kind, consumer_summary)
       ));
-      let provider_summary = finding
-        .provider
-        .as_ref()
-        .map(|side| side.summary.as_str())
-        .unwrap_or_default();
-      let consumer_summary = finding
-        .consumer
-        .as_ref()
-        .map(|side| side.summary.as_str())
-        .unwrap_or_default();
-      match finding.kind.as_str() {
-        "unreviewable" => lines.push(format!(
-          "    {} — review manually",
-          uncomparable(provider_summary, consumer_summary)
-        )),
-        kind => {
-          lines.push(format!(
-            "    provider may produce{}",
-            side_phrase(kind, provider_summary)
-          ));
-          lines.push(format!(
-            "    consumer has only tested{}",
-            side_phrase(kind, consumer_summary)
-          ));
-        }
-      }
-      for exclusion in &finding.excluded_by {
-        if let Some(reason) = exclusion.get("reason").and_then(|reason| reason.as_str()) {
-          lines.push(format!("    not exercised together: {reason}"));
-        }
-      }
     }
   }
-  lines.join("\n")
+  for exclusion in &finding.excluded_by {
+    if let Some(reason) = exclusion.get("reason").and_then(|reason| reason.as_str()) {
+      lines.push(format!("    not exercised together: {reason}"));
+    }
+  }
+  lines
 }
 
 /// `response.body.payment@card.last4` -> `response body $.payment.last4 (card)`: the same address

@@ -184,3 +184,74 @@ the shapes my tests produced*. Had this provider's own tests never set up a canc
 recorded shape would not mention `CANCELLED`, and the check against that consumer would have passed.
 That gap is the provider's test coverage, not the recorder's bug — and it is the reason design 2.8
 §2.3 ranks the four provenances at all.
+
+## Checking it — M5 in one command
+
+The recording above is checked in at
+[`shapes/order-service.provider-shape.json`](shapes/order-service.provider-shape.json), so the loop
+closes over documents alone, with nothing running (plan task 7.4):
+
+```sh
+janus check pacts/web-app-order-service.json --provider-shape shapes/
+```
+
+```text
+✗ web-app is not compatible with order-service
+  interaction 'a request for an order', response body $.items:
+    provider may produce an empty list, or up to 3 items
+    consumer has only tested at least one item
+  interaction 'a request for an order', response body $.shippedAt:
+    provider may produce exactly '2026-07-30T09:00:00Z', or absent
+    consumer has only tested strings matching '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', always present
+  ? interaction 'a request for an order', response body $.shippedAt:
+    provider exactly '2026-07-30T09:00:00Z' cannot be compared against consumer strings matching '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' — review manually
+  interaction 'a request for an order', response body $.status:
+    provider may produce: 'CANCELLED' | 'PENDING' | 'SHIPPED'
+    consumer has only tested exactly 'SHIPPED'
+  verification: no result supplied
+  ! no verification result was supplied for this pair; a contract nobody replayed is not a passing one
+  - 1 of 2 interaction(s) have no published provider shape and were not checked
+  ! 3 decided finding(s): the provider may produce responses this consumer has not tested
+  ! 1 comparison(s) the checker cannot decide either way; a person has to look
+  => WARN: web-app -> order-service
+
+WARN: 0 pair(s) blocked, 1 warned, 0 passed — policy on-finding warn, on-review warn, exemptions as of 2026-09-22
+```
+
+`$.status` is the RFC's own scenario, reached from a pact nobody migrated: the provider can produce
+`CANCELLED` and this consumer has never seen it. It **warns** rather than blocks, because both
+severities default to `warn` (ADR 0016) — a check nobody can adopt catches nothing.
+
+The whole loop, as CI would run it:
+
+```sh
+janus verify pacts/web-app-order-service.json --provider-url $URL --config verifier.janus.yaml \
+             --json > verified.json
+janus check  pacts/web-app-order-service.json --provider-shape shapes/ \
+             --verification verified.json --on-finding block
+```
+
+Now the page carries both halves — `verification: verified (2 of 2 variant(s))` beside the findings
+— and the exit code is 1: the verification passed and the deploy is still a no, which is the entire
+point of a second source of truth. `cli/tests/cli.rs` runs exactly that sequence.
+
+Four things in that output are the sample teaching what the loop costs:
+
+- **The pact works, and it is noisier than a contract.** `janus check` reads the v3 pact directly
+  (converted with design 2.5's rules), so a provider can publish a shape and get an answer about
+  consumers who have not migrated. But a conversion freezes each example as `equality`, so `$.status`
+  reads "consumer has only tested exactly 'SHIPPED'" where a Janus contract declaring
+  `anyOf('PENDING', 'SHIPPED')` would print the RFC's own second line. Three of the four results are
+  true; the fourth — the `review` at `$.shippedAt`, the recorder's single observed timestamp against
+  the pact's regex — is a comparison the shape language declines to decide and could.
+  [Phase-9 finding 9](../../Documentation/phase-9-findings.md#9-a-converted-pacts-frozen-examples-are-the-consumer-side-of-73s-noise-question)
+  measures both.
+- **`$.items` says "up to 3 items"** because that is what six recorded responses saw. A recorded
+  shape claims what the provider's tests produced, never what it can do — the honesty §2.3 of design
+  2.8 ranks the provenances for.
+- **The second interaction is not checked, and says so.** The provider recorded nothing for "a
+  request for an order that does not exist", and a report full of silent passes is what design 2.8
+  §6.3 exists to prevent.
+- **The `channel` member never appears.** The provider records it, no consumer asked for it, and an
+  extra provider member is must-ignore (shape spec §4.3). A checker that reported it would teach a
+  team to ignore the report.

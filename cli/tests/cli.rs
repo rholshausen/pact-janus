@@ -1,5 +1,6 @@
 //! Plan task 5.5: the `janus` CLI, run as a binary — `verify`, `explain` and `upgrade` against a
-//! real provider on a real socket.
+//! real provider on a real socket — and plan task 7.4's `check`, which is the one command whose
+//! subject is a *decision* over documents rather than a running provider.
 //!
 //! These drive the *shipped executable*, not a library function, because the surface under test is
 //! the command: its flags, its output and its exit code. A CI script depends on all three, and a
@@ -478,6 +479,234 @@ fn a_pact_and_the_contract_it_upgrades_into_verify_the_same_provider() {
 // The command surface itself
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// check (plan task 7.4)
+// ---------------------------------------------------------------------------------------------
+
+/// The provider shape the sample provider's own tests recorded (plan task 7.2), checked in beside
+/// its pacts and asserted against the recorder in `engine/kernel/tests/provider_shape_record.rs`.
+fn order_shapes() -> String {
+  repo("samples/order-service/shapes")
+}
+
+/// The consumer side of M5 as the RFC writes it: a contract that declares two statuses, so the
+/// provider's third shows up as the RFC's own two-line finding. The pact beside the provider
+/// froze one example as `equality` instead, which is a true finding about a narrower claim but
+/// not the sketch.
+fn order_consumer_contract() -> String {
+  let path = temp("web-app.janus.json");
+  let document = json!({ "$format": "janus-contract/1",
+    "consumer": { "name": "web-app" },
+    "provider": { "name": "order-service" },
+    "interactions": [
+      { "description": "a request for an order",
+        "states": [ { "name": "an order exists" } ],
+        "parts": { "response": { "body": {
+          "shape": "object",
+          "members": {
+            "id": { "shape": "string", "example": "66" },
+            "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" },
+            "items": { "shape": "each-like", "min": 0,
+                       "items": { "shape": "object", "members": {
+                         "sku": { "shape": "string", "example": "sku-0" },
+                         "quantity": { "shape": "integer", "example": 1 } } } } } } } },
+        "selection": { "variants": [], "report": {} } } ] });
+  std::fs::write(&path, document.to_string()).expect("writing the contract");
+  path
+}
+
+fn policy_file(name: &str, body: &str) -> String {
+  let path = temp(name);
+  std::fs::write(&path, body).expect("writing the policy");
+  path
+}
+
+/// M5, end to end and in one command: the shape the provider recorded, the contract the consumer
+/// declared, and the RFC's report — reported exactly as the RFC sketches it.
+#[test]
+fn check_reports_the_undeclared_variance_the_way_the_rfc_sketches_it() {
+  let output = janus(&[
+    "check",
+    &order_consumer_contract(),
+    "--provider-shape",
+    &order_shapes(),
+  ]);
+  let text = stdout(&output);
+  for line in [
+    "✗ web-app is not compatible with order-service",
+    "  interaction 'a request for an order', response body $.status:",
+    "    provider may produce: 'CANCELLED' | 'PENDING' | 'SHIPPED'",
+    "    consumer has only tested: 'PENDING' | 'SHIPPED'",
+  ] {
+    assert!(text.contains(line), "missing {line:?} in:\n{text}");
+  }
+  assert_eq!(code(&output), 0, "a finding warns by default (ADR 0016): {text}");
+  assert!(
+    text.contains("no verification result was supplied"),
+    "and a pair nobody replayed is not a passing one: {text}"
+  );
+}
+
+/// The whole loop as CI would run it: verify, keep the summary, then decide with it. The policy
+/// blocks on findings, so the answer is no — and the exit code says so without the command having
+/// failed.
+#[test]
+fn check_combines_a_verification_result_with_the_findings_and_exits_one_when_blocked() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let verification = temp("verification.json");
+  let verified = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--json",
+  ]);
+  assert_eq!(code(&verified), 0, "{}", stderr(&verified));
+  std::fs::write(&verification, stdout(&verified)).expect("writing the summary");
+
+  let policy = policy_file("policy-block.yaml", "on-finding: block\non-review: warn\n");
+  let output = janus(&[
+    "check",
+    &order_consumer_contract(),
+    "--provider-shape",
+    &order_shapes(),
+    "--verification",
+    &verification,
+    "--policy",
+    &policy,
+    "--as-of",
+    "2026-09-22",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 1, "{text}\n{}", stderr(&output));
+  assert!(
+    text.contains("verification: verified (2 of 2 variant(s))"),
+    "the verification half of the answer is on the page: {text}"
+  );
+  assert!(text.contains("=> BLOCK: web-app -> order-service"), "{text}");
+  assert!(
+    text.contains("BLOCK: 1 pair(s) blocked"),
+    "and the run's own verdict: {text}"
+  );
+}
+
+/// An exemption with a reason turns the same documents into a deploy — and says what it silenced
+/// and until when, which is the record design 2.8 §7.2 requires.
+#[test]
+fn an_exemption_lets_the_same_documents_deploy_and_says_what_it_silenced() {
+  let policy = policy_file(
+    "policy-exempt.yaml",
+    "on-finding: block\nexemptions:\n  - path: response.body.status\n    reason: \"CANCELLED ships next sprint; ORD-451\"\n    expires: \"2026-12-01\"\n",
+  );
+  let args = [
+    "check".to_string(),
+    order_consumer_contract(),
+    "--provider-shape".to_string(),
+    order_shapes(),
+    "--policy".to_string(),
+    policy,
+    "--as-of".to_string(),
+    "2026-09-22".to_string(),
+  ];
+  let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
+  let output = janus(&borrowed);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "{text}");
+  assert!(
+    text.contains("~ interaction 'a request for an order', response body $.status:"),
+    "the exempted finding is still printed, marked: {text}"
+  );
+  assert!(
+    text.contains("exempted until 2026-12-01: CANCELLED ships next sprint; ORD-451"),
+    "{text}"
+  );
+
+  // The same policy, a year later: the exemption has lapsed and the finding is decided again.
+  let mut lapsed = borrowed.clone();
+  let index = lapsed.len() - 1;
+  lapsed[index] = "2027-09-22";
+  let output = janus(&lapsed);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 1, "{text}");
+  assert!(text.contains("lapsed exemption (2026-12-01)"), "{text}");
+}
+
+#[test]
+fn check_json_prints_the_compatibility_report_a_script_can_read() {
+  let output = janus(&[
+    "check",
+    &order_consumer_contract(),
+    "--provider-shape",
+    &order_shapes(),
+    "--json",
+  ]);
+  assert_eq!(code(&output), 0);
+  let report: Value = serde_json::from_str(&stdout(&output)).expect("one JSON document");
+  assert_eq!(report["$format"], json!("janus-compatibility-report/1"));
+  assert_eq!(report["decision"], json!("warn"));
+  assert_eq!(report["summary"]["pairs"], json!(1));
+  assert_eq!(report["pairs"][0]["subsumption"]["verdict"], json!("no"));
+  assert_eq!(report["pairs"][0]["format"], json!("janus-contract/1"));
+}
+
+/// A provider that published nothing gets today's semantics — and the command says so on stderr,
+/// because "no shape was supplied for this provider" is the CLI's own half of the answer: the
+/// engine was never handed a file to miss.
+#[test]
+fn check_without_a_provider_shape_says_which_provider_published_nothing() {
+  let verification = temp("verification-noshape.json");
+  let provider = provider();
+  let config = state_config(&provider);
+  let verified = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--json",
+  ]);
+  std::fs::write(&verification, stdout(&verified)).expect("writing the summary");
+
+  let output = janus(&[
+    "check",
+    &order_pact(),
+    "--verification",
+    &verification,
+    "--on-finding",
+    "block",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "replay-only semantics is a pass: {text}");
+  assert!(text.contains("no shapes published"), "{text}");
+  assert!(
+    stderr(&output).contains("no provider shape supplied for 'order-service'"),
+    "{}",
+    stderr(&output)
+  );
+}
+
+#[test]
+fn check_refuses_a_policy_value_that_is_not_warn_or_block() {
+  let output = janus(&[
+    "check",
+    &order_consumer_contract(),
+    "--provider-shape",
+    &order_shapes(),
+    "--on-finding",
+    "maybe",
+  ]);
+  assert_eq!(code(&output), 2);
+  assert!(
+    stderr(&output).contains("--on-finding takes 'warn' or 'block'"),
+    "{}",
+    stderr(&output)
+  );
+}
+
 #[test]
 fn an_unknown_command_or_option_is_a_command_failure_with_the_usage() {
   let unknown = janus(&["frobnicate"]);
@@ -492,7 +721,7 @@ fn an_unknown_command_or_option_is_a_command_failure_with_the_usage() {
 
 #[test]
 fn every_command_explains_itself() {
-  for command in ["verify", "explain", "upgrade"] {
+  for command in ["verify", "check", "explain", "upgrade"] {
     let output = janus(&[command, "--help"]);
     assert_eq!(code(&output), 0);
     assert!(

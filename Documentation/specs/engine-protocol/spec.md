@@ -416,6 +416,7 @@ Capabilities defined in v1:
 | `push-events` | both | On the stdio pipe: sender may deliver events as EventFrames instead of waiting to be polled (§9). Effective only when both sides declare it. |
 | `encoding` | both | Frame encoding negotiation (§3.4). Host: `{ "accepts": [name, …] }` in preference order. Engine: `{ "selected": name }`. Absent on either side means `json`. |
 | `provider-shape-recording` | engine | The `provider-shape-session/*` operations (§8.5) are available. Value `{}` — presence is the whole signal. |
+| `subsumption-check` | engine | The `subsumption/*` operations (§8.6) are available. Value `{}` — presence is the whole signal. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -495,7 +496,8 @@ binding, not in the protocol envelope.
 ## 8. Operation set
 
 Operation names are namespaced `<area>/<verb>`, kebab-case. v1 defines the areas `engine`
-(§5–6), `consumer-session`, `verification`, `upgrade` and `events` (§9). The vocabulary is
+(§5–6), `consumer-session`, `verification`, `provider-shape-session`, `subsumption`, `upgrade`
+and `events` (§9). The vocabulary is
 open: new operations may be added within a protocol version, gated by capability when a host
 must know in advance (§5.3); unknown operations are answered with `operation-unsupported`.
 
@@ -632,6 +634,103 @@ withhold a contract (contract spec §2.2) has no counterpart here, and importing
 category error: a contract claims a test passed, while a provider shape claims only that these
 responses were produced.
 
+### 8.6 Subsumption and the compatibility decision — `subsumption/*`
+
+Schema: [`schemas/v1/subsumption.schema.json`](schemas/v1/subsumption.schema.json). Behind the
+`subsumption-check` capability (§5.3); an engine that does not declare it answers these
+operations with `operation-unsupported`.
+
+| Operation | Body → Result |
+|---|---|
+| `subsumption/check` | `{ contract, provider-shape }` → `{ report, format }` |
+| `subsumption/decide` | `{ pairs, verification?, policy?, as-of? }` → `{ report, text }` |
+
+Session-less, like `upgrade/*`: pure document-in, document-out.
+
+- **`check`** walks one consumer contract against one provider shape and returns the
+  subsumption report [design 2.8](../subsumption-check/spec.md) §6 defines. `contract` may be a
+  Janus contract or a v1–v4 pact, identified rather than declared (ADR 0011) and converted with
+  design 2.5's rules when it is the latter — the pact a consumer published years ago is the
+  document a provider actually has, and a check only reachable by teams who had already migrated
+  would be the wrong way round. `format` says which it was. A contract and a shape naming
+  different providers is `document-mismatched` (§10.2), not an empty report.
+- **`decide`** answers the RFC's `can-i-deploy` question over documents that already exist: the
+  reports `check` produced, the verification summaries a run reported (§9.6), and the policy
+  layers design 2.8 §7.1 resolves. The host names the `pairs`; the engine never infers one from a
+  verification result it was handed, so a question nobody asked is not answered and a pair asked
+  about with nothing attached is answered honestly rather than dropped.
+
+Two operations rather than one, because the second is the question asked at deploy time, over
+inputs that came from different places and different days: `check`'s report is the artifact a
+broker would store (task 7.5), and folding the decision into the walk would make it impossible to
+ask without re-walking every tree — which is exactly the coupling design 2.8 §4.3 stores
+`severity` to avoid.
+
+**Policy arrives as a list, not a merged document.** Scalars override, `exemptions` accumulate
+([ADR 0016](../../decisions/0016-subsumption-defaults-to-warn-with-mandatory-reason-exemptions.md));
+a host that merged the layers itself would be reimplementing that rule, and two hosts would
+eventually disagree about a team's accepted exemptions.
+
+**The engine has no clock.** `as-of` (RFC 3339 full-date) is the date exemption expiry is judged
+against, supplied by the host. Omitting it evaluates no expiry and reports every applied
+exemption's date as unevaluated — the honest answer to "expired relative to when?" when nobody
+said. This is also what keeps the operation's answer identical on every pipe, `wasm32-wasip2`
+included.
+
+#### The compatibility report
+
+`decide`'s `report` is a `janus-compatibility-report/1` document — **task 7.4's own**, not design
+2.8's: that specification's §1 lists combining its report with verification results as out of its
+scope, and its §6.4 fixes the finding block "not the page it appears on". One pair's answer is a
+`decision` (`pass`, `warn`, `block`) plus the `reasons` that produced it, one entry per fact. The
+run's decision is the most severe of its pairs'.
+
+| Reason code | Action | Raised when |
+|---|---|---|
+| `verification-failed` | `block` | a supplied summary's `failures` name this pair |
+| `verification-incomplete` | `block` | a covering run was aborted by a hook, so what it did not reach is unknown |
+| `verification-missing` | `warn` | no supplied summary covers this pair |
+| `verification-filtered` | `warn` | a covering run was filtered: unreplayed variants are not passing ones |
+| `provider-shape-missing` | `note` | no report was attached — replay-only semantics, the RFC's per-provider adoption path |
+| `interactions-not-published` | `note` | the provider published a shape, but not for every interaction (design 2.8 §6.3) |
+| `subsumption-findings` | `on-finding` | at least one `finding`-severity result no exemption silenced |
+| `subsumption-reviews` | `on-review` | at least one `review`-severity result no exemption silenced |
+| `subsumption-exempt` | `note` | an exemption silenced at least one finding |
+| `subsumption-advisories` | `note` | a passing field carries an exercised-coverage caveat (design 2.8 §5) |
+| `exemption-lapsed` | `warn` | an exemption is past its `expires` date, so what it covered is decided again |
+| `exemption-no-expiry` | `note` | an applied exemption carries no `expires` — design 2.8 §7.2's smell, surfaced here as that section requires |
+| `exemption-unused` | `note` | an exemption matched nothing: either the gap closed, or the selectors never fitted it |
+| `expiry-not-evaluated` | `note` | an applied exemption carries a date and no `as-of` was supplied |
+
+The vocabulary is open (§2.2): an unknown `code` is displayed, never dispatched on, because
+`action` is the part a script reads. Three rules hold across the table and are the point of it:
+
+1. **Policy governs subsumption severities only.** `on-finding`/`on-review` resolve what a
+   *subsumption* result does (design 2.8 §7.1). A verification that ran and found mismatches is a
+   decided incompatibility on the evidence, and no policy or exemption list makes it a pass.
+2. **A verdict is the walk's; a decision is the policy's.** An exempted finding is still a `no`,
+   and `subsumption.verdict` still says so. Rewriting it would destroy the only record of what
+   the checker found, which is what a team revisiting an exemption needs to read. Exempted
+   findings are listed in `findings` with `disposition: "exempt"`, never dropped.
+3. **A missing input is never a pass.** The one exception is a provider that published no shape,
+   which the RFC makes replay-only semantics rather than an omission.
+
+`text` is the same answer as the page a person reads: design 2.8 §6.4's block per pair — its
+header line and its `provider may produce` / `consumer has only tested` lines verbatim, so the
+RFC's own sketch is reproducible — with the verification line, the reasons and the decision
+around it. Findings an exemption silenced carry the marker `~`, which is this page's own: design
+2.8 §6.5 fixes three markers for the three severities, and an exempted finding is not a fourth
+severity but a finding with a decision over it.
+
+Errors follow design 2.8 §8's table: a document that is not one is `contract-invalid`, a `$format`
+major this checker does not implement is `contract-version-unsupported`, a shape neither document
+can parse is `interaction-invalid`, and a policy layer that is not a policy is `contract-invalid`
+with a `/policy/<layer>/…` pointer. All of them name what was wrong with which member (§10.2).
+
+A `block` decision is an **answer, not an error** (§10.2's own distinction): the operation
+succeeded. What a `block` does to an exit code is the host's business — `janus check` maps it to
+exit 1, the code it uses for "the subject failed".
+
 ## 9. Events and streams
 
 Delivery model fixed by [ADR 0005](../../decisions/0005-poll-based-event-delivery.md):
@@ -707,6 +806,13 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 
+The summary document the terminal event carries is the document a report is written from, so it
+names **who the run was about**: `consumers` and `providers`, positionally parallel, one entry per
+source document, plus `failures` naming the pair each failing variant belonged to. That is what
+makes a run attributable per pair by `subsumption/decide` (§8.6) — a summary that said "verified"
+without saying which consumer and which provider it verified could not be read back as an answer
+about either.
+
 ## 10. Error taxonomy
 
 Schema: [`schemas/v1/engine-error.schema.json`](schemas/v1/engine-error.schema.json).
@@ -730,9 +836,18 @@ a bug). An `EngineError` carries:
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
 | `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
-| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `variant-budget-exceeded` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
+
+`document-mismatched` is the answer when two documents are each valid but not about the same
+thing — a consumer contract handed to `subsumption/check` with another provider's shape (§8.6).
+It carries `{ member, contract, provider-shape }`. Refused rather than answered, because the
+answer would be a report in which nothing matched, and that reads like "this provider publishes
+nothing" instead of "you passed the wrong file". An operation that reads *two* documents of
+different kinds names the member rather than an index: `subsumption/check`'s document errors carry
+`member` (`"contract"` or `"provider-shape"`) beside the usual `problems`, because "contract 0 is
+invalid" would send a reader to the wrong file.
 
 `details` conventions worth fixing now: `protocol-version-unsupported` carries
 `supported: [int]`; `operation-unsupported` carries `op`; `capability-required` carries

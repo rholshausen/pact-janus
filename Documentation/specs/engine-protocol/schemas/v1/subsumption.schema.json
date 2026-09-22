@@ -1,0 +1,567 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/subsumption.schema.json",
+  "title": "SubsumptionOps",
+  "description": "Request/result bodies for the subsumption/* operations (spec.md §8.6). Session-less: pure document-in, document-out, like upgrade/*. The provider shape, the subsumption report, the finding and the policy are design 2.8's documents (its schemas/v1/), carried here as objects; the compatibility report is plan task 7.4's own and is defined below.",
+  "$defs": {
+    "Check": {
+      "title": "Check",
+      "type": "object",
+      "required": [
+        "contract",
+        "provider-shape"
+      ],
+      "properties": {
+        "contract": {
+          "type": "object",
+          "description": "The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's."
+        },
+        "provider-shape": {
+          "type": "object",
+          "description": "A provider shape (design 2.8 §2), for the same provider the contract names."
+        },
+        "options": {
+          "type": "object"
+        }
+      }
+    },
+    "CheckResult": {
+      "title": "CheckResult",
+      "type": "object",
+      "required": [
+        "report",
+        "format"
+      ],
+      "properties": {
+        "report": {
+          "type": "object",
+          "description": "The subsumption report (design 2.8 §6, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for."
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.",
+          "x-known-values": [
+            "janus-contract/1",
+            "pact/2.0.0",
+            "pact/3.0.0",
+            "pact/4.0"
+          ]
+        }
+      }
+    },
+    "Decide": {
+      "title": "Decide",
+      "type": "object",
+      "required": [
+        "pairs"
+      ],
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "description": "The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.",
+          "items": {
+            "$ref": "#/$defs/DecidePair"
+          }
+        },
+        "verification": {
+          "type": "array",
+          "description": "Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "policy": {
+          "type": "array",
+          "description": "Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "as-of": {
+          "type": "string",
+          "format": "date",
+          "description": "The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated."
+        },
+        "options": {
+          "type": "object"
+        }
+      }
+    },
+    "DecidePair": {
+      "title": "DecidePair",
+      "type": "object",
+      "required": [
+        "consumer",
+        "provider"
+      ],
+      "properties": {
+        "consumer": {
+          "$ref": "consumer-session.schema.json#/$defs/Party"
+        },
+        "provider": {
+          "$ref": "consumer-session.schema.json#/$defs/Party"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the consumer document identified itself, as CheckResult reported it."
+        },
+        "subsumption": {
+          "type": "object",
+          "description": "This pair's subsumption report, when the host has one. Its absence is not an error: a provider that has published no shape gets replay-only semantics (design 2.8 §6.3), which is what makes the check adoptable per provider."
+        }
+      }
+    },
+    "DecideResult": {
+      "title": "DecideResult",
+      "type": "object",
+      "required": [
+        "report",
+        "text"
+      ],
+      "properties": {
+        "report": {
+          "$ref": "#/$defs/CompatibilityReport"
+        },
+        "text": {
+          "type": "string",
+          "description": "The page a person reads: design 2.8 §6.4's finding block per pair, under a decision. Rendered by the engine so that two hosts printing the same decision print the same words."
+        }
+      }
+    },
+    "CompatibilityReport": {
+      "title": "CompatibilityReport",
+      "description": "The can-i-deploy answer for one run (spec.md §8.6): every pair asked about, why each decided the way it did, and what policy decided it. Owned by plan task 7.4 — design 2.8 §1 lists combining its report with verification results as out of its own scope.",
+      "type": "object",
+      "required": [
+        "$format",
+        "decision",
+        "policy",
+        "pairs",
+        "summary"
+      ],
+      "properties": {
+        "$format": {
+          "type": "string",
+          "description": "'janus-compatibility-report/1'.",
+          "x-known-values": [
+            "janus-compatibility-report/1"
+          ]
+        },
+        "decision": {
+          "$ref": "#/$defs/Decision"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyView"
+        },
+        "as-of": {
+          "type": "string",
+          "format": "date",
+          "description": "The date exemption expiry was judged against, when the host supplied one."
+        },
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PairResult"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/CompatibilitySummary"
+        }
+      }
+    },
+    "Decision": {
+      "title": "Decision",
+      "type": "string",
+      "description": "'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.",
+      "x-known-values": [
+        "pass",
+        "warn",
+        "block"
+      ]
+    },
+    "PolicyView": {
+      "title": "PolicyView",
+      "description": "The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.",
+      "type": "object",
+      "required": [
+        "on-finding",
+        "on-review",
+        "exemptions"
+      ],
+      "properties": {
+        "on-finding": {
+          "$ref": "#/$defs/PolicyAction"
+        },
+        "on-review": {
+          "$ref": "#/$defs/PolicyAction"
+        },
+        "exemptions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many exemptions were in force across every layer."
+        }
+      }
+    },
+    "PolicyAction": {
+      "title": "PolicyAction",
+      "type": "string",
+      "description": "What a subsumption severity does to the run (design 2.8 §7.1). Both default to 'warn' (ADR 0016).",
+      "x-known-values": [
+        "warn",
+        "block"
+      ]
+    },
+    "PairResult": {
+      "title": "PairResult",
+      "type": "object",
+      "required": [
+        "consumer",
+        "provider",
+        "decision",
+        "verification",
+        "subsumption",
+        "reasons"
+      ],
+      "properties": {
+        "consumer": {
+          "$ref": "consumer-session.schema.json#/$defs/Party"
+        },
+        "provider": {
+          "$ref": "consumer-session.schema.json#/$defs/Party"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the consumer document identified itself."
+        },
+        "decision": {
+          "$ref": "#/$defs/Decision"
+        },
+        "verification": {
+          "$ref": "#/$defs/VerificationView"
+        },
+        "subsumption": {
+          "$ref": "#/$defs/SubsumptionView"
+        },
+        "reasons": {
+          "type": "array",
+          "description": "One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.",
+          "items": {
+            "$ref": "#/$defs/Reason"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "description": "Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.",
+          "items": {
+            "$ref": "#/$defs/FindingEntry"
+          }
+        },
+        "exemptions": {
+          "type": "array",
+          "description": "What became of each exemption the policy carried.",
+          "items": {
+            "$ref": "#/$defs/ExemptionResult"
+          }
+        }
+      }
+    },
+    "Reason": {
+      "title": "Reason",
+      "type": "object",
+      "required": [
+        "code",
+        "action",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.",
+          "x-known-values": [
+            "verification-failed",
+            "verification-incomplete",
+            "verification-missing",
+            "verification-filtered",
+            "provider-shape-missing",
+            "interactions-not-published",
+            "subsumption-findings",
+            "subsumption-reviews",
+            "subsumption-exempt",
+            "subsumption-advisories",
+            "exemption-lapsed",
+            "exemption-no-expiry",
+            "exemption-unused",
+            "expiry-not-evaluated"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "description": "What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.",
+          "x-known-values": [
+            "note",
+            "warn",
+            "block"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "VerificationView": {
+      "title": "VerificationView",
+      "description": "What the supplied verification results say about this pair. A missing result is never a pass.",
+      "type": "object",
+      "required": [
+        "status",
+        "runs"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.",
+          "x-known-values": [
+            "verified",
+            "failed",
+            "incomplete",
+            "unknown"
+          ]
+        },
+        "runs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many supplied results covered this pair."
+        },
+        "filtered": {
+          "type": "boolean",
+          "description": "Whether any covering run was filtered: unreplayed variants are not passing ones."
+        },
+        "variants": {
+          "type": "object",
+          "description": "The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do."
+        }
+      }
+    },
+    "SubsumptionView": {
+      "title": "SubsumptionView",
+      "description": "What the subsumption report says about this pair, after policy.",
+      "type": "object",
+      "required": [
+        "verdict",
+        "interactions",
+        "matched",
+        "not-published",
+        "findings",
+        "reviews",
+        "exempt",
+        "advisories"
+      ],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "description": "The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.",
+          "x-known-values": [
+            "yes",
+            "no",
+            "unknown",
+            "not-checked"
+          ]
+        },
+        "interactions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Interactions with a published provider-shape entry (design 2.8 §2.2)."
+        },
+        "not-published": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Interactions the provider published nothing for, which were therefore not checked (design 2.8 §6.3)."
+        },
+        "findings": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "'finding'-severity results no exemption silenced."
+        },
+        "reviews": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "'review'-severity results no exemption silenced."
+        },
+        "exempt": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Results of either severity an exemption silenced."
+        },
+        "advisories": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences."
+        }
+      }
+    },
+    "FindingEntry": {
+      "title": "FindingEntry",
+      "type": "object",
+      "required": [
+        "interaction",
+        "disposition",
+        "finding"
+      ],
+      "properties": {
+        "interaction": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "disposition": {
+          "type": "string",
+          "description": "Whether policy left this finding live or an exemption silenced it.",
+          "x-known-values": [
+            "live",
+            "exempt"
+          ]
+        },
+        "exemption": {
+          "$ref": "#/$defs/ExemptionRef"
+        },
+        "finding": {
+          "type": "object",
+          "description": "Design 2.8 §4's finding (its schemas/v1/finding.schema.json), carried through untouched."
+        }
+      }
+    },
+    "InteractionId": {
+      "title": "InteractionId",
+      "description": "An interaction by contract spec §4.2's identity: description plus state names.",
+      "type": "object",
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "ExemptionRef": {
+      "title": "ExemptionRef",
+      "description": "The silencing exemption, quoted where the finding is — the reason a reader is looking for.",
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "ExemptionResult": {
+      "title": "ExemptionResult",
+      "description": "One exemption's outcome, echoing the exemption itself (design 2.8 §7.2's selectors) so a reader of the report does not need the policy file open beside it.",
+      "type": "object",
+      "required": [
+        "status",
+        "matched",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.",
+          "x-known-values": [
+            "applied",
+            "unused",
+            "lapsed"
+          ]
+        },
+        "matched": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consumer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interaction": {
+          "$ref": "#/$defs/InteractionId"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "CompatibilitySummary": {
+      "title": "CompatibilitySummary",
+      "type": "object",
+      "required": [
+        "pairs",
+        "blocked",
+        "warned",
+        "passed",
+        "findings",
+        "reviews",
+        "exempt"
+      ],
+      "properties": {
+        "pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exempt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

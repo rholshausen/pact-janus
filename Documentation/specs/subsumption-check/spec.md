@@ -60,7 +60,7 @@ Out of scope, with owners:
 |---|---|
 | what `admits` means, and the per-operator comparability classes the walk calls at each node | design [2.2](../shape-language/spec.md) §8 |
 | how a provider shape is produced — recorded from the provider's own tests, derived from types, authored, observed | tasks 7.1–7.3 |
-| combining a subsumption report with verification results into one `can-i-deploy` report, and the `janus check` CLI surface | task 7.4 |
+| combining a subsumption report with verification results into one `can-i-deploy` report, and the `janus check` CLI surface | task 7.4 — the `subsumption/*` operations and the `janus-compatibility-report/1` document, [engine-protocol spec §8.6](../engine-protocol/spec.md#86-subsumption-and-the-compatibility-decision--subsumption) |
 | broker storage and rendering of provider shapes and subsumption reports | task 7.5 |
 | property-testing the walk's verdicts against brute-force sampling | task 7.1 |
 
@@ -354,8 +354,10 @@ RFC's own style:
     consumer has only tested at least one item
 ```
 
-The header line's verdict (`✗` for any `finding`-severity result, a distinct marker task 7.4 defines for
-`review`-only reports) and the per-finding two-line body are this specification's rendering contract; the
+The header line's verdict (`✗` for any `finding`-severity result, `?` for a report whose most severe
+result is a `review` — the marker task 7.4 settled, and the same one §6.5 gives a `review` finding, so a
+header and the lines under it cannot contradict each other) and the per-finding two-line body are this
+specification's rendering contract; the
 `$.status`-style path is the same address as `path` (§4.4), rendered with a leading `$.` per part/slot
 convention rather than shown raw, because this text is read by people who know JSONPath and not
 necessarily this project's dimension-id grammar. Combining this block with verification-result lines into
@@ -450,17 +452,30 @@ an exemption applies to a finding only when **every selector it sets** matches:
 |---|---|
 | `consumer` | every finding for the named consumer |
 | `interaction` (`description` + optional `states`) | every finding within that interaction, for any consumer if `consumer` is unset |
-| `path` | one field, within whatever `interaction`/`consumer` also narrow |
+| `path` | one field, within whatever `interaction`/`consumer` also narrow — matched exactly, not as a subtree prefix (v1) |
 
 This is the granularity the plan names directly — per field, per interaction, per consumer — as three
 selectors that compose rather than three separate mechanisms, following the same shape ADR 0008's
 `Exclusion` already established for a different axis (dimension points instead of report findings).
 
+**`expires` lapses the exemption, it does not merely annotate it.** An exemption whose `expires` date has
+passed silences nothing: whatever it covered is decided again, by whichever of `on-finding`/`on-review`
+governs it, and the report says an exemption lapsed rather than leaving a finding to reappear
+unexplained. The comparison is inclusive — an exemption expiring on the 1st still applies *on* the 1st —
+and it is made against a date the *checker's host* supplies, never a clock the checker reads: the same
+two documents and the same policy MUST produce the same report on every engine, and an answer that
+depended on when it was asked would not be reproducible in CI. A host that supplies no date evaluates no
+expiry, applies every exemption, and reports each date as unevaluated. The consequence worth stating
+plainly, because it is the cost of the rule: under `on-finding: "block"`, a deploy that passed yesterday
+can block today with no change to any document. That is what writing a date down asks for, and it is why
+`expires` is optional (below) rather than mandatory.
+
 `reason` is **required**, for the reason ADR 0008's `Exclusion.reason` is required: an exemption is a
 team accepting a gap between what the provider may do and what the consumer has tested, and a policy
 document that could accept that silently would make "why is this exempted" archaeology instead of a
 one-line answer. `expires` is optional but its absence is a smell a report or dashboard SHOULD surface
-(task 7.4/7.5) rather than this specification enforcing it structurally — an unconditionally-required
+(task 7.4 does, as the compatibility report's `exemption-no-expiry`; task 7.5 for a dashboard) rather
+than this specification enforcing it structurally — an unconditionally-required
 expiry would force a nonsensical date onto a genuinely permanent exemption (a field the provider will
 never narrow, by design), and the honesty problem is teams accumulating exemptions and never revisiting
 them, not the schema shape.

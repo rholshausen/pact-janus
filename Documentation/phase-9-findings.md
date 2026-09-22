@@ -422,3 +422,133 @@ its `executed.txt` still shows `%expect:size` answering `BOOL(true)` on that str
 finding preserved as evidence. And task 7.1's property test now runs against the **uncorrected**
 oracle: the compiler and the subsumption checker agree on `admits` for every pair of the exact-class
 vocabulary, which is what the workaround was standing in for.
+
+## 9. A converted pact's frozen examples are the consumer side of 7.3's noise question
+
+**Found:** 2026-09-22, running task 7.4's `janus check` over the sample provider's v3 pact and the
+shape task 7.2 recorded from it. **Status:** open — the noise is measured and one of its two causes
+has a named, non-heuristic fix that nobody has implemented.
+
+### What was measured
+
+Task 7.3 asked how noisy `derived` *provider* shapes get, and answered it for an
+everything-nullable OpenAPI document. The same question has a mirror on the consumer side, and
+`janus check` is where it shows up: a v1–v4 pact is a legitimate consumer document (the pact a
+provider actually has), and converting one produces shapes that are *narrower* than what the
+consumer really tolerates, because a pact's single example becomes `equality` (contract-file spec
+§8.4's `example-frozen-as-equality`). A narrower consumer shape admits less, so the walk finds
+more.
+
+The sample provider's own pact against its own recorded shape, four results:
+
+| Result | True, or an artifact? |
+|---|---|
+| `wider-cardinality` at `$.items` — provider may produce an empty list | **true**: a cancelled order has no items |
+| `weaker-presence` at `$.shippedAt` — provider may omit it | **true**: an unshipped order omits it |
+| `unreviewable` at `$.shippedAt` — provider `equality '2026-07-30T09:00:00Z'` against consumer `regex '\d{4}-…'` | **artifact**, and decidable — see below |
+| `wider-values` at `$.status` — provider may produce `CANCELLED` | **true**, and the RFC's own scenario |
+
+One in four, which is a much better ratio than 7.3's ORM-generated document produced — and the
+shape of the noise is different. 7.3's derived shapes were *too wide* and produced findings about
+variance the provider does not have. A converted pact is *too narrow* and produces findings about
+tolerance the consumer does have. Both push in the same direction for the warn-vs-block default
+(ADR 0016 holds), but they need different remedies.
+
+The two causes are worth keeping apart, because only one of them is the conversion's fault:
+
+1. **The `review` is a comparison neither document is wrong about.** Its provider side is
+   `equality` because the *recorder* saw one distinct timestamp in six responses and design 2.8
+   §2's judgement is that one observation is a literal, not a domain; its consumer side is `regex`
+   because the pact carried a matching rule for that field. Two honest shapes, one comparison the
+   shape language declines to decide — and, as below, one it could.
+2. **`$.status` is the conversion's own bluntness.** `equality 'SHIPPED'` where a Janus contract
+   would have said `anyOf('PENDING', 'SHIPPED')`.
+
+### The artifact is a decidable comparison reported as `unknown`
+
+Provider `equality '<literal>'` against consumer `regex '<pattern>'` is in the *exact* class on one
+side and the *conservative* class on the other, and shape spec §8's conservative row answers
+`unknown` for anything but identity or an exactly-wider container. But this particular pair is
+decidable without a containment algorithm and without a heuristic: `admits(P)` is a single value, so
+`admits(P) ⊆ admits(C)` iff that one literal matches the pattern — which the kernel can answer with
+the regex engine it already runs in the interpreter. The same argument covers `equality` against
+`datetime`/`date`/`time`/`include`/`content-type`, which is to say: against every operator in the
+conservative class.
+
+Shape spec §8 already permits this — "the conservative class is conservative by *policy*, not by
+mathematics … `unknown` is a permission, not a requirement, and narrowing it is a pure improvement
+that changes no recorded contract". So this is not a specification change. It is
+`engine/kernel/src/subsumption/compare.rs` growing one arm, a corpus of comparisons, and a
+subsumption test per conservative operator.
+
+Why it was not folded into 7.4: the walk is task 7.1's, the fix changes verdicts (a `review`
+becomes a `yes` or a decided `no`), and a verdict change is the kind of thing that wants its own
+commit and its own property-test run rather than riding along with a CLI.
+
+### The bluntness has no fix, only an argument for upgrading
+
+`$.status` reading "consumer has only tested exactly 'SHIPPED'" is not wrong — that pact really did
+test one value. It is *less useful* than the RFC's "'PENDING' | 'SHIPPED'", and nothing in the
+conversion can recover the difference: the pact never recorded which values the consumer tolerates,
+only which one it saw. That is the honest cost of the v1–v4 format, and the argument for upgrading
+rather than a defect in the check. Worth stating in the RFC's migration story: **the subsumption
+loop gets sharper when a consumer declares its shapes, and a converted pact gets an answer that is
+true but blunt.**
+
+### Reproduce
+
+```sh
+janus check samples/order-service/pacts/web-app-order-service.json \
+            --provider-shape samples/order-service/shapes/ --json
+# the same shape against a contract that declares anyOf('PENDING','SHIPPED') produces the RFC's
+# two-line finding and no `review` at all: engine/kernel/tests/compatibility.rs,
+# `the_page_reproduces_the_rfcs_own_sketch`
+```
+
+### Options
+
+- **A. Decide `equality` against the conservative class** (above). Removes the artifact, needs no
+  specification change, and is a pure improvement to every existing report.
+- **B. A `format` or `provenance` selector on exemptions.** Design 2.8 §7.3 deliberately left
+  `provenance` out of v1's policy selectors until 7.3 reported back. It has now reported, and so has
+  this: the axis teams will want to scope by is "how did this shape come to exist", on *both* sides
+  of the walk. Additive (§9), and better decided with A in hand, since A removes the noisiest
+  consumer-side case.
+- **C. Nothing, and lean on `warn`.** What the prototype does today. It is defensible precisely
+  because the ratio measured here is 1 in 4 rather than 3 in 4 — but it is an argument that rests on
+  one sample.
+
+## 10. A verification summary cannot say how many variants *one pair* ran
+
+**Found:** 2026-09-22, building task 7.4's compatibility report. **Status:** open — worked around in
+the report, which omits the counts it cannot attribute.
+
+A verification run takes several contracts (`janus verify a.json b.json …`), and its summary reports
+one set of variant counts for the whole run. Task 7.4 needed the answer *per pair*, because
+`can-i-deploy` is a question about one consumer against one provider. Two members were enough to
+attribute the run — `consumers` and `providers`, positionally parallel, added to the summary and to
+`verification/started` in the same commit as this finding, plus `failures`, which already named the
+contract each failing variant came from. So status is per-pair: a pair is `failed` when a failure
+names it, `incomplete` when the run was aborted, `verified` otherwise.
+
+The counts are not. "3 of 3 variants verified" for one pair cannot be derived from a run that says
+"12 of 12" across four contracts, so `VerificationView.variants` is present only when one run
+covered one pair, and omitted otherwise — an honest gap rather than a division nobody could defend.
+A page for a four-contract run therefore reads `verification: verified` with no numbers, which is
+noticeably worse than the single-contract case a reader will have seen first.
+
+Options, in increasing order of cost:
+
+- **A. Per-pair sub-summaries in the run summary.** `pairs: [{ consumer, provider, variants: {…},
+  filtered }]` beside the run-level totals. Additive (protocol spec §11.2), and the run already has
+  the numbers — the tally is just not keyed by source. Costs one more member on the hottest document
+  the protocol has.
+- **B. Leave it, and tell hosts to verify one contract per run.** Cheap, and pushes a reporting
+  limitation into everyone's CI script, which is how a limitation becomes folklore.
+- **C. A per-pair result event.** The stream already carries one event per interaction × variant; a
+  host that wants per-pair counts can tally them. True today, and it makes the *summary* — the
+  document a report is written from (spec §9.6) — the one thing that cannot answer the question its
+  readers ask.
+
+Worth deciding with 7.5's broker notes in hand: a broker storing verification results per pair wants
+exactly A's shape.

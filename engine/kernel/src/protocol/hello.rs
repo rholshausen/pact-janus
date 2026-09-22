@@ -34,11 +34,13 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 /// `provider-shape-recording` is declared, and is what spec §7.3 means by "new session kinds
 /// arrive as new operations plus capabilities": a host that wants to record a provider shape has
 /// to know before it builds a run whether this engine can, and §5.3's rule is that it MUST NOT
-/// rely on operations behind a capability the engine did not declare.
+/// rely on operations behind a capability the engine did not declare. `subsumption-check` is the
+/// other half of that loop (spec §8.6) and is declared for the same reason: a CLI or a broker
+/// decides whether to *offer* a compatibility check before it has any documents to check.
 pub fn result() -> Value {
   json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
-    "capabilities": { "provider-shape-recording": {} }
+    "capabilities": { "provider-shape-recording": {}, "subsumption-check": {} }
   })
 }

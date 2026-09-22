@@ -291,6 +291,47 @@ impl EngineError {
     }
   }
 
+  /// Design 2.8 §8's error table, for the two documents a subsumption check reads: "not a
+  /// provider shape" is `contract-invalid`, a major this checker does not implement is
+  /// `contract-version-unsupported`, and a structurally invalid document carries positions. It
+  /// names the *member* it was handed rather than an index, because a check takes two documents of
+  /// different kinds and "contract 0 is not a Janus contract" would send a reader to the wrong one.
+  pub fn document_error(member: &'static str, error: &crate::contract::ContractError) -> Self {
+    use crate::contract::ContractError;
+    let (code, details) = match error {
+      ContractError::VersionUnsupported { format } => (
+        "contract-version-unsupported",
+        serde_json::json!({ "member": member, "found": format }),
+      ),
+      ContractError::NotAContract => ("contract-invalid", serde_json::json!({ "member": member })),
+      ContractError::Invalid { problems } => (
+        "contract-invalid",
+        serde_json::json!({ "member": member, "problems": problems }),
+      ),
+    };
+    EngineError {
+      code: code.to_string(),
+      category: "document".to_string(),
+      message: format!("'{member}': {error}"),
+      details: Some(details),
+    }
+  }
+
+  /// `document-mismatched` (spec §10.2): two documents that are each valid but not about the
+  /// same thing — a consumer contract checked against another provider's shape. Refused rather
+  /// than answered, because the answer would be a report in which nothing matched, which reads
+  /// like "this provider publishes nothing" instead of "you passed the wrong file".
+  pub fn documents_mismatched(contract: &str, shape: &str) -> Self {
+    EngineError {
+      code: "document-mismatched".to_string(),
+      category: "document".to_string(),
+      message: format!("the contract is for provider '{contract}' and the provider shape is for '{shape}'"),
+      details: Some(
+        serde_json::json!({ "member": "provider", "contract": contract, "provider-shape": shape }),
+      ),
+    }
+  }
+
   /// `internal` (spec §10.1): the dispatch boundary's own panic-catch. A panic reaching this
   /// constructor is itself a bug — it exists so a panic never crosses the pipe.
   pub fn internal(message: impl Into<String>) -> Self {
