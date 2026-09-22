@@ -722,7 +722,8 @@ fn a_document_that_is_neither_a_contract_nor_a_pact_is_not_read_as_an_empty_one(
   assert_eq!(response["error"]["code"], json!("contract-invalid"));
   assert_eq!(response["error"]["category"], json!("document"));
   assert_eq!(
-    response["error"]["details"]["member"], json!("contract"),
+    response["error"]["details"]["member"],
+    json!("contract"),
     "a check reads two documents of different kinds, and the error says which one: {}",
     response["error"]
   );
