@@ -39,7 +39,7 @@ exemption 2 does not, because it records a belief that the two regexes are equiv
 temporary gap — the kind of permanent exemption spec.md §7.2 says should not be forced into carrying a
 meaningless date. Surfacing "no `expires`" for review is a *report's* job, not this document's:
 `janus check` raises it as `exemption-no-expiry` on the exemption's own entry (engine-protocol spec
-§8.6), and a dashboard (task 7.5) would do the same.
+§8.6), and a dashboard ([task 7.5](../../../broker-integration-notes.md) §6) would do the same.
 
 ## 2. What `on-finding: "block"` would change
 

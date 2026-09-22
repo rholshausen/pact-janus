@@ -61,7 +61,7 @@ Out of scope, with owners:
 | what `admits` means, and the per-operator comparability classes the walk calls at each node | design [2.2](../shape-language/spec.md) §8 |
 | how a provider shape is produced — recorded from the provider's own tests, derived from types, authored, observed | tasks 7.1–7.3 |
 | combining a subsumption report with verification results into one `can-i-deploy` report, and the `janus check` CLI surface | task 7.4 — the `subsumption/*` operations and the `janus-compatibility-report/1` document, [engine-protocol spec §8.6](../engine-protocol/spec.md#86-subsumption-and-the-compatibility-decision--subsumption) |
-| broker storage and rendering of provider shapes and subsumption reports | task 7.5 |
+| broker storage and rendering of provider shapes and subsumption reports | task 7.5 — [broker integration notes](../../broker-integration-notes.md) |
 | property-testing the walk's verdicts against brute-force sampling | task 7.1 |
 
 ## 2. Provider shapes
@@ -474,7 +474,8 @@ can block today with no change to any document. That is what writing a date down
 team accepting a gap between what the provider may do and what the consumer has tested, and a policy
 document that could accept that silently would make "why is this exempted" archaeology instead of a
 one-line answer. `expires` is optional but its absence is a smell a report or dashboard SHOULD surface
-(task 7.4 does, as the compatibility report's `exemption-no-expiry`; task 7.5 for a dashboard) rather
+(task 7.4 does, as the compatibility report's `exemption-no-expiry`; task 7.5's
+[broker integration notes](../../broker-integration-notes.md) §6 sketch the dashboard) rather
 than this specification enforcing it structurally — an unconditionally-required
 expiry would force a nonsensical date onto a genuinely permanent exemption (a field the provider will
 never narrow, by design), and the honesty problem is teams accumulating exemptions and never revisiting

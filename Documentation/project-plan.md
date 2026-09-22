@@ -409,7 +409,7 @@ shape model, so 7.1 can start any time after Phase 3.
   subsumption findings into the RFC's `can-i-deploy`-style report, with `--policy warn|block` and
   exemption scoping per 2.8. Local/CI only — broker integration is design notes for the RFC, not
   prototype code.
-- **7.5 [design] Broker integration notes.** What the broker would need to store/render/decide for
+- **7.5 [design] [Broker integration notes](broker-integration-notes.md).** What the broker would need to store/render/decide for
   Janus contracts, provider shapes and subsumption results (RFC implementation unknown "broker/PactFlow
   handling of v5"). Starts from the [format review](contract-file-format-review.md) §8.4, which already
   scopes the OSS change set for storing and rendering contracts — including why widening the
@@ -480,7 +480,7 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 | Subsumption warn/block default + exemption scoping | 2.8, 7.3, 7.4 |
 | Subsumption decidability limits | 2.8, 7.1 |
 | Plan grammar stability/versioning policy | 2.4, 8.4 |
-| Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), 7.5 |
+| Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), [7.5](broker-integration-notes.md) — the contract already stores; the provider shape has no resource that fits |
 | Performance envelope WASM vs native FFI | 1.7, 9.1 |
 | Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype |
 | AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope |
@@ -503,19 +503,24 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 
 ## 15. Immediate next steps
 
-Phases 0–4 are done: foundations and reuse inventory (Phase 0); the de-risking spikes and gate G1
+Phases 0–7 are done: foundations and reuse inventory (Phase 0); the de-risking spikes and gate G1
 (Phase 1); the full Phase 2 design round, every spec final and its ADRs accepted; the kernel's
-match-and-explain path (Phase 3, closing **M1**); and the consumer flow end-to-end with variants
-(Phase 4, tasks 4.1–4.6, closing **M2** — session lifecycle, the HTTP transport and JSON content
-components, variant machinery, Janus contract writing, the live passive exchange proven against the
-real engine over both an in-process and a subprocess embedding, and the variant-ergonomics report).
+match-and-explain path (Phase 3, closing **M1**); the consumer flow end-to-end with variants (Phase 4,
+closing **M2**); provider verification with hooks, the sample provider and the CLI (Phase 5, closing
+**M3**); both SDKs, their generated bindings, the conformance suite and the thinness audit (Phase 6,
+closing **M4**); and provider shapes and subsumption — the checker, shape recording, the type-derived
+spike, `janus check` and the [broker integration notes](broker-integration-notes.md) (Phase 7, closing
+**M5**: the RFC's "provider may produce SHIPPED, consumer only tested PENDING" loop is reproduced
+end-to-end and reported the way the RFC sketches it).
 
-Next: **Phase 5 — Provider verification** (§8), closing **M3**:
+Next: **Phase 8 — External components** (§11), closing **M6**:
 
-1. 5.1 `verify` operation: source (pact file/dir) → target (running provider), the event stream
-   from design 2.1.
-2. 5.2 Request-variant replay and response shape matching, with variant-pinned provider states.
-3. 5.3 Hooks (`state-setup`, `before-request`) configured from `verifier.janus.yaml`.
-4. 5.4 v3/v4 verification through the plan path from 3.5 — providers upgrade first at no cost.
-5. 5.5 CLI: `janus verify`/`explain --executed`/`upgrade`.
-6. 5.6 Sample provider for M3/M5 and demos.
+1. 8.1 A third-party WASM component built against the published interfaces, from the docs only —
+   every point where reading engine source was necessary is a docs finding.
+2. 8.2 OCI distribution: push, pull, resolve, cache and integrity-check that component.
+3. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
+   when they cannot be enforced.
+4. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
+
+Then **Phase 9 — Evaluation and RFC feedback** (§12), which the running
+[findings list](phase-9-findings.md) is already accumulating input for.

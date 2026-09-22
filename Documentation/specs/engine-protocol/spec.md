@@ -662,7 +662,8 @@ Session-less, like `upgrade/*`: pure document-in, document-out.
 
 Two operations rather than one, because the second is the question asked at deploy time, over
 inputs that came from different places and different days: `check`'s report is the artifact a
-broker would store (task 7.5), and folding the decision into the walk would make it impossible to
+broker would store ([task 7.5](../../broker-integration-notes.md) §3), and folding the decision
+into the walk would make it impossible to
 ask without re-walking every tree — which is exactly the coupling design 2.8 §4.3 stores
 `severity` to avoid.
 

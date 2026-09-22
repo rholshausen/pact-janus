@@ -552,3 +552,10 @@ Options, in increasing order of cost:
 
 Worth deciding with 7.5's broker notes in hand: a broker storing verification results per pair wants
 exactly A's shape.
+
+**7.5 reports back: A.** The [broker integration notes](broker-integration-notes.md) §11 land on option
+A, and add a reason beyond convenience — a broker keys results to a matrix row, which is
+(consumer version, provider version), so a run-level tally is not merely awkward for it but unusable.
+Option C would have the broker tally the event stream itself, which is the same mistake as having it
+reimplement the subsumption walk (notes §3), one document smaller. Still not a decision: the ADR is
+9.2's.
