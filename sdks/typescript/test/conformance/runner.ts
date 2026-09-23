@@ -84,6 +84,7 @@ async function runSession(testCase: Case, failures: string[]): Promise<void> {
     provider: PROVIDER,
     contractDir,
     ...(pipe ? { engine: () => pipe } : {}),
+    ...(testCase.janus?.components === undefined ? {} : { components: testCase.janus.components }),
   });
   const dimensions = new Set<string>();
   const variantCounts: number[] = [];

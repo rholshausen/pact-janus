@@ -75,6 +75,9 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
   }
 
   private static Shape valueList(Object value, String where) {
+    if (value instanceof Content) {
+      throw Content.misplaced(where);
+    }
     if (value instanceof ShapeNode node) {
       return listed(node.binding());
     }
@@ -176,5 +179,15 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
 
   static void slot(Map<String, Shape> part, String name, Object value, String where) {
     part.put(name, Literals.compile(value, where));
+  }
+
+  /** A body slot: {@link Content}'s document by the literal rules, or the value itself. */
+  static void body(Map<String, Shape> part, Object value, String where) {
+    slot(part, "body", value instanceof Content content ? content.document() : value, where);
+  }
+
+  /** The media type a body written with {@link Shapes#content} declares, or {@code null}. */
+  static String declaredType(Object body) {
+    return body instanceof Content content ? content.mediaType() : null;
   }
 }

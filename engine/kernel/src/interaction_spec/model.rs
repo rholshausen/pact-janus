@@ -7,7 +7,7 @@
 //! precisely the parsing and validation plan task 3.2 exists to do, ahead of the plan compiler
 //! (3.3) that consumes it.
 
-use crate::common::{Requirement, State, Transport};
+use crate::common::{ContentTypes, Requirement, State, Transport};
 use crate::shape::ShapeNode;
 use std::collections::BTreeMap;
 
@@ -24,5 +24,8 @@ pub struct InteractionSpec {
   /// concrete `params` happens per variant, which does not exist until execution (design 2.3).
   pub states: Option<Vec<State>>,
   pub parts: BTreeMap<String, Part>,
+  /// The media type of each declared content slot (contract-file spec §5.5, ADR 0020). Every entry
+  /// names a slot `parts` gives a shape; [`super::parse`] checks that.
+  pub content_types: Option<ContentTypes>,
   pub requires: Option<Vec<Requirement>>,
 }

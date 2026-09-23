@@ -56,6 +56,7 @@
           "description": "Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.",
           "additionalProperties": { "$ref": "#/$defs/ShapePart" }
         },
+        "content-types": { "$ref": "#/$defs/ContentTypes" },
         "requires": {
           "type": "array",
           "description": "Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.",
@@ -86,6 +87,7 @@
           "description": "Part name -> slot name -> shape (shape spec §3.6).",
           "additionalProperties": { "$ref": "#/$defs/ShapePart" }
         },
+        "content-types": { "$ref": "#/$defs/ContentTypes" },
         "requires": {
           "type": "array",
           "description": "Components this interaction cannot be matched without (spec.md §7).",
@@ -128,6 +130,15 @@
           "description": "Variant-bound parameter bindings. Each item is design 2.3's binding document; 'dimension' is always the resolved dimension id, never the author's shorthand (variant semantics §6.3).",
           "items": { "type": "object" }
         }
+      }
+    },
+    "ContentTypes": {
+      "title": "ContentTypes",
+      "description": "Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string", "minLength": 1 }
       }
     },
     "ShapePart": {

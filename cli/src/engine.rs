@@ -11,8 +11,9 @@
 //! What the CLI *does* bring is capabilities the kernel deliberately lacks (lifecycle-hooks spec
 //! §8.5, ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport
 //! and JSON content components, the `exec` and `http` hook implementations, and the built-in
-//! `oauth2` hook component. An engine handed none of those refuses a configuration naming them —
-//! by name, before a run starts — which is the behaviour a degraded run would hide.
+//! `oauth2` hook component, and the WASM loader for out-of-tree components (plan task 8.1). An
+//! engine handed none of those refuses a configuration naming them — by name, before a run starts
+//! — which is the behaviour a degraded run would hide.
 
 use pact_janus_hooks_host::{ExecHooks, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
@@ -33,6 +34,7 @@ pub fn start() -> Result<Engine, String> {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  register_components(&mut engine);
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
@@ -48,6 +50,19 @@ pub fn start() -> Result<Engine, String> {
   )?;
   tracing::debug!(?hello, "handshake complete");
   Ok(engine)
+}
+
+/// What `janus` and `janus-engine` both give the engine beyond its transports: the in-tree content
+/// component's name, and the WASM loader for the components a project declares (component-interfaces
+/// spec §10, plan task 8.1). A loader that cannot start leaves the engine with `["in-tree"]`, which
+/// `engine/hello` then says — a declared component fails by name rather than the engine failing to
+/// start at all.
+pub fn register_components(engine: &mut Engine) {
+  engine.declare_in_tree("content", "json", "1.0.0");
+  match pact_janus_component_host::WasmLoader::new() {
+    Ok(loader) => engine.register_component_loader(Arc::new(loader)),
+    Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),
+  }
 }
 
 /// One request frame in, one result document out. An `err` frame becomes this function's `Err`,

@@ -15,7 +15,12 @@
           "required": ["consumer", "provider"],
           "properties": {
             "consumer": { "$ref": "#/$defs/Party" },
-            "provider": { "$ref": "#/$defs/Party" }
+            "provider": { "$ref": "#/$defs/Party" },
+            "components": {
+              "type": "array",
+              "description": "The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.",
+              "items": { "type": "object" }
+            }
           }
         }
       }

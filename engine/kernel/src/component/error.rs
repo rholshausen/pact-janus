@@ -2,16 +2,28 @@
 //! "Deliberately the same shape as the protocol's `EngineError`, because the kernel passes it
 //! through verbatim... and a second error shape at that boundary would only need translating."
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentError {
   pub code: String,
+  /// Absent or unknown is treated as `internal` (spec §11.1), which is also what a component that
+  /// sent none gets here.
+  #[serde(default = "internal_category")]
   pub category: String,
   pub message: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  /// Who produced it (spec §11.2): absent means the component did; `engine` marks an error the
+  /// binding synthesised because the component trapped, timed out or exited — "the component said
+  /// no" and "the component died" send a reader to different places.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub source: Option<Box<str>>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
   pub details: Option<Value>,
+}
+
+fn internal_category() -> String {
+  "internal".to_string()
 }
 
 impl ComponentError {
@@ -22,6 +34,7 @@ impl ComponentError {
       code: "operation-unsupported".to_string(),
       category: "protocol".to_string(),
       message: format!("unsupported operation '{op}'"),
+      source: None,
       details: Some(serde_json::json!({ "op": op })),
     }
   }
@@ -32,6 +45,7 @@ impl ComponentError {
       code: "decode-failed".to_string(),
       category: "component".to_string(),
       message: message.into(),
+      source: None,
       details: Some(serde_json::json!({ "content-type": content_type })),
     }
   }
@@ -43,6 +57,7 @@ impl ComponentError {
       code: "unsupported-content-type".to_string(),
       category: "component".to_string(),
       message: format!("unsupported content type '{content_type}'"),
+      source: None,
       details: Some(serde_json::json!({ "content-type": content_type })),
     }
   }
@@ -54,6 +69,7 @@ impl ComponentError {
       code: "transport-failed".to_string(),
       category: "component".to_string(),
       message: message.into(),
+      source: None,
       details: None,
     }
   }
@@ -64,6 +80,19 @@ impl ComponentError {
       code: "internal".to_string(),
       category: "internal".to_string(),
       message: message.into(),
+      source: None,
+      details: None,
+    }
+  }
+
+  /// An error the binding synthesised on a component's behalf (spec §11.2): `code` is one of
+  /// `component-trapped`, `component-timeout`, `component-exited`, and `source` is `engine`.
+  pub fn synthesised(code: &str, message: impl Into<String>) -> Self {
+    ComponentError {
+      code: code.to_string(),
+      category: "component".to_string(),
+      message: message.into(),
+      source: Some("engine".into()),
       details: None,
     }
   }

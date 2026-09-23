@@ -3,7 +3,9 @@
 //! there is no per-object cleanup call (spec §7.1).
 
 use super::exchange::{self, ArmedExchange, ExchangeState};
-use crate::component::{ComponentError, ContentComponent, Start, Stop, TransportComponent};
+use super::scope::Scope;
+use crate::common::{ContentTypes, declared_type};
+use crate::component::{ComponentError, Start, Stop, TransportComponent, Unavailable};
 use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
@@ -114,10 +116,27 @@ pub(crate) struct ConsumerSession {
   /// Transports bound by `start-transport` (spec §8.2), each driving its own background exchange
   /// loop (plan task 4.5). A session MAY start several; `serve_variant` arms every `"http"` one.
   transports: Vec<TransportRun>,
+  /// The components this session can call (component-interfaces spec §10): the ones `create`'s
+  /// `config.components` declared, ahead of the embedding's in-tree ones. They end with the session.
+  scope: Scope,
+}
+
+/// Why `add-interaction` refused an interaction: it is malformed (`interaction-invalid`), or it
+/// needs a component this session does not have (`component-unavailable`, spec §2.3).
+#[derive(Debug)]
+pub enum AddInteractionError {
+  Invalid(InteractionSpecError),
+  Unavailable(Unavailable),
+}
+
+impl From<InteractionSpecError> for AddInteractionError {
+  fn from(err: InteractionSpecError) -> Self {
+    AddInteractionError::Invalid(err)
+  }
 }
 
 impl ConsumerSession {
-  fn new(consumer: Party, provider: Party, policy: Option<Value>) -> Self {
+  fn new(consumer: Party, provider: Party, policy: Option<Value>, scope: Scope) -> Self {
     ConsumerSession {
       consumer,
       provider,
@@ -126,20 +145,27 @@ impl ConsumerSession {
       order: Vec::new(),
       next_handle: 1,
       transports: Vec::new(),
+      scope,
     }
   }
 
-  /// `consumer-session/add-interaction` (spec §8.2): validate and compile, or a structured
-  /// `InteractionSpecError` a caller maps to `interaction-invalid`.
-  pub fn add_interaction(&mut self, interaction: &Value) -> Result<String, InteractionSpecError> {
+  /// `consumer-session/add-interaction` (spec §8.2): validate and compile, or a structured error a
+  /// caller maps to `interaction-invalid` or `component-unavailable`.
+  pub fn add_interaction(&mut self, interaction: &Value) -> Result<String, AddInteractionError> {
     let spec = interaction_spec::parse(interaction)?;
+    // Component-interfaces spec §2.3: what an interaction cannot run without is checked when it
+    // arrives, while the author is looking at it — not when its first body does.
+    self
+      .scope
+      .check(spec.requires.iter().flatten(), spec.content_types.as_ref())
+      .map_err(AddInteractionError::Unavailable)?;
     // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
     // §6.5): the reference resolves against this interaction's variant space, which does not exist
     // until the shapes parse, and the author is looking at the DSL that produced it right now.
     if let Some(states) = &spec.states {
       let space = plan::variant_space(&spec);
       if let Err(problems) = params::bind(states, &space, "/states") {
-        return Err(InteractionSpecError { problems });
+        return Err(InteractionSpecError { problems }.into());
       }
     }
     let compiled = plan::compile(&spec, &Assignment::new(), None);
@@ -169,7 +195,6 @@ impl ConsumerSession {
     &mut self,
     kind: &str,
     component: Arc<dyn TransportComponent>,
-    content: Option<Arc<dyn ContentComponent>>,
     instance: String,
     options: Option<Value>,
   ) -> Result<Value, ComponentError> {
@@ -186,6 +211,7 @@ impl ConsumerSession {
     let thread_stop = Arc::clone(&stop);
     let thread_state = Arc::clone(&state);
     let thread_instance = instance.clone();
+    let content = self.scope.content();
     let handle = thread::spawn(move || {
       exchange::run(
         thread_component,
@@ -297,6 +323,7 @@ impl ConsumerSession {
           variant_id: variant_id.to_string(),
           request_plan: request_plan.clone(),
           response_parts: parts.clone(),
+          content_types: entry.spec.content_types.clone().unwrap_or_default(),
         });
       }
     }
@@ -426,7 +453,7 @@ impl ConsumerSession {
             // is the whole point of a binding, and recording the resolved values is what lets a
             // verifier's own resolution be checked against this one rather than trusted.
             states: params::resolve_states(entry.spec.states.as_ref(), &space, &v.assignment),
-            parts: to_value_parts(&exercised.parts),
+            parts: to_value_parts(&exercised.parts, entry.spec.content_types.as_ref()),
           }
         })
         .collect();
@@ -436,6 +463,7 @@ impl ConsumerSession {
         transport: entry.spec.transport.clone(),
         states: entry.spec.states.clone(),
         parts: entry.raw_parts.clone(),
+        content_types: entry.spec.content_types.clone(),
         requires: entry.spec.requires.clone(),
         selection: contract::RecordedSelection {
           variants,
@@ -487,11 +515,13 @@ fn raw_parts(interaction: &Value) -> BTreeMap<String, contract::ShapePart> {
 }
 
 /// Wrap a generated payload's values as the contract format's slot values (contract-file spec
-/// §5.3): `content` as-is and no `encoded`/`content-type` tag, which is the default `json`
-/// encoding — exactly right for a value [`generate::interaction`] already produced as a document-
-/// model `Value`.
+/// §5.3): `content` as-is and no `encoded` tag, which is the default `json` encoding — exactly right
+/// for a value [`generate::interaction`] already produced as a document-model `Value`. A declared
+/// content slot also carries its type (§5.5), which is how a verifier knows which component turns
+/// the recorded document back into the octets the consumer sent.
 fn to_value_parts(
   parts: &BTreeMap<String, BTreeMap<String, Value>>,
+  content_types: Option<&ContentTypes>,
 ) -> BTreeMap<String, contract::ValuePart> {
   parts
     .iter()
@@ -504,7 +534,7 @@ fn to_value_parts(
             contract::SlotValue {
               content: value.clone(),
               encoded: None,
-              content_type: None,
+              content_type: declared_type(content_types, part, slot).map(str::to_string),
             },
           )
         })
@@ -557,12 +587,13 @@ pub(crate) struct SessionStore {
 
 impl SessionStore {
   /// `consumer-session/create` (spec §8.2). Returns the new session id.
-  pub fn create(&mut self, consumer: Party, provider: Party, policy: Option<Value>) -> String {
+  pub fn create(&mut self, consumer: Party, provider: Party, policy: Option<Value>, scope: Scope) -> String {
     self.next_session += 1;
     let id = format!("cs-{}", self.next_session);
-    self
-      .sessions
-      .insert(id.clone(), ConsumerSession::new(consumer, provider, policy));
+    self.sessions.insert(
+      id.clone(),
+      ConsumerSession::new(consumer, provider, policy, scope),
+    );
     id
   }
 
@@ -599,8 +630,8 @@ mod tests {
   #[test]
   fn session_ids_are_distinct_and_stable() {
     let mut store = SessionStore::default();
-    let a = store.create(party("web-app"), party("order-api"), None);
-    let b = store.create(party("web-app"), party("order-api"), None);
+    let a = store.create(party("web-app"), party("order-api"), None, Scope::none());
+    let b = store.create(party("web-app"), party("order-api"), None, Scope::none());
     assert_ne!(a, b);
     assert!(store.get_mut(&a).is_some());
     assert!(store.get_mut(&b).is_some());
@@ -608,7 +639,7 @@ mod tests {
 
   #[test]
   fn handles_are_allocated_in_submission_order() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let spec = serde_json::json!({
       "description": "a request for an order",
       "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
@@ -629,7 +660,7 @@ mod tests {
   #[test]
   fn end_removes_the_session() {
     let mut store = SessionStore::default();
-    let id = store.create(party("web-app"), party("order-api"), None);
+    let id = store.create(party("web-app"), party("order-api"), None, Scope::none());
     assert!(store.end(&id).is_some());
     assert!(store.get_mut(&id).is_none());
     assert!(store.end(&id).is_none());
@@ -668,14 +699,14 @@ mod tests {
 
   #[test]
   fn contract_is_none_when_variants_was_never_called() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     session.add_interaction(&degenerate_interaction()).unwrap();
     assert_eq!(session.contract().unwrap(), None);
   }
 
   #[test]
   fn contract_is_withheld_until_every_selected_variant_is_verified() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let handle = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &handle);
     assert_eq!(
@@ -696,7 +727,7 @@ mod tests {
 
   #[test]
   fn contract_is_withheld_if_any_selected_variant_failed() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     assert_eq!(
@@ -716,7 +747,7 @@ mod tests {
 
   #[test]
   fn contract_records_only_exercised_variants_with_their_concrete_parts() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {
@@ -764,7 +795,7 @@ mod tests {
 
   #[test]
   fn contract_records_a_states_literal_params_per_variant() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let interaction = serde_json::json!({
       "description": "an order exists",
       "states": [ { "name": "an order exists", "params": { "id": "42" } } ],
@@ -786,7 +817,7 @@ mod tests {
 
   #[test]
   fn results_reports_per_variant_status_after_exercising() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     session.record_exercised(&handle, &ids[0], ExchangeOutcome::Verified);
@@ -814,7 +845,7 @@ mod tests {
 
   #[test]
   fn contract_rejects_duplicate_interaction_identity() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let h1 = session.add_interaction(&degenerate_interaction()).unwrap();
     let h2 = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &h1);
@@ -831,7 +862,7 @@ mod tests {
 
   #[test]
   fn a_session_built_contract_round_trips_through_canonical_bytes() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None);
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {

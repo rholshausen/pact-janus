@@ -1,0 +1,28 @@
+[package]
+name = "pact_janus_component_host"
+description = "The WASM component loader (component-interfaces spec §9.2, §10, plan task 8.1): out-of-tree components, instantiated under wasmtime with deny-by-default grants, per-call deadlines and loud poisoning. Native embeddings only — a WASM guest cannot host WASM components (ADR 0013), which is why this is not in the kernel."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+tracing = "0.1"
+wasmtime = { version = "47", default-features = false, features = ["component-model", "cranelift", "runtime", "std", "parallel-compilation", "cache"] }
+wasmtime-wasi = { version = "47", default-features = false }
+
+[dev-dependencies]
+pretty_assertions = "1"
+# The engine this loader plugs into, with the in-tree components `janus-engine` registers beside
+# it, and the sample provider a CSV consumer's contract is verified against (plan task 8.1).
+pact_janus_component_http = { path = "../component-http" }
+pact_janus_component_json = { path = "../component-json" }
+pact_janus_sample_order_service = { path = "../../samples/order-service" }
+
+[lints]
+workspace = true

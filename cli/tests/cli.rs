@@ -743,3 +743,134 @@ fn verify_without_a_provider_url_is_a_usage_error_not_a_run() {
     stderr(&output)
   );
 }
+
+// ---------------------------------------------------------------------------------------------
+// components (plan task 8.1)
+// ---------------------------------------------------------------------------------------------
+
+/// The out-of-tree CSV component, built for `wasm32-wasip2` by the test itself so it never runs a
+/// stale one. Its crate depends on nothing in this workspace.
+fn csv_component() -> String {
+  static WASM: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+  WASM
+    .get_or_init(|| {
+      let dir = PathBuf::from(repo("third-party/janus-csv"));
+      let status = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string()))
+        .args(["build", "--release", "--target", "wasm32-wasip2"])
+        .current_dir(&dir)
+        .env_remove("CARGO_TARGET_DIR")
+        .status()
+        .expect("cargo runs");
+      assert!(status.success(), "building the CSV component");
+      dir
+        .join("target/wasm32-wasip2/release/janus_csv.wasm")
+        .display()
+        .to_string()
+    })
+    .clone()
+}
+
+/// A consumer's contract for the orders export: one interaction, one recorded variant, a body the
+/// interaction declares as `text/csv` (contract spec §5.5) and records as the document it decoded.
+fn csv_contract() -> String {
+  let path = temp("reporting.janus.json");
+  let row = json!({ "id": "66", "status": "PENDING", "items": "1" });
+  let document = json!({ "$format": "janus-contract/1",
+    "consumer": { "name": "reporting" },
+    "provider": { "name": "order-service" },
+    "interactions": [
+      { "description": "the orders export",
+        "transport": { "kind": "http", "mode": "passive" },
+        "states": [ { "name": "an order exists", "params": { "id": "66" } } ],
+        "parts": {
+          "request": { "method": { "shape": "equality", "example": "GET" },
+                       "path": { "shape": "equality", "example": "/orders.csv" } },
+          "response": { "status": { "shape": "equality", "example": 200 },
+                        "body": { "shape": "each-like", "min": 1, "max": 1,
+                                  "items": { "shape": "object", "members": {
+                                    "id": { "shape": "string", "example": "66" },
+                                    "status": { "shape": "string", "example": "PENDING" },
+                                    "items": { "shape": "regex", "pattern": "^[0-9]+$", "example": "1" } } } } } },
+        "content-types": { "response": { "body": "text/csv" } },
+        "requires": [ { "component": "content/csv", "min-version": 1 } ],
+        "selection": {
+          "variants": [ { "id": "base", "origin": "base", "assignment": [],
+            "states": [ { "name": "an order exists", "params": { "id": "66" } } ],
+            "parts": {
+              "request": { "method": { "content": "GET" }, "path": { "content": "/orders.csv" } },
+              "response": { "status": { "content": 200 },
+                            "body": { "content": [row], "content-type": "text/csv" } } } } ],
+          "report": {} } } ] });
+  std::fs::write(&path, document.to_string()).expect("writing the contract");
+  path
+}
+
+/// The sample's state hook, and the component — one file, as a project writes it (lifecycle-hooks
+/// spec §6.1). The component's path is relative to the file, which is how the loader resolves it.
+fn csv_config(provider: &Provider, component: &str) -> String {
+  let port = provider.base_url().rsplit(':').next().unwrap_or("0").to_string();
+  let path = temp(&format!("verifier-csv-{port}.yaml"));
+  let reference = pathdiff(component, &std::env::temp_dir());
+  std::fs::write(
+    &path,
+    format!(
+      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: file, reference: \"{reference}\" }}\nhooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
+      provider.base_url()
+    ),
+  )
+  .expect("writing the config");
+  path
+}
+
+/// `target` relative to `base`, the way a project would write a path in a file that lives in `base`.
+fn pathdiff(target: &str, base: &std::path::Path) -> String {
+  let target = PathBuf::from(target);
+  let base = base.canonicalize().expect("the temp dir exists");
+  let common = target
+    .components()
+    .zip(base.components())
+    .take_while(|(a, b)| a == b)
+    .count();
+  let ups = base.components().count() - common;
+  let rest: PathBuf = target.components().skip(common).collect();
+  let mut relative = PathBuf::new();
+  for _ in 0..ups {
+    relative.push("..");
+  }
+  relative.join(rest).display().to_string()
+}
+
+#[test]
+fn verify_loads_a_declared_component_and_verifies_a_csv_contract() {
+  let provider = provider();
+  let config = csv_config(&provider, &csv_component());
+  let output = janus(&[
+    "verify",
+    &csv_contract(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "stdout: {text}\nstderr: {}", stderr(&output));
+  assert!(text.contains("VERIFIED: 1 verified, 0 failed"), "{text}");
+}
+
+#[test]
+fn verify_without_the_component_fails_before_the_run_naming_what_is_missing() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let output = janus(&[
+    "verify",
+    &csv_contract(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+  ]);
+  assert_eq!(code(&output), 2, "the command could not run: {}", stderr(&output));
+  let text = stderr(&output);
+  assert!(text.contains("component-unavailable"), "{text}");
+  assert!(text.contains("content/csv"), "{text}");
+}

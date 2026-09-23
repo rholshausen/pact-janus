@@ -1,0 +1,13 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/content-nested",
+  "category": "translation",
+  "title": "'content' nested inside a body's template is refused at the call.",
+  "covers": ["shape.content.body-only"],
+  "why": "behavioural spec 'content' (ADR 0019): 'content' anywhere else — nested in a template — is refused at the call. A member of a document has no content type of its own; the document's slot does.",
+  "interaction": {
+    "description": "a content declaration inside a document",
+    "response": { "body": { "report": { "$": "content", "args": ["text/csv", "a,b"] } } }
+  },
+  "expect": { "refused": true }
+}

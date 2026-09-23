@@ -27,7 +27,8 @@ usage: janus verify <contract-or-pact>... --provider-url <url> [options]
 
   <contract-or-pact>...      Janus contract or v1-v4 pact files, or directories of them
   --provider-url <url>       the provider under test
-  --config <file>            a verifier.janus.yaml (hooks: states, auth, anything else)
+  --config <file>            a verifier.janus.yaml (hooks: states, auth, anything else;
+                             components: the content and matcher components the contracts need)
   --variant <id>             replay only this variant; repeatable. A filtered run is
                              reported as filtered — a partial run is not a pass
   --transport <kind>         transport to bind (default: http)
@@ -80,7 +81,15 @@ pub fn run(args: &Args) -> ExitCode {
       "options": { "base-url": provider_url },
     }]
   });
-  if let Some(hooks) = hooks {
+  if let Some(mut hooks) = hooks {
+    // One file, two members, two owners (lifecycle-hooks spec §6.1): the components are design
+    // 2.6's and ride beside the hooks, not inside them.
+    if let Some(components) = hooks
+      .as_object_mut()
+      .and_then(|config| config.remove("components"))
+    {
+      target["components"] = components;
+    }
     target["hooks"] = hooks;
   }
 

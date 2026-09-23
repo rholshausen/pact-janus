@@ -26,9 +26,19 @@ export interface Contract {
 }
 
 /**
+ * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+ */
+export interface ContentTypes {
+  [k: string]: {
+    [k: string]: string;
+  };
+}
+
+/**
  * One interaction: its shape recorded once, and the evidence of every variant that was exercised (spec.md §4). Identity is 'description' plus 'states' (spec.md §4.2).
  */
 export interface Interaction {
+  "content-types"?: ContentTypes;
   /**
    * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
    */
@@ -56,6 +66,7 @@ export interface Interaction {
  * The interaction specification an author writes and a host submits to 'consumer-session/add-interaction': this document's interaction record minus the evidence — the same members as 'Interaction', with no 'selection' (spec.md §1). Not a member of a contract; it is defined here so the author's input and the engine's output stay one document with one optional half.
  */
 export interface InteractionSpec {
+  "content-types"?: ContentTypes;
   /**
    * What the interaction is, in the author's words (spec.md §4.2).
    */

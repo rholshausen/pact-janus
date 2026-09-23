@@ -21,6 +21,7 @@
 
 use super::session::{ExchangeOutcome, Exercised};
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
+use crate::common::ContentTypes;
 use crate::component::{
   ContentComponent, ContentSlots, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
@@ -43,6 +44,9 @@ pub(crate) struct ArmedExchange {
   /// verbatim on a match, the consumer side's own mirror of variant-semantics spec §5.2's
   /// replay-by-example.
   pub response_parts: BTreeMap<String, BTreeMap<String, Value>>,
+  /// The interaction's declared content types (contract-file spec §5.5): how the inbound request's
+  /// slots are decoded and the reply's encoded.
+  pub content_types: ContentTypes,
 }
 
 /// Shared between `serve_variant` (arms) and this module's background loop (matches, replies,
@@ -111,7 +115,7 @@ fn handle_inbound(
     return;
   };
 
-  let resolver = parts_resolver(&inbound.parts, content);
+  let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
   let executed = execute(&armed.request_plan, &resolver);
   let request_subtree = find_container(&executed, "request").unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
@@ -129,7 +133,12 @@ fn handle_inbound(
   }
 
   let reply_parts = match status {
-    Status::Matched => response_parts(&armed.response_parts, &transport.content_slots(), content),
+    Status::Matched => response_parts(
+      &armed.response_parts,
+      &transport.content_slots(),
+      armed.content_types.get("response"),
+      content,
+    ),
     Status::Mismatched => mismatch_reply(&mismatches, content),
   };
   let delivered = transport.reply(Reply {
@@ -179,6 +188,7 @@ fn handle_inbound(
 fn response_parts(
   response: &BTreeMap<String, BTreeMap<String, Value>>,
   content_slots: &ContentSlots,
+  declared_types: Option<&BTreeMap<String, String>>,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
   let mut parts = Parts::new();
@@ -188,7 +198,10 @@ fn response_parts(
     for (slot_name, value) in slots {
       let is_content = declared.is_some_and(|names| names.contains(slot_name));
       let wired = if is_content {
-        encode_slot(value, content)
+        let declared_type = declared_types
+          .and_then(|slots| slots.get(slot_name))
+          .map(String::as_str);
+        encode_slot(value, declared_type, content)
       } else {
         plain_slot(value)
       };
@@ -207,7 +220,7 @@ fn mismatch_reply(mismatches: &[Mismatch], content: Option<&dyn ContentComponent
   let body = Value::Array(mismatches.iter().map(mismatch_json).collect());
   let mut part = Part::new();
   part.insert("status".to_string(), plain_slot(&Value::from(500)));
-  part.insert("body".to_string(), encode_slot(&body, content));
+  part.insert("body".to_string(), encode_slot(&body, None, content));
   let mut parts = Parts::new();
   parts.insert("response".to_string(), part);
   parts

@@ -8,6 +8,7 @@
 //! document value is. A recorded request that replayed differently from how it was matched would
 //! make every variant's evidence meaningless.
 
+use crate::common::{ContentTypes, declared_type};
 use crate::component::{ContentComponent, Decode, Encode, Parts, SlotValue};
 use crate::plan::{CapturedValues, Executed, ExecutedKind, Mismatch, RuntimeValue};
 use serde_json::Value;
@@ -26,48 +27,84 @@ pub(crate) fn find_container<'a>(executed: &'a Executed, label: &str) -> Option<
 
 /// A resolver over an inbound arrival's wire-form parts (component-interfaces spec §4), decoded to
 /// the document model a plan resolves against — the same `$.<part>.<slot>` paths `plan::compile`
-/// roots every slot at (shape spec §6.2).
-pub(crate) fn parts_resolver(parts: &Parts, content: Option<&dyn ContentComponent>) -> CapturedValues {
+/// roots every slot at (shape spec §6.2). `declared` is the interaction's own `content-types`
+/// (contract-file spec §5.5): a declared slot is decoded as the interaction said, not as the peer
+/// labelled it.
+pub(crate) fn parts_resolver(
+  parts: &Parts,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> CapturedValues {
   let mut resolver = CapturedValues::new();
   for (part_name, slots) in parts {
     for (slot_name, slot_value) in slots {
       let path = format!("$.{part_name}.{slot_name}");
-      resolver = resolver.capture(path, decode_slot(slot_value, content));
+      let declared = declared_type(Some(declared), part_name, slot_name);
+      resolver = resolver.capture(path, decode_slot(slot_value, declared, content));
     }
   }
   resolver
 }
 
-/// A wire-form slot's document value: a content component decodes anything it tagged with a
-/// content type (component-interfaces spec §6); everything else — method, path, headers, an
-/// untyped body — is already the document model's own value (contract-file spec §5.3's `json`
-/// default), so it is taken as-is.
-pub(crate) fn decode_slot(slot: &SlotValue, content: Option<&dyn ContentComponent>) -> RuntimeValue {
-  match (&slot.content_type, content) {
+/// A wire-form slot's document value: a content component decodes anything with a content type —
+/// the one the interaction declared for the slot, else the one it arrived labelled with
+/// (component-interfaces spec §6, contract-file spec §5.5); everything else — method, path,
+/// headers, an untyped body — is already the document model's own value (contract-file spec §5.3's
+/// `json` default), so it is taken as-is.
+pub(crate) fn decode_slot(
+  slot: &SlotValue,
+  declared: Option<&str>,
+  content: Option<&dyn ContentComponent>,
+) -> RuntimeValue {
+  match (declared.or(slot.content_type.as_deref()), content) {
     (Some(content_type), Some(content)) => match content.decode(Decode {
-      content_type: content_type.clone(),
+      content_type: content_type.to_string(),
       value: slot.clone(),
       options: None,
     }) {
       Ok(result) => result.document,
       // Undecodable is "not there", not a crash: the plan discovers it via `check:exists`/a
       // failed match, same as any other absent value (plan-grammar spec §2.4).
-      Err(_) => RuntimeValue::Absent,
+      Err(error) => {
+        tracing::debug!(
+          content_type,
+          ?error,
+          "slot could not be decoded; matching it as absent"
+        );
+        RuntimeValue::Absent
+      }
     },
     _ => RuntimeValue::from_json(&slot.content),
   }
 }
 
-/// A generated document value, wired for reply: a scalar rides as the transport's plain wire form
-/// (component-http reads `status` this way, no content component involved); anything structured
-/// has no wire form except through a content component's encoding, so it gets one.
-///
-/// Which content type a slot actually wants is really a per-slot property of the interaction's
-/// declared shape (design 2.6) — this loop doesn't have that wiring (the same "single slot, not a
-/// registry" gap [`crate::plan::resolve`] already documents), so it infers structured-vs-scalar
-/// from the generated value instead. Correct for the RFC order interaction's JSON body; whoever
-/// adds a second content type resolves this properly.
-pub(crate) fn encode_slot(value: &Value, content: Option<&dyn ContentComponent>) -> SlotValue {
+/// A generated document value, wired for a transport. A slot the interaction declared a content type
+/// for (contract-file spec §5.5) is encoded through the component for that type, whatever the value
+/// is. An undeclared one keeps the default the declaration exists to override: a scalar rides as the
+/// transport's plain wire form (component-http reads `status` this way, no content component
+/// involved), and anything structured is encoded as `application/json`.
+pub(crate) fn encode_slot(
+  value: &Value,
+  declared: Option<&str>,
+  content: Option<&dyn ContentComponent>,
+) -> SlotValue {
+  if let (Some(content_type), Some(content)) = (declared, content) {
+    return match content.encode(Encode {
+      content_type: content_type.to_string(),
+      document: RuntimeValue::from_json(value),
+      options: None,
+    }) {
+      Ok(result) => result.value,
+      Err(error) => {
+        tracing::warn!(
+          content_type,
+          ?error,
+          "a declared content slot could not be encoded; sending its plain value"
+        );
+        plain_slot(value)
+      }
+    };
+  }
   match (value, content) {
     (Value::Object(_) | Value::Array(_), Some(content)) => match content.encode(Encode {
       content_type: "application/json".to_string(),

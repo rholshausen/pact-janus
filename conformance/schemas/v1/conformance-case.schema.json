@@ -33,6 +33,18 @@
       "description": "What this case deliberately does not decide — an open finding, or a fact ADR 0017 places outside conformance."
     },
     "interaction": { "$ref": "#/$defs/InteractionScript" },
+    "janus": {
+      "type": "object",
+      "description": "The 'janus' options this case configures beyond consumer and provider (behavioural spec 'janus'). Absent means the defaults.",
+      "properties": {
+        "components": {
+          "type": "array",
+          "description": "The project's declared components, handed to 'janus' as its components option.",
+          "items": { "type": "object" }
+        }
+      },
+      "additionalProperties": false
+    },
     "engine": { "$ref": "#/$defs/ScriptedEngine" },
     "steps": {
       "type": "array",

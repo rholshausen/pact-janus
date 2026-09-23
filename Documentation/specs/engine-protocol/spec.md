@@ -417,6 +417,7 @@ Capabilities defined in v1:
 | `encoding` | both | Frame encoding negotiation (§3.4). Host: `{ "accepts": [name, …] }` in preference order. Engine: `{ "selected": name }`. Absent on either side means `json`. |
 | `provider-shape-recording` | engine | The `provider-shape-session/*` operations (§8.5) are available. Value `{}` — presence is the whole signal. |
 | `subsumption-check` | engine | The `subsumption/*` operations (§8.6) are available. Value `{}` — presence is the whole signal. |
+| `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -538,6 +539,12 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 
 - **`create`**: `config` names the consumer and provider (`{ "consumer": { "name": … },
   "provider": { "name": … } }`) plus open, additive options. Returns the session id.
+  `config.components` carries the project's declared components (design 2.6 §10.2) as a loader
+  resolved them (design 2.7 §7.1): the engine reads no configuration file, so a host that read
+  `consumer.janus.yaml` hands its `components` over here. The engine loads them before answering, and
+  a component that cannot be loaded — no loader for its source, a failed handshake, a name that
+  collides — fails the `create` with `component-unavailable` naming it. They belong to the session
+  and end with it.
 - **`add-interaction`**: submits one complete interaction specification. The engine
   validates it and compiles what it needs; a rejected spec is a structured error
   (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
@@ -584,7 +591,10 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   or a broker is host/CLI business in the
   prototype, which also keeps I/O out of the WASM kernel. `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
-  change configuration (design 2.7 owns hook config). For message interactions, matching is
+  change configuration (design 2.7 owns hook config). `target.components` declares the project's
+  components exactly as `consumer-session/create`'s `config.components` does; they are loaded, and
+  the union of every contract's `requires` checked against them and the in-tree components (design
+  2.6 §2.3), before `verify` answers. For message interactions, matching is
   parts-in wherever the parts come from: a wire-level transport binding and a
   `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
   MUST produce identical results for the same parts (spike 1.5, finding 6).

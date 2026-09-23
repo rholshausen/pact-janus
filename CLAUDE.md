@@ -48,9 +48,11 @@ Three sources are the source of truth and take precedence over this file when th
 ## Intended repository layout
 
 ```
-engine/          Rust workspace members: kernel, built-in component crates, and hooks-host —
+engine/          Rust workspace members: kernel, built-in component crates, hooks-host —
                  the host side of hooks (loader, exec and http implementations), which lives
-                 outside the kernel because it needs a filesystem, a process and a socket
+                 outside the kernel because it needs a filesystem, a process and a socket — and
+                 component-host, the wasmtime loader for out-of-tree WASM components (task 8.1),
+                 outside the kernel because a WASM guest cannot host WASM (ADR 0013)
 cli/             `janus` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
                  its protocol bindings (task 6.1)
@@ -68,6 +70,10 @@ samples/         Demo subjects (workspace members), e.g. samples/order-service �
                  pact of a consumer that has not upgraded, which task 5.4 verifies against
                  it unchanged, and shapes/ the provider shape its own tests recorded
                  (task 7.2) — the other half of M5, which `janus check` reads
+third-party/     Components written as a third party would, from the published interfaces
+                 only — each its own Cargo workspace, excluded from ours and depending on
+                 nothing in it: third-party/janus-csv, the text/csv content component task 8.1
+                 built from the docs (Documentation/third-party-component-report.md)
 spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
@@ -171,6 +177,17 @@ consumer contracts or v1–v4 pacts, the shapes a provider published, and the su
 running. Its policy (design 2.8 §7) resolves in layers: the specification's defaults, then
 `--policy`'s document, then `--on-finding`/`--on-review`. `block` is exit 1 — the subject failed,
 not the command. Both severities default to `warn` (ADR 0016).
+
+Out-of-tree components (plan task 8.1, design 2.6 §10) are **declared**, never discovered: a
+`components` list in the project configuration (`verifier.janus.yaml` for `janus verify --config`;
+the SDKs' `components` option on the consumer side), each entry naming its source — `file` is a
+local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`. `janus`
+and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
+so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
+one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked
+third-party component is `third-party/janus-csv`: its own workspace, built with
+`cargo build --release --target wasm32-wasip2` from its directory, and built again by the tests
+that load it.
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
 normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`

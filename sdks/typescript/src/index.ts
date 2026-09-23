@@ -2,12 +2,22 @@
 // DSL is the behavioural specification's (Documentation/specs/sdk-specification/
 // behavioural-spec.json), spelled the TypeScript way (STYLE.md).
 
-export { Janus, type JanusConfig, type Mock, type Variant, type Closure, type Finalised } from "./janus.js";
+export {
+  Janus,
+  type JanusConfig,
+  type ComponentDeclaration,
+  type Mock,
+  type Variant,
+  type Closure,
+  type Finalised,
+} from "./janus.js";
 export { InteractionBuilder, type RequestParts, type ResponseParts, type MultiValue, type Spellable } from "./interaction.js";
 export {
   Shape,
+  Content,
   type Template,
   json,
+  content,
   integer,
   number,
   decimal,

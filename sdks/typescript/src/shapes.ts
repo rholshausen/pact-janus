@@ -23,6 +23,22 @@ export class Shape {
   }
 }
 
+/**
+ * A body of a named media type (behavioural spec 'content'): the slot's shape, and the type the
+ * interaction declares for it (contract spec §5.5, ADR 0020). Not a shape — it names a whole slot —
+ * so it is its own class, and only a request or response `body` accepts one.
+ */
+export class Content {
+  readonly mediaType: string;
+  readonly document: Template;
+
+  /** @internal Content comes from `content()`. */
+  constructor(mediaType: string, document: Template) {
+    this.mediaType = mediaType;
+    this.document = document;
+  }
+}
+
 /** JSON values, as a DSL author writes them where a shape is expected. */
 export type Template = Shape | string | number | boolean | null | readonly Template[] | { readonly [k: string]: Template };
 
@@ -34,6 +50,12 @@ export type Template = Shape | string | number | boolean | null | readonly Templ
 export function compile(template: Template): shape.Shape {
   if (template instanceof Shape) {
     return template.toJSON();
+  }
+  if ((template as unknown) instanceof Content) {
+    throw new TypeError(
+      "content() declares a whole slot's media type, so it belongs directly in a request or response " +
+        "body — a member of a document has no content type of its own",
+    );
   }
   if (template === null || typeof template !== "object") {
     return { shape: "equality", example: template };
@@ -53,6 +75,13 @@ const withExample = (operator: string, example: unknown, extra: Partial<shape.Sh
 
 /** A JSON body. Compiles its argument by the 'literal' rules and adds nothing (behavioural spec 'json'). */
 export const json = (document: Template): Shape => new Shape(compile(document));
+
+/**
+ * A body of `mediaType` — `text/csv`, `application/xml`, whatever a declared component handles
+ * (behavioural spec 'content'). The type is written as given; whether anything handles it is the
+ * engine's answer, at `execute`.
+ */
+export const content = (mediaType: string, document: Template): Content => new Content(mediaType, document);
 
 export const integer = (example: number): Shape => withExample("integer", example);
 export const number = (example: number): Shape => withExample("number", example);

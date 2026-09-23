@@ -242,12 +242,13 @@ defensively and fall through (§9).
   "transport": { "kind": "http", "mode": "passive" },
   "states": [ { "name": "an order exists", "params": { "id": "42" } } ],
   "parts": { "request": { }, "response": { } },
+  "content-types": { "response": { "body": "application/x-protobuf" } },
   "requires": [ { "component": "content/protobuf", "min-version": 2 } ],
   "selection": { "variants": [ ], "report": { } } }
 ```
 
 `description`, `parts` and `selection` are required; a record without evidence is not an interaction
-this format can carry (§2.2).
+this format can carry (§2.2). `content-types` declares the media type of a content slot, and is §5.5's.
 
 ### 4.2 Identity
 
@@ -356,6 +357,40 @@ needs:
 
 A verifier needs nothing else, and in particular re-samples nothing: it replays the recorded variants,
 all of them, in recorded order (variant semantics §5.1).
+
+### 5.5 Content types
+
+A content slot's octets become a document through a content component (design 2.6 §6), and which
+component that is depends on the slot's media type. A shape cannot say: it denotes a set of decoded
+documents (ADR 0007), and two shapes admitting the same documents are the same shape however the
+bytes were spelled. So the type is declared beside the parts, nested the same way
+([ADR 0020](../../decisions/0020-a-content-slots-type-is-declared-on-the-interaction.md)):
+
+```json sketch
+{ "description": "orders as CSV",
+  "content-types": { "response": { "body": "text/csv" } },
+  "parts": { "response": {
+      "status": { "shape": "equality", "example": 200 },
+      "body": { "shape": "each-like", "items": { "shape": "object", "members": { } } } } } }
+```
+
+- **It is a decode instruction, not a constraint.** The declared type chooses the component that
+  encodes the slot when the engine produces it (a mock's reply, a verifier's request) and the one that
+  decodes it when it arrives; the shape applies to the document that comes out. A subsumption check
+  does not compare declarations.
+- **Every entry names a slot `parts` gives a shape.** One that does not is `interaction-invalid`,
+  naming the entry: a declaration for a slot nobody wrote is a typo, and ignoring it would hide one.
+- **An undeclared slot keeps the default.** A structured value is produced as `application/json`,
+  anything else is passed as its plain value, and an arriving slot is decoded by the type it is
+  labelled with. This is exactly what every contract written before this section meant.
+- **The evidence repeats it.** A recorded variant's value for a declared slot carries the type in its
+  `content-type` member (§5.3), with the document itself still recorded as JSON so it stays readable.
+  A verifier encodes a replayed request slot through that component, and decodes the reply's
+  declared slots under the declared type rather than the type the provider labelled them with — the
+  consumer's shape is about the document as the consumer declared it.
+- **A declared type needs a component.** An interaction declaring `text/csv` cannot be matched by an
+  engine with no `text/csv` content component, and SHOULD say so in `requires` (§7) so the union check
+  fails the run before it starts rather than at the first body.
 
 ## 6. Provider states
 

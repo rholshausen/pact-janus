@@ -7,12 +7,14 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -24,11 +26,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "components",
     "consumer",
     "provider"
 })
 public class SessionConfig {
 
+    /**
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, **resolved** by the host's loader (spec.md \u00a78.2, lifecycle-hooks spec \u00a77.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create \u2014 not the first interaction that needs one \u2014 when one cannot be loaded. A session's components are its own and end with it.")
+    private List<Map<String, Object>> components;
     /**
      * Party
      * <p>
@@ -48,7 +58,25 @@ public class SessionConfig {
     @JsonProperty("provider")
     private Party provider;
     @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
 
     /**
      * Party
@@ -99,19 +127,23 @@ public class SessionConfig {
     }
 
     @JsonAnyGetter
-    public Map<String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public String toString() {
+    public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(SessionConfig.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
         sb.append("consumer");
         sb.append('=');
         sb.append(((this.consumer == null)?"<null>":this.consumer));
@@ -135,6 +167,7 @@ public class SessionConfig {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
         result = ((result* 31)+((this.consumer == null)? 0 :this.consumer.hashCode()));
@@ -142,7 +175,7 @@ public class SessionConfig {
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -150,7 +183,7 @@ public class SessionConfig {
             return false;
         }
         SessionConfig rhs = ((SessionConfig) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))));
+        return (((((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))));
     }
 
 }

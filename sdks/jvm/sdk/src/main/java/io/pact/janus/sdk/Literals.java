@@ -23,6 +23,9 @@ final class Literals {
     if (value instanceof ShapeNode node) {
       return node.binding();
     }
+    if (value instanceof Content) {
+      throw Content.misplaced(where);
+    }
     if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
       return equality(value, where);
     }

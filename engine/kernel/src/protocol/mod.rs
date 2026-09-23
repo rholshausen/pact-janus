@@ -32,6 +32,7 @@ mod explain;
 mod frame;
 mod hello;
 mod provider_shape_session;
+mod scope;
 mod session;
 mod subsumption;
 mod verification;

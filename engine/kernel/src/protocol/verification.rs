@@ -44,8 +44,10 @@
 //! verifying the pact where it stands, and it is the reason this path exists at all.
 
 use super::events::Stream;
-use super::wire::{find_container, mismatch_json, parts_resolver};
-use crate::component::{ContentComponent, Parts, Send as SendRequest, Stop, TransportComponent};
+use super::scope::Scope;
+use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
+use crate::common::ContentTypes;
+use crate::component::{ContentComponent, Parts, Send as SendRequest, Stop, TransportComponent, Unavailable};
 use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::hooks::{HookRunner, Occurrence, PointOutcome};
@@ -182,6 +184,11 @@ pub struct VerificationTarget {
   /// spec §8.3 says so in as many words ("open options such as state-change configuration").
   #[serde(default)]
   pub hooks: Option<Value>,
+  /// The project's declared components, resolved by the host's loader exactly as for
+  /// `consumer-session/create` (spec §8.3). Loaded, and every contract's `requires` checked, before
+  /// `verify` answers.
+  #[serde(default)]
+  pub components: Vec<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -273,6 +280,21 @@ impl Source {
         .map(|i| i.selection.variants.len())
         .sum(),
       Source::Legacy(pact) => pact.interactions.len(),
+    }
+  }
+
+  /// Component-interfaces spec §2.3: everything this document's interactions cannot run without —
+  /// their requirements and a component for each content type they declare — checked against the
+  /// run's scope before the run starts. A v1–v4 pact declares neither.
+  pub(crate) fn check(&self, scope: &Scope) -> Result<(), Unavailable> {
+    match self {
+      Source::Janus(contract) => contract.interactions.iter().try_for_each(|interaction| {
+        scope.check(
+          interaction.requires.iter().flatten(),
+          interaction.content_types.as_ref(),
+        )
+      }),
+      Source::Legacy(_) => Ok(()),
     }
   }
 
@@ -743,7 +765,11 @@ struct Ready {
   /// because the difference *is* a different reading of the same parts: design 3.5's plans
   /// address a header as one value per name (`legacy_pact::header_captures`), shapes address the
   /// slot the transport actually produced.
-  resolve: fn(&Parts, Option<&dyn ContentComponent>) -> CapturedValues,
+  resolve: fn(&Parts, &ContentTypes, Option<&dyn ContentComponent>) -> CapturedValues,
+  /// The interaction's declared content types (contract-file spec §5.5): the request's declared
+  /// slots are encoded through them before sending, the reply's decoded under them. Empty for a
+  /// v1–v4 pact, which has no declarations.
+  content_types: ContentTypes,
   /// Emitted before this variant's exchange starts, so a warning precedes the result it qualifies.
   warnings: Vec<Value>,
   /// The `interaction` document a hook's occurrence carries (lifecycle-hooks spec §3.2), with this
@@ -826,6 +852,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str) -> Prepared {
         // demonstrated `SHIPPED`, and the variant would have proved nothing.
         plan: plan::compile(&spec, &assignment, Some(&variant.id)),
         resolve: parts_resolver,
+        content_types: interaction.content_types.clone().unwrap_or_default(),
         states: states.unwrap_or_default(),
         request,
         warnings,
@@ -908,6 +935,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       assignment: json!([]),
       plan: plan::compile_legacy_response(&response),
       resolve: legacy_resolver,
+      content_types: ContentTypes::new(),
       states,
       request: legacy_pact::request_parts(&interaction.request),
       warnings: Vec::new(),
@@ -925,8 +953,12 @@ const LEGACY_VARIANT: &str = "base";
 
 /// A reply read the way design 3.5's plans address it: the generic slot captures, plus one string
 /// per header name ([`legacy_pact::header_captures`] documents why the two forms differ).
-fn legacy_resolver(parts: &Parts, content: Option<&dyn ContentComponent>) -> CapturedValues {
-  legacy_pact::header_captures(parts_resolver(parts, content), parts)
+fn legacy_resolver(
+  parts: &Parts,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> CapturedValues {
+  legacy_pact::header_captures(parts_resolver(parts, declared, content), parts)
 }
 
 /// A v1–v4 body design 3.5 cannot compile, as the error a result carries. The two cases are
@@ -1242,6 +1274,12 @@ fn drive(
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
 
+  let request = encode_declared(
+    request,
+    &exchange.ready.content_types,
+    &target.component.content_slots(),
+    content,
+  );
   let sent = target.component.send(SendRequest {
     instance: target.instance.clone(),
     parts: request,
@@ -1269,7 +1307,7 @@ fn drive(
     }));
   };
 
-  let resolver = (exchange.ready.resolve)(&reply, content);
+  let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
   let executed = execute(&exchange.ready.plan, &resolver);
   // Only the response half is scored. The request was replayed verbatim, so matching it against
   // itself would assert nothing; the provider answers for the response (variant-semantics §5.2).
@@ -1369,10 +1407,40 @@ fn interaction_spec(interaction: &contract::Interaction) -> Result<InteractionSp
   if let Some(states) = &interaction.states {
     map.insert("states".to_string(), json!(states));
   }
+  if let Some(content_types) = &interaction.content_types {
+    map.insert("content-types".to_string(), json!(content_types));
+  }
   if let Some(requires) = &interaction.requires {
     map.insert("requires".to_string(), json!(requires));
   }
   interaction_spec::parse(&document).map_err(|err| err.problems)
+}
+
+/// A replayed request's declared content slots, turned back into octets (contract-file spec §5.5):
+/// the contract records a declared slot as its document, tagged with its type, and the transport
+/// carries octets. A slot already carried as octets or text is sent as it stands, and so is every
+/// slot the transport does not treat as content (component-interfaces spec §5.5).
+fn encode_declared(
+  mut request: Parts,
+  declared: &ContentTypes,
+  content_slots: &crate::component::ContentSlots,
+  content: Option<&dyn ContentComponent>,
+) -> Parts {
+  for (part_name, slots) in request.iter_mut() {
+    let (Some(types), Some(names)) = (declared.get(part_name), content_slots.get(part_name)) else {
+      continue;
+    };
+    for (slot_name, slot) in slots.iter_mut() {
+      let as_document = matches!(slot.encoded.as_deref(), None | Some("json"));
+      if let Some(content_type) = types.get(slot_name)
+        && names.contains(slot_name)
+        && as_document
+      {
+        *slot = encode_slot(&slot.content, Some(content_type), content);
+      }
+    }
+  }
+  request
 }
 
 /// A recorded assignment (`[{dimension, point}, …]`, contract-file spec §5.2) as the compiler's

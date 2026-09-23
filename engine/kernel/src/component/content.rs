@@ -72,6 +72,10 @@ pub struct DetectResult {
 /// including its `Send + Sync` bound, for the same reason (plan task 4.5's live exchange loop
 /// calls `decode`/`encode` from a background thread while the dispatch thread runs concurrently).
 pub trait ContentComponent: Send + Sync {
+  /// Whether this component handles `content_type` — the native projection of the `content-types`
+  /// its handshake declares (spec §3.3), which is what a [`super::ContentRegistry`] routes on. Not an
+  /// operation: it answers from the declaration, never from the octets.
+  fn handles(&self, content_type: &str) -> bool;
   fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError>;
   fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError>;
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError>;

@@ -192,6 +192,12 @@ authoritative than this exploratory review — before acting on them.
   content component exists; it stops being fine at Phase 8 task 8.1, the first point a second
   (third-party WASM) content component actually needs to coexist with this one — that task should
   either build a real `ContentRegistry` or explicitly re-scope to keep deferring it.
+  **Resolved by plan task 8.1** for decoding and encoding: `component::ContentRegistry` routes by
+  media type across a session's declared components and the embedding's in-tree ones, and
+  `component::resolve`/`check_requirements` answer spec §2.3 before a session or run starts. What
+  8.1 left alone is the `ContentDetector` slot itself — `match:content-type` still takes one
+  detector, handed in by `tools/corpus` and the tests, and the live exchange and verification paths
+  execute without one ([third-party component report](third-party-component-report.md) §4).
 - **Finding 2 — not a defect; no change.** Plan-grammar spec §4.4's legacy-action table already lists
   `match:header-value` as *legacy only*, deliberately core, in the same family as
   `match:array-contains` and `match:min-type`/`max-type`: it encodes v1–v4's own *specified* default

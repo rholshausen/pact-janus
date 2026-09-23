@@ -37,10 +37,18 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 /// rely on operations behind a capability the engine did not declare. `subsumption-check` is the
 /// other half of that loop (spec §8.6) and is declared for the same reason: a CLI or a broker
 /// decides whether to *offer* a compatibility check before it has any documents to check.
-pub fn result() -> Value {
+///
+/// `components` is always declared (component-interfaces spec §10.1, ADR 0013): a host learns which
+/// loaders this embedding has from the handshake, not from a failure at interaction 40. An engine
+/// with no loader registered still says `["in-tree"]`.
+pub fn result(loaders: &[&str]) -> Value {
   json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
-    "capabilities": { "provider-shape-recording": {}, "subsumption-check": {} }
+    "capabilities": {
+      "provider-shape-recording": {},
+      "subsumption-check": {},
+      "components": { "loaders": loaders },
+    }
   })
 }

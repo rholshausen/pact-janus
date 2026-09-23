@@ -211,6 +211,9 @@ impl Conversion {
       }),
       states,
       parts,
+      // A v1–v4 body is JSON or carried as bytes (§8.4's `body-not-parsed`); either way nothing
+      // here needs a declared type — an undeclared slot already means exactly that (§5.5).
+      content_types: None,
       requires: (!requires.is_empty()).then_some(requires),
       selection: RecordedSelection {
         variants: vec![RecordedVariant {

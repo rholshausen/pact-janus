@@ -30,11 +30,11 @@ pub trait Resolver {
 /// "The kernel does not know what a header is; it knows how to ask" applies here too — the kernel
 /// does not know what JSON looks like, it knows how to ask a content component.
 ///
-/// A single slot, not a registry: every caller today hands in one hardcoded component (there is
-/// only one, `engine/component-json`'s `JsonContent`). No resolution mechanism exists yet for
-/// component-interfaces spec §2.3's "collect requirements across interactions, resolve to loaded
-/// components" — tracked in `Documentation/kernel-boundary-review.md`'s finding-1 resolution as a
-/// gap for whoever adds a second content component (Phase 8 task 8.1).
+/// A single slot, not a registry: its callers (`tools/corpus`, the tests) hand in `JsonContent`.
+/// Decoding and encoding stopped being single-slot in plan task 8.1 — [`crate::component::ContentRegistry`]
+/// routes them by media type — but detection was left as it was, and the live exchange and
+/// verification paths execute without a detector (`Documentation/kernel-boundary-review.md`,
+/// finding 1's resolution).
 pub trait ContentDetector {
   /// `None` means this detector doesn't recognise `value` as any type it handles — not "no
   /// detector was available", which [`super::interpret::execute_with_content`] reports on its own

@@ -3,7 +3,7 @@
 // *when* — one engine and one session per configured object, which is to say per test suite.
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { protocolVocabulary, type protocol } from "./generated/index.js";
 import { Engine } from "./engine/engine.js";
 import type { FramePipe } from "./engine/pipe.js";
@@ -20,6 +20,22 @@ export interface JanusConfig {
   contractDir?: string;
   /** How the engine is reached: subprocess options, or any frame pipe (a test double, or a later embedding). */
   engine?: SubprocessOptions | (() => FramePipe);
+  /**
+   * The project's declared components (component-interfaces spec §10.2) — a content handler for a
+   * type the engine does not have built in, say. Handed to the engine as they are, with a `file`
+   * source's relative path made absolute against the working directory; whether one loads is the
+   * engine's answer, at the first `execute`.
+   */
+  components?: readonly ComponentDeclaration[];
+}
+
+/** One declared component (component-interfaces `component-config.schema.json`). */
+export interface ComponentDeclaration {
+  name: string;
+  source: { kind: string; reference?: string; digest?: string; [k: string]: unknown };
+  grants?: { env?: string[]; fs?: { path: string; access?: string }[]; network?: boolean };
+  limits?: { "deadline-ms"?: number; instances?: string };
+  [k: string]: unknown;
 }
 
 /** The started transport, as the closure sees it. */
@@ -145,7 +161,11 @@ export class Janus {
   async #openSession(engine: Engine): Promise<string> {
     this.#session ??= (
       await engine.call(Op.ConsumerSessionCreate, {
-        config: { consumer: { name: this.#config.consumer }, provider: { name: this.#config.provider } },
+        config: {
+          consumer: { name: this.#config.consumer },
+          provider: { name: this.#config.provider },
+          ...(this.#config.components === undefined ? {} : { components: this.#config.components.map(resolved) }),
+        },
       })
     ).session;
     return this.#session;
@@ -159,6 +179,18 @@ export class Janus {
     await writeFile(file, `${JSON.stringify(contract)}\n`, "utf8");
     return file;
   }
+}
+
+/**
+ * A declaration as the engine receives it (lifecycle-hooks spec §7.1: the loader resolves paths, the
+ * engine reads none it was not given absolute). Everything else is passed as written.
+ */
+function resolved(declaration: ComponentDeclaration): ComponentDeclaration {
+  const reference = declaration.source.reference;
+  if (declaration.source.kind !== "file" || reference === undefined || isAbsolute(reference)) {
+    return declaration;
+  }
+  return { ...declaration, source: { ...declaration.source, reference: resolve(reference) } };
 }
 
 function mockFor(started: protocol.StartTransportResult): Mock {

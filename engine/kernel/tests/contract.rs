@@ -81,6 +81,7 @@ fn sample_contract() -> Contract {
       }),
       states: None,
       parts,
+      content_types: None,
       requires: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {

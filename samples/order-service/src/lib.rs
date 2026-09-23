@@ -209,8 +209,33 @@ fn handle(mut request: tiny_http::Request, store: &Mutex<Store>, token: Option<&
       .any(|header| header.field.equiv("Authorization") && header.value.as_str() == format!("Bearer {token}"))
   });
 
+  // The one route that answers something other than JSON (plan task 8.1): a consumer that reads
+  // orders as CSV is what a third-party `text/csv` content component is verified against.
+  if method == "GET" && path == "/orders.csv" && authorized {
+    let csv = orders_csv(&store.lock().expect("store lock poisoned"));
+    respond_bytes(request, 200, "text/csv; charset=utf-8", csv.into_bytes());
+    return;
+  }
   let (status, payload) = route(&method, &path, &body, store, authorized, token);
   respond(request, status, payload);
+}
+
+/// Every order as CSV, one row each, with a header row (RFC 4180). `channel` is a column no consumer
+/// declares — the same deliberate extra the JSON form carries — and an unshipped order's
+/// `shippedAt` is an empty field, which is all CSV has for "absent".
+fn orders_csv(store: &Store) -> String {
+  let mut csv = String::from("id,status,shippedAt,items,channel\r\n");
+  for order in store.orders.values() {
+    csv.push_str(&format!(
+      "{},{},{},{},{}\r\n",
+      order.id,
+      order.status,
+      order.shipped_at.as_deref().unwrap_or_default(),
+      order.items,
+      order.channel
+    ));
+  }
+  csv
 }
 
 fn route(
@@ -410,8 +435,12 @@ fn provider_state(body: &[u8], store: &Mutex<Store>) -> (u16, Value) {
 
 fn respond(request: tiny_http::Request, status: u16, payload: Value) {
   let body = serde_json::to_vec(&payload).expect("a serde_json::Value always serializes");
-  let header = tiny_http::Header::from_bytes(&b"content-type"[..], &b"application/json"[..])
-    .expect("a constant header always parses");
+  respond_bytes(request, status, "application/json", body);
+}
+
+fn respond_bytes(request: tiny_http::Request, status: u16, content_type: &str, body: Vec<u8>) {
+  let header = tiny_http::Header::from_bytes(&b"content-type"[..], content_type.as_bytes())
+    .expect("a content type is always a valid header value");
   let response = tiny_http::Response::from_data(body)
     .with_status_code(status)
     .with_header(header);

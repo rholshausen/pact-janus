@@ -4,6 +4,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import type { ComponentDeclaration } from "../../src/index.js";
 
 export const repoRoot = resolve(import.meta.dirname, "../../../..");
 export const suiteRoot = join(repoRoot, "conformance");
@@ -78,6 +79,8 @@ export interface Case {
   why?: string;
   note?: string;
   interaction?: InteractionScript;
+  /** The 'janus' options beyond consumer and provider. */
+  janus?: { components?: ComponentDeclaration[] };
   engine?: ScriptedEngine;
   steps?: Step[];
   expect?: {

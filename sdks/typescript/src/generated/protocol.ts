@@ -28,6 +28,12 @@ export interface Create {
 }
 
 export interface SessionConfig {
+  /**
+   * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
   consumer: Party;
   provider: Party;
   [k: string]: unknown;
@@ -284,7 +290,7 @@ export interface Hello {
 }
 
 /**
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
  */
 export interface Capabilities {
   encoding?: EncodingCapability;
@@ -857,6 +863,12 @@ export interface ExplainResult {
  * The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).
  */
 export interface VerificationTarget {
+  /**
+   * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
   /**
    * @minItems 1
    */

@@ -97,6 +97,14 @@ SDK (plan task 6.3); what that turned up is in
 - Headers and query parameters use the name-to-list rule exactly as specified: a `String` →
   `equality` over `[value]`, a `List<String>` → `equality` over the list, a `ShapeNode` → `each-like`
   of it, bounded at exactly one value (`min` 1, `max` 1). Header names are lower-cased with `Locale.ROOT`. Query names are kept as written.
+- `Shapes.content(mediaType, document)` returns a `Content`, not a `ShapeNode`: it names a whole slot,
+  so `body(Object)` is the only member that accepts one, and the literal rules and the name-to-list
+  rule refuse it with an `IllegalArgumentException` naming where it was written (behavioural spec
+  `content`, ADR 0019). It cannot be refused at compile time without overloading `body`, and one
+  `Object` parameter is what every other slot takes.
+- Components are `JanusOptions.withComponents(List<Map<String, ?>>)`: the project configuration's
+  own declarations, as plain maps (checked for JSON-ness, not for meaning). The SDK does not read
+  `consumer.janus.yaml` — see the TypeScript style guide's reason, which is the same one.
 
 ```java
 Interaction getOrder = janus.interaction("get an order")

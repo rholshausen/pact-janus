@@ -9,11 +9,11 @@
       "signature": [
         { "name": "consumer", "role": "label", "description": "The consumer's name, as 'consumer-session/create' records it." },
         { "name": "provider", "role": "label", "description": "The provider's name." },
-        { "name": "options", "role": "options-bag", "description": "Where the contract is written (default: a 'contracts' directory under the working directory) and how the engine is reached (the embedding, spec.md §2; ADR 0003)." } ],
-      "semantics": "Makes no protocol call when constructed. The engine is started, and 'engine/hello' sent offering protocol version 1 (engine-protocol spec §5), when the first 'execute' needs it; one engine and at most one open consumer session belong to one configured object, and a test suite uses one configured object. A hello that fails, or agrees any protocol version other than 1, fails that first 'execute' with the engine's error; nothing is retried.",
+        { "name": "options", "role": "options-bag", "description": "Where the contract is written (default: a 'contracts' directory under the working directory), how the engine is reached (the embedding, spec.md §2; ADR 0003), and the project's declared components (design 2.6 §10.2) — a list of component declarations, none by default." } ],
+      "semantics": "Makes no protocol call when constructed. The engine is started, and 'engine/hello' sent offering protocol version 1 (engine-protocol spec §5), when the first 'execute' needs it; one engine and at most one open consumer session belong to one configured object, and a test suite uses one configured object. A hello that fails, or agrees any protocol version other than 1, fails that first 'execute' with the engine's error; nothing is retried. When the options declare components, 'consumer-session/create' carries them as 'config.components', each declaration as written except that a 'file' source's relative 'reference' is made absolute against the working directory — the SDK is the loader here (lifecycle-hooks spec §7.1), and the engine reads no paths it did not receive absolute. No declaration is checked, fetched or opened by the SDK: whether a component loads is the engine's answer, and a component that cannot be loaded fails the first 'execute' with the engine's 'component-unavailable'. With no components declared, 'config' carries no 'components' member.",
       "errors": [
         { "code": "protocol-version-unsupported", "surfaced-as": "thrown from the first 'execute', carrying the engine's 'details.supported' verbatim" } ],
-      "conformance": [ "session.janus.no-call-until-execute", "session.janus.hello-offers-v1" ]
+      "conformance": [ "session.janus.no-call-until-execute", "session.janus.hello-offers-v1", "session.janus.components-in-create" ]
     },
     {
       "id": "interaction",
@@ -106,9 +106,22 @@
       "summary": "Marks a body as a JSON document.",
       "produces": [ { "kind": "shape-operator", "operator": "object" } ],
       "signature": [ { "name": "document", "role": "nested-shape" } ],
-      "semantics": "Compiles 'document' by the 'literal' rules and adds nothing: the HTTP transport writes a structured body through the engine's JSON content component and labels it application/json (design 2.6), so there is no node for 'json' to emit today. It exists because the RFC's DSL names the body's content type at the call site, and a later content type — or a per-slot content-type declaration in the interaction spec — will give it one; until then it is sugar, and a body written without it compiles identically.",
+      "semantics": "Compiles 'document' by the 'literal' rules and adds nothing: a structured body with no declared content type is produced as application/json (contract spec §5.5, ADR 0020 decision 3), so there is nothing for 'json' to declare and no node for it to emit. It exists because the RFC's DSL names the body's content type at the call site; a body written without it compiles identically, and a body of any other type is written with 'content'.",
       "errors": [],
       "conformance": [ "shape.json.compiles-as-literal" ]
+    },
+    {
+      "id": "content",
+      "category": "shape",
+      "summary": "Marks a body as content of a named media type — CSV, XML, anything a declared component handles.",
+      "produces": [ { "kind": "spec-member", "path": "content-types" } ],
+      "signature": [
+        { "name": "media-type", "role": "label", "description": "The body's media type, e.g. 'text/csv'. Written as given." },
+        { "name": "document", "role": "nested-shape", "description": "The body's shape, over the document the content component decodes the octets to." } ],
+      "semantics": "Accepted only as the 'body' of 'request' or 'response'. There, 'document' is compiled by the 'literal' rules as that slot's shape, exactly as if it had been written without 'content', and the interaction-spec document gains 'content-types' with the media type under the part and slot — { 'response': { 'body': 'text/csv' } } (contract spec §5.5, ADR 0020). The media type is written as given: not lower-cased, not parsed, not checked against any list, because which types exist is the engine's and its components' answer, and an interaction declaring a type no loaded component handles is refused by 'add-interaction' with 'component-unavailable'. 'content' anywhere else — nested in a template, as a header or query value, as a method, path or status — is refused at the call (ADR 0019): a declaration names a whole slot, and there is no slot for it to name there. 'content' contributes no variant dimension of its own; 'document' contributes whatever its shape does.",
+      "errors": [
+        { "code": "component-unavailable", "surfaced-as": "thrown from 'execute', naming 'content/<media type>' as the engine does" } ],
+      "conformance": [ "shape.content.declares-slot-type", "shape.content.body-only" ]
     },
     {
       "id": "integer",

@@ -1,0 +1,22 @@
+[package]
+name = "misbehaving"
+version = "1.0.0"
+edition = "2024"
+publish = false
+description = "A component that fails in every way the WASM loader must contain (component-interfaces spec §3.4, §9.2, §11.2): a trap, a runaway loop, a malformed frame, and — with the `network` feature — a socket import it was not granted."
+
+# A fixture, built by engine/component-host's tests; its own workspace keeps the root one from
+# adopting it.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+network = []
+
+[dependencies]
+wit-bindgen = "0.60"
+
+[profile.release]
+opt-level = "s"

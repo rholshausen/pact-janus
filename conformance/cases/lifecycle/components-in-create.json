@@ -1,0 +1,39 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/components-in-create",
+  "category": "lifecycle",
+  "title": "Declared components travel in 'consumer-session/create' as 'config.components', as written.",
+  "covers": ["session.janus.components-in-create"],
+  "why": "behavioural spec 'janus': when the options declare components, 'consumer-session/create' carries them as 'config.components', each declaration as written except that a 'file' source's relative 'reference' is made absolute against the working directory. No declaration is checked, fetched or opened by the SDK.",
+  "note": "The reference is absolute, so the case means the same in every language whatever its working directory. Nothing exists at it: a scripted engine loads nothing, and an SDK that opened the file would fail here.",
+  "janus": {
+    "components": [
+      { "name": "csv",
+        "source": { "kind": "file", "reference": "/components/janus-csv.wasm", "digest": "sha256:9f2c" },
+        "grants": { "env": [], "network": false },
+        "limits": { "deadline-ms": 5000 } }
+    ]
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base"] }
+    }
+  ],
+  "expect": {
+    "frames": {
+      "consumer-session/create": {
+        "config": {
+          "consumer": { "name": "web-app" },
+          "provider": { "name": "orders-api" },
+          "components": [
+            { "name": "csv",
+              "source": { "kind": "file", "reference": "/components/janus-csv.wasm", "digest": "sha256:9f2c" },
+              "grants": { "env": [], "network": false },
+              "limits": { "deadline-ms": 5000 } }
+          ]
+        }
+      }
+    }
+  }
+}

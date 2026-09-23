@@ -1,5 +1,6 @@
 package io.pact.janus.sdk;
 
+import io.pact.janus.bindings.contract.v1.ContentTypes;
 import io.pact.janus.bindings.contract.v1.InteractionSpec;
 import io.pact.janus.bindings.contract.v1.ShapePart;
 import io.pact.janus.bindings.contract.v1.State;
@@ -25,6 +26,8 @@ public final class Interaction {
   private final List<State> states = new ArrayList<>();
   private Map<String, Shape> request;
   private Map<String, Shape> response;
+  /** Part -> slot -> media type, for every body written with {@code content} (contract spec §5.5). */
+  private final Map<String, Map<String, String>> contentTypes = new LinkedHashMap<>();
 
   Interaction(String description) {
     this.description = Objects.requireNonNull(description, "interaction description");
@@ -64,6 +67,7 @@ public final class Interaction {
     RequestParts compiled = new RequestParts();
     Objects.requireNonNull(parts, "request parts").accept(compiled);
     this.request = compiled.compile(); // a malformed value is reported here, at the call
+    declare("request", compiled.bodyType());
     return this;
   }
 
@@ -75,7 +79,15 @@ public final class Interaction {
     ResponseParts compiled = new ResponseParts();
     Objects.requireNonNull(parts, "response parts").accept(compiled);
     this.response = compiled.compile();
+    declare("response", compiled.bodyType());
     return this;
+  }
+
+  private void declare(String part, String bodyType) {
+    contentTypes.remove(part);
+    if (bodyType != null) {
+      contentTypes.put(part, Map.of("body", bodyType));
+    }
   }
 
   /**
@@ -107,6 +119,11 @@ public final class Interaction {
       parts.put("response", part(response));
     }
     spec.setParts(parts);
+    if (!contentTypes.isEmpty()) {
+      ContentTypes declared = new ContentTypes();
+      contentTypes.forEach((part, slots) -> declared.setAdditionalProperty(part, new LinkedHashMap<>(slots)));
+      spec.setContentTypes(declared);
+    }
     return spec;
   }
 

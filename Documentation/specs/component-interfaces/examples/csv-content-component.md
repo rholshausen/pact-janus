@@ -69,8 +69,12 @@ component declaring `column` unnamespaced, or `xml:column`, fails to load here a
 namespace is a partition the engine enforces, not a convention authors are asked to respect.
 
 The two degradations are the honest part. `numeric-lexical` is the case shape spec §4.2 names, and
-declaring it is what lets `explain` tell a user that `{ "shape": "integer" }` over a CSV column is
-checking the *spelling* of an integer, which is all CSV can offer.
+declaring it is what lets `explain` tell a user why `{ "shape": "integer" }` over a CSV column
+rejects every value: the column decodes to strings (§3 below), and `integer` admits numbers. What
+CSV can offer is the *spelling* of an integer — `{ "shape": "regex", "pattern": "^[0-9]+$" }` — and
+that is what a consumer of a CSV body writes. (Plan task 8.1 built this component from this page,
+and found the earlier wording promised a coercion nothing performs:
+[third-party component report](../../../third-party-component-report.md), finding 4.)
 
 ## 3. Decoding
 

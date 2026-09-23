@@ -24,6 +24,7 @@ let base_url = provider.base_url();   // stopped when it is dropped
 | `GET /health` | no | `{ "status": "up" }` |
 | `GET /orders/{id}` | yes | the order, `404` if it does not exist |
 | `GET /orders` | yes | every order |
+| `GET /orders.csv` | yes | every order as `text/csv` (a header row, then one row per order) — what the third-party CSV component is verified against (plan task 8.1) |
 | `POST /orders` | yes | `201` with the created order |
 | `POST /_pact/provider-states` | no | the v3 provider-state protocol (below) |
 
@@ -255,3 +256,44 @@ Four things in that output are the sample teaching what the loop costs:
 - **The `channel` member never appears.** The provider records it, no consumer asked for it, and an
   extra provider member is must-ignore (shape spec §4.3). A checker that reported it would teach a
   team to ignore the report.
+
+## The CSV export, and a component the engine does not ship (plan task 8.1)
+
+`GET /orders.csv` is the one route that is not JSON, and it exists to be verified by a content
+component nobody in the engine wrote: `third-party/janus-csv`, a `text/csv` handler built from the
+published component interfaces alone. A consumer that reads the export declares the body's type
+(`content("text/csv", …)` in the SDKs — contract spec §5.5) and the component, and its contract
+records both. Verifying it takes one more member in the configuration, beside the hooks:
+
+```yaml
+version: 1
+
+components:
+  - name: csv
+    source: { kind: file, reference: ../../third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm }
+
+hooks:
+  state-setup:
+    - name: fixtures
+      run: { kind: http, url: "${PROVIDER_URL}/_pact/provider-states", format: pact-state-change }
+```
+
+```sh
+(cd ../../third-party/janus-csv && cargo build --release --target wasm32-wasip2)
+janus verify reporting-order-service.janus.json --provider-url $URL --config verifier-csv.janus.yaml
+```
+
+The path is relative to the configuration file, and the loader makes it absolute before the engine
+sees it. Leave the `components` member out and the run does not start: `component-unavailable`,
+naming `content/csv`, exit 2 — the contract said what it needs, and the engine checked before the
+first exchange rather than at the first body. `cli/tests/cli.rs` runs both.
+
+Three things the export teaches about CSV, which the component says rather than hides:
+
+- **Every field is a string.** CSV has no other type, so a consumer's `items` column is
+  `regex("^[0-9]+$", "2")`, not `integer(2)`: the component declares `string-only`, and an
+  `integer` shape would reject every value it decodes.
+- **An unshipped order's `shippedAt` is an empty field**, which is all CSV has for "absent". The
+  component reports `no-null` at that column when it decodes one.
+- **`channel` is a column no consumer declares**, as the JSON form's member is: an extra column is
+  must-ignore, exactly like an extra member.

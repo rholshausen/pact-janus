@@ -513,14 +513,17 @@ spike, `janus check` and the [broker integration notes](broker-integration-notes
 **M5**: the RFC's "provider may produce SHIPPED, consumer only tested PENDING" loop is reproduced
 end-to-end and reported the way the RFC sketches it).
 
-Next: **Phase 8 — External components** (§11), closing **M6**:
+Next: **Phase 8 — External components** (§11), closing **M6**. 8.1 is done: a `text/csv` content
+component written from the docs alone (`third-party/janus-csv`), the WASM loader that hosts it
+(`engine/component-host`), and the same `.wasm` running in a TypeScript consumer test and in
+`janus verify` — M6 for a content component, with the author's two documentation gaps fixed and the
+engine's missing half built ([third-party component report](third-party-component-report.md), ADR
+0020). Remaining:
 
-1. 8.1 A third-party WASM component built against the published interfaces, from the docs only —
-   every point where reading engine source was necessary is a docs finding.
-2. 8.2 OCI distribution: push, pull, resolve, cache and integrity-check that component.
-3. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
+1. 8.2 OCI distribution: push, pull, resolve, cache and integrity-check that component.
+2. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
    when they cannot be enforced.
-4. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
+3. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
 
 Then **Phase 9 — Evaluation and RFC feedback** (§12), which the running
 [findings list](phase-9-findings.md) is already accumulating input for.

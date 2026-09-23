@@ -559,3 +559,73 @@ A, and add a reason beyond convenience — a broker keys results to a matrix row
 Option C would have the broker tally the event stream itself, which is the same mistake as having it
 reimplement the subsumption walk (notes §3), one document smaller. Still not a decision: the ADR is
 9.2's.
+
+## 11. The document model has no member order, and some content types do
+
+**Found:** 2026-09-23, plan task 8.1. **Status:** open.
+
+A CSV body served by the mock comes out with its columns in alphabetical order, whatever order the
+consumer wrote them in. The kernel's document model is `serde_json` without `preserve_order`, and
+`RuntimeValue::Object` is a `BTreeMap`, so object members are sorted everywhere past the SDK. JSON
+does not care: its members are a set. CSV's header row is a sequence, and so are XML's child elements.
+The third-party CSV component keeps header order when it *decodes* (its document is ordered); the
+kernel loses it on the way back out.
+
+Nothing fails, because the CSV component's consumers read columns by name. A consumer that reads by
+position has no way to say so, and a mock that reorders columns is testing a different body from the
+one the provider sends. Options: **A.** turn on `preserve_order` workspace-wide and make
+`RuntimeValue::Object` an ordered map — the cheapest fix, with a canonical-bytes question to answer
+for contracts (ADR 0018 writes members in schema order, not insertion order, for its own records);
+**B.** let a content component declare order-significance as a degradation (`unordered-members` is
+already in the vocabulary) and leave the model alone; **C.** give `content/encode` the slot's shape,
+which carries the author's member order (see 12).
+
+## 12. `content/encode` is handed a document but not the shape it was generated from
+
+**Found:** 2026-09-23, plan task 8.1. **Status:** open.
+
+`encode([])` for CSV cannot write a header row: an empty array names no columns, and the columns are
+in the shape, which `encode` never sees. So `each-like(min: 0)`'s minimal variant serves an empty
+body, and the component's own `decode` refuses that ("no header row") — a round trip spec §6.2 says
+must hold for anything `decode` can produce, and technically does, because `decode` never produces
+`[]` from nothing. It is still a mock that serves a body its own contract calls malformed.
+
+Options: **A.** add an optional `shape` member to `content/encode` — additive, and it also answers 11's
+ordering; **B.** have the kernel pass the shape as `options` (no schema change, but `options` is the
+author's, not the engine's); **C.** declare it a degradation (`empty-loses-structure`) and let the
+author avoid `min: 0` over CSV.
+
+## 13. A verifier cannot say "you sent the wrong content type"
+
+**Found:** 2026-09-23, plan task 8.1. **Status:** open.
+
+Contract spec §5.5 decodes a declared slot as the consumer declared it, not as the provider labelled
+it, because the consumer's shape is about the document it declared. The consequence is honest, and
+the message is not. A provider answering `application/json` where `text/csv` was agreed fails with:
+
+```text
+$.response.body: Expected at least 1 item(s) and at most 1 but got 0   (expect:size)
+```
+
+It failed for the right reason, and the reason it gives is wrong: the JSON parsed as a one-line CSV
+with no data rows. The mismatch a reader needs is "declared text/csv, the provider sent
+application/json". Options: **A.** a core `check:content-type` action at the top of a declared slot's
+plan, comparing the arrival's label with the declaration (a plan change, so a corpus change); **B.** a
+verifier-side mismatch outside the plan, which ADR 0010 argues against — the plan is the record;
+**C.** surface the decode's own degradations and errors in the result (see 14), which would at least
+put "decoded 0 rows from a body labelled application/json" beside the size mismatch.
+
+## 14. A content component's errors and degradations never reach the user
+
+**Found:** 2026-09-23, plan task 8.1 (true since 4.2 for the in-tree JSON component). **Status:** open.
+
+`wire::decode_slot` turns a decode error into `RuntimeValue::Absent`, so a component that answered
+`decode-failed` — or trapped, or timed out — reaches the user as an ordinary "expected a value"
+mismatch, never as `component-failed` (component-interfaces spec §11.3). Its degradations are logged
+at `debug` and dropped, where spec §6.4 says an engine SHOULD surface them in `explain` output and
+verification results. For JSON this rarely mattered: bodies parse. For a third-party component it is
+the difference between "the provider's CSV has a ragged row on line 3" and "expected at least 1
+item". Options: **A.** carry decode outcomes into the executed plan as annotations on the resolve
+node — the same place `explain --executed` already looks; **B.** add them to the interaction-result
+event's payload beside `mismatches`; **C.** both. The component-failed half is not optional: spec
+§11.3 already says what it must be, and nothing implements it.

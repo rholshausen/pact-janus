@@ -243,6 +243,9 @@ public final class Janus implements AutoCloseable {
         SessionConfig config = new SessionConfig();
         config.setConsumer(party(consumer));
         config.setProvider(party(provider));
+        if (!options.components().isEmpty()) {
+          config.setComponents(options.components().stream().map(Janus::resolved).toList());
+        }
         create.setConfig(config);
         session = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class).getSession();
       }
@@ -428,5 +431,24 @@ public final class Janus implements AutoCloseable {
   @Override
   public String toString() {
     return "Janus[" + consumer + " -> " + provider + "]";
+  }
+
+  /**
+   * A declaration as the engine receives it (lifecycle-hooks spec §7.1: the loader resolves paths, the
+   * engine reads none it was not given absolute). Everything else is passed as written.
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> resolved(Map<String, Object> declaration) {
+    if (!(declaration.get("source") instanceof Map<?, ?> source)
+        || !"file".equals(source.get("kind"))
+        || !(source.get("reference") instanceof String reference)
+        || Path.of(reference).isAbsolute()) {
+      return declaration;
+    }
+    Map<String, Object> resolvedSource = new LinkedHashMap<>((Map<String, Object>) source);
+    resolvedSource.put("reference", Path.of(System.getProperty("user.dir")).resolve(reference).toString());
+    Map<String, Object> copy = new LinkedHashMap<>(declaration);
+    copy.put("source", resolvedSource);
+    return copy;
   }
 }

@@ -6,7 +6,7 @@
 
 use super::error::InteractionSpecError;
 use super::model::{InteractionSpec, Part};
-use crate::common::{Requirement, State, Transport};
+use crate::common::{ContentTypes, Requirement, State, Transport};
 use crate::error::{Problem, json_pointer, push_pointer_segment};
 use crate::shape;
 use serde::de::DeserializeOwned;
@@ -30,6 +30,10 @@ pub fn parse(value: &Value) -> Result<InteractionSpec, InteractionSpecError> {
   let states = parse_field::<Vec<State>>(obj, "states", &mut problems);
   let requires = parse_field::<Vec<Requirement>>(obj, "requires", &mut problems);
   let parts = parse_parts(obj, &mut problems);
+  let content_types = parse_field::<ContentTypes>(obj, "content-types", &mut problems);
+  if let (Some(content_types), Some(parts)) = (&content_types, &parts) {
+    check_content_types(content_types, parts, &mut problems);
+  }
 
   match (description, parts) {
     (Some(description), Some(parts)) if problems.is_empty() => Ok(InteractionSpec {
@@ -37,6 +41,7 @@ pub fn parse(value: &Value) -> Result<InteractionSpec, InteractionSpecError> {
       transport,
       states,
       parts,
+      content_types,
       requires,
     }),
     _ => Err(InteractionSpecError { problems }),
@@ -89,6 +94,39 @@ fn parse_field<T: DeserializeOwned>(
         message: err.inner().to_string(),
       });
       None
+    }
+  }
+}
+
+/// `content-types` (contract-file spec §5.5): every entry names a slot `parts` gives a shape, and
+/// names a media type. A declaration for a slot nobody wrote is a typo, and ignoring it would hide
+/// one.
+fn check_content_types(
+  content_types: &ContentTypes,
+  parts: &BTreeMap<String, Part>,
+  problems: &mut Vec<Problem>,
+) {
+  for (part_name, slots) in content_types {
+    for (slot_name, media_type) in slots {
+      let mut pointer = String::from("/content-types");
+      push_pointer_segment(&mut pointer, part_name);
+      push_pointer_segment(&mut pointer, slot_name);
+      if !parts
+        .get(part_name)
+        .is_some_and(|part| part.contains_key(slot_name))
+      {
+        problems.push(Problem {
+          pointer,
+          message: format!(
+            "declares a content type for '{part_name}.{slot_name}', which 'parts' gives no shape"
+          ),
+        });
+      } else if media_type.trim().is_empty() {
+        problems.push(Problem {
+          pointer,
+          message: "a declared content type must not be empty".to_string(),
+        });
+      }
     }
   }
 }

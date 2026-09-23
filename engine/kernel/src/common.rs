@@ -38,3 +38,13 @@ pub struct Requirement {
   #[serde(rename = "min-version", skip_serializing_if = "Option::is_none")]
   pub min_version: Option<u64>,
 }
+
+/// Part name -> slot name -> the media type of that slot's content (contract-file spec §5.5, ADR
+/// 0020). A decode instruction, not a constraint: it names the content component that turns the
+/// slot's octets into the document its shape applies to. A slot with no entry is undeclared.
+pub type ContentTypes = BTreeMap<String, BTreeMap<String, String>>;
+
+/// The declared media type of one slot, if the interaction declared one.
+pub fn declared_type<'a>(content_types: Option<&'a ContentTypes>, part: &str, slot: &str) -> Option<&'a str> {
+  content_types?.get(part)?.get(slot).map(String::as_str)
+}

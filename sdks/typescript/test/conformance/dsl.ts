@@ -7,6 +7,7 @@ import {
   Janus,
   anyOf,
   boolean,
+  content,
   date,
   datetime,
   decimal,
@@ -32,6 +33,9 @@ import type { HelperCall, InteractionScript, MultiValue } from "./cases.js";
 const helpers: Record<string, (args: unknown[], options: Record<string, number>) => Shape | Template> = {
   literal: (args) => template(args[0]),
   json: (args) => json(template(args[0])),
+  // Not a shape — it names a whole slot — but a case writes it where a body goes, as a call, like
+  // every other primitive. The SDK decides where it is accepted; this only spells it.
+  content: (args) => content(args[0] as string, template(args[1])) as unknown as Template,
   integer: (args) => integer(args[0] as number),
   number: (args) => number(args[0] as number),
   decimal: (args) => decimal(args[0] as number),

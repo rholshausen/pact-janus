@@ -14,6 +14,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -25,10 +26,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "components",
     "transports"
 })
 public class VerificationTarget {
 
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md \u00a78.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.")
+    private List<Map<String, Object>> components;
     /**
      * 
      * (Required)
@@ -37,7 +46,25 @@ public class VerificationTarget {
     @JsonProperty("transports")
     private List<TransportBinding> transports;
     @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
 
     /**
      * 
@@ -60,19 +87,23 @@ public class VerificationTarget {
     }
 
     @JsonAnyGetter
-    public Map<String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public String toString() {
+    public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VerificationTarget.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
         sb.append("transports");
         sb.append('=');
         sb.append(((this.transports == null)?"<null>":this.transports));
@@ -93,12 +124,13 @@ public class VerificationTarget {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.transports == null)? 0 :this.transports.hashCode()));
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -106,7 +138,7 @@ public class VerificationTarget {
             return false;
         }
         VerificationTarget rhs = ((VerificationTarget) other);
-        return (((this.transports == rhs.transports)||((this.transports!= null)&&this.transports.equals(rhs.transports)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.transports == rhs.transports)||((this.transports!= null)&&this.transports.equals(rhs.transports)))&&((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

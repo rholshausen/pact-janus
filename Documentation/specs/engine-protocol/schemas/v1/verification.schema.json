@@ -65,6 +65,11 @@
               "options": { "type": "object" }
             }
           }
+        },
+        "components": {
+          "type": "array",
+          "description": "The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.",
+          "items": { "type": "object" }
         }
       }
     },

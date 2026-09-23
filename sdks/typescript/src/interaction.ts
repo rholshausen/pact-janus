@@ -3,7 +3,7 @@
 // call — `execute` submits it.
 
 import type { contract, shape } from "./generated/index.js";
-import { compile, Shape, type Template } from "./shapes.js";
+import { compile, Content, Shape, type Template } from "./shapes.js";
 
 /** A header or query value the rule can spell: a string, a whole number, or a boolean (ADR 0019). */
 export type Spellable = string | number | boolean;
@@ -16,13 +16,13 @@ export interface RequestParts {
   path?: Template;
   query?: { readonly [name: string]: MultiValue };
   headers?: { readonly [name: string]: MultiValue };
-  body?: Template;
+  body?: Template | Content;
 }
 
 export interface ResponseParts {
   status?: Template;
   headers?: { readonly [name: string]: MultiValue };
-  body?: Template;
+  body?: Template | Content;
 }
 
 export class InteractionBuilder {
@@ -30,6 +30,8 @@ export class InteractionBuilder {
   readonly #states: contract.State[] = [];
   #request: Record<string, shape.Shape> | undefined;
   #response: Record<string, shape.Shape> | undefined;
+  /** Part -> slot -> media type, for every body written with `content` (contract spec §5.5). */
+  readonly #contentTypes = new Map<string, Record<string, string>>();
 
   constructor(description: string) {
     this.#description = description;
@@ -50,7 +52,7 @@ export class InteractionBuilder {
       ...slots({ method: parts.method, path: parts.path }),
       ...multiValueSlot("query", parts.query, (name) => name),
       ...multiValueSlot("headers", parts.headers, (name) => name.toLowerCase()),
-      ...slots({ body: parts.body }),
+      ...this.#body("request", parts.body),
     };
     return this;
   }
@@ -59,9 +61,19 @@ export class InteractionBuilder {
     this.#response = {
       ...slots({ status: parts.status }),
       ...multiValueSlot("headers", parts.headers, (name) => name.toLowerCase()),
-      ...slots({ body: parts.body }),
+      ...this.#body("response", parts.body),
     };
     return this;
+  }
+
+  /** The body slot: its shape by the 'literal' rules, and its declared media type if `content` named one. */
+  #body(part: string, body: Template | Content | undefined): Record<string, shape.Shape> {
+    this.#contentTypes.delete(part);
+    if (body instanceof Content) {
+      this.#contentTypes.set(part, { body: body.mediaType });
+      return slots({ body: body.document });
+    }
+    return slots({ body });
   }
 
   /** The interaction-spec document this chain describes. */
@@ -78,6 +90,9 @@ export class InteractionBuilder {
       transport: { kind: "http", mode: "passive" },
       ...(this.#states.length > 0 ? { states: this.#states.map((s) => ({ ...s })) } : {}),
       parts,
+      ...(this.#contentTypes.size > 0
+        ? { "content-types": Object.fromEntries([...this.#contentTypes].map(([part, slots]) => [part, { ...slots }])) }
+        : {}),
     };
   }
 }
@@ -120,6 +135,12 @@ function multiValueSlot(
         `${slot}: '${name}' is already declared as '${spelled}' — HTTP header names are ` +
           "case-insensitive, so the SDK writes them lower-cased; give one name a list of values " +
           "instead of declaring it twice",
+      );
+    }
+    if ((value as unknown) instanceof Content) {
+      throw new TypeError(
+        `${slot}.${spelled}: content() declares a body's media type; a ${slot === "query" ? "query" : "header"} ` +
+          "value has no content type of its own",
       );
     }
     compiled[spelled] =

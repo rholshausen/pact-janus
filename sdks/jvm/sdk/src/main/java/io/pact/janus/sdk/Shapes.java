@@ -31,6 +31,17 @@ public final class Shapes {
     return new ShapeNode(Literals.compile(document, "json(...)"));
   }
 
+  /**
+   * {@code content}: a body of {@code mediaType} — {@code text/csv}, {@code application/xml},
+   * whatever a declared component handles. {@code document} is compiled by the literal rules as the
+   * body's shape, and the interaction declares the type for that slot (contract spec §5.5). The type
+   * is written as given; whether anything handles it is the engine's answer, at {@code execute}.
+   * Accepted only as a request or response body.
+   */
+  public static Content content(String mediaType, Object document) {
+    return new Content(mediaType, document);
+  }
+
   // ---------------------------------------------------------------------------------------------
   // kind predicates
 

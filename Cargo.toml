@@ -6,6 +6,7 @@ members = [
   "engine/component-http",
   "engine/component-oauth2",
   "engine/hooks-host",
+  "engine/component-host",
   "cli",
   "samples/order-service",
   "tools/schema-compat",
@@ -17,7 +18,7 @@ members = [
 # Spikes are standalone projects, never workspace members. The benchmark
 # harness is durable but standalone too — it drags the whole pact_ffi
 # dependency tree, which the main workspace should not pay for.
-exclude = ["spikes", "benchmarks"]
+exclude = ["spikes", "benchmarks", "third-party"]
 
 [workspace.package]
 version = "0.0.0"

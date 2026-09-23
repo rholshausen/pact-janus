@@ -68,6 +68,14 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   that collide once lower-cased (ADR 0019). Note that this is an exact comparison — see
   [Phase 9 finding 1](../../Documentation/phase-9-findings.md) for why a provider adding
   `; charset=utf-8` to a *response* header will fail it today.
+- `content(mediaType, document)` returns a `Content`, not a `Shape`: it names a whole slot, so it is
+  its own class, and `RequestParts.body`/`ResponseParts.body` are the only members typed to accept
+  one (`Template | Content`). Anywhere else the type checker refuses it, and `compile` refuses it at
+  run time for a caller that cast around the types (behavioural spec `content`, ADR 0019).
+- Components are the `components` member of `JanusConfig`, a list of `ComponentDeclaration`s — the
+  project configuration's own document, typed loosely because its vocabulary is open. The SDK does
+  not read `consumer.janus.yaml`: a YAML parser would be the SDK's first runtime dependency, and the
+  behavioural specification asks only for the declarations (third-party component report §4).
 
 ## Test-framework integration
 

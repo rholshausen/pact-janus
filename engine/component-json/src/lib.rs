@@ -72,6 +72,10 @@ fn require_json(content_type: &str) -> Result<(), ComponentError> {
 }
 
 impl ContentComponent for JsonContent {
+  fn handles(&self, content_type: &str) -> bool {
+    require_json(content_type).is_ok()
+  }
+
   fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError> {
     require_json(&req.content_type)?;
     let document = match slot_text(&req.value)? {

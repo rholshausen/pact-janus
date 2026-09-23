@@ -1,0 +1,35 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/content-declares-slot-type",
+  "category": "translation",
+  "title": "A body wrapped in 'content' compiles as it would unwrapped, and declares its media type under its part and slot.",
+  "covers": ["shape.content.declares-slot-type"],
+  "why": "behavioural spec 'content': 'document' is compiled by the 'literal' rules as that slot's shape, exactly as if it had been written without 'content', and the interaction-spec document gains 'content-types' with the media type under the part and slot (contract spec §5.5, ADR 0020). The media type is written as given.",
+  "interaction": {
+    "description": "orders as CSV",
+    "request": {
+      "method": "POST",
+      "path": "/orders/import",
+      "body": { "$": "content", "args": ["text/csv", "id,status\r\n42,NEW\r\n"] }
+    },
+    "response": {
+      "status": 200,
+      "body": { "$": "content", "args": ["Text/CSV; header=present", [{ "id": { "$": "string", "args": ["42"] } }]] }
+    }
+  },
+  "expect": {
+    "at": {
+      "/content-types": {
+        "request": { "body": "text/csv" },
+        "response": { "body": "Text/CSV; header=present" }
+      },
+      "/parts/request/body": { "shape": "equality", "example": "id,status\r\n42,NEW\r\n" },
+      "/parts/response/body": {
+        "shape": "array",
+        "entries": [
+          { "shape": "object", "members": { "id": { "shape": "string", "example": "42" } } }
+        ]
+      }
+    }
+  }
+}

@@ -13,7 +13,7 @@
 //! writer's determinism (§2.4) independent of whatever order the code that built the value
 //! happened to insert members in, rather than a property that depends on construction order.
 
-use crate::common::{Requirement, State, Transport};
+use crate::common::{ContentTypes, Requirement, State, Transport};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -61,6 +61,9 @@ pub struct Interaction {
   pub states: Option<Vec<State>>,
   /// Part name -> slot name -> shape (opaque; design 2.2 owns the shape's own interior).
   pub parts: BTreeMap<String, ShapePart>,
+  /// Declared content types (contract-file spec §5.5, ADR 0020), recorded as the author wrote them.
+  #[serde(rename = "content-types", skip_serializing_if = "Option::is_none")]
+  pub content_types: Option<ContentTypes>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub requires: Option<Vec<Requirement>>,
   pub selection: RecordedSelection,

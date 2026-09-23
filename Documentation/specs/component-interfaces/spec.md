@@ -604,11 +604,16 @@ projection of the frame surface, and the projection is specified rather than inc
 
 ### 9.2 The WASM binding (out-of-tree, default)
 
-The component exports the frozen byte-pipe world, the same shape ADR 0003 froze for the engine itself:
+The component exports the frozen byte-pipe world, the same shape ADR 0003 froze for the engine itself.
+Its WIT is published as [`wit/component.wit`](wit/component.wit) — package
+`pact:janus-component@1.0.0`, world `component`, exporting interface `pipe`:
 
 ```wit
 call: func(request: list<u8>) -> list<u8>;
 ```
+
+The package names the pipe, not the protocol: it never changes, because nothing a component says
+travels in its type (§3). An author builds against that file; an engine's WASM loader links it.
 
 One request frame in, exactly one response frame out, strictly serial per instance, UTF-8 JSON with no
 framing header — the buffer length delimits the frame. There is no negotiated encoding on this pipe in
@@ -621,7 +626,21 @@ Normative host obligations, all measured in spike 1.4:
 - **Governed imports.** A component's imports MUST be checked against its grants at load; surplus
   imports are a load failure. A component built with `std` will import WASI interfaces it never uses,
   and satisfying them with nothing is why that is harmless — but "harmless" is a property to verify,
-  not to assume (spike 1.4 finding 7).
+  not to assume (spike 1.4 finding 7). The rule, per WASI 0.2 package:
+
+  | Import | Needs | Without the grant |
+  |---|---|---|
+  | `wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:cli/{stdin,stdout,stderr,exit,terminal-*}` | nothing | linked; stdin is empty, stdout and stderr are discarded or logged by the engine, never a frame channel |
+  | `wasi:cli/environment` | nothing | linked with exactly the variables `env` names — none by default |
+  | `wasi:filesystem/*` | nothing | linked with exactly the directories `fs` preopens — none by default |
+  | `wasi:sockets/*`, `wasi:http/*` | `network: true` | **load failure**, naming the import |
+  | anything else (`pact:*` aside, which is the export) | — | **load failure**, naming the import |
+
+  Environment and filesystem imports are what `std` brings whether a component reads a variable or
+  not, so refusing them would refuse every `std` component; linking them to nothing is the grant.
+  Sockets are refused at load because a component that imports them intends to open one, and a
+  refusal at load names the component where a refusal at first use names a body that would not
+  parse.
 - **Bounded execution.** Epoch interruption with a per-call deadline (§3.4).
 - **Loud poisoning.** A trapped instance is never reused (§3.4).
 
@@ -726,7 +745,10 @@ Components are **declared**, never discovered. An engine that goes looking for s
 ```
 
 `source.kind` is an open vocabulary: `oci`, `file` (a local `.wasm`, for development and for task 8.1),
-`subprocess` (a command the engine spawns). Where this configuration file lives and how it merges with the rest
+`subprocess` (a command the engine spawns). A `file` reference is resolved against the configuration
+file's directory by the loader (design 2.7 §7.1), so the engine receives an absolute path; a `digest`
+on a `file` source is the SHA-256 of the file's bytes and is checked before instantiation exactly as
+an OCI manifest digest is (§10.3). Where this configuration file lives and how it merges with the rest
 of a project's configuration is design 2.7's business — it shares a file with hook configuration — and
 this specification owns only the component entries.
 

@@ -34,6 +34,17 @@ jobs:
         run: cargo test
       - name: WASM build (kernel)
         run: cargo build --package pact_janus_kernel --target wasm32-wasip2
+      # Plan task 8.1: the third-party CSV component is out of tree — its own workspace, depending
+      # on nothing here — so the workspace steps above never see it. It is held to the same bar on
+      # its own, and built for the target a component ships as; the engine's tests build it again
+      # and load it.
+      - name: Third-party component (janus-csv)
+        working-directory: third-party/janus-csv
+        run: |
+          cargo fmt -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          cargo build --release --target wasm32-wasip2
       - name: Spec schema lint
         run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
       # Plan task 6.4: the conformance corpus against its own schema, and against the behavioural

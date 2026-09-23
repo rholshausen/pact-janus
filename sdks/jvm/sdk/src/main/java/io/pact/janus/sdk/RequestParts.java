@@ -60,7 +60,10 @@ public final class RequestParts extends HttpPart<RequestParts> {
     return this;
   }
 
-  /** The body: any value or shape, compiled by the literal rules ({@link Shapes#json} is sugar for it). */
+  /**
+   * The body: any value or shape, compiled by the literal rules ({@link Shapes#json} is sugar for it),
+   * or {@link Shapes#content}'s result, which also declares the body's media type.
+   */
   public RequestParts body(Object body) {
     this.body = body;
     return this;
@@ -81,8 +84,13 @@ public final class RequestParts extends HttpPart<RequestParts> {
       slots.put("headers", headersShape());
     }
     if (body != UNSET) {
-      slot(slots, "body", body, "request.body");
+      body(slots, body, "request.body");
     }
     return slots;
+  }
+
+  /** The body's declared media type (behavioural spec {@code content}), or {@code null}. */
+  String bodyType() {
+    return body == UNSET ? null : declaredType(body);
   }
 }

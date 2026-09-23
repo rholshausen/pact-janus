@@ -11,12 +11,15 @@ use super::hello::{self, Hello};
 use super::provider_shape_session::{
   Create as CreateRecording, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
 };
-use super::session::{ServeVariantError, SessionStore, VariantsError};
+use super::scope::Scope;
+use super::session::{AddInteractionError, ServeVariantError, SessionStore, VariantsError};
 use super::subsumption::{
   self as subsumption_ops, Check as SubsumptionCheck, Decide as SubsumptionDecide, SubsumptionError,
 };
 use super::verification::{self, Run, Target, Verify, VerifyError};
-use crate::component::{ContentComponent, HookComponent, Start, Stop, TransportComponent};
+use crate::component::{
+  ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, Start, Stop, TransportComponent,
+};
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
 use crate::subsumption::CheckError;
 use crate::upgrade;
@@ -38,9 +41,16 @@ pub struct Engine {
   /// design 2.6) — empty for a plain [`Engine::new`], which is a legitimate engine that simply
   /// answers `start-transport` with `component-unavailable` for anything named.
   transports: HashMap<String, Arc<dyn TransportComponent>>,
-  /// The one content component this embedding registered, if any (plan task 4.5's exchange loop;
-  /// [`crate::plan::resolve`]'s own "single slot, not a registry" simplification, reused here).
-  content: Option<Arc<dyn ContentComponent>>,
+  /// The content components compiled into this embedding, in precedence order. A session or run
+  /// puts the components its project declared ahead of these ([`Scope`], plan task 8.1).
+  content: ContentRegistry,
+  /// How this embedding loads declared components, by source kind (component-interfaces spec
+  /// §10.1, ADR 0013). Empty means `["in-tree"]` only: every declared component is
+  /// `component-unavailable`, naming the loaders there are.
+  loaders: Vec<Arc<dyn ComponentLoader>>,
+  /// The components compiled in, by interface and name: what a requirement can be satisfied by
+  /// without a declaration, and what a declaration may not reuse the name of (spec §2.4).
+  in_tree: Vec<InTree>,
   next_transport: u64,
   /// Live event streams by id (spec §9.1), each belonging to the session whose work produces it.
   /// Registered when that work starts and removed when its terminal event is *delivered* —
@@ -69,6 +79,11 @@ pub struct Engine {
   next_recording: u64,
 }
 
+/// The version an in-tree component answers requirements with. In-tree components ship with the
+/// engine and have no release line of their own yet, so they all claim the first major a contract
+/// can require (component-interfaces spec §2.3).
+const IN_TREE_VERSION: &str = "1.0.0";
+
 impl Default for Engine {
   fn default() -> Self {
     Self::new()
@@ -85,7 +100,9 @@ impl Engine {
       shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
-      content: None,
+      content: ContentRegistry::new(),
+      loaders: Vec::new(),
+      in_tree: Vec::new(),
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
@@ -106,12 +123,25 @@ impl Engine {
     transports: HashMap<String, Arc<dyn TransportComponent>>,
     content: Option<Arc<dyn ContentComponent>>,
   ) -> Self {
+    let in_tree = transports
+      .keys()
+      .map(|name| InTree {
+        interface: "transport".to_string(),
+        name: name.clone(),
+        version: IN_TREE_VERSION.to_string(),
+      })
+      .collect();
+    let content = content
+      .into_iter()
+      .fold(ContentRegistry::new(), ContentRegistry::with);
     Engine {
       hello_done: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports,
       content,
+      loaders: Vec::new(),
+      in_tree,
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
@@ -122,6 +152,30 @@ impl Engine {
       recordings: HashMap::new(),
       next_recording: 0,
     }
+  }
+
+  /// Register a way of loading declared components (component-interfaces spec §10.1): the WASM
+  /// loader lives in `engine/component-host`, because a kernel that builds for `wasm32-wasip2`
+  /// cannot host WASM components (ADR 0013). It is listed in `engine/hello`'s `components.loaders`.
+  pub fn register_component_loader(&mut self, loader: Arc<dyn ComponentLoader>) {
+    self.loaders.push(loader);
+  }
+
+  /// Name a component compiled into this embedding, so a requirement can be satisfied by it and a
+  /// declaration cannot reuse its name (spec §2.3, §2.4). Transports passed to
+  /// [`Engine::with_components`] are named already; a content component carries no name there.
+  pub fn declare_in_tree(&mut self, interface: &str, name: &str, version: &str) {
+    self.in_tree.push(InTree {
+      interface: interface.to_string(),
+      name: name.to_string(),
+      version: version.to_string(),
+    });
+  }
+
+  /// Load a scope's declared components (spec §10.3 steps 4–5).
+  fn scope(&self, declarations: &[Value]) -> Result<Scope, EngineError> {
+    Scope::resolve(declarations, &self.loaders, &self.in_tree, &self.content)
+      .map_err(|unavailable| EngineError::component_unresolved(&unavailable))
   }
 
   /// Register a hook implementation this embedding can run (lifecycle-hooks spec §8.5). `exec` and
@@ -231,7 +285,10 @@ impl Engine {
     match hello::negotiate(&hello) {
       Some(_version) => {
         self.hello_done = true;
-        ResponseFrame::ok(id, hello::result())
+        let loaders: Vec<&str> = std::iter::once("in-tree")
+          .chain(self.loaders.iter().map(|loader| loader.name()))
+          .collect();
+        ResponseFrame::ok(id, hello::result(&loaders))
       }
       None => ResponseFrame::err(
         id,
@@ -265,10 +322,17 @@ impl Engine {
       Ok(create) => create,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    // Component-interfaces spec §10.3: a component that cannot be loaded fails the `create`, not
+    // the first interaction that would have needed it.
+    let scope = match self.scope(&create.config.components) {
+      Ok(scope) => scope,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
     let session = self.sessions.create(
       create.config.consumer,
       create.config.provider,
       create.config.policy,
+      scope,
     );
     ResponseFrame::ok(id, json!({ "session": session }))
   }
@@ -283,7 +347,12 @@ impl Engine {
     };
     match session.add_interaction(&req.interaction) {
       Ok(handle) => ResponseFrame::ok(id, json!({ "handle": handle })),
-      Err(err) => ResponseFrame::err(id, EngineError::interaction_invalid(&err.problems)),
+      Err(AddInteractionError::Invalid(err)) => {
+        ResponseFrame::err(id, EngineError::interaction_invalid(&err.problems))
+      }
+      Err(AddInteractionError::Unavailable(unavailable)) => {
+        ResponseFrame::err(id, EngineError::component_unresolved(&unavailable))
+      }
     }
   }
 
@@ -328,13 +397,7 @@ impl Engine {
     };
     self.next_transport += 1;
     let instance = format!("t-{}", self.next_transport);
-    match session.start_transport(
-      &req.transport,
-      component,
-      self.content.clone(),
-      instance,
-      req.options,
-    ) {
+    match session.start_transport(&req.transport, component, instance, req.options) {
       Ok(endpoint) => ResponseFrame::ok(id, json!({ "endpoint": endpoint })),
       Err(err) => ResponseFrame::err(id, EngineError::component_failed(&req.transport, &err)),
     }
@@ -405,6 +468,19 @@ impl Engine {
       Err(err) => return ResponseFrame::err(id, verify_error(err)),
     };
 
+    // Component-interfaces spec §2.3: load what the project declared, then collect the union of
+    // every interaction's requirements and fail the unsatisfiable ones — before any transport is
+    // started and before any exchange runs.
+    let scope = match self.scope(&req.target.components) {
+      Ok(scope) => scope,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    for source in &contracts {
+      if let Err(unavailable) = source.check(&scope) {
+        return ResponseFrame::err(id, EngineError::component_unresolved(&unavailable));
+      }
+    }
+
     // Every target transport is started before the run begins, so an unreachable or
     // misconfigured provider fails the *call* rather than arriving as a run that verified nothing.
     let mut targets = Vec::with_capacity(req.target.transports.len());
@@ -473,14 +549,7 @@ impl Engine {
     };
 
     let stream = self.open_stream();
-    let run = verification::start(
-      contracts,
-      targets,
-      self.content.clone(),
-      hooks,
-      req.options,
-      stream,
-    );
+    let run = verification::start(contracts, targets, scope.content(), hooks, req.options, stream);
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))

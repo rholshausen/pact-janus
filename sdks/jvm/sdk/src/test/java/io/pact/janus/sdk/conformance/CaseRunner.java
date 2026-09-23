@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -91,6 +92,11 @@ final class CaseRunner {
     ScriptedPipe pipe = live ? null : new ScriptedPipe(testCase.get("engine"));
     Path contractDirectory = Files.createTempDirectory("janus-conformance-");
     JanusOptions options = JanusOptions.defaults().withContractDirectory(contractDirectory);
+    JsonNode components = testCase.path("janus").path("components");
+    if (components.isArray()) {
+      options = options.withComponents(Suite.MAPPER.convertValue(
+          components, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {}));
+    }
     Janus janus = Janus.of(CONSUMER, PROVIDER, pipe == null ? options : options.withEmbedding(pipe));
     Set<String> dimensions = new LinkedHashSet<>();
     List<Integer> variantCounts = new ArrayList<>();

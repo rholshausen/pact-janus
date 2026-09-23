@@ -42,6 +42,13 @@ fn main() {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  // The components a consumer's project declares arrive in `consumer-session/create` (plan task
+  // 8.1): this embedding is native, so it can host them, and says so in `engine/hello`.
+  engine.declare_in_tree("content", "json", "1.0.0");
+  match pact_janus_component_host::WasmLoader::new() {
+    Ok(loader) => engine.register_component_loader(Arc::new(loader)),
+    Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),
+  }
 
   let stdin = std::io::stdin();
   let stdout = std::io::stdout();

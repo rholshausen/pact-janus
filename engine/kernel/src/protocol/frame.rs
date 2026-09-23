@@ -266,6 +266,17 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` for a declared component that could not be resolved, or a requirement
+  /// nothing satisfies (component-interfaces spec §11.3): `details` says which case.
+  pub fn component_unresolved(unavailable: &crate::component::Unavailable) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: unavailable.message.clone(),
+      details: Some(unavailable.details.clone()),
+    }
+  }
+
   /// `component-failed` (spec §10.2): a loaded component answered with an error, passed through
   /// opaquely (`details.error`) — the kernel does not understand a component error's interior and
   /// MUST NOT translate it (design 2.6).

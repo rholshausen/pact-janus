@@ -1,0 +1,13 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/content-in-a-header",
+  "category": "translation",
+  "title": "'content' given as a header value is refused at the call.",
+  "covers": ["shape.content.body-only"],
+  "why": "behavioural spec 'content' (ADR 0019): accepted only as the 'body' of 'request' or 'response'; anywhere else it is refused at the call — a declaration names a whole slot, and there is no slot for it to name there.",
+  "interaction": {
+    "description": "a content declaration where no slot is",
+    "response": { "headers": { "X-Report": { "$": "content", "args": ["text/csv", "a,b"] } } }
+  },
+  "expect": { "refused": true }
+}

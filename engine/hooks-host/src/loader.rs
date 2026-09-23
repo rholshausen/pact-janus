@@ -114,6 +114,9 @@ pub fn resolve(document: &Value, base: &Path, env: &HashMap<String, String>) -> 
     }
   }
   resolved.insert("hooks".to_string(), Value::Object(hooks));
+  if let Some(components) = interpolated.get("components") {
+    resolved.insert("components".to_string(), resolve_components(components, base)?);
+  }
   let resolved = Value::Object(resolved);
 
   // Validated by the kernel's own validator, not a second copy of the rules here: a configuration
@@ -121,6 +124,39 @@ pub fn resolve(document: &Value, base: &Path, env: &HashMap<String, String>) -> 
   // the file form would grow its own dialect.
   pact_janus_kernel::hooks::config::parse(&resolved).map_err(LoadError::Invalid)?;
   Ok(resolved)
+}
+
+/// The project's `components` (component-interfaces spec §10.2), with step 3 applied: a `file`
+/// source's path is relative to the configuration file, and the engine — which reads no
+/// configuration — is handed it absolute. Each entry is checked against the kernel's own
+/// declaration model, so a malformed one fails here, naming its position, rather than at `verify`.
+fn resolve_components(components: &Value, base: &Path) -> Result<Value, LoadError> {
+  let Some(entries) = components.as_array() else {
+    return Err(LoadError::Invalid(vec![Problem {
+      pointer: "/components".to_string(),
+      message: "'components' must be a list".to_string(),
+    }]));
+  };
+  let mut resolved = Vec::with_capacity(entries.len());
+  for (index, entry) in entries.iter().enumerate() {
+    let mut entry = entry.clone();
+    if let Err(err) =
+      serde_json::from_value::<pact_janus_kernel::component::ComponentDeclaration>(entry.clone())
+    {
+      return Err(LoadError::Invalid(vec![Problem {
+        pointer: format!("/components/{index}"),
+        message: err.to_string(),
+      }]));
+    }
+    if entry.pointer("/source/kind").and_then(Value::as_str) == Some("file")
+      && let Some(reference) = entry.pointer("/source/reference").and_then(Value::as_str)
+    {
+      let full = resolve_path(reference, base);
+      entry["source"]["reference"] = Value::String(full.display().to_string());
+    }
+    resolved.push(entry);
+  }
+  Ok(Value::Array(resolved))
 }
 
 fn resolve_entry(entry: &Value, base: &Path) -> Result<Value, LoadError> {
@@ -426,6 +462,33 @@ hooks:
       resolved["hooks"]["state-setup"][0]["run"]["cwd"],
       json!("/projects/orders/./fixtures")
     );
+  }
+
+  #[test]
+  fn a_file_components_path_resolves_against_the_configuration_file_and_nothing_else_changes() {
+    let document = json!({
+      "components": [
+        { "name": "csv", "source": { "kind": "file", "reference": "components/csv.wasm", "digest": "sha256:ab" },
+          "grants": { "network": false }, "limits": { "deadline-ms": 500 } },
+        { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-xml:1" } } ]
+    });
+    let resolved = resolve(&document, Path::new("/projects/orders"), &env(&[])).expect("resolves");
+    assert_eq!(
+      resolved["components"],
+      json!([
+        { "name": "csv", "source": { "kind": "file", "reference": "/projects/orders/components/csv.wasm", "digest": "sha256:ab" },
+          "grants": { "network": false }, "limits": { "deadline-ms": 500 } },
+        { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-xml:1" } } ])
+    );
+  }
+
+  #[test]
+  fn a_component_declaration_the_kernel_cannot_read_fails_the_load_naming_it() {
+    let document = json!({ "components": [ { "name": "csv" } ] });
+    match resolve(&document, Path::new("."), &env(&[])).expect_err("no source") {
+      LoadError::Invalid(problems) => assert_eq!(problems[0].pointer, "/components/0"),
+      other => panic!("expected an invalid document, got {other:?}"),
+    }
   }
 
   #[test]

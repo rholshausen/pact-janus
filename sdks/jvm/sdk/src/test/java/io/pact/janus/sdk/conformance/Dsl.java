@@ -64,6 +64,9 @@ final class Dsl {
     return switch (primitive) {
       case "literal" -> template(args.path(0));
       case "json" -> Shapes.json(template(args.path(0)));
+      // Not a shape — it names a whole slot — but a case writes it where a body goes, as a call.
+      // The SDK decides where it is accepted; this only spells it.
+      case "content" -> Shapes.content(args.path(0).asText(), template(args.path(1)));
       case "integer" -> Shapes.integer(args.path(0).longValue());
       case "number" -> Shapes.number(args.path(0).numberValue());
       case "decimal" -> Shapes.decimal(args.path(0).decimalValue());
