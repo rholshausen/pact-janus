@@ -36,7 +36,11 @@ fn hello_declares_the_content_type_and_its_degradations() {
   let ok = &hello["ok"];
   assert_eq!(ok["component-protocol-version"], 1);
   assert_eq!(ok["component"]["name"], "csv");
-  assert_eq!(ok["interfaces"], json!(["content"]));
+  assert_eq!(ok["interfaces"], json!(["content", "matcher"]));
+  assert_eq!(
+    ok["contributes"]["actions"],
+    json!([ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" } ])
+  );
   let content_types = ok["contributes"]["content-types"].as_array().unwrap();
   assert_eq!(content_types[0]["media-type"], "text/csv");
   let codes: Vec<&str> = content_types[0]["degradations"]
@@ -74,9 +78,10 @@ fn every_operation_before_hello_is_refused() {
 #[test]
 fn an_unknown_operation_is_named() {
   let mut component = greeted();
-  let result = call(&mut component, "matcher/apply", json!({}));
+  // An op of an interface it declared (matcher) but does not implement: spec §3.1 says named.
+  let result = call(&mut component, "matcher/compare", json!({}));
   assert_eq!(result["error"]["code"], "operation-unsupported");
-  assert_eq!(result["error"]["details"]["op"], "matcher/apply");
+  assert_eq!(result["error"]["details"]["op"], "matcher/compare");
   let detect = call(
     &mut component,
     "content/detect",
@@ -280,13 +285,94 @@ fn encode_refuses_what_csv_cannot_hold() {
   assert_eq!(not_rows["error"]["code"], "encode-failed");
 }
 
-#[test]
-fn compile_contributes_no_fragment() {
-  let mut component = greeted();
-  let result = call(
+fn orders() -> Value {
+  json!({ "shape": "each-like", "min": 1, "items": { "shape": "object", "members": {
+    "id": { "shape": "string", "example": "66" },
+    "items": { "shape": "integer", "example": 1 },
+    "paid": { "shape": "boolean", "example": true } } } })
+}
+
+fn greeted_reading(grammars: Value) -> Component {
+  let mut component = Component::default();
+  call(
     &mut component,
-    "content/compile",
-    json!({ "content-type": "text/csv", "shape": {}, "path": "$.response.body" }),
+    "component/hello",
+    json!({ "component-protocol-versions": [1], "plan-grammar-versions": grammars }),
   );
-  assert_eq!(result["ok"], json!({}));
+  component
+}
+
+fn compile(component: &mut Component, shape: Value) -> Value {
+  call(
+    component,
+    "content/compile",
+    json!({ "content-type": "text/csv", "shape": shape, "path": "$.response.body" }),
+  )
+}
+
+#[test]
+fn compile_contributes_a_fragment_that_reads_typed_operators_as_text() {
+  let mut component = greeted_reading(json!(["v0"]));
+  let result = compile(&mut component, orders());
+  assert_eq!(result["ok"]["grammar-version"], "v0");
+  let text = result["ok"]["fragment"].to_string();
+  for expected in [
+    r#""name":"match:string""#,
+    r#""name":"csv:integer""#,
+    r#""name":"csv:boolean""#,
+    r#""path":"~>.items""#,
+    r#""label":"$.response.body[*].paid""#,
+  ] {
+    assert!(text.contains(expected), "{expected} in {text}");
+  }
+  assert!(!text.contains("match:integer"), "{text}");
+}
+
+#[test]
+fn compile_declines_what_it_does_not_cover_and_what_the_engine_does_not_read() {
+  let mut component = greeted_reading(json!(["v0"]));
+  let optional_member = json!({ "shape": "each-like", "items": { "shape": "object", "members": {
+    "note": { "shape": "optional", "of": { "shape": "string" } } } } });
+  assert_eq!(compile(&mut component, optional_member)["ok"], json!({}));
+  assert_eq!(
+    compile(&mut component, json!({ "shape": "string" }))["ok"],
+    json!({})
+  );
+
+  // An engine that says nothing about grammars, or reads only one this component does not write,
+  // gets the generic plan: correct for every operator but the typed ones, and never a skew.
+  for grammars in [Value::Null, json!(["v1"])] {
+    let mut component = greeted_reading(grammars);
+    assert_eq!(compile(&mut component, orders())["ok"], json!({}));
+  }
+  let mut silent = greeted();
+  assert_eq!(compile(&mut silent, orders())["ok"], json!({}));
+}
+
+#[test]
+fn apply_reads_text_as_the_type_it_spells() {
+  let mut component = greeted();
+  let apply = |component: &mut Component, action: &str, value: Value| {
+    call(
+      component,
+      "matcher/apply",
+      json!({ "action": action, "values": [ { "content": value } ] }),
+    )["ok"]["results"][0]["status"]
+      .clone()
+  };
+  assert_eq!(apply(&mut component, "csv:integer", json!("12")), "ok");
+  assert_eq!(apply(&mut component, "csv:integer", json!("-3")), "ok");
+  assert_eq!(apply(&mut component, "csv:integer", json!("1.5")), "error");
+  assert_eq!(apply(&mut component, "csv:integer", json!("")), "error");
+  assert_eq!(apply(&mut component, "csv:number", json!("12.50")), "ok");
+  assert_eq!(apply(&mut component, "csv:number", json!("twelve")), "error");
+  assert_eq!(apply(&mut component, "csv:number", json!("NaN")), "error");
+  assert_eq!(apply(&mut component, "csv:boolean", json!("true")), "ok");
+  assert_eq!(apply(&mut component, "csv:boolean", json!("yes")), "error");
+  let unknown = call(
+    &mut component,
+    "matcher/apply",
+    json!({ "action": "csv:date", "values": [ { "content": "x" } ] }),
+  );
+  assert_eq!(unknown["error"]["code"], "unknown-action");
 }

@@ -54,9 +54,9 @@ a documentation finding: the spec describes a loader, and nobody had built one. 
 3. `janus verify --config` against the sample provider, with the component declared by a relative
    path (`cli/tests/cli.rs`).
 
-A matcher component (contributed operators, `matcher/apply`, `compare`) is not exercised. The kernel
-has no matcher dispatch yet, and plan task 8.4, which contributes fragments and actions, is where it
-gets one.
+A matcher component (contributed operators, `matcher/apply`, `compare`) is not exercised here. Plan
+task 8.4 gave the kernel `matcher/apply` and this component a plan fragment and three actions — see the
+[plan-fragment stress test](plan-fragment-stress-test.md).
 
 ## 2. Findings
 
@@ -169,8 +169,9 @@ serialisation is the pipe's real cost" measured again, with a CSV parser inside 
 
 - **OCI distribution** was task 8.2, since done: the same `.wasm` is pushed with
   `janus component push`, declared by digest, and verified from a registry (ADR 0021).
-- **Plan fragments and contributed actions** are task 8.4. `content/compile` is called by nobody yet,
-  and the component answers it with no fragment.
+- **Plan fragments and contributed actions** were task 8.4, since done: the component contributes a
+  fragment for its body and `csv:integer`, `csv:number` and `csv:boolean`, run by `matcher/apply`
+  ([stress test](plan-fragment-stress-test.md), ADR 0022).
 - **`match:content-type` in live runs.** The exchange and verification paths still execute without a
   `ContentDetector` (kernel-boundary review, finding 1's resolution). Decoding and encoding route
   through the registry; detection does not.

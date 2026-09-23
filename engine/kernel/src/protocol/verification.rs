@@ -43,6 +43,7 @@
 //! turns a pact's matching rules into *shapes*. That is a different and lossier operation than
 //! verifying the pact where it stands, and it is the reason this path exists at all.
 
+use super::contributions::Contributions;
 use super::events::Stream;
 use super::scope::Scope;
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
@@ -53,7 +54,7 @@ use crate::error::Problem;
 use crate::hooks::{HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
 use crate::legacy_pact::{self, LegacyInteraction};
-use crate::plan::{self, Assignment, CapturedValues, Status, execute, outcome};
+use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
 use crate::variant::params;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -292,15 +293,19 @@ impl Source {
         scope.check(
           interaction.requires.iter().flatten(),
           interaction.content_types.as_ref(),
-        )
+        )?;
+        // Plan task 8.4: a fragment this engine cannot use fails the run before it starts.
+        scope
+          .contributions()
+          .check(interaction.content_types.as_ref(), &interaction.parts)
       }),
       Source::Legacy(_) => Ok(()),
     }
   }
 
-  fn prepare(&self, index: usize) -> Prepared {
+  fn prepare(&self, index: usize, contributions: &Contributions) -> Prepared {
     match self {
-      Source::Janus(contract) => prepare_janus(contract, index, &self.format()),
+      Source::Janus(contract) => prepare_janus(contract, index, &self.format(), contributions),
       Source::Legacy(pact) => prepare_legacy(pact, index, &self.format()),
     }
   }
@@ -440,10 +445,17 @@ pub(crate) struct Run {
 ///
 /// `options.variants`/`options.variant` narrow the run (variant-semantics spec §5.1); everything
 /// else in `options` is ignored for now and logged rather than silently dropped.
+/// What a run's scope lends it: the content components that decode and encode its slots, and what
+/// its declared components contribute to its plans (plan task 8.4).
+pub(crate) struct RunComponents {
+  pub content: Option<Arc<dyn ContentComponent>>,
+  pub contributions: Arc<Contributions>,
+}
+
 pub(crate) fn start(
   sources: Vec<Source>,
   targets: Vec<Target>,
-  content: Option<Arc<dyn ContentComponent>>,
+  components: RunComponents,
   hooks: Option<HookRunner>,
   options: Option<Value>,
   stream: Arc<Stream>,
@@ -455,7 +467,7 @@ pub(crate) fn start(
     run(
       sources,
       targets,
-      content,
+      components,
       hooks,
       filter,
       executed_plans,
@@ -468,12 +480,16 @@ pub(crate) fn start(
 fn run(
   sources: Vec<Source>,
   targets: Vec<Target>,
-  content: Option<Arc<dyn ContentComponent>>,
+  components: RunComponents,
   hooks: Option<HookRunner>,
   filter: Filter,
   executed_plans: ExecutedPlans,
   stream: Arc<Stream>,
 ) {
+  let RunComponents {
+    content,
+    contributions,
+  } = components;
   let interactions: usize = sources.iter().map(Source::interactions).sum();
   let variants: usize = sources.iter().map(Source::variants).sum();
   stream.emit(
@@ -513,10 +529,11 @@ fn run(
     'sources: for source in &sources {
       for index in 0..source.interactions() {
         let flow = verify_prepared(
-          source.prepare(index),
+          source.prepare(index, &contributions),
           &mut RunContext {
             targets: &targets,
             content: content.as_deref(),
+            actions: contributions.as_ref(),
             filter: &filter,
             executed_plans,
             stream: &stream,
@@ -710,6 +727,8 @@ fn summary(
 struct RunContext<'a> {
   targets: &'a [Target],
   content: Option<&'a dyn ContentComponent>,
+  /// Runs a contributed fragment's component actions (plan task 8.4).
+  actions: &'a dyn ActionApplier,
   filter: &'a Filter,
   executed_plans: ExecutedPlans,
   stream: &'a Stream,
@@ -779,7 +798,7 @@ struct Ready {
 
 /// A Janus contract's interaction (plan tasks 5.1–5.3): compiled from its recorded shapes, one
 /// replay per recorded variant.
-fn prepare_janus(contract: &Contract, index: usize, format: &str) -> Prepared {
+fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions: &Contributions) -> Prepared {
   let interaction = &contract.interactions[index];
   let reference = interaction_ref(contract, index, interaction, format);
   let transport = interaction
@@ -850,7 +869,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str) -> Prepared {
         // `optional` pinned to `absent` admits only absence, an `any-of` pinned to `SHIPPED` only
         // that. Matching against the unpinned shape would accept `PENDING` where the consumer
         // demonstrated `SHIPPED`, and the variant would have proved nothing.
-        plan: plan::compile(&spec, &assignment, Some(&variant.id)),
+        plan: contributions.compile(&spec, &interaction.parts, &assignment, Some(&variant.id)),
         resolve: parts_resolver,
         content_types: interaction.content_types.clone().unwrap_or_default(),
         states: states.unwrap_or_default(),
@@ -1147,7 +1166,14 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   if result.is_none()
     && let Some(request) = parts
   {
-    match drive(exchange, request, target, ctx.content, ctx.executed_plans) {
+    match drive(
+      exchange,
+      request,
+      target,
+      ctx.content,
+      ctx.actions,
+      ctx.executed_plans,
+    ) {
       Ok(driven) => {
         executed_plan = driven.executed;
         result = Some(driven.payload);
@@ -1269,6 +1295,7 @@ fn drive(
   request: Parts,
   target: &Target,
   content: Option<&dyn ContentComponent>,
+  actions: &dyn ActionApplier,
   executed_plans: ExecutedPlans,
 ) -> Result<Driven, Value> {
   let reference = exchange.reference;
@@ -1308,7 +1335,7 @@ fn drive(
   };
 
   let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
-  let executed = execute(&exchange.ready.plan, &resolver);
+  let executed = execute_with(&exchange.ready.plan, &resolver, None, Some(actions));
   // Only the response half is scored. The request was replayed verbatim, so matching it against
   // itself would assert nothing; the provider answers for the response (variant-semantics §5.2).
   // A shape-compiled plan carries both parts and the `response` subtree is picked out of it; a

@@ -503,38 +503,43 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 
 ## 15. Immediate next steps
 
-Phases 0–7 are done: foundations and reuse inventory (Phase 0); the de-risking spikes and gate G1
+Phases 0–8 are done: foundations and reuse inventory (Phase 0); the de-risking spikes and gate G1
 (Phase 1); the full Phase 2 design round, every spec final and its ADRs accepted; the kernel's
 match-and-explain path (Phase 3, closing **M1**); the consumer flow end-to-end with variants (Phase 4,
 closing **M2**); provider verification with hooks, the sample provider and the CLI (Phase 5, closing
 **M3**); both SDKs, their generated bindings, the conformance suite and the thinness audit (Phase 6,
-closing **M4**); and provider shapes and subsumption — the checker, shape recording, the type-derived
+closing **M4**); provider shapes and subsumption — the checker, shape recording, the type-derived
 spike, `janus check` and the [broker integration notes](broker-integration-notes.md) (Phase 7, closing
 **M5**: the RFC's "provider may produce SHIPPED, consumer only tested PENDING" loop is reproduced
-end-to-end and reported the way the RFC sketches it).
+end-to-end and reported the way the RFC sketches it); and external components (Phase 8, closing
+**M6**):
 
-Next: **Phase 8 — External components** (§11), closing **M6**. 8.1 is done: a `text/csv` content
-component written from the docs alone (`third-party/janus-csv`), the WASM loader that hosts it
-(`engine/component-host`), and the same `.wasm` running in a TypeScript consumer test and in
-`janus verify` — M6 for a content component, with the author's two documentation gaps fixed and the
-engine's missing half built ([third-party component report](third-party-component-report.md), ADR
-0020). 8.2 is done: that component pushed as an OCI artifact of its own type, whose config is written
-from its handshake and checked against it; pulled by digest, cached content-addressed and re-verified,
-so a pinned second run fetches nothing and runs offline; `janus component push|pull`; tested against a
-registry that tampers on request and against `registry:2`, with `oras` and ghcr.io as outside evidence
-(ADR 0021, Phase 9 findings 15–17). 8.3 is done
-([spike findings](../spikes/8.3-subprocess-transport/FINDINGS.md)): a dependency-free Node `tcp`
-transport over the subprocess binding served a consumer test and drove a verification through the real
-engine. Every containment obligation held, and the component exited 11 ms after its host was killed.
-Out of process `env` turned out to be enforceable and `fs`/`network` did not. The kernel now takes a
-transport from a declared component and arms passive exchanges by kind rather than `"http"`. Two
-more HTTP assumptions are in the kernel-boundary review (findings 8–9), and three design questions
-are Phase 9 findings 18–20. On real Windows (CI) every binding obligation held, the orphan test
-included, which closes spike 1.3's open risk for this mechanism. The one failure was a fixture
-whose unhandled socket reset ended the process, which is finding 18 again, seen from the other side.
-Remaining:
+- **8.1** — a `text/csv` content component written from the docs alone (`third-party/janus-csv`), the
+  WASM loader that hosts it (`engine/component-host`), and the same `.wasm` running in a TypeScript
+  consumer test and in `janus verify` ([third-party component report](third-party-component-report.md),
+  ADR 0020).
+- **8.2** — that component as an OCI artifact of its own type, whose config is written from its
+  handshake and checked against it; pulled by digest, cached content-addressed and re-verified, so a
+  pinned second run fetches nothing and runs offline; `janus component push|pull`; tested against a
+  registry that tampers on request and against `registry:2` (ADR 0021, Phase 9 findings 15–17).
+- **8.3** ([spike findings](../spikes/8.3-subprocess-transport/FINDINGS.md)) — a dependency-free Node
+  `tcp` transport over the subprocess binding served a consumer test and drove a verification through
+  the real engine. Every containment obligation held, on Linux and on real Windows, orphan test
+  included. Out of process `env` is enforceable and `fs`/`network` are not. The kernel takes a transport
+  from a declared component and arms passive exchanges by kind (kernel-boundary review findings 7–9,
+  Phase 9 findings 18–20).
+- **8.4** ([stress test](plan-fragment-stress-test.md)) — the CSV component contributes a plan fragment
+  and three actions, run by `matcher/apply`, so a CSV consumer can write `integer` and mean it. The
+  versioning policy holds once it is stated: grammar versions have an order, the engine says in
+  `component/hello` which it reads, and every skew — a newer grammar, none declared, an action the
+  grammar lacks, another component's namespace, a path outside the slot — fails by name before
+  anything runs. The fragment model is where it strains. A fragment replaces its slot's plan and is
+  compiled without the variant, and a variant checked against one was shown to pass where the engine's
+  own plan fails (ADR 0022, Phase 9 findings 21–24).
 
-1. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
+M6 closes with a content *and* matcher component: the 8.1 `.wasm`, grown in 8.4 into both, runs
+unmodified in a consumer test and in verification.
 
-Then **Phase 9 — Evaluation and RFC feedback** (§12), which the running
-[findings list](phase-9-findings.md) is already accumulating input for.
+Next: **Phase 9 — Evaluation and RFC feedback** (§12). Its input is already accumulated: the
+[findings list](phase-9-findings.md) (24 entries), the kernel-boundary review's open findings, three
+spike write-ups and the ADRs' tripwires.

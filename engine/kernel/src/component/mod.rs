@@ -6,8 +6,9 @@
 //!
 //! Out of scope here, deliberately: the WASM and subprocess bindings themselves, which need a
 //! runtime this crate cannot depend on and which an embedding registers as a [`ComponentLoader`]
-//! (plan task 8.1; `engine/component-host` is the WASM one), and the matcher interface, which has
-//! no caller yet. What *is* here is everything around a load that must not differ by binding:
+//! (plan task 8.1; `engine/component-host` is the WASM one). Of the matcher interface only `apply`
+//! is here ([`matcher`], plan task 8.4): it is what executes a fragment's component actions. What
+//! *is* here is everything around a load that must not differ by binding:
 //! resolution, the handshake checks, requirements ([`loader`]) and routing by media type
 //! ([`registry`]). The hook interface ([`hook`]) does, as of plan task 5.3: the hook *system*
 //! around it is design 2.7's and lives in [`crate::hooks`]. See
@@ -17,6 +18,7 @@ mod content;
 mod error;
 mod hook;
 mod loader;
+mod matcher;
 mod parts;
 mod registry;
 mod transport;
@@ -27,9 +29,10 @@ pub use content::{
 pub use error::ComponentError;
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
-  ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
-  Unavailable, check_requirements, resolve,
+  CORE_FAMILIES, ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved,
+  Source, Unavailable, check_requirements, resolve,
 };
+pub use matcher::{Apply, ApplyResult, MatcherComponent};
 pub use parts::{Part, Parts, SlotValue};
 pub use registry::{ContentRegistry, media_type_matches};
 pub use transport::{

@@ -15,6 +15,11 @@
           "description": "Component-protocol major versions the engine can speak, in preference order.",
           "items": { "type": "integer", "minimum": 1 }
         },
+        "plan-grammar-versions": {
+          "type": "array",
+          "description": "The plan-grammar versions this engine reads (plan-grammar spec §7.1), so a component that contributes fragments can write one the engine can read — or contribute none — rather than guess and learn at a refusal (spec.md §12.3). Absent means the engine said nothing, and a component should contribute no fragment.",
+          "items": { "type": "string", "x-known-values": ["v0"] }
+        },
         "engine": { "$ref": "#/$defs/Party" },
         "grants": {
           "$ref": "component-config.schema.json#/$defs/Grants",

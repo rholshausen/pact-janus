@@ -2,7 +2,8 @@
 //!
 //! Written against the published component interfaces (component-interfaces spec v1, the WIT world in
 //! `wit/component.wit`) and nothing else. It implements the `content` interface: `decode`, `encode`,
-//! `compile` (which contributes no fragment) and `detect` (which it declines).
+//! `compile` and `detect` (which it declines); and, since plan task 8.4, the `matcher` interface's
+//! `apply`, for the actions its plan fragments use ([`fragment`]).
 //!
 //! CSV is lossy, and this component says so instead of pretending (spec §6.4). Every field decodes as a
 //! string: CSV has no numeric type, no boolean and no null, so `12.50`, `true` and an empty field are
@@ -14,6 +15,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Map, Value, json};
 
+mod fragment;
+
 pub const NAME: &str = "csv";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const MEDIA_TYPE: &str = "text/csv";
@@ -24,6 +27,9 @@ const PROTOCOL_VERSION: u64 = 1;
 #[derive(Default)]
 pub struct Component {
   greeted: bool,
+  /// Whether the engine said it reads the plan grammar this component writes fragments in. An engine
+  /// that did not say gets no fragments: the generic plan is always safe, a guessed grammar is not.
+  reads_our_grammar: bool,
 }
 
 type OpResult = Result<Value, Value>;
@@ -91,9 +97,8 @@ impl Component {
       "component/shutdown" => Ok(json!({})),
       "content/decode" => decode(body),
       "content/encode" => encode(body),
-      // No fragment: the kernel compiles the slot generically and calls decode at execution time
-      // (spec §6.3). Contributing one is task 8.4's business.
-      "content/compile" => Ok(json!({})),
+      "content/compile" => self.compile(body),
+      "matcher/apply" => apply(body),
       _ => Err(error(
         "operation-unsupported",
         "protocol",
@@ -118,11 +123,16 @@ impl Component {
       ));
     }
     self.greeted = true;
+    self.reads_our_grammar = body
+      .get("plan-grammar-versions")
+      .and_then(Value::as_array)
+      .is_some_and(|versions| versions.iter().any(|v| v == fragment::GRAMMAR));
     Ok(json!({
       "component-protocol-version": PROTOCOL_VERSION,
       "component": { "name": NAME, "version": VERSION },
-      "interfaces": ["content"],
+      "interfaces": ["content", "matcher"],
       "contributes": {
+        "actions": fragment::ACTIONS.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>(),
         "content-types": [ {
           "media-type": MEDIA_TYPE,
           "degradations": [
@@ -133,6 +143,45 @@ impl Component {
       }
     }))
   }
+}
+
+impl Component {
+  /// `content/compile` (spec §6.3): a fragment for the body shapes CSV changes the meaning of, in the
+  /// grammar the engine said it reads — or nothing, and the engine's generic plan.
+  fn compile(&self, body: &Value) -> OpResult {
+    content_type(body)?;
+    let path = body.get("path").and_then(Value::as_str).unwrap_or("$");
+    match body
+      .get("shape")
+      .filter(|_| self.reads_our_grammar)
+      .and_then(|shape| fragment::compile(shape, path))
+    {
+      Some(fragment) => Ok(json!({ "fragment": fragment, "grammar-version": fragment::GRAMMAR })),
+      None => Ok(json!({})),
+    }
+  }
+}
+
+/// `matcher/apply` (spec §7.1): each value, through the named action.
+fn apply(body: &Value) -> OpResult {
+  let action = body.get("action").and_then(Value::as_str).unwrap_or_default();
+  if !fragment::ACTIONS.contains(&action) {
+    return Err(error(
+      "unknown-action",
+      "document",
+      &format!("the csv component has no action '{action}'"),
+      Some(json!({ "action": action })),
+    ));
+  }
+  let values = body
+    .get("values")
+    .and_then(Value::as_array)
+    .cloned()
+    .unwrap_or_default();
+  // Each value is a `MatchValue` (matcher schema): the value itself is its `content`.
+  Ok(
+    json!({ "results": values.iter().map(|value| fragment::apply(action, &value["content"])).collect::<Vec<_>>() }),
+  )
 }
 
 /// `content/decode`: octets to document (spec §6.1).
@@ -440,7 +489,7 @@ fn kind(value: Option<&Value>) -> &'static str {
 
 /// A member path segment in the plan grammar's path syntax: `.name` when it is a plain identifier,
 /// `['name']` otherwise.
-fn member_path(name: &str) -> String {
+pub(crate) fn member_path(name: &str) -> String {
   if !name.is_empty()
     && name
       .chars()

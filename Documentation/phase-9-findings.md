@@ -741,3 +741,66 @@ against the configuration's directory, additive in the schema; **B.** `reference
 through the platform shell, which is portable only in name; **C.** a `reference` that must be a single
 executable path, and wrapper scripts for anything with arguments.
 
+## 21. `content/compile` is not told the variant, so a fragment cannot pin one
+
+**Found:** 2026-09-23, plan task 8.4 ([stress test](plan-fragment-stress-test.md) finding 2).
+**Status:** open — demonstrated, and ADR 0022's tripwire.
+
+The engine compiles one plan per variant and pins each dimensional operator to the variant's point: an
+`each-like` of 1–3's maximal variant is checked with `expect:count 3`. `content/compile` receives the
+slot's authored shape and nothing else, so a contributed fragment checks `expect:size 1..3` for every
+variant. Against the sample provider (one order), the three-row variant fails under the generic plan and
+*passes* under the CSV component's fragment. The variant proved nothing, and the run reports it
+verified. Reproduce: `a_fragment_compiled_without_the_variant_widens_a_pinned_variant` in
+`engine/component-host/tests/csv_component.rs`, which asserts today's behaviour so the day it changes is
+visible.
+
+Options: **A.** pass the variant's assignment to `compile` (additive in the schema); every
+fragment-contributing component then has to implement pinning, the engine's own compiler's subtlest
+part. **B.** operator-level substitution (ADR 0022's rejected-for-now alternative): the engine compiles
+the slot, pinning included, and asks the content component only what a *value* operator means for its
+content type. The component never sees structure, so it cannot get pinning wrong. **C.** refuse
+fragments for slots with dimensional operators, which in practice is every slot worth a fragment.
+
+## 22. A fragment sees the decoded document, never the octets
+
+**Found:** 2026-09-23, plan task 8.4 (stress test finding 3). **Status:** open.
+
+Plan grammar §4.6 and component-interfaces §6.3 describe decoding as a plan step, `json:parse` or
+`csv:parse`, contributed by the content component so that `explain` shows it. The engine has never done
+that. `wire::parts_resolver` decodes each declared slot before the plan runs, the shape compiler emits
+no parse step, and a fragment's `resolve` returns the document. The CSV worked example, which showed a
+`csv:parse` fragment, was written against the spec and is now corrected. Options: **A.** resolvers
+return octets for declared slots and the compiler emits `<component>:parse` at the top of each slot
+plan, so decoding becomes visible, and degradations and decode errors get a node to attach to (which is
+finding 14's gap); **B.** the spec stops promising decoding in the plan, and `explain` annotates a
+declared slot with the content type it was decoded as.
+
+## 23. `explain` loads no components, so it prints a plan `verify` does not run
+
+**Found:** 2026-09-23, plan task 8.4 (stress test finding 4). **Status:** open.
+
+`verification/explain` takes an interaction and no `components`. For any contract whose slots a
+component contributes a fragment for, it prints the generic plan: for the CSV contract, `match:integer`
+where `verify` runs `csv:integer`. The executed plans `verify` emits (`executed-plan: always`) are
+correct, so the gap is `explain`'s alone, but `explain` is where the RFC's inspectability claim lives.
+Options: **A.** an optional `components` on the `explain` request (additive; the SDKs' generated
+bindings change); **B.** `janus explain --config` resolves components the way `verify --config` does,
+through the same request change; **C.** `explain` marks slots it compiled generically where a declared
+content type might be contributed for, and says so.
+
+## 24. `matcher/apply`'s `config` has no source in the plan grammar
+
+**Found:** 2026-09-23, plan task 8.4 (stress test finding 5). **Status:** open — a provisional mapping
+is in place (ADR 0022 decision 6).
+
+`Apply` carries `values` and a `config` "as the compiled plan node carries it". A plan action node carries
+children and nothing else. The engine now sends the first child's value as the value under test and any
+further children's values as `config.arguments`. The shape compiler already emits a component
+operator's extra members as a second, object-valued child (corpus `shapes/unknown-component-action`),
+so that is where configuration lives in practice. Options: **A.** make the mapping normative in the
+matcher interface: first child is the value, the rest are `config.arguments`; **B.** give action nodes an
+optional `config` member in the next grammar minor, so configuration and arguments are different things;
+**C.** make every action unary and put configuration in the action's name, which is how `csv:integer`
+avoids the question.
+

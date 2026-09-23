@@ -19,13 +19,14 @@
 //! this is a documented gap, not a silent one: the WASM-component embedding will need either
 //! wasi-threads or a single-threaded poll model here, not this one unmodified.
 
+use super::contributions::Contributions;
 use super::session::{ExchangeOutcome, Exercised};
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
 use crate::common::ContentTypes;
 use crate::component::{
   ContentComponent, ContentSlots, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
-use crate::plan::{Mismatch, Plan, Status, execute, outcome};
+use crate::plan::{Mismatch, Plan, Status, execute_with, outcome};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -71,6 +72,7 @@ const POLL_TIMEOUT_MS: u64 = 200;
 pub(crate) fn run(
   transport: Arc<dyn TransportComponent>,
   content: Option<Arc<dyn ContentComponent>>,
+  contributions: Arc<Contributions>,
   instance: String,
   stop: Arc<AtomicBool>,
   state: Arc<Mutex<ExchangeState>>,
@@ -87,7 +89,14 @@ pub(crate) fn run(
       },
       Err(_) => break, // the instance is gone (stopped) or the transport itself failed
     };
-    handle_inbound(transport.as_ref(), content.as_deref(), &instance, inbound, &state);
+    handle_inbound(
+      transport.as_ref(),
+      content.as_deref(),
+      &contributions,
+      &instance,
+      inbound,
+      &state,
+    );
   }
 }
 
@@ -97,6 +106,7 @@ pub(crate) fn run(
 fn handle_inbound(
   transport: &dyn TransportComponent,
   content: Option<&dyn ContentComponent>,
+  contributions: &Contributions,
   instance: &str,
   inbound: Inbound,
   state: &Mutex<ExchangeState>,
@@ -116,7 +126,7 @@ fn handle_inbound(
   };
 
   let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
-  let executed = execute(&armed.request_plan, &resolver);
+  let executed = execute_with(&armed.request_plan, &resolver, None, Some(contributions));
   let request_subtree = find_container(&executed, "request").unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
 

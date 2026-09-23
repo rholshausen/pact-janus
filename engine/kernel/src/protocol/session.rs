@@ -160,6 +160,13 @@ impl ConsumerSession {
       .scope
       .check(spec.requires.iter().flatten(), spec.content_types.as_ref())
       .map_err(AddInteractionError::Unavailable)?;
+    // And any plan fragment a declared component contributes for its slots (plan task 8.4): one
+    // written against a grammar this engine cannot read fails here, naming the skew.
+    let raw_parts = raw_parts(interaction);
+    let contributions = self.scope.contributions();
+    contributions
+      .check(spec.content_types.as_ref(), &raw_parts)
+      .map_err(AddInteractionError::Unavailable)?;
     // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
     // §6.5): the reference resolves against this interaction's variant space, which does not exist
     // until the shapes parse, and the author is looking at the DSL that produced it right now.
@@ -169,8 +176,7 @@ impl ConsumerSession {
         return Err(InteractionSpecError { problems }.into());
       }
     }
-    let compiled = plan::compile(&spec, &Assignment::new(), None);
-    let raw_parts = raw_parts(interaction);
+    let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
     self.next_handle += 1;
     self.interactions.insert(
@@ -218,10 +224,12 @@ impl ConsumerSession {
     let thread_state = Arc::clone(&state);
     let thread_instance = instance.clone();
     let content = self.scope.content();
+    let contributions = self.scope.contributions();
     let handle = thread::spawn(move || {
       exchange::run(
         thread_component,
         content,
+        contributions,
         thread_instance,
         thread_stop,
         thread_state,
@@ -292,6 +300,7 @@ impl ConsumerSession {
   /// answer with; an emissive interaction, or one with no transport bound, stops at recording the
   /// arming, exactly as before.
   pub fn serve_variant(&mut self, handle: &str, variant_id: &str) -> Result<(), ServeVariantError> {
+    let contributions = self.scope.contributions();
     let Some(entry) = self.interactions.get_mut(handle) else {
       return Err(ServeVariantError::HandleNotFound);
     };
@@ -325,7 +334,7 @@ impl ConsumerSession {
       .filter(|t| t.mode.as_deref() != Some("emissive"))
       .map(|t| t.kind.clone());
     if let Some(kind) = passive_kind {
-      let request_plan = plan::compile(&entry.spec, &assignment, Some(variant_id));
+      let request_plan = contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id));
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.state.lock().expect("exchange state lock poisoned");
         state.armed = Some(ArmedExchange {

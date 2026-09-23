@@ -26,8 +26,9 @@ pub mod oci;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
-  Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader, ContentComponent, Decode,
-  DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Loaded, SlotValue, media_type_matches,
+  Apply, ApplyResult, Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader,
+  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Loaded,
+  MatcherComponent, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::{Value, json};
@@ -293,17 +294,21 @@ impl ComponentLoader for WasmLoader {
       check_artifact_config(pulled, &hello)?;
     }
 
-    let declares_content = hello
-      .get("interfaces")
-      .and_then(Value::as_array)
-      .is_some_and(|interfaces| interfaces.iter().any(|i| i == "content"));
+    let declares = |interface: &str| {
+      hello
+        .get("interfaces")
+        .and_then(Value::as_array)
+        .is_some_and(|interfaces| interfaces.iter().any(|i| i == interface))
+    };
+    let (declares_content, declares_matcher) = (declares("content"), declares("matcher"));
     let wasm = Arc::new(wasm);
     // No transport over this binding yet: a WASM transport needs sockets, which is the grant a
     // sandbox exists to withhold (spec §13), and 8.3's escape hatch is the subprocess binding.
     Ok(Loaded {
       hello,
-      content: declares_content.then_some(wasm as Arc<dyn ContentComponent>),
+      content: declares_content.then(|| Arc::clone(&wasm) as Arc<dyn ContentComponent>),
       transport: None,
+      matcher: declares_matcher.then_some(wasm as Arc<dyn MatcherComponent>),
     })
   }
 }
@@ -464,6 +469,9 @@ impl WasmComponent {
 fn hello_body(grants: &Grants) -> Value {
   json!({
     "component-protocol-versions": COMPONENT_PROTOCOL_VERSIONS,
+    // The plan grammars this engine reads (plan task 8.4): without them a component contributing
+    // fragments can only guess which grammar to write, and learn it guessed wrong at a refusal.
+    "plan-grammar-versions": pact_janus_kernel::plan::fragment::READABLE_GRAMMAR_VERSIONS,
     "engine": { "name": "janus-engine", "version": pact_janus_kernel::ENGINE_VERSION },
     "grants": grants,
     "capabilities": {},
@@ -607,6 +615,23 @@ impl ContentComponent for WasmComponent {
         .map(str::to_string),
       confidence: result.get("confidence").and_then(Value::as_f64),
     })
+  }
+}
+
+/// `matcher/apply` over the pipe (spec §7.1): the one matcher operation anything calls yet.
+impl MatcherComponent for WasmComponent {
+  fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
+    let mut body = json!({ "action": req.action, "values": req.values });
+    if let Some(config) = req.config {
+      body["config"] = config;
+    }
+    let result = self.instance_call("matcher/apply", body)?;
+    let results = result
+      .get("results")
+      .and_then(Value::as_array)
+      .cloned()
+      .ok_or_else(|| ComponentError::synthesised("component-malformed", "apply returned no results"))?;
+    Ok(ApplyResult { results })
   }
 }
 

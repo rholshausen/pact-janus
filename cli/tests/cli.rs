@@ -974,7 +974,7 @@ fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
   );
   assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
   assert!(
-    stdout(&pushed).contains("pushed csv 1.0.0 (content)"),
+    stdout(&pushed).contains("pushed csv 1.0.0 (content, matcher)"),
     "{}",
     stdout(&pushed)
   );
@@ -984,7 +984,7 @@ fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
   let pulled = janus_cached(&cache, &["component", "pull", &reference]);
   let text = stdout(&pulled);
   assert_eq!(code(&pulled), 0, "{}", stderr(&pulled));
-  assert!(text.contains("csv 1.0.0 (content)"), "{text}");
+  assert!(text.contains("csv 1.0.0 (content, matcher)"), "{text}");
   assert!(text.contains("content types: text/csv"), "{text}");
   assert!(
     text.contains(&format!(

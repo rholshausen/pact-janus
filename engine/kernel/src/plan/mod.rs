@@ -4,6 +4,7 @@
 //! task 3.4), and `explain`'s two text forms (plan-grammar spec §3, plan task 3.6).
 
 mod compile;
+pub mod fragment;
 mod interpret;
 mod legacy;
 mod model;
@@ -13,7 +14,8 @@ mod value;
 
 pub use compile::{Assignment, compile, variant_space};
 pub use interpret::{
-  Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, execute_with_content, outcome,
+  ActionApplier, Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, execute_with,
+  execute_with_content, is_component_action, outcome,
 };
 pub use legacy::{
   LegacyRequest, LegacyResponse, compile_interaction as compile_legacy_interaction,

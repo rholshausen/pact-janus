@@ -462,7 +462,10 @@ it would put a second source of truth beside the shape that the verifier actuall
 So:
 
 - **The grammar is a versioned compatibility surface**, evolving additively under the protocol's rules
-  (protocol spec §11.2) and enforced by the same CI checker. Node kinds, the value model, action
+  (protocol spec §11.2) and enforced by the same CI checker. A version is `v<major>` or
+  `v<major>.<minor>` (`v0` is `v0.0`); an additive change is a new minor, anything else a new major, and
+  a reader reads its own major at any minor no newer than its own (component-interfaces spec §12.3, ADR
+  0022). Node kinds, the value model, action
   naming and result kinds are what a fragment author writes against.
 - **An action's semantics are frozen once published.** A component emitting `match:regex` breaks if an
   engine redefines it. New behaviour is a new action name — ADR 0007's commitment, for the same

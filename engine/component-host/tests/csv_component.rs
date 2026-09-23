@@ -110,6 +110,10 @@ fn http_get(addr: &str, path: &str) -> (u16, Vec<(String, String)>, String) {
 
 /// A consumer test against the mock: every variant served as real CSV, a contract written.
 fn consumer_run(engine: &mut Engine) -> Value {
+  consumer_run_with(engine, orders_csv_interaction())
+}
+
+fn consumer_run_with(engine: &mut Engine, interaction: Value) -> Value {
   let created = send(
     engine,
     "consumer-session/create",
@@ -123,7 +127,7 @@ fn consumer_run(engine: &mut Engine) -> Value {
   let added = send(
     engine,
     "consumer-session/add-interaction",
-    json!({ "session": session, "interaction": orders_csv_interaction() }),
+    json!({ "session": session, "interaction": interaction }),
   );
   let handle = added["ok"]["handle"]
     .as_str()
@@ -387,4 +391,130 @@ fn drain(engine: &mut Engine, stream: &str) -> Value {
     }
   }
   panic!("the run never finished");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Plan fragments (plan task 8.4)
+// ---------------------------------------------------------------------------------------------
+
+/// Orders as CSV, with `items` and `channel` as given and up to `max` rows.
+fn orders_with(items: Value, channel: Value, max: u64) -> Value {
+  let mut interaction = orders_csv_interaction();
+  interaction["parts"]["response"]["body"] = json!({ "shape": "each-like", "min": 1, "max": max,
+    "items": { "shape": "object", "members": {
+      "id": { "shape": "string", "example": "66" },
+      "status": { "shape": "string", "example": "PENDING" },
+      "items": items,
+      "channel": channel } } });
+  interaction
+}
+
+/// Verify `contract` against the sample provider — one order, so one CSV row — asking for every
+/// executed plan, and return (summary, every event's text).
+fn verify_against_sample(engine: &mut Engine, contract: &Value) -> (Value, String) {
+  let provider = order_service::start(order_service::Config {
+    token: None,
+    ..Default::default()
+  })
+  .unwrap();
+  let started = send(
+    engine,
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": provider.base_url() } } ],
+                  "components": [declaration()] },
+      "options": { "executed-plan": "always" },
+    }),
+  );
+  let stream = started["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify: {started}"))
+    .to_string();
+  let mut text = String::new();
+  for _ in 0..100 {
+    let polled = send(
+      engine,
+      "events/poll",
+      json!({ "streams": [stream], "wait-ms": 5_000 }),
+    );
+    for event in polled["ok"]["events"].as_array().unwrap() {
+      text.push_str(&event.to_string());
+      if event["last"] == json!(true) {
+        return (event["payload"].clone(), text);
+      }
+    }
+  }
+  panic!("the run never finished");
+}
+
+/// What 8.1 could not write: `items: integer` of a CSV column. The generic plan says
+/// `match:integer`, and CSV's `"1"` is a string; the component's fragment says `csv:integer` —
+/// text that spells an integer — and the contract verifies against a real provider.
+#[test]
+fn a_consumer_can_say_integer_of_a_csv_column_because_the_component_says_what_it_means() {
+  let mut engine = engine();
+  let contract = consumer_run_with(
+    &mut engine,
+    orders_with(
+      json!({ "shape": "integer", "example": 1 }),
+      json!({ "shape": "string", "example": "web" }),
+      1,
+    ),
+  );
+  let (summary, events) = verify_against_sample(&mut engine, &contract);
+  assert_eq!(summary["status"], "verified", "{summary}\n{events}");
+  assert!(
+    events.contains("csv:integer"),
+    "the executed plan is the component's: {events}"
+  );
+  assert!(!events.contains("match:integer"), "{events}");
+}
+
+/// Plan task 8.4's sharpest finding, demonstrated. `content/compile` is handed the slot's shape and
+/// not the variant, so a fragment checks every variant against the unpinned range — `expect:size 1..3`
+/// — where the engine's own plan pins each variant to the size it demonstrated (`expect:count 3`).
+/// Against a provider with one order, the variant that demonstrated three rows fails under the
+/// generic plan, as it should, and *passes* under the fragment: the variant proved nothing
+/// (variant-semantics spec §5.2), and the run says verified. The two contracts differ only in
+/// `channel`: `type`, which this component declines to compile (so the generic plan), or `string`,
+/// which it compiles (so its fragment). Neither adds a variant.
+#[test]
+fn a_fragment_compiled_without_the_variant_widens_a_pinned_variant() {
+  let items = json!({ "shape": "regex", "pattern": "^[0-9]+$", "example": "1" });
+  let mut engine = engine();
+  let generic = consumer_run_with(
+    &mut engine,
+    orders_with(items.clone(), json!({ "shape": "type", "example": "web" }), 3),
+  );
+  let fragment = consumer_run_with(
+    &mut engine,
+    orders_with(items, json!({ "shape": "string", "example": "web" }), 3),
+  );
+  let variants = |contract: &Value| {
+    contract["interactions"][0]["selection"]["variants"]
+      .as_array()
+      .unwrap()
+      .len()
+  };
+  assert_eq!(
+    variants(&generic),
+    variants(&fragment),
+    "the same variants either way"
+  );
+  assert!(
+    variants(&generic) >= 2,
+    "a cardinality range has more than one variant"
+  );
+
+  let (generic, generic_events) = verify_against_sample(&mut engine, &generic);
+  assert_eq!(generic["status"], "failed", "{generic}");
+  assert!(generic_events.contains("expect:count"), "{generic_events}");
+
+  let (widened, widened_events) = verify_against_sample(&mut engine, &fragment);
+  assert_eq!(
+    widened["status"], "verified",
+    "if this fails, content/compile has learnt the variant — update Phase 9 finding 21: {widened}"
+  );
+  assert!(!widened_events.contains("expect:count"), "{widened_events}");
 }

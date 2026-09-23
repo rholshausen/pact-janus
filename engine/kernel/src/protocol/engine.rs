@@ -556,7 +556,17 @@ impl Engine {
     };
 
     let stream = self.open_stream();
-    let run = verification::start(contracts, targets, scope.content(), hooks, req.options, stream);
+    let run = verification::start(
+      contracts,
+      targets,
+      verification::RunComponents {
+        content: scope.content(),
+        contributions: scope.contributions(),
+      },
+      hooks,
+      req.options,
+      stream,
+    );
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))

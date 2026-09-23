@@ -117,6 +117,7 @@ impl ComponentLoader for StubLoader {
       hello: self.hello.clone(),
       content: None,
       transport: Some(self.transport.clone()),
+      matcher: None,
     })
   }
 }

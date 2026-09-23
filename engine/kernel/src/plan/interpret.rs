@@ -74,7 +74,24 @@ pub enum ExecutedKind {
 struct Ctx<'a> {
   resolver: &'a dyn Resolver,
   content: Option<&'a dyn ContentDetector>,
+  actions: Option<&'a dyn ActionApplier>,
   current: Vec<RuntimeValue>,
+}
+
+/// What runs a component's own namespaced action when a plan reaches one (plan-grammar spec §4.6,
+/// component-interfaces spec §7.1 — `matcher/apply`, plan task 8.4). The kernel knows nothing
+/// about the action: it hands over the values its children produced and reads back a result.
+pub trait ActionApplier {
+  /// `None` when no component in scope contributes `action` — a named failure, never a skipped
+  /// node (spec §4.1). `path` is where the value under test was resolved from, when it was.
+  fn apply(&self, action: &str, arguments: &[RuntimeValue], path: Option<&str>) -> Option<NodeResult>;
+}
+
+/// Whether `name` is a component's action: namespaced, in a namespace no core family owns.
+pub fn is_component_action(name: &str) -> bool {
+  name
+    .split_once(':')
+    .is_some_and(|(family, _)| !crate::component::CORE_FAMILIES.contains(&family))
 }
 
 /// Execute a compiled plan against `resolver`, with no content component available for
@@ -93,9 +110,22 @@ pub fn execute_with_content(
   resolver: &dyn Resolver,
   content: Option<&dyn ContentDetector>,
 ) -> Executed {
+  execute_with(plan, resolver, content, None)
+}
+
+/// Execute with everything a plan can reach outside the kernel: a content detector for
+/// `match:content-type`, and the components whose actions a contributed fragment uses (plan task
+/// 8.4).
+pub fn execute_with(
+  plan: &Plan,
+  resolver: &dyn Resolver,
+  content: Option<&dyn ContentDetector>,
+  actions: Option<&dyn ActionApplier>,
+) -> Executed {
   let mut ctx = Ctx {
     resolver,
     content,
+    actions,
     current: Vec::new(),
   };
   run(&plan.root, &mut ctx)
@@ -313,7 +343,11 @@ fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
     "match:contains" => run_contains(children, ctx),
     _ => {
       let executed_children: Vec<Executed> = children.iter().map(|c| run(c, ctx)).collect();
-      let result = dispatch(name, &executed_children, ctx.content);
+      let result = if is_component_action(name) {
+        apply_component(name, &executed_children, ctx.actions)
+      } else {
+        dispatch(name, &executed_children, ctx.content)
+      };
       Executed {
         kind: ExecutedKind::Action {
           name: name.to_string(),
@@ -322,6 +356,26 @@ fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
         result: Some(result),
       }
     }
+  }
+}
+
+/// A component action (spec §4.6): the arguments its children produced, handed to whoever
+/// contributes it. Nobody does → a named failure at the node, never a silent pass.
+fn apply_component(name: &str, children: &[Executed], actions: Option<&dyn ActionApplier>) -> NodeResult {
+  let arguments: Vec<RuntimeValue> = children.iter().map(value_of).collect();
+  let path = locus(children);
+  match actions.and_then(|applier| applier.apply(name, &arguments, path.as_deref())) {
+    Some(result) => match result {
+      NodeResult::Error { message, path: None } => NodeResult::Error {
+        message,
+        path: locus(children),
+      },
+      other => other,
+    },
+    None => NodeResult::Error {
+      message: format!("no component in scope contributes the action '{name}'"),
+      path: locus(children),
+    },
   }
 }
 

@@ -6,6 +6,7 @@
 //! resource and that rule "extends inward": a component a session loaded ends with it, and two
 //! sessions on one pipe may declare different ones.
 
+use super::contributions::Contributions;
 use crate::common::{ContentTypes, Requirement};
 use crate::component::{
   self, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, TransportComponent,
@@ -16,6 +17,10 @@ use std::sync::Arc;
 
 pub(crate) struct Scope {
   resolved: Vec<Resolved>,
+  /// What the declared components contribute to plans: fragments and the actions they use (plan
+  /// task 8.4). Shared, because a verification run and an exchange loop outlive the call that
+  /// built the scope.
+  contributions: Arc<Contributions>,
   in_tree: Vec<InTree>,
   loaders: Vec<Arc<dyn ComponentLoader>>,
   content: ContentRegistry,
@@ -27,6 +32,7 @@ impl Scope {
   pub fn none() -> Scope {
     Scope {
       resolved: Vec::new(),
+      contributions: Arc::default(),
       in_tree: Vec::new(),
       loaders: Vec::new(),
       content: ContentRegistry::new(),
@@ -50,6 +56,7 @@ impl Scope {
       .fold(ContentRegistry::new(), ContentRegistry::with)
       .then(in_tree_content);
     Ok(Scope {
+      contributions: Arc::new(Contributions::from_resolved(&resolved)),
       resolved,
       in_tree: in_tree.to_vec(),
       loaders: loaders.to_vec(),
@@ -60,6 +67,10 @@ impl Scope {
   /// What decodes and encodes this scope's content slots, or `None` when nothing can.
   pub fn content(&self) -> Option<Arc<dyn ContentComponent>> {
     (!self.content.is_empty()).then(|| Arc::new(self.content.clone()) as Arc<dyn ContentComponent>)
+  }
+
+  pub fn contributions(&self) -> Arc<Contributions> {
+    Arc::clone(&self.contributions)
   }
 
   /// The declared transport contributing `kind`, if one does (plan task 8.3). Declared components

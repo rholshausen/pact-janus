@@ -25,6 +25,7 @@
 //! transport instance, which is what a sequential `serve-variant` loop actually needs.
 
 mod consumer_session;
+mod contributions;
 mod engine;
 mod events;
 mod exchange;

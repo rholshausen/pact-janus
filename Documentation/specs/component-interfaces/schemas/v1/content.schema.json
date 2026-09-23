@@ -85,11 +85,11 @@
       "properties": {
         "fragment": {
           "type": "object",
-          "description": "A plan fragment in design 2.4's grammar, using core actions and this component's own namespaced actions and nothing else. Returning nothing is legitimate: the kernel then compiles the slot generically and calls decode at execution time (spec.md §6.3)."
+          "description": "A plan node in design 2.4's grammar that replaces the engine's generic plan for this slot. It may use the core actions of the grammar it declares, this component's own contributed actions, and resolve paths inside this slot, and nothing else. Returning nothing is legitimate and always safe: the kernel then compiles the slot generically and calls decode at execution time (spec.md §6.3)."
         },
         "grammar-version": {
           "type": "string",
-          "description": "The plan-grammar version the fragment was authored against. An engine whose grammar has moved on either accepts it or fails naming the skew; it never silently reinterprets (spec.md §12.3).",
+          "description": "The plan-grammar version the fragment was authored against: 'v<major>' or 'v<major>.<minor>'. Required whenever a fragment is returned — a fragment without one cannot be checked for skew and is refused. An engine reads it when it has the same major and a minor at least as new; otherwise it fails naming the skew, and never silently reinterprets (spec.md §12.3).",
           "x-known-values": ["v0"]
         }
       }

@@ -11,6 +11,7 @@
 
 use super::content::ContentComponent;
 use super::error::ComponentError;
+use super::matcher::MatcherComponent;
 use super::transport::TransportComponent;
 use crate::common::Requirement;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,9 @@ pub struct Loaded {
   /// The transport interface, bound, when the component declared it (plan task 8.3: the
   /// subprocess binding's first client, and the reason a declared component may contribute one).
   pub transport: Option<Arc<dyn TransportComponent>>,
+  /// The matcher interface's `apply`, bound, when the component declared `matcher` (plan task 8.4:
+  /// what runs the component's own actions when a fragment it contributed reaches them).
+  pub matcher: Option<Arc<dyn MatcherComponent>>,
 }
 
 /// A way of loading components, which an embedding registers (ADR 0013: hosting is a capability of
@@ -101,7 +105,17 @@ pub struct Resolved {
   /// `contributes.transports`) — what `start-transport` and a verification target look it up by.
   pub transport: Option<Arc<dyn TransportComponent>>,
   pub transport_kinds: Vec<String>,
+  pub matcher: Option<Arc<dyn MatcherComponent>>,
+  /// The namespaced actions its handshake contributed (spec §3.3's `contributes.actions`): the only
+  /// component actions a fragment it contributes may use (plan task 8.4).
+  pub actions: Vec<String>,
 }
+
+/// The first segments of the core action families (plan-grammar spec §4.1: `match:*`, `expect:*`,
+/// `check:*`, `convert:*`). A core family *looks* namespaced, so a component carrying one of these
+/// names would contribute actions indistinguishable from core ones — and collide with the next
+/// grammar version that adds one (plan task 8.4). They are reserved, like unnamespaced names.
+pub const CORE_FAMILIES: &[&str] = &["match", "expect", "check", "convert"];
 
 /// A component compiled into the embedding, named so requirements and conflicts can see it. Only
 /// its identity matters here; it is called through the embedding's own registries.
@@ -223,6 +237,11 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   if interfaces.is_empty() {
     return Err(invalid(format!("component '{declared}' declared no interfaces")));
   }
+  if CORE_FAMILIES.contains(&declared.as_str()) {
+    return Err(invalid(format!(
+      "'{declared}' is a core action family (plan-grammar spec §4.1); a component named it would contribute actions that read as core ones"
+    )));
+  }
 
   let prefix = format!("{declared}:");
   if let Some(contributes) = hello.get("contributes").and_then(Value::as_object) {
@@ -266,6 +285,19 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   } else {
     (None, Vec::new())
   };
+  let actions: Vec<String> = hello
+    .pointer("/contributes/actions")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+    .filter_map(|entry| entry.get("name").and_then(Value::as_str))
+    .map(str::to_string)
+    .collect();
+  let matcher = if interfaces.iter().any(|i| i == "matcher") {
+    loaded.matcher
+  } else {
+    None
+  };
   Ok(Resolved {
     name: declared.clone(),
     version: version.to_string(),
@@ -273,6 +305,8 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     content,
     transport,
     transport_kinds,
+    matcher,
+    actions,
   })
 }
 

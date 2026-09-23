@@ -151,6 +151,12 @@ consequences, both normative:
 Checking contributions against the component's own name at load time — rather than at use — is what
 makes the namespace a real partition instead of a convention.
 
+One more name is reserved, because the partition has a hole otherwise: **the core action families**
+`match`, `expect`, `check` and `convert` (plan grammar §4.1). A core family *looks* namespaced, so a
+component called `expect` could contribute `expect:unique` — indistinguishable from a core action, and
+colliding with the grammar version that adds one. A component with one of those names fails to load
+(`component-invalid`). Task 8.4 found the hole; ADR 0022 closes it.
+
 ## 3. The component pipe
 
 ### 3.1 Frames
@@ -187,6 +193,7 @@ Request (`ComponentHello`), engine → component:
 ```json component-hello
 {
   "component-protocol-versions": [1],
+  "plan-grammar-versions": ["v0"],
   "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "fs": [], "network": false },
   "capabilities": { }
@@ -218,6 +225,9 @@ Result (`ComponentHelloResult`), component → engine:
 - The component picks the first version in `component-protocol-versions` it supports; if it supports
   none it MUST answer `protocol-version-unsupported` with `details.supported`, and the engine reports
   it as a load failure rather than continuing.
+- `plan-grammar-versions` names the plan grammars the engine reads (§12.3). A component that contributes
+  plan fragments writes one in a grammar listed here, or contributes none; an engine that sends no list
+  gets no fragments.
 - `grants` tells the component what it was given, so it can fail its own handshake usefully rather than
   failing at first use — a component that needs the network and was granted none SHOULD say so here.
 - `capabilities` on both sides is the protocol's open capability mechanism (protocol §5.3), used for
@@ -424,14 +434,38 @@ records an example its own matcher would reject.
 
 ### 6.3 Contributing plan fragments
 
-`compile` is asked for a body slot's shape and MAY return a **plan fragment** — a plan document in
-design 2.4's grammar, spliced at `path` — so that the component's own decoding and addressing appear in
-the plan the user can `explain`. Returning nothing is legitimate: the kernel then compiles the slot
-generically and calls `decode` at execution time.
+`compile` is asked for a content slot's shape and MAY return a **plan fragment**: a plan node in
+design 2.4's grammar that **replaces** the engine's generic plan for that slot. Returning nothing is
+legitimate and always safe: the kernel then compiles the slot generically and calls `decode` at
+execution time.
 
-The fragment is written in the plan grammar and constrained by it: it may use core actions and the
-component's own namespaced actions, and nothing else. Grammar-version targeting and what happens when
-the engine's grammar moves are §12.3, and are what task 8.4 stresses.
+A fragment replaces rather than joins because of why a component contributes one at all. A content
+type can change what a shape operator *means* for it — CSV has no types, so `integer` of a CSV column is
+text that spells an integer — and the generic plan's `match:integer`, left beside the component's own
+check, would still fail every such body. So a fragment is the whole plan for its slot, and a component
+that contributes one takes on the kernel's obligation for it (plan grammar §5.1): it must accept exactly
+what the slot's shape admits, *under this content type*. In practice that means a component compiles
+the shapes it can express and declines the rest, and the worked CSV component (`third-party/janus-csv`)
+does exactly that.
+
+The fragment is constrained, and the engine checks each rule before anything runs — when the
+interaction arrives, beside its requirements (§2.3), and before a verification starts — failing as
+`component-unavailable` with a `reason`:
+
+- it declares its `grammar-version`, and the engine reads that grammar (§12.3) — else `grammar-skew`;
+- it is a node of that grammar, and uses **core actions of that grammar and the component's own
+  contributed actions** (§3.3's `contributes.actions`) and nothing else — else `fragment-invalid`;
+- every `resolve` in it addresses the slot it was compiled for, or a path inside it — else
+  `fragment-invalid`. A content component's authority is its slot.
+
+The component's actions are executed through `matcher/apply` (§7), so a component that contributes a
+fragment using its own actions implements `matcher` as well as `content`.
+
+Two limits, found by task 8.4 and recorded rather than resolved (Phase 9 findings 21 and 22): `compile`
+is given the slot's shape and **not the variant**, so a fragment cannot pin a dimensional operator the
+way the engine's own compiler does for each variant; and the value a fragment resolves is the
+**decoded** document, because the engine decodes a declared slot before the plan runs — a fragment
+cannot show the component's own decoding as a plan step.
 
 ### 6.4 Declaring degradations
 
@@ -488,7 +522,11 @@ behaviour is fully visible in `explain`.
 
 ### 7.2 Batching
 
-`values` is an array and `results` is an array of the same length, in the same order. This is in the
+`values` is an array of `MatchValue`s and `results` is an array of the same length, in the same order.
+A plan's action node becomes an application like this: its **first** child's value is the value under
+test, wrapped as a `MatchValue` (`content`, `encoded: base64` for bytes, and the `path` it was resolved
+from); any **further** children's values travel as `config.arguments`, because the plan grammar gives an
+action node no `config` of its own. The second half is provisional (Phase 9 finding 24). This is in the
 interface from day one because spike 1.4 measured the pipe binding at 1.4 µs per call: fine per value at
 test scale, and the obvious lever if it ever is not. A component MAY declare the `batch-apply`
 capability to accept more than one value per call; without it the engine sends one, and the arrays are
@@ -904,13 +942,28 @@ authors* rather than this project:
 ### 12.3 Fragments and grammar skew
 
 A contributed plan fragment is authored against a plan-grammar version and shipped separately from the
-engine — the one place a plan document crosses a version boundary (plan grammar §7.1). A fragment
-therefore declares the grammar version it targets, and an engine whose grammar has moved on either
-accepts it (the grammar grew additively, which is the designed-for case) or fails the load naming the
-skew. It MUST NOT silently reinterpret a fragment written against an older grammar.
+engine — the one place a plan document crosses a version boundary (plan grammar §7.1). The rules, tested
+by task 8.4 (ADR 0022):
 
-Task 8.4 is the stress test for exactly this, and it is scoped here rather than left to be discovered:
-the question it answers is what happens when a component targets grammar v0 and the engine has moved.
+- **A fragment declares its grammar.** A grammar version is `v<major>` or `v<major>.<minor>`; `v0` is
+  `v0.0`. A fragment without one cannot be checked for skew, and is refused rather than guessed at.
+- **An engine reads a fragment written against the same major and a minor no newer than its own.** The
+  grammar grows additively within a major (plan grammar §7.1), so a `v0` fragment on a `v0.1` engine is
+  the designed-for case; a `v0.1` fragment on a `v0` engine may use what `v0` never had; a `v1` fragment
+  is another grammar.
+- **The engine says what it reads**, as `plan-grammar-versions` in `component/hello` (§3.2), so a
+  component can write a fragment the engine reads, fall back to an older grammar it also writes, or
+  contribute none. Without the list, the first a component learns of skew is a refusal.
+- **Skew fails by name, before anything runs** — `component-unavailable`, `reason: grammar-skew`,
+  naming the version declared and the versions read. It MUST NOT silently reinterpret a fragment
+  written against another grammar, and a plan document of any origin is read under the grammar it
+  declares or not at all.
+
+What the rules deliberately leave to the component: a component that wants a core action a newer
+grammar adds uses its own contributed action until the engines it targets read that grammar, then
+switches — the same fragment, two grammars, chosen from the handshake. Its own action keeps working
+throughout, because contributed semantics are frozen (§12.2) and namespaced names never collide with
+core ones (§2.4).
 
 ## 13. Where full symmetry hurts
 

@@ -299,6 +299,16 @@ fn literal_json(literal: &Literal) -> Value {
 /// and re-compiling from the source document instead would mean two compilers had to agree about
 /// what the user was shown.
 pub fn from_json(document: &Value) -> Result<Plan, String> {
+  // Component-interfaces spec §12.3: never silently reinterpret a document written against another
+  // grammar. Until plan task 8.4 this read any document as v0, whatever its `grammar` said.
+  let grammar = document
+    .get("grammar")
+    .and_then(Value::as_str)
+    .ok_or("a plan needs a 'grammar'")?;
+  super::fragment::readable(Some(grammar)).map_err(|skew| match skew {
+    super::fragment::FragmentError::Skew { message, .. }
+    | super::fragment::FragmentError::Invalid(message) => message.replace("the fragment", "the plan"),
+  })?;
   let root = node_from_json(document.get("root").ok_or("a plan needs a 'root'")?)?;
   Ok(Plan {
     grammar: GRAMMAR_VERSION,
@@ -310,7 +320,7 @@ pub fn from_json(document: &Value) -> Result<Plan, String> {
   })
 }
 
-fn node_from_json(value: &Value) -> Result<Node, String> {
+pub(crate) fn node_from_json(value: &Value) -> Result<Node, String> {
   let kind = value
     .get("kind")
     .and_then(Value::as_str)

@@ -75,6 +75,7 @@ impl ComponentLoader for SubprocessLoader {
       hello,
       content: None,
       transport,
+      matcher: None,
     })
   }
 }

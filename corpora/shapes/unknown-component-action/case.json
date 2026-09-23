@@ -1,5 +1,5 @@
 {
-  "description": "a component operator compiles to its own namespaced action, opaque to the kernel — with no protobuf component loaded, the engine reports the unknown action by name rather than silently ignoring the node (shape spec section 3.7)",
+  "description": "a component operator compiles to its own namespaced action, opaque to the kernel — with no protobuf component loaded, the engine reports the unknown action by name, at the path it was applied to, rather than silently ignoring the node (shape spec section 3.7). Since plan task 8.4 a namespaced action is run by whichever declared component contributes it (matcher/apply); with none in scope, that is the failure.",
   "input": {
     "kind": "spec",
     "spec": {
@@ -16,8 +16,8 @@
     "status": "mismatched",
     "mismatches": [
       {
-        "path": "",
-        "message": "unknown or unavailable action 'protobuf:enum'",
+        "path": "$.response.body",
+        "message": "no component in scope contributes the action 'protobuf:enum'",
         "action": "protobuf:enum"
       }
     ]

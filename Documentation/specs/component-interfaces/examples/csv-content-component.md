@@ -102,35 +102,51 @@ matcher rejects.
 
 ## 4. The plan fragment it contributes
 
-`content/compile` is offered the body slot's shape and returns a fragment the kernel splices in, so the
-component's decoding is visible in `explain` rather than hidden inside a match:
+CSV has no types, so a CSV body decodes to strings: `items` is `"1"`, never `1`. A consumer who writes
+the shape they mean — `items: integer` — would get the engine's generic `match:integer`, and a string is
+not an integer. So `content/compile`, offered the body slot's shape, returns a fragment that **replaces**
+the slot's generic plan and says what `integer` means for this content type (§6.3):
 
 ```json compile-result
 { "grammar-version": "v0",
   "fragment": {
-    "kind": "pipeline",
+    "kind": "container", "label": "text/csv",
     "children": [
-      { "kind": "resolve", "path": "$.response.body" },
-      { "kind": "action", "name": "csv:parse",
-        "children": [ { "kind": "value", "value": { "of": "object",
-                                                    "value": { "header": "present", "delimiter": "," } } } ] } ] } }
+      { "kind": "action", "name": "expect:array", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
+      { "kind": "action", "name": "for-each", "children": [
+        { "kind": "splat", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
+        { "kind": "container", "label": "$.response.body[*]", "children": [
+          { "kind": "action", "name": "match:string",
+            "children": [ { "kind": "resolve-current", "path": "~>.id" } ] },
+          { "kind": "action", "name": "csv:integer",
+            "children": [ { "kind": "resolve-current", "path": "~>.items" } ] } ] } ] } ] } }
 ```
 
 which renders as:
 
 ```text
-(
-  $.response.body
-  | %csv:parse (
-      {"header": "present", "delimiter": ","}
+:"text/csv" (
+  %expect:array ( $.response.body ),
+  %for-each (
+    ** ( $.response.body ),
+    :"$.response.body[*]" (
+      %match:string ( ~>.id ),
+      %csv:integer ( ~>.items )
     )
+  )
 )
 ```
 
-The fragment uses one core node kind and one namespaced action, which is the whole permitted alphabet
-(§6.3). It declares the grammar version it targets: an engine on a later grammar accepts it if the
-grammar grew additively and fails naming the skew if it did not, and never silently reinterprets it
-(§12.3). Task 8.4 is that scenario run deliberately.
+Everything CSV does not change is the core action the engine would have used; only the typed operator
+becomes the component's own, `csv:integer`, run by `matcher/apply`. The fragment declares the grammar it
+targets and is written only when the engine's `component/hello` lists it (§12.3), and it addresses its
+own slot and nothing else. A shape the component cannot express — an `optional` member, a nested object
+— gets no fragment and the generic plan, which is always a safe answer.
+
+An earlier draft of this example had the fragment *decode* — a `csv:parse` step in the plan — so the
+component's decoding would show in `explain`. Task 8.4 found that cannot work as the engine stands: a
+declared slot is decoded before the plan runs, so a fragment only ever sees the document (Phase 9
+finding 22).
 
 ## 5. The operator, compiled and executed
 

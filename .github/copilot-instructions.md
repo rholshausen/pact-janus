@@ -160,7 +160,11 @@ local `.wasm` implementing `Documentation/specs/component-interfaces/wit/compone
 registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subprocess` a command
 spawned over the protocol's stdio framing — loaded only by `spikes/8.3-subprocess-transport`'s
 loader, which no shipped embedding registers yet. A declared component may contribute a transport,
-looked up by the `kind`s its handshake names. `janus`
+looked up by the `kind`s its handshake names. A declared content component may contribute a **plan
+fragment** for a slot (plan task 8.4, ADR 0022): it replaces the slot's generic plan, must declare a
+plan grammar the engine lists in `component/hello` (`plan-grammar-versions`), may use only core actions
+and its own contributed ones — run through `matcher/apply` — and is checked when the interaction arrives,
+failing as `component-unavailable` with `reason: grammar-skew` or `fragment-invalid`. `janus`
 and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
 so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
 one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked

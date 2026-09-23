@@ -5,7 +5,7 @@
         %protobuf:enum (
           $.response.body => 'SHIPPED',
           {'extra': true}
-        ) => ERROR(unknown or unavailable action 'protobuf:enum')
+        ) => ERROR(no component in scope contributes the action 'protobuf:enum')
       ) => BOOL(false)
     ) => BOOL(false)
   ) => BOOL(false)
