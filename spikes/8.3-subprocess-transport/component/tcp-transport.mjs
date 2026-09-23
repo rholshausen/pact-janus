@@ -77,6 +77,8 @@ serve({
       state.server.once("error", reject);
       state.server.listen(options.port ?? 0, options.host ?? "127.0.0.1", resolve);
     });
+    // After listening, a server error must not be uncaught either: one process hosts every instance.
+    state.server.on("error", (e) => console.error(`${instance}: ${e.message}`));
     instances.set(instance, state);
     const { address, port } = state.server.address();
     return { endpoint: { kind: "tcp", host: address, port } };

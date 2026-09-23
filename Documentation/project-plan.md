@@ -529,7 +529,10 @@ engine. Every containment obligation held, and the component exited 11 ms after 
 Out of process `env` turned out to be enforceable and `fs`/`network` did not. The kernel now takes a
 transport from a declared component and arms passive exchanges by kind rather than `"http"`. Two
 more HTTP assumptions are in the kernel-boundary review (findings 8–9), and three design questions
-are Phase 9 findings 18–20. Windows is wired into CI and was not observed. Remaining:
+are Phase 9 findings 18–20. On real Windows (CI) every binding obligation held, the orphan test
+included, which closes spike 1.3's open risk for this mechanism. The one failure was a fixture
+whose unhandled socket reset ended the process, which is finding 18 again, seen from the other side.
+Remaining:
 
 1. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
 

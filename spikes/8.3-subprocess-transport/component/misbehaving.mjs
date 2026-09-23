@@ -32,7 +32,12 @@ serve({
       case "listen":
         // A transport instance's real state: a listening socket, which lives in this process only.
         return new Promise((resolve) => {
-          const server = net.createServer((socket) => socket.end("hello\n"));
+          // The 'error' listener is not optional: a client that closes without reading resets the
+          // connection, and an unhandled ECONNRESET ends the process — reliably on Windows (FINDINGS §2.9).
+          const server = net.createServer((socket) => {
+            socket.on("error", () => {});
+            socket.end("hello\n");
+          });
           server.listen(0, "127.0.0.1", () => resolve({ endpoint: { port: server.address().port } }));
         });
       case "env":

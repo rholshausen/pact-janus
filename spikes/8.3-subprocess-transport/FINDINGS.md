@@ -1,9 +1,9 @@
 # Spike 8.3 findings — The out-of-process transport escape hatch
 
-Status: **complete on Linux**. The boundary exists and holds: a Node transport, declared by a project,
-served a consumer test and drove a verification through the real engine. Every containment
-obligation passes. On Windows the tests are wired into CI (`spike-8-3`) but had not run when this
-was written, so §4 is a prediction, not evidence. Method: [README.md](README.md).
+Status: **complete**. The boundary exists and holds: a Node transport, declared by a project, served a
+consumer test and drove a verification through the real engine. Every containment obligation passes
+on Linux. On Windows the first CI run (`spike-8-3`) passed 13 of 14; the one failure was a bug in a
+test fixture that Windows exposed and Linux had been hiding (§2.9, §4). Method: [README.md](README.md).
 
 ## 1. What was proven
 
@@ -106,6 +106,22 @@ transport of its own**:
    a print that splits a header line would desynchronise the stream, and the length prefix
    recovers it at the next frame.
 
+9. **One unhandled socket error ends every instance in the process, and Windows makes it
+   routine.** The first Windows run failed `one_hung_call_takes_every_instance…` with
+   `component-exited` where `component-timeout` was expected. The component had died *before* the
+   hung call. The fixture's listening socket had no `'error'` listener. The test connected and
+   closed without reading, which resets the connection, and Node turns an unhandled `ECONNRESET` into
+   an uncaught exception that ends the process. Windows resets reliably. Linux usually avoided it on
+   timing alone, and does crash when the reset is forced (reproduced with `resetAndDestroy()`). The
+   binding did its part: the death was reported at once, as `component-exited`, and the next call
+   got a fresh process. But this is finding 1 again, from the other side. A component process is a
+   single point of failure for every instance it hosts, so one careless socket in a transport ends
+   every session's mock. The fixture now handles the error, and `tcp-transport.mjs` handles errors on
+   every socket and on its server after `listen`. The lesson for the spec's author guidance (Phase 9
+   finding 18): a transport author must treat every socket error as survivable. A catch-all
+   `uncaughtException` handler in the framing module would also keep the process alive, but it would
+   hide real bugs behind a component that looks healthy.
+
 ## 3. What it costs
 
 `cargo run --release --example call_cost`, Node 22, Linux, same machine as spikes 1.3 and 8.1:
@@ -132,9 +148,13 @@ Not observed. What the code does about it, so CI has something specific to confi
   and Node sees `end` on stdin;
 - the tests kill with `Child::kill` (TerminateProcess) and check liveness with `tasklist`.
 
-The `spike-8-3` CI job runs this directory's tests on `windows-latest`. Its first run is the first
-real-Windows evidence for component processes, and for the engine's own subprocess too, since the
-mechanism is the same. If it is red, that is the finding.
+The `spike-8-3` CI job runs this directory's tests on `windows-latest`. Its first run — the first
+real-Windows evidence for component processes, and for the engine's own subprocess, since the
+mechanism is the same — passed 13 of 14. Spawning through the engine's `PATH`, the empty environment
+with `SystemRoot`, timeouts with kill escalation, respawn, exit on stdin EOF, and **the orphan test**
+(a host killed by `TerminateProcess`, its component gone) all held on real Windows. That closes
+spike 1.3's open risk for this mechanism. The one failure was not the binding: it was §2.9, a
+fixture bug that Windows' connection resets exposed.
 
 ## 5. Not done
 
