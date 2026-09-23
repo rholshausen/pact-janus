@@ -298,9 +298,12 @@ impl ComponentLoader for WasmLoader {
       .and_then(Value::as_array)
       .is_some_and(|interfaces| interfaces.iter().any(|i| i == "content"));
     let wasm = Arc::new(wasm);
+    // No transport over this binding yet: a WASM transport needs sockets, which is the grant a
+    // sandbox exists to withhold (spec §13), and 8.3's escape hatch is the subprocess binding.
     Ok(Loaded {
       hello,
       content: declares_content.then_some(wasm as Arc<dyn ContentComponent>),
+      transport: None,
     })
   }
 }

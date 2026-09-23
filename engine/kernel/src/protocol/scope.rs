@@ -8,7 +8,8 @@
 
 use crate::common::{ContentTypes, Requirement};
 use crate::component::{
-  self, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, Unavailable, check_requirements,
+  self, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, TransportComponent,
+  Unavailable, check_requirements,
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -59,6 +60,16 @@ impl Scope {
   /// What decodes and encodes this scope's content slots, or `None` when nothing can.
   pub fn content(&self) -> Option<Arc<dyn ContentComponent>> {
     (!self.content.is_empty()).then(|| Arc::new(self.content.clone()) as Arc<dyn ContentComponent>)
+  }
+
+  /// The declared transport contributing `kind`, if one does (plan task 8.3). Declared components
+  /// come ahead of the embedding's in-tree ones, as they do for content: the project named it.
+  pub fn transport(&self, kind: &str) -> Option<Arc<dyn TransportComponent>> {
+    self
+      .resolved
+      .iter()
+      .find(|component| component.transport_kinds.iter().any(|k| k == kind))
+      .and_then(|component| component.transport.clone())
   }
 
   /// The components that took part, as a contract's `metadata.writer` or a run's report names them

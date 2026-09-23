@@ -522,11 +522,16 @@ engine's missing half built ([third-party component report](third-party-componen
 from its handshake and checked against it; pulled by digest, cached content-addressed and re-verified,
 so a pinned second run fetches nothing and runs offline; `janus component push|pull`; tested against a
 registry that tampers on request and against `registry:2`, with `oras` and ghcr.io as outside evidence
-(ADR 0021, Phase 9 findings 15–17). Remaining:
+(ADR 0021, Phase 9 findings 15–17). 8.3 is done
+([spike findings](../spikes/8.3-subprocess-transport/FINDINGS.md)): a dependency-free Node `tcp`
+transport over the subprocess binding served a consumer test and drove a verification through the real
+engine. Every containment obligation held, and the component exited 11 ms after its host was killed.
+Out of process `env` turned out to be enforceable and `fs`/`network` did not. The kernel now takes a
+transport from a declared component and arms passive exchanges by kind rather than `"http"`. Two
+more HTTP assumptions are in the kernel-boundary review (findings 8–9), and three design questions
+are Phase 9 findings 18–20. Windows is wired into CI and was not observed. Remaining:
 
-1. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
-   when they cannot be enforced.
-2. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
+1. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
 
 Then **Phase 9 — Evaluation and RFC feedback** (§12), which the running
 [findings list](phase-9-findings.md) is already accumulating input for.

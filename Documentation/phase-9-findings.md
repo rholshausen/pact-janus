@@ -690,3 +690,54 @@ gives up refusing a non-Janus WASM artifact before fetching and compiling it; **
 whether the CNCF layout's config could carry an application-defined annotation (a Janus component name)
 that would let one artifact serve both.
 
+## 18. Out of process, "recreate the instance" kills every instance in the process
+
+**Found:** 2026-09-23, spike 8.3 ([findings](../spikes/8.3-subprocess-transport/FINDINGS.md) §2.1).
+**Status:** open. It blocks shipping the subprocess loader in an embedding.
+
+Component-interfaces spec §3.4: an instance that trapped or timed out "MUST NOT" be reused and is
+recreated. §9.3: "one process MAY host several instances". Both come from spike 1.4's WASM evidence,
+where an instance is cheap and per call, and they compound badly out of process. The only way to stop
+a call in another process is to stop the process, so one hung `poll-inbound` on one session's mock
+closes every other session's listening socket. Reproduce:
+`one_hung_call_takes_every_instance_in_the_process_with_it` in the spike's `tests/containment.rs`.
+
+Options: **A.** a transport component gets one process per instance (Node spawns in 16 ms, and a
+session starts a handful of transports at most); **B.** the loader reports which instances died with
+the process, so the engine fails their sessions by name instead of at their next call; **C.** say in
+§3.4 that out of process the unit of recreation is the process, and leave the trade to the component
+author, who chooses how many instances share one.
+
+## 19. Out of process, `env` is enforceable; spec §9.3 says no grant is
+
+**Found:** 2026-09-23, spike 8.3 (§2.2). **Status:** open. The spec's wording is the only thing to
+change.
+
+Spec §9.3: "Grants are not enforceable." For `fs` and `network` that is true without per-OS sandboxing
+(seccomp or Landlock, `sandbox-exec`, AppContainer), and the spike demonstrates it: the `tcp` component
+listens with `network: false`. For `env` it is not: starting the process with an empty environment plus
+exactly the granted variables costs nothing, and the component then cannot read a token the engine had
+and did not grant (`the_env_grant_is_enforced_out_of_process`). It has two costs the spec should name.
+The interpreter is resolved on the engine's `PATH`, because the component's own has none. On Windows
+`SystemRoot` must be kept, or Winsock does not start.
+
+Options: **A.** amend §9.3 to say `env` is enforced and `fs`/`network` are documented intent; **B.**
+leave `env` unenforced for symmetry, which throws away the one protection this binding can give for
+free.
+
+## 20. A `subprocess` source's `reference` is "the command", and nothing says what that is
+
+**Found:** 2026-09-23, spike 8.3 (§2.7). **Status:** open.
+
+The component-config schema describes `reference` for `subprocess` as "the command the engine spawns".
+It does not say whether that is a shell string or an argument vector, or what a relative path in it is
+relative to. Design 2.7 §7.1's loader resolves relative `file` references against the configuration
+file's directory and does nothing for `subprocess`. So `node components/tcp.mjs` means one thing from
+the project root and another from anywhere else. The spike splits on whitespace, which breaks on the
+first path with a space in it.
+
+Options: **A.** an `args` array beside `reference` (the program), with the 2.7 loader resolving both
+against the configuration's directory, additive in the schema; **B.** `reference` as a shell string run
+through the platform shell, which is portable only in name; **C.** a `reference` that must be a single
+executable path, and wrapper scripts for anything with arguments.
+

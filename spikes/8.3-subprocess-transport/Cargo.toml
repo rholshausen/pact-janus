@@ -1,0 +1,19 @@
+[package]
+name = "spike_subprocess_transport"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike code (plan task 8.3): excluded from the workspace, not held to its conventions, allowed to
+# rot. It depends on the kernel on purpose — the boundary under test is the real one, so the
+# transport has to be driven by the real engine. Nothing in engine/, cli/ or sdks/ depends on this.
+[dependencies]
+pact_janus_kernel = { path = "../../engine/kernel" }
+serde = "1"
+serde_json = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+pact_janus_component_json = { path = "../../engine/component-json" }
+pretty_assertions = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

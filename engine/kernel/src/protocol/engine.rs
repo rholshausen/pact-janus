@@ -389,11 +389,15 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    let Some(component) = self.transports.get(&req.transport).cloned() else {
-      return ResponseFrame::err(id, EngineError::component_unavailable(&req.transport));
-    };
     let Some(session) = self.sessions.get_mut(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    // A transport the session's project declared (plan task 8.3), ahead of the embedding's own.
+    let Some(component) = session
+      .transport(&req.transport)
+      .or_else(|| self.transports.get(&req.transport).cloned())
+    else {
+      return ResponseFrame::err(id, EngineError::component_unavailable(&req.transport));
     };
     self.next_transport += 1;
     let instance = format!("t-{}", self.next_transport);
@@ -485,7 +489,10 @@ impl Engine {
     // misconfigured provider fails the *call* rather than arriving as a run that verified nothing.
     let mut targets = Vec::with_capacity(req.target.transports.len());
     for binding in &req.target.transports {
-      let Some(component) = self.transports.get(&binding.transport).cloned() else {
+      let Some(component) = scope
+        .transport(&binding.transport)
+        .or_else(|| self.transports.get(&binding.transport).cloned())
+      else {
         return ResponseFrame::err(
           id,
           EngineError::component_unavailable(&format!("transport/{}", binding.transport)),

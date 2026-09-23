@@ -157,7 +157,10 @@ Out-of-tree components (plan task 8.1, design 2.6 §10) are **declared**, never 
 `components` list in the project configuration (`verifier.janus.yaml` for `janus verify --config`;
 the SDKs' `components` option on the consumer side), each entry naming its source — `file` is a
 local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`, `oci` a
-registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it. `janus`
+registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subprocess` a command
+spawned over the protocol's stdio framing — loaded only by `spikes/8.3-subprocess-transport`'s
+loader, which no shipped embedding registers yet. A declared component may contribute a transport,
+looked up by the `kind`s its handshake names. `janus`
 and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
 so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
 one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked

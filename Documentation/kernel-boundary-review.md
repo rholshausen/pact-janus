@@ -217,3 +217,35 @@ authoritative than this exploratory review — before acting on them.
   Retyping the legacy body compiler over `RuntimeValue` would buy nothing a real caller needs.
 - Findings 3 and 6 (the legacy compiler is permanently HTTP-shaped; nothing marks that boundary in
   the module tree) remain open, still feeding 2.6's day-one-components report rather than 4.2.
+
+## Addendum (task 8.3): what a non-HTTP transport walks into
+
+Spike 8.3 ([findings](../spikes/8.3-subprocess-transport/FINDINGS.md) §2.4) drove the kernel with a
+transport of another kind: a `tcp` transport, JSON lines over a raw socket, out of process. The
+grep-driven pass above did not catch these three, because they are not HTTP *vocabulary*. They are
+HTTP *structure*, and they only show up when something else tries to use them.
+
+### 7. Passive exchanges were armed only for transports of kind `"http"` — fixed in 8.3
+
+`protocol/session.rs`, `serve_variant`: `t.kind == "http"`, and then only the session's `"http"`
+transports were armed. A passive interaction of any other kind was accepted, its transport started,
+and nothing was ever served. It now arms the transports whose kind is the interaction's own
+(`engine/kernel/tests/declared_transport.rs` fails with the old line).
+
+### 8. The passive loop and the verifier assume parts named `request` and `response` — open
+
+`protocol/exchange.rs` matches the `request` subtree of an arrival and replies with the generated
+`response` part; `protocol/verification.rs` sends a variant's `request` part and matches the reply's
+`response` subtree. Component-interfaces spec §4 says "there is no `request`/`response` pair anywhere
+in it", because a message interaction has neither, and in the kernel there is one. The `tcp` transport
+complies by using those names. A message transport will not be able to. The fix belongs with the
+first one: the interaction's transport binding (contract spec §4.3) says which part is inbound and
+which is the answer, or the transport's contribution does.
+
+### 9. A request that does not match is answered with an HTTP 500 — open
+
+`protocol/exchange.rs`, `mismatch_reply`: a `status: 500` slot and the mismatches in `body`. That is
+HTTP's shape, written by the kernel. The `tcp` transport ignores `status` and writes `body`, which
+works by accident. The mismatch reply is the transport's business: `dispose` with a `reject`
+disposition, carrying the mismatches, would let each kind say "no" in its own way.
+

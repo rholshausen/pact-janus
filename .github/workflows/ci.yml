@@ -62,6 +62,37 @@ jobs:
       - name: Conformance corpus lint
         run: cargo run --package pact_janus_conformance -- lint
 
+  spike-8-3:
+    # Plan task 8.3: the subprocess binding's containment tests (spikes/8.3-subprocess-transport),
+    # on Linux and on Windows. Windows is the point: spike 1.3's one open risk — spawn, kill and exit
+    # on stdin EOF under real Windows — applies to component processes too, and this job is its first
+    # real evidence. Spike code is otherwise outside CI; this one earns a job because the question it
+    # answers cannot be answered on the machine it was written on.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: spikes/8.3-subprocess-transport
+      # The kernel builds rquickjs with bindgen (ADR 0015), which needs libclang on every target.
+      - name: Build prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Build prerequisites (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Spike 8.3 tests
+        working-directory: spikes/8.3-subprocess-transport
+        run: cargo test
+
   sdks:
     # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from
     # the schemas today. A schema change without regenerated bindings — or a hand edit to a

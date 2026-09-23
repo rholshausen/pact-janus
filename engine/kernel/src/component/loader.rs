@@ -11,6 +11,7 @@
 
 use super::content::ContentComponent;
 use super::error::ComponentError;
+use super::transport::TransportComponent;
 use crate::common::Requirement;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -72,6 +73,9 @@ pub struct Loaded {
   pub hello: Value,
   /// The content interface, bound, when the component declared it.
   pub content: Option<Arc<dyn ContentComponent>>,
+  /// The transport interface, bound, when the component declared it (plan task 8.3: the
+  /// subprocess binding's first client, and the reason a declared component may contribute one).
+  pub transport: Option<Arc<dyn TransportComponent>>,
 }
 
 /// A way of loading components, which an embedding registers (ADR 0013: hosting is a capability of
@@ -93,6 +97,10 @@ pub struct Resolved {
   pub version: String,
   pub interfaces: Vec<String>,
   pub content: Option<Arc<dyn ContentComponent>>,
+  /// The transport interface, and the `kind`s its handshake contributed (spec §3.3's
+  /// `contributes.transports`) — what `start-transport` and a verification target look it up by.
+  pub transport: Option<Arc<dyn TransportComponent>>,
+  pub transport_kinds: Vec<String>,
 }
 
 /// A component compiled into the embedding, named so requirements and conflicts can see it. Only
@@ -240,11 +248,31 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   } else {
     None
   };
+  let (transport, transport_kinds) = if interfaces.iter().any(|i| i == "transport") {
+    let kinds: Vec<String> = hello
+      .pointer("/contributes/transports")
+      .and_then(Value::as_array)
+      .into_iter()
+      .flatten()
+      .filter_map(|entry| entry.get("kind").and_then(Value::as_str))
+      .map(str::to_string)
+      .collect();
+    if loaded.transport.is_some() && kinds.is_empty() {
+      return Err(invalid(format!(
+        "component '{declared}' implements 'transport' and contributes no transport kind; nothing could ever start it"
+      )));
+    }
+    (loaded.transport, kinds)
+  } else {
+    (None, Vec::new())
+  };
   Ok(Resolved {
     name: declared.clone(),
     version: version.to_string(),
     interfaces,
     content,
+    transport,
+    transport_kinds,
   })
 }
 

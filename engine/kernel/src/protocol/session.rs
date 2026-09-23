@@ -114,7 +114,8 @@ pub(crate) struct ConsumerSession {
   order: Vec<String>,
   next_handle: u64,
   /// Transports bound by `start-transport` (spec §8.2), each driving its own background exchange
-  /// loop (plan task 4.5). A session MAY start several; `serve_variant` arms every `"http"` one.
+  /// loop (plan task 4.5). A session MAY start several; `serve_variant` arms every one of the
+  /// interaction's transport kind.
   transports: Vec<TransportRun>,
   /// The components this session can call (component-interfaces spec §10): the ones `create`'s
   /// `config.components` declared, ahead of the embedding's in-tree ones. They end with the session.
@@ -185,6 +186,11 @@ impl ConsumerSession {
     );
     self.order.push(handle.clone());
     Ok(handle)
+  }
+
+  /// A transport this session's project declared, contributing `kind` (plan task 8.3).
+  pub fn transport(&self, kind: &str) -> Option<Arc<dyn TransportComponent>> {
+    self.scope.transport(kind)
   }
 
   /// `consumer-session/start-transport` (spec §8.2): starts `component` under engine-assigned
@@ -281,7 +287,7 @@ impl ConsumerSession {
 
   /// `consumer-session/serve-variant` (spec §4.1, §8.2): arm the named variant of a previously
   /// selected interaction, generating its concrete payload now (plan task 4.3's generator). For a
-  /// passive HTTP interaction with a transport bound, this also arms every `"http"` transport's
+  /// passive interaction with a transport bound, this also arms every transport of its kind's
   /// exchange loop (plan task 4.5) with the pinned request plan to match and the response to
   /// answer with; an emissive interaction, or one with no transport bound, stops at recording the
   /// arming, exactly as before.
@@ -309,14 +315,18 @@ impl ConsumerSession {
       parts: parts.clone(),
     });
 
-    let is_passive_http = entry
+    // Arm every bound transport of the interaction's own kind. Until plan task 8.3 this read
+    // `kind == "http"` — HTTP knowledge in the kernel, which no transport of another kind could
+    // get past (kernel-boundary review, finding 7).
+    let passive_kind = entry
       .spec
       .transport
       .as_ref()
-      .is_some_and(|t| t.kind == "http" && t.mode.as_deref() != Some("emissive"));
-    if is_passive_http {
+      .filter(|t| t.mode.as_deref() != Some("emissive"))
+      .map(|t| t.kind.clone());
+    if let Some(kind) = passive_kind {
       let request_plan = plan::compile(&entry.spec, &assignment, Some(variant_id));
-      for run in self.transports.iter().filter(|run| run.kind == "http") {
+      for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.state.lock().expect("exchange state lock poisoned");
         state.armed = Some(ArmedExchange {
           handle: handle.to_string(),
