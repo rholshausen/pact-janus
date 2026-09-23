@@ -167,8 +167,8 @@ serialisation is the pipe's real cost" measured again, with a CSV parser inside 
 
 ## 4. Not done here, on purpose
 
-- **OCI distribution** is task 8.2. The loader handles `file` sources, and an `oci` declaration fails
-  by name with the loaders there are.
+- **OCI distribution** was task 8.2, since done: the same `.wasm` is pushed with
+  `janus component push`, declared by digest, and verified from a registry (ADR 0021).
 - **Plan fragments and contributed actions** are task 8.4. `content/compile` is called by nobody yet,
   and the component answers it with no fragment.
 - **`match:content-type` in live runs.** The exchange and verification paths still execute without a

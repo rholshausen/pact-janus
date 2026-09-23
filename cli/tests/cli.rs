@@ -1,10 +1,14 @@
 //! Plan task 5.5: the `janus` CLI, run as a binary — `verify`, `explain` and `upgrade` against a
 //! real provider on a real socket — and plan task 7.4's `check`, which is the one command whose
-//! subject is a *decision* over documents rather than a running provider.
+//! subject is a *decision* over documents rather than a running provider. Plan task 8.2 adds
+//! `component push|pull`, and a verification whose component comes from an OCI registry.
 //!
 //! These drive the *shipped executable*, not a library function, because the surface under test is
 //! the command: its flags, its output and its exit code. A CI script depends on all three, and a
 //! command whose exit code is only ever asserted from inside Rust is a command nobody has run.
+
+#[path = "../../engine/component-host/tests/support/registry.rs"]
+mod registry;
 
 use pact_janus_sample_order_service::{Config, Provider, start};
 use serde_json::{Value, json};
@@ -873,4 +877,136 @@ fn verify_without_the_component_fails_before_the_run_naming_what_is_missing() {
   let text = stderr(&output);
   assert!(text.contains("component-unavailable"), "{text}");
   assert!(text.contains("content/csv"), "{text}");
+}
+
+// ---------------------------------------------------------------------------------------------
+// OCI distribution (plan task 8.2)
+// ---------------------------------------------------------------------------------------------
+
+/// `janus`, with its own component cache: what is or is not already cached is the subject here.
+fn janus_cached(cache: &str, args: &[&str]) -> Output {
+  Command::new(env!("CARGO_BIN_EXE_janus"))
+    .args(args)
+    .env("JANUS_COMPONENT_CACHE", cache)
+    .output()
+    .expect("the janus binary runs")
+}
+
+/// The sample's state hook, and the component by OCI reference and digest.
+fn oci_config(provider: &Provider, reference: &str, digest: &str) -> String {
+  let port = provider.base_url().rsplit(':').next().unwrap_or("0").to_string();
+  let path = temp(&format!("verifier-oci-{port}.yaml"));
+  std::fs::write(
+    &path,
+    format!(
+      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: oci, reference: \"{reference}\", digest: \"{digest}\" }}\nhooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
+      provider.base_url()
+    ),
+  )
+  .expect("writing the config");
+  path
+}
+
+#[test]
+fn a_pushed_component_verifies_a_csv_contract_pinned_by_digest_and_then_offline() {
+  let registry = registry::Registry::start();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let pushed = janus_cached(
+    &temp("oci-push-cache"),
+    &["component", "push", &csv_component(), &reference, "--json"],
+  );
+  assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
+  let pushed: Value = serde_json::from_slice(&pushed.stdout).unwrap();
+  assert_eq!(pushed["component"], json!({ "name": "csv", "version": "1.0.0" }));
+  let digest = pushed["digest"].as_str().unwrap().to_string();
+
+  let provider = provider();
+  let config = oci_config(&provider, &reference, &digest);
+  let cache = temp("oci-verify-cache");
+  let _ = std::fs::remove_dir_all(&cache);
+  let verify = || {
+    janus_cached(
+      &cache,
+      &[
+        "verify",
+        &csv_contract(),
+        "--provider-url",
+        provider.base_url(),
+        "--config",
+        &config,
+      ],
+    )
+  };
+  registry.take_log();
+  let first = verify();
+  assert_eq!(
+    code(&first),
+    0,
+    "stdout: {}\nstderr: {}",
+    stdout(&first),
+    stderr(&first)
+  );
+  assert!(
+    stdout(&first).contains("VERIFIED: 1 verified, 0 failed"),
+    "{}",
+    stdout(&first)
+  );
+  assert_eq!(
+    registry.take_log().len(),
+    3,
+    "a manifest by digest, its config, its layer"
+  );
+
+  // The pin is in the cache: the next run needs no registry at all.
+  drop(registry);
+  let offline = verify();
+  assert_eq!(code(&offline), 0, "stderr: {}", stderr(&offline));
+  assert!(stdout(&offline).contains("VERIFIED: 1 verified, 0 failed"));
+}
+
+#[test]
+fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
+  let registry = registry::Registry::start();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let pushed = janus_cached(
+    &temp("oci-pull-push-cache"),
+    &["component", "push", &csv_component(), &reference],
+  );
+  assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
+  assert!(
+    stdout(&pushed).contains("pushed csv 1.0.0 (content)"),
+    "{}",
+    stdout(&pushed)
+  );
+
+  let cache = temp("oci-pull-cache");
+  let _ = std::fs::remove_dir_all(&cache);
+  let pulled = janus_cached(&cache, &["component", "pull", &reference]);
+  let text = stdout(&pulled);
+  assert_eq!(code(&pulled), 0, "{}", stderr(&pulled));
+  assert!(text.contains("csv 1.0.0 (content)"), "{text}");
+  assert!(text.contains("content types: text/csv"), "{text}");
+  assert!(
+    text.contains(&format!(
+      "source: {{ kind: oci, reference: \"{reference}\", digest: \"sha256:"
+    )),
+    "{text}"
+  );
+
+  // A registry serving other bytes: the artifact is not what it claims — the subject failed.
+  registry.tamper(registry::Tamper::Blobs);
+  let tampered_cache = temp("oci-pull-tampered-cache");
+  let _ = std::fs::remove_dir_all(&tampered_cache);
+  let tampered = janus_cached(&tampered_cache, &["component", "pull", &reference]);
+  assert_eq!(code(&tampered), 1, "{}", stderr(&tampered));
+  assert!(
+    stderr(&tampered).contains("digest-mismatch"),
+    "{}",
+    stderr(&tampered)
+  );
+
+  // And no registry at all is the command failing to run.
+  drop(registry);
+  let unreachable = janus_cached(&tampered_cache, &["component", "pull", &reference]);
+  assert_eq!(code(&unreachable), 2, "{}", stderr(&unreachable));
 }

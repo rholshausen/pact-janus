@@ -37,6 +37,7 @@ superseding ADR instead.
 | [0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md) | Write Janus contracts as compact JSON; canonical form carries no formatting promise, and a reader must not assume one of its input | accepted |
 | [0019](0019-an-sdk-refuses-what-it-cannot-spell-and-stops-when-the-engine-does.md) | Refuse at the call what an SDK cannot spell the same way in every language, write what it can, and fail a run at once when the engine errors | accepted |
 | [0020](0020-a-content-slots-type-is-declared-on-the-interaction.md) | Declare a content slot's type on the interaction, beside its parts, not inside them | accepted |
+| [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted |
 
 ## Decision backlog
 

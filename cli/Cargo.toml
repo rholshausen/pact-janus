@@ -44,6 +44,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # A real provider on a real socket for the CLI's own tests: `janus verify` is only worth testing
 # against something that can actually answer, and the one the plan calls for is in this repo.
 pact_janus_sample_order_service = { path = "../samples/order-service" }
+# The in-process OCI registry `janus component push` pushes to and `janus verify` pulls from (plan
+# task 8.2) — the component host's own test registry, included by path. Both already in the tree.
+tiny_http = "0.12"
+sha2 = "0.10"
 
 [lints]
 workspace = true

@@ -1926,6 +1926,8 @@ dependencies = [
  "pact_janus_sample_order_service",
  "serde_json",
  "serde_yaml_ng",
+ "sha2",
+ "tiny_http",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1942,7 +1944,9 @@ dependencies = [
  "pretty_assertions",
  "serde_json",
  "sha2",
+ "tiny_http",
  "tracing",
+ "ureq",
  "wasmtime",
  "wasmtime-wasi",
 ]

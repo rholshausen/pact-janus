@@ -2,9 +2,10 @@
 //!
 //! An out-of-tree component is a WASI 0.2 component exporting the frozen pipe world
 //! (`Documentation/specs/component-interfaces/wit/component.wit`): one JSON request frame in, one
-//! response frame out. This crate loads one from a `file` source, checks its digest and its imports
-//! against its grants, handshakes it, and binds the interfaces it declared to the kernel's native
-//! traits — so the kernel calls a third-party CSV handler exactly as it calls the in-tree JSON one.
+//! response frame out. This crate loads one from a `file` source or an `oci` one ([`oci`], plan task
+//! 8.2), checks its digest and its imports against its grants, handshakes it, and binds the
+//! interfaces it declared to the kernel's native traits — so the kernel calls a third-party CSV
+//! handler exactly as it calls the in-tree JSON one.
 //!
 //! It is its own crate, not part of the kernel, because hosting needs a runtime with code
 //! generation and the kernel must build for `wasm32-wasip2`, where there is none (ADR 0013). An
@@ -20,6 +21,8 @@
 //!   and requires identical behaviour either way), so a trapped instance is never reused because no
 //!   instance ever is.
 
+pub mod oci;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
@@ -28,8 +31,7 @@ use pact_janus_kernel::component::{
 };
 use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
@@ -47,15 +49,33 @@ const DEFAULT_DEADLINE_MS: u64 = 10_000;
 /// The component protocol versions this host speaks (spec §3.2).
 const COMPONENT_PROTOCOL_VERSIONS: &[u64] = &[1];
 
-/// Loads `file` sources as WASM components. One per embedding: it owns a wasmtime engine and the
-/// thread that ticks its epoch, which stops when the loader is dropped.
+/// Loads `file` and `oci` sources as WASM components. One per embedding: it owns a wasmtime engine,
+/// the thread that ticks its epoch — which stops when the loader is dropped — and the OCI client and
+/// its cache.
 pub struct WasmLoader {
   engine: Engine,
   ticking: Arc<AtomicBool>,
+  oci: oci::Oci,
+}
+
+/// What `janus component push` published: the reference, the manifest digest a declaration pins,
+/// the config blob it wrote, and the handshake that config was written from.
+pub struct Pushed {
+  pub reference: String,
+  pub digest: String,
+  pub config: Value,
+  pub hello: Value,
 }
 
 impl WasmLoader {
+  /// A loader caching OCI components where [`oci::default_cache`] says, with registry credentials
+  /// from the environment ([`oci::Credentials::from_env`]).
   pub fn new() -> Result<WasmLoader, String> {
+    WasmLoader::with_cache(oci::default_cache())
+  }
+
+  /// A loader with its own component cache — tests, and a CI job that keeps one per workspace.
+  pub fn with_cache(cache: impl Into<PathBuf>) -> Result<WasmLoader, String> {
     let mut config = Config::new();
     config.epoch_interruption(true);
     let engine = Engine::new(&config).map_err(|err| format!("wasmtime could not start: {err}"))?;
@@ -70,8 +90,164 @@ impl WasmLoader {
         }
       })
       .map_err(|err| format!("the epoch ticker could not start: {err}"))?;
-    Ok(WasmLoader { engine, ticking })
+    Ok(WasmLoader {
+      engine,
+      ticking,
+      oci: oci::Oci::new(cache, oci::Credentials::from_env()),
+    })
   }
+
+  /// Publish a component as an OCI artifact (spec §10.3). The config blob is written from the
+  /// component's own handshake — not from anything the publisher typed — so what the artifact says
+  /// it is and what answers when it is loaded cannot drift apart; the loader checks the two agree.
+  pub fn push(&self, wasm: &[u8], reference: &str) -> Result<Pushed, ComponentError> {
+    let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
+    let hello = self.describe(wasm, reference)?;
+    let config = artifact_config(&hello);
+    let digest = self.oci.push(&parsed, wasm, &config)?;
+    Ok(Pushed {
+      reference: parsed.to_string(),
+      digest,
+      config,
+      hello,
+    })
+  }
+
+  /// Fetch a component into the cache, check it, and say what it is — the digest to pin and the
+  /// handshake that will answer — without a project or a run. What `janus component pull` prints.
+  pub fn pull(&self, reference: &str, digest: Option<&str>) -> Result<(oci::Pulled, Value), ComponentError> {
+    let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
+    let pulled = self.oci.pull(&parsed, digest)?;
+    let hello = self.describe(&pulled.wasm, reference)?;
+    check_artifact_config(&pulled, &hello)?;
+    Ok((pulled, hello))
+  }
+
+  /// A component's handshake, under no grants and with no import check — the question is only what
+  /// it says it is. Instantiating grants nothing: every import a denied capability would need is
+  /// linked to a context that holds none.
+  fn describe(&self, bytes: &[u8], what: &str) -> Result<Value, ComponentError> {
+    let wasm = self.bind(what, "component", bytes, &Grants::default(), None)?;
+    wasm.hello()
+  }
+
+  /// The bytes a declaration names, checked: a `file` against its declared digest, an `oci`
+  /// reference through [`oci::Oci::pull`], which checks every byte it hands back.
+  fn fetch(
+    &self,
+    declaration: &ComponentDeclaration,
+  ) -> Result<(Vec<u8>, String, Option<oci::Pulled>), ComponentError> {
+    let Some(reference) = declaration.source.reference.as_deref() else {
+      return Err(load_error(&format!(
+        "a '{}' source needs a 'reference'",
+        declaration.source.kind
+      )));
+    };
+    if declaration.source.kind == "oci" {
+      let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
+      let mut pulled = self.oci.pull(&parsed, declaration.source.digest.as_deref())?;
+      tracing::info!(component = %declaration.name, reference = %parsed, digest = %pulled.digest, "component resolved");
+      let bytes = std::mem::take(&mut pulled.wasm);
+      return Ok((bytes, format!("{parsed} ({})", pulled.digest), Some(pulled)));
+    }
+
+    let path = reference;
+    let bytes = std::fs::read(path).map_err(|err| load_error(&format!("could not read '{path}': {err}")))?;
+    // Spec §10.3 step 2: a declared digest is checked before any bytes are instantiated — or even
+    // compiled, since compiling is where a malicious binary gets its first chance.
+    if let Some(expected) = &declaration.source.digest {
+      let actual = oci::sha256(&bytes);
+      if !actual.eq_ignore_ascii_case(expected) {
+        return Err(ComponentError {
+          code: "digest-mismatch".to_string(),
+          category: "component".to_string(),
+          message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
+          source: Some("engine".into()),
+          details: Some(json!({ "expected": expected, "actual": actual })),
+        });
+      }
+    }
+    Ok((bytes, format!("'{path}'"), None))
+  }
+
+  /// Compile and link a component's bytes, ready to instantiate per call.
+  fn bind(
+    &self,
+    what: &str,
+    name: &str,
+    bytes: &[u8],
+    grants: &Grants,
+    deadline_ms: Option<u64>,
+  ) -> Result<WasmComponent, ComponentError> {
+    let component = Component::from_binary(&self.engine, bytes)
+      .map_err(|err| load_error(&format!("{what} is not a WASM component: {err:#}")))?;
+    let mut linker: Linker<Host> = Linker::new(&self.engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|err| load_error(&format!("{err:#}")))?;
+    let pre = linker
+      .instantiate_pre(&component)
+      .map_err(|err| load_error(&format!("{what} cannot be linked: {err:#}")))?;
+    let call = component
+      .get_export_index(None, PIPE_INTERFACE)
+      .and_then(|interface| component.get_export_index(Some(&interface), "call"))
+      .ok_or_else(|| {
+        load_error(&format!(
+          "{what} does not export {PIPE_INTERFACE}#call (wit/component.wit)"
+        ))
+      })?;
+    Ok(WasmComponent {
+      name: name.to_string(),
+      component,
+      pre,
+      call,
+      grants: grants.clone(),
+      deadline_ticks: deadline_ms
+        .unwrap_or(DEFAULT_DEADLINE_MS)
+        .div_ceil(TICK.as_millis() as u64),
+      media_types: Vec::new(),
+      next_id: AtomicU64::new(0),
+      engine: self.engine.clone(),
+    })
+  }
+}
+
+/// The artifact's config blob: the identity the handshake declared, and nothing more (spec §10.3 —
+/// "a config blob carrying its name and version"). Not the interfaces, not the contributions: the
+/// handshake is the only source of truth about those, and there is no manifest to agree with it
+/// (ADR 0012). Name and version are there so a registry, a broker or a person can say which
+/// component an artifact is without running it — and they are checked against the handshake on
+/// every load, so that saying is never wrong.
+fn artifact_config(hello: &Value) -> Value {
+  json!({
+    "name": hello.pointer("/component/name").cloned().unwrap_or(Value::Null),
+    "version": hello.pointer("/component/version").cloned().unwrap_or(Value::Null),
+  })
+}
+
+/// An artifact whose config names a different component than the one that answers is lying about
+/// one of them. The handshake is the source of truth (spec §2.3), so the config is the one that is
+/// wrong — but a registry, a broker or a person read the config, and they were told something false.
+fn check_artifact_config(pulled: &oci::Pulled, hello: &Value) -> Result<(), ComponentError> {
+  let says = artifact_config(hello);
+  for member in ["name", "version"] {
+    if pulled.config.get(member) != says.get(member) {
+      return Err(ComponentError {
+        code: "artifact-mismatch".to_string(),
+        category: "component".to_string(),
+        message: format!(
+          "'{}' says its {member} is {}, and the component's handshake says {}",
+          pulled.reference,
+          pulled.config.get(member).unwrap_or(&Value::Null),
+          says[member]
+        ),
+        source: Some("engine".into()),
+        details: Some(
+          json!({ "reference": pulled.reference.to_string(), "digest": pulled.digest,
+                              "config": pulled.config, "handshake": says }),
+        ),
+      });
+    }
+  }
+  Ok(())
 }
 
 impl Drop for WasmLoader {
@@ -86,62 +262,19 @@ impl ComponentLoader for WasmLoader {
   }
 
   fn sources(&self) -> &[&str] {
-    &["file"]
+    &["file", "oci"]
   }
 
   fn load(&self, declaration: &ComponentDeclaration) -> Result<Loaded, ComponentError> {
-    let Some(path) = declaration.source.reference.as_deref() else {
-      return Err(load_error("a 'file' source needs a 'reference' naming the .wasm"));
-    };
-    let bytes = std::fs::read(path).map_err(|err| load_error(&format!("could not read '{path}': {err}")))?;
-
-    // Spec §10.3 step 2: a declared digest is checked before any bytes are instantiated — or even
-    // compiled, since compiling is where a malicious binary gets its first chance.
-    if let Some(expected) = &declaration.source.digest {
-      let actual = format!("sha256:{:x}", Sha256::digest(&bytes));
-      if !actual.eq_ignore_ascii_case(expected) {
-        return Err(ComponentError {
-          code: "digest-mismatch".to_string(),
-          category: "component".to_string(),
-          message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
-          source: Some("engine".into()),
-          details: Some(json!({ "expected": expected, "actual": actual })),
-        });
-      }
-    }
-
-    let component = Component::from_binary(&self.engine, &bytes)
-      .map_err(|err| load_error(&format!("'{path}' is not a WASM component: {err:#}")))?;
-    check_imports(&self.engine, &component, &declaration.grants)?;
-
-    let mut linker: Linker<Host> = Linker::new(&self.engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|err| load_error(&format!("{err:#}")))?;
-    let pre = linker
-      .instantiate_pre(&component)
-      .map_err(|err| load_error(&format!("'{path}' cannot be linked: {err:#}")))?;
-    let call = component
-      .get_export_index(None, PIPE_INTERFACE)
-      .and_then(|interface| component.get_export_index(Some(&interface), "call"))
-      .ok_or_else(|| {
-        load_error(&format!(
-          "'{path}' does not export {PIPE_INTERFACE}#call (wit/component.wit)"
-        ))
-      })?;
-
-    let mut wasm = WasmComponent {
-      name: declaration.name.clone(),
-      pre,
-      call,
-      grants: declaration.grants.clone(),
-      deadline_ticks: declaration
-        .limits
-        .deadline_ms
-        .unwrap_or(DEFAULT_DEADLINE_MS)
-        .div_ceil(TICK.as_millis() as u64),
-      media_types: Vec::new(),
-      next_id: AtomicU64::new(0),
-      engine: self.engine.clone(),
-    };
+    let (bytes, what, pulled) = self.fetch(declaration)?;
+    let mut wasm = self.bind(
+      &what,
+      &declaration.name,
+      &bytes,
+      &declaration.grants,
+      declaration.limits.deadline_ms,
+    )?;
+    check_imports(&self.engine, &wasm.component, &declaration.grants)?;
     let hello = wasm.hello()?;
     wasm.media_types = hello
       .pointer("/contributes/content-types")
@@ -156,6 +289,9 @@ impl ComponentLoader for WasmLoader {
       })
       .collect();
     tracing::debug!(component = %declaration.name, ?hello, "component handshake");
+    if let Some(pulled) = &pulled {
+      check_artifact_config(pulled, &hello)?;
+    }
 
     let declares_content = hello
       .get("interfaces")
@@ -211,6 +347,7 @@ fn check_imports(engine: &Engine, component: &Component, grants: &Grants) -> Res
 /// One loaded component. Holds what every call needs and nothing a call leaves behind.
 struct WasmComponent {
   name: String,
+  component: Component,
   pre: InstancePre<Host>,
   call: ComponentExportIndex,
   grants: Grants,

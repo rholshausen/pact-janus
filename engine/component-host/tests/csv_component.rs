@@ -3,8 +3,10 @@
 //! loader, and used by the real engine in a consumer test *and* a verification — the same `.wasm`
 //! both times, unmodified.
 //!
-//! The component is built by the test itself, once per test binary, so these tests never run
-//! against a stale `.wasm`: the same rule the TypeScript SDK's tests follow for `janus-engine`.
+//! The component is built by the test itself, once per test binary (`support::csv_wasm`), so these
+//! tests never run against a stale `.wasm`.
+
+mod support;
 
 use pact_janus_component_host::WasmLoader;
 use pact_janus_component_http::HttpTransport;
@@ -18,33 +20,9 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
-
-/// Build `third-party/janus-csv` for `wasm32-wasip2` and return the component's path.
-fn csv_wasm() -> &'static PathBuf {
-  static WASM: OnceLock<PathBuf> = OnceLock::new();
-  WASM.get_or_init(|| {
-    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../third-party/janus-csv");
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let status = Command::new(cargo)
-      .args(["build", "--release", "--target", "wasm32-wasip2"])
-      .current_dir(&crate_dir)
-      // The workspace's own build settings must not leak into an out-of-tree build.
-      .env_remove("CARGO_TARGET_DIR")
-      .env_remove("RUSTFLAGS")
-      .status()
-      .expect("cargo runs");
-    assert!(
-      status.success(),
-      "building third-party/janus-csv for wasm32-wasip2 failed"
-    );
-    let wasm = crate_dir.join("target/wasm32-wasip2/release/janus_csv.wasm");
-    wasm.canonicalize().expect("the component was built")
-  })
-}
+use support::csv_wasm;
 
 fn declaration() -> Value {
   json!({ "name": "csv", "source": { "kind": "file", "reference": csv_wasm() } })
@@ -386,7 +364,7 @@ fn a_source_no_loader_handles_names_the_loaders_there_are() {
     &mut engine,
     "consumer-session/create",
     json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" },
-                        "components": [ { "name": "csv", "source": { "kind": "oci", "reference": "ghcr.io/x/csv:1" } } ] } }),
+                        "components": [ { "name": "csv", "source": { "kind": "subprocess", "reference": "janus-csv" } } ] } }),
   );
   assert_eq!(refused["error"]["code"], "component-unavailable");
   assert_eq!(refused["error"]["details"]["loaders"], json!(["in-tree", "wasm"]));

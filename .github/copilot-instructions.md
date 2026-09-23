@@ -140,6 +140,8 @@ janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <
             [--as-of <YYYY-MM-DD>] [--json]
 janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
 janus upgrade <pact.json> [--out <file>] [--json] [--quiet]
+janus component push <component.wasm> <reference> [--json]
+janus component pull <reference> [--digest <sha256:...>] [--json]
 ```
 
 Exit codes are part of the surface: `0` the command did what it was asked, `1` the *subject* failed
@@ -154,13 +156,23 @@ not the command. Both severities default to `warn` (ADR 0016).
 Out-of-tree components (plan task 8.1, design 2.6 §10) are **declared**, never discovered: a
 `components` list in the project configuration (`verifier.janus.yaml` for `janus verify --config`;
 the SDKs' `components` option on the consumer side), each entry naming its source — `file` is a
-local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`. `janus`
+local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`, `oci` a
+registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it. `janus`
 and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
 so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
 one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked
 third-party component is `third-party/janus-csv`: its own workspace, built with
 `cargo build --release --target wasm32-wasip2` from its directory, and built again by the tests
 that load it.
+
+`janus component push|pull` (plan task 8.2) is the one command that does not speak the protocol —
+publishing is not an engine operation. `push` writes the artifact's config from the component's own
+handshake; `pull` fetches into the cache, checks every byte, and prints the pinned declaration. A pin
+is fetched by digest alone and a second run fetches nothing. Loopback registries are plain HTTP;
+credentials are `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`; the cache is `JANUS_COMPONENT_CACHE`
+(default: the user cache directory's `pact-janus/components`). The OCI tests run against an in-process
+registry that tampers on request, and against a real one when `JANUS_OCI_REGISTRY` names it
+(`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this).
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0003): built by the
 Rust commands above (`cargo build -p pact_janus_cli --bin janus-engine` targets it alone). Its

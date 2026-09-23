@@ -755,20 +755,60 @@ this specification owns only the component entries.
 ### 10.3 OCI artifacts and integrity
 
 An out-of-tree WASM component is distributed as an OCI artifact: an artifact type identifying it as a
-Janus component, a config blob carrying its name and version, and one layer carrying the `.wasm`.
+Janus component, a config blob carrying its name and version, and one layer carrying the `.wasm`
+([ADR 0021](../../decisions/0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md)).
+Concretely, an OCI image manifest (`application/vnd.oci.image.manifest.v1+json`) with:
+
+| Member | Value |
+|---|---|
+| `artifactType` | `application/vnd.pact.janus.component.v1` |
+| `config.mediaType` | `application/vnd.pact.janus.component.config.v1+json` — also the artifact type, to a reader that predates OCI 1.1's `artifactType` |
+| config blob | `{"name": …, "version": …}`, as the component's handshake declares them |
+| the layer | exactly one with `mediaType` `application/wasm`; other layers are ignored |
+
+A manifest is a Janus component's when its config media type is the one above and its `artifactType`,
+if present, agrees. Anything else — a container image, an image index, a manifest with no `application/wasm`
+layer or with two — fails the load as `not-a-component`, naming what it is, before any blob is fetched.
+
+The config blob says which component the artifact is so that a registry, a broker or a person can know
+without running it. It is **not** a second source of truth: the handshake remains the only one (§2.3,
+ADR 0012), and a publisher SHOULD write the config from the handshake rather than by hand
+(`janus component push` does). A loader MUST compare the config's `name` and `version` with what the
+handshake declares, and fail the load as `artifact-mismatch` when they differ — an artifact that
+describes itself falsely has misinformed everyone who read the description.
+
 Resolution is:
 
-1. resolve the reference (registry, repository, tag or digest);
-2. if a `digest` is declared, the resolved manifest digest MUST match it, or the load fails —
-   before any bytes are instantiated;
-3. cache content-addressed by digest, so a second run of the same pinned component fetches nothing;
-4. instantiate, handshake, index contributions (§3.2), check the namespace rule (§2.4);
+1. resolve the reference (registry, repository, tag or digest) — **with a digest declared, by that digest
+   alone**: the tag is then a label, never consulted, so a tag that moves cannot change what runs;
+2. if a `digest` is declared, the fetched manifest's bytes MUST hash to it, or the load fails —
+   before any bytes are instantiated. Every blob MUST hash to the digest, and be the size, its
+   descriptor gives. A digest is computed from the bytes received, never taken from a registry header;
+3. cache content-addressed by digest, so a second run of the same pinned component fetches nothing. A
+   cached blob is re-hashed when read, and one that no longer matches is discarded and fetched again;
+4. instantiate, handshake, index contributions (§3.2), check the namespace rule (§2.4), and check the
+   artifact's config against the handshake;
 5. check declared component versions against requirements (§2.3).
 
-A declaration with a tag and no digest resolves the tag; CI SHOULD pin digests, because a tag is a name
-and a digest is the artifact. The engine records the resolved name and version of every component that
-took part in a run; a contract's `metadata.writer` map (contract spec §3) is where that lands for the
-consumer side.
+A declaration's `digest` and a digest written in its `reference` (`…@sha256:…`) must agree; either is the
+pin. A declaration with a tag and no digest resolves the tag on every run; CI SHOULD pin digests, because
+a tag is a name and a digest is the artifact. A reference names a tag or a digest — no `latest` is
+implied, because a component resolved from a tag nobody wrote down is a component nobody chose. v1 accepts
+`sha256` digests only.
+
+The rest is the loader's, and v1's is deliberately minimal: loopback registries (`localhost`,
+`127.0.0.1`, `[::1]`) are reached over plain HTTP and every other over HTTPS; a registry's `Bearer`
+challenge is answered with a token from its token service, and a `Basic` one with credentials. Those
+credentials come from `JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` in the loader's environment — an
+exception to design 2.7 §7.1's rule that a run does not depend on its host's environment, taken because a
+credential decides whether a component can be fetched and never which one runs. The cache lives at
+`JANUS_COMPONENT_CACHE`, else the user cache directory's `pact-janus/components`, laid out as an OCI image
+layout's `blobs/sha256/<hex>`. A load failure the loader produced carries `source: "engine"` and one of
+`digest-mismatch`, `not-a-component`, `artifact-mismatch`, `not-found`, `unauthorized` or `unavailable`
+as its code, inside the `component-unavailable` of §11.3.
+
+The engine records the resolved name and version of every component that took part in a run; a
+contract's `metadata.writer` map (contract spec §3) is where that lands for the consumer side.
 
 Signature verification is not specified in v1. It belongs on top of digest pinning rather than instead
 of it, and the prototype has no evidence about which scheme the ecosystem would adopt; adding it later

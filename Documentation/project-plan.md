@@ -518,12 +518,15 @@ component written from the docs alone (`third-party/janus-csv`), the WASM loader
 (`engine/component-host`), and the same `.wasm` running in a TypeScript consumer test and in
 `janus verify` — M6 for a content component, with the author's two documentation gaps fixed and the
 engine's missing half built ([third-party component report](third-party-component-report.md), ADR
-0020). Remaining:
+0020). 8.2 is done: that component pushed as an OCI artifact of its own type, whose config is written
+from its handshake and checked against it; pulled by digest, cached content-addressed and re-verified,
+so a pinned second run fetches nothing and runs offline; `janus component push|pull`; tested against a
+registry that tampers on request and against `registry:2`, with `oras` and ghcr.io as outside evidence
+(ADR 0021, Phase 9 findings 15–17). Remaining:
 
-1. 8.2 OCI distribution: push, pull, resolve, cache and integrity-check that component.
-2. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
+1. 8.3 The out-of-process transport escape hatch over the subprocess binding, and what grants cost
    when they cannot be enforced.
-3. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
+2. 8.4 Plan-fragment stress test against the 2.4 versioning policy.
 
 Then **Phase 9 — Evaluation and RFC feedback** (§12), which the running
 [findings list](phase-9-findings.md) is already accumulating input for.

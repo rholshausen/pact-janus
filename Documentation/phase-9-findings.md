@@ -629,3 +629,64 @@ item". Options: **A.** carry decode outcomes into the executed plan as annotatio
 node — the same place `explain --executed` already looks; **B.** add them to the interaction-result
 event's payload beside `mismatches`; **C.** both. The component-failed half is not optional: spec
 §11.3 already says what it must be, and nothing implements it.
+
+## 15. The engine records no component it resolved — not its version, not its digest
+
+**Found:** 2026-09-23, plan task 8.2 (true since 8.1). **Status:** open.
+
+Component-interfaces spec §10.3: "The engine records the resolved name and version of every component
+that took part in a run; a contract's `metadata.writer` map is where that lands for the consumer side."
+Nothing does. `Scope::components()` exists for exactly this and has no caller (it carries
+`#[allow(dead_code)]`), and a consumer session writes its contract with `metadata: None`
+(`protocol/session.rs`) — so a contract written with the CSV component carries no `writer` map at all,
+not even the engine's own entry, and a verification summary says nothing about components either. With OCI distribution the gap got wider, because the value most worth
+recording is now the manifest digest — the one thing that says *which bytes* decoded a body — and it
+reaches only an `info` log line (`component resolved`, with reference and digest).
+
+Reproduce: run `a_consumer_test_serves_csv_and_records_a_contract_that_says_so`
+(`engine/component-host/tests/csv_component.rs`) and look for the contract's `metadata`. Options: **A.**
+`metadata.writer` gains `component:<name>` entries (`"csv": "1.0.0 sha256:…"`) — the map exists and is
+open, but a version-and-digest string in a map of versions is a shape the contract spec did not
+intend; **B.** a `components` member beside `writer` in contract metadata, and the same in the
+verification summary — additive in both schemas; **C.** carry `Resolved`'s source (reference, digest)
+through `Loaded`, whichever of A or B records it. The loader already knows the digest; only the path to
+the record is missing.
+
+## 16. Registry credentials come from the loader's environment, which 2.7 says a run must not use
+
+**Found:** 2026-09-23, plan task 8.2. **Status:** open — the exception is deliberate and recorded in
+spec §10.3 and ADR 0021.
+
+Design 2.7 §7.1: between the configuration file and the engine there is one transformation — the
+loader interpolates `${VAR}` from the environment — so that "a run does not depend on … the environment
+of the process that hosts the engine". Registry credentials break that: the WASM loader reads
+`JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` itself. The argument for it is that a credential decides
+*whether* bytes can be fetched and never *which* (the digest decides), so it cannot change what a run
+does; the argument against is that two runs of the same document on two machines can differ in whether
+they start, and nothing in the document says why. It also leaves out what every registry user already
+has: `~/.docker/config.json` and credential helpers.
+
+Options: **A.** leave it — the exception is small and named; **B.** `source.auth` in the component
+declaration, `${VAR}`-interpolated by the loader like any hook's `run.headers`, and subject to 2.7 §7.3's
+redaction (which would need extending from hooks to component entries); **C.** read Docker's config and
+credential helpers, as `oras` and `crane` do — convenient, and exactly the ambient dependency 2.7
+exists to avoid.
+
+## 17. A component published by `wkg` is not a Janus component
+
+**Found:** 2026-09-23, plan task 8.2. **Status:** open — ADR 0021's tripwire.
+
+ADR 0021 gives a Janus component its own artifact type. The WebAssembly ecosystem's own tooling
+(`wkg oci push`) publishes to the CNCF Wasm OCI artifact layout instead: config media type
+`application/vnd.wasm.config.v0+json`, the same `application/wasm` layer. The layer would load; the
+manifest is refused as `not-a-component` first. An author who publishes with `wkg` publishes again
+with `janus component push` or `oras` — the evidence in ADR 0021 shows `oras` works with no Janus
+tooling at all — but that is one more step on the extension path, where friction is the whole cost
+(ADR 0013).
+
+Options: **A.** keep one artifact type, and document the `oras` recipe; **B.** accept the CNCF layout
+as well, identifying the component by its handshake alone and treating the config as absent — which
+gives up refusing a non-Janus WASM artifact before fetching and compiling it; **C.** ask upstream
+whether the CNCF layout's config could carry an application-defined annotation (a Janus component name)
+that would let one artifact serve both.
+

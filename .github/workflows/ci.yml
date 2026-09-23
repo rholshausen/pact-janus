@@ -11,6 +11,14 @@ env:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    # Plan task 8.2: a real OCI registry for the component-distribution tests. They also run against
+    # a registry in their own process, which can be told to lie; this one is the evidence that a
+    # registry nobody here wrote agrees with the client (JANUS_OCI_REGISTRY, on the Test step).
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -32,6 +40,8 @@ jobs:
         run: cargo build --all-targets
       - name: Test
         run: cargo test
+        env:
+          JANUS_OCI_REGISTRY: localhost:5000
       - name: WASM build (kernel)
         run: cargo build --package pact_janus_kernel --target wasm32-wasip2
       # Plan task 8.1: the third-party CSV component is out of tree — its own workspace, depending

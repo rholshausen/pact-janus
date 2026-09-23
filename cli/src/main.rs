@@ -1,11 +1,14 @@
-//! The `janus` CLI (plan task 5.5): `verify`, `explain` and `upgrade`, over the *same engine* every
-//! SDK will speak to.
+//! The `janus` CLI (plan task 5.5): `verify`, `explain`, `upgrade` and `component`, over the *same
+//! engine* every SDK will speak to.
 //!
 //! Nothing here reaches into the kernel's Rust API to do its work. Each command builds protocol
 //! frames and reads frames back ([`engine`]), which is what makes this CLI evidence rather than a
 //! convenience: if a command needs something the protocol cannot express, that is a finding about
 //! the protocol and it shows up here first. `janus-engine`, the sibling binary, carries the
 //! identical frames over stdio for embeddings that want a subprocess (ADR 0003).
+//!
+//! `component` (plan task 8.2) is the one command that does not speak the protocol, and says why
+//! in its own module: publishing a component is not an engine operation.
 //!
 //! `check` (plan task 7.4) is the one command whose subject is not a provider but a *decision*:
 //! it reads documents that already exist — contracts, provider shapes, the summaries `verify`
@@ -16,6 +19,7 @@
 
 mod args;
 mod check;
+mod component;
 mod engine;
 mod explain;
 mod io;
@@ -32,6 +36,7 @@ usage: janus <command> [options]
   check     decide whether a consumer can deploy against a provider
   explain   print the plan the engine will execute for one interaction
   upgrade   convert a v1-v4 pact into a Janus contract
+  component push a WASM component to an OCI registry, or pull one and say what it is
   version   print the engine and protocol versions
 
 `janus <command> --help` explains one of them.
@@ -59,6 +64,7 @@ fn main() -> ExitCode {
     "check" => (&check::SPEC, check::USAGE),
     "explain" => (&explain::SPEC, explain::USAGE),
     "upgrade" => (&upgrade::SPEC, upgrade::USAGE),
+    "component" => (&component::SPEC, component::USAGE),
     "version" | "--version" => {
       println!(
         "janus {} (engine protocol v{})",
@@ -94,6 +100,7 @@ fn main() -> ExitCode {
     "check" => check::run(&args),
     "explain" => explain::run(&args),
     "upgrade" => upgrade::run(&args),
+    "component" => component::run(&args),
     _ => unreachable!("the match above covers every command"),
   }
 }
