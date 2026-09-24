@@ -33,9 +33,10 @@ To record the screencast again, from the repo root, with [VHS](https://github.co
 vhs demo/demo.tape     # writes demo/demo.gif
 ```
 
-VHS v0.12.0 cancels its own context before it renders, so ffmpeg is killed at once and no file is
-written, with no error. Until that is fixed upstream, build VHS with `Render(context.WithoutCancel(ctx))`
-in `evaluator.go`.
+VHS v0.12.0 writes no file and still exits 0. It cancels its own context before rendering, so every
+ffmpeg call is killed before it starts ([charmbracelet/vhs#787](https://github.com/charmbracelet/vhs/issues/787);
+fixes are open as #788–#791). Until a fixed release ships, use v0.11.0, or build v0.12.0 with
+`v.Render(context.WithoutCancel(ctx))` in `evaluator.go`, which is how `demo.gif` was recorded.
 
 ## What is here
 
