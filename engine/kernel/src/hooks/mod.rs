@@ -10,7 +10,7 @@
 //!
 //! **The implementations live where their capabilities live** (spec §8.5: they are an embedding
 //! capability, exactly as component loaders are — ADR 0013). `exec` needs to spawn a process and
-//! `http` needs a socket, neither of which a kernel that must build for `wasm32-wasip2` has, so
+//! `http` needs an HTTP client, neither of which belongs in a kernel that builds for every embedding, so
 //! both arrive as [`invoke::HookInvoker`]s the embedding registers — the same injection point
 //! transports already use, for the same reason (CLAUDE.md's B3). `component` hooks are answered by
 //! a registered [`crate::component::HookComponent`]. A configuration naming a kind the embedding

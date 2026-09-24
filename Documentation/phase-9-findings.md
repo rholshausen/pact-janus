@@ -235,6 +235,16 @@ So for Node — the RFC's own example language — "WASM preferred" does not hol
 does most. ADR 0003's tripwire ("If real projects routinely need a third-party component …") is about
 components; this is a stronger case, about the built-in transport.
 
+### Correction (task 9.4)
+
+The **Sockets** bullet above is wrong about the target. Spike 1.2 scoped its guest to no sockets, and
+this entry read that scoping as a fact about `wasm32-wasip2`: the target has `wasi:sockets`, and Rust's
+`std::net` works on it under wasmtime (used for a Kafka client in another project). The blocker is the
+**Threads** bullet alone, together with a transport that was never built for the target. That matters
+for what could change the answer: WASI 0.3 (`wasm32-wasip3`, being promoted to tier 2 in Rust) brings
+component-model async, under which the exchange loop could be a thread-free async task over
+`wasi:sockets`. ADR 0023's tripwire now names that reassessment.
+
 **Options:** (a) accept the subprocess as Node's primary for consumer tests and amend ADR 0003's row;
 (b) run the engine component in a Node worker thread with WASI sockets through jco's preview2-shim,
 and rework the exchange loop into a single-threaded poll the host drives — a kernel change, and

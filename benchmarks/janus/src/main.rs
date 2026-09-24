@@ -5,8 +5,8 @@
 //! - **subprocess**: `janus-engine` over its stdio framing (ADR 0003's artifact 3), the embedding
 //!   both SDKs ship.
 //! - **wasm**: the engine as a WASM component under wasmtime (ADR 0003's artifact 1, built for
-//!   this task in `engine-wasm/`). It has no sockets and no threads, so it runs only what the
-//!   kernel does without I/O. Every scenario that needs a mock server or a provider is absent from
+//!   this task in `engine-wasm/`). It has no transports (no threads for the exchange loop), so it
+//!   runs only what the kernel does without I/O. Every scenario that needs a mock server or a provider is absent from
 //!   its results because the embedding cannot run it, not because it was skipped.
 //!
 //! Scenario names are the baseline's where the workload is the baseline's. Where Janus has to do

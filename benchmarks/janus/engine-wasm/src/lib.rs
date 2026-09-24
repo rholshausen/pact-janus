@@ -3,9 +3,9 @@
 //! ADR 0003 decided that one engine build produces three artifacts, with the WASM component as the
 //! canonical one. Until this task only the subprocess one existed. This crate is the smallest
 //! honest version of the component: `Engine::dispatch` behind the frozen pipe, with the in-tree
-//! JSON content component. It has no transports, because a `wasm32-wasip2` guest has no sockets
-//! to serve a mock on or drive a provider with, and no threads for the exchange loop (Phase 9
-//! finding 3). So it can do what the kernel does without I/O (handshake, compile, variant
+//! JSON content component. It has no transports: a `wasm32-wasip2` guest has sockets, but no threads
+//! for the exchange loop or the HTTP transport's server, and that transport was not built for the
+//! target (Phase 9 finding 3). So it can do what the kernel does without I/O (handshake, compile, variant
 //! enumeration, upgrade, subsumption), and `start-transport` and `verification/verify` fail by
 //! name.
 

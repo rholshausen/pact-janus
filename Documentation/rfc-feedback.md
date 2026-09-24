@@ -68,8 +68,10 @@ is resolved; the WASM story is reversed.*
   JSON Schema plus a CI checker enforces the open-world evolution rules, and both SDKs' bindings are
   generated from those schemas.
 - **WASM host story.** A WASM build of the engine cannot run a consumer test or a verification in any
-  language: a mock server needs a socket, the exchange loop needs a thread, and a `wasm32-wasip2` guest
-  has neither ([Phase 9 findings](phase-9-findings.md) 3 and 29). The zero-import core module meant for
+  language, as built: its exchange loop and HTTP server run on threads, and a `wasm32-wasip2` guest has
+  none ([Phase 9 findings](phase-9-findings.md) 3 and 29). It does have sockets; an earlier version of
+  this document said otherwise. WASI 0.3's async (`wasm32-wasip3`) could remove the need for the thread,
+  which is why ADR 0023 reassesses when that target lands. The zero-import core module meant for
   the JVM and Go cannot be built at all. So the subprocess is every SDK's primary embedding, and WASM is
   the embedding for offline operations — explain, upgrade, the subsumption check, variant enumeration —
   where a host wants no native binary ([ADR 0023](decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)).

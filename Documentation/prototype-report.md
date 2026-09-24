@@ -90,11 +90,14 @@ The prototype also changed parts of the RFC. The full list, with evidence, is in
 [RFC feedback](rfc-feedback.md) §3.
 
 - **The engine runs as a subprocess, not as WASM.** The RFC preferred compiling the engine to WASM so no
-  SDK would ship a native binary. But a WASM engine cannot run a mock server or a verification: it
-  has no sockets and no threads. So every SDK starts a small `janus-engine` process per test run. It
+  SDK would ship a native binary. But the WASM engine, as built, cannot run a mock server or a
+  verification, because the engine answers mock requests on a thread of its own and today's WASM target
+  (WASI 0.2) has no threads. So every SDK starts a small `janus-engine` process per test run. It
   exits when the test run ends, and cannot be left behind. The cost is that per-platform binaries come
   back, shipped the way tools like esbuild ship theirs. WASM stays useful for offline work such as
-  `explain`, `upgrade` and `janus check`.
+  `explain`, `upgrade` and `janus check`. WASI 0.3, whose async support could make the thread
+  unnecessary, is on its way to being a supported Rust target, and the decision will be revisited when
+  it lands.
 - **Provider shapes can be matched by operation.** A shape generated from an OpenAPI document has no
   way to know what a consumer team called its interaction. Before this change, it silently checked
   nothing.

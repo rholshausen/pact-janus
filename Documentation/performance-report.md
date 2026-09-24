@@ -26,8 +26,9 @@ it is not a slower option. It is no option. The measurements also found a quadra
 Nothing built the WASM artifact before this task. ADR 0003 makes it canonical ("one engine build
 produces three artifacts") and only the subprocess one existed. `engine-wasm/` is the smallest honest
 version: the kernel and the JSON content component behind the frozen pipe, and no transports, because
-a `wasm32-wasip2` guest has no sockets to serve on and no threads for the exchange loop (Phase 9
-finding 3). It lives in `benchmarks/`, not `engine/`, because this task measures it. Whether it
+a `wasm32-wasip2` guest has no threads for the exchange loop and the HTTP server, and the HTTP
+transport was not built for the target (Phase 9 finding 3). *Corrected in task 9.4:* this sentence
+first said the guest has no sockets; `wasi:sockets` gives it them. It lives in `benchmarks/`, not `engine/`, because this task measures it. Whether it
 graduates is a 9.4 question (§6).
 
 The plan meant this harness to run against Janus "from Phase 4 on", so that the question would get a
