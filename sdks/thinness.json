@@ -29,6 +29,7 @@
           "sdk/src/main/java/io/pact/janus/sdk/JanusOptions.java",
           "sdk/src/main/java/io/pact/janus/sdk/Interaction.java",
           "sdk/src/main/java/io/pact/janus/sdk/Shapes.java",
+          "sdk/src/main/java/io/pact/janus/sdk/VariantBinding.java",
           "sdk/src/main/java/io/pact/janus/sdk/Content.java",
           "sdk/src/main/java/io/pact/janus/sdk/ShapeNode.java",
           "sdk/src/main/java/io/pact/janus/sdk/Cardinality.java",

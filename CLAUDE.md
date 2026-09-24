@@ -70,6 +70,10 @@ samples/         Demo subjects (workspace members), e.g. samples/order-service �
                  pact of a consumer that has not upgraded, which task 5.4 verifies against
                  it unchanged, and shapes/ the provider shape its own tests recorded
                  (task 7.2) — the other half of M5, which `janus check` reads
+demo/            The RFC's whole loop as a runnable walkthrough (task 9.3): web-app/, a TypeScript
+                 consumer of samples/order-service; run.sh, which records its contract, verifies
+                 it with hooks, runs janus check, widens and fixes it (--ci asserts each step, and CI
+                 runs it); demo.tape, the VHS script that records demo.gif
 third-party/     Components written as a third party would, from the published interfaces
                  only — each its own Cargo workspace, excluded from ours and depending on
                  nothing in it: third-party/janus-csv, the text/csv content component task 8.1

@@ -1,0 +1,17 @@
+{
+  "name": "janus-demo-web-app",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Pact Janus demo's consumer: a web app that shows orders from order-service (plan task 9.3).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.1"
+  }
+}

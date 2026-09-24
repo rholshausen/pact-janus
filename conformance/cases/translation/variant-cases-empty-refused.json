@@ -1,0 +1,13 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/variant-cases-empty-refused",
+  "category": "translation",
+  "title": "'variant-cases' with no cases is refused at the call.",
+  "covers": ["state.variant-cases.empty-refused"],
+  "why": "behavioural spec 'variant-cases': an empty map is refused at the call, since a binding with no case can only ever be its default — and the binding schema requires at least one case, so the document would be one the engine rejects.",
+  "interaction": {
+    "description": "a binding with nothing to choose between",
+    "given": [{ "name": "an order exists", "params": { "status": { "$": "variant-cases", "args": ["status", {}, "PENDING"] } } }]
+  },
+  "expect": { "refused": true }
+}

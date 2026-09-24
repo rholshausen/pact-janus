@@ -562,5 +562,15 @@ Phase 9 — Evaluation and RFC feedback (§12) — is under way:
   the HTTP transport no longer costs 200 ms per session, and `janus-engine` runs host hooks (Phase 9
   findings 2, 9, 19, 25, 27, 29, 30, 32). The RFC is revised in place on `rfc/pact-mkii`.
 
-Next: **9.3**, the demo and community report, then **9.4**, the staged plan — whose open inputs are
-[RFC feedback](rfc-feedback.md) §8.
+- **9.3** ([demo](../demo/README.md), [community report](prototype-report.md)) — the RFC's whole loop as
+  `demo/run.sh`, which CI runs with `--ci`: a TypeScript consumer test records a contract over its
+  variants, `janus verify` replays it against the sample provider with its OAuth2, state and script
+  hooks, `janus check` finds the `CANCELLED` and empty-list variance, the consumer widens its
+  contract and variant testing fails its code until it handles both. Recorded as `demo/demo.gif` from
+  `demo/demo.tape` (VHS). It needed variant-bound provider states in the SDKs: `when-variant` and
+  `variant-cases` joined the behavioural specification, both SDKs implement them, and both pass 47
+  of 47 conformance cases. The new conformance case found that a contract recorded a binding's
+  shorthand instead of its resolved dimension, now fixed in the engine (Phase 9 findings 33–35).
+
+Next: **9.4**, the staged plan for the real build. Its open inputs are [RFC feedback](rfc-feedback.md)
+§8 and findings 33–35.

@@ -68,6 +68,11 @@ final class Json {
       }
       return out;
     }
+    if (v instanceof VariantBinding) {
+      // Written here it would be data that only looks like a binding (variant semantics spec §6.2).
+      throw new IllegalArgumentException(
+          what + " is a variant binding, which must be a given() parameter's own value, not nested inside one");
+    }
     if (v instanceof ShapeNode) {
       throw new IllegalArgumentException(
           what + " is a shape helper's result, but a value is expected here, not a shape");

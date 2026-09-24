@@ -1,0 +1,20 @@
+--- a/src/orders.ts
++++ b/src/orders.ts
+@@ -22,6 +22,7 @@
+ const STATUS = new Map([
+   ["PENDING", "being prepared"],
+   ["SHIPPED", "on its way"],
++  ["CANCELLED", "cancelled"],
+ ]);
+ 
+ /** "Order 42 (on its way): 1 × sku-0 and 1 more" */
+@@ -31,6 +32,9 @@
+     throw new Error(`unknown order status '${order.status}'`);
+   }
+   const [first, ...rest] = order.items;
++  if (first === undefined) {
++    return `Order ${order.id} (${status}): no items`;
++  }
+   const more = rest.length > 0 ? ` and ${rest.length} more` : "";
+   return `Order ${order.id} (${status}): ${first.quantity} × ${first.sku}${more}`;
+ }

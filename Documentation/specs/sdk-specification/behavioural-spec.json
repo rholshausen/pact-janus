@@ -9,7 +9,7 @@
       "signature": [
         { "name": "consumer", "role": "label", "description": "The consumer's name, as 'consumer-session/create' records it." },
         { "name": "provider", "role": "label", "description": "The provider's name." },
-        { "name": "options", "role": "options-bag", "description": "Where the contract is written (default: a 'contracts' directory under the working directory), how the engine is reached (the embedding, spec.md §2; ADR 0003), and the project's declared components (design 2.6 §10.2) — a list of component declarations, none by default." } ],
+        { "name": "options", "role": "options-bag", "description": "Where the contract is written (default: a 'contracts' directory under the working directory), how the engine is reached (the embedding, spec.md §2; ADR 0023), and the project's declared components (design 2.6 §10.2) — a list of component declarations, none by default." } ],
       "semantics": "Makes no protocol call when constructed. The engine is started, and 'engine/hello' sent offering protocol version 1 (engine-protocol spec §5), when the first 'execute' needs it; one engine and at most one open consumer session belong to one configured object, and a test suite uses one configured object. A hello that fails, or agrees any protocol version other than 1, fails that first 'execute' with the engine's error; nothing is retried. When the options declare components, 'consumer-session/create' carries them as 'config.components', each declaration as written except that a 'file' source's relative 'reference' is made absolute against the working directory — the SDK is the loader here (lifecycle-hooks spec §7.1), and the engine reads no paths it did not receive absolute. No declaration is checked, fetched or opened by the SDK: whether a component loads is the engine's answer, and a component that cannot be loaded fails the first 'execute' with the engine's 'component-unavailable'. With no components declared, 'config' carries no 'components' member.",
       "errors": [
         { "code": "protocol-version-unsupported", "surfaced-as": "thrown from the first 'execute', carrying the engine's 'details.supported' verbatim" } ],
@@ -32,10 +32,35 @@
       "produces": [ { "kind": "spec-member", "path": "states" } ],
       "signature": [
         { "name": "name", "role": "label" },
-        { "name": "params", "role": "options-bag", "description": "Optional literal state parameters, a JSON object. Variant-bound parameters (variant semantics spec §6) are not yet part of this primitive." } ],
-      "semantics": "Appends { name, params } to the interaction-spec document's 'states' array, in call order; 'params' is omitted from the entry when not given, never written as null or {}. Calling 'given' again appends a further state. 'params' is passed through as written — no key is renamed, reordered or coerced. Contributes nothing to the variant space.",
+        { "name": "params", "role": "options-bag", "description": "Optional state parameters, a JSON object. A member whose value is a 'when-variant' or 'variant-cases' helper is variant-bound (variant semantics spec §6); every other member is literal." } ],
+      "semantics": "Appends { name, params, variant-params } to the interaction-spec document's 'states' array, in call order. A member of 'params' whose value is a 'when-variant' or 'variant-cases' helper is not a literal parameter: it is written instead as one binding in the entry's 'variant-params' (variant semantics spec §6.2), with 'name' set to that member's name, in the order the members were written. Every other member stays in 'params', passed through as written — no key is renamed, reordered or coerced. 'params' is omitted from the entry when it has no literal members, and 'variant-params' when it has no bindings; neither is ever written as null, {} or []. A binding helper anywhere other than as a params member's own value — inside a list, or inside a nested object — is refused at the call, because it would otherwise be written as a literal that only looks like a binding, the in-band ambiguity variant semantics spec §6.2 exists to prevent. Calling 'given' again appends a further state. The binding's dimension reference is passed through as written: resolving it against the variant space, and rejecting a reference that matches no dimension or several, or a point the dimension lacks, is the engine's (variant semantics spec §6.3, §6.5), because only the engine computes the space. Contributes nothing to the variant space.",
+      "errors": [ { "code": "interaction-invalid", "surfaced-as": "thrown from 'execute' (this primitive makes no call), with the engine's 'problems' carried verbatim — e.g. a dimension reference that resolves to nothing, pointed at '/states/<i>/variant-params/<j>/dimension'" } ],
+      "conformance": [ "session.given.appends-state", "session.given.multiple-states", "session.given.params-omitted-when-absent", "session.given.variant-bound-params", "session.given.nested-binding-refused", "session.given.engine-resolves-bindings" ]
+    },
+    {
+      "id": "when-variant",
+      "category": "interaction",
+      "summary": "A provider-state parameter that is true exactly when the running variant is at one point of one dimension — the RFC's 'whenVariant'.",
+      "produces": [ { "kind": "spec-member", "path": "states[].variant-params" } ],
+      "signature": [
+        { "name": "dimension", "role": "label", "description": "A dimension reference: its full id, its full path, or a trailing run of whole path segments ('shippedAt', 'response.body.shippedAt#presence')." },
+        { "name": "point", "role": "label", "description": "One of that dimension's point names ('present', 'SHIPPED', 'min+1')." } ],
+      "semantics": "Valid only as the value of a 'given' params member, which names the parameter. Written as the binding { name, dimension, cases: [ { point, value: true } ], default: false } — ADR 0009's two-case boolean form, spelled with a 'default' rather than a second case so that it means the same thing for a dimension of any number of points, and for a gated dimension, which variant semantics spec §6.5 requires to have a 'default'. 'dimension' and 'point' are written as given.",
       "errors": [],
-      "conformance": [ "session.given.appends-state", "session.given.multiple-states", "session.given.params-omitted-when-absent" ]
+      "conformance": [ "state.when-variant.boolean-binding" ]
+    },
+    {
+      "id": "variant-cases",
+      "category": "interaction",
+      "summary": "A provider-state parameter whose value is chosen by the running variant's point for one dimension.",
+      "produces": [ { "kind": "spec-member", "path": "states[].variant-params" } ],
+      "signature": [
+        { "name": "dimension", "role": "label", "description": "A dimension reference, as for 'when-variant'." },
+        { "name": "cases", "role": "options-bag", "description": "Point name -> the parameter's value at that point. At least one." },
+        { "name": "default", "role": "example-value", "description": "Optional: the value when the dimension is inactive or at a point no case names." } ],
+      "semantics": "Valid only as the value of a 'given' params member, which names the parameter. Written as the binding { name, dimension, cases, default } of variant semantics spec §6.2: 'cases' as a list of { point, value }, one per member of the map, in the order the members were written; 'default' omitted when not given — never written as null, since null is a value a parameter can take. With no default, a variant at a point no case names leaves the parameter absent (variant semantics spec §6.4). An empty map is refused at the call, since a binding with no case can only ever be its default.",
+      "errors": [],
+      "conformance": [ "state.variant-cases.cases-as-written", "state.variant-cases.empty-refused" ]
     },
     {
       "id": "request",

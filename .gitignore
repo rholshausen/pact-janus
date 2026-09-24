@@ -16,6 +16,8 @@ target
 # Node / TypeScript (SDK prototypes)
 node_modules/
 dist/
+# What the demo's consumer test writes when run by hand (demo/run.sh works on a copy)
+demo/web-app/contracts/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

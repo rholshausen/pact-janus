@@ -43,17 +43,31 @@ public final class Interaction {
   }
 
   /**
-   * {@code given}: appends {@code { name, params }} to {@code states}, in call order. The
-   * parameters are passed through as written; {@code null} means not given, and then no
-   * {@code params} member is written at all.
+   * {@code given}: appends {@code { name, params, variant-params }} to {@code states}, in call
+   * order. A parameter whose value is a {@link VariantBinding} becomes a {@code variant-params}
+   * binding under that name; every other parameter is passed through as written. {@code params} is
+   * not written when no literal parameter remains, nor {@code variant-params} when there is no
+   * binding.
    */
   public Interaction given(String name, Map<String, ?> params) {
     State state = new State();
     state.setName(Objects.requireNonNull(name, "state name"));
+    Map<String, Object> literal = new LinkedHashMap<>();
+    List<Map<String, Object>> bindings = new ArrayList<>();
     if (params != null) {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> json = (Map<String, Object>) Json.value(params, "given('" + name + "') params");
-      state.setParams(json);
+      for (Map.Entry<String, Object> e : Json.entries(params, "given('" + name + "') params")) {
+        if (e.getValue() instanceof VariantBinding binding) {
+          bindings.add(binding.binding(e.getKey()));
+        } else {
+          literal.put(e.getKey(), Json.value(e.getValue(), "given('" + name + "')." + e.getKey()));
+        }
+      }
+    }
+    if (!literal.isEmpty()) {
+      state.setParams(literal);
+    }
+    if (!bindings.isEmpty()) {
+      state.setVariantParams(bindings);
     }
     states.add(state);
     return this;
@@ -107,6 +121,7 @@ public final class Interaction {
         State c = new State();
         c.setName(s.getName());
         c.setParams(s.getParams() == null ? null : new LinkedHashMap<>(s.getParams()));
+        c.setVariantParams(s.getVariantParams() == null ? null : new ArrayList<>(s.getVariantParams()));
         copy.add(c);
       }
       spec.setStates(copy);

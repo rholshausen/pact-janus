@@ -11,7 +11,9 @@ specification disagree, the behavioural specification wins and this file has a b
   `one-of` → `oneOf`. `janus` is the `Janus` class (`useJanus` under Vitest); `interaction`, `execute`
   and `finalise` are its methods; `given`, `request` and `response` are methods of the builder
   `interaction` returns. The `literal` primitive is not a function — it is what happens to a plain
-  value written where a shape is expected.
+  value written where a shape is expected. `when-variant` and `variant-cases` are `whenVariant` and
+  `variantCases`, written as a `given` param's value; `variantCases`' default is a trailing optional
+  argument, so "no default" and "a default of `undefined`" cannot be confused.
 - A primitive whose `signature` is empty is still a function, called with no arguments —
   `forbidden()`, not a `forbidden` constant. Every shape helper is then written the same way, and a
   call is a fresh node rather than one document fragment shared by every use of it.

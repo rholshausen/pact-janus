@@ -26,6 +26,7 @@ SDK (plan task 6.3); what that turned up is in
   | `janus` | `Janus.of(consumer, provider[, JanusOptions])` |
   | `interaction` | `janus.interaction(description)` → `Interaction` |
   | `given`, `request`, `response` | `Interaction.given(...)`, `.request(r -> ...)`, `.response(r -> ...)` |
+  | `when-variant`, `variant-cases` | static methods on `io.pact.janus.sdk.VariantBinding`, written as a `given` parameter's value: `given("an order exists", map("shipped", whenVariant("shippedAt", "present")))`. Not on `Shapes`, because a binding is not a shape and is refused wherever a shape is expected |
   | `execute` | `janus.execute(interaction, (mock, variant) -> ...)` |
   | `finalise` | `janus.finalise()`; run for you by `JanusExtension` |
   | `literal` | no call site: any plain value where a shape is expected |

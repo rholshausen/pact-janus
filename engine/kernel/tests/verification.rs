@@ -870,8 +870,8 @@ fn a_bound_state_parameter_is_recorded_resolved_per_variant() {
   // The binding itself is recorded on the interaction, resolved to the dimension id — never the
   // author's shorthand, so a verifier resolves nothing (variant-semantics spec §6.3).
   assert_eq!(
-    interaction["states"][0]["variant-params"][0]["dimension"], "shippedAt",
-    "the interaction keeps the document as authored"
+    interaction["states"][0]["variant-params"][0]["dimension"], "response.body.shippedAt#presence",
+    "the interaction records the resolved id, not the authored 'shippedAt' (phase-9 finding 34)"
   );
 
   let variants = interaction["selection"]["variants"].as_array().expect("variants");

@@ -1,0 +1,59 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/when-variant-resolved-and-recorded",
+  "category": "live",
+  "title": "The engine resolves a binding's short dimension reference, and the contract records the resolved id.",
+  "covers": ["session.given.engine-resolves-bindings"],
+  "why": "behavioural spec 'given': the dimension reference is passed through as written, and resolving it is the engine's (variant semantics spec §6.3), because only the engine computes the variant space. So the SDK writes 'shippedAt', and what the contract records is 'response.body.shippedAt#presence' — which the SDK could not have produced.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order that may not have shipped",
+          "given": [{ "name": "an order exists", "params": { "id": "42", "shipped": { "$": "when-variant", "args": ["shippedAt", "present"] } } }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [{ "id": "42", "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] } }]
+            }
+          }
+        },
+        "closure": { "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 } }
+      },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "content": {
+            "interactions": [
+              {
+                "description": "an order that may not have shipped",
+                "states": [
+                  {
+                    "name": "an order exists",
+                    "params": { "id": "42" },
+                    "variant-params": [
+                      {
+                        "name": "shipped",
+                        "dimension": "response.body.shippedAt#presence",
+                        "cases": [{ "point": "present", "value": true }],
+                        "default": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": { "variant-count": 2 }
+}

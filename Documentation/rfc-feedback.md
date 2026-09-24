@@ -27,10 +27,10 @@ failure mode is a claim nobody checked.
 
 | Pillar | Verdict | The one caveat that matters |
 |---|---|---|
-| **One core, thin SDKs** | **Holds.** Two SDKs, one engine, 42 of 42 conformance cases each, 583 and 1,630 hand-written lines | The engine is embedded as a subprocess, not as WASM ([ADR 0023](decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)) |
+| **One core, thin SDKs** | **Holds.** Two SDKs, one engine, 47 of 47 conformance cases each, 723 and 1,802 hand-written lines | The engine is embedded as a subprocess, not as WASM ([ADR 0023](decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)) |
 | **Declarative interactions, compiled plans** | **Holds.** v1–v4 rules compile to plans that agree with pact-specification on 583 of 583 cases in scope; `explain` renders every plan | `explain` loads no components, and matching captured values is a CLI feature, not a protocol operation (findings 23, 31) |
 | **Everything is a component** | **Holds at the interface.** A third party wrote a CSV component from the docs alone, and it runs in a consumer test and in verification | "Contribute plan fragments" turned out to mean "replace the slot's plan", which is not safe with variants (ADR 0022, finding 21) |
-| **Shapes with honest optionality** | **Holds.** One consumer test covers the RFC's 12-variant order space with 8 variants, and the SHIPPED/PENDING loop closes end to end | Request-side variants and list lengths needed a decision ([ADR 0024](decisions/0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md)), and the SDK alone knows whether a test passed (finding 4) |
+| **Shapes with honest optionality** | **Holds.** One consumer test covers the RFC's order payload, a 24-variant space (the RFC counted 12, leaving out the list-length boundary it declares), with 8 variants, and the SHIPPED/PENDING loop closes end to end | Request-side variants and list lengths needed a decision ([ADR 0024](decisions/0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md)), and the SDK alone knows whether a test passed (finding 4) |
 | **Scriptable lifecycle** | **Holds** for HTTP: hooks are configuration the engine receives as values, and scripts run in an embedded QuickJS | Message-interaction hooks were designed and never built |
 
 ## 2. The unresolved questions
@@ -80,7 +80,7 @@ is resolved; the WASM story is reversed.*
 ([ADR 0008](decisions/0008-deterministic-pairwise-variant-sampling.md), variant-semantics spec §3):
 exhaustive below a threshold, a named deterministic pairwise algorithm above it, boundary variants
 always, pins always, and a budget that **fails** rather than truncates. The RFC's order payload (a
-12-variant space) is covered by 8, and two SDKs written independently select the same 8 in the same order
+24-variant space once its list-length boundary is counted — the RFC counted 12) is covered by 8, and two SDKs written independently select the same 8 in the same order
 ([conformance report](conformance-suite-report.md) §2). Honest limit: no real team has used it, so none
 of ADR 0008's tripwires (routinely disabled boundaries, routinely raised budgets) could fire. One
 sub-question was settled in 9.2 — what a list-length variant matches ([ADR 0024](decisions/0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md)) —
@@ -119,7 +119,8 @@ matcher bug (finding 8).
 **Governance: who owns the engine, the SDK spec and conformance sign-off, and what is the funding
 model?** — *Framed, not decided* (charter non-goals; task 9.4). Evidence the discussion can use:
 
-- a complete SDK's hand-written layer is **583 lines** of TypeScript or **1,630** of Java
+- a complete SDK's hand-written layer is **723 lines** of TypeScript or **1,802** of Java
+  (task 6.5 measured 583 and 1,630, before content components and variant bindings)
   ([thinness audit](thinness-audit-report.md));
 - the JVM SDK was written from the specification alone and recorded the same contract, member for member,
   as the TypeScript one ([JVM report](jvm-sdk-from-spec-report.md), conformance report §2);
@@ -219,9 +220,9 @@ These are not open questions. The RFC stated them as design, and the revision sh
 | **A very large undertaking** | The prototype covers one engine, two SDKs, a CLI, three embeddings (one for measurement only) and a third-party component. The 9.4 staged plan has to scope the real build against that |
 | **Osborne effect / community split** | Not measurable in a prototype. The mitigation the RFC relies on is real: v1–v4 pacts verify unchanged, with 583 of 583 in-scope specification cases agreeing, and `janus upgrade` converts them, reporting every narrowing it makes |
 | **WASM host maturity varies; the subprocess reintroduces process management** | **Worse than predicted, and in a different place.** Host maturity was not the limit; the guest was. No WASM engine can serve a mock or drive a provider (ADR 0023). Process management is therefore the main path. It held up on Linux and on real Windows: orphan tests, EOF exit, 0.6–1.2 ms spawn (spikes 1.3, 8.3) |
-| **Social cost of pact-jvm ceasing to be independent** | Not measurable. The JVM SDK written from the spec alone shows what a JVM maintainer would own: a 1,630-line idiomatic layer |
+| **Social cost of pact-jvm ceasing to be independent** | Not measurable. The JVM SDK written from the spec alone shows what a JVM maintainer would own: an idiomatic layer of about 1,560 lines |
 | **The plan grammar becomes public, versioned API** | The versioning policy held under a stress test once it was stated (ADR 0022). The strain was in the fragment model, not the versioning (§2.2) |
-| **Variant testing has sharp edges** | **Confirmed.** Whether a failing variant can be identified depends on the test framework, not the engine: Vitest and JUnit 5 name it for free, and a flat Rust loop gives no variant context ([variant ergonomics report](variant-ergonomics-report.md)). The engine cannot tell whether the closure handled the response (finding 4). Request-side dimensions make the closure variant-parameterised (ADR 0024). Pairwise stayed small on the RFC payload (8 of 12) |
+| **Variant testing has sharp edges** | **Confirmed.** Whether a failing variant can be identified depends on the test framework, not the engine: Vitest and JUnit 5 name it for free, and a flat Rust loop gives no variant context ([variant ergonomics report](variant-ergonomics-report.md)). The engine cannot tell whether the closure handled the response (finding 4). Request-side dimensions make the closure variant-parameterised (ADR 0024). Pairwise stayed small on the RFC payload (8 of 24) |
 | **Subsumption findings can overwhelm** | **Confirmed and quantified** (§2.1): 4.5× from generator-derived shapes, and a separate narrowness in converted pacts. Warn-first (ADR 0016) is the right default. A second, worse problem appeared that the RFC did not predict: derived shapes silently matched nothing (ADR 0025) |
 
 ## 5. Drawbacks the RFC did not predict
@@ -244,10 +245,10 @@ These are not open questions. The RFC stated them as design, and the revision sh
 
 | Criterion | Outcome |
 |---|---|
-| 1. One engine, thin SDKs | **Met** (M4). Both SDKs pass 42 of 42 conformance cases against one engine; the thinness audit is a CI gate |
+| 1. One engine, thin SDKs | **Met** (M4). Both SDKs pass 47 of 47 conformance cases against one engine; the thinness audit is a CI gate |
 | 2. No FFI failure modes | **Met.** No per-object cleanup (sessions are the only resource), errors are values at the boundary, no SDK orchestrates differently. Two gaps remain in the SDKs' hands: whether a test passed (finding 4) and contract bytes (finding 6) |
 | 3. Plans carry the semantics | **Met** (M1, M3). 583 of 583 in-scope pact-specification cases agree; 158 are named known gaps (XML bodies, four rules with no coverage) |
-| 4. Optionality is answered | **Met** (M2). A 12-variant space in one test, 8 variants, a careless consumer fails on an identifiable variant, and only exercised variants are recorded |
+| 4. Optionality is answered | **Met** (M2). The RFC's order payload in one test, 8 variants of 24, a careless consumer fails on an identifiable variant, and only exercised variants are recorded |
 | 5. The loop closes | **Met** (M5). SHIPPED/PENDING caught, fixed by widening, and the widened shape forced into the consumer's variants |
 | 6. Components are real | **Met** (M6). The CSV component, written from the docs, runs in a consumer test and in verification |
 | 7. Performance is characterised | **Met** (9.1). The answer changed the embedding decision instead of confirming it |

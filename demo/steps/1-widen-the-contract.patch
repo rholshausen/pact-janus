@@ -1,0 +1,24 @@
+--- a/test/orders.test.ts
++++ b/test/orders.test.ts
+@@ -12,17 +12,17 @@
+   // What the provider must set up for each variant: the status it is testing, and as many items.
+   .given("an order exists", {
+     id: "42",
+-    status: variantCases("status", { PENDING: "PENDING", SHIPPED: "SHIPPED" }),
++    status: variantCases("status", { PENDING: "PENDING", SHIPPED: "SHIPPED", CANCELLED: "CANCELLED" }),
+     shipped: whenVariant("status", "SHIPPED"),
+-    items: variantCases("items", { min: 1, "min+1": 2 }),
++    items: variantCases("items", { min: 0, "min+1": 1 }),
+   })
+   .request({ method: "GET", path: "/orders/42", headers: { Accept: "application/json" } })
+   .response({
+     status: 200,
+     body: json({
+       id: string("42"),
+-      status: anyOf("PENDING", "SHIPPED"),
+-      items: eachLike({ sku: string("sku-0"), quantity: integer(1) }),
++      status: anyOf("PENDING", "SHIPPED", "CANCELLED"),
++      items: eachLike({ sku: string("sku-0"), quantity: integer(1) }, { min: 0 }),
+     }),
+   });
+ 

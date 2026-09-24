@@ -11,7 +11,16 @@ export {
   type Closure,
   type Finalised,
 } from "./janus.js";
-export { InteractionBuilder, type RequestParts, type ResponseParts, type MultiValue, type Spellable } from "./interaction.js";
+export {
+  InteractionBuilder,
+  VariantBinding,
+  whenVariant,
+  variantCases,
+  type RequestParts,
+  type ResponseParts,
+  type MultiValue,
+  type Spellable,
+} from "./interaction.js";
 export {
   Shape,
   Content,

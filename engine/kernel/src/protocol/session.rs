@@ -153,7 +153,7 @@ impl ConsumerSession {
   /// `consumer-session/add-interaction` (spec §8.2): validate and compile, or a structured error a
   /// caller maps to `interaction-invalid` or `component-unavailable`.
   pub fn add_interaction(&mut self, interaction: &Value) -> Result<String, AddInteractionError> {
-    let spec = interaction_spec::parse(interaction)?;
+    let mut spec = interaction_spec::parse(interaction)?;
     // Component-interfaces spec §2.3: what an interaction cannot run without is checked when it
     // arrives, while the author is looking at it — not when its first body does.
     self
@@ -170,10 +170,14 @@ impl ConsumerSession {
     // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
     // §6.5): the reference resolves against this interaction's variant space, which does not exist
     // until the shapes parse, and the author is looking at the DSL that produced it right now.
+    // What is kept is the resolved id, not the author's shorthand (§6.3): the contract records
+    // `response.body.shippedAt#presence` where the DSL wrote `shippedAt`, so a verifier reading it
+    // resolves nothing and cannot resolve it differently.
     if let Some(states) = &spec.states {
       let space = plan::variant_space(&spec);
-      if let Err(problems) = params::bind(states, &space, "/states") {
-        return Err(InteractionSpecError { problems }.into());
+      match params::bind(states, &space, "/states") {
+        Ok(bound) => spec.states = Some(params::with_resolved_dimensions(states, &bound)),
+        Err(problems) => return Err(InteractionSpecError { problems }.into()),
       }
     }
     let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);

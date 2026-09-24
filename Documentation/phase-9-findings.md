@@ -990,3 +990,64 @@ falls back to it when no description matches, selecting an entry whose selector 
 example. Ties are not broken. The report records `matched-by`, and a report that matched nothing now
 says "no published shape matched any interaction". The spike's own importer does not emit selectors
 yet; an importer that does is 9.4's. Tests: `engine/kernel/tests/subsumption.rs`, the ADR 0025 block.
+
+## 33. Neither SDK could bind a provider state to a variant
+
+**Found:** 2026-09-24, starting plan task 9.3. **Status:** closed the same day, below.
+
+ADR 0009 designed variant-bound provider-state parameters, and the engine had implemented them since
+task 5.2. But the behavioural specification's `given` said "variant-bound parameters are not yet part
+of this primitive", so neither SDK could write one. A contract recorded by an SDK therefore asked the
+provider for the same state in every variant, and verification failed wherever the provider was not
+already in the variant's state. That is every variant but one, for any interaction whose response the
+provider state decides, which is the RFC's own `whenVariant` example. The demo could not run its
+second step without it.
+
+### Resolution
+
+`when-variant` and `variant-cases` are in the behavioural specification. `given` moves a param written
+with either one into `variant-params` under that name, and refuses a binding nested inside a literal
+param. Both SDKs implement it (`whenVariant`/`variantCases` in TypeScript; `VariantBinding.whenVariant`/
+`variantCases` on the JVM). Six conformance cases, written before the code; both SDKs pass 47 of 47.
+
+## 34. A consumer contract recorded a binding's shorthand, not the dimension it resolved to
+
+**Found:** 2026-09-24, plan task 9.3, by the new conformance case
+`live/when-variant-resolved-and-recorded`. **Status:** fixed the same day.
+
+Variant-semantics spec §6.3: "what is recorded is the resolved id". `consumer-session/add-interaction`
+resolved and validated every binding, then stored the states as submitted, so a contract recorded
+`"dimension": "shippedAt"` where it should have recorded `response.body.shippedAt#presence`. Nothing
+failed, because a verifier resolves the shorthand again against the same space. But the contract
+schema says the member is always the resolved id, and a verifier reading a contract whose shapes had
+since grown a second `shippedAt` would resolve it differently or not at all. The session now keeps the
+resolved ids `bind` computed (`params::with_resolved_dimensions`). Kernel test:
+`a_bindings_short_reference_is_recorded_as_the_dimension_it_resolved_to`
+(`engine/kernel/tests/consumer_flow.rs`).
+
+It had gone unnoticed since task 5.2 for an instructive reason. One kernel test did check the
+interaction's own `states`, under a comment saying the id is recorded "resolved … never the author's
+shorthand", and its assertion expected `"shippedAt"`: the test pinned the bug while its prose stated
+the rule. It surfaced when a conformance case written from the specification checked the same member,
+which is ADR 0017's argument for cases that quote the specification rather than the code.
+
+## 35. The DSL cannot exclude a combination the provider cannot produce
+
+**Found:** 2026-09-24, plan task 9.3. **Status:** open.
+
+The sample provider refuses a `SHIPPED` order without a shipping date (`state-unavailable`), which is
+right: no such order exists. A consumer declaring `status: anyOf(PENDING, SHIPPED)` and
+`shippedAt: optional(...)` independently gets that pair from pairwise sampling, so its contract always
+contains a variant the provider cannot produce. ADR 0008's remedy is an exclusion with a reason, and
+the engine applies exclusions from its sampling policy, which it reads from the session config, the
+interaction spec or a `consumer-session/variants` call (variant-semantics spec §3.8). No SDK primitive
+writes one, so the only way
+out for an SDK user is to narrow the shape. The demo narrows it honestly: its consumer does not read
+`shippedAt`, so it does not declare it. The RFC's own consumer example has the same pair.
+
+Options: **A.** an `exclude(assignment, reason)` primitive on the interaction, written into the
+interaction spec's policy; **B.** say in the SDK specification that a correlated pair
+should be written as a `one-of` (a `SHIPPED` alternative that carries `shippedAt`, others that do
+not), which is the shape language's own answer to correlated fields, and check that the subsumption
+walk compares a recorded provider object against a consumer `one-of` usefully; **C.** both. B is the
+better model and A is the escape hatch.

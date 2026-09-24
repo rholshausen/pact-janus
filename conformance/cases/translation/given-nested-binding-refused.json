@@ -1,0 +1,15 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/given-nested-binding-refused",
+  "category": "translation",
+  "title": "A binding helper nested inside a 'given' param, rather than being the param, is refused at the call.",
+  "covers": ["session.given.nested-binding-refused"],
+  "why": "behavioural spec 'given': a binding helper anywhere other than as a params member's own value is refused at the call, because it would otherwise be written as a literal that only looks like a binding — the in-band ambiguity variant semantics spec §6.2 exists to prevent.",
+  "interaction": {
+    "description": "a binding hidden inside a literal",
+    "given": [
+      { "name": "an order exists", "params": { "filter": { "shipped": { "$": "when-variant", "args": ["shippedAt", "present"] } } } }
+    ]
+  },
+  "expect": { "refused": true }
+}

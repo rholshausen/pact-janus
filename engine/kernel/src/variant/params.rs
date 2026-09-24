@@ -84,6 +84,28 @@ pub fn bind(
   }
 }
 
+/// `states` with every binding's `dimension` replaced by the id it resolved to (§6.3: "what is
+/// recorded is the resolved id"). `bound` is [`bind`]'s successful result for the same states, so
+/// binding `j` of state `i` is entry `j` of its `variant-params`; everything else in an entry —
+/// `name`, `cases`, `default`, members this version does not know — is kept as written.
+pub fn with_resolved_dimensions(states: &[State], bound: &[Vec<Binding>]) -> Vec<State> {
+  states
+    .iter()
+    .zip(bound)
+    .map(|(state, bindings)| {
+      let mut state = state.clone();
+      if let Some(entries) = state.variant_params.as_mut() {
+        for (entry, binding) in entries.iter_mut().zip(bindings) {
+          if let Some(object) = entry.as_object_mut() {
+            object.insert("dimension".to_string(), Value::String(binding.dimension.clone()));
+          }
+        }
+      }
+      state
+    })
+    .collect()
+}
+
 fn bind_one(
   entry: &Value,
   state: &State,

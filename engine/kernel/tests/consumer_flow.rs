@@ -324,6 +324,83 @@ fn a_real_http_client_drives_more_than_one_variant_in_sequence() {
   assert!(finalised["ok"]["contract"].is_object());
 }
 
+/// Variant-semantics spec §6.3: "what is recorded is the resolved id". The session used to keep the
+/// states as submitted, so a contract recorded the author's `shippedAt` — found by the SDK
+/// conformance case `live/when-variant-resolved-and-recorded` (task 9.3).
+#[test]
+fn a_bindings_short_reference_is_recorded_as_the_dimension_it_resolved_to() {
+  let mut engine = engine_with_real_components();
+  hello(&mut engine);
+  let create = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  let session = create["ok"]["session"].as_str().unwrap().to_string();
+
+  let mut interaction = order_interaction_with_optional_field();
+  interaction["states"] = json!([{ "name": "an order exists", "params": { "id": "66" },
+    "variant-params": [ { "name": "shipped", "dimension": "shippedAt",
+                          "cases": [ { "point": "present", "value": true } ], "default": false } ] }]);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  send(
+    &mut engine,
+    "r-5",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let started = send(
+    &mut engine,
+    "r-4",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!(
+    "{}:{}",
+    endpoint["host"].as_str().unwrap(),
+    endpoint["port"].as_u64().unwrap()
+  );
+  for (i, variant) in ["base", "response.body.shippedAt#presence=absent"]
+    .iter()
+    .enumerate()
+  {
+    send(
+      &mut engine,
+      &format!("r-{}", 10 + i),
+      "consumer-session/serve-variant",
+      json!({ "session": session, "handle": handle, "variant": variant }),
+    );
+    assert_eq!(http_get(&addr, "/orders/66").0, 200);
+  }
+
+  let finalised = send(
+    &mut engine,
+    "r-99",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let recorded = &finalised["ok"]["contract"]["interactions"][0];
+  assert_eq!(
+    recorded["states"][0]["variant-params"][0]["dimension"],
+    json!("response.body.shippedAt#presence")
+  );
+  let resolved: Vec<&Value> = recorded["selection"]["variants"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|v| &v["states"][0]["params"]["shipped"])
+    .collect();
+  assert_eq!(resolved, vec![&json!(true), &json!(false)]);
+}
+
 #[test]
 fn a_request_that_does_not_match_the_armed_variant_fails_it_and_withholds_the_contract() {
   let mut engine = engine_with_real_components();

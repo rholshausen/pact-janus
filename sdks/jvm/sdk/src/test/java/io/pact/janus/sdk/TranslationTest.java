@@ -134,10 +134,10 @@ class TranslationTest {
       JsonNode states = tree(janus.interaction("x")
           .given("first")
           .given("second", map("b", 2, "a", List.of(1, "x"), "n", null))
-          .given("third", Map.of())
+          .given("third", Map.of()) // no literal params left: omitted, never {}
           .toDocument()).get("states");
       assertEquals(parse("[ { 'name': 'first' }, { 'name': 'second', 'params': { 'b': 2, 'a': [1, 'x'], 'n': null } },"
-          + " { 'name': 'third', 'params': {} } ]"), states);
+          + " { 'name': 'third' } ]"), states);
       assertFalse(states.get(0).has("params"));
       // passed through as written: no key renamed, reordered or coerced
       assertEquals(List.of("b", "a", "n"), fieldNames(states.get(1).get("params")));

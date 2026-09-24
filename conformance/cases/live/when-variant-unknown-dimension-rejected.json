@@ -1,0 +1,27 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/when-variant-unknown-dimension-rejected",
+  "category": "live",
+  "title": "A binding whose dimension reference matches nothing is rejected by the engine, not by the SDK.",
+  "covers": ["session.given.engine-resolves-bindings"],
+  "why": "behavioural spec 'given': rejecting a reference that matches no dimension is the engine's (variant semantics spec §6.5) — an SDK does not compute variant spaces, so it cannot know. The DSL accepts the call, and the failure arrives from the engine as 'interaction-invalid' when the interaction is added.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "a binding on a field the shape does not have",
+          "given": [{ "name": "an order exists", "params": { "shipped": { "$": "when-variant", "args": ["deliveredAt", "present"] } } }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [{ "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] } }]
+            }
+          }
+        }
+      },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    }
+  ]
+}

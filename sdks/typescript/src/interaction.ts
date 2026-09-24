@@ -25,6 +25,60 @@ export interface ResponseParts {
   body?: Template | Content;
 }
 
+/**
+ * A provider-state parameter bound to the running variant (behavioural spec 'when-variant',
+ * 'variant-cases'; variant semantics spec §6). It has no name of its own: the `given` params member
+ * it is written as names it, and `given` moves it out of `params` into `variant-params`, because a
+ * binding written in-band as a parameter value would be indistinguishable from user data.
+ */
+export class VariantBinding {
+  readonly #dimension: string;
+  readonly #cases: readonly { point: string; value: unknown }[];
+  readonly #fallback: readonly unknown[];
+
+  constructor(dimension: string, cases: readonly { point: string; value: unknown }[], fallback: readonly unknown[]) {
+    this.#dimension = dimension;
+    this.#cases = cases;
+    this.#fallback = fallback;
+  }
+
+  /** The binding document (variant-params.schema.json's `Binding`) for the parameter `name`. */
+  binding(name: string): { [k: string]: unknown } {
+    return {
+      name,
+      dimension: this.#dimension,
+      cases: this.#cases.map((c) => ({ ...c })),
+      ...(this.#fallback.length > 0 ? { default: this.#fallback[0] } : {}),
+    };
+  }
+}
+
+/** True exactly when the running variant is at `point` of `dimension` — the RFC's `whenVariant`. */
+export function whenVariant(dimension: string, point: string): VariantBinding {
+  return new VariantBinding(dimension, [{ point, value: true }], [false]);
+}
+
+/**
+ * The value the running variant's point for `dimension` selects: `cases` maps point names to values,
+ * in the order written. With no `fallback`, a variant at a point no case names leaves the parameter
+ * absent (variant semantics spec §6.4) — which is why the argument is optional rather than defaulted.
+ */
+export function variantCases(
+  dimension: string,
+  cases: { readonly [point: string]: unknown },
+  ...fallback: [] | [unknown]
+): VariantBinding {
+  const entries = Object.entries(cases);
+  if (entries.length === 0) {
+    throw new TypeError(`variantCases('${dimension}'): at least one case is needed — with none, it is only ever its default`);
+  }
+  return new VariantBinding(
+    dimension,
+    entries.map(([point, value]) => ({ point, value })),
+    fallback,
+  );
+}
+
 export class InteractionBuilder {
   readonly #description: string;
   readonly #states: contract.State[] = [];
@@ -41,9 +95,26 @@ export class InteractionBuilder {
     return this.#description;
   }
 
-  /** Appends a provider state; `params` passed through as written. */
+  /**
+   * Appends a provider state. A param written as `whenVariant`/`variantCases` becomes a
+   * `variant-params` binding under that name; every other param is passed through as written.
+   */
   given(name: string, params?: { readonly [k: string]: unknown }): this {
-    this.#states.push(params === undefined ? { name } : { name, params: { ...params } });
+    const literal: Record<string, unknown> = {};
+    const bindings: { [k: string]: unknown }[] = [];
+    for (const [key, value] of Object.entries(params ?? {})) {
+      if (value instanceof VariantBinding) {
+        bindings.push(value.binding(key));
+      } else {
+        refuseNestedBinding(value, `given('${name}').${key}`);
+        literal[key] = value;
+      }
+    }
+    this.#states.push({
+      name,
+      ...(Object.keys(literal).length > 0 ? { params: literal } : {}),
+      ...(bindings.length > 0 ? { "variant-params": bindings } : {}),
+    });
     return this;
   }
 
@@ -94,6 +165,21 @@ export class InteractionBuilder {
         ? { "content-types": Object.fromEntries([...this.#contentTypes].map(([part, slots]) => [part, { ...slots }])) }
         : {}),
     };
+  }
+}
+
+/**
+ * A binding inside a literal param would be written as data that only looks like a binding — the
+ * in-band ambiguity variant semantics spec §6.2 exists to prevent — so it is refused at the call.
+ */
+function refuseNestedBinding(value: unknown, where: string): void {
+  if (value instanceof VariantBinding) {
+    throw new TypeError(`${where}: a variant binding must be a given() param's own value, not nested inside one`);
+  }
+  if (value !== null && typeof value === "object") {
+    for (const [key, inner] of Object.entries(value)) {
+      refuseNestedBinding(inner, `${where}.${key}`);
+    }
   }
 }
 

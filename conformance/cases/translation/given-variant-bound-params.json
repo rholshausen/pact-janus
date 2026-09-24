@@ -1,0 +1,53 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/given-variant-bound-params",
+  "category": "translation",
+  "title": "A 'given' param written with a binding helper becomes a 'variant-params' binding under that name; literal params stay literal.",
+  "covers": ["session.given.variant-bound-params", "state.when-variant.boolean-binding", "state.variant-cases.cases-as-written"],
+  "why": "behavioural spec 'given': a params member whose value is a 'when-variant' or 'variant-cases' helper is written as one binding in 'variant-params', named by the member, in the order written; 'params' is omitted when no literal members remain. 'when-variant' is the two-case boolean form spelled with a default; 'variant-cases' writes its map as cases in order, and its default only when given.",
+  "interaction": {
+    "description": "an order whose state depends on the variant",
+    "given": [
+      {
+        "name": "an order exists",
+        "params": {
+          "id": "42",
+          "shipped": { "$": "when-variant", "args": ["shippedAt", "present"] },
+          "status": { "$": "variant-cases", "args": ["status", { "SHIPPED": "SHIPPED", "CANCELLED": "CANCELLED" }, "PENDING"] }
+        }
+      },
+      {
+        "name": "the order has lines",
+        "params": { "count": { "$": "variant-cases", "args": ["items", { "min": 1, "min+1": 2 }] } }
+      }
+    ]
+  },
+  "expect": {
+    "spec": {
+      "description": "an order whose state depends on the variant",
+      "transport": { "kind": "http", "mode": "passive" },
+      "states": [
+        {
+          "name": "an order exists",
+          "params": { "id": "42" },
+          "variant-params": [
+            { "name": "shipped", "dimension": "shippedAt", "cases": [{ "point": "present", "value": true }], "default": false },
+            {
+              "name": "status",
+              "dimension": "status",
+              "cases": [{ "point": "SHIPPED", "value": "SHIPPED" }, { "point": "CANCELLED", "value": "CANCELLED" }],
+              "default": "PENDING"
+            }
+          ]
+        },
+        {
+          "name": "the order has lines",
+          "variant-params": [
+            { "name": "count", "dimension": "items", "cases": [{ "point": "min", "value": 1 }, { "point": "min+1", "value": 2 }] }
+          ]
+        }
+      ],
+      "parts": {}
+    }
+  }
+}

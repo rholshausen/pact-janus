@@ -5,6 +5,7 @@ import io.pact.janus.sdk.Cardinality;
 import io.pact.janus.sdk.Interaction;
 import io.pact.janus.sdk.Janus;
 import io.pact.janus.sdk.Shapes;
+import io.pact.janus.sdk.VariantBinding;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -169,14 +170,34 @@ final class Dsl {
     return alternatives;
   }
 
-  /** A state's params: plain data, passed through as written. */
+  /**
+   * A state's params: plain data, passed through as written, with every binding call resolved
+   * wherever it appears — a nested one too, because refusing it is the SDK's job, not this driver's.
+   */
   private static Map<String, Object> literalMap(JsonNode node) {
     Map<String, Object> params = new LinkedHashMap<>();
     node.properties().forEach(member -> params.put(member.getKey(), plain(member.getValue())));
     return params;
   }
 
+  /** A binding call, spelled the JVM way: {@code when-variant} and {@code variant-cases}. */
+  private static VariantBinding binding(JsonNode node) {
+    JsonNode args = node.path("args");
+    String primitive = node.path("$").asText();
+    return switch (primitive) {
+      case "when-variant" -> VariantBinding.whenVariant(args.path(0).asText(), args.path(1).asText());
+      case "variant-cases" -> args.size() > 2
+          ? VariantBinding.variantCases(args.path(0).asText(), literalMap(args.path(1)), plain(args.path(2)))
+          : VariantBinding.variantCases(args.path(0).asText(), literalMap(args.path(1)));
+      default -> throw new IllegalArgumentException(
+          "the case names a binding primitive this SDK does not implement: '" + primitive + "'");
+    };
+  }
+
   private static Object plain(JsonNode node) {
+    if (isCall(node)) {
+      return binding(node);
+    }
     if (node.isObject()) {
       return literalMap(node);
     }

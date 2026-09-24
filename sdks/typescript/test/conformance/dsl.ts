@@ -22,6 +22,8 @@ import {
   regex,
   string,
   time,
+  variantCases,
+  whenVariant,
   type InteractionBuilder,
   type MultiValue as SdkMultiValue,
   type Shape,
@@ -80,7 +82,8 @@ function call(helperCall: HelperCall): Shape | Template {
 export function buildInteraction(janus: Janus, script: InteractionScript): InteractionBuilder {
   let interaction = janus.interaction(script.description);
   for (const state of script.given ?? []) {
-    interaction = state.params === undefined ? interaction.given(state.name) : interaction.given(state.name, state.params);
+    interaction =
+      state.params === undefined ? interaction.given(state.name) : interaction.given(state.name, stateParams(state.params));
   }
   if (script.request) {
     const { method, path, query, headers, body } = script.request;
@@ -101,6 +104,33 @@ export function buildInteraction(janus: Janus, script: InteractionScript): Inter
     });
   }
   return interaction;
+}
+
+/** Binding primitive id -> how this SDK spells it. A `given` param may name one of these, at any depth. */
+const bindings: Record<string, (args: unknown[]) => unknown> = {
+  "when-variant": (args) => whenVariant(args[0] as string, args[1] as string),
+  "variant-cases": (args) =>
+    args.length > 2
+      ? variantCases(args[0] as string, args[1] as Record<string, unknown>, args[2])
+      : variantCases(args[0] as string, args[1] as Record<string, unknown>),
+};
+
+/**
+ * A `given` param as the case wrote it, with every binding call resolved wherever it appears — a
+ * nested one too, because refusing it is the SDK's job, not this driver's.
+ */
+function stateParams(value: unknown): Record<string, unknown> {
+  const resolve = (inner: unknown): unknown => {
+    const binding = isCall(inner) ? bindings[inner.$] : undefined;
+    if (binding && isCall(inner)) {
+      return binding(inner.args ?? []);
+    }
+    if (inner !== null && typeof inner === "object" && !Array.isArray(inner)) {
+      return mapValues(inner as Record<string, unknown>, resolve);
+    }
+    return inner;
+  };
+  return resolve(value) as Record<string, unknown>;
 }
 
 /**
