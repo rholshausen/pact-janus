@@ -95,36 +95,45 @@ impl RuntimeValue {
 /// the addressed shape (an object for `.member`, an array for `[index]`) yields
 /// [`RuntimeValue::Absent`] rather than an error: resolution is where absence is *discovered*,
 /// and `check:exists` — not a resolve failure — is how a plan asks about it.
+///
+/// It walks by reference and clones only the value it lands on. Cloning at every step made a
+/// path's cost the size of everything above it, so a plan resolving every leaf of a document by
+/// absolute path was quadratic in the document (plan task 9.1's performance report).
 pub fn navigate(value: &RuntimeValue, suffix: &str) -> RuntimeValue {
-  if suffix.is_empty() {
-    return value.clone();
-  }
-  if let Some(after_dot) = suffix.strip_prefix('.') {
-    let end = after_dot.find(['.', '[']).unwrap_or(after_dot.len());
-    let (member, remaining) = after_dot.split_at(end);
-    let next = match value {
-      RuntimeValue::Object(members) => members.get(member).cloned().unwrap_or(RuntimeValue::Absent),
-      RuntimeValue::Entry { key, value } => match member {
-        "key" => RuntimeValue::String(key.clone()),
-        "value" => (**value).clone(),
-        _ => RuntimeValue::Absent,
-      },
-      _ => RuntimeValue::Absent,
+  let mut current = value;
+  let mut suffix = suffix;
+  loop {
+    if suffix.is_empty() {
+      return current.clone();
+    }
+    let next = if let Some(after_dot) = suffix.strip_prefix('.') {
+      let end = after_dot.find(['.', '[']).unwrap_or(after_dot.len());
+      let (member, remaining) = after_dot.split_at(end);
+      suffix = remaining;
+      match current {
+        RuntimeValue::Object(members) => members.get(member),
+        RuntimeValue::Entry { key, value } => match member {
+          // The one step that makes a value rather than finding one, so it cannot be borrowed.
+          "key" => return navigate(&RuntimeValue::String(key.clone()), remaining),
+          "value" => Some(&**value),
+          _ => None,
+        },
+        _ => None,
+      }
+    } else if let Some(after_bracket) = suffix.strip_prefix('[') {
+      let end = after_bracket.find(']').unwrap_or(after_bracket.len());
+      let (index_text, rest) = after_bracket.split_at(end);
+      suffix = rest.strip_prefix(']').unwrap_or(rest);
+      match (index_text.parse::<usize>(), current) {
+        (Ok(index), RuntimeValue::Array(items)) => items.get(index),
+        _ => None,
+      }
+    } else {
+      None
     };
-    navigate(&next, remaining)
-  } else if let Some(after_bracket) = suffix.strip_prefix('[') {
-    let end = after_bracket.find(']').unwrap_or(after_bracket.len());
-    let (index_text, rest) = after_bracket.split_at(end);
-    let remaining = rest.strip_prefix(']').unwrap_or(rest);
-    let next = match index_text.parse::<usize>() {
-      Ok(index) => match value {
-        RuntimeValue::Array(items) => items.get(index).cloned().unwrap_or(RuntimeValue::Absent),
-        _ => RuntimeValue::Absent,
-      },
-      Err(_) => RuntimeValue::Absent,
-    };
-    navigate(&next, remaining)
-  } else {
-    RuntimeValue::Absent
+    match next {
+      Some(value) => current = value,
+      None => return RuntimeValue::Absent,
+    }
   }
 }
