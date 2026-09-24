@@ -41,9 +41,9 @@ Three sources are the source of truth and take precedence over this file when th
   style-guide skeleton, the compatibility-facade classification for today's DSL, and what
   "conformant" means (ADR 0017).
 
-> **Status**: this repo is in the plan/design phase. The layout and commands below describe the intended
-> structure from the project plan (task 0.3). Update this file as scaffolding actually lands, and trust
-> the repo over this file if they diverge.
+> **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
+> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). The layout and
+> commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
 

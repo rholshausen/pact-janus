@@ -486,7 +486,7 @@ Every row is answered in [RFC feedback](rfc-feedback.md) §2 (task 9.2), which t
 | Performance envelope WASM vs native FFI | 1.7, [9.1](performance-report.md) — WASM is within 10–35% of native on the kernel's work; it cannot host a mock or a verification, which decides more | Resolved |
 | Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype | Still open; kernel-boundary review 8, 9 are the first obstacles |
 | AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope | Design notes only |
-| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community | Framed in 9.4 |
+| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community | Framed in the [staged plan](staged-implementation-plan.md) §7 |
 
 ---
 
@@ -542,7 +542,7 @@ end-to-end and reported the way the RFC sketches it); and external components (P
 M6 closes with a content *and* matcher component: the 8.1 `.wasm`, grown in 8.4 into both, runs
 unmodified in a consumer test and in verification.
 
-Phase 9 — Evaluation and RFC feedback (§12) — is under way:
+Phase 9 — Evaluation and RFC feedback (§12):
 
 - **9.1** ([performance report](performance-report.md)) — the 1.7 scenarios, run against Janus for the
   first time, in all three embeddings (`benchmarks/janus/`), with the engine built as a WASM component
@@ -572,5 +572,15 @@ Phase 9 — Evaluation and RFC feedback (§12) — is under way:
   of 47 conformance cases. The new conformance case found that a contract recorded a binding's
   shorthand instead of its resolved dimension, now fixed in the engine (Phase 9 findings 33–35).
 
-Next: **9.4**, the staged plan for the real build. Its open inputs are [RFC feedback](rfc-feedback.md)
-§8 and findings 33–35.
+- **9.4** ([staged implementation plan](staged-implementation-plan.md)) — what carries over from Janus
+  (the specifications, corpora, conformance suite and most of the kernel graduate; the HTTP transport
+  is rewritten; the SDKs are seeds), six stages from foundations to breadth with exit criteria and
+  relative sizes, providers first, the reassessment gates that could change the plan (the WASM
+  embedding at `wasm32-wasip3`, plan fragments, encoding, packaging, DSL defaults, policy), every open
+  finding assigned to a stage, and the naming, ownership, funding and deprecation questions set out
+  for the community.
+
+**The prototype is complete.** Every condition of the charter's "prototype complete" is met (staged plan
+§8): Phases 0–9 are done, every success criterion has a demo or a finding, every unresolved question
+has an answer or an honest "still open", and the report and staged plan are published for review on
+the RFC.

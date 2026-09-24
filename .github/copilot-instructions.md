@@ -30,8 +30,9 @@ implements, the per-language style-guide skeleton, the compatibility-facade clas
 today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync with
 `CLAUDE.md`.
 
-> **Status**: plan/design phase. Layout and commands below are the intended structure from plan task
-> 0.3; trust the repo over this file as scaffolding lands, and update this file when it does.
+> **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
+> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). The layout and
+> commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
 

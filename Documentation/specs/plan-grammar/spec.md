@@ -249,6 +249,16 @@ transforms. `json:parse` is a *namespaced* action belonging to the JSON content 
 is a *core* family. The difference is whether the first segment names a component, and §4.6 is
 explicit about which is which.
 
+**Grammar v1 changes this (ADR 0026, decided, not yet implemented).** In v1 every action is
+`namespace:name` with exactly one `:`, and the core families are **reserved namespaces**: `flow`
+(today's unprefixed control actions: `flow:if`, `flow:for-each`, …), `value` (today's unprefixed value
+actions: `value:upper-case`, …), `expect`, `check`, `match`, and `legacy` (the legacy-only actions of
+§4.4: `legacy:header-value`, `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`,
+`legacy:max-type`, `legacy:min-max-type`). A component MUST NOT declare a reserved namespace, and an
+engine refuses one that does at load. The meaning of every action is unchanged, so an engine reading v1
+reads a v0 fragment by the one-to-one mapping ADR 0026 tabulates. This document describes v0, which is
+what the prototype implements; the real build implements v1 (staged implementation plan §5).
+
 ### 4.2 Core actions (v0)
 
 | Family | Actions | Lazy |

@@ -135,15 +135,22 @@ We went looking for evidence against the RFC, too.
 
 ## What's next
 
-The prototype has one task left: a staged plan for building the real thing. It will say what carries
-over from Janus, what gets rewritten, and in what order. Some questions are not the prototype's to
-answer: the name, versioning, governance and funding. Those belong to the community, and the plan will
-set them out for that discussion.
+The prototype is complete, and its last piece is a
+**[staged plan for building the real thing](staged-implementation-plan.md)**. It sets out:
 
-Please join it on the [RFC pull request](https://github.com/pact-foundation/roadmap/pull/146).
+- what carries over from Janus: the specifications, test corpora and conformance suite, and most of the
+  engine;
+- the build order, providers first: a drop-in verifier for existing pacts comes before anything asks a
+  consumer to change;
+- the gates that could change the plan, such as reconsidering WASM once WASI 0.3 is a supported target.
+
+Some questions are not the prototype's to answer: the name, versioning, who owns what, funding, and
+when today's implementations retire. The plan sets them out for that discussion, which happens on the
+[RFC pull request](https://github.com/pact-foundation/roadmap/pull/146).
 
 ---
 
 **More detail:** [RFC feedback](rfc-feedback.md), every open question answered with evidence ·
+[the staged plan](staged-implementation-plan.md) ·
 [the demo](../demo/README.md) · [performance report](performance-report.md) ·
 [decision records](decisions/README.md) · [project plan](project-plan.md)

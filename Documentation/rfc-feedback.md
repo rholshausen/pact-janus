@@ -281,6 +281,9 @@ Fixes with no open design question:
 
 ## 8. Carried to 9.4
 
+Each item below is assigned to a stage of the real build in the
+[staged implementation plan](staged-implementation-plan.md) §5.
+
 Open, with what the prototype learned (each has an entry in the [findings list](phase-9-findings.md)):
 
 - **Protocol:** per-pair verification counts (10); a consumer's test verdict and per-interaction results

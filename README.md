@@ -18,9 +18,10 @@ Pact is a testing framework with duality (consumer and provider looking in oppos
 </tr>
 </table>
 
-**Status:** a prototype, and nearly finished: Phases 0–9.3 of the [project plan](Documentation/project-plan.md) are done. It exists to test the RFC's
-bets against real code, so its findings are the deliverable. It is not production software, it is not
-published anywhere, and it is not "Pact 6". **Start with the [community report](Documentation/prototype-report.md).**
+**Status:** the prototype is complete: every phase of the [project plan](Documentation/project-plan.md) is done. It existed to test the RFC's
+bets against real code, so its findings are the deliverable, along with a [staged plan for the real build](Documentation/staged-implementation-plan.md).
+It is not production software, it is not published anywhere, and it is not "Pact 6". **Start with the
+[community report](Documentation/prototype-report.md).**
 
 ![The demo: a consumer test, verification with hooks, janus check, widening and fixing](demo/demo.gif)
 
@@ -100,6 +101,8 @@ audit and `demo/run.sh --ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the practic
 
 - [Community report](Documentation/prototype-report.md): the short version, for everyone.
 - [RFC feedback](Documentation/rfc-feedback.md): every question the RFC left open, answered with evidence.
+- [Staged implementation plan](Documentation/staged-implementation-plan.md): what carries over, the
+  build order, the gates that could change it, and the questions for the community.
 - [Charter](Documentation/charter.md) and [project plan](Documentation/project-plan.md): what the
   prototype set out to prove, and how.
 - [Specifications](Documentation/specs): the engine protocol, shape language, variant semantics, plan
