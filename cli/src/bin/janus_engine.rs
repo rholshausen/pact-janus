@@ -18,14 +18,11 @@
 //! itself already traces every frame at `trace` level, so `RUST_LOG=trace janus-engine` shows
 //! exactly what crossed the wire in both directions with no further wiring needed here.
 
-use pact_janus_component_http::HttpTransport;
-use pact_janus_component_json::JsonContent;
-use pact_janus_kernel::component::TransportComponent;
-use pact_janus_kernel::protocol::Engine;
-use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
+
+#[path = "../register.rs"]
+mod register;
 
 fn main() {
   tracing_subscriber::fmt()
@@ -39,16 +36,9 @@ fn main() {
     "janus-engine starting"
   );
 
-  let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
-  transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
-  let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
-  // The components a consumer's project declares arrive in `consumer-session/create` (plan task
-  // 8.1): this embedding is native, so it can host them, and says so in `engine/hello`.
-  engine.declare_in_tree("content", "json", "1.0.0");
-  match pact_janus_component_host::WasmLoader::new() {
-    Ok(loader) => engine.register_component_loader(Arc::new(loader)),
-    Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),
-  }
+  // The same engine `janus` drives (phase-9 finding 30): transports, content, the WASM loader for
+  // the components a project declares, and the hook implementations a verifier configuration names.
+  let mut engine = register::native_engine();
 
   let stdin = std::io::stdin();
   let stdout = std::io::stdout();

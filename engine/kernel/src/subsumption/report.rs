@@ -7,6 +7,7 @@
 
 use super::compare::{RecordedExclusion, Verdict, Walk};
 use super::provider_shape::ProviderShape;
+use super::select::{BY_DESCRIPTION, BY_SELECTOR, Selection, select};
 use crate::contract::{Contract, Party};
 use crate::error::{Problem, push_pointer_segment};
 use crate::shape::{self, ShapeNode, path};
@@ -178,6 +179,15 @@ pub struct InteractionResult {
   /// Whether a provider-shape entry was found (spec §2.2). `false` means the interaction was
   /// never checked, which is a different fact from a checked-and-passing one.
   pub matched: bool,
+  /// How the entry was found (spec §2.2, ADR 0025): `description`, or `selector` when the
+  /// descriptions differ and an entry's operation selector admitted every recorded example — a
+  /// fact a reader wants, because the two sides then never agreed on a name.
+  #[serde(rename = "matched-by", skip_serializing_if = "Option::is_none")]
+  pub matched_by: Option<String>,
+  /// Why an unmatched interaction is unmatched, when that is more than "nothing was published":
+  /// today only an ambiguous selection, naming the entries that tied.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub reason: Option<String>,
   /// The Kleene conjunction of every part/slot root comparison (spec §6.2), or `not-published`
   /// when `matched` is false (spec §6.3) — a report-level state, not one of the walk's own three.
   pub verdict: String,
@@ -273,15 +283,34 @@ pub fn check(contract: &Contract, provider_shape: &ProviderShape) -> Result<Subs
         .collect()
     });
 
-    let Some(published) = provider_shape.find(&interaction.description, &states) else {
-      interactions.push(InteractionResult {
-        description: interaction.description.clone(),
-        states: recorded_states,
-        matched: false,
-        verdict: NOT_PUBLISHED.to_string(),
-        findings: Vec::new(),
-      });
-      continue;
+    let (published, matched_by) = match select(provider_shape, interaction, &states, &mut problems) {
+      Selection::Description(entry) => (entry, BY_DESCRIPTION),
+      Selection::Selector(entry) => (entry, BY_SELECTOR),
+      unmatched => {
+        let reason = match unmatched {
+          Selection::Ambiguous(entries) => Some(format!(
+            "{} published shapes select this interaction by operation ({}); the checker does not \
+             choose between them",
+            entries.len(),
+            entries
+              .iter()
+              .map(|entry| format!("'{}'", entry.description))
+              .collect::<Vec<_>>()
+              .join(", ")
+          )),
+          _ => None,
+        };
+        interactions.push(InteractionResult {
+          description: interaction.description.clone(),
+          states: recorded_states,
+          matched: false,
+          matched_by: None,
+          reason,
+          verdict: NOT_PUBLISHED.to_string(),
+          findings: Vec::new(),
+        });
+        continue;
+      }
     };
 
     // §5's cross-reference reads the consumer's own recorded exclusions; a contract whose
@@ -334,6 +363,8 @@ pub fn check(contract: &Contract, provider_shape: &ProviderShape) -> Result<Subs
       description: interaction.description.clone(),
       states: recorded_states,
       matched: true,
+      matched_by: Some(matched_by.to_string()),
+      reason: None,
       verdict: verdict.as_str().to_string(),
       findings,
     });

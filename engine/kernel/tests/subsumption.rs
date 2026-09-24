@@ -346,6 +346,56 @@ fn a_kind_a_conservative_operator_can_never_produce_is_still_decided() {
 
 // --- discriminated unions (spec §3.3) ----------------------------------------------------------
 
+/// Phase-9 finding 9: a provider that admits one literal against a conservative consumer is a
+/// membership question, and the consumer's own matcher answers it.
+#[rstest::rstest]
+#[case::literal_inside_a_regex(
+  json!({ "shape": "equality", "example": "2026-07-30T09:00:00Z" }),
+  json!({ "shape": "regex", "pattern": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "example": "2026-07-30T09:00:00Z" }),
+  Verdict::Yes
+)]
+#[case::literal_outside_a_regex(
+  json!({ "shape": "equality", "example": "30/07/2026" }),
+  json!({ "shape": "regex", "pattern": "^\\d{4}-", "example": "2026-07-30" }),
+  Verdict::No
+)]
+#[case::literal_is_a_datetime(
+  json!({ "shape": "equality", "example": "2026-07-30T09:00:00Z" }),
+  json!({ "shape": "datetime", "example": "2026-07-30T09:00:00Z" }),
+  Verdict::Yes
+)]
+#[case::every_option_includes(
+  json!({ "shape": "any-of", "options": ["order-1", "order-22"] }),
+  json!({ "shape": "include", "substring": "order-", "example": "order-1" }),
+  Verdict::Yes
+)]
+#[case::one_option_does_not(
+  json!({ "shape": "any-of", "options": ["order-1", "invoice-2"] }),
+  json!({ "shape": "include", "substring": "order-", "example": "order-1" }),
+  Verdict::No
+)]
+fn an_enumerable_provider_against_a_conservative_consumer_is_decided(
+  #[case] provider: Value,
+  #[case] consumer: Value,
+  #[case] expected: Verdict,
+) {
+  let (verdict, findings) = walk(&provider, &consumer);
+  assert_eq!(verdict, expected, "{findings:?}");
+  if expected == Verdict::No {
+    assert_eq!(findings[0].kind, "wider-values");
+  }
+}
+
+#[test]
+fn two_different_regexes_are_still_unknown() {
+  let (verdict, findings) = walk(
+    &json!({ "shape": "regex", "pattern": "^a", "example": "a" }),
+    &json!({ "shape": "regex", "pattern": "^[ab]", "example": "a" }),
+  );
+  assert_eq!(verdict, Verdict::Unknown);
+  assert_eq!(findings[0].kind, "unreviewable");
+}
+
 #[test]
 fn a_discriminator_value_the_consumer_names_no_alternative_for_is_decided_no() {
   let consumer = json!({ "shape": "one-of", "discriminator": "type",
@@ -506,6 +556,123 @@ fn an_interaction_is_matched_by_description_and_state_names_together() {
     report.interactions[0].matched,
     "the consumer's state params are not part of the match"
   );
+}
+
+// --- ADR 0025: selecting by operation when the descriptions differ -----------------------------
+
+/// A contract whose interaction the consumer named in its own words, with two recorded variants —
+/// both `GET /orders/<id>`, as every example of one operation is.
+fn get_order_contract() -> Contract {
+  let variant = |id: &str, order: u64| {
+    json!({ "id": id, "origin": "base", "assignment": [],
+      "parts": { "request": { "method": { "content": "GET" },
+                              "path": { "content": format!("/orders/{order}") } } } })
+  };
+  read_contract(
+    contract_document(json!([
+      { "description": "a request for an order",
+        "parts": { "request": { "method": { "shape": "equality", "example": "GET" },
+                                "path": { "shape": "regex", "pattern": "^/orders/\\d+$", "example": "/orders/1" } },
+                   "response": { "body": consumer_shape() } },
+        "selection": { "variants": [ variant("base", 1), variant("other", 27) ], "report": { } } }
+    ]))
+    .to_string()
+    .as_bytes(),
+    IdentifyMode::Tolerant,
+  )
+  .expect("a well-formed contract")
+}
+
+/// A derived entry: an OpenAPI `operationId` for a description and no states, which is all an
+/// OpenAPI document can say — plus a selector for its method and path template.
+fn derived_entry(description: &str, method: &str, path_pattern: &str) -> Value {
+  json!({ "description": description,
+    "selector": { "request": { "method": { "shape": "equality", "example": method },
+                               "path": { "shape": "regex", "pattern": path_pattern,
+                                         "example": "/orders/1" } } },
+    "parts": { "response": { "body": published_shape() } } })
+}
+
+fn derived_shape(entries: Value) -> ProviderShape {
+  let document = json!({ "$format": "janus-provider-shape/1",
+    "provider": { "name": "orders-api" },
+    "provenance": "derived",
+    "interactions": entries });
+  read_provider_shape(document.to_string().as_bytes()).expect("a well-formed provider shape")
+}
+
+#[test]
+fn a_derived_entry_is_selected_by_its_operation_when_no_description_matches() {
+  // Spike 7.3 §2: without a selector every derived interaction was `not-published`, silently.
+  let shape = derived_shape(json!([
+    derived_entry("listOrders", "GET", "^/orders$"),
+    derived_entry("getOrder", "GET", "^/orders/[^/]+$"),
+    derived_entry("cancelOrder", "DELETE", "^/orders/[^/]+$"),
+  ]));
+  let report = check(&get_order_contract(), &shape).expect("both documents parse");
+  let interaction = &report.interactions[0];
+  assert!(interaction.matched);
+  assert_eq!(interaction.matched_by.as_deref(), Some("selector"));
+  assert_eq!(interaction.verdict, "no");
+  assert_eq!(
+    interaction.findings.len(),
+    4,
+    "the same four the recorded shape finds"
+  );
+
+  let json = serde_json::to_value(&report).expect("serialises");
+  assert_eq!(json["interactions"][0]["matched-by"], json!("selector"));
+}
+
+#[test]
+fn a_description_match_wins_over_a_selector() {
+  let mut exact = derived_entry("a request for an order", "GET", "^/never$");
+  exact.as_object_mut().expect("an object").remove("selector");
+  let shape = derived_shape(json!([
+    derived_entry("getOrder", "GET", "^/orders/[^/]+$"),
+    exact
+  ]));
+  let report = check(&get_order_contract(), &shape).expect("both documents parse");
+  assert_eq!(report.interactions[0].matched_by.as_deref(), Some("description"));
+}
+
+#[test]
+fn a_selector_must_admit_every_recorded_example() {
+  // The second variant's `/orders/27` is outside `^/orders/1$`: one example is not the operation.
+  let shape = derived_shape(json!([derived_entry("getOrder", "GET", "^/orders/1$")]));
+  let report = check(&get_order_contract(), &shape).expect("both documents parse");
+  assert!(!report.interactions[0].matched);
+  assert_eq!(report.interactions[0].verdict, "not-published");
+}
+
+#[test]
+fn two_selectors_that_tie_are_not_chosen_between() {
+  let shape = derived_shape(json!([
+    derived_entry("getOrder", "GET", "^/orders/[^/]+$"),
+    derived_entry("getAnything", "GET", "^/.*$"),
+  ]));
+  let report = check(&get_order_contract(), &shape).expect("both documents parse");
+  let interaction = &report.interactions[0];
+  assert!(!interaction.matched);
+  assert_eq!(interaction.matched_by, None);
+  let reason = interaction.reason.as_deref().expect("an ambiguity says so");
+  assert!(reason.contains("'getOrder', 'getAnything'"), "{reason}");
+  assert!(
+    render(&report).contains("not checked — 2 published shapes select"),
+    "{}",
+    render(&report)
+  );
+}
+
+#[test]
+fn a_selector_that_is_not_a_shape_is_interaction_invalid() {
+  let shape = derived_shape(json!([
+    { "description": "getOrder",
+      "selector": { "request": { "path": { "shape": "no-such-operator" } } },
+      "parts": { "response": { "body": published_shape() } } }
+  ]));
+  let err = check(&get_order_contract(), &shape).expect_err("the selector does not parse");
+  assert_eq!(err.code(), "interaction-invalid");
 }
 
 #[test]

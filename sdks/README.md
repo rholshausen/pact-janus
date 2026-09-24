@@ -13,8 +13,9 @@ language.
 see [`test/vitest-integration.test.ts`](typescript/test/vitest-integration.test.ts). Its DSL is the
 [canonical behavioural specification](../Documentation/specs/sdk-specification/behavioural-spec.json),
 spelled as [`STYLE.md`](typescript/STYLE.md) records. It embeds the engine as the `janus-engine`
-subprocess, named by `JANUS_ENGINE`; `npm test` builds one first. The WASM embedding ADR 0003 names as
-Node's primary cannot host a consumer test's mock server yet —
+subprocess, named by `JANUS_ENGINE`; `npm test` builds one first. That is every SDK's primary embedding
+([ADR 0023](../Documentation/decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)):
+a WASM engine cannot host a consumer test's mock server —
 [Phase 9 finding 3](../Documentation/phase-9-findings.md).
 
 ## JVM (task 6.3)
@@ -27,9 +28,9 @@ idiomatic layer is the Gradle project `jvm/sdk` (`io.pact.janus.sdk`), spelled a
 The RFC's consumer example runs against the real engine in
 [`OrderConsumerTest`](jvm/sdk/src/test/java/io/pact/janus/sdk/OrderConsumerTest.java). It embeds the
 engine as the `janus-engine` subprocess, named by `JANUS_ENGINE`. `./gradlew build` (from `jvm/`) builds
-the engine with cargo before the tests run. Chicory, ADR 0003's primary JVM embedding, cannot host the
-mock server either ([Phase 9 finding 3](../Documentation/phase-9-findings.md)). The
-`io.pact.janus.sdk.engine.FramePipe` interface is where one would plug in.
+the engine with cargo before the tests run. Chicory, which the superseded ADR 0003 made the JVM's
+primary, cannot host the mock server either ([Phase 9 finding 3](../Documentation/phase-9-findings.md)).
+The `io.pact.janus.sdk.engine.FramePipe` interface is where one would plug in.
 
 ## Conformance (task 6.4)
 

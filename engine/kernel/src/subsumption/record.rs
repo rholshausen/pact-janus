@@ -141,6 +141,7 @@ impl Recorder {
             .map(|name| StateRef { name })
             .collect::<Vec<_>>()
         }),
+        selector: None,
         provenance: None,
         source: Some(BTreeMap::from([(
           "observations".to_string(),

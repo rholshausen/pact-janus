@@ -151,8 +151,8 @@ Interaction getOrder = janus.interaction("get an order")
   explicitly. The SDK's own build runs `cargo build -p pact_janus_cli --bin janus-engine` before its
   tests (Gradle task `:sdk:buildEngine`) and points `JANUS_ENGINE` at the result, so tests never run
   against a stale engine.
-- **Embedding.** Subprocess only. ADR 0003 names Chicory as the JVM's primary embedding, but a WASM
-  guest cannot host a consumer test's mock server (Phase 9 finding 3). `Embedding`/`FramePipe` is
+- **Embedding.** Subprocess only, which ADR 0023 makes every SDK's primary: a WASM guest cannot host
+  a consumer test's mock server (Phase 9 finding 3), so Chicory, the superseded ADR 0003's choice, is not. `Embedding`/`FramePipe` is
   the seam a Chicory embedding would implement: `FramePipe.call(byte[]) -> byte[]` is exactly the
   WASM call pipe's shape (engine-protocol spec §3.1).
 - **Protocol version.** Pinned to protocol 1. `engine/hello` offers `[1]` and declares no

@@ -40,7 +40,10 @@ pub fn render(report: &SubsumptionReport) -> String {
   )];
   for interaction in &report.interactions {
     if interaction.verdict == NOT_PUBLISHED {
-      lines.push(not_published_line(&interaction.description));
+      lines.push(not_published_line(
+        &interaction.description,
+        interaction.reason.as_deref(),
+      ));
       continue;
     }
     for finding in &interaction.findings {
@@ -71,12 +74,20 @@ pub(crate) fn header(
   } else if any_matched {
     format!("✓ {consumer} is compatible with {provider}")
   } else {
-    format!("? {consumer} was not checked against {provider}: no shapes published")
+    // Not "no shapes published": a provider that published shapes nobody's interactions match —
+    // a derived shape named by operationId, say (spike 7.3 §2) — lands here too, and that line
+    // read like reassurance to exactly the team that most needed to hear nothing was checked.
+    format!("? {consumer} was not checked against {provider}: no published shape matched any interaction")
   }
 }
 
-pub(crate) fn not_published_line(description: &str) -> String {
-  format!("  interaction '{description}': the provider has published no shape for it")
+pub(crate) fn not_published_line(description: &str, reason: Option<&str>) -> String {
+  match reason {
+    Some(reason) => format!("  interaction '{description}': not checked — {reason}"),
+    None => {
+      format!("  interaction '{description}': no published shape matches it by description or operation")
+    }
+  }
 }
 
 /// One finding, as the two-or-one-line block §6.4 fixes: its header line, then a line per side.

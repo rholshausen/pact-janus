@@ -713,6 +713,20 @@ impl Conversion {
     // checks the bound only when `!cascaded`) — nor does design 3.5's plan, which reduces a
     // cascaded one to `match:type`, admitting any length. `min: 0` is what agrees with both.
     let (min, max) = if cascaded { (0, None) } else { cardinality(&list) };
+    // A bare `type` names no bound, and v1–v4 then admit `[]` where `each-like`'s default `min: 1`
+    // does not (phase-9 finding 2). Stricter, so false failures rather than false passes — but the
+    // two paths now disagree about the empty list, and plan-grammar spec §4.4 wants that said.
+    if !cascaded && list.rules.iter().all(|rule| matches!(rule, MatchingRule::Type)) {
+      self.finding(Finding::at(
+        "rule-narrowed",
+        "judgement",
+        &ctx.at,
+        "a type rule on an array names no length, and v1–v4 admit an empty one; the contract's \
+         each-like keeps its default min: 1 — write min: 0 if an empty list is a case the consumer \
+         handles"
+          .to_string(),
+      ));
+    }
     let template = items.first().cloned().unwrap_or(Value::Null);
     let items_shape = self.body_shape(rules, &template, &ctx.template_item());
     let mut shape = json!({ "shape": "each-like", "items": items_shape, "min": min });

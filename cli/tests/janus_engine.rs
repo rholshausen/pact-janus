@@ -69,3 +69,56 @@ fn shutdown_is_answered_and_then_the_process_exits_cleanly() {
   assert!(status.success(), "exit status {status}");
   drop(stdin);
 }
+
+/// Phase-9 finding 30: `janus-engine` is the engine both SDKs embed, and it registered no hook
+/// implementations, so a verifier configuration naming an `http` or `exec` hook — the sample
+/// provider's own — was refused by it and accepted by `janus`. Both now start from one function.
+#[test]
+fn a_verification_naming_an_http_hook_is_not_refused() {
+  assert_hook_kind_accepted(
+    "http",
+    json!({ "kind": "http", "url": "http://127.0.0.1:1/state" }),
+  );
+}
+
+#[test]
+fn a_verification_naming_an_exec_hook_is_not_refused() {
+  assert_hook_kind_accepted("exec", json!({ "kind": "exec", "command": "true" }));
+}
+
+fn assert_hook_kind_accepted(kind: &str, run: Value) {
+  let mut child = Command::new(env!("CARGO_BIN_EXE_janus-engine"))
+    .env("RUST_LOG", "warn")
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .spawn()
+    .expect("janus-engine starts");
+  let mut stdin = child.stdin.take().expect("stdin");
+  let mut stdout = BufReader::new(child.stdout.take().expect("stdout"));
+
+  let hello =
+    json!({ "type": "request", "id": "r-1", "op": "engine/hello", "body": { "protocol-versions": [1] } });
+  stdin.write_all(&frame(&hello)).expect("write hello");
+  read_frame(&mut stdout);
+
+  let pact: Value = serde_json::from_str(include_str!(
+    "../../samples/order-service/pacts/web-app-order-service.json"
+  ))
+  .expect("the sample pact is JSON");
+  let verify = json!({ "type": "request", "id": "r-2", "op": "verification/verify", "body": {
+    "source": { "kind": "inline", "contracts": [pact] },
+    "target": {
+      "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } } ],
+      "hooks": { "hooks": { "before-request": [ { "name": "sign", "run": run } ] } }
+    } } });
+  stdin.write_all(&frame(&verify)).expect("write verify");
+  let response = read_frame(&mut stdout);
+  assert_ne!(
+    response["error"]["code"],
+    json!("hook-unavailable"),
+    "{kind} hooks refused: {response}"
+  );
+  drop(stdin);
+  let _ = child.wait();
+}

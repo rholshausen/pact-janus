@@ -153,6 +153,36 @@ fn a_cascaded_bound_does_not_size_a_nested_array() {
   assert!(tags.get("max").is_none(), "no bound was declared here: {tags}");
 }
 
+/// Phase-9 finding 2: a bare `type` on an array admits `[]` in v1–v4 and not in the contract
+/// (`each-like`'s default `min: 1`). Stricter, so safe — but the two paths disagree, and the
+/// upgrade says so where it used to be silent. A stated `min` is the author's own bound: no finding.
+#[test]
+fn a_bare_type_on_an_array_says_the_empty_list_is_no_longer_admitted() {
+  let response = json!({
+    "status": 200,
+    "body": { "items": [{ "sku": "a" }] },
+    "matchingRules": { "body": { "$.items": { "matchers": [{ "match": "type" }] } } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), response));
+  let items = &shape(&upgraded, 0, "response", "body")["members"]["items"];
+  assert_eq!(items["min"], json!(1));
+  let finding = find(&upgraded.findings, "rule-narrowed");
+  assert_eq!(finding.kind, "judgement");
+  assert!(finding.message.contains("empty"), "{}", finding.message);
+
+  let bounded = json!({
+    "status": 200,
+    "body": { "items": [{ "sku": "a" }] },
+    "matchingRules": { "body": { "$.items": { "matchers": [{ "match": "type", "min": 1 }] } } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), bounded));
+  assert!(
+    !codes(&upgraded.findings).contains(&"rule-narrowed"),
+    "{:?}",
+    codes(&upgraded.findings)
+  );
+}
+
 /// An array with no rule asserted an exact list, and `array` is the operator that says so.
 #[test]
 fn an_array_with_no_rule_becomes_a_fixed_array() {

@@ -19,7 +19,7 @@ superseding ADR instead.
 |---|---|---|
 | [0001](0001-record-decisions-as-adrs.md) | Record decisions as ADRs | accepted |
 | [0002](0002-document-first-protocol-over-frozen-pipes.md) | Define the protocol as schema-governed JSON documents over frozen byte-pipes | accepted |
-| [0003](0003-embedding-priority-per-language.md) | Ship dual engine artifacts; set embedding priority per SDK language | accepted |
+| [0003](0003-embedding-priority-per-language.md) | Ship dual engine artifacts; set embedding priority per SDK language | superseded by 0023 |
 | [0004](0004-fork-v2-engine-as-kernel.md) | Fork the pact-reference v2 matching engine as the kernel starting point | accepted |
 | [0005](0005-poll-based-event-delivery.md) | Poll-based event delivery on all pipes; push as a negotiated stdio capability | accepted |
 | [0006](0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md) | Model bytes explicitly; make frame encoding a negotiated axis with JSON as the baseline | accepted |
@@ -39,6 +39,9 @@ superseding ADR instead.
 | [0020](0020-a-content-slots-type-is-declared-on-the-interaction.md) | Declare a content slot's type on the interaction, beside its parts, not inside them | accepted |
 | [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted |
 | [0022](0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md) | A plan fragment replaces its slot's plan, declares a grammar the engine says it reads, and is checked before anything runs | accepted |
+| [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md) | Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations | accepted |
+| [0024](0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) | Keep request dimensions pinned, and match a cardinality point as a region | accepted |
+| [0025](0025-a-provider-shape-entry-may-select-interactions-by-operation.md) | Let a provider-shape entry select the interactions it is about by operation | accepted |
 
 ## Decision backlog
 
@@ -49,3 +52,9 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
   edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)
+- Per-pair verification summaries (`pairs` in the run summary) — the broker notes §11 chose the shape;
+  Phase 9 finding 10 (task 9.4)
+- A consumer's test verdict reaching the engine (`report-variant`), so the engine, not each SDK,
+  withholds a dishonest contract — Phase 9 findings 4 and 5 (task 9.4)
+- Operator-level substitution in place of whole-slot plan fragments — ADR 0022's tripwire, Phase 9
+  finding 21 (task 9.4)

@@ -597,7 +597,9 @@ fn a_provider_that_published_no_shape_passes_on_its_verification_alone() {
   assert_eq!(report["decision"], json!("pass"));
   assert!(reason_codes(pair).contains(&"provider-shape-missing".to_string()));
   assert!(
-    text.contains("? order-consumer was not checked against order-service: no shapes published"),
+    text.contains(
+      "? order-consumer was not checked against order-service: no published shape matched any interaction"
+    ),
     "{text}"
   );
 }
@@ -655,7 +657,10 @@ fn a_shape_that_matches_nothing_is_not_checked_rather_than_passing() {
   assert_eq!(pair["subsumption"]["verdict"], json!("not-checked"));
   assert_eq!(pair["subsumption"]["matched"], json!(0));
   assert_eq!(pair["decision"], json!("pass"));
-  assert!(text.contains("no shapes published"), "{text}");
+  assert!(
+    text.contains("no published shape matched any interaction"),
+    "{text}"
+  );
 }
 
 // --- the operations themselves -------------------------------------------------------------------

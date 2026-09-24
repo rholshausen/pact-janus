@@ -1,0 +1,36 @@
+(
+  :"submit a batch of orders" (
+    :request (
+      :body (
+        %expect:array (
+          $.request.body
+        ),
+        %expect:size (
+          $.request.body,
+          2,
+          NULL
+        ),
+        %for-each (
+          ** (
+            $.request.body
+          ),
+          :"$.request.body[*]" (
+            %expect:object (
+              ~>
+            ),
+            :"$.request.body[*].qty" (
+              %match:integer (
+                ~>.qty
+              )
+            ),
+            :"$.request.body[*].sku" (
+              %match:string (
+                ~>.sku
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

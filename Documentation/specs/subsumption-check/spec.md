@@ -93,6 +93,41 @@ interactions within one contract are told apart (contract spec §4.2): **`descri
 generally know the parameter values a given consumer's states bind, only the state vocabulary its own
 `state-setup` hooks answer to.
 
+That identity is the consumer's own words, and a provider that did not record its shape from the
+consumer's tests cannot know them: an OpenAPI document has paths and `operationId`s, never the prose a
+consumer team typed (spike 7.3 §2). So an entry MAY also carry a **`selector`** (ADR 0025): shapes over
+slots, in the same part → slot → shape form as `parts`, usually over the request-direction slots that
+identify an operation — for HTTP, a `method` and a `path` pattern:
+
+```json provider-shape
+{ "$format": "janus-provider-shape/1",
+  "provider": { "name": "orders-api" },
+  "provenance": "derived",
+  "interactions": [
+    { "description": "getOrder",
+      "selector": { "request": {
+        "method": { "shape": "equality", "example": "GET" },
+        "path": { "shape": "regex", "pattern": "^/orders/[^/]+$", "example": "/orders/1" } } },
+      "parts": { "response": { "body": { "shape": "object", "members": { } } } } } ] }
+```
+
+The checker matches in two steps:
+
+1. **By description** — `description` and state names, as above. If an entry matches, it is used.
+2. **By selector** — otherwise, every entry with a `selector` whose shapes admit the recorded values of
+   **every** variant the contract records for the interaction. An entry that names `states` also needs
+   the state names to be equal; one that names none (every derived shape) is about the operation in
+   any state. Exactly one such entry is used. More than one is **not** chosen between — the checker
+   does not guess, any more than §8's walk does — and the interaction is `not-published` with a
+   `reason` naming the entries that tied.
+
+A selector is matched against recorded *examples*, by the same plans every exchange runs, so the kernel
+never parses a path template and never learns HTTP: "is this request an instance of that operation" is
+a question about a request the consumer actually sent. A selector is never compared for subsumption,
+and so carries no claim about what the provider *accepts* — §2.1's "no request-direction slots" is
+about that claim, and still holds. The report records which step matched (`matched-by`, §6.1), because
+a pair whose descriptions differ is a fact a reader wants.
+
 An interaction the checker cannot match to any provider-shape entry gets **no** subsumption result — not
 `unknown`, a distinct report state, `not-published` (§6.3) — because "the provider published nothing for
 this interaction" is a different fact from "the provider published something the checker could not
@@ -338,6 +373,13 @@ An interaction with no matching provider-shape entry (§2.2) gets `"matched": fa
 means *no check ran*, not *the check passed*. This is what keeps the mechanism adoptable per-provider
 (RFC): a provider that has published nothing produces a report that says so plainly, rather than a report
 full of silent `yes`es a reader could mistake for coverage.
+
+A matched interaction records how it was matched (`matched-by`: `description` or `selector`, §2.2); an
+unmatched one MAY carry a `reason` when there is more to say than "nothing was published" — today, that
+several selectors tied. A report in which *no* interaction matched is rendered as not checked at all,
+never as a pass, and its header says that no published shape matched rather than that none was
+published: a provider that published derived shapes nobody's interactions match is the case that most
+needs to hear it (spike 7.3 §2).
 
 ### 6.4 Text rendering
 

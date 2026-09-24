@@ -15,7 +15,7 @@
 
 use super::model::{Literal, Node};
 use crate::interaction_spec::InteractionSpec;
-use crate::shape::variant_space::{VariantSpace, canonical_point_name, cardinality_points, compute_many};
+use crate::shape::variant_space::{VariantSpace, canonical_point_name, cardinality_region, compute_many};
 use crate::shape::{CoreShape, Example, ShapeKind, ShapeNode, path};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -321,30 +321,32 @@ fn compile_each_entry(
   ]
 }
 
+/// The unpinned form is `expect:size` over `[min, max]`; a pinned point narrows to its region
+/// (shape spec §6.4, ADR 0024) — `expect:count` when the region is one length, `expect:size` over
+/// it when it is wider, which is what `min+1` is unless `max` sits right above it.
 fn cardinality_assertion(ctx: &Ctx, min: u64, max: Option<u64>) -> Node {
   let dim_id = ctx.dim_id("cardinality");
-  match pinned_cardinality(&dim_id, min, max, ctx.assignment) {
-    Some(size) => Node::action(
+  let region = ctx
+    .assignment
+    .get(&dim_id)
+    .and_then(|point_name| cardinality_region(min, max, point_name));
+  match region {
+    Some((size, Some(upper))) if size == upper => Node::action(
       "expect:count",
       vec![ctx.resolve(), Node::value(Literal::number(size))],
     ),
-    None => Node::action(
-      "expect:size",
-      vec![
-        ctx.resolve(),
-        Node::value(Literal::number(min)),
-        Node::value(max.map(Literal::number).unwrap_or_else(Literal::null)),
-      ],
-    ),
+    region => {
+      let (lower, upper) = region.unwrap_or((min, max));
+      Node::action(
+        "expect:size",
+        vec![
+          ctx.resolve(),
+          Node::value(Literal::number(lower)),
+          Node::value(upper.map(Literal::number).unwrap_or_else(Literal::null)),
+        ],
+      )
+    }
   }
-}
-
-fn pinned_cardinality(dim_id: &str, min: u64, max: Option<u64>, assignment: &Assignment) -> Option<u64> {
-  let point_name = assignment.get(dim_id)?;
-  cardinality_points(min, max)
-    .into_iter()
-    .find(|p| &p.name == point_name)
-    .map(|p| p.size)
 }
 
 /// `contains` (spec §5.2, emitted under an `expect:array`): opaque — each entry shape is checked

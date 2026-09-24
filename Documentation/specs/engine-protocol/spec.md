@@ -8,7 +8,8 @@ the structured error taxonomy, version and capability negotiation, and the compa
 
 The protocol's architecture is fixed by [ADR 0002](../../decisions/0002-document-first-protocol-over-frozen-pipes.md):
 schema-governed JSON documents ("frames") carried over frozen, never-growing byte-pipes, one
-pipe per embedding ([ADR 0003](../../decisions/0003-embedding-priority-per-language.md)). The
+pipe per embedding ([ADR 0023](../../decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md),
+superseding ADR 0003). The
 JSON Schemas under [`schemas/v1/`](schemas/v1/) are the **specified surface** — this prose
 defines their semantics; the schemas define their shapes. When prose and schema disagree, that
 is a bug in this specification; file it rather than inferring precedence. The schemas govern

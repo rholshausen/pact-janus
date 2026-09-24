@@ -63,6 +63,15 @@
           "type": "boolean",
           "description": "Whether a provider-shape entry was found for this interaction (spec.md §2.2). False means the interaction was never checked, distinct from a checked-and-passing interaction."
         },
+        "matched-by": {
+          "type": "string",
+          "description": "How the provider-shape entry was found (spec.md §2.2, ADR 0025): 'description', or 'selector' when the descriptions differ and an entry's operation selector admitted every recorded example. Absent when 'matched' is false.",
+          "x-known-values": ["description", "selector"]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why an unmatched interaction is unmatched, when that is more than nothing having been published — e.g. several entries' selectors tie, and the checker does not choose between them."
+        },
         "verdict": {
           "type": "string",
           "description": "The Kleene conjunction of every part/slot root comparison (spec.md §6.2), or 'not-published' when 'matched' is false (spec.md §6.3) — a report-level state, not one of the walk's own three values.",

@@ -61,19 +61,27 @@
     },
     "ProviderInteraction": {
       "title": "ProviderInteraction",
-      "description": "One operation's published shape. Matched to a consumer contract's interaction by 'description' plus 'states' names (spec.md §2.2, contract spec §4.2).",
+      "description": "One operation's published shape. Matched to a consumer contract's interaction by 'description' plus 'states' names (spec.md §2.2, contract spec §4.2), or failing that by 'selector' (ADR 0025).",
       "type": "object",
       "required": ["description", "parts"],
       "properties": {
         "description": {
           "type": "string",
           "minLength": 1,
-          "description": "MUST equal the consumer interaction's description for the two to be matched."
+          "description": "Matches a consumer interaction whose description is equal (spec.md §2.2); when no entry's does, 'selector' is tried instead."
         },
         "states": {
           "type": "array",
-          "description": "Names only, no params (spec.md §2.2).",
+          "description": "Names only, no params (spec.md §2.2). On an entry matched by 'selector', present means the consumer's state names must also be equal; absent means the entry is about the operation in every state.",
           "items": { "$ref": "#/$defs/StateRef" }
+        },
+        "selector": {
+          "type": "object",
+          "description": "Which consumer interactions this entry is about, for a provider that cannot know their descriptions (spec.md §2.2, ADR 0025): part name -> slot name -> shape, usually over request-direction slots (for HTTP, 'method' and 'path'). An entry selects an interaction when these shapes admit the values of every variant the contract recorded. Only ever matched against examples, never compared for subsumption.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "object" }
+          }
         },
         "provenance": {
           "type": "string",

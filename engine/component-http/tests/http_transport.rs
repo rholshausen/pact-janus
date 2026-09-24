@@ -297,6 +297,53 @@ fn poll_inbound_times_out_with_no_arrival() {
     .unwrap();
 }
 
+/// Phase-9 finding 27: a poll waited with the lock over every instance held, so `stop` — and the
+/// `consumer-session/finalise` behind it — sat out the rest of the poll's timeout. Now the waiter
+/// lets go of the lock, `stop` wakes it, and neither waits.
+#[test]
+fn stop_does_not_wait_for_a_poll_in_progress() {
+  let transport = std::sync::Arc::new(HttpTransport::new());
+  start_serve(&transport, "t-5");
+  start_serve(&transport, "t-6");
+
+  let poller = {
+    let transport = transport.clone();
+    std::thread::spawn(move || {
+      let started = std::time::Instant::now();
+      let polled = transport.poll_inbound(PollInbound {
+        instance: "t-5".to_string(),
+        timeout_ms: 5_000,
+      });
+      (polled, started.elapsed())
+    })
+  };
+  std::thread::sleep(Duration::from_millis(50));
+
+  let started = std::time::Instant::now();
+  transport
+    .stop(Stop {
+      instance: "t-6".to_string(),
+    })
+    .unwrap();
+  transport
+    .stop(Stop {
+      instance: "t-5".to_string(),
+    })
+    .unwrap();
+  assert!(
+    started.elapsed() < Duration::from_millis(500),
+    "stop waited {:?} behind another instance's poll",
+    started.elapsed()
+  );
+
+  let (polled, waited) = poller.join().unwrap();
+  assert!(polled.unwrap().inbound.is_none());
+  assert!(
+    waited < Duration::from_millis(2_000),
+    "the poll was not woken: {waited:?}"
+  );
+}
+
 // The drive role's own tests live in `http_drive.rs` (plan task 5.1). What this file used to
 // assert here — that `start`/`send` answer `operation-unsupported` for it — has been replaced by
 // the role-confusion cases there: a *served* instance still refuses `send` by name, which is the

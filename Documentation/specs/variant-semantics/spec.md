@@ -527,6 +527,16 @@ what the verifier will replay; a dimension in the *response* changes what is pro
 matched. The slot prefix in the dimension id is what tells them apart, and nothing else in this
 specification treats them differently.
 
+Request dimensions stay pinned (ADR 0024). The mock accepts, under a variant, only requests that
+variant admits, so a consumer whose request shape declares width demonstrates each point of it — and
+that is what makes the RFC's "the reverse direction is covered by variant replay" true: the verifier
+replays the requests the consumer actually sent (§5.2), so a request width nobody demonstrated would be
+a width no provider was ever verified against. The cost is that a closure over an interaction with
+request dimensions is variant-*parameterised*, not variant-agnostic: it reads the variant to decide what
+to send. What pinning does not do is demand an exact list length. A cardinality point is matched as a
+region (shape spec §6.4), so `min+1` takes any list longer than the minimum, and a consumer sending a
+list whose length is its own data meets it with that list.
+
 ### 4.2 Exercised
 
 A variant is **exercised** when the interaction actually ran under it: for a passive interaction, the
@@ -591,7 +601,9 @@ For each recorded variant, in order:
 2. send the **recorded request example** for that variant — replay is by example, so the provider sees
    the bytes the consumer actually sent, not a re-derivation;
 3. match the response against the interaction's shape **pinned to that variant** (shape spec §7.1): an
-   `optional` pinned to `absent` admits only `⊥`, an `any-of` pinned to `SHIPPED` admits only that.
+   `optional` pinned to `absent` admits only `⊥`, an `any-of` pinned to `SHIPPED` admits only that, an
+   `each-like` pinned to `min+1` admits any length in that point's region (shape spec §6.4) — a
+   provider asked for "more than one item" may answer with five.
 
 Pinning at step 3 is what makes a variant mean something on this side. Matching the response against
 the whole shape would accept `PENDING` where the consumer demonstrated `SHIPPED`, and the variant would

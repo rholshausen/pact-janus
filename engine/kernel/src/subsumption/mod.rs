@@ -27,6 +27,7 @@ mod provider_shape;
 mod record;
 mod render;
 mod report;
+mod select;
 
 pub use crate::contract::Party;
 pub use compare::{Verdict, compare};

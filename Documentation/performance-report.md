@@ -156,7 +156,12 @@ suites pass, and the golden corpus is 21/21. This harness's v3 pact plans barely
 absolute path.
 `cargo run --release -- probe` in `benchmarks/janus` reproduces the table (Phase 9 finding 26).
 
-### 5.2 Every consumer session costs 200 ms in `finalise` — not fixed
+### 5.2 Every consumer session costs 200 ms in `finalise` — fixed in task 9.2
+
+*Task 9.2:* fixed as proposed below — the poll waits outside the lock and `stop` unblocks it. `finalise`
+is now 0.18 ms native and 0.19 ms subprocess, and the subprocess startup cycle's p95 is 221 µs
+(`results/2026-09-24-janus-*-0fc5d7c-dirty.json`; Phase 9 finding 27). The text below is 9.1's.
+
 
 `finalise` stops the transport, and the HTTP transport's `stop` waits for the instance lock, which
 the exchange loop holds through each `poll-inbound`, up to its 200 ms timeout

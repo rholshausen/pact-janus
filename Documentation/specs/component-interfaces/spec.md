@@ -718,9 +718,15 @@ Normative rules:
 
 Two things this binding does not have, stated plainly rather than implied:
 
-- **Grants are not enforceable.** The component runs with the engine user's authority. Declaring grants
-  for it documents intent and nothing more, and this specification says so because a sandbox that is
-  announced but absent is worse than one that was never claimed.
+- **Only the `env` grant is enforceable.** The component runs with the engine user's authority, so its
+  `fs` and `network` grants document intent and nothing more — enforcing them would take per-OS
+  sandboxing (seccomp or Landlock, `sandbox-exec`, AppContainer) that this binding does not assume —
+  and this specification says so because a sandbox that is announced but absent is worse than one that
+  was never claimed. `env` is different, because the engine chooses the process's environment when it
+  spawns it: an engine MUST start the component with an empty environment plus exactly the variables
+  its `env` grant names (spike 8.3 §2.2, phase-9 finding 19). Two consequences an engine has to handle:
+  the program is resolved on the *engine's* `PATH`, since the component's own has none; and on Windows
+  `SystemRoot` is always passed, or Winsock does not start.
 - **It is the escape hatch, not the second default.** It exists for the cases WASM cannot serve.
   Task 8.3 proves the boundary exists; nothing else should reach for it.
 

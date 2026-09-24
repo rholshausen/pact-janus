@@ -147,7 +147,8 @@ before any code, with the upgrade then writing `http:media-type` for any `Conten
 ## 2. Does an array matcher admit the empty array by default?
 
 **Found:** 2026-09-18, fixing the upgrade of cascaded `min`/`max` rules (commit `e34d686`).
-**Status:** open by choice — the prototype needs only to be consistent. Resolve it when a real test
+**Status:** open by choice — the prototype needs only to be consistent; since task 9.2 the upgrade
+reports the difference (below). Resolve the default when a real test
 framework is built from the prototype (task 9.4).
 
 ### The question
@@ -204,9 +205,18 @@ array, so there is no default to interpret, only v1–v4's behaviour to preserve
 Until then: leave `each-like`'s default at 1, and treat the upgrade's silent `min: 1` as the known
 inconsistency this entry records.
 
+### Task 9.2
+
+The default is still open — ADR 0024 decision 4 says so — but the silent half is gone. A bare `type` on
+an array now upgrades with a `rule-narrowed` (`judgement`) finding saying v1–v4 admitted `[]` and the
+contract does not, and how to write `min: 0` if the consumer handles an empty list
+(`a_bare_type_on_an_array_says_the_empty_list_is_no_longer_admitted`, `engine/kernel/tests/upgrade.rs`).
+A stated `min` is the author's own bound and raises nothing.
+
 ## 3. The WASM embedding cannot host a consumer test's mock server
 
-**Found:** 2026-09-19, starting plan task 6.2. **Status:** open — the TypeScript SDK ships the
+**Found:** 2026-09-19, starting plan task 6.2. **Status:** resolved by ADR 0023 (task 9.2), option (a)
+for every language. Originally: the TypeScript SDK ships the
 subprocess embedding only, behind a frame-pipe interface a WASM embedding can implement later.
 
 ADR 0003 makes the jco-transpiled WASM component Node's *primary* embedding, with the subprocess as
@@ -230,6 +240,13 @@ components; this is a stronger case, about the built-in transport.
 and rework the exchange loop into a single-threaded poll the host drives — a kernel change, and
 unproven; (c) host the mock transport on the SDK side of the pipe — ADR 0013's rejected "trampoline"
 alternative, which puts transport code in every SDK.
+
+### Resolution
+
+[ADR 0023](decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)
+takes option (a) for every SDK language, not only Node: `janus-engine` is the primary embedding, and WASM
+is the embedding for offline operations. Option (b) is recorded there as the only route back to a WASM
+engine that runs a test, and not taken.
 
 ## 4. A consumer's test verdict has no way into the engine
 
@@ -426,7 +443,8 @@ vocabulary, which is what the workaround was standing in for.
 ## 9. A converted pact's frozen examples are the consumer side of 7.3's noise question
 
 **Found:** 2026-09-22, running task 7.4's `janus check` over the sample provider's v3 pact and the
-shape task 7.2 recorded from it. **Status:** open — the noise is measured and one of its two causes
+shape task 7.2 recorded from it. **Status:** option A implemented in task 9.2; option B open. Originally:
+open — the noise is measured and one of its two causes
 has a named, non-heuristic fix that nobody has implemented.
 
 ### What was measured
@@ -517,6 +535,17 @@ janus check samples/order-service/pacts/web-app-order-service.json \
 - **C. Nothing, and lean on `warn`.** What the prototype does today. It is defensible precisely
   because the ratio measured here is 1 in 4 rather than 3 in 4 — but it is an argument that rests on
   one sample.
+
+### Task 9.2: option A
+
+A provider that admits a finite set of values (`equality`, `any-of`) against a string-valued conservative
+consumer (`regex`, `datetime`, `date`, `time`, `include`) is now decided by running the consumer's own
+matcher on each value (`engine/kernel/src/subsumption/compare.rs`, `matched_by`; shape spec §8's
+conservative row). The sample provider's check now reports the three true findings and no review:
+`$.shippedAt` keeps its `weaker-presence`, and the `equality` against `regex` comparison is decided
+`yes`. `content-type` stays conservative, since it inspects octets. Two different regexes are still
+`unknown`. Option B (a `provenance` selector on exemptions) stays open for 9.4, now with one fewer noisy
+case to argue from.
 
 ## 10. A verification summary cannot say how many variants *one pair* ran
 
@@ -710,7 +739,8 @@ author, who chooses how many instances share one.
 
 ## 19. Out of process, `env` is enforceable; spec §9.3 says no grant is
 
-**Found:** 2026-09-23, spike 8.3 (§2.2). **Status:** open. The spec's wording is the only thing to
+**Found:** 2026-09-23, spike 8.3 (§2.2). **Status:** resolved in task 9.2 by option A (component-interfaces
+spec §9.3 now says `env` MUST be enforced). Originally: open. The spec's wording is the only thing to
 change.
 
 Spec §9.3: "Grants are not enforceable." For `fs` and `network` that is true without per-OS sandboxing
@@ -808,6 +838,7 @@ avoids the question.
 ## 25. An `each-like` in a request pins the request, so a data-dependent list is unmatchable
 
 **Found:** 2026-09-24, plan task 9.1 ([performance report](performance-report.md) §5.4). **Status:**
+resolved by ADR 0024 (task 9.2), below. Originally:
 open — behaving as specified.
 
 `each-like` is the shape language's only every-element operator, and it contributes a cardinality
@@ -825,6 +856,16 @@ consumer *receives*, so this may lose nothing. **B.** keep pinning, and give `ea
 (`vary: false`) that contributes no dimension. **C.** a new every-element operator with no dimension,
 and `each-like` keeps its current meaning.
 
+### Resolution
+
+[ADR 0024](decisions/0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) takes
+none of the three options as written. Option A would have made the RFC's argument for leaving requests out
+of subsumption false: the reverse direction is "covered by variant replay" only because a request width
+has to be demonstrated. So request dimensions stay pinned, and what changed is what a cardinality point
+*matches*: `min+1` is produced as `min + 1` elements and matched as any length above `min` (and below
+`max` when there is a `max` point). A consumer's 310-order request meets `min+1`; it still has to show
+`min` once. Corpus case `shapes/cardinality-pinned-region`; `engine/kernel/tests/plan.rs`.
+
 ## 26. `plan::navigate` cloned at every step, so absolute-path plans were quadratic
 
 **Found:** 2026-09-24, plan task 9.1 (report §5.1). **Status:** resolved in the same task.
@@ -837,7 +878,7 @@ A mock request typed leaf by leaf took 0.9 ms at 1 KiB and 80 ms at 16 KiB, and 
 
 ## 27. The HTTP transport holds one lock across every instance's 200 ms poll
 
-**Found:** 2026-09-24, plan task 9.1 (report §5.2). **Status:** open.
+**Found:** 2026-09-24, plan task 9.1 (report §5.2). **Status:** fixed in task 9.2, below.
 
 `HttpTransport::poll_inbound` blocks in `recv_timeout` (up to the exchange loop's 200 ms) while holding
 the mutex over *all* instances. `stop` needs that mutex, so `consumer-session/finalise` takes 200 ms,
@@ -846,6 +887,16 @@ reading, two serve instances in one engine hold up each other's `reply`, though 
 gave each mock its own engine, so that was not measured. Options: wait for arrivals outside the lock
 (an `Arc` to the server per instance), and have `stop` call `tiny_http::Server::unblock` so the waiter
 wakes at once. Separately or as well, shorten the poll.
+
+### Resolution (task 9.2)
+
+`poll_inbound` clones the instance's server out from under the lock and waits with it released, and
+`stop` calls `tiny_http::Server::unblock` so a waiting poll returns at once. Median `finalise` in
+`variants-consumer-rfc-order` went from 200.4 ms to 0.18 ms (native) and 0.19 ms (subprocess), and the
+subprocess `mock-server-startup-cycle` p95 from 200,733 µs to 221 µs
+(`benchmarks/results/2026-09-24-janus-*-0fc5d7c-dirty.json`). A request that arrives while its instance
+is being stopped is answered `503` rather than left hanging. Test:
+`stop_does_not_wait_for_a_poll_in_progress` (`engine/component-http/tests/http_transport.rs`).
 
 ## 28. `serve-variant` regenerates and recompiles on every arming
 
@@ -860,7 +911,8 @@ exchange (a timestamp, a random id) would then produce the same ones.
 
 ## 29. ADR 0003's WASM artifacts: one built late, one unbuildable, neither able to host a test
 
-**Found:** 2026-09-24, plan task 9.1 (report §4, §5.5). **Status:** open — input for a superseding
+**Found:** 2026-09-24, plan task 9.1 (report §4, §5.5). **Status:** resolved by ADR 0023 (task 9.2),
+option A. Originally: open — input for a superseding
 ADR in 9.2.
 
 - The canonical component did not exist until 9.1 built one for measurement
@@ -880,9 +932,15 @@ with a WASI shim for Chicory and wazero, which both support WASI p1, replacing "
 portability story. **C.** a transport the host provides (finding 3's option b), which is the only route
 to a WASM engine that runs a test.
 
+### Resolution
+
+[ADR 0023](decisions/0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md):
+option A. The zero-import core module is withdrawn rather than repaired, and option C is recorded as the
+only route back to a WASM engine that can run a test.
+
 ## 30. `janus-engine` registers no hook implementations
 
-**Found:** 2026-09-24, plan task 9.1 (report §5.6). **Status:** open.
+**Found:** 2026-09-24, plan task 9.1 (report §5.6). **Status:** fixed in task 9.2, below.
 
 `cli/src/bin/janus_engine.rs` registers the HTTP transport, the JSON content component and the WASM
 loader, and none of the `exec`/`http` hook invokers or the `oauth2` hook component that
@@ -892,6 +950,14 @@ else. An SDK that drives provider verification through the subprocess cannot use
 the same set in both binaries through one shared function (as `register_components` already is), or
 say in `engine/hello` which hook kinds an embedding offers, so a host can know before it sends a
 configuration.
+
+### Resolution (task 9.2)
+
+The first option. Both binaries now build their engine with one function, `cli/src/register.rs`'s
+`native_engine` (included by `janus-engine` through `#[path]`, since the two share no library target):
+transports, content, the WASM loader, the `exec` and `http` invokers and the `oauth2` component. Tests:
+`a_verification_naming_an_{http,exec}_hook_is_not_refused` (`cli/tests/janus_engine.rs`), which fail with
+`hook-unavailable` against the old registration.
 
 ## 31. Matching captured values is not a protocol operation
 
@@ -904,3 +970,23 @@ host or subprocess host can do it, and 9.1 had to add a benchmark-only export to
 inside WASM. Options: `verification/explain` takes an optional `values` and returns the executed plan
 with its verdict (additive), or a separate `plan/execute` operation. The first keeps the RFC's
 inspectability in one call.
+
+## 32. A derived provider shape cannot be matched to a consumer contract
+
+**Found:** 2026-09-22, spike 7.3 ([findings](../spikes/7.3-type-derived-shapes/FINDINGS.md) §2).
+**Status:** resolved by ADR 0025 (task 9.2). Recorded here in task 9.2, because the spike wrote it down
+and this list did not.
+
+Design 2.8 §2.2 matched a provider-shape entry to a consumer interaction by the consumer's description and
+state names. An OpenAPI document has `operationId`s, never a consumer's prose, so every derived entry was
+`not-published` — and the report's "no shapes published" read like reassurance. The spike's workaround
+was a hand-written per-consumer mapping file that fails silently when stale.
+
+### Resolution
+
+[ADR 0025](decisions/0025-a-provider-shape-entry-may-select-interactions-by-operation.md): an entry may
+carry a `selector` — shapes over request slots, such as `method` and a `path` pattern — and the checker
+falls back to it when no description matches, selecting an entry whose selector admits every recorded
+example. Ties are not broken. The report records `matched-by`, and a report that matched nothing now
+says "no published shape matched any interaction". The spike's own importer does not emit selectors
+yet; an importer that does is 9.4's. Tests: `engine/kernel/tests/subsumption.rs`, the ADR 0025 block.

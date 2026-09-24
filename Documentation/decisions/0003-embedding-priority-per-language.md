@@ -1,6 +1,6 @@
 # 0003 — Ship dual engine artifacts; set embedding priority per SDK language
 
-- **Status**: accepted
+- **Status**: superseded by [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md)
 - **Date**: 2026-08-23
 - **Plan tasks**: 1.2, 1.3, 1.8 (G1)
 - **Evidence**: [spike 1.2 findings](../../spikes/1.2-wasm-embedding/FINDINGS.md) (embedding

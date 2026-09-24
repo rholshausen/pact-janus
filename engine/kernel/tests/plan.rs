@@ -4,6 +4,7 @@
 
 use pact_janus_kernel::interaction_spec::{InteractionSpec, parse};
 use pact_janus_kernel::plan::{Assignment, DocumentKind, Node, NodeKind, Plan, compile};
+use rstest::rstest;
 use serde_json::{Value, json};
 
 fn interaction(body: Value) -> InteractionSpec {
@@ -371,13 +372,51 @@ fn each_like_unpinned_asserts_size_and_for_eachs_over_a_splat() {
   assert_eq!(resolve_current_path(&sku_children[0]), "~>.sku");
 }
 
+/// ADR 0024: `min+1` is produced as `min + 1` elements and matched as "more than the minimum" —
+/// the list length is the other party's data, so the point is a region, not a count.
 #[test]
-fn each_like_pinned_to_min_plus_1_narrows_to_expect_count() {
+fn each_like_pinned_to_min_plus_1_matches_more_than_the_minimum() {
   let mut assignment = Assignment::new();
   assignment.insert("response.body#cardinality".to_string(), "min+1".to_string());
   let body = compile_slot_under(each_like_body(), &assignment);
   let nodes = after_kind_assertion(&body, "expect:array");
   let (name, children) = action(&nodes[0]);
+  assert_eq!(name, "expect:size");
+  assert_eq!(literal_value(&children[1]), &json!(2));
+  assert_eq!(literal_value(&children[2]), &json!(null));
+}
+
+#[rstest]
+#[case::min("min", "expect:count", json!(1), None)]
+#[case::interior("min+1", "expect:size", json!(2), Some(json!(4)))]
+#[case::max("max", "expect:count", json!(5), None)]
+fn each_like_with_a_finite_max_pins_each_point_to_its_region(
+  #[case] point: &str,
+  #[case] action_name: &str,
+  #[case] lower: Value,
+  #[case] upper: Option<Value>,
+) {
+  let mut shape = each_like_body();
+  shape["max"] = json!(5);
+  let mut assignment = Assignment::new();
+  assignment.insert("response.body#cardinality".to_string(), point.to_string());
+  let body = compile_slot_under(shape, &assignment);
+  let (name, children) = action(&after_kind_assertion(&body, "expect:array")[0]);
+  assert_eq!(name, action_name);
+  assert_eq!(literal_value(&children[1]), &lower);
+  if let Some(upper) = upper {
+    assert_eq!(literal_value(&children[2]), &upper);
+  }
+}
+
+#[test]
+fn each_like_whose_max_is_min_plus_1_pins_min_plus_1_to_a_count() {
+  let mut shape = each_like_body();
+  shape["max"] = json!(2);
+  let mut assignment = Assignment::new();
+  assignment.insert("response.body#cardinality".to_string(), "min+1".to_string());
+  let body = compile_slot_under(shape, &assignment);
+  let (name, children) = action(&after_kind_assertion(&body, "expect:array")[0]);
   assert_eq!(name, "expect:count");
   assert_eq!(literal_value(&children[1]), &json!(2));
 }

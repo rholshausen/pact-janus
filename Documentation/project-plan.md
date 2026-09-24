@@ -471,20 +471,22 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 
 ## 13. Traceability: RFC unresolved questions → plan tasks
 
-| RFC unresolved question | Addressed by |
-|---|---|
-| IDL choice (WIT vs protobuf) + WASM-host story per language | 1.1, 1.2, 1.3 → G1 (1.8) |
-| Components day-one vs HTTP/JSON kernel-privileged | 2.6 (ADR 0012: interface symmetry, two bindings — packaging symmetry is impossible in the primary embedding, ADR 0013); evidence from 3.8, 4.2, 8.1, 9.1 |
-| Variant sampling defaults, caps, overrides | 2.3, 4.3, 4.6 |
-| Provider-state/variant linkage (`whenVariant`) | 2.3, 5.2 |
-| Subsumption warn/block default + exemption scoping | 2.8, 7.3, 7.4 |
-| Subsumption decidability limits | 2.8, 7.1 |
-| Plan grammar stability/versioning policy | 2.4, 8.4 |
-| Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), [7.5](broker-integration-notes.md) — the contract already stores; the provider shape has no resource that fits |
-| Performance envelope WASM vs native FFI | 1.7, [9.1](performance-report.md) — WASM is within 10–35% of native on the kernel's work; it cannot host a mock or a verification, which decides more |
-| Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype |
-| AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope |
-| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community |
+Every row is answered in [RFC feedback](rfc-feedback.md) §2 (task 9.2), which the RFC's revision links to.
+
+| RFC unresolved question | Addressed by | Answer (9.2) |
+|---|---|---|
+| IDL choice (WIT vs protobuf) + WASM-host story per language | 1.1, 1.2, 1.3 → G1 (1.8); 9.1 | IDL resolved (ADR 0002). WASM story reversed: subprocess primary everywhere, WASM for offline operations (ADR 0023) |
+| Components day-one vs HTTP/JSON kernel-privileged | 2.6 (ADR 0012: interface symmetry, two bindings — packaging symmetry is impossible in the primary embedding, ADR 0013); evidence from 3.8, 4.2, 8.1, 9.1 | Day one for the interfaces; packaging and HTTP *structure* (kernel-boundary review 8, 9) remain privileged, and are named |
+| Variant sampling defaults, caps, overrides | 2.3, 4.3, 4.6; 9.2 | Resolved (ADR 0008); a cardinality point matches a region (ADR 0024); the empty-array default stays open |
+| Provider-state/variant linkage (`whenVariant`) | 2.3, 5.2 | Resolved (ADR 0009) |
+| Subsumption warn/block default + exemption scoping | 2.8, 7.3, 7.4; 9.2 | Resolved (ADR 0016); derived shapes matched by operation (ADR 0025); a `provenance` selector stays open |
+| Subsumption decidability limits | 2.8, 7.1; 9.2 | Resolved (shape spec §8), narrowed in 9.2 for enumerable providers (finding 9) |
+| Plan grammar stability/versioning policy | 2.4, 8.4 | Resolved (ADRs 0010, 0022); the fragment model is open (finding 21) |
+| Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), [7.5](broker-integration-notes.md) — the contract already stores; the provider shape has no resource that fits | Partly resolved; per-pair verification counts open (finding 10) |
+| Performance envelope WASM vs native FFI | 1.7, [9.1](performance-report.md) — WASM is within 10–35% of native on the kernel's work; it cannot host a mock or a verification, which decides more | Resolved |
+| Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype | Still open; kernel-boundary review 8, 9 are the first obstacles |
+| AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope | Design notes only |
+| Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community | Framed in 9.4 |
 
 ---
 
@@ -550,6 +552,15 @@ Phase 9 — Evaluation and RFC feedback (§12) — is under way:
   decides the embedding. The harness found a quadratic in `plan::navigate` (fixed) and a fixed 200 ms
   per consumer session in the HTTP transport (not fixed) (Phase 9 findings 25–31).
 
-Next: **9.2**, the unresolved-questions resolution. Its input: the
-[findings list](phase-9-findings.md) (31 entries), the kernel-boundary review's open findings, three
-spike write-ups, the performance report and the ADRs' tripwires.
+- **9.2** ([RFC feedback](rfc-feedback.md)) — every RFC unresolved question answered or honestly left
+  open, the drawbacks measured, and eight places where the RFC stated as design what the evidence
+  changed. Three ADRs where the RFC's text depended on a decision: the subprocess is every SDK's primary
+  embedding and WASM serves offline operations (ADR 0023, superseding 0003); request dimensions stay
+  pinned and a cardinality point matches a region (ADR 0024); a provider shape may be matched by
+  operation (ADR 0025). Five small fixes: the upgrade reports the empty-array narrowing, subsumption
+  decides enumerable providers against conservative consumers, `env` grants are enforced out of process,
+  the HTTP transport no longer costs 200 ms per session, and `janus-engine` runs host hooks (Phase 9
+  findings 2, 9, 19, 25, 27, 29, 30, 32). The RFC is revised in place on `rfc/pact-mkii`.
+
+Next: **9.3**, the demo and community report, then **9.4**, the staged plan — whose open inputs are
+[RFC feedback](rfc-feedback.md) §8.

@@ -1,0 +1,66 @@
+(
+  :"submit a batch of orders" (
+    :request (
+      :body (
+        %expect:array (
+          $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}]
+        ) => BOOL(true),
+        %expect:size (
+          $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}],
+          2,
+          NULL
+        ) => BOOL(true),
+        %for-each (
+          ** (
+            $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}]
+          ) => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}],
+          :"$.request.body[*]" (
+            %expect:object (
+              ~> => {'qty': 1, 'sku': 'SKU-1'}
+            ) => BOOL(true),
+            :"$.request.body[*].qty" (
+              %match:integer (
+                ~>.qty => 1
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.request.body[*].sku" (
+              %match:string (
+                ~>.sku => 'SKU-1'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.request.body[*]" (
+            %expect:object (
+              ~> => {'qty': 4, 'sku': 'SKU-2'}
+            ) => BOOL(true),
+            :"$.request.body[*].qty" (
+              %match:integer (
+                ~>.qty => 4
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.request.body[*].sku" (
+              %match:string (
+                ~>.sku => 'SKU-2'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.request.body[*]" (
+            %expect:object (
+              ~> => {'qty': 2, 'sku': 'SKU-3'}
+            ) => BOOL(true),
+            :"$.request.body[*].qty" (
+              %match:integer (
+                ~>.qty => 2
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.request.body[*].sku" (
+              %match:string (
+                ~>.sku => 'SKU-3'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

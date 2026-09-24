@@ -13,7 +13,9 @@ readability:
 - `shapes/` — one case per core shape operator (design 2.2), plus `order-payload/`: the RFC's full
   order response, every failure reported in one run, the untaken `:card` alternative never executed;
   and `structural-kind-guard/`, a value of the wrong kind given to operators whose members and
-  elements would otherwise have nothing to fail on (phase-9 finding 8).
+  elements would otherwise have nothing to fail on (phase-9 finding 8); and
+  `cardinality-pinned-region/`, a request list pinned to `min+1` admitting any length above the
+  minimum (ADR 0024, phase-9 finding 25) — the corpus's one case compiled under a variant.
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-

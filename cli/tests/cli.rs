@@ -685,7 +685,10 @@ fn check_without_a_provider_shape_says_which_provider_published_nothing() {
   ]);
   let text = stdout(&output);
   assert_eq!(code(&output), 0, "replay-only semantics is a pass: {text}");
-  assert!(text.contains("no shapes published"), "{text}");
+  assert!(
+    text.contains("no published shape matched any interaction"),
+    "{text}"
+  );
   assert!(
     stderr(&output).contains("no provider shape supplied for 'order-service'"),
     "{}",

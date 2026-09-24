@@ -22,11 +22,13 @@
 
 use super::phrases;
 use super::report::{Finding, Side};
+use crate::interaction_spec::InteractionSpec;
+use crate::plan;
 use crate::shape::{CoreShape, Example, ShapeKind, ShapeNode, ValueKind, path};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The walk's three-valued answer (shape spec §8). `not-published` is a report-level state, not
 /// one of these (spec §6.3), and lives on [`super::InteractionResult`].
@@ -359,6 +361,33 @@ impl<'a> Walk<'a> {
     if is_conservative(pc) || is_conservative(cc) {
       if is_conservative(pc) && string_valued(pc) && matches!(cc, CoreShape::Kind(ValueKind::String)) {
         return Out::yes();
+      }
+      // A provider that admits a finite set of values against a conservative consumer is decided
+      // by asking the consumer's own matcher about each value — no containment algorithm, just
+      // membership, which is what the interpreter already decides for every exchange (shape spec
+      // §8: `unknown` is a permission, and narrowing it is a pure improvement; phase-9 finding
+      // 9). `content-type` stays out: it inspects octets, and an enumerated example is JSON.
+      if string_valued(cc)
+        && let Some(values) = enumerate(p)
+      {
+        let outside: Vec<&Value> = values.iter().filter(|value| !matched_by(c, value)).collect();
+        if outside.is_empty() {
+          return Out::yes();
+        }
+        return Out::no(Finding::wider_values(
+          at,
+          Side::new(phrases::describe(p)),
+          Side::new(phrases::describe(c)),
+          format!(
+            "the consumer's {} does not admit {}",
+            cc.operator_name(),
+            outside
+              .iter()
+              .map(|value| value.to_string())
+              .collect::<Vec<_>>()
+              .join(", ")
+          ),
+        ));
       }
       return Out::unknown(Finding::unreviewable(
         at,
@@ -1206,6 +1235,27 @@ fn admits_value(node: &ShapeNode, value: &Value) -> Option<bool> {
     CoreShape::Forbidden => Some(false),
     _ => None,
   }
+}
+
+/// `value ∈ admits(node)` decided by the engine's own matcher: the node compiled as the only slot
+/// of a one-slot interaction and run against the value. Shape spec §7.4 makes the compiled plan
+/// the definition of `admits`, so this cannot disagree with what a verification would decide.
+fn matched_by(node: &ShapeNode, value: &Value) -> bool {
+  let spec = InteractionSpec {
+    description: "membership".to_string(),
+    transport: None,
+    states: None,
+    parts: BTreeMap::from([(
+      "subsumption".to_string(),
+      BTreeMap::from([("value".to_string(), node.clone())]),
+    )]),
+    content_types: None,
+    requires: None,
+  };
+  let plan = plan::compile(&spec, &plan::Assignment::new(), None);
+  let resolver =
+    plan::CapturedValues::new().capture("$.subsumption.value", plan::RuntimeValue::from_json(value));
+  plan::outcome(&plan::execute(&plan, &resolver)).0 == plan::Status::Matched
 }
 
 fn admits_example(node: &ShapeNode, example: &Example) -> Option<bool> {

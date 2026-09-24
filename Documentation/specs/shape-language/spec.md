@@ -598,6 +598,15 @@ point, because a declared upper bound that is never exercised is precisely the s
 claim the shape language exists to prevent — and because it is the boundary a provider is most likely
 to actually break. 2.3 owns the caps that keep this affordable.
 
+A cardinality point is **produced** as one length and **matched** as a region (ADR 0024). `min` and
+`max` are exactly themselves either way. `min+1` is produced as `min + 1` elements and matched as every
+length strictly between the points either side of it — above `min`, and below `max` when there is a
+`max` point — because what the point stands for is "more than the minimum", and the party whose list
+it is (a consumer sending a request, a provider answering one) chooses the length from its own data. A
+mock that pinned a request to exactly two elements refused the consumer's three-element basket under
+every variant, and no variant admitted it (phase-9 finding 25). Production is unchanged, so the
+representative the consumer is served, and the example a contract records, are what they were.
+
 ### 6.5 Dimensions inside a collection are shared
 
 Dimensions inside `each-like` items or `each-entry` values are **shared across all elements**: one
@@ -657,7 +666,8 @@ Two consequences worth stating because today's model does not have them:
 
 Matching against a variant is narrower: when an interaction is being served or verified under a
 variant assignment, each dimensional operator is *pinned* to its selected point — an `optional` pinned
-to `absent` admits only `⊥`, an `any-of` pinned to `SHIPPED` admits only that value. This is what
+to `absent` admits only `⊥`, an `any-of` pinned to `SHIPPED` admits only that value, an `each-like`
+pinned to `min+1` admits the lengths §6.4 gives that point's region. This is what
 makes variant testing meaningful in both directions: the consumer's mock serves that variant, and the
 provider's response is checked against that variant, not against the whole shape.
 
@@ -711,7 +721,7 @@ shapes actually differ".
 | Class | Operators | What the checker can do |
 |---|---|---|
 | **exact** | `any`, `equality`, `type`, kind predicates, `semver`, `not-empty`, `object`, `array`, `each-like`, `each-entry`, `optional`, `forbidden`, `nullable`, `any-of`, `one-of` | decide `yes`/`no` for every pair of operators in this class, by set containment: literal sets, kind lattice (`integer ⊂ number ⊂ any`), cardinality intervals, presence sets (`{v} ⊂ {v, ⊥}`), member-wise recursion, alternative-wise recursion keyed on discriminator literals |
-| **conservative** | `regex`, `datetime`, `date`, `time`, `include`, `content-type` | `yes` on identity, and `yes` where the container is exactly wider (`regex ⊆ string ⊆ any`); otherwise `unknown`. Two different regexes, or two different datetime formats, are `unknown` — not `no` |
+| **conservative** | `regex`, `datetime`, `date`, `time`, `include`, `content-type` | `yes` on identity, and `yes` where the container is exactly wider (`regex ⊆ string ⊆ any`); when `P` admits a finite, enumerable set of values (`equality`, `any-of`) and `C` is string-valued, decide by asking `C`'s own matcher about each value — `yes` if it admits them all, `no` otherwise; otherwise `unknown`. Two different regexes, or two different datetime formats, are `unknown` — not `no` |
 | **opaque** | `contains`, component operators with no declared comparability | `yes` on identity; `unknown` otherwise |
 
 The asymmetric findings the RFC lists fall out of the exact class directly: extra provider members are
@@ -727,7 +737,10 @@ Two notes for 2.8:
 - The conservative class is conservative by *policy*, not by mathematics. Containment of RE2-subset
   languages is decidable, and an engine that decides more of it stays conformant — `unknown` is a
   permission, not a requirement, and narrowing it is a pure improvement that changes no recorded
-  contract. What an engine MUST NOT do is answer `yes` or `no` by heuristic.
+  contract. What an engine MUST NOT do is answer `yes` or `no` by heuristic. The enumerable-provider
+  row above is the first such narrowing (phase-9 finding 9): membership of a known value is what the
+  interpreter decides on every exchange, so it is a decision, not a containment algorithm.
+  `content-type` is left out of it because it inspects octets and an enumerated example is JSON.
 - Component operators SHOULD declare a comparability class and, where they can, a containment
   procedure (design 2.6's interface). A component that declares nothing is opaque, and the check
   degrades locally and visibly rather than globally and silently.

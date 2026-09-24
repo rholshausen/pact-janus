@@ -5,7 +5,7 @@
 //! frames and reads frames back ([`engine`]), which is what makes this CLI evidence rather than a
 //! convenience: if a command needs something the protocol cannot express, that is a finding about
 //! the protocol and it shows up here first. `janus-engine`, the sibling binary, carries the
-//! identical frames over stdio for embeddings that want a subprocess (ADR 0003).
+//! identical frames over stdio for embeddings that want a subprocess (ADR 0023: every SDK's).
 //!
 //! `component` (plan task 8.2) is the one command that does not speak the protocol, and says why
 //! in its own module: publishing a component is not an engine operation.
@@ -23,6 +23,7 @@ mod component;
 mod engine;
 mod explain;
 mod io;
+mod register;
 mod upgrade;
 mod verify;
 

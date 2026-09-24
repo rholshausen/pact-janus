@@ -103,6 +103,26 @@ pub fn cardinality_points(min: u64, max: Option<u64>) -> Vec<CardinalityPoint> {
   points
 }
 
+/// The lengths a cardinality point admits when a value is *matched* under it (spec §6.4, ADR
+/// 0024), as `(lower, upper)` with `None` for unbounded; `None` for a name that is not a point.
+/// `min` and `max` admit exactly their size. `min+1` is produced as `min + 1` copies but matched as
+/// every length strictly between the points either side of it — "more than the minimum" — so a
+/// party whose list length is its own data (a consumer's request, a provider's response) meets the
+/// point with any list of that kind, not only with one of exactly `min + 1` elements.
+pub fn cardinality_region(min: u64, max: Option<u64>, point_name: &str) -> Option<(u64, Option<u64>)> {
+  let points = cardinality_points(min, max);
+  let point = points.iter().find(|p| p.name == point_name)?;
+  if point.name != "min+1" {
+    return Some((point.size, Some(point.size)));
+  }
+  let has_max_point = points.iter().any(|p| p.name == "max");
+  let upper = match max {
+    Some(m) if has_max_point => Some(m - 1),
+    other => other,
+  };
+  Some((point.size, upper))
+}
+
 /// Compute the variant space of one shape tree, rooted at `at` (a dimension path, spec §6.2 —
 /// typically [`path::root`]'s `"<part>.<slot>"`).
 pub fn compute(shape: &ShapeNode, at: &str) -> VariantSpace {

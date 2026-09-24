@@ -22,7 +22,7 @@ use pact_janus_kernel::component::{
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// One started instance, in whichever role `start` named (spec §5.1). The role is fixed at
@@ -34,7 +34,9 @@ enum Instance {
 }
 
 struct ServeInstance {
-  server: tiny_http::Server,
+  /// Shared so that `poll-inbound` can wait on it without holding the lock over every instance
+  /// (phase-9 finding 27): a waiter clones this and lets go, and `stop` wakes it with `unblock`.
+  server: Arc<tiny_http::Server>,
   pending: HashMap<String, tiny_http::Request>,
   next_event: u64,
 }
@@ -349,11 +351,17 @@ impl TransportComponent for HttpTransport {
   }
 
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError> {
-    self
+    let removed = self
       .instances
       .lock()
       .expect("instance lock poisoned")
       .remove(&req.instance);
+    // A `poll-inbound` may be waiting on this server right now; wake it rather than let `stop`
+    // (and the `finalise` behind it) sit out the rest of its timeout. The server closes when the
+    // waiter drops its clone.
+    if let Some(Instance::Serve(instance)) = removed {
+      instance.server.unblock();
+    }
     Ok(StopResult {})
   }
 
@@ -413,11 +421,14 @@ impl TransportComponent for HttpTransport {
   }
 
   fn poll_inbound(&self, req: PollInbound) -> Result<PollInboundResult, ComponentError> {
-    let mut instances = self.instances.lock().expect("instance lock poisoned");
-    let instance = serve_instance(&mut instances, &req.instance, "transport/poll-inbound")?;
-
-    let received = instance
-      .server
+    // Wait with the lock released: every other instance's `reply`, and this one's `stop`, need it.
+    let server = {
+      let mut instances = self.instances.lock().expect("instance lock poisoned");
+      serve_instance(&mut instances, &req.instance, "transport/poll-inbound")?
+        .server
+        .clone()
+    };
+    let received = server
       .recv_timeout(Duration::from_millis(req.timeout_ms))
       .map_err(|err| ComponentError::transport_failed(err.to_string()))?;
 
@@ -426,6 +437,13 @@ impl TransportComponent for HttpTransport {
     };
 
     let parts = request_parts(&mut request);
+    let mut instances = self.instances.lock().expect("instance lock poisoned");
+    let Ok(instance) = serve_instance(&mut instances, &req.instance, "transport/poll-inbound") else {
+      // Stopped while this request was arriving: nothing will ever reply to it, so answer it now
+      // rather than leave the client's connection hanging.
+      let _ = request.respond(tiny_http::Response::from_data(Vec::new()).with_status_code(503));
+      return Ok(PollInboundResult { inbound: None });
+    };
     let event = format!("e-{}", instance.next_event);
     instance.next_event += 1;
     instance.pending.insert(event.clone(), request);
@@ -529,7 +547,7 @@ impl HttpTransport {
     self.instances.lock().expect("instance lock poisoned").insert(
       req.instance,
       Instance::Serve(ServeInstance {
-        server,
+        server: Arc::new(server),
         pending: HashMap::new(),
         next_event: 1,
       }),

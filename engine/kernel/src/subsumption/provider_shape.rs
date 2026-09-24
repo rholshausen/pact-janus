@@ -36,12 +36,19 @@ pub struct ProviderShape {
 }
 
 /// One operation's published shape, matched to a consumer interaction by `description` plus
-/// `states` names (spec §2.2).
+/// `states` names, or failing that by its `selector` (spec §2.2, ADR 0025).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProviderInteraction {
   pub description: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub states: Option<Vec<StateRef>>,
+  /// Which consumer interactions this entry is *about*, when the provider cannot know their
+  /// descriptions (spec §2.2, ADR 0025): part -> slot -> shape, usually over request-direction
+  /// slots — for HTTP, `method` and `path`. Only ever matched against a contract's recorded
+  /// examples, never compared for subsumption, so it carries no claim about what the provider
+  /// accepts.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub selector: Option<BTreeMap<String, ShapePart>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub provenance: Option<String>,
   /// Open provenance detail (spec §2.4), not interpreted by the walk.
