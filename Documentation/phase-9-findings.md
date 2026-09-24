@@ -804,3 +804,103 @@ optional `config` member in the next grammar minor, so configuration and argumen
 **C.** make every action unary and put configuration in the action's name, which is how `csv:integer`
 avoids the question.
 
+
+## 25. An `each-like` in a request pins the request, so a data-dependent list is unmatchable
+
+**Found:** 2026-09-24, plan task 9.1 ([performance report](performance-report.md) §5.4). **Status:**
+open — behaving as specified.
+
+`each-like` is the shape language's only every-element operator, and it contributes a cardinality
+dimension. Variant-semantics §4.1 says a dimension in the request "changes what the mock will accept",
+so the mock pins the request's array to the armed variant's point. The baseline's 100 KB request,
+written as `each-like` of orders, was answered `500` under `base` with "Expected exactly 1 item(s) but
+got 310". No variant admits 310, and every variant is required. A consumer whose request carries a list
+whose length depends on its data (a basket, a batch, a page) cannot say "every element is typed" in a
+way the mock will take. It can only send exactly `min` and `min+1` elements across two exchanges, or
+fall back to positional `array` or to `type` on the array. v1–v4's cascaded `type` has no equivalent.
+
+Options: **A.** request-side dimensions do not pin. A request is matched against the unpinned shape,
+and only response dimensions are variants. The consumer side of the RFC's argument is about what the
+consumer *receives*, so this may lose nothing. **B.** keep pinning, and give `each-like` an opt-out
+(`vary: false`) that contributes no dimension. **C.** a new every-element operator with no dimension,
+and `each-like` keeps its current meaning.
+
+## 26. `plan::navigate` cloned at every step, so absolute-path plans were quadratic
+
+**Found:** 2026-09-24, plan task 9.1 (report §5.1). **Status:** resolved in the same task.
+
+Resolving a path copied the value at each step, so a leaf under a large document cost the document.
+A mock request typed leaf by leaf took 0.9 ms at 1 KiB and 80 ms at 16 KiB, and about 3 s at 100 KB.
+`navigate` now walks by reference and clones once (`engine/kernel/src/plan/value.rs`), and 16 KiB takes
+3.7 ms. Behaviour is unchanged, per the kernel tests and the golden corpus. Reproduce the curve with
+`cd benchmarks/janus && cargo run --release -- probe`.
+
+## 27. The HTTP transport holds one lock across every instance's 200 ms poll
+
+**Found:** 2026-09-24, plan task 9.1 (report §5.2). **Status:** open.
+
+`HttpTransport::poll_inbound` blocks in `recv_timeout` (up to the exchange loop's 200 ms) while holding
+the mutex over *all* instances. `stop` needs that mutex, so `consumer-session/finalise` takes 200 ms,
+measured at 200.4 ms median in every embedding. That is 99% of a small consumer session. By the same
+reading, two serve instances in one engine hold up each other's `reply`, though every scenario in 9.1
+gave each mock its own engine, so that was not measured. Options: wait for arrivals outside the lock
+(an `Arc` to the server per instance), and have `stop` call `tiny_http::Server::unblock` so the waiter
+wakes at once. Separately or as well, shorten the poll.
+
+## 28. `serve-variant` regenerates and recompiles on every arming
+
+**Found:** 2026-09-24, plan task 9.1 (report §5.3). **Status:** open.
+
+`ConsumerSession::serve_variant` calls `generate::interaction` and compiles the variant's plan every
+time it arms. That costs 13 µs for a small request shape and 16.8 ms for a 100 KB one, so it makes a
+large-request mock twice as slow as pact_ffi's while the match itself is twice as fast. The selection is
+fixed once `variants` returns, so the compiled request plan and the generated parts can be cached per
+`(handle, variant)`. One thing to decide first: a generator that should produce fresh values on each
+exchange (a timestamp, a random id) would then produce the same ones.
+
+## 29. ADR 0003's WASM artifacts: one built late, one unbuildable, neither able to host a test
+
+**Found:** 2026-09-24, plan task 9.1 (report §4, §5.5). **Status:** open — input for a superseding
+ADR in 9.2.
+
+- The canonical component did not exist until 9.1 built one for measurement
+  (`benchmarks/janus/engine-wasm/`). It is 5.7 MB stripped (1.6 MB gzipped) and imports 18 WASI
+  interfaces. It compiles in 302 ms uncached, and runs the kernel's work within 10–35% of native.
+- The zero-import core module (ADR 0003 decisions 1 and 4, the JVM's and Go's primary) cannot be built.
+  `cargo build -p pact_janus_kernel --target wasm32-unknown-unknown` fails in `getrandom`, reached
+  through `pact_models` → `rand`. Behind that, `rquickjs` (ADR 0015) needs a libc for QuickJS's C
+  sources. CI builds only `wasm32-wasip2`, so nothing noticed.
+- Neither form can serve a mock or drive a provider: `start-transport` and `verify` answer
+  `component-unavailable`. Finding 3 said this for Node's mock. It holds for verification and for
+  every language.
+
+Options: **A.** subprocess-primary everywhere, and WASM for offline operations (explain, upgrade,
+subsumption, variant enumeration) where no native binary is wanted. **B.** a `wasm32-wasip1` core module
+with a WASI shim for Chicory and wazero, which both support WASI p1, replacing "zero-import" as the
+portability story. **C.** a transport the host provides (finding 3's option b), which is the only route
+to a WASM engine that runs a test.
+
+## 30. `janus-engine` registers no hook implementations
+
+**Found:** 2026-09-24, plan task 9.1 (report §5.6). **Status:** open.
+
+`cli/src/bin/janus_engine.rs` registers the HTTP transport, the JSON content component and the WASM
+loader, and none of the `exec`/`http` hook invokers or the `oauth2` hook component that
+`cli/src/engine.rs` gives the `janus` CLI. A verification whose provider states come from an `http`
+hook (the sample provider's own `verifier.janus.yaml`) therefore runs through the CLI and nowhere
+else. An SDK that drives provider verification through the subprocess cannot use it. `script` hooks are unaffected, because they compile with the kernel. Options: register
+the same set in both binaries through one shared function (as `register_components` already is), or
+say in `engine/hello` which hook kinds an embedding offers, so a host can know before it sends a
+configuration.
+
+## 31. Matching captured values is not a protocol operation
+
+**Found:** 2026-09-24, plan task 9.1 (report §5.6). **Status:** open.
+
+`janus explain --executed` compiles through `verification/explain` and then runs the plan with the
+kernel's Rust API (`cli/src/explain.rs`, `executed`). That is the one place the CLI steps outside the
+protocol. So M1's "matches captured values offline" is a CLI feature, not an engine one. No SDK, WASM
+host or subprocess host can do it, and 9.1 had to add a benchmark-only export to time the interpreter
+inside WASM. Options: `verification/explain` takes an optional `values` and returns the executed plan
+with its verdict (additive), or a separate `plan/execute` operation. The first keeps the RFC's
+inspectability in one call.

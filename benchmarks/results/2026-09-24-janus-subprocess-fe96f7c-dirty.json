@@ -1,0 +1,102 @@
+{
+  "arch": "x86_64",
+  "date": "2026-09-24",
+  "os": "linux",
+  "scenarios": {
+    "cold-start": {
+      "iterations": 20,
+      "median_us": 1454.4,
+      "min_us": 1203.0,
+      "p95_us": 1654.4
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 22661.1,
+      "min_us": 22012.2,
+      "p95_us": 23328.8
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 276.0,
+      "min_us": 262.7,
+      "p95_us": 365.7
+    },
+    "mock-server-latency-100k": {
+      "arm_median_us": 16930.1,
+      "iterations": 500,
+      "median_us": 23144.9,
+      "min_us": 16367.7,
+      "p95_us": 24530.9
+    },
+    "mock-server-latency-mismatch": {
+      "arm_median_us": 15.3,
+      "iterations": 500,
+      "median_us": 37.6,
+      "min_us": 34.7,
+      "p95_us": 72.4
+    },
+    "mock-server-latency-small": {
+      "arm_median_us": 14.6,
+      "iterations": 5000,
+      "median_us": 34.5,
+      "min_us": 31.1,
+      "p95_us": 43.8
+    },
+    "mock-server-startup-cycle": {
+      "iterations": 20,
+      "median_us": 312.6,
+      "min_us": 145.9,
+      "p95_us": 200733.0
+    },
+    "mock-server-throughput-4engines": {
+      "engines": 4,
+      "requests": 163439,
+      "rps": 81720.0,
+      "seconds": 2
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 22168.4,
+      "min_us": 21410.8,
+      "p95_us": 22831.1
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 186.8,
+      "min_us": 178.1,
+      "p95_us": 228.3,
+      "variants": 8
+    },
+    "variants-consumer-rfc-order": {
+      "median_ms_all_variants": 202.33,
+      "median_ms_base_only": 201.29,
+      "median_ms_finalise": 200.47,
+      "median_ms_per_extra_variant": 0.149,
+      "runs": 20,
+      "variants": 8
+    },
+    "verify-corpus-100k": {
+      "interactions": 5,
+      "median_ms_per_interaction": 18.87,
+      "median_total_ms": 94.4,
+      "pacts": 1,
+      "runs": 3
+    },
+    "verify-corpus-small": {
+      "interactions": 50,
+      "median_ms_per_interaction": 0.29,
+      "median_total_ms": 14.4,
+      "pacts": 10,
+      "runs": 5
+    },
+    "verify-corpus-small-upgraded": {
+      "interactions": 50,
+      "median_ms_per_interaction": 0.39,
+      "median_total_ms": 19.3,
+      "pacts": 10,
+      "runs": 5
+    }
+  },
+  "schema": 1,
+  "stack": "janus-subprocess-fe96f7c-dirty"
+}

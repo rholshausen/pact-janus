@@ -1,0 +1,22 @@
+// The Janus engine as a WASM component (ADR 0003's canonical artifact), built for plan task 9.1 to
+// measure it. `pipe` is ADR 0002's frozen byte-pipe: one engine-protocol frame in, one out.
+package pact:janus-engine@0.1.0;
+
+interface pipe {
+  call: func(request: list<u8>) -> list<u8>;
+}
+
+// Benchmark-only, and deliberately outside the protocol. Running a compiled plan against captured
+// values is not an engine operation — `janus explain --executed` does it with the kernel's Rust
+// API, beside the protocol — so without this the interpreter's cost inside WASM could not be
+// measured at all. `set-plan` takes the plan document `verification/explain` returned; `execute`
+// takes a JSON object of path -> value and answers "matched" or "mismatched".
+interface bench {
+  set-plan: func(plan: list<u8>) -> result<_, string>;
+  execute: func(values: list<u8>) -> result<string, string>;
+}
+
+world engine {
+  export pipe;
+  export bench;
+}

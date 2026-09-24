@@ -481,7 +481,7 @@ Goal: convert the prototype into the RFC's next revision and a credible staged p
 | Subsumption decidability limits | 2.8, 7.1 |
 | Plan grammar stability/versioning policy | 2.4, 8.4 |
 | Broker handling of Janus contracts | 2.5 (ADR 0011 decision 6), [7.5](broker-integration-notes.md) — the contract already stores; the provider shape has no resource that fits |
-| Performance envelope WASM vs native FFI | 1.7, 9.1 |
+| Performance envelope WASM vs native FFI | 1.7, [9.1](performance-report.md) — WASM is within 10–35% of native on the kernel's work; it cannot host a mock or a verification, which decides more |
 | Message-interaction hook design | 1.5, 2.7 (design); build deferred beyond prototype |
 | AI-assisted verification (mismatch diagnosis, agentic verification) | [2.10](ai-layer-design-notes.md) (design notes only, per charter non-goals); build out of prototype scope |
 | Naming/versioning (v5 + "Pact 6" vs new brand); governance/funding | Out of prototype scope; framed for the community in 9.4. ADR 0011 names *Janus's own* artifact only, and deliberately leaves the Pact specification's next version to the community |
@@ -540,6 +540,16 @@ end-to-end and reported the way the RFC sketches it); and external components (P
 M6 closes with a content *and* matcher component: the 8.1 `.wasm`, grown in 8.4 into both, runs
 unmodified in a consumer test and in verification.
 
-Next: **Phase 9 — Evaluation and RFC feedback** (§12). Its input is already accumulated: the
-[findings list](phase-9-findings.md) (24 entries), the kernel-boundary review's open findings, three
-spike write-ups and the ADRs' tripwires.
+Phase 9 — Evaluation and RFC feedback (§12) — is under way:
+
+- **9.1** ([performance report](performance-report.md)) — the 1.7 scenarios, run against Janus for the
+  first time, in all three embeddings (`benchmarks/janus/`), with the engine built as a WASM component
+  for the purpose. Janus beats pact_ffi everywhere it can do the same thing except large request
+  bodies, the subprocess costs almost nothing over in-process, and WASM runs the kernel's work within
+  10–35% of native. It cannot run a mock or a verification at all, so capability, not performance,
+  decides the embedding. The harness found a quadratic in `plan::navigate` (fixed) and a fixed 200 ms
+  per consumer session in the HTTP transport (not fixed) (Phase 9 findings 25–31).
+
+Next: **9.2**, the unresolved-questions resolution. Its input: the
+[findings list](phase-9-findings.md) (31 entries), the kernel-boundary review's open findings, three
+spike write-ups, the performance report and the ADRs' tripwires.

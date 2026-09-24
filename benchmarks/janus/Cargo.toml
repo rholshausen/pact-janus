@@ -1,0 +1,26 @@
+[package]
+name = "pact-bench-janus"
+version = "0.1.0"
+edition = "2024"
+description = "Plan task 9.1: the 1.7 benchmark scenarios run against Janus, in each embedding — native in-process, the janus-engine subprocess, and the engine as a WASM component under wasmtime."
+
+# Its own workspace, for the same reason as the baseline harness beside it: the two cannot share a
+# lockfile (pact_ffi 0.5.6 needs a pact_models older than the kernel's), and neither belongs in the
+# root workspace's build. The payloads, HTTP client, provider stub and results schema are the
+# baseline's own file, compiled in (`#[path]` in main.rs), so both stacks run the same workloads.
+[workspace]
+
+[dependencies]
+pact_janus_kernel = { path = "../../engine/kernel" }
+pact_janus_component_http = { path = "../../engine/component-http" }
+pact_janus_component_json = { path = "../../engine/component-json" }
+pact_janus_hooks_host = { path = "../../engine/hooks-host" }
+pact_janus_sample_order_service = { path = "../../samples/order-service" }
+serde_json = "1"
+# The host for the WASM embedding: the same runtime and version the engine's own component loader
+# uses (engine/component-host), and the runtime spike 1.2 found no slower than V8 at document scale.
+wasmtime = "47"
+wasmtime-wasi = "47"
+
+[profile.release]
+debug = false

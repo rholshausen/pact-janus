@@ -1,0 +1,23 @@
+[package]
+name = "janus-engine-wasm"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "The Janus engine as a WASM component (ADR 0003's canonical artifact), built for plan task 9.1's measurements: the kernel and the in-tree JSON content component behind the frozen byte-pipe."
+
+# Its own workspace: it only builds for wasm32-wasip2, and the root workspace builds for the host.
+# `cargo build --release --target wasm32-wasip2` from this directory; the harness beside it does
+# that itself before a run.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pact_janus_kernel = { path = "../../../engine/kernel" }
+pact_janus_component_json = { path = "../../../engine/component-json" }
+serde_json = "1"
+wit-bindgen = "0.60"
+
+[profile.release]
+debug = false

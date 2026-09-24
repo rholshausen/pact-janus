@@ -1,0 +1,72 @@
+{
+  "arch": "x86_64",
+  "date": "2026-09-24",
+  "os": "linux",
+  "scenarios": {
+    "cold-start": {
+      "compile_median_ms": 302.0,
+      "component_bytes": 6949015,
+      "iterations": 20,
+      "median_us": 40.6,
+      "min_us": 37.9,
+      "p95_us": 51.4
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 24260.4,
+      "min_us": 23628.3,
+      "p95_us": 24917.6
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 322.9,
+      "min_us": 302.0,
+      "p95_us": 341.0
+    },
+    "match-100k": {
+      "iterations": 500,
+      "median_us": 9661.2,
+      "min_us": 9408.9,
+      "p95_us": 10376.3
+    },
+    "match-small": {
+      "iterations": 5000,
+      "median_us": 14.1,
+      "min_us": 13.4,
+      "p95_us": 15.1
+    },
+    "unsupported": {
+      "consumer-session/start-transport": {
+        "category": "component",
+        "code": "component-unavailable",
+        "details": {
+          "component": "http"
+        },
+        "message": "no 'http' component is loaded"
+      },
+      "verification/verify": {
+        "category": "component",
+        "code": "component-unavailable",
+        "details": {
+          "component": "transport/http"
+        },
+        "message": "no 'transport/http' component is loaded"
+      }
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 24372.8,
+      "min_us": 23867.5,
+      "p95_us": 24768.9
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 255.8,
+      "min_us": 245.2,
+      "p95_us": 347.1,
+      "variants": 8
+    }
+  },
+  "schema": 1,
+  "stack": "janus-wasm-fe96f7c-dirty"
+}

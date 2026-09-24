@@ -64,7 +64,10 @@ third-party/     Components written as a third party would, from the published i
                  built from the docs (Documentation/third-party-component-report.md)
 spikes/          Time-boxed experiments — disposable code, durable findings
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
-                 (excluded from the workspace; run with `cd benchmarks && cargo run --release`)
+                 (excluded from the workspace; run with `cd benchmarks && cargo run --release`).
+                 benchmarks/janus runs the same scenarios against Janus in each embedding
+                 (task 9.1, `cd benchmarks/janus && cargo run --release`); its engine-wasm/ is
+                 the engine built as a WASM component, for measurement only
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation

@@ -275,6 +275,13 @@ impl RunResults {
     }
 
     pub fn write(self, date: &str) -> std::io::Result<String> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("results");
+        self.write_in(&dir, date)
+    }
+
+    /// Like [`RunResults::write`], into `dir` — how a harness in another crate (the Janus one,
+    /// plan task 9.1) lands its results beside the baseline's.
+    pub fn write_in(self, dir: &std::path::Path, date: &str) -> std::io::Result<String> {
         let doc = json!({
             "schema": 1,
             "date": date,
@@ -283,8 +290,7 @@ impl RunResults {
             "arch": std::env::consts::ARCH,
             "scenarios": Value::Object(self.scenarios),
         });
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("results");
-        std::fs::create_dir_all(&dir)?;
+        std::fs::create_dir_all(dir)?;
         let path = dir.join(format!("{date}-{}.json", self.stack.replace([' ', '/'], "-")));
         std::fs::write(&path, serde_json::to_string_pretty(&doc)?)?;
         Ok(path.display().to_string())
