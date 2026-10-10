@@ -13,7 +13,9 @@ plugins as first-class components.
 
 Three sources are the source of truth and take precedence over this file when they conflict:
 
-- `Documentation/project-plan.md` — the phased plan; task numbers like "1.6" or "G1" refer to it.
+- `Documentation/project-plan.md` — the phased plan the prototype was built to; task numbers like
+  "1.6" or "G1" refer to it. `Documentation/staged-implementation-plan.md` — the plan for the real
+  build, now live; item ids like "S1.4" refer to it.
 - `Documentation/decisions/` — ADRs. Every gate and contested design choice lands here. Do not
   re-litigate an accepted ADR in code; propose a superseding ADR instead.
 - `Documentation/specs/` — the Phase 2 design specifications. Normative for the code that
@@ -42,8 +44,9 @@ Three sources are the source of truth and take precedence over this file when th
   "conformant" means (ADR 0017).
 
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
-> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). The layout and
-> commands below describe the repo as built; trust the repo over this file if they diverge.
+> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
+> plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
+> The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
 

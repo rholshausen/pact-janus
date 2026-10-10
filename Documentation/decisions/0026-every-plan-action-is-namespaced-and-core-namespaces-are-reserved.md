@@ -69,7 +69,8 @@ prototype's own CSV component, so it will never be cheaper.
    name to its v1 name one to one. That is ADR 0022's designed-for case, an older fragment read by a
    newer engine by rule, and it keeps the CSV component working without a rebuild.
 5. **Decided now, built later.** The prototype keeps v0: its kernel, corpora and CSV component are
-   unchanged. The rename is a stage 1 item in the staged implementation plan. It has to land before the
+   unchanged. The rename is the first item of the staged implementation plan (S0.1; it was a stage 1
+   item until the plan's 2026-10-11 revision). It has to land before the
    real build publishes the plan grammar for third parties, and before `explain` output reaches users.
 
 ## Alternatives considered

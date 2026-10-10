@@ -5,8 +5,9 @@ the [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146): one Ru
 behind a coarse-grained versioned protocol, thin language SDKs, interaction specs compiled to
 inspectable matching plans, a shape language with variant testing, and plugins as first-class components.
 
-Source of truth: `Documentation/project-plan.md` (the phased plan; task numbers like "1.6"/"G1" refer to
-it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
+Source of truth: `Documentation/project-plan.md` (the phased plan the prototype was built to; task
+numbers like "1.6"/"G1" refer to it), `Documentation/staged-implementation-plan.md` (the plan for the
+real build, now live; item ids like "S1.4" refer to it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
 `Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
 they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
 every frame crossing the engine boundary, `shape-language/` from task 2.2 governs shapes — what they
@@ -31,8 +32,9 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 `CLAUDE.md`.
 
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
-> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). The layout and
-> commands below describe the repo as built; trust the repo over this file if they diverge.
+> for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
+> plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
+> The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
 

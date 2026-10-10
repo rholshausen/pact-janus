@@ -1,10 +1,11 @@
 # Staged implementation plan for Pact MkII
 
-Plan task **9.4**, the prototype's last. **Date:** 2026-09-24. **Inputs:** [RFC feedback](rfc-feedback.md)
-(9.2), the [community report](prototype-report.md) and [demo](../demo/README.md) (9.3), the
+Plan task **9.4**, the prototype's last. **Date:** 2026-09-24; **revised 2026-10-11** (see
+[Revision](#revision)). **Inputs:** [RFC feedback](rfc-feedback.md) (9.2), the
+[community report](prototype-report.md) and [demo](../demo/README.md) (9.3), the
 [performance report](performance-report.md) (9.1), the [Phase 9 findings](phase-9-findings.md), the
-[decision records](decisions/README.md) and their tripwires, and the [reuse inventory](reuse-inventory.md)
-(task 0.2).
+[kernel-boundary review](kernel-boundary-review.md), the [decision records](decisions/README.md) and
+their tripwires, and the [reuse inventory](reuse-inventory.md) (task 0.2).
 
 This is a plan for building the real thing, written by the people who built the prototype. It says:
 - what should carry over from Janus, and what should not;
@@ -12,7 +13,11 @@ This is a plan for building the real thing, written by the people who built the 
 - which decisions are deliberately left open, and what will reopen them;
 - which questions belong to the community rather than to this plan.
 
-It is a proposal for the RFC process, not a commitment on anyone's behalf.
+It is a proposal for the RFC process, not a commitment on anyone's behalf. Since the revision it is also
+the **live plan for this repository**: work on the real build is tracked against the item ids below
+(`S0.1`, `S1.4`, …), the way the prototype's work was tracked against the project plan's task numbers.
+The two numbering schemes never collide: the project plan's are bare (`1.6`, `G1`), this plan's carry an
+`S`.
 
 ## Contents
 
@@ -24,6 +29,7 @@ It is a proposal for the RFC process, not a commitment on anyone's behalf.
 6. [Risks](#6-risks)
 7. [Questions for the community](#7-questions-for-the-community)
 8. [Closing the prototype](#8-closing-the-prototype)
+9. [Revision](#revision)
 
 ## 1. Principles
 
@@ -48,6 +54,9 @@ Each of these is something the prototype learned, not a preference.
 5. **Decide what the evidence decides; name the rest.** Janus left some questions open on purpose
    (§4), each with the event that should reopen it. The real build should keep those open until that
    event happens, and not settle them by accident in code.
+6. **Every item is addressable and has an exit.** An item in §3 has an id, a size, and a test that says
+   when it is done: a corpus case, a conformance case, a CI job, or a measurement. "Exactly as today"
+   is a claim a harness checks (S1.1), not a feeling.
 
 ## 2. What carries over from Janus
 
@@ -59,24 +68,25 @@ first draft of something that will be rewritten against the final specification.
 
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
-| **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7) |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the 158 known gaps closed rather than skipped |
-| **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9); make the exchange loop single-threaded and async-ready (§4, gate W); cache per-variant plans (finding 28); rename its actions to plan grammar v1 (ADR 0026) |
-| **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production |
-| **Built-in HTTP transport** (`engine/component-http`) | **Rewrite** | It is threaded (`tiny_http`, one thread per server), was never built for WASM, and has no media-type or list-header semantics (finding 1). The rewrite should be async and thread-free, which serves gate W, and should own an `http:media-type` operator |
-| **WASM component host and OCI distribution** (`engine/component-host`, `janus component push/pull`) | **Graduates** | It already does digest pinning, content-addressed caching and a tamper-testing registry. Needs findings 15–17 decided |
-| **Out-of-process component loader** (spike 8.3) | **Rewrite, if kept** | Spike code. It proved the boundary exists, and findings 18–20 say what a real one must do differently |
-| **CLI** (`janus explain`, `upgrade`, `check`, `component`) | **Graduates** | `verify` graduates too, but it has no broker integration at all (§3, stage 1) |
-| **`janus-engine` subprocess binary** | **Graduates** | The primary embedding (ADR 0023). Needs a release pipeline for one statically linked binary per target triple, and real Windows and macOS CI |
-| **WASM engine artifact** (`benchmarks/janus/engine-wasm`) | **Graduates as the offline artifact** | Moves into `engine/` with its own CI build, for explain, upgrade and check in hosts that want no native binary (ADR 0023 decision 2) |
-| **TypeScript and JVM SDKs** | **Seeds** | They prove the model: generated bindings, a few hundred lines of idiomatic layer, and conformance. But their DSL is Janus's, not the one the community will design, and they have no compatibility facade for today's pact-js and pact-jvm DSLs. Keep the bindings pipeline (`tools/bindings`) and the drivers; rewrite the idiomatic layers |
-| **Sample provider, demo, third-party CSV component** | **Graduate as examples and fixtures** | The demo is the clearest end-to-end regression test there is, and CI already runs it |
-| **Benchmark harnesses** (`benchmarks/`) | **Graduate** | As the CI trend line plan §14 promised and 9.1 found had never run |
+| **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the 158 known gaps closed rather than skipped (S1.6). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
+| **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
+| **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); make the exchange loop single-threaded and async-ready (§4, gate W; S2.1); cache per-variant plans (finding 28; S2.3) |
+| **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
+| **Built-in HTTP transport** (`engine/component-http`) | **Rewrite, in two halves** | It is threaded (`tiny_http`, one thread per server), was never built for WASM, and has no media-type or list-header semantics (finding 1). The **client** half (verification: TLS, proxies, timeouts) is stage 1 (S1.5); the **server** half (mocks: async, thread-free, which serves gate W) is stage 2 (S2.1); the `http:media-type` operator is stage 3 (S3.3) |
+| **WASM component host and OCI distribution** (`engine/component-host`, `janus component push/pull`) | **Graduates** | It already does digest pinning, content-addressed caching and a tamper-testing registry. Needs findings 15–17 decided, and signing (S5.1) |
+| **Out-of-process component loader** (spike 8.3) | **Rewrite, if kept** | Spike code. It proved the boundary exists, and findings 18–20 say what a real one must do differently (S5.5) |
+| **CLI** (`janus explain`, `upgrade`, `check`, `component`) | **Graduates** | `verify` graduates too, but it has no broker integration, no TLS options, no generator support and no flag parity with today's verifier CLI (stage 1a) |
+| **`janus-engine` subprocess binary** | **Graduates** | The primary embedding (ADR 0023). Needs a release pipeline for one statically linked binary per target triple, and real Windows and macOS CI (S0.2, S0.4) |
+| **WASM engine artifact** (`benchmarks/janus/engine-wasm`) | **Graduates as the offline artifact** | Moves into `engine/` with its own CI build (S0.4), for explain, upgrade and check in hosts that want no native binary (ADR 0023 decision 2); the broker's recompute-on-read embedding is its first real host (S4.5) |
+| **TypeScript and JVM SDKs** | **Seeds** | They prove the model: generated bindings, a few hundred lines of idiomatic layer, and conformance. But their DSL is Janus's, not the one the community will design, they have no compatibility facade for today's pact-js and pact-jvm DSLs, and they have no provider side at all. Keep the bindings pipeline (`tools/bindings`) and the drivers; rewrite the idiomatic layers (S1.15, S2.4, S2.5) |
+| **Sample provider, demo, third-party CSV component** | **Graduate as examples and fixtures** | The demo is the clearest end-to-end regression test there is, and CI already runs it. The sample provider's v3 pact is the first entry in S1.1's fixture corpus |
+| **Benchmark harnesses** (`benchmarks/`) | **Graduate** | As the CI trend line plan §14 promised and 9.1 found had never run (S0.3). Gate E cannot fire without it |
 | **Spikes** (`spikes/`) | **Findings only** | Their code is not a starting point, and their findings are already in the ADRs |
 
-The reuse inventory (task 0.2) noted what Janus took from pact-reference. The real build should settle
-early whether it lives in pact-reference, beside `pact_matching`'s v2 engine that the kernel forked,
-or in a repository of its own (§7).
+The reuse inventory (task 0.2) noted what Janus took from pact-reference. Whether the real build lives in
+pact-reference, beside `pact_matching`'s v2 engine that the kernel forked, or in a repository of its own
+is §7's second question; S0.6 says what this plan assumes until it is answered.
 
 ## 3. The stages
 
@@ -87,95 +97,253 @@ of heavily AI-assisted work, which says nothing about a volunteer team's pace. T
 are big.
 
 ```
- 0 Foundations ──► 1 Provider verifier ──► 2 Consumer engine + JS/JVM ──► 3 Shapes and variants
-                                                                               │
-                        6 Breadth (more SDKs, messages, gRPC) ◄── 5 Plugins ◄──┴── 4 Provider shapes
+ 0a Foundations, now ──► 1a CLI verifier ──► 1b Provider integrations ──► 2 Consumer engine + JS/JVM
+ 0b Foundations, community ─┘                                                      │
+                                                                                   ▼
+          6 Breadth ◄── 5 Plugins ◄──┬── 4 Provider shapes ◄── 3 Shapes and variants
+                                     └── A AI-assisted layer (optional)
 ```
 
-Stages 4 and 5 can overlap once stage 3's contract format is frozen. Stage 6 starts with SDKs as soon
-as stage 2 has proven the SDK model on two languages.
+Stage 0a can start today and 0b waits on §7. Stage 1a ships value on its own; 1b makes it a product for
+the ecosystems that verify inside a test. Stages 4 and 5 can overlap once stage 3's contract format is
+frozen. Stage 6 starts with SDKs as soon as stage 2 has proven the SDK model on two languages.
 
-### Stage 0: Foundations — **S**
+Every item below is `S<stage>.<n>` with a size and an exit. An item's exit is the thing CI, a corpus or
+a measurement can check; where an item is a decision, its exit is an ADR.
 
-Where the code lives, who reviews it, and how it ships.
+### Stage 0a: Foundations that can start now — **S**
 
-- A home for the engine and the specifications, with owners (§7).
-- CI on Linux, macOS and Windows. The prototype ran real Windows only in spike 8.3, and ADR 0023
-  makes the subprocess every SDK's primary embedding, so it has to be solid everywhere.
-- A release pipeline that builds, signs and publishes `pact-engine` (the name is §7's) for each target
-  triple, plus the offline WASM artifact.
-- The specifications published as drafts for review, versioned from the start. The plan grammar is
-  published as v1, with ADR 0026's naming: every action namespaced, and the core families reserved.
+Engineering with no dependency on a community answer. All of it happens in this repository (S0.6).
 
-**Done when** a tagged release publishes signed binaries for at least five triples, and the specs are
-open for community comment.
+- **S0.1 Plan grammar v1** (ADR 0026) — **S**. Every action namespaced, the six core families reserved,
+  the legacy-only actions moved to `legacy`, and v0 fragments read through the one-to-one mapping.
+  A rename across the interpreter, both compilers, every corpus snapshot and every `explain` example
+  in the specs, with no verdict changing. First, because nothing is cheaper before anything else forks
+  the corpora, and because `explain` output must not reach users under v0.
+  *Exit:* every corpus case passes with renamed snapshots only; `component/hello` lists v1 and v0 in
+  `plan-grammar-versions`; `third-party/janus-csv` loads unmodified through the v0 mapping; a component
+  declaring a reserved namespace is refused at load, by name.
+- **S0.2 CI on Linux, macOS and Windows for the whole workspace** — **S**. The prototype ran real
+  Windows only for spike 8.3. ADR 0023 makes the subprocess every SDK's primary embedding, so the
+  kernel, CLI, `janus-engine` and both SDK suites run on all three.
+  *Exit:* the CI matrix is green on three operating systems, including the SDK conformance runs.
+- **S0.3 Benchmark trend in CI** — **S**. The harness plan §14 promised and 9.1 found had never run.
+  Trend, not gate. Gate E (frame encoding) and gate C (contract packaging) can only fire on this data.
+  *Exit:* every merge to `main` records the 1.7 scenarios against Janus and the chart is linkable.
+- **S0.4 Release pipeline** — **M**. One statically linked `janus-engine` per target triple, signed,
+  with checksums the SDKs verify on download; the CLI the same way; and the WASM offline artifact moved
+  from `benchmarks/janus/engine-wasm` into `engine/` with its own build. The signing scheme is chosen
+  here and recorded as an ADR.
+  *Exit:* a tagged release publishes signed binaries for at least five triples and the WASM artifact,
+  and an SDK resolves one by version.
+- **S0.5 Naming policy for the codename** — **S**. "Janus" stays in crate, binary, config and
+  environment-variable names until §7.1 is answered. No **new** Janus-named *persisted* identifier is
+  minted from now on. The ones that exist are inventoried here and renamed in S2.7: the contract
+  format `janus-contract/1` and provider shape `janus-provider-shape/1` (contract-file spec), the OCI
+  artifact and config media types `application/vnd.pact.janus.component.v1` (ADR 0021), and the
+  broker's `specification` value (ADR 0011 decision 6, gate B).
+  *Exit:* the inventory above is complete (a grep for `janus` in persisted strings finds nothing else),
+  and a CI check refuses a new one.
+- **S0.6 Where the build happens** — decision. This revision assumes: **in this repository, on
+  `main`, hardening the prototype in place**, with §2's table as the inventory of what is rewritten.
+  The prototype's history is the provenance ADR 0004 requires. If §7.2 answers otherwise, the move is a
+  `git subtree`, not a rewrite.
+  *Exit:* recorded as an ADR; §8's last paragraph updated.
 
-### Stage 1: A drop-in provider verifier — **L**
+**Done when** S0.1–S0.5 have their exits and a release from this repository is installable on three
+operating systems.
+
+### Stage 0b: Foundations the community decides — **S**
+
+- **S0.7 A home and owners** for the engine, the specifications and conformance sign-off (§7.2).
+- **S0.8 The specifications published as drafts** for review, versioned from the start, at that home.
+  The plan grammar is published as v1 (S0.1 already landed it).
+- **S0.9 The name** (§7.1), which S2.7 then writes into every persisted identifier.
+
+**Done when** the specs are open for community comment at their home, under their owners.
+
+### Stage 1: A drop-in provider verifier — **XL**, as 1a (**L**) and 1b (**M**)
 
 This is the first thing users get, and it delivers the RFC's first migration step: providers switch
-verifiers at no cost.
+verifiers at no cost. "At no cost" is measured, not asserted: S1.1 is built first, and every later
+item in 1a is done when S1.1 agrees.
 
-- **Verification of v1–v4 pacts**, exactly as today's verifiers do it, including the 158
-  pact-specification cases Janus skips: XML and form bodies, and the four rules with no coverage in the
-  corpus.
-- **Broker integration, which Janus does not have at all:**
-  - fetching pacts by consumer version selectors;
-  - pending and work-in-progress pacts;
-  - publishing verification results, keyed per consumer/provider pair (finding 10);
-  - `can-i-deploy` unchanged.
-- **Hooks in place of today's request filters and state-change callbacks** (the prototype's hooks,
-  hardened), with a migration note for each old verifier option.
-- **Message pacts:** verifying v3/v4 message interactions needs a message transport. That first needs
-  the kernel's `request`/`response` part names and its HTTP-shaped mismatch reply removed
-  (kernel-boundary review 8, 9). The hook design (spike 1.5, design 2.7) is ready.
-- The verifier for the language ecosystems that embed today's: through the subprocess, with the SDKs
-  of stage 2 or a thin wrapper before them.
+#### Stage 1a: the CLI verifier, for HTTP and message pacts, with a broker
 
-**Done when** the pact-specification cases pass in full, and pilot providers have run the new verifier
-beside their current one on real pacts with identical results for a release cycle.
+- **S1.1 A differential verification harness and a fixture corpus of real pacts** — **M**. A tool
+  that runs today's verifier (`pact_verifier_cli`) and `janus verify` on the same pacts against the
+  same provider, and diffs the verdicts interaction by interaction. The fixture corpus starts with the
+  sample provider's v3 pact and the pact-foundation example repositories' pacts, and grows with every
+  pilot provider's. It is the test for principle 1, and it is what "exactly as today" means from here on.
+  *Exit:* the harness runs in CI over the corpus and reports zero disagreements, or names each one with
+  a reason (a known gap in §5, or a deliberate difference recorded as an ADR).
+- **S1.2 Where the broker client lives** — decision, ADR. The kernel knows no HTTP, so the broker
+  client is not kernel code; but if it is CLI code, every provider integration in 1b and every SDK in
+  stage 6 re-implements it, which the thinness audit measures. This plan recommends **protocol
+  operations** (`broker/*`: fetch by selectors, publish results, publish a contract or a provider
+  shape) implemented by a native-only built-in component, so every embedding gets one client and the
+  WASM offline artifact answers `component-unavailable`.
+  *Exit:* the ADR, and the operations in the engine-protocol spec with schemas and examples.
+- **S1.3 Broker integration** — **L**. Fetching pacts by consumer version selectors; pending and
+  work-in-progress pacts; publishing verification results keyed per consumer/provider pair (finding
+  10, option A: `pairs` in the run summary); `can-i-deploy` unchanged; a `janus publish` verb (broker
+  notes §11) for contracts, and later provider shapes (S4.3); compression on the publish path
+  (format review §8.2).
+  *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
+  included, and the broker's matrix shows the results per pair.
+- **S1.4 v3/v4 generators in verification** — **M**. The legacy path has no generator support:
+  `upgrade` drops them with a `generator-dropped` finding, and verification never applies them.
+  Today's verifiers apply `ProviderState` generators with values the state-change call returned,
+  `MockServerURL`, and the value generators (random, date and time, UUID, regex) to request bodies,
+  headers, paths and query strings. The shape language's `generator` member names a component; the
+  v1–v4 generator vocabulary becomes one, applied by the legacy compiler.
+  *Exit:* the generator cases from pact-reference's verifier tests pass in S1.1's harness, with a
+  state-change response feeding a `ProviderState` generator end to end.
+- **S1.5 The HTTP component's client half, rewritten** — **M**. Async and thread-free (the same
+  executor seam S2.1 uses). TLS with custom CA bundles, client certificates and an insecure mode;
+  HTTP and HTTPS proxies; request timeouts; HTTP/1.1 and HTTP/2; today's `--request-timeout`,
+  `--custom-header` and base-path options. None of this exists in the prototype.
+  *Exit:* a verification against a TLS provider with a client certificate behind a proxy, in CI; and
+  S1.13's table has a `janus` column for every transport flag.
+- **S1.6 Close the 158 skipped pact-specification cases, and the body kinds the cases do not cover**
+  — **L**. XML and form-urlencoded content components, and multipart and raw binary bodies, which real
+  pacts carry though the specification cases do not. This pulls two things forward: **member order in
+  the document model** (finding 11, formerly stage 5), because XML children and form fields are
+  ordered; and **retyping the legacy body compiler off `serde_json::Value`** (kernel-boundary review
+  finding 5, closed on the premise that no v1–v4 pact body is non-JSON, which XML bodies disprove).
+  *Exit:* every pact-specification case the legacy harness runs passes, with no `janus:skip` left; a
+  v3 pact with XML, form, multipart and binary bodies agrees with today's verifier in S1.1.
+- **S1.7 Message pact verification** — **L**. Verifying v3 message pacts and v4 message and
+  synchronous-message interactions, which pact-jvm users have in numbers. First the kernel's
+  `request`/`response` part names and its HTTP 500 mismatch reply go (kernel-boundary review 8, 9):
+  the transport binding says which part is inbound and which the answer, and a mismatch is a `dispose`
+  with a `reject` disposition. Then a message transport, and the `produce-message` and
+  `consume-message` hooks spike 1.5 and design 2.7 specified, hardened as the way a provider's message
+  producer is invoked. Consumer-side message interactions are S6.2.
+  *Exit:* corpus cases for message interactions; pact-jvm's and pact-js's message provider examples
+  verify identically in S1.1.
+- **S1.8 Plugin-backed v4 interactions are refused by name** — **S**. A v4 pact whose interaction
+  requires a pact-plugins plugin (protobuf, gRPC, Avro, CSV) cannot verify "exactly as today" until the
+  bridge (S5.2). Until then the verifier fails that interaction before anything runs, as
+  `component-unavailable` naming the plugin, and the run summary counts it, so a mixed pact is not
+  silently half-verified.
+  *Exit:* a conformance and corpus case per plugin-bearing interaction kind.
+- **S1.9 Hooks in place of request filters and state-change callbacks** — **M**. The prototype's
+  hooks, hardened: the hooks host's credential redaction reviewed for production, script and `exec`
+  hook timeouts and resource limits enforced, and a migration note for each verifier option they
+  replace (S1.13).
+  *Exit:* every state-change and request-filter option in S1.13's table maps to a hook, and the
+  redaction rules (lifecycle-hooks spec §7.3) have a test per secret-bearing context member.
+- **S1.10 `match:content-type` in live runs** — **S**. The exchange and verification paths execute
+  with no content detector (third-party component report §4); the single `ContentDetector` slot
+  becomes a lookup over the session's `ContentRegistry`.
+  *Exit:* `corpora/shapes/content-type` runs through `janus verify`, not only `tools/corpus`.
+- **S1.11 The legacy compiler behind a marked boundary** — **S**. Kernel-boundary review findings 3
+  and 6: `plan::legacy` and `legacy_pact` move into their own crate (or a submodule whose `mod.rs`
+  states the exception), so "the kernel knows nothing about HTTP or JSON" is checkable by reading the
+  module tree.
+  *Exit:* the kernel crate has no `pact_models::v4::http_parts` import outside that boundary, and a CI
+  grep says so.
+- **S1.12 Two protocol gaps `explain` hit** — **S**. Matching captured values becomes a protocol
+  operation (finding 31), and `explain` loads the components a run would (finding 23), so what it
+  prints is the plan `verify` runs.
+  *Exit:* the protocol-level test client exercises both; `janus explain --executed` on a CSV
+  interaction prints the fragment.
+- **S1.13 Flag parity with today's verifier CLI** — **S**, but it gates the stage. A table with a row
+  per `pact_verifier_cli` and `pact-provider-verifier` option: the `janus` option, the hook, or
+  "dropped, because". The table is the migration note for providers.
+  *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.
+
+**Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
+pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
+verifier on real pacts, from a broker, with identical results for a release cycle.
+
+#### Stage 1b: provider-side integrations for the ecosystems that verify inside a test
+
+Most providers do not run a CLI. They run verification inside a test: pact-jvm's provider runner with
+state methods, pact-js's `Verifier` with state handlers, and the same in Go, .NET and Python. The
+hook that makes an in-process state handler possible already exists on paper: the test process serves
+a loopback endpoint and the configuration names it as an `http` hook (lifecycle-hooks spec §8.4). No
+SDK implements it, and the SDK specification covers only the consumer side.
+
+- **S1.14 The provider side of the SDK specification** — **M**. A provider section of
+  `behavioural-spec.json` and conformance cases for it: verify-in-test, state handlers and request
+  filters as loopback hooks, selecting pacts by selector, publishing results, and the per-variant
+  result surface. The thinness layers for it in `sdks/thinness.json`.
+  *Exit:* the conformance lint passes with provider ids; both drivers run the provider cases.
+- **S1.15 JVM and JavaScript provider integrations** — **L**. A JUnit 5 provider runner and a
+  `Verifier`-shaped API for Jest and Vitest, over the subprocess, from generated bindings, under the
+  thinness audit. Each ships with a migration note from today's annotations and options.
+  *Exit:* pact-jvm's and pact-js's provider example suites run on the new integrations with
+  identical results in S1.1.
+- **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
+  migration note).
+
+**Stage 1b is done when** S1.15's exit holds and a pilot provider in each language has verified from
+inside its test suite for a release cycle.
 
 ### Stage 2: The consumer engine, and the JS and JVM SDKs — **XL**
 
 The RFC's second migration step: SDKs ship MkII as a new major version.
 
-- **The consumer side of the engine, production-hardened:** sessions, the rewritten HTTP transport
-  serving mocks, and contract writing. Janus has all of it in prototype form.
-- **Two SDKs, JavaScript/TypeScript and JVM, built from the SDK specification.** The JVM SDK is the
-  proof that pact-jvm becomes one SDK among several. Each needs:
-  - generated bindings and an idiomatic layer;
-  - the test-framework integrations people use (Jest and Vitest; JUnit 5, plus JUnit 4 and Spock if the
-    community wants them);
-  - the thinness audit;
-  - and, as the new part, a **compatibility facade** for today's pact-js and pact-jvm DSLs, so most
-    existing consumer tests need only mechanical changes (SDK spec §6's classification).
-- **The protocol gaps the SDKs hit** (findings 4, 5, 6):
-  - the consumer's test verdict reaches the engine, so the engine, not each SDK, withholds a dishonest
-    contract;
-  - results per interaction arrive before the suite ends;
-  - the engine writes the contract's canonical bytes.
-- **The contract format decided.** Janus writes its own format. Whether that is the next Pact
-  specification version is §7's first question, and it must be answered before this stage ships a
-  major version.
+- **S2.1 The consumer side of the engine, production-hardened** — **L**. Sessions; the HTTP
+  component's **server** half rewritten async and thread-free, behind an executor seam so that native
+  runs on `tokio` and a `wasm32-wasip3` build runs on WASI async with the same loop (gate W then costs
+  a build target, not a redesign; ADR 0023 decision 5); and the engine, not the SDK, writes the
+  contract's canonical bytes (finding 6).
+  *Exit:* 9.1's consumer scenarios run on the new transport with no thread created by the engine, and
+  both SDKs' conformance contracts are byte-identical because neither wrote them.
+- **S2.2 The consumer's test verdict reaches the engine** — **M**. `report-variant` (ADR backlog;
+  findings 4, 5): the engine, not each SDK, withholds a dishonest contract, and per-interaction
+  results arrive before the suite ends, so an engine-side failure surfaces in the test that caused it.
+  *Exit:* the TypeScript SDK's own withholding logic is deleted; a conformance case fails a suite on
+  the variant that failed.
+- **S2.3 Plans cached per (handle, variant)** — **S**. Arming a variant recompiles its plan (finding
+  28); the cache, and a decision on what a fresh-per-exchange generator means under it.
+  *Exit:* the 100 KB request scenario in S0.3's trend drops to the small-exchange cost.
+- **S2.4 Two SDKs rebuilt from the SDK specification** — **L**. JavaScript/TypeScript and JVM, each
+  with generated bindings, an idiomatic layer, the test-framework integrations people use (Jest and
+  Vitest; JUnit 5, plus JUnit 4 and Spock if the community wants them), and the thinness audit. The
+  JVM SDK is the proof that pact-jvm becomes one SDK among several.
+- **S2.5 A compatibility facade** for today's pact-js and pact-jvm DSLs — **L**, so most existing
+  consumer tests need only mechanical changes (SDK spec §6's classification). The facade is the
+  hand-written layer most likely to grow matching logic, so it is its own layer in
+  `sdks/thinness.json` with its own budget, and a `kept`/`changed`/`dropped` verdict per old primitive
+  is published as the migration note.
+  *Exit:* the example suites of pact-js and pact-jvm run on the facade.
+- **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
+  report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
+  *Exit:* every facade primitive classified `kept` has a conformance case.
+- **S2.7 The contract format named, and every persisted identifier renamed** — **S**, blocked on
+  §7.1 (S0.9). S0.5's inventory is renamed in one change, with `upgrade` and the broker reading both
+  spellings for one major version. Until then `janus upgrade` output is **provisional**: the CLI says
+  so, and this plan recommends not publishing converted contracts to a shared broker before S2.7.
+- **S2.8 Secrets in recorded contracts** — **S**. A consumer test that sends a real token records it.
+  The lifecycle-hooks redaction rules extend to the recorded contract and to `explain --executed`
+  output, and the SDK specification says which headers and members are redacted by default.
 
-**Done when** both SDKs pass the conformance suite against a pinned engine, the example suites of
-pact-js and pact-jvm run on the compatibility facade, and early adopters publish contracts to a broker
-that the stage 1 verifier checks.
+**Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
+of pact-js and pact-jvm run on the compatibility facade, S2.7 has landed, and early adopters publish
+contracts to a broker that the stage 1 verifier checks.
 
 ### Stage 3: Shapes and variants in the DSLs — **L**
 
 The RFC's answer to optional fields, delivered to users.
 
-- **The native DSL:** `optional`, `anyOf`, `oneOf`, `eachLike`, `forbidden`, `whenVariant` and
-  `variantCases`, designed with the community, specified first, then implemented in both SDKs.
-- **Decisions to make first:**
-  - whether an array admits `[]` by default (finding 2);
-  - how to exclude combinations a provider cannot produce (finding 35);
-  - how correlated fields should be written, `oneOf` or independent members.
-- **`upgrade`** for existing pacts, with its report of what the conversion narrows. It already exists;
-  it needs the media-type operator (finding 1) so that `Content-Type` headers convert without
-  narrowing.
-- **Variant failure reporting** in each test framework: one test per variant where the framework allows
-  it (the variant ergonomics report's recommendations).
+- **S3.1 The DSL decisions, first** (gate D) — **S**: whether an array admits `[]` by default
+  (finding 2); how to exclude combinations a provider cannot produce (finding 35); how correlated
+  fields are written, `oneOf` or independent members. Each is an ADR before S3.2 starts.
+- **S3.2 The native DSL** — **L**: `optional`, `anyOf`, `oneOf`, `eachLike`, `forbidden`,
+  `whenVariant` and `variantCases`, designed with the community, specified first, then implemented in
+  both SDKs under the conformance suite.
+- **S3.3 `http:media-type` and list-valued headers** (finding 1) — **M**, as namespaced operators the
+  HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again.
+- **S3.4 `upgrade` without the media-type narrowing** — **S**. It already reports the narrowing; with
+  S3.3 it stops making it.
+- **S3.5 Variant failure reporting in each test framework** — **M**: one test per variant where the
+  framework registers tests dynamically, a per-variant result list where it does not, and the exchange
+  loop's match decision as an event a host can surface while the run is going (variant ergonomics
+  report, recommendations 1–3).
 
 **Done when** the RFC's consumer example runs natively in both SDKs, the demo runs on them, and the DSL
 is frozen as the major version's surface.
@@ -184,18 +352,23 @@ is frozen as the major version's surface.
 
 The part of the RFC no Pact user has today: catching what the provider may send that no consumer tested.
 
-- **Recording provider shapes** from provider test suites, in each provider language's test framework.
-  Janus records only through its own verifier (task 7.2).
-- **Deriving shapes from OpenAPI and protobuf**, emitting selectors so they match consumer interactions
-  by operation (ADR 0025). Spike 7.3's importer is the starting point, and its lessons are the
-  specification.
-- **The broker PR series** from the broker integration notes (task 7.5): a resource for provider shapes,
-  decisions computed on read, and rendering from the report's own words. PactFlow's side is PactFlow's to
-  decide.
-- **Policy:**
-  - a `provenance` selector for exemptions (finding 9B);
-  - whether `block` ever becomes a default, which should be judged on pilot data, not decided now
-    (ADR 0016's tripwire).
+- **S4.1 Recording provider shapes from provider test suites** — **M**, in each provider language's
+  test framework, through the S1.15 integrations. Janus records only through its own verifier (task
+  7.2).
+- **S4.2 Deriving shapes from OpenAPI and protobuf** — **M**, emitting selectors so they match
+  consumer interactions by operation (ADR 0025). Spike 7.3's importer is the starting point, and its
+  lessons are the specification.
+- **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **L**: a resource for provider shapes,
+  decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and rendering from
+  the report's own words; `janus publish` learns provider shapes (S1.3). PactFlow's side is PactFlow's
+  to decide.
+- **S4.4 Policy** — **S**: a `provenance` selector for exemptions (finding 9B); whether `block` ever
+  becomes a default, judged on pilot data, not decided now (gate P).
+- **S4.5 The WASM offline artifact in the broker** (broker notes row 9) — **M**: recompute on cache
+  miss, the first real host of ADR 0023's offline embedding. Whether N×M recomputation scales is
+  measured here (broker notes §12).
+- **S4.6 Message interactions in the broker view** — **S**. The walk is direction-agnostic, but a
+  message-only provider's shape and decision page are untested (broker notes §12).
 
 **Done when** the demo's loop runs against a real broker, with a provider shape published from a real
 provider's test suite.
@@ -204,36 +377,89 @@ provider's test suite.
 
 The component model, opened to the ecosystem.
 
-- **WASM components, generally available:** the interfaces, the loader, OCI distribution and signing.
-  First decide findings 15 (recording which components took part), 16 (registry credentials) and 17
-  (artifacts published with `wkg`).
-- **A bridge for today's pact-plugins**, at least the protobuf/gRPC one, so no existing user loses a
-  plugin. A shim process speaking both wires is the smaller route (component-interfaces spec §9).
-- **Content components that are not JSON:** member order (finding 11), `encode` seeing the shape (12),
-  and decode errors reaching the user (13, 14).
-- **Plan fragments versus operator-level substitution**, decided by gate F (§4) before any third party
-  depends on either.
-- **Out-of-process components**, if the community wants them beyond the bridge: the containment rules
-  of findings 18–20.
+- **S5.1 WASM components, generally available** — **L**: the interfaces, the loader, OCI
+  distribution, and **signing and verification** of component artifacts, which the prototype never
+  did. First decide findings 15 (recording which components took part, with their digests), 16
+  (registry credentials, which 2.7 says a run must not take from the environment) and 17 (artifacts
+  published with `wkg`).
+- **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
+  user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
+  spec §9). This closes S1.8's refusal.
+- **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
+  decode errors and degradations reaching the user as their own finding kind, not as "expected a
+  value" (findings 13, 14). Member order moved to S1.6.
+- **S5.4 Plan fragments versus operator-level substitution** — decision, gate F, before any third
+  party depends on either; with it, a fragment's access to octets (finding 22) and where action
+  configuration lives in the grammar (finding 24, ADR 0022 decision 6's provisional mapping).
+- **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **M**: the
+  containment rules of findings 18 and 20 (recreation in a shared process; what a `subprocess`
+  source's command is).
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
 
 ### Stage 6: Breadth — **XL**, ongoing
 
-- **More SDKs:** Go, Python, .NET, Rust, and whatever else the community maintains. Each is generated
-  bindings, an idiomatic layer written from the SDK specification, and the conformance suite. The
-  regeneration trial (task 6.5) showed agents can carry a specification change into several SDKs under
-  the suite's judgement. That is what makes this stage affordable for a small team, but it does not
-  replace the suite.
-- **Message interactions** end to end, with the `produce-message` and `consume-message` hooks, and
-  broker adapters as components.
-- **gRPC and other transports** as components.
-- **The RFC's fourth migration step:** today's FFI and pact-jvm cores go into maintenance mode as each
-  language's MkII SDK passes conformance. The timeline is the community's (§7).
+- **S6.1 More SDKs:** Go, Python, .NET, Rust, Ruby, PHP, and whatever else the community maintains.
+  Each is generated bindings, an idiomatic layer written from the SDK specification, **both sides**
+  (consumer and provider, S1.14), and the conformance suite. The regeneration trial (task 6.5) showed
+  agents can carry a specification change into several SDKs under the suite's judgement. That is what
+  makes this stage affordable for a small team, but it does not replace the suite.
+- **S6.2 Consumer-side message interactions**, end to end, with broker adapters as components. The
+  provider side landed in S1.7.
+- **S6.3 gRPC and other transports** as components.
+- **S6.4 The RFC's fourth migration step:** today's FFI and pact-jvm cores go into maintenance mode as
+  each language's MkII SDK passes conformance on both sides. The timeline is the community's (§7).
 
 **Done when** it never is. Each SDK has its own exit: conformance passing, and the old SDK's example
-suite running on its compatibility facade.
+suites, consumer and provider, running on its compatibility facade.
+
+### Stage A: The AI-assisted layer — **M**, optional, after stage 3
+
+The RFC's optional layer, which the prototype designed and did not build
+([design notes](ai-layer-design-notes.md), task 2.10). The notes found the deterministic design needs
+no new protocol operation, event kind or hook kind for either capability, so this stage is additive
+and can be skipped without anything above it noticing.
+
+- **SA.1 Mismatch diagnosis** over `explain --executed` output: a summariser, its prompt and its
+  evaluation, which the notes deferred.
+- **SA.2 Agentic verification**: the orchestration loop behind `exec`/`http` hooks that stand up a
+  provider and satisfy states, with its retry policy.
+- **SA.3 The security review** the notes defer: an agent with provider control-plane access crosses the
+  boundary human-written state-change scripts already cross, and that trust model is reviewed, not
+  assumed, before either capability is shipped.
+
+### Cross-cutting: security
+
+The prototype's one security line is "credential redaction reviewed for production". A verifier that
+runs in CI with broker credentials, executes scripts from a repository's configuration and loads
+third-party code needs more than that. Each item is owned by a stage; together they are the threat
+model, written down as it is built.
+
+| Item | Stage | What it covers |
+|---|---|---|
+| **X.1 The subprocess binary's provenance** | S0.4 | How an SDK resolves `janus-engine`: pinned version, verified checksum, the `JANUS_ENGINE` override logged, never a bare `PATH` lookup |
+| **X.2 The scripted-hook sandbox** | S1.9 | QuickJS runs scripts a repository's `verifier.janus.yaml` names (ADR 0015). The hook context is the script's whole capability surface; memory, time and recursion limits are enforced, and that claim has a test |
+| **X.3 Credentials** | S1.3, S1.9 | Broker, OAuth2 and registry credentials come from the loader's resolved configuration, never the run's environment (finding 16's exception closed), and the redaction rules cover every report they could reach |
+| **X.4 Secrets in recorded artifacts** | S2.8 | Contracts, executed plans and hook reports |
+| **X.5 Component sandboxing** | S5.1, S5.5 | The WASM grants (`fs`, `network`, `env`) enforced in process; out of process, `fs` and `network` are unenforceable (finding 19) and the specification says so to the user |
+| **X.6 Component supply chain** | S5.1 | Signed artifacts, verified at pull and at load; the digest recorded in the run (finding 15) |
+| **X.7 The agentic boundary** | SA.3 | As above |
+
+### Cross-cutting: documentation
+
+Each stage exit includes its user documentation on the Pact documentation site: stage 1a's is S1.13's
+table and the hook migration notes; 1b's the per-language provider migration guides; stage 2's the
+facade classification and the consumer migration guide; stage 3's the DSL reference; stage 5's the
+component author's guide, which `third-party/janus-csv`'s report is the first draft of.
+
+### Not staged
+
+Named so their absence reads as a decision. The RFC's future possibilities: semantic contract diffing,
+property-based provider fuzzing, a fully provider-driven workflow, a consumer-side runtime guard,
+runtime drift observation, centrally executed verification, stateful interaction sequences, and a WASM
+engine that runs tests through a host-provided transport (gate W is the other route). Each is a
+proposal for after stage 6, or an ADR if evidence from a stage argues for it sooner.
 
 ## 4. Reassessment gates
 
@@ -243,55 +469,71 @@ ADRs.
 
 | Gate | Trigger | What to do | What it can change |
 |---|---|---|---|
-| **W: the WASM embedding** (ADR 0023) | `wasm32-wasip3` becomes a supported Rust target (it is being promoted to tier 2), and wasmtime plus one SDK-relevant host (jco for Node, or a JVM runtime) run p3 components | Re-run task 9.1's WASM scenarios, including a served mock and a driven verification. The exchange loop runs as an async task over `wasi:sockets`, with no thread; whether p3 brings threads does not matter if the loop needs none. Check `wasi:http`'s p3 server story too | If it works, WASM becomes a candidate primary embedding again, and stage 0's per-OS binary distribution becomes the fallback. Stage 2's transport rewrite should be async and thread-free, so that passing this gate costs a build target, not a redesign |
-| **F: plan fragments** (ADR 0022) | A second content component needs a fragment, or finding 21 (a fragment compiled without the variant, which widened a pinned variant) bites a real user | Adopt operator-level substitution: the engine compiles the slot, and a component says only what one value operator means | Stage 5's component interface |
-| **E: frame encoding** (ADR 0006) | The benchmark trend shows base64 or frame size on a hot path | Negotiate CBOR, which the protocol already allows for | The protocol's second encoding |
+| **W: the WASM embedding** (ADR 0023) | `wasm32-wasip3` becomes a supported Rust target (it is being promoted to tier 2), and wasmtime plus one SDK-relevant host (jco for Node, or a JVM runtime) run p3 components | Re-run task 9.1's WASM scenarios, including a served mock and a driven verification. The exchange loop runs as an async task over `wasi:sockets`, with no thread; whether p3 brings threads does not matter if the loop needs none. Check `wasi:http`'s p3 server story too | If it works, WASM becomes a candidate primary embedding again, and S0.4's per-OS binary distribution becomes the fallback. S1.5 and S2.1 are async and thread-free behind an executor seam, so that passing this gate costs a build target, not a redesign |
+| **F: plan fragments** (ADR 0022) | A second content component needs a fragment, or finding 21 (a fragment compiled without the variant, which widened a pinned variant) bites a real user | Adopt operator-level substitution: the engine compiles the slot, and a component says only what one value operator means | S5.4, stage 5's component interface |
+| **E: frame encoding** (ADR 0006) | S0.3's trend shows base64 or frame size on a hot path | Negotiate CBOR, which the protocol already allows for | The protocol's second encoding |
 | **C: contract packaging** (ADR 0011) | A realistic contract passes 5 MB, or base64 bodies pass 25% of its bytes | The exploded projection, or a container form | The contract file |
-| **D: DSL defaults** (findings 2, 35) | Stage 3's DSL design | Decide the empty-array default and exclusions before the DSL freezes | Stage 3 |
-| **P: the subsumption policy** (ADR 0016) | Pilot teams routinely set `block`, or exemptions without an expiry dominate real policies | Revisit the defaults on that evidence | Stage 4 |
-| **B: the broker's default specification value** (ADR 0011 decision 6) | The broker PR series lands and deployed brokers catch up | Stop publishing Janus contracts as `specification: "pact"` | Stage 4 |
+| **D: DSL defaults** (findings 2, 35) | S3.1 | Decide the empty-array default and exclusions before the DSL freezes | Stage 3 |
+| **P: the subsumption policy** (ADR 0016) | Pilot teams routinely set `block`, or exemptions without an expiry dominate real policies | Revisit the defaults on that evidence | S4.4 |
+| **B: the broker's default specification value** (ADR 0011 decision 6) | The broker PR series lands and deployed brokers catch up | Stop publishing Janus contracts as `specification: "pact"` | S2.7, S4.3 |
 
 ## 5. Known debt, by stage
 
-Everything the prototype left open, assigned to the stage that needs it. The detail is in the
+Everything the prototype left open, assigned to the item that needs it. The detail is in the
 [findings](phase-9-findings.md) and the [kernel-boundary review](kernel-boundary-review.md).
 
-| Stage | Item | Source |
+| Item | Debt | Source |
 |---|---|---|
-| 0 | Windows and macOS CI for the subprocess | spike 1.3's open risk; ADR 0023 |
-| 1 | Plan grammar v1: every action namespaced, the core families reserved (`flow`, `value`, `expect`, `check`, `match`, `legacy`), v0 fragments read by the one-to-one mapping. A rename across the interpreter, both compilers and every corpus snapshot, with no verdict changing. It must land before `explain` output reaches users | ADR 0026 |
-| 1 | Close the 158 skipped pact-specification cases (XML, form bodies, four uncovered rules) | task 3.5 |
-| 1 | Remove the `request`/`response` part names and the HTTP 500 mismatch reply from the kernel | kernel-boundary review 8, 9 |
-| 1 | Per-pair verification counts in the run summary | finding 10 |
-| 1 | Matching captured values as a protocol operation, and `explain` loading components | findings 31, 23 |
-| 2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
-| 2 | The engine writes contract bytes | finding 6 |
-| 2 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |
-| 2 | An async, thread-free exchange loop and HTTP transport | ADR 0023 decision 5; gate W |
-| 3 | `http:media-type`, and list-valued headers | finding 1 |
-| 3 | The empty-array default; exclusions in the DSL | findings 2, 35 |
-| 4 | A `provenance` selector on exemptions | finding 9B |
-| 4 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
-| 5 | Member order; `encode` sees the shape; decode errors and degradations reach the user | findings 11–14 |
-| 5 | Recording the components that took part; registry credentials; `wkg` artifacts | findings 15–17 |
-| 5 | Out-of-process containment and command form | findings 18–20 |
-| 5 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
+| S0.1 | Plan grammar v1: every action namespaced, the core families reserved (`flow`, `value`, `expect`, `check`, `match`, `legacy`), v0 fragments read by the one-to-one mapping. A rename across the interpreter, both compilers and every corpus snapshot, with no verdict changing. It must land before `explain` output reaches users | ADR 0026 |
+| S0.2 | Windows and macOS CI for the subprocess, and for the whole workspace | spike 1.3's open risk; ADR 0023 |
+| S0.3 | The benchmark harness as a CI trend, which plan §14 promised and 9.1 found had never run; gates E and C depend on it | performance report §6 |
+| S0.4 | Per-OS distribution of `janus-engine`; `engine-wasm/` graduating into `engine/` | ADR 0023 decisions 2, 4 |
+| S0.5 | Persisted identifiers that carry the codename: `janus-contract/1`, `janus-provider-shape/1`, the OCI media types, the broker `specification` value | ADR 0011, ADR 0021 |
+| S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
+| S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
+| S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |
+| S1.6 | The 158 skipped pact-specification cases (XML, form bodies, four uncovered rules); multipart and binary bodies; **member order in the document model** (moved from stage 5); the legacy body compiler typed to `serde_json::Value` | task 3.5; finding 11; kernel-boundary review 5 |
+| S1.7 | The `request`/`response` part names and the HTTP 500 mismatch reply in the kernel; the `produce-message`/`consume-message` hooks designed and not built | kernel-boundary review 8, 9; spike 1.5; design 2.7 |
+| S1.8 | Plugin-bearing v4 interactions have no path until S5.2 | new in this revision |
+| S1.10 | `match:content-type` runs with no detector in live exchanges and verification | third-party component report §4 |
+| S1.11 | Nothing in the module tree marks the legacy compiler as the permanent HTTP-shaped exception | kernel-boundary review 3, 6 |
+| S1.12 | Matching captured values as a protocol operation; `explain` loading components | findings 31, 23 |
+| S1.14 | The SDK specification and conformance suite have no provider side | new in this revision |
+| S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
+| S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
+| S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |
+| S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
+| S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
+| S2.7 | `upgrade` writes `janus-contract/1` before the format is named | ADR 0011; §7.1 |
+| S3.3 | `http:media-type`, and list-valued headers | finding 1 |
+| S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
+| S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |
+| S4.4 | A `provenance` selector on exemptions | finding 9B |
+| S4.1, S4.2 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
+| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view | broker notes §12 |
+| S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
+| S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
+| S5.5 | Out-of-process containment and command form | findings 18, 20 |
+| S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
+| SA.3 | The security review an agent with provider access needs | AI-layer notes §4 |
 
 ## 6. Risks
 
 | Risk | Where it bites | Mitigation |
 |---|---|---|
-| **Volunteer capacity.** This is a multi-year build for a volunteer-driven project | Every stage | Providers-first ordering puts value in users' hands at stage 1 and stops depending on later stages. The specifications and conformance suite let contributors work in parallel without drifting apart |
+| **Volunteer capacity.** This is a multi-year build for a volunteer-driven project | Every stage | Providers-first ordering puts value in users' hands at stage 1a and stops depending on later stages. The specifications and conformance suite let contributors work in parallel without drifting apart |
+| **Stage 1 is the biggest stage**, not the L the first revision sized it. "Exactly as today" covers generators, TLS, XML and form bodies, message pacts, a broker client and in-test state handlers, none of which the prototype has | Stage 1 | Split into 1a, which ships a CLI verifier with value on its own, and 1b. S1.1's harness turns "exactly" into a number from the first week, so scope is discovered early rather than at the pilot |
 | **The Osborne effect.** Announcing MkII stalls today's Pact before MkII is ready | Stages 1–3 | Stage 1 improves life for today's users with no migration at all. The compatibility facade keeps the consumer migration mechanical |
 | **Native binaries.** Per-OS binaries were the pain of pact-ruby-standalone | Stages 0, 2 | The per-run, EOF-exit lifecycle (spike 1.3); distribution through each ecosystem's normal package channel; gate W as the way out |
 | **Specification governance.** Specs nobody can change become a bottleneck, and specs anyone can change stop meaning anything | From stage 0 | The rule Janus followed: every change lands in the spec, the corpus or the conformance suite in the same change, and ADRs record the contested ones. Who approves them is a community question |
+| **The codename leaks into artifacts** before the name is decided, and the rename then touches brokers | Stages 0–2 | S0.5 freezes the inventory; S2.7 renames it once; `upgrade` output is provisional until then |
 | **Maintainer identity.** pact-jvm ceasing to be an independent implementation | Stage 2 | The JVM SDK is a real product with its own maintainers and idiomatic layer; the JVM report (task 6.3) shows what they would own |
 | **Findings the prototype could not produce.** No real team used Janus, so several tripwires (variant budgets, exclusions, subsumption noise at scale) never had data to fire on | Stages 3–4 | Pilot teams at each stage exit, and the tripwires in §4 watched deliberately |
 
 ## 7. Questions for the community
 
 The charter says these belong to the community, and this plan does not decide them. What it can do is
-say why each one matters and what the prototype found that bears on it.
+say why each one matters, what the prototype found that bears on it, and which items wait on it.
 
 1. **Naming and versioning.** Janus writes its own contract format and does not claim to be "pact
    v5" (ADR 0011). Some of the options:
@@ -300,20 +542,21 @@ say why each one matters and what the prototype found that bears on it.
    - brand the whole redesign (the RFC's "MkII", "Pact 6").
 
    It needs deciding before stage 2 ships a major version, because the format's identifier is written
-   into every contract.
+   into every contract. Waits on it: S0.9, S2.7. Until then S0.5 stops the codename spreading.
 2. **Where it lives, and who owns what.** The engine, the specifications, and conformance sign-off each
    need an owner. The prototype suggests sign-off can be mechanical (a build passes the suite, ADR 0017),
    which leaves people deciding what goes into the specification rather than whether an SDK complies.
    The engine could live beside `pact_matching` in pact-reference, which it forked, or in a repository
-   of its own.
-3. **Funding.** Stages 1 and 2 are large, and providers-first means stage 1 pays back before stage 2
+   of its own. Waits on it: S0.7, S0.8. Until then S0.6 says where the work happens.
+3. **Funding.** Stages 1 and 2 are large, and providers-first means stage 1a pays back before stage 2
    finishes. Whether that is foundation sponsorship, vendor contribution or grants is not this plan's to
    say.
 4. **When today's implementations go into maintenance mode.** The RFC ties it to each SDK passing
-   conformance on the new engine. This plan's stage exits make that measurable per language. The
-   timeline around them is the community's.
+   conformance on the new engine. This plan's stage exits make that measurable per language, on both
+   sides. The timeline around them is the community's. Waits on it: S6.4.
 5. **How the broker's API evolves.** The broker notes (task 7.5) set out a PR series for provider shapes
-   and decisions. How far the open-source broker and PactFlow each go is theirs to decide.
+   and decisions. How far the open-source broker and PactFlow each go is theirs to decide. Waits on it:
+   S4.3, gate B.
 
 ## 8. Closing the prototype
 
@@ -326,6 +569,37 @@ The charter defines "prototype complete" as follows. Each condition is now met.
 | Every unresolved-questions row has an answer or an honest "still open" | Yes ([RFC feedback](rfc-feedback.md) §2; plan §13) |
 | The report and the staged plan are published for community review | The [community report](prototype-report.md), this plan, and the revised RFC on [PR #146](https://github.com/pact-foundation/roadmap/pull/146) |
 
-What happens to this repository now is itself a question for the community. It can stay as the
-reference prototype, which the real build reads and cites, or seed the real build's repository directly.
-§2 is written so that either works.
+What happens to this repository was itself a question for the community. This revision answers it
+provisionally (S0.6): the real build proceeds here, hardening the prototype in place, and §2 is the
+inventory of what that means. §7.2 can still move it; the history comes along.
+
+## Revision
+
+**2026-10-11.** The first revision was a proposal; this one is the plan the repository works from. A
+review against the Phase 9 findings, the kernel-boundary review, the RFC, the ADR backlog, the broker
+notes and the code found three structural problems and a list of gaps, all folded in:
+
+- **Every item has an id, a size and an exit** (principle 6), so progress can be recorded against it.
+- **Stage 0 is split** into what can start now (0a) and what waits on §7 (0b). Two decisions the first
+  revision left to "either works" are now stated as assumptions: the build happens here (S0.6), and the
+  codename stays but stops spreading into persisted identifiers (S0.5). The plan-grammar v1 rename moved
+  from stage 1 to the first item of stage 0a, since the first revision said both that stage 0 publishes
+  the grammar as v1 and that stage 1 renames it.
+- **Stage 1 is split and resized** from L to XL, as 1a (the CLI verifier) and 1b (provider-side
+  integrations). Items that a drop-in verifier needs and the first revision lacked: a differential
+  harness and fixture corpus (S1.1), the broker client's home (S1.2), v3/v4 generators (S1.4), TLS,
+  proxies and timeouts (S1.5), multipart and binary bodies (S1.6), flag parity (S1.13), the provider
+  side of the SDK specification and the JVM and JS provider integrations (S1.14, S1.15). Items moved
+  into stage 1 from later stages because stage 1 depends on them: member order (finding 11, from
+  stage 5) and the legacy body compiler's retyping (kernel-boundary review 5) for XML bodies; the
+  message hooks (from stage 6) for message pact verification; the HTTP component's client half (from
+  stage 2). Items that stage 1 cannot do and now says so: plugin-backed v4 interactions (S1.8, closed
+  by S5.2). Two gaps in neither the findings list nor the first revision: `match:content-type` runs
+  with no detector in live runs (S1.10), and the legacy compiler's boundary (S1.11).
+- **Added:** the benchmark trend as an item (S0.3; gates E and C could never fire without it); the
+  conformance suite's own gaps and the facade's thinness budget (S2.5, S2.6); `upgrade` output as
+  provisional until the name is decided (S2.7); secrets in recorded contracts (S2.8); the exchange
+  loop's match decision as an event (S3.5); the broker's offline-WASM host and the message-only
+  provider view (S4.5, S4.6); component signing (S5.1); the protocol-level test client in §2; the
+  AI-assisted layer as an optional stage; a cross-cutting security table; documentation per stage exit;
+  and a "not staged" list for the RFC's future possibilities.
