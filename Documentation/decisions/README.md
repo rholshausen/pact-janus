@@ -43,6 +43,7 @@ superseding ADR instead.
 | [0024](0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) | Keep request dimensions pinned, and match a cardinality point as a region | accepted |
 | [0025](0025-a-provider-shape-entry-may-select-interactions-by-operation.md) | Let a provider-shape entry select the interactions it is about by operation | accepted |
 | [0026](0026-every-plan-action-is-namespaced-and-core-namespaces-are-reserved.md) | Namespace every plan action, and reserve the core families as namespaces | accepted (implemented as plan grammar v1 in the real build) |
+| [0027](0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md) | Build in the prototype's repository, and graduate SDKs into their existing repositories | accepted |
 
 ## Decision backlog
 

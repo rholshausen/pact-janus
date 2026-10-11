@@ -84,9 +84,12 @@ first draft of something that will be rewritten against the final specification.
 | **Benchmark harnesses** (`benchmarks/`) | **Graduate** | As the CI trend line plan §14 promised and 9.1 found had never run (S0.3). Gate E cannot fire without it |
 | **Spikes** (`spikes/`) | **Findings only** | Their code is not a starting point, and their findings are already in the ADRs |
 
-The reuse inventory (task 0.2) noted what Janus took from pact-reference. Whether the real build lives in
-pact-reference, beside `pact_matching`'s v2 engine that the kernel forked, or in a repository of its own
-is §7's second question; S0.6 says what this plan assumes until it is answered.
+The reuse inventory (task 0.2) noted what Janus took from pact-reference. The real build happens in
+this repository ([ADR 0027](decisions/0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md)):
+the engine, specs, CLI, corpora and conformance suite stay together permanently as the executable
+specification, and the SDKs are incubated here and graduate into pact-js and pact-jvm at stage 2's
+exit. Whether the permanent part later moves beside `pact_matching` in pact-reference is §7's second
+question, and a subtree move if it does.
 
 ## 3. The stages
 
@@ -157,14 +160,32 @@ Engineering with no dependency on a community answer. All of it happens in this 
   *Exit:* the inventory above is complete and kept in one document; a rehearsal script renames the
   codename to a placeholder across every surface and the whole test suite, both SDKs' conformance runs
   and the demo pass; CI runs the rehearsal on a schedule so drift is caught.
-- **S0.6 Where the build happens** — decision. This revision assumes: **in this repository, on
-  `main`, hardening the prototype in place**, with §2's table as the inventory of what is rewritten.
-  The prototype's history is the provenance ADR 0004 requires. If §7.2 answers otherwise, the move is a
-  `git subtree`, not a rewrite.
-  *Exit:* recorded as an ADR; §8's last paragraph updated.
+- **S0.6 Where the build happens** — decided, [ADR 0027](decisions/0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md).
+  **In this repository, on `main`, hardening the prototype in place**, with §2's table as the
+  inventory of what is rewritten. The engine, specs, CLI, corpora, conformance suite and checkers stay
+  together permanently as the executable specification. `sdks/` is an incubator: the SDKs graduate
+  into pact-js and pact-jvm at stage 2's exit (S2.9), as those packages' next major version, and
+  S0.10–S0.12 make that split cheap now. If §7.2 answers "pact-reference", the move is a subtree of
+  the permanent directories, not a rewrite.
+- **S0.10 SDKs consume the engine by release** — **S**. Each SDK's test setup resolves a pinned,
+  released `janus-engine` from S0.4's pipeline, verified by checksum (X.1), with `cargo build` kept as
+  the developer fallback (`JANUS_ENGINE` already overrides). An SDK contributor needs no Rust toolchain.
+  *Exit:* both SDK suites pass in a CI job with no Rust toolchain installed.
+- **S0.11 The corpora, the conformance suite and the checkers ship with the engine** — **S**. Every
+  engine release carries `corpora/` and `conformance/` as a versioned artifact, and the checkers an
+  SDK's CI runs (`tools/conformance`, `tools/thinness`, `tools/bindings`) as binaries, so a graduated
+  SDK runs the same gates from another repository against a pinned engine version.
+  *Exit:* a checkout containing only one SDK directory runs its conformance, thinness and bindings
+  checks from the release artifacts alone, in CI.
+- **S0.12 Prune the prototype** — **S**. Spike code is deleted and each `FINDINGS.md` kept, in place,
+  so ADR links hold; the phase reports and the project plan move under `Documentation/prototype/`,
+  with links updated; the charter and the decision log stay where they are. The README describes the
+  real build and points at the prototype's record.
+  *Exit:* no code under `spikes/`; every link in `Documentation/` resolves; CI green.
 
-**Done when** S0.1–S0.5 have their exits and a release from this repository is installable on three
-operating systems.
+**Done when** S0.1–S0.6 and S0.10–S0.12 have their exits and a release from this repository is
+installable on three operating systems. Item ids are identifiers, not an order: S0.10–S0.12 were added
+by ADR 0027 after 0b's ids were taken.
 
 ### Stage 0b: Foundations the community decides — **S**
 
@@ -340,10 +361,20 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 - **S2.8 Secrets in recorded contracts** — **S**. A consumer test that sends a real token records it.
   The lifecycle-hooks redaction rules extend to the recorded contract and to `explain --executed`
   output, and the SDK specification says which headers and members are redacted by default.
+- **S2.9 The SDKs graduate** (ADR 0027) — **M**. The TypeScript SDK moves into pact-js and the JVM
+  SDK into pact-jvm, each as that package's next major version, with its conformance driver, its
+  thinness classification and its generated bindings, running S0.11's gates against the pinned engine
+  release from its new home. This repository keeps no SDK source afterwards; the demo consumes the
+  published packages. If a maintainer group declines the graduation, the SDK gets a repository of its
+  own under the Pact organisation (ADR 0027's tripwire).
+  *Exit:* both SDKs' CI is green in their new repositories against a released engine, the published
+  packages pass the conformance suite, and `sdks/` here holds only `bindings.json` and the README that
+  says where they went.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
-of pact-js and pact-jvm run on the compatibility facade, and early adopters publish contracts to a
-broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers, before or after.
+of pact-js and pact-jvm run on the compatibility facade, both SDKs have graduated (S2.9), and early
+adopters publish contracts to a broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers,
+before or after.
 
 ### Stage 3: Shapes and variants in the DSLs — **L**
 
@@ -421,7 +452,8 @@ content component exists written by someone outside the core team.
 
 - **S6.1 More SDKs:** Go, Python, .NET, Rust, Ruby, PHP, and whatever else the community maintains.
   Each is generated bindings, an idiomatic layer written from the SDK specification, **both sides**
-  (consumer and provider, S1.14), and the conformance suite. The regeneration trial (task 6.5) showed
+  (consumer and provider, S1.14), and the conformance suite, incubated here and graduated into its
+  language's existing repository the way S2.9 did (ADR 0027). The regeneration trial (task 6.5) showed
   agents can carry a specification change into several SDKs under the suite's judgement. That is what
   makes this stage affordable for a small team, but it does not replace the suite.
 - **S6.2 Consumer-side message interactions**, end to end, with broker adapters as components. The
@@ -540,6 +572,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 
 | Risk | Where it bites | Mitigation |
 |---|---|---|
+| **One pipeline carries everything** until S2.9: Rust, Node, the JDK, WASM, a registry and the demo, under one tag namespace | Stages 0–2 | ADR 0027: the SDKs leave at stage 2's exit, and S0.10–S0.11 build the pieces that move needs before it is urgent |
 | **Volunteer capacity.** This is a multi-year build for a volunteer-driven project | Every stage | Providers-first ordering puts value in users' hands at stage 1a and stops depending on later stages. The specifications and conformance suite let contributors work in parallel without drifting apart |
 | **Stage 1 is the biggest stage**, not the L the first revision sized it. "Exactly as today" covers generators, TLS, XML and form bodies, message pacts, a broker client and in-test state handlers, none of which the prototype has | Stage 1 | Split into 1a, which ships a CLI verifier with value on its own, and 1b. S1.1's harness turns "exactly" into a number from the first week, so scope is discovered early rather than at the pilot |
 | **The Osborne effect.** Announcing MkII stalls today's Pact before MkII is ready | Stages 1–3 | Stage 1 improves life for today's users with no migration at all. The compatibility facade keeps the consumer migration mechanical |
@@ -592,9 +625,10 @@ The charter defines "prototype complete" as follows. Each condition is now met.
 | Every unresolved-questions row has an answer or an honest "still open" | Yes ([RFC feedback](rfc-feedback.md) §2; plan §13) |
 | The report and the staged plan are published for community review | The [community report](prototype-report.md), this plan, and the revised RFC on [PR #146](https://github.com/pact-foundation/roadmap/pull/146) |
 
-What happens to this repository was itself a question for the community. This revision answers it
-provisionally (S0.6): the real build proceeds here, hardening the prototype in place, and §2 is the
-inventory of what that means. §7.2 can still move it; the history comes along.
+What happens to this repository was itself a question for the community. ADR 0027 answers it: the real
+build proceeds here, hardening the prototype in place, with §2 as the inventory of what that means and
+the SDKs graduating into their existing repositories at stage 2's exit. §7.2 can still move the
+permanent part; the history comes along.
 
 ## Revision
 
@@ -603,6 +637,9 @@ review against the Phase 9 findings, the kernel-boundary review, the RFC, the AD
 notes and the code found three structural problems and a list of gaps, all folded in:
 
 - **Every item has an id, a size and an exit** (principle 6), so progress can be recorded against it.
+- **The repository layout is decided** (ADR 0027, same day): build here, the executable
+  specification stays together, the SDKs are incubated and graduate into pact-js and pact-jvm at
+  stage 2's exit (S2.9), and S0.10–S0.12 make the split cheap now.
 - **Stage 0 is split** into what can start now (0a) and what waits on §7 (0b). Two decisions the first
   revision left to "either works" are now stated as assumptions: the build happens here (S0.6), and the
   codename stays, with the rename made mechanical and rehearsed rather than forbidden (S0.5). The
