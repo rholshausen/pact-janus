@@ -8,53 +8,25 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# Staged plan S0.2: every step is bash, so one script means the same thing on all three operating
+# systems (on Windows that is Git for Windows' bash, which the runners ship).
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  rust:
+  checks:
+    # The checks whose answer cannot depend on the operating system: they read the repository and
+    # run nothing from it. Once is enough.
     runs-on: ubuntu-latest
-    # Plan task 8.2: a real OCI registry for the component-distribution tests. They also run against
-    # a registry in their own process, which can be told to lie; this one is the evidence that a
-    # registry nobody here wrote agrees with the client (JANUS_OCI_REGISTRY, on the Test step).
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-          targets: wasm32-wasip2
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
-      # The kernel embeds QuickJS for scripted hooks (ADR 0015), and `rquickjs`'s bindgen build —
-      # the one that reaches the WASI targets — needs libclang. The only non-Rust build requirement
-      # this workspace has, installed explicitly so a failure here reads as "the toolchain" rather
-      # than as "the code".
-      - name: Build prerequisites
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
       - name: Format
         run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-      - name: Build
-        run: cargo build --all-targets
-      - name: Test
-        run: cargo test
-        env:
-          JANUS_OCI_REGISTRY: localhost:5000
-      - name: WASM build (kernel)
-        run: cargo build --package pact_janus_kernel --target wasm32-wasip2
-      # Plan task 8.1: the third-party CSV component is out of tree — its own workspace, depending
-      # on nothing here — so the workspace steps above never see it. It is held to the same bar on
-      # its own, and built for the target a component ships as; the engine's tests build it again
-      # and load it.
-      - name: Third-party component (janus-csv)
-        working-directory: third-party/janus-csv
-        run: |
-          cargo fmt -- --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
-          cargo build --release --target wasm32-wasip2
       - name: Spec schema lint
         run: cargo run --package pact_janus_schema_compat -- lint Documentation/specs
       # Plan task 6.4: the conformance corpus against its own schema, and against the behavioural
@@ -76,19 +48,90 @@ jobs:
             exit 1
           fi
 
-  sdks:
-    # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from
-    # the schemas today. A schema change without regenerated bindings — or a hand edit to a
-    # generated file — fails here, not later as an SDK quietly disagreeing with the engine. Then
-    # each SDK's own lint, tests and build; the TypeScript SDK's tests drive a real janus-engine
-    # (plan task 6.2), which its Vitest global setup builds — hence libclang, as in the rust job.
-    runs-on: ubuntu-latest
+  rust:
+    # Staged plan S0.2: the whole workspace on Linux, macOS and Windows. The subprocess is every
+    # SDK's primary embedding (ADR 0023), so the engine has to be known to build, spawn and exit on
+    # each of them, not assumed to.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
-      - name: Build prerequisites
+      # The kernel embeds QuickJS for scripted hooks (ADR 0015), and `rquickjs`'s bindgen build —
+      # the one that reaches the WASI targets — needs libclang. The only non-Rust build requirement
+      # this workspace has, set up explicitly so a failure here reads as "the toolchain" rather
+      # than as "the code". macOS finds the one Xcode ships.
+      - name: Build prerequisites (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Build prerequisites (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
+      # Plan task 8.2: a real OCI registry for the component-distribution tests. They also run
+      # against a registry in their own process, which can be told to lie; this one is the evidence
+      # that a registry nobody here wrote agrees with the client. Linux only, because only Linux
+      # runners run containers: on macOS and Windows the tests use the in-process registry alone.
+      - name: OCI registry (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run -d -p 5000:5000 --name registry registry:2
+          for _ in $(seq 30); do
+            curl -fsS http://localhost:5000/v2/ >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://localhost:5000/v2/ >/dev/null
+          echo "JANUS_OCI_REGISTRY=localhost:5000" >> "$GITHUB_ENV"
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Build
+        run: cargo build --all-targets
+      - name: Test
+        run: cargo test
+      - name: WASM build (kernel)
+        run: cargo build --package pact_janus_kernel --target wasm32-wasip2
+      # Plan task 8.1: the third-party CSV component is out of tree — its own workspace, depending
+      # on nothing here — so the workspace steps above never see it. It is held to the same bar on
+      # its own, and built for the target a component ships as; the engine's tests build it again
+      # and load it.
+      - name: Third-party component (janus-csv)
+        working-directory: third-party/janus-csv
+        run: |
+          cargo fmt -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          cargo build --release --target wasm32-wasip2
+
+  sdks:
+    # Each SDK's own lint, tests and build, on Linux, macOS and Windows (staged plan S0.2). Both
+    # suites drive a real janus-engine as a subprocess (plan task 6.2), which their test setup
+    # builds — hence libclang, as in the rust job — so this is also where spawning the engine,
+    # speaking frames over its stdio and its exit on stdin EOF are exercised on each system.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - name: Build prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Build prerequisites (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -96,6 +139,7 @@ jobs:
           cache-dependency-path: |
             sdks/typescript/package-lock.json
             demo/web-app/package-lock.json
+            cli/tests/janus-engine-node/package-lock.json
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -104,9 +148,15 @@ jobs:
       - name: Install TypeScript SDK dependencies
         run: npm ci
         working-directory: sdks/typescript
+      # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces
+      # from the schemas today. A schema change without regenerated bindings — or a hand edit to a
+      # generated file — fails here, not later as an SDK quietly disagreeing with the engine. What
+      # the pipeline writes does not depend on where it runs, so it is checked in one place.
       - name: Regenerate bindings
+        if: runner.os == 'Linux'
         run: cargo run --package pact_janus_bindings -- generate
       - name: Bindings match their schemas
+        if: runner.os == 'Linux'
         run: |
           if [ -n "$(git status --porcelain -- sdks)" ]; then
             git status --porcelain -- sdks
@@ -122,7 +172,8 @@ jobs:
         run: ./gradlew build
       # Plan task 6.4, ADR 0017: each SDK's test run above also ran the shared conformance suite and
       # wrote its report. Conformance is that both accounted for every case in the corpus, and
-      # passed it — the claim a build makes, rather than one a maintainer asserts.
+      # passed it — the claim a build makes, rather than one a maintainer asserts. Made here on each
+      # operating system, against the engine built on it.
       - name: SDKs are conformant
         run: cargo run --package pact_janus_conformance -- check target/conformance/typescript.json target/conformance/jvm.json
       # Plan task 6.5: "SDKs are thin" as an exit code. Every SDK source file must be classified into
@@ -130,13 +181,23 @@ jobs:
       # orchestration creeping back into an SDK shows up as a failing build, not as a stale number.
       - name: SDKs are thin
         run: cargo run --package pact_janus_thinness -- check
+      # Plan task 4.5: the protocol-level client drives janus-engine frame by frame with no SDK in
+      # the way — spawn, handshake, a consumer run through the mock, exit on stdin EOF. Spike 1.3
+      # left exactly that open on Windows.
+      - name: Protocol client (janus-engine over stdio)
+        working-directory: cli/tests/janus-engine-node
+        run: npm ci && npm test
       # Plan task 9.3: the demo is the RFC's whole loop, run end to end — consumer test, verification
       # with hooks, janus check, widening, fixing. --ci asserts every step's outcome, so a demo that no
-      # longer shows what the report says it shows fails here.
+      # longer shows what the report says it shows fails here. It is a bash walkthrough built on
+      # symbolic links and job control, so it runs where those exist; on Windows the CLI, the engine
+      # and the SDK it strings together are each covered by their own suites above.
       - name: Install the demo's dependencies
+        if: runner.os != 'Windows'
         run: npm ci
         working-directory: demo/web-app
       - name: The demo runs
+        if: runner.os != 'Windows'
         run: demo/run.sh --ci
 
   schema-compat:
