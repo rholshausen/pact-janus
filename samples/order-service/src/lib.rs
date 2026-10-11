@@ -165,10 +165,12 @@ impl Drop for Provider {
 pub fn start(config: Config) -> Result<Provider, String> {
   let server = tiny_http::Server::http((config.host.as_str(), config.port))
     .map_err(|err| format!("could not bind {}:{}: {err}", config.host, config.port))?;
-  let port = match server.server_addr() {
-    tiny_http::ListenAddr::IP(addr) => addr.port(),
-    tiny_http::ListenAddr::Unix(_) => config.port,
-  };
+  // `ListenAddr` has a Unix-socket variant on Unix only, so this is not a `match`: it has to mean
+  // the same thing on Windows.
+  let port = server
+    .server_addr()
+    .to_ip()
+    .map_or(config.port, |addr| addr.port());
   let base_url = format!("http://{}:{port}", config.host);
 
   let store = Arc::new(Mutex::new(Store::seeded()));
