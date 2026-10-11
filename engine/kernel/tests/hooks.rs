@@ -413,13 +413,16 @@ hooks:
         format: pact-state-change
   after-response:
     - name: observe
-      run: { kind: exec, command: /bin/sh, args: ["${OBSERVE_SH}"], env: { PATH: "/usr/bin:/bin" } }
+      run: { kind: exec, command: "${SH}", args: ["${OBSERVE_SH}"], env: { PATH: "/usr/bin:/bin" } }
 "#;
   std::fs::write(dir.join("verifier.janus.yaml"), config).unwrap();
 
   let env: HashMap<String, String> = [
     ("PROVIDER_URL".to_string(), provider.base_url().to_string()),
     ("OBSERVE_SH".to_string(), fixture("observe.sh")),
+    // The shell is named the way each platform has it (see `sh`), like any other machine-specific
+    // value a project keeps out of the file.
+    ("SH".to_string(), sh().to_string()),
   ]
   .into_iter()
   .collect();

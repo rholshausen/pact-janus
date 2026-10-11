@@ -105,8 +105,8 @@ cargo run -p pact_janus_conformance -- check target/conformance/*.json   # both 
 cargo run -p pact_janus_doc_links             # every relative link in the documentation resolves
 ```
 
-CI also runs clippy, rustfmt, the `wasm32-wasip2` build, schema-compatibility checks, the SDK thinness
-audit and `demo/run.sh --ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the practicalities.
+CI runs all of that on Linux, macOS and Windows, and also clippy, rustfmt, the `wasm32-wasip2` build,
+schema-compatibility checks, the SDK thinness audit and `demo/run.sh --ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the practicalities.
 
 ## What is where
 

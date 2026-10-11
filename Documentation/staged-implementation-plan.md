@@ -147,6 +147,27 @@ Engineering with no dependency on a community answer. All of it happens in this 
   Windows only for spike 8.3. ADR 0023 makes the subprocess every SDK's primary embedding, so the
   kernel, CLI, `janus-engine` and both SDK suites run on all three.
   *Exit:* the CI matrix is green on three operating systems, including the SDK conformance runs.
+  *Done 2026-10-11.* The `rust` and `sdks` jobs are a matrix over Linux, macOS and Windows; the checks
+  that only read the repository run once, in a job of their own. macOS passed at the first run. Windows
+  took four, and what it found is the reason the item exists:
+  - a Unix-only `tiny_http` variant matched on in the HTTP component and the sample provider, so
+    neither compiled;
+  - three places that read meaning out of a path's separator: the specification test-case harness
+    took 61 request cases for responses, the conformance lint found no case where its id said it
+    belonged, and two hooks-loader tests expected a `/` join;
+  - **the two SDKs disagreed**, in one conformance case of 47. A component reference that begins at
+    the root and names no drive is absolute to Node and relative to Java, so the JVM SDK rewrote what
+    the TypeScript SDK passed as written. The behavioural specification now states the rule on the
+    text rather than on a path library's answer, and the JVM SDK follows it;
+  - test fixtures that named `/bin/sh` or put a Windows path in a double-quoted YAML string, and a
+    checkout that needed `.gitattributes` to stay LF.
+  Spike 1.3's open risk has a test of its own now, on all three: `janus-engine` exits when its stdin
+  closes, with a mock transport still serving and no `engine/shutdown` sent. The protocol-level Node
+  client, which was never in CI, runs on all three as well.
+  Three things run on fewer than three systems, each for a stated reason in the workflow: the real OCI
+  registry (containers are Linux-only on the runners; elsewhere the tests use the in-process one), the
+  bindings regeneration check (what it writes does not depend on where it runs), and the demo (Linux
+  and macOS: it is a bash walkthrough built on symbolic links and job control).
 - **S0.3 Benchmark trend in CI** — **S**. The harness plan §14 promised and 9.1 found had never run.
   Trend, not gate. Gate E (frame encoding) and gate C (contract packaging) can only fire on this data.
   *Exit:* every merge to `main` records the 1.7 scenarios against Janus and the chart is linkable.
