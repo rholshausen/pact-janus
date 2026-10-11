@@ -48,7 +48,7 @@ const MARKERS: [&str; 26] = [
 
 const COMPONENT: &str = "https://pact.io/janus/component/v1";
 const PROTOCOL: &str = "https://pact.io/janus/protocol/v1";
-const PLAN: &str = "https://pact.io/janus/plan/v0";
+const PLAN: &str = "https://pact.io/janus/plan/v1";
 const SHAPE: &str = "https://pact.io/janus/shape/v1";
 
 /// Marker -> the schema (or `$defs` fragment) that owns that document.
@@ -111,7 +111,7 @@ fn load_schemas() -> HashMap<String, Value> {
   for (design, version) in [
     ("component-interfaces", "v1"),
     ("engine-protocol", "v1"),
-    ("plan-grammar", "v0"),
+    ("plan-grammar", "v1"),
     ("shape-language", "v1"),
   ] {
     let dir = specs_dir().join(design).join("schemas").join(version);

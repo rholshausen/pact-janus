@@ -264,12 +264,12 @@ fn compile_array(entries: &[ShapeNode], ctx: &Ctx) -> Vec<Node> {
 }
 
 /// `each-like` (spec §5.2): `expect:array` for the kind, `expect:size` for the cardinality
-/// (narrowed to `expect:count` when the cardinality dimension is pinned), plus `for-each` over a
+/// (narrowed to `expect:count` when the cardinality dimension is pinned), plus `flow:for-each` over a
 /// `splat` of the elements, the item shape compiled once against `resolve-current`.
 fn compile_each_like(items: &ShapeNode, min: u64, max: Option<u64>, ctx: &Ctx) -> Vec<Node> {
   let item_ctx = ctx.iteration_item(path::each_like_item(&ctx.at));
   let item_node = Node::container(Some(item_ctx.label()), compile_shape(items, &item_ctx));
-  let for_each = Node::action("for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
+  let for_each = Node::action("flow:for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
   let size_assertion = cardinality_assertion(ctx, min, max);
   vec![
     Node::action("expect:array", vec![ctx.resolve()]),
@@ -312,7 +312,7 @@ fn compile_each_entry(
   ));
 
   let item_node = Node::container(Some(ctx.label()), item_children);
-  let for_each = Node::action("for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
+  let for_each = Node::action("flow:for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
   let size_assertion = cardinality_assertion(ctx, min, max);
   vec![
     Node::action("expect:object", vec![ctx.resolve()]),
@@ -365,9 +365,9 @@ fn compile_contains(entries: &[ShapeNode], ctx: &Ctx) -> Node {
   Node::action("match:contains", children)
 }
 
-/// `optional` (spec §5.2): `if` on `check:exists`; the present branch compiles `of` (spliced
+/// `optional` (spec §5.2): `flow:if` on `check:exists`; the present branch compiles `of` (spliced
 /// directly, without a wrapping container, when it is already one node — spec's worked example
-/// shows exactly this: `%if(%check:exists(...), %match:datetime(...))`); pinning to `absent`
+/// shows exactly this: `%flow:if(%check:exists(...), %match:datetime(...))`); pinning to `absent`
 /// narrows to `expect:absent`, pinning to `present` narrows to `of` with no branch at all
 /// (spec §7.1: the plan is narrower because the shape is).
 fn compile_optional(of: &ShapeNode, ctx: &Ctx) -> Node {
@@ -376,7 +376,7 @@ fn compile_optional(of: &ShapeNode, ctx: &Ctx) -> Node {
     Some("absent") => Node::action("expect:absent", vec![ctx.resolve()]),
     Some("present") => as_single_unlabeled(compile_shape(of, ctx)),
     _ => Node::action(
-      "if",
+      "flow:if",
       vec![
         Node::action("check:exists", vec![ctx.resolve()]),
         as_single_unlabeled(compile_shape(of, ctx)),
@@ -385,8 +385,8 @@ fn compile_optional(of: &ShapeNode, ctx: &Ctx) -> Node {
   }
 }
 
-/// `nullable` (spec §5.2): `if` on `check:null`; the null branch is an explicit no-op (`and`
-/// with no children — the control family's identity element, used here because the `if` grammar
+/// `nullable` (spec §5.2): `flow:if` on `check:null`; the null branch is an explicit no-op (`flow:and`
+/// with no children — the control family's identity element, used here because the `flow:if` grammar
 /// needs a positional branch node and this shape has nothing to check once the value is null),
 /// the non-null branch compiles `of`. Pinning to `null` narrows to `match:null`; pinning to
 /// `non-null` narrows to `of` with no branch.
@@ -396,7 +396,7 @@ fn compile_nullable(of: &ShapeNode, ctx: &Ctx) -> Node {
     Some("null") => Node::action("match:null", vec![ctx.resolve()]),
     Some("non-null") => as_single_unlabeled(compile_shape(of, ctx)),
     _ => Node::action(
-      "if",
+      "flow:if",
       vec![
         Node::action("check:null", vec![ctx.resolve()]),
         ok_node(),
@@ -425,8 +425,8 @@ fn compile_any_of(options: &[Value], ctx: &Ctx) -> Node {
   Node::action("match:any-of", children)
 }
 
-/// `one-of` (spec §5.2): nested `if`/`check:equals` (or `or` of them, when an alternative's
-/// discriminator is an `any-of` rather than a bare literal) per alternative, ending in an `error`
+/// `one-of` (spec §5.2): nested `flow:if`/`check:equals` (or `flow:or` of them, when an alternative's
+/// discriminator is an `any-of` rather than a bare literal) per alternative, ending in a `flow:error`
 /// naming the discriminator value read; pinned, it narrows straight to the selected alternative's
 /// compiled object — including its own discriminator member, which is a harmless redundancy
 /// (rather than stripping it) that keeps this compiler agnostic to whether an alternative is
@@ -449,7 +449,7 @@ fn compile_one_of(discriminator: &str, alternatives: &BTreeMap<String, ShapeNode
     let alt_ctx = ctx.alternative(alt_name);
     let condition = discriminator_condition(alt_shape, discriminator, &discriminator_cursor);
     let branch = Node::container(Some(alt_name.clone()), compile_shape(alt_shape, &alt_ctx));
-    chain = Node::action("if", vec![condition, branch, chain]);
+    chain = Node::action("flow:if", vec![condition, branch, chain]);
   }
   chain
 }
@@ -500,7 +500,7 @@ fn discriminator_condition(
       vec![discriminator_cursor.resolve(), Node::value(Literal::null())],
     ),
     1 => checks.into_iter().next().expect("checked len == 1"),
-    _ => Node::action("or", checks),
+    _ => Node::action("flow:or", checks),
   }
 }
 
@@ -515,9 +515,9 @@ fn one_of_error_branch<'a>(
     names.join(", ")
   );
   Node::action(
-    "error",
+    "flow:error",
     vec![Node::action(
-      "join",
+      "value:join",
       vec![
         Node::value(Literal::string(message)),
         discriminator_cursor.resolve(),
@@ -550,10 +550,10 @@ fn as_single_unlabeled(mut nodes: Vec<Node>) -> Node {
   }
 }
 
-/// The control family's identity element: an empty conjunction. Stands in for a positional `if`
+/// The control family's identity element: an empty conjunction. Stands in for a positional `flow:if`
 /// branch that this shape's narrowing makes trivially true (`nullable`'s null case).
 fn ok_node() -> Node {
-  Node::action("and", vec![])
+  Node::action("flow:and", vec![])
 }
 
 /// Well-formedness (shape spec §4.2) makes `example` required for `equality`/`type`; this

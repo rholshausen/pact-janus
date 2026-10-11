@@ -7,78 +7,28 @@
 //! 1. **its grammar version is read** ([`readable`]) — a fragment that does not say which grammar it
 //!    was written against cannot be checked for skew, and is refused rather than guessed at;
 //! 2. **it is parsed** as a plan node, under that grammar;
-//! 3. **its actions are checked** ([`check_actions`]): core ones must be core actions this engine
-//!    has, component ones must be in the contributing component's own namespace *and* among the
-//!    actions its handshake contributed, and every `resolve` must stay inside the slot it was
-//!    compiled for.
+//! 3. **its actions are checked** ([`check_actions`]): core ones must be core actions of the grammar
+//!    it declared, component ones must be in the contributing component's own namespace *and*
+//!    among the actions its handshake contributed, and every `resolve` must stay inside the slot it
+//!    was compiled for.
+//!
+//! A fragment written against grammar v0 comes out of step 3 in v1's names (ADR 0026 decision 4):
+//! the two grammars differ in nothing else, so the rest of the engine — the interpreter, `explain` —
+//! only ever sees v1.
 //!
 //! Then it replaces the generic plan for its slot ([`splice`]). Replaces, not joins: a content
 //! component contributes a fragment precisely where the generic plan is wrong for its content type
 //! (CSV's `integer` is text that spells one), and a generic `match:integer` left beside it would
 //! still fail.
 
+use super::actions::Grammar;
 use super::model::{Node, NodeKind, node_from_json};
-use crate::component::CORE_FAMILIES;
 use serde_json::Value;
 
 /// The grammar versions this engine reads, newest last. A fragment written against any of them — or
 /// against an older minor of the same major — is readable (spec §7.1: the grammar evolves
-/// additively within a major).
-pub const READABLE_GRAMMAR_VERSIONS: &[&str] = &["v0"];
-
-/// Every core action this engine implements (spec §4.2–§4.4). A fragment that names a core action
-/// outside this list was written against a newer grammar, or is wrong — its declared version says
-/// which.
-pub const CORE_ACTIONS: &[&str] = &[
-  "and",
-  "or",
-  "if",
-  "error",
-  "apply",
-  "for-each",
-  "tee",
-  "join",
-  "join-with",
-  "length",
-  "lower-case",
-  "upper-case",
-  "to-string",
-  "expect:object",
-  "expect:array",
-  "expect:empty",
-  "expect:not-empty",
-  "expect:count",
-  "expect:size",
-  "expect:entries",
-  "expect:only-entries",
-  "expect:absent",
-  "check:exists",
-  "check:equals",
-  "check:null",
-  "match:any",
-  "match:equality",
-  "match:type",
-  "match:string",
-  "match:number",
-  "match:integer",
-  "match:decimal",
-  "match:boolean",
-  "match:null",
-  "match:regex",
-  "match:datetime",
-  "match:date",
-  "match:time",
-  "match:include",
-  "match:content-type",
-  "match:semver",
-  "match:any-of",
-  "match:contains",
-  "match:array-contains",
-  "match:min-type",
-  "match:max-type",
-  "match:min-max-type",
-  "match:header-value",
-];
+/// additively within a major). `v0` is read by the one-to-one mapping to `v1` (ADR 0026).
+pub const READABLE_GRAMMAR_VERSIONS: &[&str] = &["v0", "v1"];
 
 /// Why a fragment cannot be used. `Skew` is a version question; `Invalid` is the component's bug.
 #[derive(Debug, Clone, PartialEq)]
@@ -102,8 +52,8 @@ pub fn parse_version(version: &str) -> Option<(u64, u64)> {
 
 /// Whether an engine reading `engine` can read a fragment written against `fragment`: same major,
 /// and a minor no newer than the engine's. `v0` fragments on a `v0.1` engine are the designed-for
-/// case (the grammar grew); a `v0.1` fragment on a `v0` engine may use what `v0` never had; a `v1`
-/// fragment is a different grammar.
+/// case (the grammar grew); a `v0.1` fragment on a `v0` engine may use what `v0` never had. Another
+/// major is another grammar, read only if the engine lists it too ([`READABLE_GRAMMAR_VERSIONS`]).
 pub fn readable_by(engine: &str, fragment: &str) -> bool {
   match (parse_version(engine), parse_version(fragment)) {
     (Some((engine_major, engine_minor)), Some((major, minor))) => {
@@ -148,44 +98,44 @@ pub fn validate(
   slot_path: &str,
 ) -> Result<Node, FragmentError> {
   readable(declared)?;
-  let node =
+  let grammar = declared
+    .and_then(Grammar::of)
+    .expect("a readable version names a grammar this engine has");
+  let mut node =
     node_from_json(fragment).map_err(|err| FragmentError::Invalid(format!("not a plan node: {err}")))?;
-  check_actions(&node, component, contributed, slot_path)?;
+  check_actions(&mut node, grammar, component, contributed, slot_path)?;
   Ok(node)
 }
 
-/// Step 3, over the whole fragment.
+/// Step 3, over the whole fragment, which was written in `grammar`. Each core action is left under
+/// its v1 name.
 pub fn check_actions(
-  node: &Node,
+  node: &mut Node,
+  grammar: Grammar,
   component: &str,
   contributed: &[String],
   slot_path: &str,
 ) -> Result<(), FragmentError> {
-  match &node.kind {
+  match &mut node.kind {
     NodeKind::Action { name, children } => {
-      match name.split_once(':') {
-        Some((namespace, _)) if !CORE_FAMILIES.contains(&namespace) => {
-          if namespace != component {
-            return Err(FragmentError::Invalid(format!(
-              "'{name}' is in another component's namespace; a fragment may use core actions and '{component}:' ones"
-            )));
-          }
-          if !contributed.iter().any(|action| action == name) {
-            return Err(FragmentError::Invalid(format!(
-              "'{name}' is not among the actions '{component}' contributed in its handshake"
-            )));
-          }
-        }
-        _ if !CORE_ACTIONS.contains(&name.as_str()) => {
-          return Err(FragmentError::Invalid(format!(
-            "'{name}' is not a core action of the grammar the fragment declared"
-          )));
-        }
-        _ => {}
+      if let Some(core) = grammar.core(name) {
+        *name = core.to_string();
+      } else if grammar.reserves(name) {
+        return Err(FragmentError::Invalid(format!(
+          "'{name}' is not a core action of the grammar the fragment declared"
+        )));
+      } else if name.split_once(':').map(|(namespace, _)| namespace) != Some(component) {
+        return Err(FragmentError::Invalid(format!(
+          "'{name}' is in another component's namespace; a fragment may use core actions and '{component}:' ones"
+        )));
+      } else if !contributed.iter().any(|action| action == name) {
+        return Err(FragmentError::Invalid(format!(
+          "'{name}' is not among the actions '{component}' contributed in its handshake"
+        )));
       }
       children
-        .iter()
-        .try_for_each(|child| check_actions(child, component, contributed, slot_path))
+        .iter_mut()
+        .try_for_each(|child| check_actions(child, grammar, component, contributed, slot_path))
     }
     NodeKind::Resolve { path } => {
       if path == slot_path
@@ -201,10 +151,31 @@ pub fn check_actions(
     }
     NodeKind::Container { children, .. } | NodeKind::Pipeline { children } | NodeKind::Splat { children } => {
       children
-        .iter()
-        .try_for_each(|child| check_actions(child, component, contributed, slot_path))
+        .iter_mut()
+        .try_for_each(|child| check_actions(child, grammar, component, contributed, slot_path))
     }
     NodeKind::Value(_) | NodeKind::ResolveCurrent { .. } | NodeKind::Annotation { .. } => Ok(()),
+  }
+}
+
+/// A whole plan written in grammar v0, renamed to v1 in place (ADR 0026 decision 4). A name v0 did
+/// not define is left as it is: it is a component's, or it is unknown, and the interpreter says
+/// which when it reaches it.
+pub fn rename_from_v0(node: &mut Node) {
+  match &mut node.kind {
+    NodeKind::Action { name, children } => {
+      if let Some(core) = Grammar::V0.core(name) {
+        *name = core.to_string();
+      }
+      children.iter_mut().for_each(rename_from_v0);
+    }
+    NodeKind::Container { children, .. } | NodeKind::Pipeline { children } | NodeKind::Splat { children } => {
+      children.iter_mut().for_each(rename_from_v0);
+    }
+    NodeKind::Value(_)
+    | NodeKind::Resolve { .. }
+    | NodeKind::ResolveCurrent { .. }
+    | NodeKind::Annotation { .. } => {}
   }
 }
 
@@ -257,6 +228,8 @@ mod tests {
     assert!(!readable_by("v0", "v0.1"), "it may use what v0 never had");
     assert!(!readable_by("v1", "v0"), "another major is another grammar");
     assert!(!readable_by("v0", "v1"));
+    assert!(readable_by("v1", "v1"));
+    assert!(!readable_by("v1", "v1.1"));
     assert!(!readable_by("v0", "0"), "not a grammar version");
     assert!(!readable_by("v0", "v0.x"));
   }
@@ -268,34 +241,73 @@ mod tests {
       Err(FragmentError::Skew { declared: None, .. })
     ));
     assert_eq!(readable(Some("v0")), Ok(()));
-    let skew = readable(Some("v0.1")).unwrap_err();
-    assert!(
-      matches!(&skew, FragmentError::Skew { declared: Some(v), .. } if v == "v0.1"),
-      "{skew:?}"
-    );
+    assert_eq!(readable(Some("v1")), Ok(()), "both majors are read");
+    for newer in ["v0.1", "v1.1", "v2"] {
+      let skew = readable(Some(newer)).unwrap_err();
+      assert!(
+        matches!(&skew, FragmentError::Skew { declared: Some(v), .. } if v == newer),
+        "{skew:?}"
+      );
+    }
   }
 
-  fn check(action: &str) -> Result<Node, FragmentError> {
+  fn check_in(grammar: &str, action: &str) -> Result<Node, FragmentError> {
     validate(
       &json!({ "kind": "action", "name": action,
                "children": [ { "kind": "resolve", "path": "$.response.body" } ] }),
-      Some("v0"),
+      Some(grammar),
       "csv",
       &["csv:integer".to_string()],
       "$.response.body",
     )
   }
 
+  fn check(action: &str) -> Result<Node, FragmentError> {
+    check_in("v1", action)
+  }
+
+  fn name_of(node: Result<Node, FragmentError>) -> String {
+    match node.expect("a valid fragment").kind {
+      NodeKind::Action { name, .. } => name,
+      other => panic!("not an action: {other:?}"),
+    }
+  }
+
   #[test]
   fn a_fragment_may_use_core_actions_and_its_own_contributed_ones_and_nothing_else() {
     assert!(check("expect:array").is_ok());
+    assert!(check("flow:for-each").is_ok());
     assert!(check("csv:integer").is_ok());
     assert!(matches!(check("csv:decimal"), Err(FragmentError::Invalid(m)) if m.contains("not among")));
     assert!(matches!(check("json:parse"), Err(FragmentError::Invalid(m)) if m.contains("another component")));
-    // A core-looking name the engine does not have: from a newer grammar, or a typo. The fragment
-    // declared v0, so it is a typo — or a component that declared the wrong version.
+    // A reserved namespace, and a name the engine does not have in it: from a newer grammar, or a
+    // typo. The fragment declared v1, so it is a typo — or a component that declared the wrong
+    // version.
     assert!(
       matches!(check("expect:unique"), Err(FragmentError::Invalid(m)) if m.contains("not a core action"))
+    );
+    // v1 has no unnamespaced actions, so this is nobody's.
+    assert!(matches!(check("for-each"), Err(FragmentError::Invalid(m)) if m.contains("another component")));
+  }
+
+  #[test]
+  fn a_v0_fragment_is_read_by_the_one_to_one_mapping_and_comes_out_in_v1_names() {
+    assert_eq!(name_of(check_in("v0", "for-each")), "flow:for-each");
+    assert_eq!(name_of(check_in("v0", "upper-case")), "value:upper-case");
+    assert_eq!(name_of(check_in("v0", "match:min-type")), "legacy:min-type");
+    assert_eq!(name_of(check_in("v0", "expect:array")), "expect:array");
+    assert_eq!(name_of(check_in("v0", "csv:integer")), "csv:integer");
+    // A fragment is held to the grammar it declared, not to the newest one the engine reads.
+    assert!(
+      matches!(check_in("v0", "flow:for-each"), Err(FragmentError::Invalid(m)) if m.contains("another component")),
+      "v0 has no flow namespace"
+    );
+    assert!(
+      matches!(check_in("v0", "expect:unique"), Err(FragmentError::Invalid(m)) if m.contains("not a core action"))
+    );
+    assert!(
+      matches!(check_in("v1", "match:min-type"), Err(FragmentError::Invalid(m)) if m.contains("not a core action")),
+      "in v1 it is legacy:min-type"
     );
   }
 
@@ -303,7 +315,7 @@ mod tests {
   fn a_fragment_stays_inside_its_slot() {
     let outside = validate(
       &json!({ "kind": "resolve", "path": "$.request.headers" }),
-      Some("v0"),
+      Some("v1"),
       "csv",
       &[],
       "$.response.body",
@@ -311,7 +323,7 @@ mod tests {
     assert!(matches!(outside, Err(FragmentError::Invalid(m)) if m.contains("outside the slot")));
     let prefix_only = validate(
       &json!({ "kind": "resolve", "path": "$.response.bodyguard" }),
-      Some("v0"),
+      Some("v1"),
       "csv",
       &[],
       "$.response.body",

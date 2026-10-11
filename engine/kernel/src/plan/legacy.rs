@@ -30,7 +30,7 @@
 //! **Scope.** JSON bodies only (component-owned content types — XML, form, multipart — are out of
 //! scope until design 2.6's components exist, matching plan task 3.3's own JSON-first scope and
 //! the reuse-inventory's risk note). `Values`, `EachKey`, `EachValue`, `ArrayContains` and
-//! plugin-provided rules compile to an `error` node naming the gap rather than a guess: the 803
+//! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
 
@@ -269,7 +269,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
       vec![resolve, Node::value(Literal::from_json(example))],
     ),
     MatchingRule::MinType(min) => Node::action(
-      "match:min-type",
+      "legacy:min-type",
       vec![
         resolve,
         Node::value(Literal::from_json(example)),
@@ -277,7 +277,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
       ],
     ),
     MatchingRule::MaxType(max) => Node::action(
-      "match:max-type",
+      "legacy:max-type",
       vec![
         resolve,
         Node::value(Literal::from_json(example)),
@@ -285,7 +285,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
       ],
     ),
     MatchingRule::MinMaxType(min, max) => Node::action(
-      "match:min-max-type",
+      "legacy:min-max-type",
       vec![
         resolve,
         Node::value(Literal::from_json(example)),
@@ -319,7 +319,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
     MatchingRule::NotEmpty => Node::action("expect:not-empty", vec![resolve]),
     MatchingRule::Semver => Node::action("match:semver", vec![resolve]),
     other => Node::action(
-      "error",
+      "flow:error",
       vec![Node::value(Literal::string(format!(
         "legacy matching rule '{}' is not yet supported by the compiled plan",
         other.name()
@@ -329,8 +329,8 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
 }
 
 /// A [`RuleList`] to one node: the single rule's node, or every rule's node combined by
-/// `RuleLogic::And`/`Or` (plan-grammar spec §4.2's `and`/`or` control actions — the interpreter
-/// already short-circuits `or` and conjoins `and`, so the combination needs no special handling
+/// `RuleLogic::And`/`Or` (plan-grammar spec §4.2's `flow:and`/`flow:or` control actions — the interpreter
+/// already short-circuits `flow:or` and conjoins `flow:and`, so the combination needs no special handling
 /// here beyond picking the right wrapper).
 /// One position's winning [`RuleList`] to its node. A `cascaded` list reached this position from a
 /// shallower path, and a cascaded `MinType`/`MaxType`/`MinMaxType` is reduced to `Type`: the bound
@@ -352,8 +352,8 @@ fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Valu
     1 => nodes.pop().expect("checked len == 1"),
     _ => {
       let family = match list.rule_logic {
-        RuleLogic::And => "and",
-        RuleLogic::Or => "or",
+        RuleLogic::And => "flow:and",
+        RuleLogic::Or => "flow:or",
       };
       Node::action(family, nodes)
     }
@@ -375,14 +375,14 @@ fn compile_scalar_slot(
   match best_rule(category.as_ref(), &fragments, false) {
     Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, example),
     // Method is the one scalar slot v1-v4 compares case-insensitively by default (spec test case
-    // `method/method is different case`) — expressed with the existing `upper-case` core action
+    // `method/method is different case`) — expressed with the existing `value:upper-case` core action
     // rather than a new one, since `match:equality`'s own children may be any value-producing node.
     // Upper, not lower: that is the method's canonical form, so a mismatch reads `'POST'` against
     // `'GET'`. Only the actual needs it — `pact_models` upper-cases the example when it loads.
     None if category_name == "method" => Node::action(
       "match:equality",
       vec![
-        Node::action("upper-case", vec![resolve]),
+        Node::action("value:upper-case", vec![resolve]),
         Node::value(Literal::from_json(example)),
       ],
     ),
@@ -423,7 +423,7 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
         // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
         // extra actual parameters allowed. Legacy-only: no shape operator needs this.
         None => Node::action(
-          "match:header-value",
+          "legacy:header-value",
           vec![resolve, Node::value(Literal::from_json(&example))],
         ),
       };
@@ -472,7 +472,7 @@ fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, p
   let names: Vec<Node> = query.keys().map(|k| Node::value(Literal::string(k))).collect();
   let mut only_entries = vec![Node::resolve(base_path)];
   only_entries.extend(names);
-  nodes.push(Node::action("expect:only-entries", only_entries));
+  nodes.push(Node::action("legacy:only-entries", only_entries));
   nodes
 }
 
@@ -546,7 +546,7 @@ struct BodyCtx<'a> {
   /// `pact_models::matchingrules` stores body-category paths (`$.animals`, not `$.body.animals`).
   fragments: Vec<String>,
   /// Where a `resolve`/`resolve-current` node emitted here actually addresses (absolute, or
-  /// relative to a `for-each`'s current item once one has been entered).
+  /// relative to a `flow:for-each`'s current item once one has been entered).
   cursor: Cursor,
   /// The dotted display path (`$.request.body.animals[*]`) a container labels itself with —
   /// always absolute-looking and always growing, independent of `cursor` (plan task 3.3's
@@ -554,7 +554,7 @@ struct BodyCtx<'a> {
   label_path: String,
   category: Option<&'a MatchingRuleCategory>,
   /// Whether an object encountered under this context is closed to unnamed members
-  /// (`expect:only-entries`) or must-ignores them. v1–v4's default is asymmetric by part — request
+  /// (`legacy:only-entries`) or must-ignores them. v1–v4's default is asymmetric by part — request
   /// bodies are closed, response bodies are not (spec test case `body/unexpected key with null
   /// value`, which mismatches on the request side and matches on the response side of the same
   /// shape) — so this is set once, from `part`, when the walk starts, and threaded down unchanged.
@@ -587,7 +587,7 @@ impl<'a> BodyCtx<'a> {
     }
   }
 
-  /// The item context inside a rule-driven array's `for-each` (module docs): a fresh relative
+  /// The item context inside a rule-driven array's `flow:for-each` (module docs): a fresh relative
   /// cursor, because the splat's expansion is what makes the element current, not anything the
   /// enclosing cursor knew (plan task 3.3's `Ctx::iteration_item` is the same move). The fragment
   /// pushed is a synthetic `"0"`: it scores identically to any real index against a
@@ -669,7 +669,7 @@ fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) 
     let names: Vec<Node> = members.keys().map(|k| Node::value(Literal::string(k))).collect();
     let mut only_entries = vec![ctx.resolve()];
     only_entries.extend(names);
-    nodes.push(Node::action("expect:only-entries", only_entries));
+    nodes.push(Node::action("legacy:only-entries", only_entries));
   }
   nodes
 }
@@ -684,7 +684,7 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 /// `array` (module docs): a rule reaching this path (exactly or cascaded — `matcher_is_defined`'s
 /// own behaviour, not just an exact hit) switches the array from the strict, no-rule default
 /// (`expect:count` plus one compiled container per literal index) to the rule-driven form: the
-/// rule's own node, plus (when there is a first element to serve as one) a `for-each` compiling
+/// rule's own node, plus (when there is a first element to serve as one) a `flow:for-each` compiling
 /// that one element once as a template and applying it to every actual element at run time —
 /// exactly [`compile.rs`](super::compile)'s `each-like`, with the item shape replaced by whatever
 /// rule cascades into the template's own path.
@@ -701,7 +701,7 @@ fn compile_body_array(items: &[Value], ctx: &BodyCtx) -> Vec<Node> {
         let item_ctx = ctx.template_item();
         let item_node = Node::container(Some(item_ctx.label()), compile_body_value(template, &item_ctx));
         nodes.push(Node::action(
-          "for-each",
+          "flow:for-each",
           vec![Node::splat(vec![ctx.resolve()]), item_node],
         ));
       }

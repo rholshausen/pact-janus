@@ -3,7 +3,7 @@
     :request (
       :method (
         %match:equality (
-          %upper-case (
+          %value:upper-case (
             $.request.method
           ),
           'POST'
@@ -16,13 +16,13 @@
         )
       ),
       :query (
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.query
         )
       ),
       :headers (
         :"$.Content-Type" (
-          %match:header-value (
+          %legacy:header-value (
             $.request.headers.content-type,
             'application/json'
           )
@@ -30,12 +30,12 @@
       ),
       :body (
         :"$.animals" (
-          %match:min-type (
+          %legacy:min-type (
             $.request.body.animals,
             [{'phoneNumber': '0415674567'}],
             1
           ),
-          %for-each (
+          %flow:for-each (
             ** (
               $.request.body.animals
             ),
@@ -46,14 +46,14 @@
                   '\\d+'
                 )
               ),
-              %expect:only-entries (
+              %legacy:only-entries (
                 ~>,
                 'phoneNumber'
               )
             )
           )
         ),
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.body,
           'animals'
         )

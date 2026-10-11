@@ -14,7 +14,7 @@
             0,
             NULL
           ),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items
             ),
@@ -30,7 +30,7 @@
             $.response.body.totals
           ),
           :"$.totals.discount" (
-            %if (
+            %flow:if (
               %check:exists (
                 $.response.body.totals.discount
               ),

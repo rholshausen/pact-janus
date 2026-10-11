@@ -4,7 +4,7 @@ A corpus case is four files in a directory (spec §6.1). This is one of them end
 two ways it can go red — which mean opposite things and must be told apart on sight.
 
 The `case.json` below is validated against
-[`corpus-case.schema.json`](../schemas/v0/corpus-case.schema.json) by
+[`corpus-case.schema.json`](../schemas/v1/corpus-case.schema.json) by
 `cargo test -p pact_janus_schema_compat`.
 
 ## 1. `case.json`
@@ -52,7 +52,7 @@ guarantee no assertion in the plan can state, only the absence of one.
           )
         ),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt
             ),
@@ -84,7 +84,7 @@ guarantee no assertion in the plan can state, only the absence of one.
           ) => BOOL(true)
         ) => BOOL(true),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt => NULL
             ) => BOOL(false),
@@ -101,7 +101,7 @@ guarantee no assertion in the plan can state, only the absence of one.
 ```
 
 The `%match:datetime` node has no result. It was never executed, because the member is absent and
-`%if` is lazy. A corpus that recorded only the verdict would record `matched` and lose the fact that
+`%flow:if` is lazy. A corpus that recorded only the verdict would record `matched` and lose the fact that
 the interesting branch is the one that *didn't* run — which is precisely the evidence this case
 exists to preserve.
 
@@ -131,7 +131,7 @@ to decide the branch and once to match — and hoists it into a pipeline so the 
         :"$.shippedAt" (
           -> (
             $.response.body.shippedAt,
-            %if (
+            %flow:if (
               %check:exists (
                 ~>
               ),
@@ -151,7 +151,7 @@ The run reports:
   plan.txt differs; result unchanged ('matched', 0 mismatches)
     + -> (
     +   $.response.body.shippedAt,
-        %if (
+        %flow:if (
           %check:exists (
     -       $.response.body.shippedAt
     +       ~>

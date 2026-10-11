@@ -36,7 +36,7 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
           )
         ),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt
             ),
@@ -47,7 +47,7 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
           )
         ),
         :"$.payment" (
-          %if (
+          %flow:if (
             %check:equals (
               $.response.body.payment.type,
               'card'
@@ -63,7 +63,7 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
                 )
               )
             ),
-            %if (
+            %flow:if (
               %check:equals (
                 $.response.body.payment.type,
                 'invoice'
@@ -79,8 +79,8 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
                   )
                 )
               ),
-              %error (
-                %join (
+              %flow:error (
+                %value:join (
                   'Expected payment.type to be one of card, invoice but got ',
                   $.response.body.payment.type
                 )
@@ -97,7 +97,7 @@ The response body's shape, compiled without a variant (spec §5.1), rendered in 
             1,
             NULL
           ),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items
             ),
@@ -128,13 +128,13 @@ Five things in that tree are the design decisions of §4 and §5 made visible:
 
 - **Value operators are one action; structural operators are structure.** `integer`, `any-of`,
   `datetime`, `regex`, `date` and `string` each became a single `%match:` node. `optional`, `one-of`
-  and `each-like` became `%if`, nested `%if`, and `%for-each` — the presence decision, the
+  and `each-like` became `%flow:if`, nested `%flow:if`, and `%flow:for-each` — the presence decision, the
   discriminator decision and the iteration are nodes a reader can see and a result can be attached to
   (spec §4.3).
 - **Every condition is a `check:`, never a `match:`.** `%check:exists` and `%check:equals` yield
   booleans. Putting `%match:equality` in the condition of the `payment` branch would fail the whole
   interaction while merely deciding which alternative to take (spec §4.2).
-- **`one-of`'s failure names the value it read.** The innermost `%error` is what a user gets for
+- **`one-of`'s failure names the value it read.** The innermost `%flow:error` is what a user gets for
   `"type": "cheque"`, and it is a node in the plan rather than a message the interpreter invents.
 - **`must-ignore` is an absence.** Nothing in `:body` mentions members the shape did not name, so
   `warehouse` and `network` are admitted because no node looks at them. That is the most inspectable
@@ -182,7 +182,7 @@ subtrees that matter:
           ) => ERROR(Expected 'REFUNDED' to be one of 'PENDING', 'SHIPPED', 'DELIVERED')
         ) => BOOL(false),
         :"$.payment" (
-          %if (
+          %flow:if (
             %check:equals (
               $.response.body.payment.type => 'invoice',
               'card'
@@ -198,7 +198,7 @@ subtrees that matter:
                 )
               )
             ),
-            %if (
+            %flow:if (
               %check:equals (
                 $.response.body.payment.type => 'invoice',
                 'invoice'
@@ -226,7 +226,7 @@ subtrees that matter:
             1,
             NULL
           ) => ERROR(Expected at least 1 item but got 0),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items => []
             ) => []
@@ -236,11 +236,11 @@ subtrees that matter:
 
 Three things this shows that a list of mismatches would not:
 
-- **The `:card` subtree has no `=> ` anywhere.** It was not executed, because `%if` is lazy (spec
+- **The `:card` subtree has no `=> ` anywhere.** It was not executed, because `%flow:if` is lazy (spec
   §2.4) and its condition was false. A reader can tell "skipped" from "passed" at a glance, which is
   exactly why laziness has to be declared rather than incidental.
 - **Every failure was found in one run.** The status, the due date and the item count all report;
   execution did not stop at the first error, because an error is a value (spec §2.3).
-- **The `%for-each` succeeded.** Zero elements means the body ran zero times, which is true and not
+- **The `%flow:for-each` succeeded.** Zero elements means the body ran zero times, which is true and not
   useful — the cardinality assertion beside it is what carries the real verdict. Splitting them is
   what lets the report say "0 items" rather than "no failures in the loop".

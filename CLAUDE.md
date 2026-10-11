@@ -48,7 +48,7 @@ Three sources are the source of truth and take precedence over this file when th
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
-> Done so far: S0.12.
+> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -214,7 +214,8 @@ spike 8.3's loader proved the binding and was deleted with the rest of the spike
 real one is S5.5. A declared component may contribute a transport,
 looked up by the `kind`s its handshake names. A declared content component may contribute a **plan
 fragment** for a slot (plan task 8.4, ADR 0022): it replaces the slot's generic plan, must declare a
-plan grammar the engine lists in `component/hello` (`plan-grammar-versions`), may use only core actions
+plan grammar the engine lists in `component/hello` (`plan-grammar-versions`: `v1`, and `v0`, read by ADR 0026's
+one-to-one renaming), may use only core actions
 and its own contributed ones — run through `matcher/apply` — and is checked when the interaction arrives,
 failing as `component-unavailable` with `reason: grammar-skew` or `fragment-invalid`. `janus`
 and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says

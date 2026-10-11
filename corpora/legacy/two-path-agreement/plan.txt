@@ -3,7 +3,7 @@
     :request (
       :method (
         %match:equality (
-          %upper-case (
+          %value:upper-case (
             $.request.method
           ),
           'GET'
@@ -16,7 +16,7 @@
         )
       ),
       :query (
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.query
         )
       )

@@ -1,8 +1,9 @@
 //! The plan compiler and interpreter: interaction specs (design 3.2) and the shapes they carry
-//! (design 2.2) compiled to plans (design 2.4, `schemas/v0/plan.schema.json`, plan task 3.3), the
+//! (design 2.2) compiled to plans (design 2.4, `schemas/v1/plan.schema.json`, plan task 3.3), the
 //! v1–v4 matching-rule compiler (plan task 3.5), the plans executed against a [`Resolver`] (plan
 //! task 3.4), and `explain`'s two text forms (plan-grammar spec §3, plan task 3.6).
 
+pub mod actions;
 mod compile;
 pub mod fragment;
 mod interpret;
@@ -12,10 +13,11 @@ mod render;
 mod resolve;
 mod value;
 
+pub use actions::{RESERVED_NAMESPACES, is_component_action};
 pub use compile::{Assignment, compile, variant_space};
 pub use interpret::{
   ActionApplier, Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, execute_with,
-  execute_with_content, is_component_action, outcome,
+  execute_with_content, outcome,
 };
 pub use legacy::{
   LegacyRequest, LegacyResponse, compile_interaction as compile_legacy_interaction,

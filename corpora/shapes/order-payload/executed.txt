@@ -19,14 +19,14 @@
             1,
             NULL
           ) => ERROR(Expected at least 1 item(s) but got 0),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items => []
             ) => []
           ) => BOOL(true)
         ) => BOOL(false),
         :"$.payment" (
-          %if (
+          %flow:if (
             %check:equals (
               $.response.body.payment.type => 'invoice',
               'card'
@@ -48,7 +48,7 @@
                 )
               )
             ),
-            %if (
+            %flow:if (
               %check:equals (
                 $.response.body.payment.type => 'invoice',
                 'invoice'
@@ -70,8 +70,8 @@
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(false),
-              %error (
-                %join (
+              %flow:error (
+                %value:join (
                   'Expected type to be one of card, invoice but got ',
                   $.response.body.payment.type
                 )
@@ -80,7 +80,7 @@
           ) => BOOL(false)
         ) => BOOL(false),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt => NULL
             ) => BOOL(false),

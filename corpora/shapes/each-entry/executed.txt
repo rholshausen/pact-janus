@@ -10,7 +10,7 @@
           1,
           NULL
         ) => BOOL(true),
-        %for-each (
+        %flow:for-each (
           ** (
             $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'}
           ) => [{'cache-control': 'no-store'}, {'content-type': 'application/json'}],

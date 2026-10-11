@@ -3,7 +3,7 @@
     :request (
       :method (
         %match:equality (
-          %upper-case (
+          %value:upper-case (
             $.request.method => 'GET'
           ) => 'GET',
           'GET'
@@ -16,7 +16,7 @@
         ) => BOOL(true)
       ) => BOOL(true),
       :query (
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.query => {}
         ) => BOOL(true)
       ) => BOOL(true)
@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :headers (
         :"$.Content-Type" (
-          %match:header-value (
+          %legacy:header-value (
             $.response.headers.content-type => 'application/json',
             'application/json'
           ) => BOOL(true)

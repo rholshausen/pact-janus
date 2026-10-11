@@ -35,6 +35,7 @@ names a body that would not parse.
 ```json component-hello
 {
   "component-protocol-versions": [1],
+  "plan-grammar-versions": ["v0", "v1"],
   "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "network": false },
   "capabilities": { }
@@ -122,12 +123,15 @@ the slot's generic plan and says what `integer` means for this content type (§6
             "children": [ { "kind": "resolve-current", "path": "~>.items" } ] } ] } ] } ] } }
 ```
 
-which renders as:
+This component was written against plan grammar `v0`, where the loop is `for-each`, and has not been
+rebuilt since. The engine's grammar is `v1`; it lists `v0` in `plan-grammar-versions` because it reads
+it, by the one-to-one renaming of plan grammar §4.7, and it shows the fragment in v1's names. A
+component written today declares `v1` and says `flow:for-each` itself. Either way the plan renders as:
 
 ```text
 :"text/csv" (
   %expect:array ( $.response.body ),
-  %for-each (
+  %flow:for-each (
     ** ( $.response.body ),
     :"$.response.body[*]" (
       %match:string ( ~>.id ),

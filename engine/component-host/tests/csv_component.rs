@@ -469,6 +469,14 @@ fn a_consumer_can_say_integer_of_a_csv_column_because_the_component_says_what_it
     "the executed plan is the component's: {events}"
   );
   assert!(!events.contains("match:integer"), "{events}");
+  // The component was built against plan grammar v0 and has not been rebuilt: its fragment says
+  // `for-each`. This engine's grammar is v1, it read the fragment by ADR 0026's one-to-one mapping,
+  // and what it shows is v1's name for the same action.
+  assert!(
+    events.contains("flow:for-each"),
+    "a v0 fragment is shown in v1 names: {events}"
+  );
+  assert!(!events.contains("\"for-each\""), "{events}");
 }
 
 /// Plan task 8.4's sharpest finding, demonstrated. `content/compile` is handed the slot's shape and

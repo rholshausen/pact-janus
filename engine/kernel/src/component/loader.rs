@@ -14,6 +14,7 @@ use super::error::ComponentError;
 use super::matcher::MatcherComponent;
 use super::transport::TransportComponent;
 use crate::common::Requirement;
+use crate::plan::RESERVED_NAMESPACES;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -110,12 +111,6 @@ pub struct Resolved {
   /// component actions a fragment it contributes may use (plan task 8.4).
   pub actions: Vec<String>,
 }
-
-/// The first segments of the core action families (plan-grammar spec §4.1: `match:*`, `expect:*`,
-/// `check:*`, `convert:*`). A core family *looks* namespaced, so a component carrying one of these
-/// names would contribute actions indistinguishable from core ones — and collide with the next
-/// grammar version that adds one (plan task 8.4). They are reserved, like unnamespaced names.
-pub const CORE_FAMILIES: &[&str] = &["match", "expect", "check", "convert"];
 
 /// A component compiled into the embedding, named so requirements and conflicts can see it. Only
 /// its identity matters here; it is called through the embedding's own registries.
@@ -237,9 +232,13 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   if interfaces.is_empty() {
     return Err(invalid(format!("component '{declared}' declared no interfaces")));
   }
-  if CORE_FAMILIES.contains(&declared.as_str()) {
+  // Plan-grammar spec §4.1, ADR 0026: the core action namespaces are the specification's. A
+  // component carrying one would contribute actions that read as core ones, so it is refused here,
+  // by name, before anything it contributes is looked at.
+  if RESERVED_NAMESPACES.contains(&declared.as_str()) {
     return Err(invalid(format!(
-      "'{declared}' is a core action family (plan-grammar spec §4.1); a component named it would contribute actions that read as core ones"
+      "'{declared}' is a namespace reserved for core plan actions (plan-grammar spec §4.1: {}); a component cannot be named it",
+      RESERVED_NAMESPACES.join(", ")
     )));
   }
 
@@ -256,6 +255,12 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
         if !contributed.starts_with(&prefix) || contributed.len() == prefix.len() {
           return Err(invalid(format!(
             "component '{declared}' contributes {member} entry '{contributed}', which is not in its own namespace '{prefix}'"
+          )));
+        }
+        // An action name is `namespace:name`, with exactly one `:` (plan-grammar spec §4.1).
+        if member == "actions" && contributed[prefix.len()..].contains(':') {
+          return Err(invalid(format!(
+            "component '{declared}' contributes the action '{contributed}'; an action name is '{prefix}<name>', with one ':'"
           )));
         }
       }

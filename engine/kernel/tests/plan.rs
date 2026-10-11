@@ -88,7 +88,7 @@ fn label_of(node: &Node) -> Option<&str> {
 }
 
 /// Unwrap the one child of a container that exists only to bundle a single compiled node under
-/// the slot label — every value operator, and every dimensional operator's *node* (`if`, an
+/// the slot label — every value operator, and every dimensional operator's *node* (`flow:if`, an
 /// `expect:*`, `match:any-of`, ...) compiles to exactly one node (spec §5.2), so a slot whose root
 /// shape is one of those has a single-child slot container.
 fn only_child(node: &Node) -> Node {
@@ -136,7 +136,7 @@ fn the_plan_root_is_wrapped_by_description_part_and_slot() {
     &Assignment::new(),
     None,
   );
-  assert_eq!(plan.grammar, "v0");
+  assert_eq!(plan.grammar, "v1");
   assert_eq!(plan.variant, None);
   assert_eq!(label_of(&plan.root), Some("get an order"));
 
@@ -348,7 +348,7 @@ fn each_like_unpinned_asserts_size_and_for_eachs_over_a_splat() {
   assert_eq!(literal_value(&size_children[2]), &Value::Null);
 
   let (name, for_each_children) = action(&nodes[1]);
-  assert_eq!(name, "for-each");
+  assert_eq!(name, "flow:for-each");
   let (splat_name, splat_children) = match &for_each_children[0].kind {
     NodeKind::Splat { children } => ("splat", children),
     other => panic!("expected a splat, got {other:?}"),
@@ -439,7 +439,7 @@ fn each_entry_checks_keys_and_values_against_the_current_entry() {
     "values": { "shape": "string", "example": "application/json" } }));
   let nodes = after_kind_assertion(&body, "expect:object");
   let (name, for_each_children) = action(&nodes[1]);
-  assert_eq!(name, "for-each");
+  assert_eq!(name, "flow:for-each");
   let item = &for_each_children[1];
   let item_children = children_of(item);
   assert_eq!(item_children.len(), 2, "one container for keys, one for values");
@@ -460,12 +460,12 @@ fn optional_unpinned_is_an_if_on_check_exists_with_an_unwrapped_present_branch()
   let body = compile_field(json!({ "shape": "optional",
     "of": { "shape": "datetime", "format": "yyyy-MM-dd'T'HH:mm:ssX", "example": "2026-07-30T10:00:00Z" } }));
   let (name, children) = action(&body);
-  assert_eq!(name, "if");
+  assert_eq!(name, "flow:if");
   let (cond_name, cond_children) = action(&children[0]);
   assert_eq!(cond_name, "check:exists");
   assert_eq!(resolve_path(&cond_children[0]), "$.response.body.field");
   // The present branch is the bare match node, not wrapped in a container (matches
-  // order-payload-plan.md's `%if(%check:exists(...), %match:datetime(...))`).
+  // order-payload-plan.md's `%flow:if(%check:exists(...), %match:datetime(...))`).
   let (branch_name, _) = action(&children[1]);
   assert_eq!(branch_name, "match:datetime");
   assert_eq!(
@@ -513,12 +513,12 @@ fn forbidden_is_always_expect_absent() {
 fn nullable_unpinned_is_an_if_on_check_null_with_an_explicit_ok_branch() {
   let body = compile_body(json!({ "shape": "nullable", "of": { "shape": "integer", "example": 1 } }));
   let (name, children) = action(&body);
-  assert_eq!(name, "if");
+  assert_eq!(name, "flow:if");
   assert_eq!(children.len(), 3);
   let (cond_name, _) = action(&children[0]);
   assert_eq!(cond_name, "check:null");
   let (ok_name, ok_children) = action(&children[1]);
-  assert_eq!(ok_name, "and");
+  assert_eq!(ok_name, "flow:and");
   assert!(ok_children.is_empty());
   let (else_name, _) = action(&children[2]);
   assert_eq!(else_name, "match:integer");
@@ -592,10 +592,10 @@ fn payment_body() -> Value {
 #[test]
 fn one_of_unpinned_is_a_nested_if_chain_ending_in_a_named_error() {
   let body = compile_body(payment_body());
-  // The chain is built in reverse (last alternative innermost), so the outermost `if` is the
+  // The chain is built in reverse (last alternative innermost), so the outermost `flow:if` is the
   // lexicographically-first alternative: "card".
   let (name, children) = action(&body);
-  assert_eq!(name, "if");
+  assert_eq!(name, "flow:if");
   let (cond_name, cond_children) = action(&children[0]);
   assert_eq!(cond_name, "check:equals");
   assert_eq!(resolve_path(&cond_children[0]), "$.response.body.type");
@@ -603,13 +603,13 @@ fn one_of_unpinned_is_a_nested_if_chain_ending_in_a_named_error() {
   assert_eq!(label_of(&children[1]), Some("card"));
 
   let (next_name, next_children) = action(&children[2]);
-  assert_eq!(next_name, "if");
+  assert_eq!(next_name, "flow:if");
   assert_eq!(label_of(&next_children[1]), Some("invoice"));
 
   let (error_name, error_children) = action(&next_children[2]);
-  assert_eq!(error_name, "error");
+  assert_eq!(error_name, "flow:error");
   let (join_name, join_children) = action(&error_children[0]);
-  assert_eq!(join_name, "join");
+  assert_eq!(join_name, "value:join");
   assert_eq!(
     literal_value(&join_children[0]),
     &json!("Expected type to be one of card, invoice but got ")

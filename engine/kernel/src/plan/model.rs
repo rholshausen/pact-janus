@@ -1,4 +1,4 @@
-//! The plan document model (plan-grammar spec §2, `schemas/v0/plan.schema.json`).
+//! The plan document model (plan-grammar spec §2, `schemas/v1/plan.schema.json`).
 //!
 //! A [`Node`]'s `result` (spec §2.3) is not modelled here: nothing in plan task 3.3 executes a
 //! plan or attaches one, and adding the field speculatively would just be a place for `None` to
@@ -7,7 +7,7 @@
 use serde_json::Value;
 
 /// The grammar version every [`Plan`] this compiler produces is written against (spec §7.1).
-pub const GRAMMAR_VERSION: &str = "v0";
+pub const GRAMMAR_VERSION: &str = "v1";
 
 /// A compiled matching plan (spec §2): a rendering, not a record (spec §7) — nothing outside this
 /// process stores one.
@@ -44,7 +44,7 @@ pub enum NodeKind {
   /// Resolves `path` against the interaction context (spec §2.1).
   Resolve { path: String },
   /// Resolves `path` against the current item on the iteration stack (spec §2.1) — the companion
-  /// of `for-each` and `pipeline`, the only two constructs that make anything current.
+  /// of `flow:for-each` and `pipeline`, the only two constructs that make anything current.
   ResolveCurrent { path: String },
   /// Applies each child to the next, yielding the last (spec §2.1).
   Pipeline { children: Vec<Node> },
@@ -300,7 +300,7 @@ fn literal_json(literal: &Literal) -> Value {
 /// what the user was shown.
 pub fn from_json(document: &Value) -> Result<Plan, String> {
   // Component-interfaces spec §12.3: never silently reinterpret a document written against another
-  // grammar. Until plan task 8.4 this read any document as v0, whatever its `grammar` said.
+  // grammar. A v0 plan is read by rule — the one-to-one renaming of ADR 0026 — not by guessing.
   let grammar = document
     .get("grammar")
     .and_then(Value::as_str)
@@ -309,7 +309,10 @@ pub fn from_json(document: &Value) -> Result<Plan, String> {
     super::fragment::FragmentError::Skew { message, .. }
     | super::fragment::FragmentError::Invalid(message) => message.replace("the fragment", "the plan"),
   })?;
-  let root = node_from_json(document.get("root").ok_or("a plan needs a 'root'")?)?;
+  let mut root = node_from_json(document.get("root").ok_or("a plan needs a 'root'")?)?;
+  if super::actions::Grammar::of(grammar) == Some(super::actions::Grammar::V0) {
+    super::fragment::rename_from_v0(&mut root);
+  }
   Ok(Plan {
     grammar: GRAMMAR_VERSION,
     root,

@@ -212,15 +212,40 @@ fn a_fragment_that_cannot_be_used_fails_the_interaction_naming_why() {
     ),
     (
       action("expect:not-empty", body),
-      Some("v1"),
+      Some("v1.1"),
       "grammar-skew",
-      "'v1'",
+      "'v1.1'",
+    ),
+    (
+      action("expect:not-empty", body),
+      Some("v2"),
+      "grammar-skew",
+      "'v2'",
     ),
     (
       action("expect:unique", body),
       Some("v0"),
       "fragment-invalid",
       "not a core action",
+    ),
+    // A fragment is held to the grammar it declared: v1's names are not v0's, nor v0's v1's.
+    (
+      action("value:length", body),
+      Some("v0"),
+      "fragment-invalid",
+      "another component's namespace",
+    ),
+    (
+      action("match:min-type", body),
+      Some("v1"),
+      "fragment-invalid",
+      "not a core action",
+    ),
+    (
+      action("length", body),
+      Some("v1"),
+      "fragment-invalid",
+      "another component's namespace",
     ),
     (
       action("csv:integer", body),
@@ -265,18 +290,40 @@ fn a_fragment_that_cannot_be_used_fails_the_interaction_naming_why() {
   }
 }
 
+/// Plan-grammar spec §4.1, ADR 0026 decision 2: the six core namespaces are the specification's.
 #[test]
-fn a_component_named_for_a_core_family_is_refused_at_load() {
+fn a_component_declaring_a_reserved_namespace_is_refused_at_load_by_name() {
   let stub = stub(None, None);
-  for family in ["match", "expect", "check", "convert"] {
-    let mut engine = engine(&stub, family, json!(4));
-    let refused = add(&mut engine, family);
+  assert_eq!(
+    pact_janus_kernel::plan::RESERVED_NAMESPACES,
+    ["flow", "value", "expect", "check", "match", "legacy"]
+  );
+  for namespace in pact_janus_kernel::plan::RESERVED_NAMESPACES {
+    let mut engine = engine(&stub, namespace, json!(4));
+    let refused = add(&mut engine, namespace);
     assert_eq!(refused["error"]["code"], "component-unavailable", "{refused}");
     assert_eq!(
       refused["error"]["details"]["reason"], "component-invalid",
       "{refused}"
     );
+    assert_eq!(refused["error"]["details"]["component"], *namespace, "{refused}");
+    let message = refused["error"]["message"].as_str().unwrap();
+    assert!(
+      message.contains(&format!(
+        "'{namespace}' is a namespace reserved for core plan actions"
+      )),
+      "{message}"
+    );
   }
+}
+
+/// v0 reserved `convert` as a family that never had an action. v1 reserves six namespaces and that
+/// is not one of them (ADR 0026: further ones need a new major).
+#[test]
+fn a_namespace_v1_does_not_reserve_is_a_components_to_take() {
+  let stub = stub(None, None);
+  let mut engine = engine(&stub, "convert", json!(4));
+  assert!(add(&mut engine, "convert")["ok"]["handle"].is_string());
 }
 
 #[test]
@@ -356,6 +403,47 @@ fn a_readable_fragment_replaces_the_slots_plan_and_its_action_runs_through_apply
       );
     }
   }
+}
+
+/// ADR 0026 decision 4: a fragment written against v0 runs on an engine whose grammar is v1, and
+/// what the engine shows of it is in v1's names — `explain` has one vocabulary, not one per author.
+#[test]
+fn a_v0_fragment_runs_and_is_shown_in_v1_names() {
+  let in_v0 = json!({ "kind": "container", "label": "stub", "children": [
+    { "kind": "action", "name": "if", "children": [
+      { "kind": "action", "name": "check:null", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
+      { "kind": "action", "name": "and", "children": [] },
+      action("stub:even", "$.response.body") ] } ] });
+  let in_v1 = json!({ "kind": "container", "label": "stub", "children": [
+    { "kind": "action", "name": "flow:if", "children": [
+      { "kind": "action", "name": "check:null", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
+      { "kind": "action", "name": "flow:and", "children": [] },
+      action("stub:even", "$.response.body") ] } ] });
+  let mut shown = Vec::new();
+  for (fragment, grammar) in [(in_v0, "v0"), (in_v1, "v1")] {
+    for (answer, status) in [(json!(4), "verified"), (json!(3), "failed")] {
+      let stub = stub(Some(fragment.clone()), Some(grammar));
+      let mut engine = engine(&stub, "stub", answer.clone());
+      let events = verify(&mut engine, "stub");
+      let summary = events.as_array().unwrap().last().unwrap()["payload"].clone();
+      assert_eq!(summary["status"], status, "{grammar}, {answer}: {events}");
+      let text = events.to_string();
+      assert!(
+        text.contains("flow:if"),
+        "{grammar}: the executed plan is in v1 names: {text}"
+      );
+      assert!(
+        !text.contains("\"name\":\"if\"") && !text.contains("%if "),
+        "{grammar}: {text}"
+      );
+      shown.push(text);
+    }
+  }
+  assert_eq!(
+    shown[0], shown[2],
+    "the same fragment, in either grammar, is the same plan"
+  );
+  assert_eq!(shown[1], shown[3]);
 }
 
 #[test]

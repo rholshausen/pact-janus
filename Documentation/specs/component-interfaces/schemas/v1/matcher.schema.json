@@ -29,7 +29,7 @@
         },
         "grammar-version": {
           "type": "string",
-          "x-known-values": ["v0"]
+          "x-known-values": ["v0", "v1"]
         }
       }
     },

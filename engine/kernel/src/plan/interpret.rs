@@ -5,12 +5,12 @@
 //!
 //! **What "container/if/for-each/and/or all render as a boolean" resolves.** Spec §2.3 states a
 //! container's result is the conjunction of its children's, `ok` or `error`; the worked executed
-//! example (`order-payload-plan.md` §3) prints every container, `if` and `for-each` as
+//! example (`order-payload-plan.md` §3) prints every container, `flow:if` and `flow:for-each` as
 //! `BOOL(true/false)`, never bare `ok`/`error`, and only the *leaf* action that actually failed
 //! carries a message (`ERROR(...)`). This module resolves that by giving conjunction-style nodes
-//! (`container`, `if`, `or`, `and`, `for-each`) a [`RuntimeValue::Bool`] result summarising
+//! (`container`, `flow:if`, `flow:or`, `flow:and`, `flow:for-each`) a [`RuntimeValue::Bool`] result summarising
 //! whether their subtree failed, and reserving [`NodeResult::Error`] for the node that actually
-//! has something to say: a failed `match:*`/`expect:*`, or `error` itself. [`outcome`] then only
+//! has something to say: a failed `match:*`/`expect:*`, or `flow:error` itself. [`outcome`] then only
 //! ever needs to collect real `Error`s — nothing double-reports a descendant's failure at every
 //! ancestor.
 //!
@@ -39,7 +39,7 @@ pub struct Executed {
   pub result: Option<NodeResult>,
 }
 
-/// Mirrors [`NodeKind`], with children recursively [`Executed`] rather than [`Node`]. `for-each`
+/// Mirrors [`NodeKind`], with children recursively [`Executed`] rather than [`Node`]. `flow:for-each`
 /// and `match:contains` legitimately have more children here than the [`Node`] they were compiled
 /// from — this tree records what actually happened (every element iterated, every entry tried),
 /// not the shape of the static plan.
@@ -85,13 +85,6 @@ pub trait ActionApplier {
   /// `None` when no component in scope contributes `action` — a named failure, never a skipped
   /// node (spec §4.1). `path` is where the value under test was resolved from, when it was.
   fn apply(&self, action: &str, arguments: &[RuntimeValue], path: Option<&str>) -> Option<NodeResult>;
-}
-
-/// Whether `name` is a component's action: namespaced, in a namespace no core family owns.
-pub fn is_component_action(name: &str) -> bool {
-  name
-    .split_once(':')
-    .is_some_and(|(family, _)| !crate::component::CORE_FAMILIES.contains(&family))
 }
 
 /// Execute a compiled plan against `resolver`, with no content component available for
@@ -144,7 +137,7 @@ pub struct Mismatch {
   pub path: Option<String>,
   pub message: String,
   /// The nearest enclosing action's name, when the error came from one — a `match:*`/`expect:*`
-  /// failure always has one; a bare `%error` node may not.
+  /// failure always has one; a bare `%flow:error` node may not.
   pub action: Option<String>,
 }
 
@@ -285,7 +278,7 @@ fn value_of(executed: &Executed) -> RuntimeValue {
   }
 }
 
-/// What `for-each` iterates over (plan-grammar spec §5.2): an `each-like`'s array, element by
+/// What `flow:for-each` iterates over (plan-grammar spec §5.2): an `each-like`'s array, element by
 /// element, or an `each-entry`'s object, as [`RuntimeValue::Entry`] pairs in key order (a
 /// `BTreeMap`'s own iteration order) so `resolve-current`'s `.key`/`.value` suffixes have
 /// something to address (spec §2.2's `entry` value kind).
@@ -337,13 +330,13 @@ fn run_pipeline(children: &[Node], ctx: &mut Ctx) -> Executed {
 
 fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
   match name {
-    "if" => run_if(children, ctx),
-    "or" => run_or(children, ctx),
-    "for-each" => run_for_each(children, ctx),
+    "flow:if" => run_if(children, ctx),
+    "flow:or" => run_or(children, ctx),
+    "flow:for-each" => run_for_each(children, ctx),
     "match:contains" => run_contains(children, ctx),
     _ => {
       let executed_children: Vec<Executed> = children.iter().map(|c| run(c, ctx)).collect();
-      let result = if is_component_action(name) {
+      let result = if super::actions::is_component_action(name) {
         apply_component(name, &executed_children, ctx.actions)
       } else {
         dispatch(name, &executed_children, ctx.content)
@@ -379,7 +372,7 @@ fn apply_component(name: &str, children: &[Executed], actions: Option<&dyn Actio
   }
 }
 
-/// `if` (spec §2.4): the condition always executes; exactly one branch does. Two children means
+/// `flow:if` (spec §2.4): the condition always executes; exactly one branch does. Two children means
 /// "no explicit else" — an untaken condition is `ok` (plan task 3.3's compiler relies on this for
 /// `optional`'s absent case).
 fn run_if(children: &[Node], ctx: &mut Ctx) -> Executed {
@@ -406,14 +399,14 @@ fn run_if(children: &[Node], ctx: &mut Ctx) -> Executed {
   };
   Executed {
     kind: ExecutedKind::Action {
-      name: "if".to_string(),
+      name: "flow:if".to_string(),
       children: executed,
     },
     result: Some(result),
   }
 }
 
-/// `or` (spec §2.4): lazy, stops at the first success.
+/// `flow:or` (spec §2.4): lazy, stops at the first success.
 fn run_or(children: &[Node], ctx: &mut Ctx) -> Executed {
   let mut executed = Vec::with_capacity(children.len());
   let mut success = false;
@@ -430,14 +423,14 @@ fn run_or(children: &[Node], ctx: &mut Ctx) -> Executed {
   }
   Executed {
     kind: ExecutedKind::Action {
-      name: "or".to_string(),
+      name: "flow:or".to_string(),
       children: executed,
     },
     result: Some(NodeResult::Value(RuntimeValue::Bool(success))),
   }
 }
 
-/// `for-each` (spec §5.2): the source `splat` is executed once for its array; the item template
+/// `flow:for-each` (spec §5.2): the source `splat` is executed once for its array; the item template
 /// is executed once per element, each with that element pushed as the current item
 /// (`resolve-current`'s addressee). An empty array is a vacuous success (spec's own note: the
 /// cardinality assertion beside it, not this loop, carries the "0 items" verdict).
@@ -480,7 +473,7 @@ fn run_for_each(children: &[Node], ctx: &mut Ctx) -> Executed {
   all_children.extend(item_executions);
   Executed {
     kind: ExecutedKind::Action {
-      name: "for-each".to_string(),
+      name: "flow:for-each".to_string(),
       children: all_children,
     },
     result: Some(NodeResult::Value(RuntimeValue::Bool(!any_failed))),
@@ -559,7 +552,7 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
 /// in-process interpreter does not yet sit behind.
 fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetector>) -> NodeResult {
   match name {
-    "and" => {
+    "flow:and" => {
       if children.is_empty() {
         // The empty conjunction: plan task 3.3's compiler emits this as the explicit no-op branch
         // where the grammar needs a positional node but the shape is trivially satisfied.
@@ -571,11 +564,11 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         NodeResult::Ok
       }
     }
-    "error" => NodeResult::Error {
+    "flow:error" => NodeResult::Error {
       message: plain_text(&value_of(&children[0])),
       path: None,
     },
-    "apply" | "tee" => {
+    "flow:apply" | "flow:tee" => {
       // Neither has a worked example anywhere in the specs; this is a documented placeholder
       // pending a real use (a component fragment, or design 3.5's legacy compiler) rather than a
       // guess dressed up as a decision.
@@ -584,10 +577,10 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         .and_then(|c| c.result.clone())
         .unwrap_or(NodeResult::Ok)
     }
-    "join" => NodeResult::Value(RuntimeValue::String(
+    "value:join" => NodeResult::Value(RuntimeValue::String(
       children.iter().map(|c| plain_text(&value_of(c))).collect(),
     )),
-    "join-with" => {
+    "value:join-with" => {
       let separator = plain_text(&value_of(&children[0]));
       let joined = children[1..]
         .iter()
@@ -596,16 +589,16 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         .join(&separator);
       NodeResult::Value(RuntimeValue::String(joined))
     }
-    "length" => NodeResult::Value(RuntimeValue::Number(Number::from(length_of(&value_of(
+    "value:length" => NodeResult::Value(RuntimeValue::Number(Number::from(length_of(&value_of(
       &children[0],
     ))))),
-    "lower-case" => NodeResult::Value(RuntimeValue::String(
+    "value:lower-case" => NodeResult::Value(RuntimeValue::String(
       plain_text(&value_of(&children[0])).to_lowercase(),
     )),
-    "upper-case" => NodeResult::Value(RuntimeValue::String(
+    "value:upper-case" => NodeResult::Value(RuntimeValue::String(
       plain_text(&value_of(&children[0])).to_uppercase(),
     )),
-    "to-string" => NodeResult::Value(RuntimeValue::String(plain_text(&value_of(&children[0])))),
+    "value:to-string" => NodeResult::Value(RuntimeValue::String(plain_text(&value_of(&children[0])))),
 
     "check:exists" => NodeResult::Value(RuntimeValue::Bool(!matches!(
       value_of(&children[0]),
@@ -702,7 +695,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         },
       }
     }
-    "expect:only-entries" => {
+    "legacy:only-entries" => {
       let value = value_of(&children[0]);
       let allowed: Vec<String> = children[1..].iter().map(|c| plain_text(&value_of(c))).collect();
       match value {
@@ -858,19 +851,19 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         }
       }
     }
-    "match:min-type" => {
+    "legacy:min-type" => {
       match_type_with_bounds(children, Some(as_u64(&value_of(&children[2])).unwrap_or(0)), None)
     }
-    "match:max-type" => {
+    "legacy:max-type" => {
       match_type_with_bounds(children, None, Some(as_u64(&value_of(&children[2])).unwrap_or(0)))
     }
-    "match:min-max-type" => match_type_with_bounds(
+    "legacy:min-max-type" => match_type_with_bounds(
       children,
       Some(as_u64(&value_of(&children[2])).unwrap_or(0)),
       Some(as_u64(&value_of(&children[3])).unwrap_or(0)),
     ),
 
-    "match:array-contains" => {
+    "legacy:array-contains" => {
       // Legacy-only (spec §4.4): reachable once design 3.5's compiler emits it, not yet.
       let value = value_of(&children[0]);
       let target = value_of(&children[1]);
@@ -889,7 +882,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       }
     }
 
-    "match:header-value" => {
+    "legacy:header-value" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
       match as_text(&value) {
@@ -914,7 +907,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
   }
 }
 
-/// `match:min-type`/`match:max-type`/`match:min-max-type` (legacy only, plan task 3.5's
+/// `legacy:min-type`/`legacy:max-type`/`legacy:min-max-type` (legacy only, plan task 3.5's
 /// `MinType`/`MaxType`/`MinMaxType`): a `match:type` check, plus a size bound enforced only when
 /// the resolved value is an **array** — v1–v4's own rule (`pact_matching`'s JSON matcher bounds
 /// only `(Array, Array)`). A string's characters and an object's members are not items: on either,
@@ -985,7 +978,7 @@ fn match_temporal(children: &[Executed], default_format: &str, kind_name: &str) 
   }
 }
 
-/// `match:header-value` (legacy only, plan task 3.5): v1-v4's default header comparison is not
+/// `legacy:header-value` (legacy only, plan task 3.5): v1-v4's default header comparison is not
 /// plain string equality. A MIME-shaped value (`type/subtype; param=value; ...`) compares the base
 /// type case-insensitively and requires every parameter named in `expected` to be present in
 /// `actual` with a case-insensitively equal value — extra parameters on the actual side, or a
@@ -995,8 +988,8 @@ fn match_temporal(children: &[Executed], default_format: &str, kind_name: &str) 
 /// different`); anything else is exact, case-sensitive equality (`header value is different case`).
 ///
 /// Deliberately an unnamespaced core action, not a component's: plan-grammar spec §4.4 lists it
-/// as *legacy only*, alongside `match:array-contains` and `match:min-type`/`max-type` — it encodes
-/// v1–v4's own specified default, the same way `expect:only-entries` encodes v1–v4's closed-body
+/// as *legacy only*, alongside `legacy:array-contains` and `legacy:min-type`/`max-type` — it encodes
+/// v1–v4's own specified default, the same way `legacy:only-entries` encodes v1–v4's closed-body
 /// default, not a guess the kernel invented (kernel-boundary-review.md finding 2, resolved as
 /// "no change" in that doc's task-4.2 resolution section).
 fn header_values_match(expected: &str, actual: &str) -> bool {
@@ -1118,11 +1111,11 @@ fn runtime_eq(a: &RuntimeValue, b: &RuntimeValue) -> bool {
   }
 }
 
-/// A value's text, unquoted — the raw content of a `join`/`join-with`/`to-string`/`lower-case`/
-/// `upper-case` result and of a parameter meant to be used as text (a regex pattern, a
-/// `content-type`, a datetime format, `expect:only-entries`' allowed key names), as opposed to
+/// A value's text, unquoted — the raw content of a `value:join`/`value:join-with`/`value:to-string`/`value:lower-case`/
+/// `value:upper-case` result and of a parameter meant to be used as text (a regex pattern, a
+/// `content-type`, a datetime format, `legacy:only-entries`' allowed key names), as opposed to
 /// [`display`]'s job of describing a *compared* value inside a mismatch message. Conflating the
-/// two quotes text that must not be quoted — a regex pattern, an error message built by `join` —
+/// two quotes text that must not be quoted — a regex pattern, an error message built by `value:join` —
 /// which is exactly the bug this split exists to make impossible to reintroduce by accident.
 fn plain_text(value: &RuntimeValue) -> String {
   match value {

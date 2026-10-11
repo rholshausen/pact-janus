@@ -14,7 +14,7 @@
             0,
             NULL
           ) => BOOL(true),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items => 'SKU-1'
             ) => []
@@ -25,7 +25,7 @@
             $.response.body.totals => 7
           ) => ERROR(Expected an object but got 7),
           :"$.totals.discount" (
-            %if (
+            %flow:if (
               %check:exists (
                 $.response.body.totals.discount => NULL
               ) => BOOL(false),

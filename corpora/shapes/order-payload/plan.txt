@@ -19,7 +19,7 @@
             1,
             NULL
           ),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items
             ),
@@ -41,7 +41,7 @@
           )
         ),
         :"$.payment" (
-          %if (
+          %flow:if (
             %check:equals (
               $.response.body.payment.type,
               'card'
@@ -63,7 +63,7 @@
                 )
               )
             ),
-            %if (
+            %flow:if (
               %check:equals (
                 $.response.body.payment.type,
                 'invoice'
@@ -85,8 +85,8 @@
                   )
                 )
               ),
-              %error (
-                %join (
+              %flow:error (
+                %value:join (
                   'Expected type to be one of card, invoice but got ',
                   $.response.body.payment.type
                 )
@@ -95,7 +95,7 @@
           )
         ),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt
             ),

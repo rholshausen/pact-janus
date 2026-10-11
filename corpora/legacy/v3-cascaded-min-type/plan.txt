@@ -3,7 +3,7 @@
     :request (
       :method (
         %match:equality (
-          %upper-case (
+          %value:upper-case (
             $.request.method
           ),
           'GET'
@@ -16,7 +16,7 @@
         )
       ),
       :query (
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.query
         )
       )
@@ -30,12 +30,12 @@
       ),
       :body (
         :"$.items" (
-          %match:min-type (
+          %legacy:min-type (
             $.response.body.items,
             [{'sku': 'sku-0', 'tags': ['gift']}],
             2
           ),
-          %for-each (
+          %flow:for-each (
             ** (
               $.response.body.items
             ),
@@ -51,7 +51,7 @@
                   ~>.tags,
                   ['gift']
                 ),
-                %for-each (
+                %flow:for-each (
                   ** (
                     ~>.tags
                   ),

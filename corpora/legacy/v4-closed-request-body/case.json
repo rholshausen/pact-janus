@@ -44,7 +44,7 @@
       {
         "path": "$.request.body.alligator",
         "message": "Unexpected member(s): phoneNumber",
-        "action": "expect:only-entries"
+        "action": "legacy:only-entries"
       }
     ]
   }

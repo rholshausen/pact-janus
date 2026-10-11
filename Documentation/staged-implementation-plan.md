@@ -131,6 +131,18 @@ Engineering with no dependency on a community answer. All of it happens in this 
   *Exit:* every corpus case passes with renamed snapshots only; `component/hello` lists v1 and v0 in
   `plan-grammar-versions`; `third-party/janus-csv` loads unmodified through the v0 mapping; a component
   declaring a reserved namespace is refused at load, by name.
+  *Done 2026-10-11.* All 22 corpus cases pass. Undoing the rename textually on the 28 corpus files that
+  changed gives back the previous commit's bytes, so nothing but names moved. Two of the 28 are
+  `case.json` files, not snapshots: an expected mismatch records the action that failed, and two of
+  those are legacy-only actions that were renamed. Their status, path and message are unchanged. The
+  specification is [plan grammar v1](specs/plan-grammar/spec.md), with its schemas in a new `v1`
+  directory beside `v0`'s, and §4.7 of it is the v0 mapping. A fragment is held to the grammar it
+  declared, and `explain` shows every fragment in v1's names. v0 also reserved a `convert` family that
+  never had an action; ADR 0026 reserves six namespaces and that is not one, so v1 does not.
+  One thing the rename made visible and did not fix, because fixing it changes behaviour: a shape whose
+  operator is spelled in a reserved namespace (`"shape": "legacy:only-entries"`) compiles straight to
+  that core action, which plan grammar §4.5 and §5.3 say the shape compiler must never emit. v0 had the
+  same hole under the old names. It wants its own change, with a corpus case.
 - **S0.2 CI on Linux, macOS and Windows for the whole workspace** — **S**. The prototype ran real
   Windows only for spike 8.3. ADR 0023 makes the subprocess every SDK's primary embedding, so the
   kernel, CLI, `janus-engine` and both SDK suites run on all three.

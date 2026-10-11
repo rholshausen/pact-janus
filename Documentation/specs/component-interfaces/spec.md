@@ -151,11 +151,13 @@ consequences, both normative:
 Checking contributions against the component's own name at load time — rather than at use — is what
 makes the namespace a real partition instead of a convention.
 
-One more name is reserved, because the partition has a hole otherwise: **the core action families**
-`match`, `expect`, `check` and `convert` (plan grammar §4.1). A core family *looks* namespaced, so a
-component called `expect` could contribute `expect:unique` — indistinguishable from a core action, and
-colliding with the grammar version that adds one. A component with one of those names fails to load
-(`component-invalid`). Task 8.4 found the hole; ADR 0022 closes it.
+Six more names are reserved, because the partition has a hole otherwise: **the core action
+namespaces** `flow`, `value`, `expect`, `check`, `match` and `legacy` (plan grammar §4.1). Every plan
+action is `namespace:name`, so a component called `expect` could contribute `expect:unique` —
+indistinguishable from a core action, and colliding with the grammar version that adds one. A component
+with one of those names fails to load (`component-invalid`), and the failure names it. A contributed
+action's name has exactly one `:`, after the component's own name. Task 8.4 found the hole and ADR 0022
+closed it for the families plan grammar v0 had; ADR 0026 made them namespaces and reserved the set.
 
 ## 3. The component pipe
 
@@ -193,7 +195,7 @@ Request (`ComponentHello`), engine → component:
 ```json component-hello
 {
   "component-protocol-versions": [1],
-  "plan-grammar-versions": ["v0"],
+  "plan-grammar-versions": ["v0", "v1"],
   "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "fs": [], "network": false },
   "capabilities": { }
@@ -951,12 +953,17 @@ A contributed plan fragment is authored against a plan-grammar version and shipp
 engine — the one place a plan document crosses a version boundary (plan grammar §7.1). The rules, tested
 by task 8.4 (ADR 0022):
 
-- **A fragment declares its grammar.** A grammar version is `v<major>` or `v<major>.<minor>`; `v0` is
-  `v0.0`. A fragment without one cannot be checked for skew, and is refused rather than guessed at.
+- **A fragment declares its grammar.** A grammar version is `v<major>` or `v<major>.<minor>`; `v1` is
+  `v1.0`. A fragment without one cannot be checked for skew, and is refused rather than guessed at.
 - **An engine reads a fragment written against the same major and a minor no newer than its own.** The
-  grammar grows additively within a major (plan grammar §7.1), so a `v0` fragment on a `v0.1` engine is
-  the designed-for case; a `v0.1` fragment on a `v0` engine may use what `v0` never had; a `v1` fragment
+  grammar grows additively within a major (plan grammar §7.1), so a `v1` fragment on a `v1.1` engine is
+  the designed-for case; a `v1.1` fragment on a `v1` engine may use what `v1` never had; another major
   is another grammar.
+- **An engine may read more than one major, each by rule.** Plan grammar v1 is v0 renamed and nothing
+  else, so an engine whose grammar is v1 also reads a `v0` fragment, by the one-to-one mapping of plan
+  grammar §4.7 (ADR 0026), and lists both. The fragment is held to the grammar it declared — a v0
+  fragment may use v0's names and not v1's — and is shown by `explain` in v1's names. A component built
+  against v0 therefore keeps working without a rebuild.
 - **The engine says what it reads**, as `plan-grammar-versions` in `component/hello` (§3.2), so a
   component can write a fragment the engine reads, fall back to an older grammar it also writes, or
   contribute none. Without the list, the first a component learns of skew is a refusal.

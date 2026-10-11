@@ -37,7 +37,7 @@ impl jsonschema::Retrieve for InMemory {
 
 fn load_schemas() -> HashMap<String, Value> {
   let mut out = HashMap::new();
-  for (design, version) in [("plan-grammar", "v0"), ("shape-language", "v1")] {
+  for (design, version) in [("plan-grammar", "v1"), ("shape-language", "v1")] {
     let dir = specs_dir().join(design).join("schemas").join(version);
     for entry in std::fs::read_dir(&dir).expect("schemas dir") {
       let path = entry.expect("entry").path();
@@ -142,8 +142,8 @@ fn parens_balance(text: &str) -> i32 {
 #[test]
 fn plan_examples_validate_against_the_schemas() {
   let schemas = load_schemas();
-  let plan = validator_for("https://pact.io/janus/plan/v0/plan.schema.json", &schemas);
-  let corpus = validator_for("https://pact.io/janus/plan/v0/corpus-case.schema.json", &schemas);
+  let plan = validator_for("https://pact.io/janus/plan/v1/plan.schema.json", &schemas);
+  let corpus = validator_for("https://pact.io/janus/plan/v1/corpus-case.schema.json", &schemas);
   let shape = validator_for("https://pact.io/janus/shape/v1/shape.schema.json", &schemas);
 
   let mut counts: HashMap<String, usize> = HashMap::new();

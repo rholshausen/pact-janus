@@ -90,7 +90,7 @@
         "grammar-version": {
           "type": "string",
           "description": "The plan-grammar version the fragment was authored against: 'v<major>' or 'v<major>.<minor>'. Required whenever a fragment is returned — a fragment without one cannot be checked for skew and is refused. An engine reads it when it has the same major and a minor at least as new; otherwise it fails naming the skew, and never silently reinterprets (spec.md §12.3).",
-          "x-known-values": ["v0"]
+          "x-known-values": ["v0", "v1"]
         }
       }
     },

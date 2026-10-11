@@ -10,7 +10,7 @@
           2,
           NULL
         ) => BOOL(true),
-        %for-each (
+        %flow:for-each (
           ** (
             $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}]
           ) => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}],

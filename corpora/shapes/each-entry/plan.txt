@@ -10,7 +10,7 @@
           1,
           NULL
         ),
-        %for-each (
+        %flow:for-each (
           ** (
             $.response.body
           ),

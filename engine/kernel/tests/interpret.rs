@@ -114,9 +114,9 @@ fn the_rfc_order_payload_reports_every_failure_in_one_run() {
   );
 
   // The `card` alternative's subtree must never have executed: `type` was `invoice`.
-  // `payment`'s one-of chain is the first `if` a depth-first walk meets (member order is
+  // `payment`'s one-of chain is the first `flow:if` a depth-first walk meets (member order is
   // lexicographic: id, items, payment, shippedAt, status).
-  let payment_if = find_action(&executed, "if").expect("payment compiles to a one-of if-chain");
+  let payment_if = find_action(&executed, "flow:if").expect("payment compiles to a one-of if-chain");
   let card_branch = &children_of(payment_if)[1];
   assert!(
     all_unexecuted(card_branch),

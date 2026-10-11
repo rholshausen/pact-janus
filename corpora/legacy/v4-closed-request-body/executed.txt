@@ -3,7 +3,7 @@
     :request (
       :method (
         %match:equality (
-          %upper-case (
+          %value:upper-case (
             $.request.method => 'POST'
           ) => 'POST',
           'POST'
@@ -16,13 +16,13 @@
         ) => BOOL(true)
       ) => BOOL(true),
       :query (
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.query => {}
         ) => BOOL(true)
       ) => BOOL(true),
       :headers (
         :"$.Content-Type" (
-          %match:header-value (
+          %legacy:header-value (
             $.request.headers.content-type => 'application/json',
             'application/json'
           ) => BOOL(true)
@@ -36,12 +36,12 @@
               'Mary'
             ) => BOOL(true)
           ) => BOOL(true),
-          %expect:only-entries (
+          %legacy:only-entries (
             $.request.body.alligator => {'name': 'Mary', 'phoneNumber': '0415674567'},
             'name'
           ) => ERROR(Unexpected member(s): phoneNumber)
         ) => BOOL(false),
-        %expect:only-entries (
+        %legacy:only-entries (
           $.request.body => {'alligator': {'name': 'Mary', 'phoneNumber': '0415674567'}},
           'alligator'
         ) => BOOL(true)

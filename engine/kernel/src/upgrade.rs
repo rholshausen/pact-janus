@@ -498,7 +498,7 @@ impl Conversion {
   ///
   /// A header with no rule is where this conversion is least exact, and it says so. v1–v4 compare
   /// a header value with their own defaulted comparison — MIME parameters as a set, whitespace
-  /// around commas ignored (plan-grammar spec §4.4's `match:header-value`) — and the shape
+  /// around commas ignored (plan-grammar spec §4.4's `legacy:header-value`) — and the shape
   /// language has no operator for that: `header:parse` is its eventual answer and no component
   /// contributes it yet. `equality` is strictly narrower, which is a judgement worth a finding
   /// rather than a silent tightening.

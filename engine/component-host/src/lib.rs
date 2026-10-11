@@ -471,6 +471,8 @@ fn hello_body(grants: &Grants) -> Value {
     "component-protocol-versions": COMPONENT_PROTOCOL_VERSIONS,
     // The plan grammars this engine reads (plan task 8.4): without them a component contributing
     // fragments can only guess which grammar to write, and learn it guessed wrong at a refusal.
+    // v1 is the engine's own; v0 is read by rule (ADR 0026), so a component built before the
+    // rename still finds its grammar here.
     "plan-grammar-versions": pact_janus_kernel::plan::fragment::READABLE_GRAMMAR_VERSIONS,
     "engine": { "name": "janus-engine", "version": pact_janus_kernel::ENGINE_VERSION },
     "grants": grants,
@@ -637,4 +639,23 @@ impl MatcherComponent for WasmComponent {
 
 fn slot_json(slot: &SlotValue) -> Result<Value, ComponentError> {
   serde_json::to_value(slot).map_err(|err| ComponentError::internal(err.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use pretty_assertions::assert_eq;
+
+  /// Staged plan S0.1: the engine's grammar is v1, and it still reads v0 (ADR 0026 decision 4) —
+  /// so a component is told both, and one built against v0 finds its grammar in the list.
+  #[test]
+  fn component_hello_lists_plan_grammar_v1_and_v0() {
+    let hello = hello_body(&Grants::default());
+    assert_eq!(hello["plan-grammar-versions"], json!(["v0", "v1"]));
+    assert_eq!(
+      pact_janus_kernel::plan::GRAMMAR_VERSION,
+      "v1",
+      "what the engine itself writes"
+    );
+  }
 }

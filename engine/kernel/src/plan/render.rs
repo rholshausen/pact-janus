@@ -6,7 +6,7 @@
 //! its own idea of what it should produce.
 //!
 //! **One ambiguity the worked examples don't settle, resolved here rather than left to guess.**
-//! `corpus-case.md`'s executed form shows an untaken, no-`else` `if` (`optional`'s absent branch)
+//! `corpus-case.md`'s executed form shows an untaken, no-`else` `flow:if` (`optional`'s absent branch)
 //! rendered as `=> BOOL(true)` — but [`interpret::run_if`](super::interpret) deliberately returns
 //! bare [`NodeResult::Ok`] in exactly that case (its own doc comment explains why, and plan task
 //! 3.3's compiler relies on `ok`/`Value(Bool(true))` being interchangeable for `truthy`). Rather

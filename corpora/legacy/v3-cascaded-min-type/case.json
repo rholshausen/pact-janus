@@ -41,7 +41,7 @@
       {
         "path": "$.response.body.items",
         "message": "Expected at least 2 item(s) but got 1",
-        "action": "match:min-type"
+        "action": "legacy:min-type"
       }
     ]
   }

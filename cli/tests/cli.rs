@@ -344,7 +344,7 @@ fn explain_needs_a_flag_only_for_an_interaction_specification() {
 fn explain_prints_the_structured_plan_document_on_request() {
   let output = janus(&["explain", &order_pact(), "--plan"]);
   let plan: Value = serde_json::from_str(&stdout(&output)).expect("the plan is JSON");
-  assert_eq!(plan["grammar"], json!("v0"));
+  assert_eq!(plan["grammar"], json!("v1"));
   assert_eq!(plan["root"]["kind"], json!("container"));
 }
 

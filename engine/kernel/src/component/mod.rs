@@ -29,8 +29,8 @@ pub use content::{
 pub use error::ComponentError;
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
-  CORE_FAMILIES, ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved,
-  Source, Unavailable, check_requirements, resolve,
+  ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
+  Unavailable, check_requirements, resolve,
 };
 pub use matcher::{Apply, ApplyResult, MatcherComponent};
 pub use parts::{Part, Parts, SlotValue};

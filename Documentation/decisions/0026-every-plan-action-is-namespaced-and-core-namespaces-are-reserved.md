@@ -1,7 +1,7 @@
 # 0026 — Namespace every plan action, and reserve the core families as namespaces
 
-- **Status**: accepted — decided in task 9.4; implemented as plan grammar v1 in the real build (staged
-  plan §5), the prototype keeps v0
+- **Status**: accepted — decided in task 9.4; implemented as plan grammar v1 by staged plan item S0.1
+  (2026-10-11). The prototype kept v0, as decision 5 says
 - **Date**: 2026-09-24
 - **Plan tasks**: 9.4 (amends design 2.4 §4.1, §4.2, §4.4; feeds the staged plan)
 - **Evidence**: plan-grammar spec §4.1 and §4.6, [ADR 0010](0010-plans-are-renderings-the-grammar-is-the-record.md),

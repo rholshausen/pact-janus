@@ -1,6 +1,7 @@
-# Plan grammar and core action set specification (v0, final)
+# Plan grammar and core action set specification (v1)
 
-Plan task: **2.4**. Status: **final**.
+Plan task: **2.4**; grammar v1 by staged plan item **S0.1** ([ADR
+0026](../../decisions/0026-every-plan-action-is-namespaced-and-core-namespaces-are-reserved.md)). Status: **final**.
 
 A shape says what a value must be; a **plan** is what the engine actually executes to find out, and
 what `explain` prints when someone asks why a match succeeded or failed. This document specifies the
@@ -13,16 +14,19 @@ pact-reference as the kernel's starting point, and §9 records exactly what this
 from it and what it does not. The versioning decision is [ADR
 0010](../../decisions/0010-plans-are-renderings-the-grammar-is-the-record.md).
 
-The schemas under [`schemas/v0/`](schemas/v0/) are the **specified surface**, on the same terms as the
+The schemas under [`schemas/v1/`](schemas/v1/) are the **specified surface**, on the same terms as the
 other Phase 2 designs': this prose defines their semantics, the schemas define their shapes, and they
 follow the Engine Protocol's open-world authoring rules
 ([protocol spec §2.2](../engine-protocol/spec.md#22-open-world-authoring-rules)).
 
-**Why v0 and not v1.** Every other Phase 2 schema set is `v1`, because the documents they govern are
-authored by users and recorded in artifacts that outlive the engine. A plan is neither (§7). The
-grammar is a real compatibility surface — plugins author fragments against it (plan task 8.4) — but it
-has had no external consumer yet, and calling it v1 before one has ever tried to extend it would be
-claiming a stability nobody has tested. Plan task 8.4 is the test; v1 is what it earns.
+**Why this is v1, and what v0 was.** The prototype's grammar was `v0`: a real compatibility surface —
+plugins author fragments against it — that had had no external consumer, so calling it v1 would have
+claimed a stability nobody had tested. Plan task 8.4 was the test. A third-party component contributed
+fragments and actions, the versioning policy held, and one thing did not: v0 named its actions three
+different ways, and a reader of `explain` could not tell a core action from a component's (ADR 0026).
+v1 is v0 with that fixed and **nothing else changed** — every node kind, every result, every action's
+meaning is the same, and only names differ. §4.7 is the whole difference, as a table an engine reads v0
+documents by. [`schemas/v0/`](schemas/v0/) stays, as the record of what a v0 document is.
 
 ## Contents
 
@@ -75,7 +79,7 @@ Out of scope, with owners:
 ### 2.1 Nodes
 
 A plan is a tree. Every node has a **kind**, zero or more **children**, and — once executed — a
-**result** (§2.3). v0 defines eight kinds:
+**result** (§2.3). The grammar defines eight kinds:
 
 | Kind | Carries | Executes by |
 |---|---|---|
@@ -97,7 +101,7 @@ check them. Deleting containers would leave a plan that executes identically and
 `splat` is the variadic escape: an action whose argument count depends on the value being matched —
 every entry of an object, every element of an array — takes a `splat` child that expands at execution
 time. `resolve-current` is its companion, addressing whatever the enclosing construct has made
-current: the element a `for-each` is on, or the running value of a `pipeline`. Those are the only two
+current: the element a `flow:for-each` is on, or the running value of a `pipeline`. Those are the only two
 constructs that make anything current, and a `resolve-current` outside both is a compiler bug (§8).
 
 There is no empty or null node kind. The forked engine has one as a Rust `Default`; it is an artifact
@@ -144,8 +148,8 @@ and it is what makes a failure report worth reading.
 ### 2.4 Execution
 
 An interpreter walks the tree depth-first, left to right. Children are executed before the node that
-owns them, except where an action is **lazy** — `if` evaluates its condition before its branches, `or`
-stops at the first success — and every lazy action MUST declare it (§4.2), because a reader of an
+owns them, except where an action is **lazy** — `flow:if` evaluates its condition before its branches,
+`flow:or` stops at the first success — and every lazy action MUST declare it (§4.2), because a reader of an
 executed plan needs to know whether an unannotated node was skipped or never reached.
 
 Values reach the plan through **resolvers**. A `resolve` node holds a path — `$.query`,
@@ -188,7 +192,7 @@ Nodes are written with a sigil, children in parentheses, one per line, indented 
     :"query parameters" (
       %expect:empty (
         $.query,
-        %join (
+        %value:join (
           'Expected no query parameters but got ',
           $.query
         )
@@ -200,7 +204,7 @@ Nodes are written with a sigil, children in parentheses, one per line, indented 
 
 This is a **specified surface**, not a debugging convenience. It is what `explain` prints, what a
 golden corpus records (§6), and what a user reads when a verification fails, so it is governed like a
-schema: the sigils and layout above are fixed for v0, and a renderer MUST produce exactly this form.
+schema: the sigils and layout above are fixed, and a renderer MUST produce exactly this form.
 
 ### 3.2 The executed form
 
@@ -214,7 +218,7 @@ comparing like with like.
     :"query parameters" (
       %expect:empty (
         $.query => {'a': 'b'},
-        %join (
+        %value:join (
           'Expected no query parameters but got ' => 'Expected no query parameters but got ',
           $.query => {'a': 'b'}
         ) => 'Expected no query parameters but got {\'a\': \'b\'}'
@@ -232,42 +236,41 @@ declared rather than incidental.
 
 ### 4.1 Naming and namespacing
 
-An action name is kebab-case, optionally `:`-separated into a family and a name (`expect:empty`,
-`match:regex`). The rules mirror the shape language's (shape spec §3.5), for the same reasons:
+**An action name is `namespace:name`, with exactly one `:`.** Both halves are kebab-case. There are no
+unnamespaced actions. The namespace says who defined the action, and that is the first thing a reader
+of `explain` output needs to know about a node:
 
-- **An unnamespaced action name is reserved for this specification, forever.** A component MUST NOT
-  define one, and an engine MUST NOT resolve an unnamespaced name to a component.
-- A component contributes actions under its own identifier: `protobuf:decode`, `http:status-class`.
-  The namespace is the component's; the requirement that pulls it in travels in the interaction spec,
-  not in the plan node.
-- An **unknown action is a named failure**, never an ignored node (shape spec §3.7's rule, applied
+- **Six namespaces are reserved for this specification:** `flow`, `value`, `expect`, `check`, `match`
+  and `legacy` (§4.2). An action in one of them is a core action, defined here, or it is nothing: an
+  engine MUST NOT resolve a name in a reserved namespace to a component.
+- **Every other namespace is a component's.** A component contributes actions under its own identifier:
+  `protobuf:decode`, `http:status-class`, `csv:integer`. The requirement that pulls the component in
+  travels in the interaction spec, not in the plan node.
+- **A component MUST NOT declare a reserved namespace**, and an engine MUST refuse one that does, at
+  load, naming it (component-interfaces spec §2). Without that, a component called `expect` could
+  contribute `expect:unique`, indistinguishable from a core action and colliding with the grammar
+  version that adds one.
+- **An unknown action is a named failure**, never an ignored node (shape spec §3.7's rule, applied
   here): silently skipping a node drops a constraint while still reporting success.
 
-The families a `:` prefix names are conventions, not scopes: `match:*` asserts a value is in a set,
-`expect:*` asserts a structural property, `check:*` yields a boolean rather than failing, `convert:*`
-transforms. `json:parse` is a *namespaced* action belonging to the JSON content component; `expect:*`
-is a *core* family. The difference is whether the first segment names a component, and §4.6 is
-explicit about which is which.
+The rules mirror the shape language's (shape spec §3.5), for the same reasons, with one difference:
+the shape language reserves the *unnamespaced* names and a plan has none. A reserved set that is a
+short list of namespaces can be checked when a component loads; a rule about the absence of a prefix
+could not stop a component naming itself after a core family, which is the hole v0 had.
 
-**Grammar v1 changes this (ADR 0026, decided, not yet implemented).** In v1 every action is
-`namespace:name` with exactly one `:`, and the core families are **reserved namespaces**: `flow`
-(today's unprefixed control actions: `flow:if`, `flow:for-each`, …), `value` (today's unprefixed value
-actions: `value:upper-case`, …), `expect`, `check`, `match`, and `legacy` (the legacy-only actions of
-§4.4: `legacy:header-value`, `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`,
-`legacy:max-type`, `legacy:min-max-type`). A component MUST NOT declare a reserved namespace, and an
-engine refuses one that does at load. The meaning of every action is unchanged, so an engine reading v1
-reads a v0 fragment by the one-to-one mapping ADR 0026 tabulates. This document describes v0, which is
-what the prototype implements; the real build implements v1 (staged implementation plan §5).
+Further reserved namespaces are added only by a new major version of the grammar (§7.1). Within v1 the
+set is these six, so a namespace outside it is a component's to take and stays that way.
 
-### 4.2 Core actions (v0)
+### 4.2 Core actions
 
-| Family | Actions | Lazy |
-|---|---|---|
-| control | `and`, `or`, `if`, `error`, `apply`, `for-each`, `tee` | `or`, `if` |
-| value | `join`, `join-with`, `length`, `lower-case`, `upper-case`, `to-string` | |
-| structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:only-entries`, `expect:absent` | |
-| checks | `check:exists`, `check:equals`, `check:null` | |
-| matching | `match:*`, one per shape operator (§4.3) | |
+| Namespace | What it holds | Actions | Lazy |
+|---|---|---|---|
+| `flow` | control | `flow:and`, `flow:or`, `flow:if`, `flow:error`, `flow:apply`, `flow:for-each`, `flow:tee` | `flow:or`, `flow:if` |
+| `value` | value transforms | `value:join`, `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string` | |
+| `expect` | structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:absent` | |
+| `check` | boolean checks | `check:exists`, `check:equals`, `check:null` | |
+| `match` | one per value operator of the shape language (§4.3) | `match:*` | |
+| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value` | |
 
 The `check:` family is what the `expect:` and `match:` families are not: a check **yields a boolean**,
 an assertion **fails**. Both are needed and they are not each other's negation in any useful sense — a
@@ -322,17 +325,20 @@ The v1–v4 compiler (design 3.5) emits from the same set. Most of it overlaps: 
 `regex`'s dialect and anchoring to match v1–v4 exactly, so `match:regex` serves both compilers with
 one semantics. Where they differ is small and worth naming:
 
+The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
+"which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:
+
 | Action | Emitted by | Note |
 |---|---|---|
-| `expect:only-entries` | legacy only | v1–v4's request bodies are closed by default; response bodies (like every shape) are must-ignore — design 3.5 verified this asymmetry against the 803 specification test cases rather than assuming a single default, and only the request side ever emits this action. No shape compiles to it either way — ADR 0007 commitment 4 refuses closed objects, and §5.3 makes that a checkable rule rather than a convention. |
-| `match:array-contains` | legacy only | the old `arrayContains`; shapes reach it through the opaque `contains` operator |
-| `match:min-type`, `match:max-type`, `match:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a size bound, enforced only when the resolved value is an array — a string's characters and an object's members are not items — and never emitted bounded for a cascaded rule, which the legacy compiler reduces to `match:type` (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
-| `match:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
+| `legacy:only-entries` | legacy only | v1–v4's request bodies are closed by default; response bodies (like every shape) are must-ignore — design 3.5 verified this asymmetry against the 803 specification test cases rather than assuming a single default, and only the request side ever emits this action. No shape compiles to it either way — ADR 0007 commitment 4 refuses closed objects, and §5.3 makes that a checkable rule rather than a convention. |
+| `legacy:array-contains` | legacy only | the old `arrayContains`; shapes reach it through the opaque `contains` operator |
+| `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a size bound, enforced only when the resolved value is an array — a string's characters and an object's members are not items — and never emitted bounded for a cascaded rule, which the legacy compiler reduces to `match:type` (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
+| `legacy:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
 | `match:any-of`, `expect:absent` | shapes only | v1–v4 has no enumeration or absence assertion |
 
 This is why the forked action set is worth keeping rather than replacing: it is the legacy half of the
-answer, already validated against pact-reference's 803 specification test cases. What v0 adds is the
-shape half.
+answer, already validated against pact-reference's 803 specification test cases. What this grammar adds
+is the shape half.
 
 **Both paths must agree.** A v1–v4 pact can reach a plan two ways: compiled directly (design 3.5), or
 upgraded to shapes (design 2.5) and compiled as shapes. Where both paths exist for the same input they
@@ -342,22 +348,51 @@ unchecked claim about migration is how migrations break.
 
 ### 4.5 Which compiler may emit what
 
-An action carries a set of compilers permitted to emit it. An engine MUST reject a plan in which the
-shape compiler emitted a legacy-only action, as an internal error — this is the mechanism that keeps
-2.2's must-ignore guarantee true rather than merely intended. A guarantee that depends on nobody
-writing the wrong line is not a guarantee.
+An action carries a set of compilers permitted to emit it, and the name says which: the shape compiler
+MUST NOT emit an action in the `legacy` namespace, and the v1–v4 compiler MUST NOT emit `match:any-of`
+or `expect:absent`. An engine MUST reject a plan in which the shape compiler emitted a `legacy:` action,
+as an internal error — this is the mechanism that keeps 2.2's must-ignore guarantee true rather than
+merely intended. A guarantee that depends on nobody writing the wrong line is not a guarantee.
 
 ### 4.6 Component actions
 
-Everything content- or transport-specific is namespaced and contributed: `json:parse`, `xml:parse`,
-`header:parse`, `form:parse`, `multipart:parse`. None of them is core, and the kernel resolves none of
-them itself.
+Everything content- or transport-specific is in a component's namespace and contributed: `json:parse`,
+`xml:parse`, `header:parse`, `form:parse`, `multipart:parse`. None of them is core, and the kernel
+resolves none of them itself.
 
 This is the largest single change from the forked engine (§9), and it is not a stylistic preference:
 it is the architecture rule that the kernel knows nothing about HTTP or JSON, applied to the one place
 where the knowledge would otherwise be invisible — inside the interpreter's dispatch table rather than
 in an obviously content-shaped module. Whether the JSON component ships in-tree is design 2.6's
 question and does not change this: in-tree components implement exactly the same interface.
+
+### 4.7 Reading grammar v0
+
+Grammar v0 named actions three ways: a component's carried its namespace, most core ones carried a
+*family* prefix that was a convention and not a scope, and control and value actions carried nothing.
+v1 renames, and does nothing else. **An engine that reads v1 SHOULD also read a v0 document, by this
+mapping**, one name to one name:
+
+| v0 | v1 |
+|---|---|
+| `and`, `or`, `if`, `error`, `apply`, `for-each`, `tee` | `flow:and`, `flow:or`, `flow:if`, `flow:error`, `flow:apply`, `flow:for-each`, `flow:tee` |
+| `join`, `join-with`, `length`, `lower-case`, `upper-case`, `to-string` | `value:join`, `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string` |
+| `expect:only-entries` | `legacy:only-entries` |
+| `match:array-contains` | `legacy:array-contains` |
+| `match:min-type`, `match:max-type`, `match:min-max-type` | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` |
+| `match:header-value` | `legacy:header-value` |
+| every other `expect:*`, `check:*` and `match:*` action | the same name |
+| `<component>:<name>` | the same name |
+
+A document is read under the grammar it declares and no other (§7.1): a v0 fragment that says
+`flow:if` is naming a component called `flow`, and a v1 fragment that says `if` is naming nothing. What
+an engine *shows* is always v1 — a v0 fragment's nodes are printed by `explain` under their v1 names, so
+a plan has one vocabulary whoever wrote its parts. v0 also reserved a `convert` family that never had an
+action; v1 does not reserve it.
+
+This is what [ADR 0022](../../decisions/0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md)
+designed for, an older fragment read by a newer engine by rule, and it is why a component built against
+v0 keeps working without a rebuild.
 
 ## 5. Compiling shapes to plans
 
@@ -379,12 +414,12 @@ are two plans.
 | value operators | the matching action of §4.3, applied to the resolved value |
 | `object` | `expect:object`, then a `container` per named member, each holding the member's compiled shape; no assertion about unnamed members |
 | `array` | `expect:array`, `expect:count`, then a `container` per index |
-| `each-like` | `expect:array`, `expect:size` for the cardinality, plus `for-each` over a `splat` of the elements, with the item shape compiled once and applied to `resolve-current` |
+| `each-like` | `expect:array`, `expect:size` for the cardinality, plus `flow:for-each` over a `splat` of the elements, with the item shape compiled once and applied to `resolve-current` |
 | `each-entry` | `expect:object`, then the same over entries, with `entry` values (§2.2) feeding key and value shapes |
-| `optional` | `if` on `check:exists`: present branch compiles `of`, absent branch is `ok` |
+| `optional` | `flow:if` on `check:exists`: present branch compiles `of`, absent branch is `ok` |
 | `forbidden` | `expect:absent` |
-| `nullable` | `if` on `check:null`: null branch is `ok`, otherwise compile `of` |
-| `one-of` | nested `if` on `check:equals` of the discriminator, one branch per alternative, `error` on no match naming the value read |
+| `nullable` | `flow:if` on `check:null`: null branch is `ok`, otherwise compile `of` |
+| `one-of` | nested `flow:if` on `check:equals` of the discriminator, one branch per alternative, `flow:error` on no match naming the value read |
 | `any-of` | `match:any-of` with the options as `value` children |
 | `contains` | `expect:array`, then `match:contains` — opaque, per shape spec §4.1 |
 
@@ -401,14 +436,15 @@ that — it says what the value *is*, never what members it may carry.
 
 ### 5.3 What the shape compiler may not emit
 
-The shape compiler MUST NOT emit `expect:only-entries` or any other action that fails on an unnamed
-member. §4.5 makes this checkable; ADR 0007 commitment 4 is why it is a rule.
+The shape compiler MUST NOT emit `legacy:only-entries` or any other action that fails on an unnamed
+member, and no action in the `legacy` namespace at all. §4.5 makes this checkable; ADR 0007 commitment 4
+is why it is a rule.
 
 ## 6. Golden corpora
 
 ### 6.1 A case
 
-Schema: [`schemas/v0/corpus-case.schema.json`](schemas/v0/corpus-case.schema.json). A case is a
+Schema: [`schemas/v1/corpus-case.schema.json`](schemas/v1/corpus-case.schema.json). A case is a
 directory holding four files:
 
 | File | Holds | On a diff |
@@ -473,10 +509,11 @@ So:
 
 - **The grammar is a versioned compatibility surface**, evolving additively under the protocol's rules
   (protocol spec §11.2) and enforced by the same CI checker. A version is `v<major>` or
-  `v<major>.<minor>` (`v0` is `v0.0`); an additive change is a new minor, anything else a new major, and
+  `v<major>.<minor>` (`v1` is `v1.0`); an additive change is a new minor, anything else a new major, and
   a reader reads its own major at any minor no newer than its own (component-interfaces spec §12.3, ADR
-  0022). Node kinds, the value model, action
-  naming and result kinds are what a fragment author writes against.
+  0022). Node kinds, the value model, action naming and result kinds are what a fragment author writes
+  against. A reader MAY read another major where a rule says how, and never by guessing: v1's rule for
+  v0 is §4.7, and an engine lists every grammar it reads so a component can tell.
 - **An action's semantics are frozen once published.** A component emitting `match:regex` breaks if an
   engine redefines it. New behaviour is a new action name — ADR 0007's commitment, for the same
   reason.
@@ -498,8 +535,8 @@ Codes are the Engine Protocol's (protocol spec §10.2). This specification const
 | Code | Category | When |
 |---|---|---|
 | `interaction-invalid` | `document` | a shape that cannot be compiled, with `problems[].path` at the node |
-| `component-unavailable` / `component-failed` | `component` | a namespaced action whose component is missing, or which the component rejected (shape spec §3.7's table, applied to actions) |
-| `internal` | `internal` | an unnamespaced action the engine does not implement, or a compiler emitting an action §4.5 forbids it — both are engine bugs, not user errors |
+| `component-unavailable` / `component-failed` | `component` | a component's action whose component is missing, or which the component rejected (shape spec §3.7's table, applied to actions) |
+| `internal` | `internal` | an action in a reserved namespace that the engine does not implement, or a compiler emitting an action §4.5 forbids it — both are engine bugs, not user errors |
 
 A mismatch is **not** an error in this sense. It is an `error` *result* on a node (§2.3), carried in
 the executed plan and reported through the plan's result form — which is what design 2.1 means by
@@ -531,7 +568,7 @@ granularity of what survives.
 - **Fourteen content- and transport-specific actions** become namespaced component contributions
   (§4.6): `json:*`, `xml:*`, `header:*`, `form:parse`, `multipart:parse`.
 - The **matching family gains a shape half** (§4.3), derived from the operator set rather than from
-  v1–v4 matcher names, and `expect:only-entries` becomes legacy-only and unreachable from shapes
+  v1–v4 matcher names, and `legacy:only-entries` becomes legacy-only and unreachable from shapes
   (§4.5).
 
 **Dropped:**

@@ -50,7 +50,7 @@ fn pretty_form_matches_corpus_case_plan_txt() {
           )
         ),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt
             ),
@@ -86,7 +86,7 @@ fn executed_form_matches_corpus_case_executed_txt() {
           ) => BOOL(true)
         ) => BOOL(true),
         :"$.shippedAt" (
-          %if (
+          %flow:if (
             %check:exists (
               $.response.body.shippedAt => NULL
             ) => BOOL(false),
@@ -208,7 +208,7 @@ fn executed_form_matches_order_payload_plan_section_3() {
     "status subtree:\n{status}"
   );
 
-  // The `:card` alternative was never taken (`%if` is lazy) — no `=> ` appears anywhere under it.
+  // The `:card` alternative was never taken (`%flow:if` is lazy) — no `=> ` appears anywhere under it.
   let payment = find_container(&text, ":\"$.payment\" (");
   let card_start = payment.find(":card (").expect(":card subtree");
   let card_end = card_start + payment[card_start..].find("),\n").expect("end of :card subtree");
@@ -233,8 +233,8 @@ mod fragments {
 
   #[test]
   fn empty_and_renders_as_a_single_line() {
-    let node = Node::action("and", vec![]);
-    pretty_assertions::assert_eq!(super::render_one(&node), "%and ()");
+    let node = Node::action("flow:and", vec![]);
+    pretty_assertions::assert_eq!(super::render_one(&node), "%flow:and ()");
   }
 
   #[test]
@@ -242,7 +242,7 @@ mod fragments {
     let node = Node::pipeline(vec![
       Node::resolve("$.response.body.shippedAt"),
       Node::action(
-        "if",
+        "flow:if",
         vec![
           Node::action("check:exists", vec![Node::resolve_current("~>")]),
           Node::action(
@@ -257,7 +257,7 @@ mod fragments {
     ]);
     let expected = r#"-> (
   $.response.body.shippedAt,
-  %if (
+  %flow:if (
     %check:exists (
       ~>
     ),

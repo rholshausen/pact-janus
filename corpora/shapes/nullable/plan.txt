@@ -2,11 +2,11 @@
   :"an optionally-empty account balance" (
     :response (
       :body (
-        %if (
+        %flow:if (
           %check:null (
             $.response.body
           ),
-          %and (),
+          %flow:and (),
           %match:integer (
             $.response.body
           )
