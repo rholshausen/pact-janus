@@ -308,6 +308,12 @@ mod tests {
       .collect()
   }
 
+  /// What the loader makes of a path relative to the configuration file: the platform's own join,
+  /// so the separator is the one the process that receives it expects.
+  fn joined(base: &str, relative: &str) -> String {
+    Path::new(base).join(relative).display().to_string()
+  }
+
   #[test]
   fn a_yaml_file_and_a_json_file_resolve_to_the_same_document() {
     let yaml = r#"
@@ -460,7 +466,7 @@ hooks:
     let resolved = resolve(&document, Path::new("/projects/orders"), &env(&[])).expect("resolves");
     assert_eq!(
       resolved["hooks"]["state-setup"][0]["run"]["cwd"],
-      json!("/projects/orders/./fixtures")
+      json!(joined("/projects/orders", "./fixtures"))
     );
   }
 
@@ -476,7 +482,7 @@ hooks:
     assert_eq!(
       resolved["components"],
       json!([
-        { "name": "csv", "source": { "kind": "file", "reference": "/projects/orders/components/csv.wasm", "digest": "sha256:ab" },
+        { "name": "csv", "source": { "kind": "file", "reference": joined("/projects/orders", "components/csv.wasm"), "digest": "sha256:ab" },
           "grants": { "network": false }, "limits": { "deadline-ms": 500 } },
         { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-xml:1" } } ])
     );

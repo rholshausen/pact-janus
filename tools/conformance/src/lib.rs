@@ -294,6 +294,14 @@ fn compile_schema(path: &Path) -> Result<jsonschema::Validator, String> {
     .map_err(|e| format!("compiling {}: {e}", path.display()))
 }
 
+/// A path inside the suite, spelled the way a case's id spells it: with `/`, on every platform. A
+/// case's id says where its file belongs, and on Windows the file's own path would never agree.
 fn relative(path: &Path, root: &Path) -> String {
-  path.strip_prefix(root).unwrap_or(path).display().to_string()
+  path
+    .strip_prefix(root)
+    .unwrap_or(path)
+    .components()
+    .map(|part| part.as_os_str().to_string_lossy())
+    .collect::<Vec<_>>()
+    .join("/")
 }
