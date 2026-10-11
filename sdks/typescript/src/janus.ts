@@ -183,7 +183,8 @@ export class Janus {
 
 /**
  * A declaration as the engine receives it (lifecycle-hooks spec §7.1: the loader resolves paths, the
- * engine reads none it was not given absolute). Everything else is passed as written.
+ * engine resolves none against a directory of its own). A reference with a root is passed as written,
+ * and Node's `isAbsolute` is that rule: a leading separator counts on Windows too, drive or no drive.
  */
 function resolved(declaration: ComponentDeclaration): ComponentDeclaration {
   const reference = declaration.source.reference;

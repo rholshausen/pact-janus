@@ -93,7 +93,9 @@ contract=contracts/web-app-order-service.janus.json
 consumer_test() {
   typed "npm test"
   local status=0
-  (cd web-app && npm test --silent >../test.log 2>&1) || status=$?
+  # The plain reporter, named so Vitest does not add its GitHub one in CI: step 4's failure is the
+  # point, this script checks it happened, and reported as an error it reads as a broken build.
+  (cd web-app && npm test --silent -- --reporter=default >../test.log 2>&1) || status=$?
   if [[ $status -eq 0 ]]; then
     printf '%s✓ shows an order%s\n' "$green" "$reset"
     node -e '
