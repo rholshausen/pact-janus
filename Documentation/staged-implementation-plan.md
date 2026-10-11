@@ -171,6 +171,21 @@ Engineering with no dependency on a community answer. All of it happens in this 
 - **S0.3 Benchmark trend in CI** — **S**. The harness plan §14 promised and 9.1 found had never run.
   Trend, not gate. Gate E (frame encoding) and gate C (contract packaging) can only fire on this data.
   *Exit:* every merge to `main` records the 1.7 scenarios against Janus and the chart is linkable.
+  *Done 2026-10-11.* The chart is <https://rholshausen.github.io/pact-janus/bench/>, and its first
+  point is the merge that added it (`497fc53`). The `Benchmarks` workflow runs the Janus harness in all
+  three embeddings on every push to `main` and records 51 numbers: each scenario's headline, the
+  arming share of a mock exchange, the per-interaction and per-variant costs, throughput, and the
+  WASM component's compile time and size. They are kept on the `gh-pages` branch by
+  `benchmark-action/github-action-benchmark`, pinned by commit, in the only job in this repository's
+  CI that can write to it. Nothing fails for being slower. A pull request that touches the harness
+  measures and compares, and records nothing.
+  The numbers are a shared runner's: the mock-server scenarios run two to four times slower there
+  than on the machine the hand-recorded results in `benchmarks/results/` come from, and they move
+  between runs. So the chart answers "did
+  this get worse over the last twenty merges", which is what gates E and C ask, and not "how fast is
+  Janus", which `benchmarks/results/` and the performance report answer. The harness had not been
+  built or tested by CI before this; its tests run in the workflow now, and it had survived S0.1
+  and S0.13 unbroken.
 - **S0.4 Release pipeline** — **M**. One statically linked `janus-engine` per target triple, signed,
   with checksums the SDKs verify on download; the CLI the same way; and the WASM offline artifact moved
   from `benchmarks/janus/engine-wasm` into `engine/` with its own build. The signing scheme is chosen

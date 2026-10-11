@@ -36,7 +36,7 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
-> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2.
+> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2, S0.3.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
