@@ -98,14 +98,18 @@ are big.
 
 ```
  0a Foundations, now ──► 1a CLI verifier ──► 1b Provider integrations ──► 2 Consumer engine + JS/JVM
- 0b Foundations, community ─┘                                                      │
+                                                      │                            │
+                                 0b Foundations, community ◄─┘ (once people can run their pipelines)
                                                                                    ▼
           6 Breadth ◄── 5 Plugins ◄──┬── 4 Provider shapes ◄── 3 Shapes and variants
                                      └── A AI-assisted layer (optional)
 ```
 
-Stage 0a can start today and 0b waits on §7. Stage 1a ships value on its own; 1b makes it a product for
-the ecosystems that verify inside a test. Stages 4 and 5 can overlap once stage 3's contract format is
+Stage 0a can start today. Stage 0b waits on §7, and §7's answers are not expected until people can run
+their existing CI pipelines on the real thing, which is stage 1's exit: a prototype invites playing, not
+an opinion. So nothing before stage 2 blocks on 0b, the codename stays until then, and S0.5 makes the
+eventual rename mechanical rather than forbidding it. Stage 1a ships value on its own; 1b makes it a
+product for the ecosystems that verify inside a test. Stages 4 and 5 can overlap once stage 3's contract format is
 frozen. Stage 6 starts with SDKs as soon as stage 2 has proven the SDK model on two languages.
 
 Every item below is `S<stage>.<n>` with a size and an exit. An item's exit is the thing CI, a corpus or
@@ -136,14 +140,23 @@ Engineering with no dependency on a community answer. All of it happens in this 
   here and recorded as an ADR.
   *Exit:* a tagged release publishes signed binaries for at least five triples and the WASM artifact,
   and an SDK resolves one by version.
-- **S0.5 Naming policy for the codename** — **S**. "Janus" stays in crate, binary, config and
-  environment-variable names until §7.1 is answered. No **new** Janus-named *persisted* identifier is
-  minted from now on. The ones that exist are inventoried here and renamed in S2.7: the contract
-  format `janus-contract/1` and provider shape `janus-provider-shape/1` (contract-file spec), the OCI
-  artifact and config media types `application/vnd.pact.janus.component.v1` (ADR 0021), and the
-  broker's `specification` value (ADR 0011 decision 6, gate B).
-  *Exit:* the inventory above is complete (a grep for `janus` in persisted strings finds nothing else),
-  and a CI check refuses a new one.
+- **S0.5 Rename-ready under the codename** — **S**. "Janus" stays, everywhere, until §7.1 is
+  answered, which is expected late (§3's preamble). What stage 0 does is make the rename a mechanical
+  change rather than an archaeology: every surface the name reaches is defined in one place per
+  surface, and a rehearsal proves the change is complete. The surfaces: crate and package names
+  (`pact_janus_*`, `@pact-foundation/janus`, the Gradle group), the binaries (`janus`, `janus-engine`),
+  the configuration file (`verifier.janus.yaml`), the environment-variable prefix (`JANUS_*`), the
+  user cache directory, and the **persisted identifiers**, which are the ones a rename cannot simply
+  replace because documents in brokers and registries already carry them: the contract format
+  `janus-contract/1` and provider shape `janus-provider-shape/1` (contract-file spec), the OCI artifact
+  and config media types `application/vnd.pact.janus.component.v1` (ADR 0021), and the broker's
+  `specification` value (ADR 0011 decision 6, gate B). The rule for those is **dual spelling for one
+  major version**: the renamed engine reads both and writes the new one, so a contract converted or
+  recorded under the codename stays readable, and nothing published before the rename has to be
+  republished. New persisted identifiers may be added; they follow the same rule when the rename comes.
+  *Exit:* the inventory above is complete and kept in one document; a rehearsal script renames the
+  codename to a placeholder across every surface and the whole test suite, both SDKs' conformance runs
+  and the demo pass; CI runs the rehearsal on a schedule so drift is caught.
 - **S0.6 Where the build happens** — decision. This revision assumes: **in this repository, on
   `main`, hardening the prototype in place**, with §2's table as the inventory of what is rewritten.
   The prototype's history is the provenance ADR 0004 requires. If §7.2 answers otherwise, the move is a
@@ -155,10 +168,14 @@ operating systems.
 
 ### Stage 0b: Foundations the community decides — **S**
 
+Not expected before stage 1's exit, for the reason in §3's preamble, and nothing before stage 2 blocks
+on it. The plan's assumptions until then: the work happens here (S0.6) and under the codename (S0.5).
+
 - **S0.7 A home and owners** for the engine, the specifications and conformance sign-off (§7.2).
 - **S0.8 The specifications published as drafts** for review, versioned from the start, at that home.
   The plan grammar is published as v1 (S0.1 already landed it).
-- **S0.9 The name** (§7.1), which S2.7 then writes into every persisted identifier.
+- **S0.9 The name** (§7.1), which S2.7 then writes into every surface S0.5 inventoried, by the rehearsed
+  change.
 
 **Done when** the specs are open for community comment at their home, under their owners.
 
@@ -314,17 +331,19 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
-- **S2.7 The contract format named, and every persisted identifier renamed** — **S**, blocked on
-  §7.1 (S0.9). S0.5's inventory is renamed in one change, with `upgrade` and the broker reading both
-  spellings for one major version. Until then `janus upgrade` output is **provisional**: the CLI says
-  so, and this plan recommends not publishing converted contracts to a shared broker before S2.7.
+- **S2.7 The rename, when the name is decided** — **S**, blocked on §7.1 (S0.9), and **not** a stage
+  2 exit condition: if the answer has not come, stage 2 ships its major version under the codename.
+  When it comes, S0.5's rehearsed change runs for real, and the persisted identifiers follow S0.5's
+  dual-spelling rule for one major version, so contracts and components published under the codename
+  stay readable and are never republished. Converted and recorded contracts may therefore be published
+  to a shared broker before the rename.
 - **S2.8 Secrets in recorded contracts** — **S**. A consumer test that sends a real token records it.
   The lifecycle-hooks redaction rules extend to the recorded contract and to `explain --executed`
   output, and the SDK specification says which headers and members are redacted by default.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
-of pact-js and pact-jvm run on the compatibility facade, S2.7 has landed, and early adopters publish
-contracts to a broker that the stage 1 verifier checks.
+of pact-js and pact-jvm run on the compatibility facade, and early adopters publish contracts to a
+broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers, before or after.
 
 ### Stage 3: Shapes and variants in the DSLs — **L**
 
@@ -488,7 +507,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S0.2 | Windows and macOS CI for the subprocess, and for the whole workspace | spike 1.3's open risk; ADR 0023 |
 | S0.3 | The benchmark harness as a CI trend, which plan §14 promised and 9.1 found had never run; gates E and C depend on it | performance report §6 |
 | S0.4 | Per-OS distribution of `janus-engine`; `engine-wasm/` graduating into `engine/` | ADR 0023 decisions 2, 4 |
-| S0.5 | Persisted identifiers that carry the codename: `janus-contract/1`, `janus-provider-shape/1`, the OCI media types, the broker `specification` value | ADR 0011, ADR 0021 |
+| S0.5 | The codename reaches every surface, with no inventory and no rehearsal of the rename; the persisted identifiers (`janus-contract/1`, `janus-provider-shape/1`, the OCI media types, the broker `specification` value) need a dual-spelling rule | ADR 0011, ADR 0021 |
 | S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
 | S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
 | S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |
@@ -504,7 +523,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
-| S2.7 | `upgrade` writes `janus-contract/1` before the format is named | ADR 0011; §7.1 |
+| S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |
@@ -526,7 +545,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | **The Osborne effect.** Announcing MkII stalls today's Pact before MkII is ready | Stages 1–3 | Stage 1 improves life for today's users with no migration at all. The compatibility facade keeps the consumer migration mechanical |
 | **Native binaries.** Per-OS binaries were the pain of pact-ruby-standalone | Stages 0, 2 | The per-run, EOF-exit lifecycle (spike 1.3); distribution through each ecosystem's normal package channel; gate W as the way out |
 | **Specification governance.** Specs nobody can change become a bottleneck, and specs anyone can change stop meaning anything | From stage 0 | The rule Janus followed: every change lands in the spec, the corpus or the conformance suite in the same change, and ADRs record the contested ones. Who approves them is a community question |
-| **The codename leaks into artifacts** before the name is decided, and the rename then touches brokers | Stages 0–2 | S0.5 freezes the inventory; S2.7 renames it once; `upgrade` output is provisional until then |
+| **The name comes late.** Users will not weigh in until they can run their pipelines, so the codename reaches brokers and registries before the rename, and a rename then touches them | Stages 0–3 | S0.5 inventories every surface and rehearses the rename in CI; the persisted identifiers are read under both spellings for one major version, so nothing is republished |
 | **Maintainer identity.** pact-jvm ceasing to be an independent implementation | Stage 2 | The JVM SDK is a real product with its own maintainers and idiomatic layer; the JVM report (task 6.3) shows what they would own |
 | **Findings the prototype could not produce.** No real team used Janus, so several tripwires (variant budgets, exclusions, subsumption noise at scale) never had data to fire on | Stages 3–4 | Pilot teams at each stage exit, and the tripwires in §4 watched deliberately |
 
@@ -541,13 +560,17 @@ say why each one matters, what the prototype found that bears on it, and which i
    - keep it a separately versioned format under the Pact name;
    - brand the whole redesign (the RFC's "MkII", "Pact 6").
 
-   It needs deciding before stage 2 ships a major version, because the format's identifier is written
-   into every contract. Waits on it: S0.9, S2.7. Until then S0.5 stops the codename spreading.
+   The format's identifier is written into every contract, so the first revision wanted this decided
+   before stage 2 ships a major version. This revision expects it later: people will not have an
+   opinion until they can run their pipelines on the real thing (§3). So stage 2 may ship under the
+   codename, and S0.5 makes the rename, whenever it comes, mechanical and backward-readable. Waits on
+   it: S0.9, S2.7.
 2. **Where it lives, and who owns what.** The engine, the specifications, and conformance sign-off each
    need an owner. The prototype suggests sign-off can be mechanical (a build passes the suite, ADR 0017),
    which leaves people deciding what goes into the specification rather than whether an SDK complies.
    The engine could live beside `pact_matching` in pact-reference, which it forked, or in a repository
-   of its own. Waits on it: S0.7, S0.8. Until then S0.6 says where the work happens.
+   of its own. Waits on it: S0.7, S0.8, and the same timing applies: the work happens here (S0.6) until
+   there is something to move.
 3. **Funding.** Stages 1 and 2 are large, and providers-first means stage 1a pays back before stage 2
    finishes. Whether that is foundation sponsorship, vendor contribution or grants is not this plan's to
    say.
@@ -582,7 +605,10 @@ notes and the code found three structural problems and a list of gaps, all folde
 - **Every item has an id, a size and an exit** (principle 6), so progress can be recorded against it.
 - **Stage 0 is split** into what can start now (0a) and what waits on §7 (0b). Two decisions the first
   revision left to "either works" are now stated as assumptions: the build happens here (S0.6), and the
-  codename stays but stops spreading into persisted identifiers (S0.5). The plan-grammar v1 rename moved
+  codename stays, with the rename made mechanical and rehearsed rather than forbidden (S0.5). The
+  community's answers are not expected until people can run their pipelines on the real thing, so
+  nothing before stage 2 blocks on them and stage 2 may ship under the codename (S2.7). The
+  plan-grammar v1 rename moved
   from stage 1 to the first item of stage 0a, since the first revision said both that stage 0 publishes
   the grammar as v1 and that stage 1 renames it.
 - **Stage 1 is split and resized** from L to XL, as 1a (the CLI verifier) and 1b (provider-side
@@ -598,7 +624,7 @@ notes and the code found three structural problems and a list of gaps, all folde
   with no detector in live runs (S1.10), and the legacy compiler's boundary (S1.11).
 - **Added:** the benchmark trend as an item (S0.3; gates E and C could never fire without it); the
   conformance suite's own gaps and the facade's thinness budget (S2.5, S2.6); `upgrade` output as
-  provisional until the name is decided (S2.7); secrets in recorded contracts (S2.8); the exchange
+  the rename as a non-blocking item (S2.7); secrets in recorded contracts (S2.8); the exchange
   loop's match decision as an event (S3.5); the broker's offline-WASM host and the message-only
   provider view (S4.5, S4.6); component signing (S5.1); the protocol-level test client in §2; the
   AI-assisted layer as an optional stage; a cross-cutting security table; documentation per stage exit;
