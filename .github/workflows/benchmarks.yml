@@ -103,6 +103,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: ${{ env.RECORD }}
           save-data-file: ${{ env.RECORD }}
+          # When nothing is recorded the first call leaves its commit on the runner's own copy of
+          # gh-pages, unpushed, and fetching over that is refused. When recording, the first call
+          # pushed, and this one must fetch what it pushed.
+          skip-fetch-gh-pages: ${{ env.RECORD != 'true' }}
           summary-always: true
           comment-on-alert: false
           fail-on-alert: false
