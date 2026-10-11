@@ -156,5 +156,5 @@ Three outcomes, and it matters which one is chosen:
 3. **The specification does not say.** Then neither SDK is wrong, and a case that decides it would
    be making the suite normative beyond the document every implementer reads. Change
    `behavioural-spec.json` first (SDK spec §10's evolution rules), then write the case.
-   [`Documentation/conformance-suite-report.md`](../Documentation/conformance-suite-report.md)
+   [`Documentation/conformance-suite-report.md`](../Documentation/prototype/conformance-suite-report.md)
    lists what the suite deliberately does not decide today, and why.

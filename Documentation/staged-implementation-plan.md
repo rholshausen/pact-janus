@@ -1,11 +1,11 @@
 # Staged implementation plan for Pact MkII
 
 Plan task **9.4**, the prototype's last. **Date:** 2026-09-24; **revised 2026-10-11** (see
-[Revision](#revision)). **Inputs:** [RFC feedback](rfc-feedback.md) (9.2), the
-[community report](prototype-report.md) and [demo](../demo/README.md) (9.3), the
-[performance report](performance-report.md) (9.1), the [Phase 9 findings](phase-9-findings.md), the
-[kernel-boundary review](kernel-boundary-review.md), the [decision records](decisions/README.md) and
-their tripwires, and the [reuse inventory](reuse-inventory.md) (task 0.2).
+[Revision](#revision)). **Inputs:** [RFC feedback](prototype/rfc-feedback.md) (9.2), the
+[community report](prototype/prototype-report.md) and [demo](../demo/README.md) (9.3), the
+[performance report](prototype/performance-report.md) (9.1), the [Phase 9 findings](prototype/phase-9-findings.md), the
+[kernel-boundary review](prototype/kernel-boundary-review.md), the [decision records](decisions/README.md) and
+their tripwires, and the [reuse inventory](prototype/reuse-inventory.md) (task 0.2).
 
 This is a plan for building the real thing, written by the people who built the prototype. It says:
 - what should carry over from Janus, and what should not;
@@ -116,7 +116,8 @@ product for the ecosystems that verify inside a test. Stages 4 and 5 can overlap
 frozen. Stage 6 starts with SDKs as soon as stage 2 has proven the SDK model on two languages.
 
 Every item below is `S<stage>.<n>` with a size and an exit. An item's exit is the thing CI, a corpus or
-a measurement can check; where an item is a decision, its exit is an ADR.
+a measurement can check; where an item is a decision, its exit is an ADR. An item that has met its exit
+says so in a *Done* line under it, with the date and anything the exit did not foresee.
 
 ### Stage 0a: Foundations that can start now — **S**
 
@@ -182,6 +183,13 @@ Engineering with no dependency on a community answer. All of it happens in this 
   with links updated; the charter and the decision log stay where they are. The README describes the
   real build and points at the prototype's record.
   *Exit:* no code under `spikes/`; every link in `Documentation/` resolves; CI green.
+  *Done 2026-10-11.* Both halves of the exit are CI steps now: `tools/doc-links` checks every relative
+  link in every Markdown file in the repository, headings included, and a second step fails if
+  `spikes/` holds anything but Markdown. The record is indexed at
+  [`prototype/README.md`](prototype/README.md); `b8d5010` is the last commit with spike code in it.
+  Two things went with the code. The `spike-8-3` CI job was the only one that ran on Windows, so
+  until S0.2 lands nothing does. And spike 8.3's loader was the only thing that could load a
+  `subprocess` component, so that source is specified and unloadable until S5.5.
 
 **Done when** S0.1–S0.6 and S0.10–S0.12 have their exits and a release from this repository is
 installable on three operating systems. Item ids are identifiers, not an order: S0.10–S0.12 were added
@@ -468,7 +476,7 @@ suites, consumer and provider, running on its compatibility facade.
 ### Stage A: The AI-assisted layer — **M**, optional, after stage 3
 
 The RFC's optional layer, which the prototype designed and did not build
-([design notes](ai-layer-design-notes.md), task 2.10). The notes found the deterministic design needs
+([design notes](prototype/ai-layer-design-notes.md), task 2.10). The notes found the deterministic design needs
 no new protocol operation, event kind or hook kind for either capability, so this stage is additive
 and can be skipped without anything above it noticing.
 
@@ -531,7 +539,7 @@ ADRs.
 ## 5. Known debt, by stage
 
 Everything the prototype left open, assigned to the item that needs it. The detail is in the
-[findings](phase-9-findings.md) and the [kernel-boundary review](kernel-boundary-review.md).
+[findings](prototype/phase-9-findings.md) and the [kernel-boundary review](prototype/kernel-boundary-review.md).
 
 | Item | Debt | Source |
 |---|---|---|
@@ -621,9 +629,9 @@ The charter defines "prototype complete" as follows. Each condition is now met.
 | Condition | State |
 |---|---|
 | Phases 0–9 done or explicitly descoped by ADR | Done: this task closes Phase 9 |
-| Every success criterion has a demo or a written finding | All seven met ([RFC feedback](rfc-feedback.md) §6) |
-| Every unresolved-questions row has an answer or an honest "still open" | Yes ([RFC feedback](rfc-feedback.md) §2; plan §13) |
-| The report and the staged plan are published for community review | The [community report](prototype-report.md), this plan, and the revised RFC on [PR #146](https://github.com/pact-foundation/roadmap/pull/146) |
+| Every success criterion has a demo or a written finding | All seven met ([RFC feedback](prototype/rfc-feedback.md) §6) |
+| Every unresolved-questions row has an answer or an honest "still open" | Yes ([RFC feedback](prototype/rfc-feedback.md) §2; plan §13) |
+| The report and the staged plan are published for community review | The [community report](prototype/prototype-report.md), this plan, and the revised RFC on [PR #146](https://github.com/pact-foundation/roadmap/pull/146) |
 
 What happens to this repository was itself a question for the community. ADR 0027 answers it: the real
 build proceeds here, hardening the prototype in place, with §2 as the inventory of what that means and

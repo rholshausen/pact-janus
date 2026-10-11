@@ -3,7 +3,7 @@
 - **Status**: accepted (decision 4's indentation is superseded by [ADR 0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md); decisions 1–3 and 5–8 stand)
 - **Date**: 2026-08-29
 - **Plan tasks**: 2.5 (feeds 3.1, 4.4, 5.5; constrains 2.8)
-- **Evidence**: [contract file format review](../contract-file-format-review.md) (candidate
+- **Evidence**: [contract file format review](../prototype/contract-file-format-review.md) (candidate
   formats, measured size distribution, verified broker behaviour);
   [ADR 0002](0002-document-first-protocol-over-frozen-pipes.md) (schema-governed JSON documents);
   [ADR 0006](0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md) (bytes and their

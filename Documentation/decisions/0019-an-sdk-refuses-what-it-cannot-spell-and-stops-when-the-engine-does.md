@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-20
 - **Plan tasks**: 6.4 (amends the 2.9 behavioural specification; binds 6.2, 6.3, 6.5)
-- **Evidence**: [conformance-suite report](../conformance-suite-report.md) §4.2 and §5,
-  [JVM-SDK-from-spec report](../jvm-sdk-from-spec-report.md) §2.3 and §2.5, the conformance suite's
+- **Evidence**: [conformance-suite report](../prototype/conformance-suite-report.md) §4.2 and §5,
+  [JVM-SDK-from-spec report](../prototype/jvm-sdk-from-spec-report.md) §2.3 and §2.5, the conformance suite's
   own cases `translation/header-name-collision`, `translation/value-as-one-string`,
   `translation/unspellable-value`, `lifecycle/engine-error-aborts-the-loop`,
   `lifecycle/variant-budget-exceeded`

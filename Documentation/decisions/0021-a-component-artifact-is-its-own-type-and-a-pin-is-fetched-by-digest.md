@@ -54,7 +54,7 @@ is exactly what "declared, never discovered" (spec §10.2) rules out.
 
 Smaller calls, recorded in spec §10.3 rather than argued here: loopback registries are plain HTTP and
 everything else HTTPS; credentials come from `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD` (a deliberate
-exception to design 2.7 §7.1 — [finding 16](../phase-9-findings.md)); the cache is an OCI image layout's
+exception to design 2.7 §7.1 — [finding 16](../prototype/phase-9-findings.md)); the cache is an OCI image layout's
 `blobs/sha256/` directory, re-verified on read; `sha256` digests only.
 
 ## Alternatives considered
@@ -65,7 +65,7 @@ exception to design 2.7 §7.1 — [finding 16](../phase-9-findings.md)); the cac
   because "any WebAssembly component" is the wrong thing to accept by type. A generic WASM artifact
   would be accepted by media type and then refused by the handshake, which is a worse place to learn it
   — after a fetch and a compile, rather than on the manifest. The cost is interop with `wkg`, which is
-  [finding 17](../phase-9-findings.md): a real one, but a door that stays open (accepting the CNCF config
+  [finding 17](../prototype/phase-9-findings.md): a real one, but a door that stays open (accepting the CNCF config
   as well is additive).
 - **A config with interfaces and contributions**, so a broker could index what a component contributes
   without running it. Rejected as a second source of truth: ADR 0012's point is that the handshake is

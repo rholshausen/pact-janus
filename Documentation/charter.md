@@ -13,7 +13,7 @@ Janus is a prototype: its code may seed the real build, but its *findings* are t
 ## Success criteria
 
 The prototype is a success if all of the following are demonstrated (milestones in brackets refer to
-`project-plan.md`):
+`prototype/project-plan.md`):
 
 1. **One engine, thin SDKs.** The RFC's consumer example runs near-verbatim in TypeScript and on the
    JVM against the same engine over the same protocol, with behaviour proven identical by a conformance
@@ -51,12 +51,12 @@ coverage beyond what CI gives for free.
 
 ## Definition of "prototype complete"
 
-Phases 0–9 of `project-plan.md` are done or explicitly descoped by ADR; every success criterion above
+Phases 0–9 of `prototype/project-plan.md` are done or explicitly descoped by ADR; every success criterion above
 has either a demo or a written finding; the RFC's unresolved-questions table (plan §13) has an answer or
 an honest "still open, here is what we learned" for every row; and the Phase 9 report + staged
 implementation plan are published for community review.
 
-## Working practices (summary — details in `project-plan.md` §14)
+## Working practices (summary — details in `prototype/project-plan.md` §14)
 
 Decisions land in `Documentation/decisions/` as ADRs. Spikes are disposable, findings are not
 (`FINDINGS.md` required). Corpora are load-bearing from Phase 3. Benchmarks trend in CI from Phase 4.

@@ -51,7 +51,7 @@ Known decisions waiting on evidence, seeded from the RFC's unresolved questions 
 Each becomes a numbered ADR when its inputs are ready (feeding task in brackets):
 
 - Upstream Pact Broker support for a `janus` specification value — a PR series, not an allowlist
-  edit (ADR 0011 decision 6; scoped in the [format review](../contract-file-format-review.md) §8.4)
+  edit (ADR 0011 decision 6; scoped in the [format review](../prototype/contract-file-format-review.md) §8.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)
 - Per-pair verification summaries (`pairs` in the run summary) — the broker notes §11 chose the shape;

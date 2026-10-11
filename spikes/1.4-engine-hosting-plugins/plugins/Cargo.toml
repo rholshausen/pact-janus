@@ -1,8 +1,0 @@
-[workspace]
-resolver = "2"
-members = ["matcher", "misbehaved"]
-
-[profile.release]
-lto = true
-opt-level = "s"
-strip = true

@@ -33,7 +33,7 @@ pub trait Resolver {
 /// A single slot, not a registry: its callers (`tools/corpus`, the tests) hand in `JsonContent`.
 /// Decoding and encoding stopped being single-slot in plan task 8.1 — [`crate::component::ContentRegistry`]
 /// routes them by media type — but detection was left as it was, and the live exchange and
-/// verification paths execute without a detector (`Documentation/kernel-boundary-review.md`,
+/// verification paths execute without a detector (`Documentation/prototype/kernel-boundary-review.md`,
 /// finding 1's resolution).
 pub trait ContentDetector {
   /// `None` means this detector doesn't recognise `value` as any type it handles — not "no

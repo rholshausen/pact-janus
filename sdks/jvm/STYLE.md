@@ -7,7 +7,7 @@ per SDK spec §5. This file records how the
 *expressed* in Java; it never changes what a primitive means. Where the two disagree, the behavioural
 specification wins. The SDK was written from the specification alone, without reading the TypeScript
 SDK (plan task 6.3); what that turned up is in
-[`Documentation/jvm-sdk-from-spec-report.md`](../../Documentation/jvm-sdk-from-spec-report.md).
+[`Documentation/jvm-sdk-from-spec-report.md`](../../Documentation/prototype/jvm-sdk-from-spec-report.md).
 
 ## Naming and module layout
 

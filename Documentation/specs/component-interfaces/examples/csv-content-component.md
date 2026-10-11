@@ -74,7 +74,7 @@ rejects every value: the column decodes to strings (§3 below), and `integer` ad
 CSV can offer is the *spelling* of an integer — `{ "shape": "regex", "pattern": "^[0-9]+$" }` — and
 that is what a consumer of a CSV body writes. (Plan task 8.1 built this component from this page,
 and found the earlier wording promised a coercion nothing performs:
-[third-party component report](../../../third-party-component-report.md), finding 4.)
+[third-party component report](../../../prototype/third-party-component-report.md), finding 4.)
 
 ## 3. Decoding
 

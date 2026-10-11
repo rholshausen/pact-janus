@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-23
 - **Plan tasks**: 8.4
-- **Evidence**: [plan-fragment stress test](../plan-fragment-stress-test.md);
+- **Evidence**: [plan-fragment stress test](../prototype/plan-fragment-stress-test.md);
   `engine/kernel/tests/fragments.rs`, `engine/kernel/src/plan/fragment.rs`'s tests,
   `engine/component-host/tests/csv_component.rs` (§ plan fragments), `third-party/janus-csv`;
   [ADR 0010](0010-plans-are-renderings-the-grammar-is-the-record.md), [ADR 0012](0012-one-interface-two-bindings.md)

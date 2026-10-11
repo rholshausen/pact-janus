@@ -61,37 +61,20 @@ jobs:
       # specification's conformance ids — an id with no case is a hole in what "conformant" means.
       - name: Conformance corpus lint
         run: cargo run --package pact_janus_conformance -- lint
-
-  spike-8-3:
-    # Plan task 8.3: the subprocess binding's containment tests (spikes/8.3-subprocess-transport),
-    # on Linux and on Windows. Windows is the point: spike 1.3's one open risk — spawn, kill and exit
-    # on stdin EOF under real Windows — applies to component processes too, and this job is its first
-    # real evidence. Spike code is otherwise outside CI; this one earns a job because the question it
-    # answers cannot be answered on the machine it was written on.
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: spikes/8.3-subprocess-transport
-      # The kernel builds rquickjs with bindgen (ADR 0015), which needs libclang on every target.
-      - name: Build prerequisites (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
-      - name: Build prerequisites (Windows)
-        if: runner.os == 'Windows'
-        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-      - name: Spike 8.3 tests
-        working-directory: spikes/8.3-subprocess-transport
-        run: cargo test
+      # Staged plan S0.12: the ADRs, the specs and the plan cite each other and the prototype's
+      # record by path, so a relative link that stops resolving — to a file, or to a heading in it —
+      # fails here. Offline: links with a scheme are not fetched.
+      - name: Documentation links resolve
+        run: cargo run --package pact_janus_doc_links
+      # S0.12's other exit: spikes/ keeps each spike's findings, and no code.
+      - name: Spikes hold findings only
+        run: |
+          code="$(git ls-files -- spikes | grep -v '\.md$' || true)"
+          if [ -n "$code" ]; then
+            echo "$code"
+            echo "::error::spikes/ holds findings only (staged plan S0.12); these files are not Markdown."
+            exit 1
+          fi
 
   sdks:
     # Plan task 6.1: every SDK's generated bindings must be exactly what the pipeline produces from

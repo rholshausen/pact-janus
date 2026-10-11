@@ -1,5 +1,9 @@
 # Spike 7.3 — Type-derived shapes (provenance #2)
 
+> **The code this README describes is no longer here.** Staged plan item S0.12 deleted every spike's
+> code and kept its findings. The last commit with the code in it is `b8d5010`;
+> [`spikes/README.md`](../README.md) says how to read it or run it again.
+
 Plan task 7.3. **The deliverable is [FINDINGS.md](FINDINGS.md)**; the code here is disposable.
 
 ## The question

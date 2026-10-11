@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-23
 - **Plan tasks**: 8.1 (amends designs 2.5 and 2.6; binds 2.9's `json` primitive, 6.2, 6.3)
-- **Evidence**: [third-party component report](../third-party-component-report.md) finding 9;
-  `Documentation/kernel-boundary-review.md` finding 1's resolution, which left "a second content
+- **Evidence**: [third-party component report](../prototype/third-party-component-report.md) finding 9;
+  `Documentation/prototype/kernel-boundary-review.md` finding 1's resolution, which left "a second content
   type" to this task; SDK spec `behavioural-spec.json`'s `json` entry, which anticipated "a per-slot
   content-type declaration in the interaction spec"
 

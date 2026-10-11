@@ -2006,6 +2006,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_doc_links"
+version = "0.0.0"
+dependencies = [
+ "pretty_assertions",
+ "rstest 0.26.1",
+]
+
+[[package]]
 name = "pact_janus_hooks_host"
 version = "0.0.0"
 dependencies = [

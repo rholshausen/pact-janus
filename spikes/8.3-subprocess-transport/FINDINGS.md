@@ -66,7 +66,7 @@ transport of its own**:
    improvement; the error here already counts `unattributed-frames` so the cause is not lost.
 
 4. **The kernel knew three HTTP things a non-HTTP transport walks into.** One is fixed; two are
-   recorded in the [kernel-boundary review](../../Documentation/kernel-boundary-review.md) as
+   recorded in the [kernel-boundary review](../../Documentation/prototype/kernel-boundary-review.md) as
    findings 7–9:
    - **7 (fixed here):** `serve-variant` armed only transports of kind `"http"`, so a passive
      interaction of any other kind was never served. It now arms transports of the interaction's

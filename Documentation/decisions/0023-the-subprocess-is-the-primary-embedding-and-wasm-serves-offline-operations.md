@@ -3,8 +3,8 @@
 - **Status**: accepted; context corrected 2026-09-24 (task 9.4), decision unchanged
 - **Date**: 2026-09-24
 - **Plan tasks**: 9.2 (supersedes [ADR 0003](0003-embedding-priority-per-language.md); feeds 9.4)
-- **Evidence**: [performance report](../performance-report.md) §3–§5.5 (task 9.1),
-  [Phase 9 findings](../phase-9-findings.md) 3 and 29, [ADR 0013](0013-component-hosting-is-an-embedding-capability.md)
+- **Evidence**: [performance report](../prototype/performance-report.md) §3–§5.5 (task 9.1),
+  [Phase 9 findings](../prototype/phase-9-findings.md) 3 and 29, [ADR 0013](0013-component-hosting-is-an-embedding-capability.md)
   (a WASM guest hosts no components), [spike 1.2](../../spikes/1.2-wasm-embedding/FINDINGS.md) and
   [spike 1.3](../../spikes/1.3-subprocess-embedding/FINDINGS.md) (the evidence ADR 0003 stood on),
   `sdks/README.md` (both SDKs ship the subprocess only)

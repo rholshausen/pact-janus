@@ -237,7 +237,7 @@ one into the file would make a five-year-old contract depend on a five-year-old 
 
 **The request parts repeat, identically, eight times.** That is honest — the request really was the same
 each time — and it is also the clearest illustration of where a contract's size comes from: the variant
-multiplier, not base64. The [format review](../../../contract-file-format-review.md) §8.2 puts a
+multiplier, not base64. The [format review](../../../prototype/contract-file-format-review.md) §8.2 puts a
 tripwire on it rather than optimising it away before there is anything to measure.
 
 **`metadata` has no timestamp.** This contract is reproducible: run the same consumer build twice and

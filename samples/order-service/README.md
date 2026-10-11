@@ -1,6 +1,6 @@
 # order-service — the sample provider
 
-The provider [plan task 5.6](../../Documentation/project-plan.md) calls for: "a small order-service
+The provider [plan task 5.6](../../Documentation/prototype/project-plan.md) calls for: "a small order-service
 provider with deliberate variance and auth, used for M3, M5 and demos". It is a real HTTP service on
 a real socket, not a stub — a verification run drives it exactly as it would drive anything else.
 
@@ -245,7 +245,7 @@ Four things in that output are the sample teaching what the loop costs:
   `anyOf('PENDING', 'SHIPPED')` would print the RFC's own second line. Three of the four results are
   true; the fourth — the `review` at `$.shippedAt`, the recorder's single observed timestamp against
   the pact's regex — is a comparison the shape language declines to decide and could.
-  [Phase-9 finding 9](../../Documentation/phase-9-findings.md#9-a-converted-pacts-frozen-examples-are-the-consumer-side-of-73s-noise-question)
+  [Phase-9 finding 9](../../Documentation/prototype/phase-9-findings.md#9-a-converted-pacts-frozen-examples-are-the-consumer-side-of-73s-noise-question)
   measures both.
 - **`$.items` says "up to 3 items"** because that is what six recorded responses saw. A recorded
   shape claims what the provider's tests produced, never what it can do — the honesty §2.3 of design

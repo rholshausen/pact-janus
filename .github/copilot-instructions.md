@@ -1,13 +1,15 @@
 # Copilot Instructions
 
-Pact Janus prototypes a ground-up redesign of the [Pact](https://pact.io) contract testing framework per
-the [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146): one Rust reference engine
+Pact Janus is a ground-up redesign of the [Pact](https://pact.io) contract testing framework per
+the [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) — begun as a prototype of the
+RFC, now the real build, hardening that prototype in place (ADR 0027): one Rust reference engine
 behind a coarse-grained versioned protocol, thin language SDKs, interaction specs compiled to
 inspectable matching plans, a shape language with variant testing, and plugins as first-class components.
 
-Source of truth: `Documentation/project-plan.md` (the phased plan the prototype was built to; task
-numbers like "1.6"/"G1" refer to it), `Documentation/staged-implementation-plan.md` (the plan for the
-real build, now live; item ids like "S1.4" refer to it), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
+Source of truth: `Documentation/staged-implementation-plan.md` (the plan for the real build, and the
+live one; item ids like "S1.4" refer to it), `Documentation/prototype/project-plan.md` (the phased plan
+the prototype was built to; task numbers like "1.6"/"G1" refer to it — it and the reports beside it are
+a finished record: cite them, do not update them), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
 `Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
 they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
 every frame crossing the engine boundary, `shape-language/` from task 2.2 governs shapes — what they
@@ -34,6 +36,7 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
+> Done so far: S0.12.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
@@ -68,8 +71,9 @@ demo/            The RFC's whole loop as a runnable walkthrough (task 9.3): web-
 third-party/     Components written as a third party would, from the published interfaces
                  only — each its own Cargo workspace, excluded from ours and depending on
                  nothing in it: third-party/janus-csv, the text/csv content component task 8.1
-                 built from the docs (Documentation/third-party-component-report.md)
-spikes/          Time-boxed experiments — disposable code, durable findings
+                 built from the docs (Documentation/prototype/third-party-component-report.md)
+spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
+                 ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`).
                  benchmarks/janus runs the same scenarios against Janus in each embedding
@@ -78,10 +82,11 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation
-                 pipeline (task 6.1), tools/conformance, the conformance suite's checker, and
-                 tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK by layer
-                 (task 6.4)
-Documentation/   Plan, ADRs, specs
+                 pipeline (task 6.1), tools/conformance, the conformance suite's checker
+                 (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK
+                 by layer — and tools/doc-links, the documentation link check (S0.12)
+Documentation/   The staged plan, ADRs, specs and the charter; prototype/ is the prototype's
+                 record — the project plan and each task's report, kept as written (S0.12)
 ```
 
 ## Build, test, and lint commands
@@ -168,8 +173,9 @@ Out-of-tree components (plan task 8.1, design 2.6 §10) are **declared**, never 
 the SDKs' `components` option on the consumer side), each entry naming its source — `file` is a
 local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`, `oci` a
 registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subprocess` a command
-spawned over the protocol's stdio framing — loaded only by `spikes/8.3-subprocess-transport`'s
-loader, which no shipped embedding registers yet. A declared component may contribute a transport,
+spawned over the protocol's stdio framing — specified (design 2.6 §9.3) but loaded by nothing:
+spike 8.3's loader proved the binding and was deleted with the rest of the spike code (S0.12), and a
+real one is S5.5. A declared component may contribute a transport,
 looked up by the `kind`s its handshake names. A declared content component may contribute a **plan
 fragment** for a slot (plan task 8.4, ADR 0022): it replaces the slot's generic plan, must declare a
 plan grammar the engine lists in `component/hello` (`plan-grammar-versions`), may use only core actions
@@ -212,8 +218,10 @@ stderr (stdout stays frames-only).
 - Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit,
   and any change to what an SDK's DSL does belongs in the behavioural specification and
   `conformance/`, which every SDK runs (ADR 0017).
-- Spike code under `spikes/` is disposable and exempt from the conventions below, but every spike
-  directory must contain a `FINDINGS.md`. Never depend on spike code from `engine/`, `cli/` or `sdks/`.
+- Documents are cited by path, so links are load-bearing too: every relative link in the repository's
+  Markdown must resolve (`cargo run -p pact_janus_doc_links`, which CI runs), and moving a document
+  means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md` and no
+  code (S0.12): the findings stay where the ADRs cite them, and nothing new is added there.
 
 ## Conventions
 
@@ -226,7 +234,7 @@ Rust:
 
 TypeScript / JavaScript:
 - TypeScript with `strict: true` for all SDK/tooling source; no `any` in exported API surfaces. Plain
-  JavaScript only in spikes or generated output.
+  JavaScript only in generated output.
 - ESM modules, active Node LTS, Vitest for tests, ESLint + Prettier for lint/format, lean
   devDependencies.
 - The public DSL mirrors the RFC's consumer example (`optional`, `anyOf`, `oneOf`, `eachLike`,

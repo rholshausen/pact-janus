@@ -1,7 +1,7 @@
 // The frozen pipe (ADR 0002, ADR 0023): one frame in, one frame back. Everything above this file
 // speaks frames; everything below it is one embedding's way of carrying them. The subprocess
 // embedding is every SDK's primary (ADR 0023) — a WASM engine cannot host a consumer test's mock
-// server (it needs sockets and a thread of its own; see Documentation/phase-9-findings.md §3) —
+// server (it needs sockets and a thread of its own; see Documentation/prototype/phase-9-findings.md §3) —
 // and a WASM embedding for offline operations drops in by implementing this.
 
 import type { protocol } from "../generated/index.js";

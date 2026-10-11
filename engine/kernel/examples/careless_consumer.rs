@@ -1,5 +1,5 @@
 //! Plan task 4.6 — a report companion, not a test (it is *supposed* to panic; that is the whole
-//! point). Findings: `Documentation/variant-ergonomics-report.md`.
+//! point). Findings: `Documentation/prototype/variant-ergonomics-report.md`.
 //!
 //! A consumer that loops over every selected variant correctly (no shortcut, no
 //! `--exhaustive`-only-on-CI skip) but then reads the response the way most hand-written test

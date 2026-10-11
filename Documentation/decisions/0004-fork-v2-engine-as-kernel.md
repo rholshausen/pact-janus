@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-23
 - **Plan tasks**: 0.4, 1.8 (G1)
-- **Evidence**: [reuse inventory](../reuse-inventory.md) (task 0.4 — this ADR ratifies its
+- **Evidence**: [reuse inventory](../prototype/reuse-inventory.md) (task 0.4 — this ADR ratifies its
   recommendation)
 
 ## Context

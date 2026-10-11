@@ -1,5 +1,9 @@
 # Spike 1.4 — Engine hosting WASM components as plugins
 
+> **The code this README describes is no longer here.** Staged plan item S0.12 deleted every spike's
+> code and kept its findings. The last commit with the code in it is `b8d5010`;
+> [`spikes/README.md`](../README.md) says how to read it or run it again.
+
 Plan task 1.4 · Feeds gate G1 (and Phase 2 component-interface design) · Findings in
 [FINDINGS.md](FINDINGS.md) (the durable artifact — code here is disposable).
 

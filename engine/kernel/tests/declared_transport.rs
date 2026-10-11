@@ -4,8 +4,9 @@
 //! deliberately not `http`: until 8.3 the kernel armed only `"http"` transports, so any other kind
 //! would have served nothing (kernel-boundary review, finding 7).
 //!
-//! The component is a stub loaded by a stub loader; the real out-of-process one, a Node `tcp`
-//! transport over the subprocess binding, is `spikes/8.3-subprocess-transport`.
+//! The component is a stub loaded by a stub loader. Spike 8.3 drove a real out-of-process one, a
+//! Node `tcp` transport over the subprocess binding; its code is gone (staged plan S0.12) and what it
+//! found is `spikes/8.3-subprocess-transport/FINDINGS.md`.
 
 use pact_janus_kernel::component::{
   self, ComponentDeclaration, ComponentError, ComponentLoader, Loaded, SlotValue, TransportComponent,

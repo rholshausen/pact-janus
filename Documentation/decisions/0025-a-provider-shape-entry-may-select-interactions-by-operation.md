@@ -4,7 +4,7 @@
 - **Date**: 2026-09-24
 - **Plan tasks**: 9.2 (amends design 2.8 §2.2 and §6; feeds 9.4 and the broker notes)
 - **Evidence**: [spike 7.3 findings](../../spikes/7.3-type-derived-shapes/FINDINGS.md) §2 (the blocking
-  finding), [broker integration notes](../broker-integration-notes.md) §2,
+  finding), [broker integration notes](../prototype/broker-integration-notes.md) §2,
   [ADR 0016](0016-subsumption-defaults-to-warn-with-mandatory-reason-exemptions.md)
 
 ## Context

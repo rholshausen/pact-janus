@@ -84,7 +84,7 @@ accepted. The polyglot escape hatch stays "bring your own WASM component" (1.4's
 
 Finding 4 left one thing open: this spike compiled rquickjs for **wasip1**, and the engine's own
 component build targets **wasip2**. ADR 0015 could not be accepted on the wasip1 result alone, so
-the build was verified before it was written. [`wasip2-check/`](wasip2-check/) is that check —
+the build was verified before it was written. `wasip2-check/` is that check —
 the same signing workload, the same rquickjs 0.9 with its bundled C QuickJS, built for the target
 the engine ships to:
 

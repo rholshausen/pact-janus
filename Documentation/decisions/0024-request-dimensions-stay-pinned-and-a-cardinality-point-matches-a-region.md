@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-24
 - **Plan tasks**: 9.2 (amends design 2.2 §6.4 and §7.1, design 2.3 §4.1 and §5.2)
-- **Evidence**: [Phase 9 findings](../phase-9-findings.md) 25 (and 2, which it leaves open),
-  [performance report](../performance-report.md) §5.4, [ADR 0008](0008-deterministic-pairwise-variant-sampling.md),
+- **Evidence**: [Phase 9 findings](../prototype/phase-9-findings.md) 25 (and 2, which it leaves open),
+  [performance report](../prototype/performance-report.md) §5.4, [ADR 0008](0008-deterministic-pairwise-variant-sampling.md),
   corpus case `corpora/shapes/cardinality-pinned-region`
 
 ## Context

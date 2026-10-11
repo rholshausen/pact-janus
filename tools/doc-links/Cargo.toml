@@ -1,0 +1,19 @@
+[package]
+name = "pact_janus_doc_links"
+description = "The documentation link check (staged plan S0.12): every relative link in the repository's Markdown resolves to a file that exists, and to a heading in it when the link names one"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "doc-links"
+path = "src/main.rs"
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.26"
+
+[lints]
+workspace = true

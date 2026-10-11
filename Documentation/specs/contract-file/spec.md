@@ -13,7 +13,7 @@ this project does not have and bind that specification's next version to a proto
 settles the format — a single self-identifying JSON object — the identification rules, canonical
 writing, the placement rule and the broker posture. The evidence behind those choices, including every
 rejected alternative, is the [contract file format
-review](../../contract-file-format-review.md). This specification does not re-argue them; it says what
+review](../../prototype/contract-file-format-review.md). This specification does not re-argue them; it says what
 goes in the document.
 
 The schemas under [`schemas/v1/`](schemas/v1/) are the **specified surface**, on the same terms as the

@@ -6,7 +6,7 @@
 - **Plan tasks**: 9.4 (amends design 2.4 §4.1, §4.2, §4.4; feeds the staged plan)
 - **Evidence**: plan-grammar spec §4.1 and §4.6, [ADR 0010](0010-plans-are-renderings-the-grammar-is-the-record.md),
   [ADR 0022](0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md),
-  the [plan-fragment stress test](../plan-fragment-stress-test.md) (task 8.4), `third-party/janus-csv`
+  the [plan-fragment stress test](../prototype/plan-fragment-stress-test.md) (task 8.4), `third-party/janus-csv`
 
 ## Context
 

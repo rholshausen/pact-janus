@@ -14,11 +14,12 @@ members = [
   "tools/conformance",
   "tools/thinness",
   "tools/bindings",
+  "tools/doc-links",
 ]
-# Spikes are standalone projects, never workspace members. The benchmark
-# harness is durable but standalone too — it drags the whole pact_ffi
-# dependency tree, which the main workspace should not pay for.
-exclude = ["spikes", "benchmarks", "third-party"]
+# The benchmark harness is durable but standalone — it drags the whole
+# pact_ffi dependency tree, which the main workspace should not pay for.
+# Each third-party component is its own workspace, depending on nothing here.
+exclude = ["benchmarks", "third-party"]
 
 [workspace.package]
 version = "0.0.0"

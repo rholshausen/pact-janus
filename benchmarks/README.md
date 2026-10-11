@@ -6,7 +6,7 @@ SDKs use. Plan task 9.1 added [`janus/`](janus/), which runs the same scenarios 
 each of its embeddings, so the RFC's "performance envelope of WASM vs native FFI" question gets a
 **trend line, not a one-off**. The plan meant that to start in Phase 4 and it did not: the first
 Janus data points are 9.1's. The findings are in the
-[performance report](../Documentation/performance-report.md).
+[performance report](../Documentation/prototype/performance-report.md).
 
 ## Running
 

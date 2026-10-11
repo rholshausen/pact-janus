@@ -1,5 +1,5 @@
 //! v1–v4 pact reading (plan task 3.1), via `pact_models` — the Phase 0.4 reuse decision
-//! (`Documentation/reuse-inventory.md`).
+//! (`Documentation/prototype/reuse-inventory.md`).
 //!
 //! `pact_models::pact::load_pact_from_json` takes an already-parsed [`serde_json::Value`], not a
 //! file path: no filesystem access, which is what the kernel needs on the WASM path (spike 1.2

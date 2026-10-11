@@ -68,7 +68,7 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   `X-Count: 3`), a boolean, a list of those, or a shape helper; `MultiValue` is that type, and
   anything else — a fractional number, a `Date`, `null` — is refused at the call, as are two names
   that collide once lower-cased (ADR 0019). Note that this is an exact comparison — see
-  [Phase 9 finding 1](../../Documentation/phase-9-findings.md) for why a provider adding
+  [Phase 9 finding 1](../../Documentation/prototype/phase-9-findings.md) for why a provider adding
   `; charset=utf-8` to a *response* header will fail it today.
 - `content(mediaType, document)` returns a `Content`, not a `Shape`: it names a whole slot, so it is
   its own class, and `RequestParts.body`/`ResponseParts.body` are the only members typed to accept
@@ -104,4 +104,4 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 | Primitive | Deviation | Reason |
 |---|---|---|
 | `execute` | Each selected variant is a line in `execute`'s failure, not a separately reported test | Vitest cannot add tests to a test that is already running, and naming variants at collection time would need an engine session before any test runs. The failure message names every failed variant by label and id, which task 4.6 found is what makes a failing variant identifiable (SDK spec §5 SHOULD). |
-| `finalise` | "Members in the order the engine returned them" holds except for integer-like member names, which are written first, in ascending numeric order | The contract arrives parsed, inside a frame, and JavaScript enumerates integer-like keys first whatever order they were written in; `JSON.stringify` of the parsed document is otherwise the engine's canonical form ([Phase 9 finding 6](../../Documentation/phase-9-findings.md)). |
+| `finalise` | "Members in the order the engine returned them" holds except for integer-like member names, which are written first, in ascending numeric order | The contract arrives parsed, inside a frame, and JavaScript enumerates integer-like keys first whatever order they were written in; `JSON.stringify` of the parsed document is otherwise the engine's canonical form ([Phase 9 finding 6](../../Documentation/prototype/phase-9-findings.md)). |
