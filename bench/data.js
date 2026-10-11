@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791696154274,
+  "lastUpdate": 1791696156286,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -672,6 +672,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30205,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "adf8e2c16b502d00d254d212f2db432d2215ae9b",
+          "message": "docs: S0.3 is done; its first point is recorded and the chart is live\n\nThe Done line for staged plan item S0.3, written after the exit could be\nchecked rather than before: the merge that added the Benchmarks workflow\n(497fc53) recorded 51 numbers to gh-pages, and the chart at\nhttps://rholshausen.github.io/pact-janus/bench/ draws them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-11T16:18:16+11:00",
+          "tree_id": "02221ce5279659173756546bbc47524c7326f5b7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/adf8e2c16b502d00d254d212f2db432d2215ae9b"
+        },
+        "date": 1791696155594,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 36597,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30346,
             "unit": "requests per second",
             "extra": "engines 4"
           }
