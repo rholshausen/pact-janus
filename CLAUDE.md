@@ -48,7 +48,7 @@ Three sources are the source of truth and take precedence over this file when th
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
-> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`).
+> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -251,7 +251,10 @@ stderr (stdout stays frames-only).
   ones. If a change leaks protocol- or content-specific knowledge into the kernel, stop and flag it
   (plan task 3.8 tracks exactly this).
 - **Errors are values at the engine boundary.** Panics must never cross the protocol; every operation
-  returns structured errors. Sessions are the only resource — no per-object cleanup calls.
+  returns structured errors. Sessions are the only resource — no per-object cleanup calls. A plan node
+  the engine's own compilers did not build — a component's fragment, a plan document read back — is
+  not trusted: the interpreter reads an action's children by position, so every core action has a
+  least child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.
 - **SDKs are thin.** No matching logic, no orchestration beyond the protocol operations, in any SDK.
   Generated protocol bindings are never hand-edited — regenerate them via the binding pipeline.
 - **Corpora are load-bearing.** Any change to matching behaviour must change `corpora/` in the same

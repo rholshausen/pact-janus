@@ -200,6 +200,35 @@ fn a_namespaced_operator_is_parsed_opaquely_with_no_well_formedness_checks() {
   assert!(node.generator.is_some());
 }
 
+/// Staged plan S0.13, spec §3.5 and §3.7: the plan grammar's core namespaces are no component's. A
+/// component operator compiles to the action of the same name, so an operator in one of them would
+/// be a core action no shape compiles to — reached by naming it.
+#[rstest]
+#[case::control("flow:if")]
+#[case::value("value:length")]
+#[case::assertion("expect:size")]
+#[case::check("check:equals")]
+#[case::a_real_match_action("match:regex")]
+#[case::closed_objects("legacy:only-entries")]
+#[case::a_name_no_grammar_has("match:nothing-of-the-kind")]
+fn an_operator_in_a_namespace_reserved_for_core_plan_actions_is_rejected_by_name(#[case] operator: &str) {
+  let shape = json!({ "shape": "object",
+    "members": { "total": { "shape": operator, "example": 42, "pattern": ".*" } } });
+  assert_problem(
+    &shape,
+    "/body/members/total",
+    &format!("'{operator}' is not an operator"),
+  );
+  assert_problem(&shape, "/body/members/total", "reserved for core plan actions");
+}
+
+#[test]
+fn a_namespace_nobody_reserved_is_still_a_components() {
+  for operator in ["convert:celsius", "csv:integer", "http:status-class"] {
+    assert_ok(&json!({ "shape": operator, "example": 1 }));
+  }
+}
+
 // --- other well-formedness rules (spec §5) not covered by the shipped worked examples ---
 
 #[rstest]

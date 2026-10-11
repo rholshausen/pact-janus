@@ -36,7 +36,7 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
-> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`).
+> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
@@ -213,7 +213,9 @@ stderr (stdout stays frames-only).
   hooks — including built-ins — are components behind the published component interfaces. Flag any
   change that leaks protocol/content knowledge into the kernel.
 - Errors are values at the engine boundary; panics never cross the protocol. Sessions are the only
-  resource (no per-object cleanup calls).
+  resource (no per-object cleanup calls). A plan node the engine's own compilers did not build (a
+  component's fragment, a plan document read back) is not trusted: every core action has a least
+  child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.
 - SDKs are thin: no matching logic or orchestration beyond the protocol operations. Generated protocol
   bindings are never hand-edited — regenerate them.
 - Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit,

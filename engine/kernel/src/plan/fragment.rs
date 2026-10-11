@@ -8,9 +8,9 @@
 //!    was written against cannot be checked for skew, and is refused rather than guessed at;
 //! 2. **it is parsed** as a plan node, under that grammar;
 //! 3. **its actions are checked** ([`check_actions`]): core ones must be core actions of the grammar
-//!    it declared, component ones must be in the contributing component's own namespace *and*
-//!    among the actions its handshake contributed, and every `resolve` must stay inside the slot it
-//!    was compiled for.
+//!    it declared, with at least the children each takes; component ones must be in the
+//!    contributing component's own namespace *and* among the actions its handshake contributed; and
+//!    every `resolve` must stay inside the slot it was compiled for.
 //!
 //! A fragment written against grammar v0 comes out of step 3 in v1's names (ADR 0026 decision 4):
 //! the two grammars differ in nothing else, so the rest of the engine — the interpreter, `explain` —
@@ -119,6 +119,15 @@ pub fn check_actions(
   match &mut node.kind {
     NodeKind::Action { name, children } => {
       if let Some(core) = grammar.core(name) {
+        // The interpreter reads a core action's children by position (spec §4.2), so a fragment
+        // that gives one too few is refused here, where it can still be blamed on its author.
+        let least = super::actions::least_children(core).unwrap_or(0);
+        if children.len() < least {
+          return Err(FragmentError::Invalid(format!(
+            "'{name}' takes at least {least} child node(s) and the fragment gives it {}",
+            children.len()
+          )));
+        }
         *name = core.to_string();
       } else if grammar.reserves(name) {
         return Err(FragmentError::Invalid(format!(
@@ -251,10 +260,12 @@ mod tests {
     }
   }
 
+  /// One action over the slot, with as many children as any core action takes — these tests are
+  /// about names; `a_core_action_with_fewer_children_than_it_takes_is_refused` is about counts.
   fn check_in(grammar: &str, action: &str) -> Result<Node, FragmentError> {
+    let child = json!({ "kind": "resolve", "path": "$.response.body" });
     validate(
-      &json!({ "kind": "action", "name": action,
-               "children": [ { "kind": "resolve", "path": "$.response.body" } ] }),
+      &json!({ "kind": "action", "name": action, "children": [child, child, child, child] }),
       Some(grammar),
       "csv",
       &["csv:integer".to_string()],
@@ -309,6 +320,44 @@ mod tests {
       matches!(check_in("v1", "match:min-type"), Err(FragmentError::Invalid(m)) if m.contains("not a core action")),
       "in v1 it is legacy:min-type"
     );
+  }
+
+  /// Staged plan S0.13: the interpreter reads a core action's children by position, so a fragment
+  /// that gives one too few is the component's bug, found before anything runs.
+  #[test]
+  fn a_core_action_with_fewer_children_than_it_takes_is_refused() {
+    let short = |grammar: &str, name: &str| {
+      validate(
+        &json!({ "kind": "action", "name": name,
+                 "children": [ { "kind": "resolve", "path": "$.response.body" } ] }),
+        Some(grammar),
+        "csv",
+        &["csv:integer".to_string()],
+        "$.response.body",
+      )
+    };
+    assert!(
+      matches!(short("v1", "expect:size"), Err(FragmentError::Invalid(m))
+        if m.contains("'expect:size' takes at least 3 child node(s) and the fragment gives it 1"))
+    );
+    // Counted against the action the name means, in the grammar the fragment declared.
+    assert!(matches!(short("v0", "for-each"), Err(FragmentError::Invalid(m))
+        if m.contains("'for-each' takes at least 2 child node(s)")));
+    assert!(short("v1", "expect:array").is_ok(), "one child is what it takes");
+    // A component's own action takes whatever its component says it does.
+    assert!(short("v1", "csv:integer").is_ok());
+    // And the check reaches every node, not only the root.
+    let nested = validate(
+      &json!({ "kind": "container", "label": "csv", "children": [
+        { "kind": "action", "name": "flow:and", "children": [
+          { "kind": "action", "name": "match:regex",
+            "children": [ { "kind": "resolve", "path": "$.response.body" } ] } ] } ] }),
+      Some("v1"),
+      "csv",
+      &[],
+      "$.response.body",
+    );
+    assert!(matches!(nested, Err(FragmentError::Invalid(m)) if m.contains("'match:regex' takes at least 2")));
   }
 
   #[test]

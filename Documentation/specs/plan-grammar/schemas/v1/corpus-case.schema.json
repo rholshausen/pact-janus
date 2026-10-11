@@ -60,12 +60,34 @@
       "properties": {
         "status": {
           "type": "string",
-          "x-known-values": ["matched", "mismatched"]
+          "description": "'matched' and 'mismatched' are verdicts of executing the plan. 'invalid' says the input is refused before there is a plan: the case then carries 'problems' and has no plan.txt or executed.txt (spec.md §6.1).",
+          "x-known-values": ["matched", "mismatched", "invalid"]
         },
         "mismatches": {
           "type": "array",
           "description": "Every expected mismatch, in the plan's result form. A case that expects a mismatch and gets a different one has failed.",
           "items": { "$ref": "#/$defs/Mismatch" }
+        },
+        "problems": {
+          "type": "array",
+          "description": "For status 'invalid': every problem the engine must report when it refuses the input, in order. A case that expects a refusal and gets a plan, or different problems, has failed.",
+          "items": { "$ref": "#/$defs/Problem" }
+        }
+      }
+    },
+    "Problem": {
+      "title": "Problem",
+      "description": "One reason an input is refused, as the engine reports it in an interaction-invalid error's details.",
+      "type": "object",
+      "required": ["pointer", "message"],
+      "properties": {
+        "pointer": {
+          "type": "string",
+          "description": "An RFC 6901 pointer into the input, at the node that is wrong."
+        },
+        "message": {
+          "type": "string",
+          "description": "Words the engine's message must contain. Not the whole message, so that rewording one does not fail a case that is about which input is refused and where."
         }
       }
     },

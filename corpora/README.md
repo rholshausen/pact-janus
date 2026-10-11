@@ -15,7 +15,9 @@ readability:
   and `structural-kind-guard/`, a value of the wrong kind given to operators whose members and
   elements would otherwise have nothing to fail on (phase-9 finding 8); and
   `cardinality-pinned-region/`, a request list pinned to `min+1` admitting any length above the
-  minimum (ADR 0024, phase-9 finding 25) — the corpus's one case compiled under a variant.
+  minimum (ADR 0024, phase-9 finding 25) — the corpus's one case compiled under a variant; and
+  `reserved-namespace-operator/`, a shape that asks for core plan actions by name and is refused
+  (staged plan S0.13) — the corpus's one case with no plan.
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
@@ -27,6 +29,10 @@ readability:
 `cargo test -p pact_janus_corpus` is what CI runs: every case must match its `result` exactly, and
 its `plan.txt`/`executed.txt` must match the checked-in snapshot byte for byte. `cargo run -p
 pact_janus_corpus` runs the same checks with human-readable `✓`/`✗` output.
+
+A case may instead say that its input is refused: `result` is then `status: invalid` with the
+`problems` the engine must report — each the pointer it names and words its message must contain — and
+the case has no `plan.txt` or `executed.txt`, because there is no plan (plan-grammar spec §6.1).
 
 A `result` diff is a behaviour change — a bug, or a deliberate change that means editing `case.json`
 in the same commit; it is never auto-fixed. A snapshot diff is regenerated with:

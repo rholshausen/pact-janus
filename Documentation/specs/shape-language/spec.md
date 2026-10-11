@@ -225,6 +225,12 @@ Namespacing rules, matching the plan grammar's (design 2.4):
   shape node.
 - A component operator's semantics — its `admits`, its variant dimension if any, its comparability
   class (§8) — are declared by the component. The kernel treats them opaquely and MUST NOT guess.
+- **Six namespaces are no component's:** `flow`, `value`, `expect`, `check`, `match` and `legacy`, which
+  the plan grammar reserves for its core actions (plan grammar §4.1). No component can be named one, so
+  no operator is in one, and an engine MUST refuse a shape that names such an operator (§3.7). The rule
+  is here and not only there because a component operator compiles to the action of the same name: a
+  shape spelled `flow:if` or `legacy:only-entries` would otherwise reach a core action that no shape
+  compiles to, with arguments it was never meant to take.
 
 The HTTP status matcher of today's model is the worked case: `status-code` is *not* a core operator,
 because the kernel knows nothing about HTTP. It arrives as `http:status-class`, contributed by the
@@ -262,6 +268,7 @@ not implement MUST fail the interaction and name the operator:
 | Operator | Engine's response |
 |---|---|
 | unnamespaced, not in this specification | `interaction-invalid`, `problems[].path` at the node, message naming the operator |
+| namespaced, in a namespace reserved for core plan actions (§3.5) | `interaction-invalid`, `problems[].path` at the node, message naming the operator — no component could ever contribute it |
 | namespaced, no such component loaded | `component-unavailable`, `details.component` naming the requirement |
 | namespaced, component loaded, operator unknown to it | `component-failed`, the component's own error passed through |
 

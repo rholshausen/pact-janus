@@ -271,6 +271,20 @@ fn a_fragment_that_cannot_be_used_fails_the_interaction_naming_why() {
       "fragment-invalid",
       "unknown plan node kind",
     ),
+    // Staged plan S0.13: a core action with fewer children than it takes would be read out of
+    // bounds by the interpreter, so it never gets that far.
+    (
+      action("expect:size", body),
+      Some("v1"),
+      "fragment-invalid",
+      "'expect:size' takes at least 3 child node(s) and the fragment gives it 1",
+    ),
+    (
+      action("match:min-max-type", body),
+      Some("v0"),
+      "fragment-invalid",
+      "'match:min-max-type' takes at least 4 child node(s)",
+    ),
   ];
   for (fragment, grammar, reason, words) in cases {
     let stub = stub(Some(fragment.clone()), grammar);

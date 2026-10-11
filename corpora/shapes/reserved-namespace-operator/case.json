@@ -1,0 +1,43 @@
+{
+  "description": "an operator spelled in a namespace the plan grammar reserves for core actions is refused, by name, before there is a plan — no component can contribute it, and compiled it would be a core action no shape compiles to (shape spec section 3.7, plan-grammar spec section 5.3)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order that asks for core actions by name",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "check": { "shape": "check:equals", "example": 1 },
+              "expect": { "shape": "expect:size", "example": [1] },
+              "flow": { "shape": "flow:if", "example": 1 },
+              "legacy": { "shape": "legacy:only-entries", "example": { "id": 1 } },
+              "match": { "shape": "match:regex", "example": "abc", "pattern": "a.c" },
+              "value": { "shape": "value:length", "example": "abc" },
+              "id": { "shape": "integer", "example": 1 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {},
+  "result": {
+    "status": "invalid",
+    "problems": [
+      { "pointer": "/parts/response/body/members/check",
+        "message": "'check:equals' is not an operator: 'check' is a namespace reserved for core plan actions" },
+      { "pointer": "/parts/response/body/members/expect",
+        "message": "'expect:size' is not an operator: 'expect' is a namespace reserved for core plan actions" },
+      { "pointer": "/parts/response/body/members/flow",
+        "message": "'flow:if' is not an operator: 'flow' is a namespace reserved for core plan actions" },
+      { "pointer": "/parts/response/body/members/legacy",
+        "message": "'legacy:only-entries' is not an operator: 'legacy' is a namespace reserved for core plan actions" },
+      { "pointer": "/parts/response/body/members/match",
+        "message": "'match:regex' is not an operator: 'match' is a namespace reserved for core plan actions" },
+      { "pointer": "/parts/response/body/members/value",
+        "message": "'value:length' is not an operator: 'value' is a namespace reserved for core plan actions" }
+    ]
+  }
+}

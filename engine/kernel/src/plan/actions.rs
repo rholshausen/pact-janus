@@ -15,56 +15,58 @@ pub const RESERVED_NAMESPACES: &[&str] = &["flow", "value", "expect", "check", "
 /// never had an action; v0 reserved the name and v1 does not.
 const V0_FAMILIES: &[&str] = &["match", "expect", "check", "convert"];
 
-/// Every core action this engine implements (spec §4.2–§4.4), as (v1 name, v0 name).
-const CORE: &[(&str, &str)] = &[
-  ("flow:and", "and"),
-  ("flow:or", "or"),
-  ("flow:if", "if"),
-  ("flow:error", "error"),
-  ("flow:apply", "apply"),
-  ("flow:for-each", "for-each"),
-  ("flow:tee", "tee"),
-  ("value:join", "join"),
-  ("value:join-with", "join-with"),
-  ("value:length", "length"),
-  ("value:lower-case", "lower-case"),
-  ("value:upper-case", "upper-case"),
-  ("value:to-string", "to-string"),
-  ("expect:object", "expect:object"),
-  ("expect:array", "expect:array"),
-  ("expect:empty", "expect:empty"),
-  ("expect:not-empty", "expect:not-empty"),
-  ("expect:count", "expect:count"),
-  ("expect:size", "expect:size"),
-  ("expect:entries", "expect:entries"),
-  ("expect:absent", "expect:absent"),
-  ("check:exists", "check:exists"),
-  ("check:equals", "check:equals"),
-  ("check:null", "check:null"),
-  ("match:any", "match:any"),
-  ("match:equality", "match:equality"),
-  ("match:type", "match:type"),
-  ("match:string", "match:string"),
-  ("match:number", "match:number"),
-  ("match:integer", "match:integer"),
-  ("match:decimal", "match:decimal"),
-  ("match:boolean", "match:boolean"),
-  ("match:null", "match:null"),
-  ("match:regex", "match:regex"),
-  ("match:datetime", "match:datetime"),
-  ("match:date", "match:date"),
-  ("match:time", "match:time"),
-  ("match:include", "match:include"),
-  ("match:content-type", "match:content-type"),
-  ("match:semver", "match:semver"),
-  ("match:any-of", "match:any-of"),
-  ("match:contains", "match:contains"),
-  ("legacy:only-entries", "expect:only-entries"),
-  ("legacy:array-contains", "match:array-contains"),
-  ("legacy:min-type", "match:min-type"),
-  ("legacy:max-type", "match:max-type"),
-  ("legacy:min-max-type", "match:min-max-type"),
-  ("legacy:header-value", "match:header-value"),
+/// Every core action this engine implements (spec §4.2–§4.4), as (v1 name, v0 name, the least
+/// number of children it takes). The interpreter reads an action's children by position, so the
+/// count is what stands between a plan somebody else wrote and an index out of bounds.
+const CORE: &[(&str, &str, usize)] = &[
+  ("flow:and", "and", 0),
+  ("flow:or", "or", 0),
+  ("flow:if", "if", 2),
+  ("flow:error", "error", 1),
+  ("flow:apply", "apply", 0),
+  ("flow:for-each", "for-each", 2),
+  ("flow:tee", "tee", 0),
+  ("value:join", "join", 0),
+  ("value:join-with", "join-with", 1),
+  ("value:length", "length", 1),
+  ("value:lower-case", "lower-case", 1),
+  ("value:upper-case", "upper-case", 1),
+  ("value:to-string", "to-string", 1),
+  ("expect:object", "expect:object", 1),
+  ("expect:array", "expect:array", 1),
+  ("expect:empty", "expect:empty", 1),
+  ("expect:not-empty", "expect:not-empty", 1),
+  ("expect:count", "expect:count", 2),
+  ("expect:size", "expect:size", 3),
+  ("expect:entries", "expect:entries", 2),
+  ("expect:absent", "expect:absent", 1),
+  ("check:exists", "check:exists", 1),
+  ("check:equals", "check:equals", 2),
+  ("check:null", "check:null", 1),
+  ("match:any", "match:any", 1),
+  ("match:equality", "match:equality", 2),
+  ("match:type", "match:type", 2),
+  ("match:string", "match:string", 1),
+  ("match:number", "match:number", 1),
+  ("match:integer", "match:integer", 1),
+  ("match:decimal", "match:decimal", 1),
+  ("match:boolean", "match:boolean", 1),
+  ("match:null", "match:null", 1),
+  ("match:regex", "match:regex", 2),
+  ("match:datetime", "match:datetime", 1),
+  ("match:date", "match:date", 1),
+  ("match:time", "match:time", 1),
+  ("match:include", "match:include", 2),
+  ("match:content-type", "match:content-type", 2),
+  ("match:semver", "match:semver", 1),
+  ("match:any-of", "match:any-of", 1),
+  ("match:contains", "match:contains", 1),
+  ("legacy:only-entries", "expect:only-entries", 1),
+  ("legacy:array-contains", "match:array-contains", 2),
+  ("legacy:min-type", "match:min-type", 3),
+  ("legacy:max-type", "match:max-type", 3),
+  ("legacy:min-max-type", "match:min-max-type", 4),
+  ("legacy:header-value", "match:header-value", 2),
 ];
 
 /// The grammar a document's action names are read under. The two differ only in names.
@@ -89,11 +91,11 @@ impl Grammar {
   pub fn core(self, name: &str) -> Option<&'static str> {
     CORE
       .iter()
-      .find(|(v1, v0)| match self {
+      .find(|(v1, v0, _)| match self {
         Grammar::V0 => *v0 == name,
         Grammar::V1 => *v1 == name,
       })
-      .map(|(v1, _)| *v1)
+      .map(|(v1, _, _)| *v1)
   }
 
   /// Whether `name` is the specification's to define in this grammar, implemented here or not: in
@@ -116,6 +118,20 @@ pub fn from_v0(name: &str) -> Option<&'static str> {
 /// Whether `name` is a core action this engine implements, by its v1 name.
 pub fn is_core(name: &str) -> bool {
   Grammar::V1.core(name).is_some()
+}
+
+/// The least number of children the core action `name` (its v1 name) takes (spec §4.2). `None` for
+/// a name that is not a core action.
+pub fn least_children(name: &str) -> Option<usize> {
+  CORE
+    .iter()
+    .find(|(v1, _, _)| *v1 == name)
+    .map(|(_, _, least)| *least)
+}
+
+/// Every core action's v1 name, in the table's order.
+pub fn core_actions() -> impl Iterator<Item = &'static str> {
+  CORE.iter().map(|(v1, _, _)| *v1)
 }
 
 /// Whether `name` is a component's action: in a namespace the specification has not reserved.
@@ -141,7 +157,7 @@ mod tests {
 
   #[test]
   fn every_core_action_is_in_a_reserved_namespace_with_exactly_one_colon() {
-    for (v1, _) in CORE {
+    for (v1, _, _) in CORE {
       let (namespace, name) = v1
         .split_once(':')
         .unwrap_or_else(|| panic!("'{v1}' has no namespace"));
@@ -158,8 +174,8 @@ mod tests {
 
   #[test]
   fn the_v0_mapping_is_one_to_one() {
-    let v1: BTreeSet<&str> = CORE.iter().map(|(v1, _)| *v1).collect();
-    let v0: BTreeSet<&str> = CORE.iter().map(|(_, v0)| *v0).collect();
+    let v1: BTreeSet<&str> = CORE.iter().map(|(v1, _, _)| *v1).collect();
+    let v0: BTreeSet<&str> = CORE.iter().map(|(_, v0, _)| *v0).collect();
     assert_eq!(v1.len(), CORE.len(), "a v1 name appears twice");
     assert_eq!(v0.len(), CORE.len(), "a v0 name appears twice");
   }

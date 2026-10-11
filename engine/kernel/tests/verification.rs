@@ -896,6 +896,37 @@ fn a_bound_state_parameter_is_recorded_resolved_per_variant() {
   }
 }
 
+/// Staged plan S0.13: the verifier reads contracts it did not write. One whose shape names an
+/// operator in a reserved namespace fails that interaction as `contract-invalid`, at the node, and
+/// nothing is sent to the provider — it used to compile to that core action, and `flow:if` over a
+/// body verified whatever the provider answered.
+#[test]
+fn a_contract_whose_shape_names_a_reserved_namespace_operator_fails_without_reaching_the_provider() {
+  let mut engine = engine_with_real_components();
+  for operator in ["flow:if", "expect:size", "legacy:only-entries"] {
+    let mut contract = contract_with_one_variant();
+    contract["interactions"][0]["parts"]["response"]["body"] =
+      json!({ "shape": operator, "example": { "id": "o-1" } });
+    // Nothing listens here: a run that got as far as the provider would fail as a transport error.
+    let started = verify(&mut engine, contract, "http://127.0.0.1:1");
+    let events = drain_run(&mut engine, started["ok"]["stream"].as_str().expect("a stream"));
+    let summary = summary(&events);
+    assert_eq!(summary["status"], "failed", "{operator}: {summary}");
+    assert_eq!(summary["variants"]["verified"], 0, "{operator}: {summary}");
+    let error = &summary["failures"][0]["error"];
+    assert_eq!(error["code"], "contract-invalid", "{operator}: {summary}");
+    assert_eq!(
+      error["problems"][0]["pointer"], "/parts/response/body",
+      "{operator}"
+    );
+    let message = error["problems"][0]["message"].as_str().unwrap();
+    assert!(
+      message.contains(&format!("'{operator}' is not an operator")),
+      "{operator}: {message}"
+    );
+  }
+}
+
 #[test]
 fn a_binding_whose_reference_matches_nothing_is_rejected_at_add_interaction() {
   let mut engine = engine_with_real_components();

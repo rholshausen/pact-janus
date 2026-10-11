@@ -272,6 +272,23 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | `match` | one per value operator of the shape language (§4.3) | `match:*` | |
 | `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value` | |
 
+**Every core action takes at least a fixed number of children**, and a node with fewer is malformed:
+
+| Least children | Actions |
+|---|---|
+| 0 | `flow:and`, `flow:or`, `flow:apply`, `flow:tee`, `value:join` |
+| 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries` |
+| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value` |
+| 3 | `expect:size`; `legacy:min-type`, `legacy:max-type` |
+| 4 | `legacy:min-max-type` |
+
+The first child is the value under test wherever there is one. The engine's own compilers never emit a
+short node, so this is a rule about documents somebody else wrote: an engine MUST refuse a fragment
+that contains one (component-interfaces spec §6.3), and an interpreter that meets one anyway MUST give
+the node an `error` result naming the action and the count (§8). It MUST NOT fail in any other way —
+the protocol's errors-are-values rule (protocol spec §10.1) holds for a malformed plan as it does for a
+mismatch.
+
 The `check:` family is what the `expect:` and `match:` families are not: a check **yields a boolean**,
 an assertion **fails**. Both are needed and they are not each other's negation in any useful sense — a
 presence *branch* asks a question and carries on either way, while a `forbidden` member makes a claim
@@ -440,6 +457,13 @@ The shape compiler MUST NOT emit `legacy:only-entries` or any other action that 
 member, and no action in the `legacy` namespace at all. §4.5 makes this checkable; ADR 0007 commitment 4
 is why it is a rule.
 
+Nor may a shape *ask* for a core action by name. A component operator compiles to the action of the
+same name (shape spec §3.5), so an operator spelled in a reserved namespace would be a core action
+reached from outside the compiler's own table, with whatever arguments the shape happened to carry.
+The shape language refuses such an operator before anything is compiled (shape spec §3.7), which is
+what makes "the shape compiler emits a core action only where §5.2 says so" true of every shape and not
+only of well-meant ones. Corpus case `shapes/reserved-namespace-operator` is the evidence.
+
 ## 6. Golden corpora
 
 ### 6.1 A case
@@ -457,6 +481,13 @@ directory holding four files:
 The split is deliberate: the two halves that are text snapshots are *files a human diffs*, not strings
 inside a JSON document where every newline is an escape. A corpus nobody can read in a pull request is
 a corpus nobody reviews.
+
+**A case may say that its input is refused.** Some rules are about what never becomes a plan — an
+operator nobody can contribute, a shape that does not parse. Such a case has `status: invalid` and a
+`problems` list in place of `mismatches`: each problem has the `pointer` the engine reports (an RFC 6901
+pointer into the input) and words its message must contain. The engine must refuse the input with
+exactly those problems, in order. There is no plan, so the case has no `plan.txt` or `executed.txt`,
+and its `values` are empty.
 
 ### 6.2 Snapshots and assertions are different failures
 
@@ -534,9 +565,13 @@ Codes are the Engine Protocol's (protocol spec §10.2). This specification const
 
 | Code | Category | When |
 |---|---|---|
-| `interaction-invalid` | `document` | a shape that cannot be compiled, with `problems[].path` at the node |
+| `interaction-invalid` | `document` | a shape that cannot be compiled — including one whose operator is in a reserved namespace (§5.3) — with `problems[].path` at the node |
 | `component-unavailable` / `component-failed` | `component` | a component's action whose component is missing, or which the component rejected (shape spec §3.7's table, applied to actions) |
 | `internal` | `internal` | an action in a reserved namespace that the engine does not implement, or a compiler emitting an action §4.5 forbids it — both are engine bugs, not user errors |
+
+A node with fewer children than its action takes (§4.2) is none of these codes when an interpreter
+meets it: it is an `error` result on that node, like a mismatch, and the run carries on. Refusing it
+earlier is the fragment check's job (`fragment-invalid`, component-interfaces spec §6.3).
 
 A mismatch is **not** an error in this sense. It is an `error` *result* on a node (§2.3), carried in
 the executed plan and reported through the plan's result form — which is what design 2.1 means by

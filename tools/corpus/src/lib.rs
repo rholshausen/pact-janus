@@ -7,11 +7,16 @@
 //! - **A `plan.txt`/`executed.txt` diff is a snapshot** — in `accept` mode it is regenerated; in
 //!   check mode (what `cargo test` and CI run) it is reported as a failure to review.
 //!
+//! A case may instead say its input is **refused** (`status: invalid`, spec §6.1, staged plan
+//! S0.13): the engine must reject it with the `problems` the case lists, there is no plan, and so
+//! there are no snapshots — all of it is assertion, and none of it is ever auto-fixed.
+//!
 //! [`run_case`] is the one entry point both `src/main.rs` (`cargo run -p pact_janus_corpus
 //! [-- accept]`) and `tests/corpus.rs` (`cargo test -p pact_janus_corpus`) call, so the two never
 //! drift into checking different things.
 
 use pact_janus_component_json::JsonContent;
+use pact_janus_kernel::error::Problem;
 use pact_janus_kernel::interaction_spec;
 use pact_janus_kernel::legacy_pact;
 use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, Status};
@@ -46,6 +51,45 @@ struct ExpectedResult {
   status: String,
   #[serde(default)]
   mismatches: Vec<ExpectedMismatch>,
+  /// For `status: invalid`: the problems the engine must refuse the input with, in order.
+  #[serde(default)]
+  problems: Vec<ExpectedProblem>,
+}
+
+#[derive(Deserialize, Debug)]
+struct ExpectedProblem {
+  pointer: String,
+  /// Words the engine's message must contain — not the whole message.
+  message: String,
+}
+
+/// Why an input did not compile.
+enum Refusal {
+  /// The engine refused the document, saying where and why — what `status: invalid` asserts.
+  Problems(Vec<Problem>),
+  /// Anything else: the case is wrong, or the input could not be read at all.
+  Other(String),
+}
+
+impl std::fmt::Display for Refusal {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Refusal::Problems(problems) => write!(f, "{problems:?}"),
+      Refusal::Other(message) => f.write_str(message),
+    }
+  }
+}
+
+impl From<String> for Refusal {
+  fn from(message: String) -> Self {
+    Refusal::Other(message)
+  }
+}
+
+impl From<&str> for Refusal {
+  fn from(message: &str) -> Self {
+    Refusal::Other(message.to_string())
+  }
 }
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
@@ -116,6 +160,16 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     }
   };
 
+  if case.result.status == "invalid" {
+    check_refused(dir, &case, &mut problems);
+    return CaseReport {
+      dir: dir.to_path_buf(),
+      description: case.description,
+      ok: problems.is_empty(),
+      problems,
+    };
+  }
+
   let plan = match compile_input(&case.input) {
     Ok((plan, _)) => Some(plan),
     Err(err) => {
@@ -167,14 +221,52 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   }
 }
 
+/// A case whose input must be refused (spec §6.1): the engine's problems are the case's, in order,
+/// each at the pointer the case names and saying what the case says it must. Nothing here is a
+/// snapshot, so `accept` changes nothing — and a plan file beside such a case is a mistake.
+fn check_refused(dir: &Path, case: &CaseFile, problems: &mut Vec<String>) {
+  match compile_input(&case.input) {
+    Ok(_) => problems.push("result: the case expects its input to be refused, and it compiled".to_string()),
+    Err(Refusal::Other(err)) => problems.push(format!("input: {err}")),
+    Err(Refusal::Problems(actual)) => {
+      let expected = &case.result.problems;
+      let agree = actual.len() == expected.len()
+        && actual
+          .iter()
+          .zip(expected)
+          .all(|(a, e)| a.pointer == e.pointer && a.message.contains(&e.message));
+      if expected.is_empty() {
+        problems.push("result: an 'invalid' case must list the 'problems' it expects".to_string());
+      } else if !agree {
+        problems.push(format!(
+          "result: problems differ from case.json:\n  expected: {expected:?}\n  actual:   {actual:?}"
+        ));
+      }
+    }
+  }
+  if case.also_compiled_from.is_some() {
+    problems.push("'also-compiled-from' has no meaning for a case whose input is refused".to_string());
+  }
+  if !case.values.is_empty() {
+    problems.push("a refused input is never executed: 'values' must be empty".to_string());
+  }
+  for snapshot in ["plan.txt", "executed.txt"] {
+    if dir.join(snapshot).exists() {
+      problems.push(format!(
+        "{snapshot} sits beside a case whose input is refused; there is no plan to snapshot"
+      ));
+    }
+  }
+}
+
 /// Compiles `input`, returning the plan and a description (the pact interaction's own, for
 /// `kind: pact-interaction`; the case doesn't otherwise have one to offer for `kind: spec`, whose
 /// description already labels the compiled root).
-fn compile_input(input: &Input) -> Result<(Plan, String), String> {
+fn compile_input(input: &Input) -> Result<(Plan, String), Refusal> {
   match input.kind.as_str() {
     "spec" => {
       let spec_json = input.spec.as_ref().ok_or("kind 'spec' requires 'spec'")?;
-      let spec = interaction_spec::parse(spec_json).map_err(|err| format!("{:?}", err.problems))?;
+      let spec = interaction_spec::parse(spec_json).map_err(|err| Refusal::Problems(err.problems))?;
       let assignment = input.variant.as_deref().map(parse_variant).unwrap_or_default();
       let plan = plan::compile(&spec, &assignment, input.variant.as_deref());
       Ok((plan, spec.description.clone()))
@@ -201,7 +293,7 @@ fn compile_input(input: &Input) -> Result<(Plan, String), String> {
         plan::compile_legacy_interaction(&interaction.description, &legacy_request, &legacy_response);
       Ok((plan, interaction.description.clone()))
     }
-    other => Err(format!("unknown input kind '{other}'")),
+    other => Err(format!("unknown input kind '{other}'").into()),
   }
 }
 

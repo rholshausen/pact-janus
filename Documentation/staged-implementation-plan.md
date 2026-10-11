@@ -142,7 +142,7 @@ Engineering with no dependency on a community answer. All of it happens in this 
   One thing the rename made visible and did not fix, because fixing it changes behaviour: a shape whose
   operator is spelled in a reserved namespace (`"shape": "legacy:only-entries"`) compiles straight to
   that core action, which plan grammar §4.5 and §5.3 say the shape compiler must never emit. v0 had the
-  same hole under the old names. It wants its own change, with a corpus case.
+  same hole under the old names. It is S0.13.
 - **S0.2 CI on Linux, macOS and Windows for the whole workspace** — **S**. The prototype ran real
   Windows only for spike 8.3. ADR 0023 makes the subprocess every SDK's primary embedding, so the
   kernel, CLI, `janus-engine` and both SDK suites run on all three.
@@ -202,10 +202,43 @@ Engineering with no dependency on a community answer. All of it happens in this 
   Two things went with the code. The `spike-8-3` CI job was the only one that ran on Windows, so
   until S0.2 lands nothing does. And spike 8.3's loader was the only thing that could load a
   `subprocess` component, so that source is specified and unloadable until S5.5.
+- **S0.13 A core action is reached only by the engine's own compilers** — **S**. Found while landing
+  S0.1, and in neither the findings list nor the earlier revisions. Two defects, one cause: nothing
+  stood between a document somebody else wrote and the interpreter's dispatch table.
+  A **shape** may name an operator in any namespace, and the shape compiler turns a namespaced operator
+  into the action of the same name. Spelled in a namespace the plan grammar reserves
+  (`"shape": "flow:if"`, `"shape": "legacy:only-entries"`), that is a core action, handed the wrong
+  arguments: some accept any value, some give verdicts that mean nothing, and two take the process down.
+  The reserved namespaces are no component's (S0.1), so such an operator can never be resolved, and the
+  shape language now says so: it is `interaction-invalid`, naming the operator.
+  The **interpreter** reads an action's children by position and never checked there were enough. A
+  component's fragment is validated for the names it uses and not for their arguments, so a fragment
+  could do the same. The plan grammar now gives each core action the least number of children it
+  takes; a fragment with fewer is refused at load, and the interpreter answers a short node with an
+  `error` result rather than a panic, whoever built the plan.
+  The specifications change first, and the corpus format gains a way to say "this input is refused",
+  which it could not.
+  *Exit:* a corpus case in which a shape naming an operator in each of the six reserved namespaces is
+  refused, as `interaction-invalid`, naming it; a test that gives every core action in the table
+  fewer children than it takes and gets an `error` result on the node each time, with no panic; a
+  fragment with a short core action refused at load as `fragment-invalid`; no existing corpus case's
+  result or snapshot changes.
+  *Done 2026-10-11.* The case is `corpora/shapes/reserved-namespace-operator`, the first with
+  `status: invalid`: the runner and the v1 case schema learned that a refused input has problems and
+  no plan. The same refusal is tested where an interaction is added and where a contract is verified;
+  there it fails the interaction as `contract-invalid` and nothing is sent to the provider. The
+  least-children table is plan grammar §4.2, held in the kernel beside each action's name, and one
+  test drives all 64 short forms of the 48 actions. A second test gives every action children of
+  eleven kinds it was never meant to take, in three counts each, and nothing panics. A
+  `flow:for-each` over an empty `splat` would have, and is an error result too. The other 22 corpus
+  cases are byte for byte what they were.
+  One inconsistency seen and left alone: the shape and plan specifications call a problem's location
+  `problems[].path`, and the engine has always written `pointer`. The corpus case uses what the engine
+  writes.
 
-**Done when** S0.1–S0.6 and S0.10–S0.12 have their exits and a release from this repository is
+**Done when** S0.1–S0.6 and S0.10–S0.13 have their exits and a release from this repository is
 installable on three operating systems. Item ids are identifiers, not an order: S0.10–S0.12 were added
-by ADR 0027 after 0b's ids were taken.
+by ADR 0027 after 0b's ids were taken, and S0.13 by what S0.1 found.
 
 ### Stage 0b: Foundations the community decides — **S**
 
@@ -560,6 +593,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S0.3 | The benchmark harness as a CI trend, which plan §14 promised and 9.1 found had never run; gates E and C depend on it | performance report §6 |
 | S0.4 | Per-OS distribution of `janus-engine`; `engine-wasm/` graduating into `engine/` | ADR 0023 decisions 2, 4 |
 | S0.5 | The codename reaches every surface, with no inventory and no rehearsal of the rename; the persisted identifiers (`janus-contract/1`, `janus-provider-shape/1`, the OCI media types, the broker `specification` value) need a dual-spelling rule | ADR 0011, ADR 0021 |
+| S0.13 | A shape operator spelled in a reserved namespace compiles to that core action; the interpreter indexes an action's children without checking there are enough, and fragment validation checks names only | found landing S0.1; plan grammar §4.5, §5.3; the errors-are-values rule |
 | S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
 | S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
 | S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |

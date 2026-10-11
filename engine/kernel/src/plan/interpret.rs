@@ -329,6 +329,21 @@ fn run_pipeline(children: &[Node], ctx: &mut Ctx) -> Executed {
 }
 
 fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
+  // Everything below reads an action's children by position. The engine's own compilers always
+  // give an action what it takes; a fragment, or a plan document handed back in, might not — and
+  // that is an `error` on the node (spec §4.2, §8), never an index out of bounds.
+  if let Some(least) = super::actions::least_children(name)
+    && children.len() < least
+  {
+    return malformed(
+      name,
+      children,
+      format!(
+        "'{name}' takes at least {least} child node(s) and this one has {}",
+        children.len()
+      ),
+    );
+  }
   match name {
     "flow:if" => run_if(children, ctx),
     "flow:or" => run_or(children, ctx),
@@ -369,6 +384,17 @@ fn apply_component(name: &str, children: &[Executed], actions: Option<&dyn Actio
       message: format!("no component in scope contributes the action '{name}'"),
       path: locus(children),
     },
+  }
+}
+
+/// An action node that cannot be run as written: nothing under it executes, and the node says why.
+fn malformed(name: &str, children: &[Node], message: String) -> Executed {
+  Executed {
+    kind: ExecutedKind::Action {
+      name: name.to_string(),
+      children: children.iter().map(skip).collect(),
+    },
+    result: Some(NodeResult::Error { message, path: None }),
   }
 }
 
@@ -439,7 +465,14 @@ fn run_for_each(children: &[Node], ctx: &mut Ctx) -> Executed {
     NodeKind::Splat {
       children: splat_children,
     } => {
-      let inner = run(&splat_children[0], ctx);
+      let Some(source) = splat_children.first() else {
+        return malformed(
+          "flow:for-each",
+          children,
+          "'flow:for-each' was given a splat with nothing in it to iterate over".to_string(),
+        );
+      };
+      let inner = run(source, ctx);
       let items = iteration_items(value_of(&inner));
       let splat = Executed {
         kind: ExecutedKind::Splat {

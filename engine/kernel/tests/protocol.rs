@@ -214,6 +214,49 @@ fn invalid_interaction_document_reports_pointer_problems() {
   assert!(problems[0]["pointer"].as_str().unwrap().starts_with('/'));
 }
 
+/// Staged plan S0.13, shape spec §3.7: an operator in a namespace the plan grammar reserves is no
+/// component's, and compiled it would be a core action reached by naming it. The consumer hears
+/// about it where the interaction is added, at the node, by name.
+#[test]
+fn an_operator_in_a_reserved_namespace_is_refused_when_the_interaction_is_added() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let create = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  let session = create["ok"]["session"].as_str().unwrap().to_string();
+
+  for operator in ["flow:if", "expect:size", "legacy:only-entries"] {
+    let response = send(
+      &mut engine,
+      "r-3",
+      "consumer-session/add-interaction",
+      json!({
+        "session": session,
+        "interaction": {
+          "description": "a request for an order",
+          "parts": { "response": { "body": { "shape": operator, "example": [1, 2] } } }
+        }
+      }),
+    );
+    assert_eq!(
+      response["error"]["code"], "interaction-invalid",
+      "{operator}: {response}"
+    );
+    let problems = response["error"]["details"]["problems"].as_array().unwrap();
+    assert_eq!(problems.len(), 1, "{operator}: {response}");
+    assert_eq!(problems[0]["pointer"], "/parts/response/body", "{operator}");
+    let message = problems[0]["message"].as_str().unwrap();
+    assert!(
+      message.contains(&format!("'{operator}' is not an operator")),
+      "{operator}: {message}"
+    );
+  }
+}
+
 #[test]
 fn session_not_found_on_unknown_session() {
   let mut engine = Engine::new();

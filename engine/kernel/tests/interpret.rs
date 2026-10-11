@@ -5,8 +5,8 @@
 
 use pact_janus_kernel::interaction_spec::{InteractionSpec, parse};
 use pact_janus_kernel::plan::{
-  Assignment, CapturedValues, ContentDetector, Executed, ExecutedKind, NodeResult, RuntimeValue, Status,
-  compile, execute, execute_with_content, outcome,
+  Assignment, CapturedValues, ContentDetector, Executed, ExecutedKind, GRAMMAR_VERSION, Literal, Node,
+  NodeResult, Plan, RuntimeValue, Status, actions, compile, execute, execute_with_content, outcome,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -389,4 +389,104 @@ fn content_type_without_a_detector_is_a_distinct_error_not_a_guess() {
     mismatches[0].message,
     "no content component is loaded to detect content type"
   );
+}
+
+// --- staged plan S0.13: a malformed action node is an error on the node, never a panic ---
+//
+// The engine's own compilers always give an action the children it takes, so nothing above can
+// reach these paths. A component's fragment can, and so can a plan document handed back in.
+
+/// Executes `node` on its own, and says which node it was if the interpreter panics.
+fn run_node(node: Node, what: &str) -> Executed {
+  let plan = Plan {
+    grammar: GRAMMAR_VERSION,
+    root: Node::container(Some("probe".to_string()), vec![node]),
+    variant: None,
+  };
+  let values = captured(&[("$.v", json!([1, "two", { "three": 3 }]))]);
+  let resolver = CapturedValues::from_json(&values);
+  std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(&plan, &resolver)))
+    .unwrap_or_else(|_| panic!("the interpreter panicked on {what}"))
+}
+
+#[test]
+fn every_core_action_given_fewer_children_than_it_takes_is_an_error_on_the_node() {
+  let mut short_nodes = 0;
+  for name in actions::core_actions() {
+    let least = actions::least_children(name).expect("a core action has a least child count");
+    for given in 0..least {
+      let children = (0..given).map(|_| Node::resolve("$.v")).collect();
+      let what = format!("'{name}' with {given} of at least {least} children");
+      let executed = run_node(Node::action(name, children), &what);
+      let node = find_action(&executed, name).expect("the action is in the executed plan");
+      match &node.result {
+        Some(NodeResult::Error { message, .. }) => assert!(
+          message.contains(&format!("'{name}' takes at least {least} child node(s)"))
+            && message.contains(&format!("has {given}")),
+          "{what}: {message}"
+        ),
+        other => panic!("{what}: expected an error on the node, got {other:?}"),
+      }
+      assert!(
+        children_of(node).iter().all(all_unexecuted),
+        "{what}: nothing under a malformed node runs"
+      );
+      assert_eq!(outcome(&executed).0, Status::Mismatched, "{what}");
+      short_nodes += 1;
+    }
+  }
+  // Plan-grammar spec §4.2's table, counted: 27 actions take at least one child, 12 at least two,
+  // 3 at least three and 1 four (and 5 take none), so an action added without its count shows here.
+  assert_eq!(
+    short_nodes,
+    27 + 12 * 2 + 3 * 3 + 4,
+    "every short form of every core action"
+  );
+}
+
+#[test]
+fn no_core_action_panics_whatever_its_children_are() {
+  type Make = fn() -> Node;
+  let kinds: Vec<(&str, Make)> = vec![
+    ("a present value", || Node::resolve("$.v")),
+    ("an absent value", || Node::resolve("$.nowhere")),
+    ("null", || Node::value(Literal::null())),
+    ("a string", || Node::value(Literal::string("[unclosed"))),
+    ("a number", || Node::value(Literal::number(3))),
+    ("an object", || {
+      Node::value(Literal::from_json(&json!({ "a": [1, 2] })))
+    }),
+    ("an array", || {
+      Node::value(Literal::from_json(&json!([[], {}, null])))
+    }),
+    ("an empty splat", || Node::splat(vec![])),
+    ("an empty container", || Node::container(None, vec![])),
+    ("the current item, outside any iteration", || {
+      Node::resolve_current("~>.x")
+    }),
+    ("an action with nothing under it", || {
+      Node::action("flow:and", vec![])
+    }),
+  ];
+  for name in actions::core_actions() {
+    let least = actions::least_children(name).unwrap();
+    for (kind, make) in &kinds {
+      for given in least..=least + 2 {
+        // Every child of the one kind, and the same with a real value under test in front.
+        let uniform: Vec<Node> = (0..given).map(|_| make()).collect();
+        run_node(
+          Node::action(name, uniform),
+          &format!("'{name}' with {given} × {kind}"),
+        );
+        if given > 0 {
+          let mut led: Vec<Node> = vec![Node::resolve("$.v")];
+          led.extend((1..given).map(|_| make()));
+          run_node(
+            Node::action(name, led),
+            &format!("'{name}' with a value and {} × {kind}", given - 1),
+          );
+        }
+      }
+    }
+  }
 }

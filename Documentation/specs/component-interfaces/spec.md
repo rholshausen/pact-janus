@@ -457,6 +457,8 @@ interaction arrives, beside its requirements (§2.3), and before a verification 
 - it declares its `grammar-version`, and the engine reads that grammar (§12.3) — else `grammar-skew`;
 - it is a node of that grammar, and uses **core actions of that grammar and the component's own
   contributed actions** (§3.3's `contributes.actions`) and nothing else — else `fragment-invalid`;
+- every core action in it has at least the children that action takes (plan grammar §4.2) — else
+  `fragment-invalid`, naming the action and the count;
 - every `resolve` in it addresses the slot it was compiled for, or a path inside it — else
   `fragment-invalid`. A content component's authority is its slot.
 

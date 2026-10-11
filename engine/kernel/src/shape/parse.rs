@@ -8,6 +8,7 @@
 
 use super::model::{CORE_OPERATORS, CoreShape, Example, ShapeKind, ShapeNode, TemporalKind, ValueKind};
 use crate::error::{Problem, push_pointer_segment};
+use crate::plan::RESERVED_NAMESPACES;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
@@ -145,6 +146,18 @@ fn parse_node(
       problems.push(Problem {
         pointer: path,
         message: format!("'{operator}' is not a valid namespaced operator (spec §3.5)"),
+      });
+      return None;
+    }
+    // Spec §3.5, §3.7: the plan grammar's core namespaces are no component's, so no operator is in
+    // one — and a component operator compiles to the action of the same name, so letting one
+    // through would hand a shape a core action no shape compiles to.
+    if RESERVED_NAMESPACES.contains(&component) {
+      problems.push(Problem {
+        pointer: path,
+        message: format!(
+          "'{operator}' is not an operator: '{component}' is a namespace reserved for core plan actions, which no component can contribute (spec §3.7)"
+        ),
       });
       return None;
     }
