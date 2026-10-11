@@ -43,8 +43,8 @@ public final class JanusOptions {
   /**
    * Declares the project's components (component-interfaces spec §10.2): each a component
    * declaration, as the project's configuration writes it. They are handed to the engine when the
-   * session is created, with a {@code file} source's relative {@code reference} made absolute against
-   * the working directory; whether one loads is the engine's answer, at the first {@code execute}.
+   * session is created, with a {@code file} source's {@code reference} resolved against the working
+   * directory when it has no root; whether one loads is the engine's answer, at the first {@code execute}.
    */
   public JanusOptions withComponents(List<? extends Map<String, ?>> components) {
     List<Map<String, Object>> copy = new ArrayList<>();

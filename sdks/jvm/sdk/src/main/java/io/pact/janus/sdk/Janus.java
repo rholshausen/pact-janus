@@ -21,6 +21,7 @@ import io.pact.janus.bindings.protocol.v1.Vocabulary.RequestFrameOp;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.StartTransportTransport;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.VariantResultStatus;
 import io.pact.janus.sdk.engine.FramePipe;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -434,15 +435,24 @@ public final class Janus implements AutoCloseable {
   }
 
   /**
+   * Whether a reference has a root, and so is passed as written (behavioural spec, {@code janus}). The
+   * rule is on the text: on Windows {@code /components/x} names no drive, which {@link Path#isAbsolute}
+   * calls relative and other languages' libraries call absolute.
+   */
+  private static boolean hasRoot(String reference) {
+    return Path.of(reference).isAbsolute() || reference.startsWith("/") || reference.startsWith(File.separator);
+  }
+
+  /**
    * A declaration as the engine receives it (lifecycle-hooks spec §7.1: the loader resolves paths, the
-   * engine reads none it was not given absolute). Everything else is passed as written.
+   * engine resolves none against a directory of its own). Everything else is passed as written.
    */
   @SuppressWarnings("unchecked")
   private static Map<String, Object> resolved(Map<String, Object> declaration) {
     if (!(declaration.get("source") instanceof Map<?, ?> source)
         || !"file".equals(source.get("kind"))
         || !(source.get("reference") instanceof String reference)
-        || Path.of(reference).isAbsolute()) {
+        || hasRoot(reference)) {
       return declaration;
     }
     Map<String, Object> resolvedSource = new LinkedHashMap<>((Map<String, Object>) source);

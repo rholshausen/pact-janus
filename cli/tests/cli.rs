@@ -817,11 +817,12 @@ fn csv_contract() -> String {
 fn csv_config(provider: &Provider, component: &str) -> String {
   let port = provider.base_url().rsplit(':').next().unwrap_or("0").to_string();
   let path = temp(&format!("verifier-csv-{port}.yaml"));
+  // Single-quoted in the YAML below: a Windows path in a double-quoted scalar is a run of escapes.
   let reference = pathdiff(component, &std::env::temp_dir());
   std::fs::write(
     &path,
     format!(
-      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: file, reference: \"{reference}\" }}\nhooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
+      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: file, reference: '{reference}' }}\nhooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
       provider.base_url()
     ),
   )

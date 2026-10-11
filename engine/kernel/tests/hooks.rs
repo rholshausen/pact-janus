@@ -83,6 +83,13 @@ fn hello(engine: &mut Engine) {
   );
 }
 
+/// The shell the exec-hook fixtures run under. An exec hook's command is spawned as written, with
+/// only the environment its entry declares, so on Unix the tests name the shell by its path. Windows
+/// has no `/bin/sh`; the one Git for Windows installs is found on the test runner's own `PATH`.
+fn sh() -> &'static str {
+  if cfg!(windows) { "sh" } else { "/bin/sh" }
+}
+
 fn fixture(name: &str) -> String {
   PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     .join("tests/fixtures/hooks")
@@ -350,7 +357,7 @@ fn a_before_request_hook_supplies_the_credential_the_provider_demands() {
       "before-request": [
         { "name": "add-token",
           // The child's environment is exactly this: deny-by-default, so even PATH is asked for.
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("add-token.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("add-token.sh")],
                    "env": { "TOKEN": DEFAULT_TOKEN, "PATH": "/usr/bin:/bin" } },
           "changes": ["parts.request.headers"] }
       ]
@@ -406,13 +413,16 @@ hooks:
         format: pact-state-change
   after-response:
     - name: observe
-      run: { kind: exec, command: /bin/sh, args: ["${OBSERVE_SH}"], env: { PATH: "/usr/bin:/bin" } }
+      run: { kind: exec, command: "${SH}", args: ["${OBSERVE_SH}"], env: { PATH: "/usr/bin:/bin" } }
 "#;
   std::fs::write(dir.join("verifier.janus.yaml"), config).unwrap();
 
   let env: HashMap<String, String> = [
     ("PROVIDER_URL".to_string(), provider.base_url().to_string()),
     ("OBSERVE_SH".to_string(), fixture("observe.sh")),
+    // The shell is named the way each platform has it (see `sh`), like any other machine-specific
+    // value a project keeps out of the file.
+    ("SH".to_string(), sh().to_string()),
   ]
   .into_iter()
   .collect();
@@ -512,12 +522,12 @@ fn a_before_verification_hook_that_fails_aborts_the_run_and_says_what_never_ran(
       // fact once per interaction with the cause buried.
       "before-verification": [
         { "name": "auth-token",
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("fail.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("fail.sh")],
                    "env": { "PATH": "/usr/bin:/bin" } } }
       ],
       "after-verification": [
         { "name": "report",
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("observe.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("observe.sh")],
                    "env": { "PATH": "/usr/bin:/bin" } } }
       ]
     }
@@ -549,7 +559,7 @@ fn a_hook_that_changes_what_it_did_not_declare_is_refused_and_the_request_is_unt
   let hooks = json!({
     "hooks": { "before-request": [
       { "name": "meddler",
-        "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("rewrite-path.sh")],
+        "run": { "kind": "exec", "command": sh(), "args": [fixture("rewrite-path.sh")],
                  "env": { "PATH": "/usr/bin:/bin" } },
         // Declares headers; the hook answers with a path.
         "changes": ["parts.request.headers"] } ] }
@@ -589,7 +599,7 @@ fn a_teardown_failure_warns_and_leaves_the_result_alone() {
                    "format": "pact-state-change" } } ],
       "state-teardown": [
         { "name": "cleanup",
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("fail.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("fail.sh")],
                    "env": { "PATH": "/usr/bin:/bin" } } } ]
     }
   });
@@ -632,7 +642,7 @@ fn a_selector_runs_a_state_handler_only_for_its_own_state() {
                  "format": "pact-state-change" } },
       { "name": "somebody-elses-state",
         "when": { "state": "a shipment exists" },
-        "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("fail.sh")],
+        "run": { "kind": "exec", "command": sh(), "args": [fixture("fail.sh")],
                  "env": { "PATH": "/usr/bin:/bin" } } } ] }
   });
   let events = verify(&mut engine, contract, provider.base_url(), Some(hooks));
@@ -730,11 +740,11 @@ fn hook_activity_arrives_as_events_in_run_order() {
                    "format": "pact-state-change" } } ],
       "after-response": [
         { "name": "observe",
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("observe.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("observe.sh")],
                    "env": { "PATH": "/usr/bin:/bin" } } } ],
       "state-teardown": [
         { "name": "cleanup",
-          "run": { "kind": "exec", "command": "/bin/sh", "args": [fixture("observe.sh")],
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("observe.sh")],
                    "env": { "PATH": "/usr/bin:/bin" } } } ]
     }
   });

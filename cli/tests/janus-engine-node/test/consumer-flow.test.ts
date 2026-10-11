@@ -14,7 +14,9 @@ import { EngineClient } from "./engine-client.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../../..");
-const binaryPath = path.join(repoRoot, "target", "debug", "janus-engine");
+// What `cargo build` calls the engine on this platform.
+const binaryName = process.platform === "win32" ? "janus-engine.exe" : "janus-engine";
+const binaryPath = path.join(repoRoot, "target", "debug", binaryName);
 
 function orderInteraction() {
   return {

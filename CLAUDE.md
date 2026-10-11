@@ -48,7 +48,7 @@ Three sources are the source of truth and take precedence over this file when th
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
-> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13.
+> Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -274,6 +274,10 @@ stderr (stdout stays frames-only).
 - Test helpers: `rstest`, `expectest`, `pretty_assertions` — follow these before introducing new ones.
 - Engine crates that ship as WASM components must build for `wasm32-wasip2`; keep native-only
   dependencies (`tokio`, `reqwest`, raw sockets) out of those crates or behind target-gated features.
+- Everything builds and is tested on Linux, macOS and Windows (S0.2; CI runs all three). Never read
+  meaning out of a path's separator or spell one in an expected value — compare components, or
+  normalise to `/` where the path is an identifier. No Unix-only API or `/bin/...` path without a
+  Windows answer. `.gitattributes` pins text to LF in every checkout; keep it that way.
 
 ## TypeScript / JavaScript conventions
 

@@ -33,7 +33,9 @@ dependencies {
 
 // The repository root, where the Cargo workspace (and so `target/debug/janus-engine`) lives.
 val repoRoot: File = rootProject.projectDir.resolve("../..").canonicalFile
-val engineBinary: File = repoRoot.resolve("target/debug/janus-engine")
+// What `cargo build` calls it on this platform.
+val engineName = if (System.getProperty("os.name").startsWith("Windows")) "janus-engine.exe" else "janus-engine"
+val engineBinary: File = repoRoot.resolve("target/debug/$engineName")
 
 // The end-to-end tests drive the real engine, so they must never run against a stale one: cargo is
 // incremental, so asking it every time costs a no-op check when nothing changed.
@@ -51,6 +53,9 @@ tasks.test {
   // JANUS_ENGINE names the executable, as it does for the rest of the project; an explicit value
   // in the environment wins, so a developer can point the suite at another build.
   environment("JANUS_ENGINE", System.getenv("JANUS_ENGINE") ?: engineBinary.path)
+  // The engine is what these tests test. Without it as an input Gradle calls the task up to date
+  // after an engine change, and the conformance report it leaves behind is the old engine's.
+  inputs.file(engineBinary).withPropertyName("engineBinary")
   environment("RUST_LOG", System.getenv("RUST_LOG") ?: "warn")
   // Contracts the end-to-end tests write land under the build directory, never in the source tree.
   systemProperty("janus.test.contracts", layout.buildDirectory.dir("contracts").get().asFile.path)

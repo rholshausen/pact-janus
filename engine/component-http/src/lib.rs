@@ -532,10 +532,12 @@ impl HttpTransport {
 
     let server = tiny_http::Server::http((host, port as u16))
       .map_err(|err| ComponentError::transport_failed(format!("could not bind {host}:{port}: {err}")))?;
-    let bound_port = match server.server_addr() {
-      tiny_http::ListenAddr::IP(addr) => addr.port(),
-      tiny_http::ListenAddr::Unix(_) => port as u16,
-    };
+    // `ListenAddr` has a Unix-socket variant on Unix only, so this is not a `match`: it has to
+    // mean the same thing on Windows.
+    let bound_port = server
+      .server_addr()
+      .to_ip()
+      .map_or(port as u16, |addr| addr.port());
 
     let endpoint = serde_json::json!({
       "kind": "http",

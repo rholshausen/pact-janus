@@ -16,6 +16,10 @@ repository that prototyped it. Start with:
   `cargo fmt --all -- --check` must all pass (CI enforces them). Style is 2-space indentation via
   `rustfmt.toml`, matching pact-reference.
 - Engine kernel crates must also build for `wasm32-wasip2` (CI enforces for the kernel).
+- CI builds and tests on Linux, macOS and Windows. If you are on Linux with the
+  `x86_64-pc-windows-gnu` target, MinGW and wine, most Windows failures show up before you push:
+  `CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER=wine cargo test --target x86_64-pc-windows-gnu --no-fail-fast`.
+  Tests that spawn `cargo` or a shell fail there and are not evidence of anything.
 - Matching-behaviour changes must update `corpora/` in the same commit, and a change to what an SDK's
   DSL does belongs in the behavioural specification and `conformance/` first.
 - Every relative link in the repository's Markdown must resolve: `cargo run -p pact_janus_doc_links`

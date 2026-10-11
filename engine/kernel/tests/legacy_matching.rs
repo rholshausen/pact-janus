@@ -55,7 +55,10 @@ fn read_cases(dir: &Path, out: &mut Vec<Case>) {
         ))
         .unwrap_or(&path)
         .display()
-        .to_string(),
+        .to_string()
+        // A case is identified the way the specification's own tree names it, on every platform:
+        // `is_request` and the known-gap notes read this, and a Windows path would hide `/request/`.
+        .replace('\\', "/"),
       expected_match: json["match"]
         .as_bool()
         .unwrap_or_else(|| panic!("{path:?} has no boolean 'match'")),

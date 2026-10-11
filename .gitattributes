@@ -1,0 +1,12 @@
+# Text is LF in the repository and in every checkout, whatever the platform's git is configured to
+# do. Windows runners check out with core.autocrlf on, and CRLF breaks things that compare bytes or
+# run scripts: the golden corpora's snapshots, rustfmt's `newline_style = "Unix"`, the generated
+# bindings' diff, the `#!/bin/sh` hook fixtures and `gradlew`.
+* text=auto eol=lf
+
+# The one file Windows itself has to read.
+*.bat text eol=crlf
+
+# The pact-specification test cases are the oracle the legacy compiler is checked against, kept
+# byte for byte as they were copied (two of them are CRLF upstream).
+engine/kernel/tests/fixtures/spec_testcases/** -text

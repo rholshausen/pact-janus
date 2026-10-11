@@ -1,5 +1,6 @@
 //! The subprocess embedding's end of engine-protocol spec §6: `engine/shutdown` is answered, and
-//! then the process exits — cleanly, so a host can tell it from a crash.
+//! then the process exits — cleanly, so a host can tell it from a crash. And the other way out,
+//! which is the one that matters when nobody says goodbye: stdin closing (§7.1).
 
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
@@ -68,6 +69,71 @@ fn shutdown_is_answered_and_then_the_process_exits_cleanly() {
   };
   assert!(status.success(), "exit status {status}");
   drop(stdin);
+}
+
+/// Waits for the engine to exit, failing with `what` if it has not within ten seconds.
+fn wait_for_exit(child: &mut std::process::Child, what: &str) -> std::process::ExitStatus {
+  let deadline = Instant::now() + Duration::from_secs(10);
+  loop {
+    if let Some(status) = child.try_wait().expect("try_wait") {
+      return status;
+    }
+    if Instant::now() >= deadline {
+      let _ = child.kill();
+      panic!("{what}");
+    }
+    std::thread::sleep(Duration::from_millis(20));
+  }
+}
+
+/// Engine-protocol spec §7.1, staged plan S0.2: stdin reaching EOF is how the engine learns its host
+/// is gone — a test runner that was killed sends no `engine/shutdown`. It is the whole of orphan
+/// prevention (no process groups, no signals), and spike 1.3 left it unproven on Windows, where a
+/// pipe closing is not a signal either. With a mock transport serving, because that is when there
+/// are threads that could keep the process alive.
+#[test]
+fn stdin_closing_ends_the_process_even_with_a_transport_serving() {
+  let mut child = Command::new(env!("CARGO_BIN_EXE_janus-engine"))
+    .env("RUST_LOG", "warn")
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .spawn()
+    .expect("janus-engine starts");
+  let mut stdin = child.stdin.take().expect("stdin");
+  let mut stdout = BufReader::new(child.stdout.take().expect("stdout"));
+  let mut send = |id: &str, op: &str, body: Value| {
+    let request = json!({ "type": "request", "id": id, "op": op, "body": body });
+    stdin.write_all(&frame(&request)).expect("write a frame");
+    let response = read_frame(&mut stdout);
+    assert_eq!(response["id"], id, "{response}");
+    assert!(response.get("error").is_none(), "{op}: {response}");
+    response["ok"].clone()
+  };
+
+  send("r-1", "engine/hello", json!({ "protocol-versions": [1] }));
+  let created = send(
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  let started = send(
+    "r-3",
+    "consumer-session/start-transport",
+    json!({ "session": created["session"], "transport": "http" }),
+  );
+  assert!(
+    started["endpoint"]["base-url"].is_string(),
+    "a mock is listening: {started}"
+  );
+
+  // No `engine/shutdown`: the host just goes away.
+  drop(stdin);
+  let status = wait_for_exit(
+    &mut child,
+    "janus-engine was still running ten seconds after its stdin closed",
+  );
+  assert!(status.success(), "exit status {status}");
 }
 
 /// Phase-9 finding 30: `janus-engine` is the engine both SDKs embed, and it registered no hook

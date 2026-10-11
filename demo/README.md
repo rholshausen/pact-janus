@@ -21,7 +21,8 @@ demo/run.sh --pace 5   # 5 seconds between steps
 demo/run.sh --ci       # no pauses; checks each step's outcome and exits non-zero if one differs (CI runs this)
 ```
 
-It needs cargo, and Node 22.6 or later with npm. It builds `janus`, `janus-engine` and the sample
+It needs bash on Linux or macOS (it is built on symbolic links and background jobs, and CI runs it on
+both), cargo, and Node 22.6 or later with npm. It builds `janus`, `janus-engine` and the sample
 provider, installs the web app's one dependency (Vitest) if it is missing, and starts
 `order-service` on a free port. It works on a scratch copy of the web app and applies each step's
 change there, so nothing in the repo is modified.
