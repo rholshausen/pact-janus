@@ -78,7 +78,9 @@ benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standa
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`).
                  benchmarks/janus runs the same scenarios against Janus in each embedding
                  (task 9.1, `cd benchmarks/janus && cargo run --release`); its engine-wasm/ is
-                 the engine built as a WASM component, for measurement only
+                 the engine built as a WASM component, for measurement only. Every merge to main
+                 runs it in CI and adds a point to the trend chart (S0.3, the Benchmarks workflow;
+                 a trend, not a gate — see benchmarks/README.md)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation

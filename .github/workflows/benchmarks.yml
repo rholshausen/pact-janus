@@ -1,0 +1,108 @@
+name: Benchmarks
+
+# Staged plan S0.3: the benchmark trend. Every merge to main runs the 1.7 scenarios against Janus,
+# in each embedding, and records the numbers as one more point on a chart:
+#
+#   https://rholshausen.github.io/pact-janus/bench/
+#
+# A trend, not a gate. Nothing here fails a build for being slower: the runners are shared machines
+# and one run's numbers move by more than most regressions would. What the chart is for is the shape
+# over many merges — and it is the only data the plan's gates E (frame encoding) and C (contract
+# packaging) can fire on.
+
+on:
+  push:
+    branches: [main]
+  # A change to the harness or to this file is run, and not recorded, before it lands.
+  pull_request:
+    paths:
+      - benchmarks/**
+      - .github/workflows/benchmarks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time: each run appends to the same branch.
+concurrency:
+  group: benchmarks
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # Only a commit on main is a data point. A pull request and a manual run on a branch measure and
+  # compare, and leave the record alone.
+  RECORD: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  trend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      # To push the data point to the gh-pages branch. Nothing else in this repository's CI writes.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      # Three builds, three target directories: the harness is its own workspace, so is the engine
+      # as a WASM component, and janus-engine comes from the root one.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            benchmarks/janus -> target
+            benchmarks/janus/engine-wasm -> target
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      # The harness is outside the root workspace, so nothing else in CI builds or tests it.
+      - name: Harness tests
+        working-directory: benchmarks/janus
+        run: cargo test --release
+      - name: Run the scenarios (native, subprocess, wasm)
+        working-directory: benchmarks/janus
+        run: cargo run --release
+        env:
+          JANUS_BENCH_RESULTS_DIR: ${{ runner.temp }}/bench/results
+      - name: The points the chart plots
+        working-directory: benchmarks/janus
+        run: cargo run --release -- trend "$RUNNER_TEMP/bench/results" "$RUNNER_TEMP/bench/trend"
+      # The whole result documents, every metric of every scenario, for anyone the chart sends
+      # looking: the chart keeps one number per line.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: ${{ runner.temp }}/bench/results
+      # benchmark-action/github-action-benchmark v1.22.2, pinned by commit because it is given a
+      # token that can write. It appends the points to bench/data.js on gh-pages and keeps the page
+      # that draws them. It takes one direction per call, so it is called twice.
+      - name: Record — time and size, lower is better
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc
+        with:
+          name: Janus — time and size (lower is better)
+          tool: customSmallerIsBetter
+          output-file-path: ${{ runner.temp }}/bench/trend/smaller-is-better.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: bench
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ env.RECORD }}
+          save-data-file: ${{ env.RECORD }}
+          summary-always: true
+          # A trend, not a gate: no comment, no failure, whatever the comparison says.
+          comment-on-alert: false
+          fail-on-alert: false
+      - name: Record — throughput, higher is better
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc
+        with:
+          name: Janus — throughput (higher is better)
+          tool: customBiggerIsBetter
+          output-file-path: ${{ runner.temp }}/bench/trend/bigger-is-better.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: bench
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ env.RECORD }}
+          save-data-file: ${{ env.RECORD }}
+          summary-always: true
+          comment-on-alert: false
+          fail-on-alert: false

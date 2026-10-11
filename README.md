@@ -120,7 +120,7 @@ schema-compatibility checks, the SDK thinness audit and `demo/run.sh --ci`. [CON
 | [`samples/order-service`](samples/order-service/README.md) | The sample provider, with deliberate variance, auth and v3 provider states |
 | [`demo/`](demo/README.md) | The RFC loop as a runnable, recorded walkthrough |
 | [`third-party/janus-csv`](third-party) | A plugin written as a third party would, from the published specs only |
-| [`benchmarks/`](benchmarks) | The `pact_ffi` baseline and the Janus performance harness |
+| [`benchmarks/`](benchmarks) | The `pact_ffi` baseline and the Janus performance harness, whose numbers CI adds to a [trend chart](https://rholshausen.github.io/pact-janus/bench/) on every merge |
 | [`tools/`](tools) | The checkers CI runs: schema compatibility, the corpora, conformance, SDK thinness, binding generation, documentation links |
 | [`spikes/`](spikes/README.md) | The findings of the prototype's time-boxed experiments. Findings only: their code is gone |
 | [`Documentation/`](Documentation) | The staged plan, the specifications, the decisions (ADRs), the charter, and [the prototype's record](Documentation/prototype/README.md) |

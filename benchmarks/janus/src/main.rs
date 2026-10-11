@@ -13,6 +13,10 @@
 //! something different, the scenario has a new name and says why.
 //!
 //!   cd benchmarks/janus && cargo run --release [-- native subprocess wasm]
+//!
+//! `JANUS_BENCH_RESULTS_DIR` says where the result documents go, in place of `benchmarks/results/`.
+//! `cargo run --release -- trend <results-dir> <out-dir>` turns a directory of them into the points
+//! CI's trend chart plots (staged plan S0.3, `trend.rs`).
 
 // The baseline's own file, in the baseline's own style: `cargo fmt` here must not reformat it.
 #[allow(dead_code)]
@@ -21,6 +25,7 @@
 mod util;
 
 mod embed;
+mod trend;
 mod workloads;
 
 use embed::{Client, Native, Pipe, Subprocess, Wasm, WasmRuntime};
@@ -768,6 +773,21 @@ fn main() {
   if std::env::args().nth(1).as_deref() == Some("probe") {
     return probe();
   }
+  if std::env::args().nth(1).as_deref() == Some("trend") {
+    let arguments: Vec<String> = std::env::args().skip(2).collect();
+    let [results, out] = arguments.as_slice() else {
+      eprintln!("usage: trend <results-dir> <out-dir>");
+      std::process::exit(2);
+    };
+    match trend::write(Path::new(results), Path::new(out)) {
+      Ok(points) => println!("{points} points written to {out}"),
+      Err(error) => {
+        eprintln!("trend: {error}");
+        std::process::exit(1);
+      }
+    }
+    return;
+  }
   let root = repo_root();
   let wanted: Vec<String> = std::env::args().skip(1).collect();
   let wants = |stack: &str| wanted.is_empty() || wanted.iter().any(|w| w == stack);
@@ -777,7 +797,9 @@ fn main() {
     "git",
     &["describe", "--always", "--dirty", "--exclude", "*"],
   );
-  let results_dir = root.join("benchmarks/results");
+  let results_dir = std::env::var_os("JANUS_BENCH_RESULTS_DIR")
+    .map(PathBuf::from)
+    .unwrap_or_else(|| root.join("benchmarks/results"));
 
   println!("building janus-engine and the engine component (release)");
   let engine_binary = match std::env::var_os("JANUS_ENGINE") {
