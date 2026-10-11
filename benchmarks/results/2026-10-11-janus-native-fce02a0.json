@@ -1,0 +1,121 @@
+{
+  "arch": "x86_64",
+  "date": "2026-10-11",
+  "os": "linux",
+  "scenarios": {
+    "cold-start": {
+      "iterations": 20,
+      "median_us": 6.2,
+      "min_us": 5.5,
+      "p95_us": 8.1
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 21007.1,
+      "min_us": 19788.1,
+      "p95_us": 21731.1
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 283.2,
+      "min_us": 263.4,
+      "p95_us": 294.7
+    },
+    "match-100k": {
+      "iterations": 500,
+      "median_us": 10648.8,
+      "min_us": 10048.0,
+      "p95_us": 11396.7
+    },
+    "match-small": {
+      "iterations": 5000,
+      "median_us": 12.2,
+      "min_us": 11.6,
+      "p95_us": 12.6
+    },
+    "mock-server-latency-100k": {
+      "arm_median_us": 17156.3,
+      "iterations": 500,
+      "median_us": 23284.5,
+      "min_us": 16555.2,
+      "p95_us": 25159.5
+    },
+    "mock-server-latency-mismatch": {
+      "arm_median_us": 18.2,
+      "iterations": 500,
+      "median_us": 41.3,
+      "min_us": 34.7,
+      "p95_us": 67.1
+    },
+    "mock-server-latency-small": {
+      "arm_median_us": 13.2,
+      "iterations": 5000,
+      "median_us": 33.3,
+      "min_us": 29.2,
+      "p95_us": 38.4
+    },
+    "mock-server-startup-cycle": {
+      "iterations": 20,
+      "median_us": 149.7,
+      "min_us": 120.3,
+      "p95_us": 205.9
+    },
+    "mock-server-throughput-4engines": {
+      "engines": 4,
+      "requests": 193319,
+      "rps": 96660.0,
+      "seconds": 2
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 20300.8,
+      "min_us": 19414.3,
+      "p95_us": 20909.9
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 187.4,
+      "min_us": 178.4,
+      "p95_us": 197.7,
+      "variants": 8
+    },
+    "variants-consumer-rfc-order": {
+      "median_ms_all_variants": 1.56,
+      "median_ms_base_only": 0.72,
+      "median_ms_finalise": 0.16,
+      "median_ms_per_extra_variant": 0.119,
+      "runs": 20,
+      "variants": 8
+    },
+    "variants-provider-order-service": {
+      "median_ms_all_variants": 4.51,
+      "median_ms_one_variant": 1.08,
+      "median_ms_per_extra_variant": 0.685,
+      "runs": 10,
+      "variants": 6
+    },
+    "verify-corpus-100k": {
+      "interactions": 5,
+      "median_ms_per_interaction": 17.36,
+      "median_total_ms": 86.8,
+      "pacts": 1,
+      "runs": 3
+    },
+    "verify-corpus-small": {
+      "interactions": 50,
+      "median_ms_per_interaction": 0.28,
+      "median_total_ms": 14.2,
+      "pacts": 10,
+      "runs": 5
+    },
+    "verify-corpus-small-upgraded": {
+      "interactions": 50,
+      "median_ms_per_interaction": 0.38,
+      "median_total_ms": 19.2,
+      "pacts": 10,
+      "runs": 5
+    }
+  },
+  "schema": 1,
+  "stack": "janus-native-fce02a0"
+}

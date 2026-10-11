@@ -25,6 +25,29 @@ which `cargo build` at the repo root should not pay for. `pact_models` is pinned
 (pact_ffi 0.5.6 fails to compile against pact_models 1.3.14 — an enum grew; see spike 1.1 for
 why this class of failure is a Janus design criterion).
 
+## The trend (staged plan S0.3)
+
+Every merge to `main` runs the Janus harness on a GitHub runner, in all three embeddings, and adds
+the numbers to a chart:
+
+**<https://rholshausen.github.io/pact-janus/bench/>**
+
+The `Benchmarks` workflow (`.github/workflows/benchmarks.yml`) does it. `cargo run --release -- trend
+<results-dir> <out-dir>` in `janus/` turns the result documents into the points the chart plots, one
+line per number worth watching (`janus/src/trend.rs` is the table: a scenario's headline median, the
+arming share of a mock exchange, the per-interaction and per-variant costs, throughput, the WASM
+component's compile time and size). The points live in `bench/data.js` on the `gh-pages` branch, which
+only that workflow writes. The whole result documents, every metric, are an artifact of each run.
+
+It is a **trend, not a gate**. The runners are shared machines, so one run's numbers can move by
+tens of percent with no change in the code; nothing fails a build for being slower, and a single
+point means little. Read the shape over many merges. The runs in `results/` are the other kind of
+record: one known machine, committed by hand when a run is meant to be a data point, and the only
+numbers here that are comparable with each other in absolute terms.
+
+A pull request that touches `benchmarks/` or the workflow runs the scenarios and compares them with
+the last recorded point, in the job summary, and records nothing.
+
 ## Scenarios (schema v1)
 
 | Scenario | What it measures |
@@ -59,7 +82,8 @@ cargo run --release -- probe               # one mock exchange's steps, as the r
 ```
 
 It builds `janus-engine` and the engine component first. `JANUS_ENGINE` names an existing
-`janus-engine` to use instead. `JANUS_BENCH_LOG=debug` passes the engine's own tracing through to
+`janus-engine` to use instead, and `JANUS_BENCH_RESULTS_DIR` a directory for the result documents in
+place of `results/`. `JANUS_BENCH_LOG=debug` passes the engine's own tracing through to
 stderr, which is how you find out why a scenario's assertion failed. It writes one result document
 per embedding, `results/<date>-janus-<embedding>-<git describe>.json`. The schema is the baseline's.
 
