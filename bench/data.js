@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791791572659,
+  "lastUpdate": 1791791574454,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -1380,6 +1380,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 47835,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d3d4c85f4d61c7840f95d4e75a6a9151ac778335",
+          "message": "fix: a release moves the benchmark harness's lockfile too\n\nThe Benchmarks run on the 0.1.0 release commit failed at the step that\nrecords its point. benchmarks/janus is a workspace of its own that\ndepends on five of this workspace's crates by path, so its Cargo.lock\nnames them at a version. `knope prepare-release` refreshed the root\nlockfile and not that one. The harness's build then rewrote it in place,\nand with the checkout dirty the benchmark action could not switch to\ngh-pages.\n\n- benchmarks/janus/Cargo.lock names the five crates at 0.1.0. Nothing\n  else in it moves.\n- knope.toml refreshes and stages it when a release is prepared.\n- CI's checks job resolves, with --locked, every lockfile outside the\n  workspace that names one of its crates. It runs on every pull\n  request, so a release that leaves one behind fails before it merges.\n- The harness's tests build with --locked, so a stale lockfile fails\n  there, by name.\n\nThe release commit's point on the trend is not recorded.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-12T18:39:12+11:00",
+          "tree_id": "e33219a656ba45e2ba679c20275a889b136c41d7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d3d4c85f4d61c7840f95d4e75a6a9151ac778335"
+        },
+        "date": 1791791573979,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 32111,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 23498,
             "unit": "requests per second",
             "extra": "engines 4"
           }
