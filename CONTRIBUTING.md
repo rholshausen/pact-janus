@@ -66,6 +66,11 @@ the change files gathered so far add up to.
    `0.1.0` and `1.0.0` are). It pushes a `release` branch with the new version, `CHANGELOG.md` and
    the consumed change files. Open the pull request it links to. CI runs on it, and so does a full
    rehearsal of the release build.
+  ```
+  gh workflow run prepare-release.yml
+  # to set the version if required
+  gh workflow run prepare-release.yml -f version=0.1.0
+  ```
 2. Merge it. The **Release** workflow builds `janus-engine` and `janus` for five target triples and
    the engine as a WASM component, attests every file, and then creates the `v<version>` tag and the
    GitHub release together. Do not push the tag yourself.
