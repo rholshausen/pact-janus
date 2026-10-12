@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791791841353,
+  "lastUpdate": 1791791843598,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -1734,6 +1734,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 23498,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d6f20b08144b4db8bfd466b4de2071aea9938162",
+          "message": "docs: S0.4's record gains what its first release broke\n\nThe Benchmarks run on the release commit failed: the harness's lockfile\nnames workspace crates at a version, and preparing the release left it\nbehind. The fix is its own pull request (#6); this is the line in the\nplan that says the exit did not foresee it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-12T18:42:14+11:00",
+          "tree_id": "d6b584553aba514be325bff82912a47658ab7c71",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d6f20b08144b4db8bfd466b4de2071aea9938162"
+        },
+        "date": 1791791842916,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28178,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21821,
             "unit": "requests per second",
             "extra": "engines 4"
           }
