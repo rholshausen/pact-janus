@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791844015310,
+  "lastUpdate": 1791844017039,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -2088,6 +2088,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21821,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "76dfd22216f03637f643b33a4ec73bd8a19ffb55",
+          "message": "docs: Update CONTRIBUTING.md with release command examples",
+          "timestamp": "2026-10-13T09:23:39+11:00",
+          "tree_id": "6b7bdf44b063b8b3600af267b08d73f77855ec21",
+          "url": "https://github.com/rholshausen/pact-janus/commit/76dfd22216f03637f643b33a4ec73bd8a19ffb55"
+        },
+        "date": 1791844016586,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 66686,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 54655,
             "unit": "requests per second",
             "extra": "engines 4"
           }
