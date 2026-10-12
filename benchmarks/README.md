@@ -96,12 +96,14 @@ same workloads byte for byte.
 |---|---|---|
 | `native` | `Engine::dispatch` in the harness's own process, wired as the `janus` CLI wires it | everything |
 | `subprocess` | `janus-engine` over its stdio framing, as both SDKs embed it | everything except the state-hook variant scenario (`janus-engine` registers no hook implementations) |
-| `wasm` | the engine component in `janus/engine-wasm/`, under wasmtime 47 | only what needs no I/O: no transports, since a p2 guest has no threads for the exchange loop |
+| `wasm` | the engine component in `engine/wasm/`, under wasmtime 47 | only what needs no I/O: no transports, since a p2 guest has no threads for the exchange loop |
 
-`janus/engine-wasm/` is ADR 0003's canonical artifact, the engine as a WASM component. Nothing
-built one before 9.1. It is the kernel and the JSON content component behind the frozen pipe, plus a
-benchmark-only `bench` interface that runs a compiled plan. Offline matching is not a protocol
-operation, so without that interface the interpreter could not be measured inside WASM at all.
+`engine/wasm/` is ADR 0003's canonical artifact, the engine as a WASM component. Nothing built one
+before 9.1, which kept it here; staged plan S0.4 moved it into `engine/`, and a release ships it. It
+is the kernel and the JSON content component behind the frozen pipe. The harness builds it with the
+crate's `bench` feature, which adds a benchmark-only `bench` interface that runs a compiled plan:
+offline matching is not a protocol operation, so without that interface the interpreter could not be
+measured inside WASM at all. A released component does not have it.
 
 Janus scenarios keep the baseline's names where the workload is the baseline's. Where Janus cannot
 do the same thing, the scenario has a new name:

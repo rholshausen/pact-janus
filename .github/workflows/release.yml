@@ -1,0 +1,325 @@
+name: Release
+
+# Staged plan S0.4: what a release is, as a build. `janus-engine` — every SDK's primary embedding
+# (ADR 0023) — and the `janus` CLI, statically linked, one of each per target triple; the engine as a
+# WASM component, for offline operations; and a SHA256SUMS over all of it, with a build provenance
+# attestation an SDK or a person can check a download against (ADR 0029).
+#
+# A release is a version in Cargo.toml that has no tag yet (ADR 0028). The version gets there in a
+# pull request `knope prepare-release` wrote from the change files; merging that pull request is the
+# decision to release, and this workflow is what follows from it. The tag is made here, last, at the
+# commit that was built, with everything already attached: there is never a tag without its
+# artifacts, and an SDK that resolves a version finds all of it or none.
+#
+# Everything short of publishing also runs on a pull request that could break it — this file, the
+# dependencies, the WASM crate — and on demand, so the pipeline is not first exercised on the day it
+# matters. That includes the release pull request itself: the commit is built whole before it is
+# merged.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - engine/wasm/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time on a branch: two runs must not both decide the same version is theirs to tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # Symbols are over a quarter of each binary. Set here and not in the workspace's release profile, which
+  # the benchmark harness also builds with.
+  CARGO_PROFILE_RELEASE_STRIP: symbols
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    # What this run is: a release, a rehearsal, or — most pushes to main — nothing.
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        run: |
+          version="$(sed -n '/^\[workspace\.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml)"
+          if ! grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' <<<"$version"; then
+            echo "::error::Cargo.toml's [workspace.package] has no version this can read: '$version'"
+            exit 1
+          fi
+          tag="v$version"
+
+          # 0.0.0 is the version of a tree nothing has been released from.
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] && [ "$GITHUB_REF" = refs/heads/main ] && [ "$version" != 0.0.0 ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "$tag is already released."
+            else
+              publish=true
+            fi
+          fi
+          # A push to main with nothing to release builds nothing. Anything else is a rehearsal.
+          build=true
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$publish" = false ]; then
+            build=false
+          fi
+
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "build=$build"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version — build: $build, publish: $publish" >> "$GITHUB_STEP_SUMMARY"
+
+  binaries:
+    # Five triples, each built on a runner of its own operating system — and, but for x86_64 macOS,
+    # its own architecture — so each binary is run before it is shipped. Windows on ARM is the
+    # sixth and is not here yet.
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          # Built on Apple silicon and run there under Rosetta.
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            exe: .exe
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      TARGET: ${{ matrix.target }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      EXE: ${{ matrix.exe }}
+      # "Statically linked" on Windows is the C runtime linked in, so the binary needs no
+      # redistributable installed. The musl targets are static without being asked.
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      # libclang for `rquickjs`'s bindgen build, as in CI; musl-tools for the C the engine links —
+      # QuickJS, ring, Oniguruma — which has to be compiled against musl too.
+      - name: Build prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev musl-tools
+      - name: Build prerequisites (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
+      # --locked: a release is built from the lockfile that was reviewed, or not at all.
+      - name: Build
+        run: cargo build --release --locked --package pact_janus_cli --bin janus --bin janus-engine --target "$TARGET"
+      - name: Stage
+        run: |
+          mkdir dist
+          cp "target/$TARGET/release/janus$EXE" "dist/janus-$TARGET$EXE"
+          cp "target/$TARGET/release/janus-engine$EXE" "dist/janus-engine-$TARGET$EXE"
+          ls -l dist
+      # The claim in the release notes, as a command. A dynamic dependency that arrives with a
+      # crate update fails here, not on a user's machine that lacks the library.
+      - name: Statically linked (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          for binary in dist/*; do
+            readelf -h "$binary" > /dev/null
+            if readelf -d "$binary" | grep NEEDED; then
+              echo "::error::$binary needs a shared library."
+              exit 1
+            fi
+          done
+      # macOS has no static libc: the system's own libraries are the floor, and nothing else is allowed.
+      - name: Statically linked (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          for binary in dist/*; do
+            otool -L "$binary" > /dev/null
+            if otool -L "$binary" | tail -n +2 | awk '{ print $1 }' | grep -Ev '^(/usr/lib/|/System/Library/)'; then
+              echo "::error::$binary needs a library macOS does not ship."
+              exit 1
+            fi
+          done
+      - name: Statically linked (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Asked for its version first: a tool that is not there must fail the step, not pass it.
+          objdump="/c/Program Files/LLVM/bin/llvm-objdump"
+          "$objdump" --version > /dev/null
+          for binary in dist/*; do
+            if "$objdump" -p "$binary" | grep 'DLL Name' | grep -Ei 'vcruntime|msvcp|ucrtbase|api-ms-win-crt'; then
+              echo "::error::$binary needs the C runtime's DLLs."
+              exit 1
+            fi
+          done
+      # Each binary is run where it was built: it reports the version being released, and the
+      # engine exits when its stdin closes, which is how every SDK stops it (spike 1.3).
+      - name: Smoke test
+        run: |
+          reported="$("dist/janus-$TARGET$EXE" version)"
+          echo "$reported"
+          grep -F "janus $VERSION " <<<"$reported"
+          "dist/janus-engine-$TARGET$EXE" < /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+
+  wasm:
+    # The engine as a WASM component (engine/wasm, ADR 0023 decision 2): one artifact for every
+    # host, and the bytes that ship are the bytes the tests load.
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-wasm
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Build
+        run: |
+          cargo build --release --locked --package pact_janus_engine_wasm --target wasm32-wasip2
+          mkdir dist
+          cp target/wasm32-wasip2/release/pact_janus_engine_wasm.wasm dist/janus-engine.wasm
+          ls -l dist
+      - name: The component that ships answers as this engine
+        run: JANUS_ENGINE_WASM="$PWD/dist/janus-engine.wasm" cargo test --locked --package pact_janus_component_host --test engine_wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm
+          path: dist/
+          if-no-files-found: error
+
+  assemble:
+    # Everything a release carries, in one directory, with its checksums and its notes. Read-only:
+    # a rehearsal ends here, with the result as an artifact of the run.
+    needs: [plan, binaries, wasm]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      PUBLISH: ${{ needs.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release/dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: release/dist
+        run: |
+          # Two binaries for each of five triples, and the component.
+          if [ "$(ls | wc -l)" -ne 11 ]; then
+            ls -l
+            echo "::error::A release is 11 files; this is not."
+            exit 1
+          fi
+          LC_ALL=C sha256sum -- * > ../SHA256SUMS
+          mv ../SHA256SUMS .
+          cat SHA256SUMS
+      - name: Release notes
+        run: |
+          # This version's section of CHANGELOG.md, which knope wrote from the change files.
+          awk -v version="$VERSION" '$1 == "##" { on = ($2 == version); next } on' CHANGELOG.md > release/notes.md 2>/dev/null || true
+          if [ "$PUBLISH" = true ] && ! grep -q '[^[:space:]]' release/notes.md; then
+            echo "::error::CHANGELOG.md has no entry for $VERSION. A release is prepared with 'knope prepare-release'."
+            exit 1
+          fi
+          cat >> release/notes.md <<EOF
+
+          ## Verifying a download
+
+          Every file is listed in \`SHA256SUMS\`, and every file, that one included, has a build provenance attestation saying which commit and workflow of this repository built it:
+
+              sha256sum --check --ignore-missing SHA256SUMS
+              gh attestation verify <file> --repo $GITHUB_REPOSITORY
+          EOF
+          {
+            cat release/notes.md
+            echo
+            echo '```'
+            cat release/dist/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    # The only job that can write, and it runs only for a release: attest what was built, then tag
+    # the commit it was built from and publish, in one step.
+    needs: [plan, assemble]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # The tag and the release.
+      contents: write
+      # The attestation: signed with this run's own identity, which GitHub's OIDC token proves to
+      # Sigstore. There is no signing key, in this repository's secrets or anywhere else (ADR 0029).
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*
+      # gh uploads to a draft and publishes it when every file is there; the tag is created by the
+      # publication, at the commit this run built.
+      - name: Tag and publish
+        run: |
+          prerelease=()
+          case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$TAG" --notes-file notes.md "${prerelease[@]}"
+      # What a user would do, done to what a user would get.
+      - name: The published release verifies
+        run: |
+          mkdir published
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published
+          cd published
+          sha256sum --check SHA256SUMS
+          for file in *; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY"
+          done

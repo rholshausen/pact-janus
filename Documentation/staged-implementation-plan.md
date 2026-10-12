@@ -198,7 +198,10 @@ Engineering with no dependency on a community answer. All of it happens in this 
   surface, and a rehearsal proves the change is complete. The surfaces: crate and package names
   (`pact_janus_*`, `@pact-foundation/janus`, the Gradle group), the binaries (`janus`, `janus-engine`),
   the configuration file (`verifier.janus.yaml`), the environment-variable prefix (`JANUS_*`), the
-  user cache directory, and the **persisted identifiers**, which are the ones a rename cannot simply
+  user cache directory, the WIT packages (`pact:janus-engine`, `pact:janus-component`), a release's
+  asset names and the repository an SDK's pin names (`janus-engine-<triple>`, `janus-<triple>`,
+  `janus-engine.wasm` and `sdks/engine-release.json`; S0.4, ADR 0028 decision 9), and the
+  **persisted identifiers**, which are the ones a rename cannot simply
   replace because documents in brokers and registries already carry them: the contract format
   `janus-contract/1` and provider shape `janus-provider-shape/1` (contract-file spec), the OCI artifact
   and config media types `application/vnd.pact.janus.component.v1` (ADR 0021), and the broker's

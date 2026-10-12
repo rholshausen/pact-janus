@@ -1,0 +1,64 @@
+name: Change file
+
+# Staged plan S0.4, ADR 0028: a release's version and changelog come from change files, so a pull
+# request that changes what a release ships has to carry one — or say why it needs none. The same
+# shape as the corpora rule: a claim somebody would otherwise have to remember, made into a check.
+#
+# In a workflow of its own because it has to run again when the description is edited, and nothing
+# else in CI should.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  change-file:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # What a release ships: the engine and CLI sources and what they are built from, and the
+      # corpora and the conformance suite, which say what the engine does. A test, a tool, a
+      # document or a workflow is not in it.
+      - name: A change to what ships carries a change file
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          # Read from the environment, never spliced into the script: it is whatever the author typed.
+          DESCRIPTION: ${{ github.event.pull_request.body }}
+        run: |
+          changed="$(git diff --name-only "$BASE"...HEAD)"
+          added="$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')"
+          shipped="$(grep -E '^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/)' <<<"$changed" || true)"
+
+          if [ -z "$shipped" ]; then
+            echo "Nothing a release ships changed."
+          elif [ -n "$added" ]; then
+            echo "Change files:"; echo "$added"
+          elif grep -qx 'CHANGELOG.md' <<<"$changed"; then
+            echo "A release: the change files were consumed into CHANGELOG.md."
+          elif reason="$(grep -iE '^No-Changeset:[[:space:]]*[^[:space:]]' <<<"$DESCRIPTION")"; then
+            echo "$reason"
+          else
+            echo "$shipped"
+            echo "::error::This changes what a release ships and adds no change file. Run 'knope document-change' (or write .changeset/<name>.md by hand — CONTRIBUTING.md), or, if nobody who pins the engine could notice the change, add a line 'No-Changeset: <why>' to the pull request's description."
+            exit 1
+          fi
+      # A change file knope cannot read would otherwise be found when somebody tries to release.
+      # knope-dev/action v2.1.2, pinned by commit.
+      - uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675
+        with:
+          version: 0.23.0
+      - name: Every change file reads
+        run: |
+          knope --validate
+          if compgen -G '.changeset/*.md' >/dev/null; then
+            knope prepare-release --dry-run
+          fi

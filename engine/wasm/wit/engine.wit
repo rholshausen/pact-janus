@@ -1,5 +1,5 @@
-// The Janus engine as a WASM component (ADR 0003's canonical artifact), built for plan task 9.1 to
-// measure it. `pipe` is ADR 0002's frozen byte-pipe: one engine-protocol frame in, one out.
+// The Janus engine as a WASM component: the embedding for offline operations (ADR 0023 decision 2).
+// `pipe` is ADR 0002's frozen byte-pipe: one engine-protocol frame in, one out.
 package pact:janus-engine@0.1.0;
 
 interface pipe {
@@ -16,7 +16,13 @@ interface bench {
   execute: func(values: list<u8>) -> result<string, string>;
 }
 
+// What a release ships.
 world engine {
+  export pipe;
+}
+
+// What the benchmark harness builds, with the crate's `bench` feature.
+world engine-bench {
   export pipe;
   export bench;
 }

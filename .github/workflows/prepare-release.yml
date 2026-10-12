@@ -1,0 +1,71 @@
+name: Prepare release
+
+# Staged plan S0.4, ADR 0028: the first half of a release, run by hand. knope turns the change files
+# gathered in .changeset/ into the next version and its CHANGELOG.md entry, and this pushes the
+# result as the `release` branch. A maintainer opens the pull request from it — so that CI runs on
+# it, which it would not for a pull request a workflow's own token opened — and merging that pull
+# request is what releases (release.yml).
+#
+# The same thing by hand: `knope prepare-release` on a branch, commit, push, open the pull request.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          The version to release, when it is a decision rather than the sum of the change files
+          (the first release is 0.1.0). Empty: what the change files add up to.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      # To push the `release` branch. It cannot push to main, and opens no pull request.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # knope reads the tags for the last release.
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      # knope-dev/action v2.1.2, pinned by commit because this job's token can write.
+      - uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675
+        with:
+          version: 0.23.0
+      - name: Version, changelog and lockfile
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git switch -c release
+          if [ -n "$VERSION" ]; then
+            knope prepare-release --override-version "$VERSION"
+          else
+            knope prepare-release
+          fi
+      - name: Push the release branch
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pact_janus_kernel") | .version')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: release $version"
+          # Forced: an unmerged `release` branch from an earlier run is replaced, not built upon.
+          git push --force origin release
+          {
+            echo "### Release $version is prepared"
+            echo
+            echo "[Open the pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...release?expand=1&title=chore:%20release%20$version). Merging it publishes the release."
+          } >> "$GITHUB_STEP_SUMMARY"

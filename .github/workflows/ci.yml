@@ -99,6 +99,14 @@ jobs:
         run: cargo test --no-fail-fast
       - name: WASM build (kernel)
         run: cargo build --package pact_janus_kernel --target wasm32-wasip2
+      # Staged plan S0.4: the engine as a WASM component (engine/wasm) is a workspace member that is
+      # empty on any target but wasm32, so the clippy step above saw nothing of it. Both of its
+      # worlds are held to the same bar here: the one a release ships, and the benchmark harness's.
+      # The tests above built the first and loaded it (engine/component-host/tests/engine_wasm.rs).
+      - name: WASM engine component
+        run: |
+          cargo clippy --package pact_janus_engine_wasm --target wasm32-wasip2 -- -D warnings
+          cargo clippy --package pact_janus_engine_wasm --features bench --target wasm32-wasip2 -- -D warnings
       # Plan task 8.1: the third-party CSV component is out of tree — its own workspace, depending
       # on nothing here — so the workspace steps above never see it. It is held to the same bar on
       # its own, and built for the target a component ships as; the engine's tests build it again

@@ -44,6 +44,8 @@ superseding ADR instead.
 | [0025](0025-a-provider-shape-entry-may-select-interactions-by-operation.md) | Let a provider-shape entry select the interactions it is about by operation | accepted |
 | [0026](0026-every-plan-action-is-namespaced-and-core-namespaces-are-reserved.md) | Namespace every plan action, and reserve the core families as namespaces | accepted (implemented as plan grammar v1, staged plan S0.1) |
 | [0027](0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md) | Build in the prototype's repository, and graduate SDKs into their existing repositories | accepted |
+| [0028](0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md) | Decide a release's version with change files, and release by merging the pull request that consumes them | accepted |
+| [0029](0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md) | Attest what a release built, and let an SDK verify the digest it pins | accepted |
 
 ## Decision backlog
 
