@@ -42,6 +42,14 @@ type = "PrepareRelease"
 type = "Command"
 command = "cargo update --workspace"
 
+# The benchmark harness is a workspace of its own that depends on this one's crates by path, so its
+# lockfile names them at a version too. Left behind, the harness's next build rewrites it, and the
+# Benchmarks workflow cannot switch branches to record its point (which is how 0.1.0 found this).
+# CI's `checks` job fails a lockfile this list has missed.
 [[workflows.steps]]
 type = "Command"
-command = "git add Cargo.lock"
+command = "cargo update --manifest-path benchmarks/janus/Cargo.toml --workspace"
+
+[[workflows.steps]]
+type = "Command"
+command = "git add Cargo.lock benchmarks/janus/Cargo.lock"

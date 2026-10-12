@@ -38,6 +38,19 @@ jobs:
       # fails here. Offline: links with a scheme are not fetched.
       - name: Documentation links resolve
         run: cargo run --package pact_janus_doc_links
+      # Staged plan S0.4: a workspace outside this one that depends on its crates by path has a
+      # lockfile naming them at a version, and a release moves that version. Nothing that builds
+      # such a workspace passes --locked, so a stale lockfile is rewritten in place and found
+      # later, as a dirty checkout, by whatever needed a clean one. Found here instead, on the pull
+      # request that moved the version — `knope prepare-release` refreshes the ones knope.toml lists.
+      - name: Lockfiles that name workspace crates are current
+        run: |
+          for lock in $(git ls-files '*/Cargo.lock'); do
+            if grep -q '^name = "pact_janus_' "$lock"; then
+              echo "$lock"
+              cargo metadata --locked --format-version 1 --manifest-path "$(dirname "$lock")/Cargo.toml" > /dev/null
+            fi
+          done
       # S0.12's other exit: spikes/ keeps each spike's findings, and no code.
       - name: Spikes hold findings only
         run: |
