@@ -218,7 +218,13 @@ Engineering with no dependency on a community answer. All of it happens in this 
     workspace member that is empty on any target but wasm32, with lints of its own;
   - the released Linux binaries are musl builds, and the trend S0.3 records measures a glibc build of
     the same commit. Nobody has measured the difference;
-  - Windows on ARM is not built.
+  - Windows on ARM is not built;
+  - the first release broke the build after it. The benchmark harness is a workspace of its own that
+    depends on this one's crates by path, so its lockfile names them at a version, and preparing the
+    release refreshed only the root one. The harness's build on the release commit rewrote its
+    lockfile in place, and the Benchmarks workflow could not switch branches to record its point,
+    which is lost. `knope prepare-release` refreshes that lockfile now, and CI resolves every
+    lockfile that names a workspace crate with `--locked`, on every pull request.
   Left for S0.10: the resolver is the TypeScript suite's, run by hand on one platform. The JVM SDK
   has none, no CI job resolves a release, and the pin was written by copying five digests, which is
   the tool S0.10 owes.
