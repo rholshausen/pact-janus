@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791786953032,
+  "lastUpdate": 1791786954687,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -1026,6 +1026,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30346,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8e96e0538d5c32614bb0855341f24c646e217c26",
+          "message": "chore: S0.4 the release pipeline\n\nStaged plan item S0.4, short of its exit: nothing is released yet. This\nis everything a release needs, and the first one follows from it.\n\nHow a release is decided (ADR 0028). The version and the changelog come\nfrom change files under .changeset/, in the changesets format, and not\nfrom commit subjects. knope 0.23.0 reads them. A pull request that\nchanges what a release ships adds one, or says why not with a\n\"No-Changeset: <why>\" line in its description; the Change file workflow\nholds pull requests to that. A release is prepared as a pull request\n(the Prepare release workflow, or knope by hand) and made by merging it.\nNo step needs a credential that outlives a workflow run.\n\nWhat a release is (release.yml). janus-engine and janus, statically\nlinked, for five target triples; the engine as a WASM component; and a\nSHA256SUMS. Each binary is checked for dynamic dependencies and run\nbefore it is staged. Only when everything is built and attested is the\nv<version> tag created, at the commit that was built, with the release.\nEverything short of publishing runs on pull requests that touch the\nworkflow, the manifests, the lockfile or the WASM crate.\n\nHow it is signed (ADR 0029). Build provenance attestations, keyless,\nover every file; an SDK verifies the SHA-256 it pins beside the version.\n\n- The WASM engine moves from benchmarks/janus/engine-wasm to\n  engine/wasm, as a workspace member that is empty on any target but\n  wasm32. The world a release ships exports the pipe alone. The\n  benchmark-only interface is behind a `bench` feature the harness\n  builds with. New tests load the component under wasmtime, and CI\n  lints both worlds for wasm32-wasip2.\n- sdks/engine-release.json is the pin an SDK resolves a released engine\n  from: a version and a digest per triple, empty until there is a first\n  release. The TypeScript suite resolves it with JANUS_ENGINE_RELEASE=1\n  and builds from the tree otherwise. A download whose digest is not the\n  pinned one is refused and not kept.\n- S0.5's inventory gains the WIT package names, the release asset names\n  and the repository a pin names.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-12T17:26:04+11:00",
+          "tree_id": "c0328870b8f55920de35d68403d44aba5f324cdc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8e96e0538d5c32614bb0855341f24c646e217c26"
+        },
+        "date": 1791786954223,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 66476,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 47835,
             "unit": "requests per second",
             "extra": "engines 4"
           }
