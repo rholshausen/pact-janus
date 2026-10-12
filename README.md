@@ -20,7 +20,8 @@ Pact is a testing framework with duality (consumer and provider looking in oppos
 
 **Status:** early. This repository is where the Pact MkII engine, its specifications and its first two
 SDKs are being built, to the [staged implementation plan](Documentation/staged-implementation-plan.md).
-The work is in stage 0a, the foundations. Nothing is released yet, and it is not production software.
+The work is in stage 0a, the foundations. There is a first [release](https://github.com/rholshausen/pact-janus/releases),
+of the engine and the CLI as binaries, so that the SDKs here can pin one; it is not production software.
 It is not "Pact 6" either: "Janus" is a codename, and the name is the Pact community's to choose.
 
 It began as a prototype, built to test the RFC's bets against real code. That prototype is complete,
