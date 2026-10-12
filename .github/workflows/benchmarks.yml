@@ -58,7 +58,9 @@ jobs:
       # The harness is outside the root workspace, so nothing else in CI builds or tests it.
       - name: Harness tests
         working-directory: benchmarks/janus
-        run: cargo test --release
+        # --locked: a lockfile the build would rewrite fails here, by name, and not at the step
+        # that switches branches to record.
+        run: cargo test --release --locked
       - name: Run the scenarios (native, subprocess, wasm)
         working-directory: benchmarks/janus
         run: cargo run --release
