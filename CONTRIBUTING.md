@@ -29,5 +29,50 @@ repository that prototyped it. Start with:
 - Commit messages follow Conventional Changelog style: `feat:`, `fix:`, `chore:`, `docs:`,
   `refactor:`, `test:`.
 
+## Change files and releases
+
+A release's version and its changelog come from **change files**, not from commit subjects
+([ADR 0028](Documentation/decisions/0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md)).
+If your pull request changes what a release ships — the engine's or the CLI's sources or manifests,
+`Cargo.lock`, `corpora/` or `conformance/` — add one. [knope](https://knope.tech) writes
+it for you (`knope document-change`), or write `.changeset/<any_name>.md` by hand:
+
+```markdown
+---
+default: minor
+---
+
+# `janus check` reads provider shapes from a directory
+
+`--provider-shape` takes a directory as well as a file, and reads every shape in it.
+```
+
+- The size is what the change costs someone who pins the engine. `major`: they must change something
+  to move to it (a protocol frame, a document they hold, a CLI flag or exit code, a verdict that was
+  `matched`). `minor`: they can do something they could not. `patch`: something wrong is now right.
+  Until 1.0, `major` moves the minor version and the other two move the patch.
+- The body is the changelog entry. Write it for an SDK maintainer deciding whether to move their pin:
+  what changed for them, not which plan item it was. A `#` heading is optional; without one, a short
+  body becomes a single bullet.
+- If nobody who pins the engine could notice the change (a refactor, a comment), say so instead, with
+  a line in the pull request's description: `No-Changeset: <why>`.
+
+CI checks all of this (the `Change file` workflow), and `knope prepare-release --dry-run` shows what
+the change files gathered so far add up to.
+
+**Releasing** is two steps, for anyone with write access, and needs no secret:
+
+1. Run the **Prepare release** workflow (give it a version only when the version is a decision, as
+   `0.1.0` and `1.0.0` are). It pushes a `release` branch with the new version, `CHANGELOG.md` and
+   the consumed change files. Open the pull request it links to. CI runs on it, and so does a full
+   rehearsal of the release build.
+2. Merge it. The **Release** workflow builds `janus-engine` and `janus` for five target triples and
+   the engine as a WASM component, attests every file, and then creates the `v<version>` tag and the
+   GitHub release together. Do not push the tag yourself.
+
+What a release's signature is, and how to check a download, is
+[ADR 0029](Documentation/decisions/0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md):
+`sha256sum --check SHA256SUMS`, and `gh attestation verify <file> --repo rholshausen/pact-janus`.
+
 Conventions for AI-assisted work are in `CLAUDE.md` / `.github/copilot-instructions.md` — humans may
 find them a useful summary too.

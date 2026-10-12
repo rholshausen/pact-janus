@@ -161,7 +161,7 @@ impl Drop for Subprocess {
 // ------------------------------------------------------------------ WASM
 
 mod guest {
-  wasmtime::component::bindgen!({ world: "engine", path: "engine-wasm/wit" });
+  wasmtime::component::bindgen!({ world: "engine-bench", path: "../../engine/wasm/wit" });
 }
 
 use wasmtime::component::{Component, Linker, ResourceTable};
@@ -209,7 +209,7 @@ impl WasmRuntime {
       table: ResourceTable::new(),
     };
     let mut store = wasmtime::Store::new(&self.engine, host);
-    let instance = guest::Engine::instantiate(&mut store, &self.component, &self.linker)
+    let instance = guest::EngineBench::instantiate(&mut store, &self.component, &self.linker)
       .expect("the engine component instantiates");
     Wasm { store, instance }
   }
@@ -217,7 +217,7 @@ impl WasmRuntime {
 
 pub struct Wasm {
   store: wasmtime::Store<WasiHost>,
-  instance: guest::Engine,
+  instance: guest::EngineBench,
 }
 
 impl Pipe for Wasm {
@@ -231,7 +231,7 @@ impl Pipe for Wasm {
 }
 
 impl Wasm {
-  /// The bench-only interface (engine-wasm/wit/engine.wit): a compiled plan, run inside the guest.
+  /// The bench-only interface (engine/wasm/wit/engine.wit): a compiled plan, run inside the guest.
   pub fn set_plan(&mut self, plan: &[u8]) {
     self
       .instance

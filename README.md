@@ -106,13 +106,14 @@ cargo run -p pact_janus_doc_links             # every relative link in the docum
 ```
 
 CI runs all of that on Linux, macOS and Windows, and also clippy, rustfmt, the `wasm32-wasip2` build,
-schema-compatibility checks, the SDK thinness audit and `demo/run.sh --ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the practicalities.
+schema-compatibility checks, the SDK thinness audit and `demo/run.sh --ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the practicalities,
+including the change file a pull request needs when it changes what a release ships, and how a release is made.
 
 ## What is where
 
 | Path | |
 |---|---|
-| [`engine/`](engine) | The kernel (plan compiler and interpreter, shapes, variants, subsumption, the protocol), the built-in HTTP, JSON and OAuth2 components, the hooks host, and the WASM component loader |
+| [`engine/`](engine) | The kernel (plan compiler and interpreter, shapes, variants, subsumption, the protocol), the built-in HTTP, JSON and OAuth2 components, the hooks host, the WASM component loader, and the engine itself as a WASM component for offline use |
 | [`cli/`](cli) | `janus` (`verify`, `check`, `explain`, `upgrade`, `component push/pull`) and `janus-engine`, the subprocess every SDK embeds |
 | [`sdks/`](sdks/README.md) | The TypeScript and JVM SDKs, with generated protocol bindings. Incubated here; they graduate into pact-js and pact-jvm (ADR 0027) |
 | [`conformance/`](conformance) | The shared corpus of cases both SDKs must pass |

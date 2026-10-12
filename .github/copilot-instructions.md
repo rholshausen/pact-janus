@@ -46,13 +46,17 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  the host side of hooks (loader, exec and http implementations), which lives
                  outside the kernel because it needs a filesystem, a process and a socket — and
                  component-host, the wasmtime loader for out-of-tree WASM components (task 8.1),
-                 outside the kernel because a WASM guest cannot host WASM (ADR 0013)
+                 outside the kernel because a WASM guest cannot host WASM (ADR 0013);
+                 and wasm, the engine itself as a WASM component — the offline artifact a release
+                 ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
 cli/             `pact` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
                  its protocol bindings (task 6.1)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bindings` project
                  holds its protocol bindings (task 6.1)
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
+sdks/engine-release.json  The released janus-engine an SDK resolves when it is not building one:
+                 a version and a SHA-256 per target triple (ADR 0029)
 corpora/         Golden corpora: (spec or pact, expected plan, expected result)
 conformance/     The SDK conformance suite (task 6.4): one corpus of cases every SDK runs, in its
                  own language, against a pinned engine — ADR 0017's definition of "conformant".
@@ -77,8 +81,8 @@ spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md,
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
                  (excluded from the workspace; run with `cd benchmarks && cargo run --release`).
                  benchmarks/janus runs the same scenarios against Janus in each embedding
-                 (task 9.1, `cd benchmarks/janus && cargo run --release`); its engine-wasm/ is
-                 the engine built as a WASM component, for measurement only. Every merge to main
+                 (task 9.1, `cd benchmarks/janus && cargo run --release`); it builds engine/wasm
+                 with a benchmark-only interface to measure the WASM embedding. Every merge to main
                  runs it in CI and adds a point to the trend chart (S0.3, the Benchmarks workflow;
                  a trend, not a gate — see benchmarks/README.md)
 tools/           Repo tooling (workspace members), e.g. tools/schema-compat — the CI checker
@@ -87,6 +91,9 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  pipeline (task 6.1), tools/conformance, the conformance suite's checker
                  (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK
                  by layer — and tools/doc-links, the documentation link check (S0.12)
+.changeset/      Change files: what each unreleased change means to someone who pins the engine,
+                 and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
+                 configures it and CHANGELOG.md is what it writes
 Documentation/   The staged plan, ADRs, specs and the charter; prototype/ is the prototype's
                  record — the project plan and each task's report, kept as written (S0.12)
 ```
@@ -106,6 +113,7 @@ RUST_LOG=debug cargo test -- --nocapture     # with tracing output
 cargo clippy                                 # lint (must be clean)
 cargo fmt --all -- --check                   # formatting
 cargo build --target wasm32-wasip2           # WASM component build (engine crates)
+cargo build --release -p pact_janus_engine_wasm --target wasm32-wasip2   # the engine as a WASM component
 ```
 
 TypeScript — from `sdks/typescript/`:
@@ -134,6 +142,29 @@ The thinness audit (plan task 6.5) makes the "SDKs are thin" claim a command:
 `cargo run -p pact_janus_thinness` prints each SDK's lines by layer, and `-- check` (which CI runs)
 fails if a hand-written layer exceeds its budget in `sdks/thinness.json`, or if any SDK source file
 belongs to no layer. A new file needs a layer; raising a budget belongs in the commit message.
+
+Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects. A
+pull request that changes what a release ships — the engine's or the CLI's sources or manifests,
+`Cargo.lock`, `corpora/`, `conformance/` — adds a file under `.changeset/`, or carries a line
+`No-Changeset: <why>` in its description; CI's `Change file` workflow fails it otherwise:
+
+```bash
+knope document-change               # asks for the size and a summary, and writes .changeset/<name>.md
+knope prepare-release --dry-run     # what the change files gathered so far add up to
+```
+
+The size is what the change costs someone who pins the engine: `major`, they must change something
+to move to it; `minor`, they can do something new; `patch`, a fix. Before 1.0, `major` moves the
+minor version and the other two the patch. The body is the changelog entry, written for an SDK
+maintainer deciding whether to move a pin. A release is prepared as a pull request (the
+`Prepare release` workflow, or `knope prepare-release` by hand) and made by merging it: `release.yml`
+builds `janus-engine` and `janus` for five target triples and `janus-engine.wasm`, checks that each
+binary is statically linked and runs, attests every file, and only then tags `v<version>` and
+publishes. It rehearses everything but the publishing on any pull request that touches it. Never push
+a `v*` tag by hand, and never hand-edit `CHANGELOG.md`. An SDK resolves a released engine from
+`sdks/engine-release.json` — a version and a SHA-256 per target triple — and refuses a download with
+any other digest; the TypeScript suite does so with `JANUS_ENGINE_RELEASE=1`
+(`sdks/typescript/test/engine-release.ts`) and builds from the tree otherwise.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to
@@ -223,6 +254,11 @@ stderr (stdout stays frames-only).
 - Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit,
   and any change to what an SDK's DSL does belongs in the behavioural specification and
   `conformance/`, which every SDK runs (ADR 0017).
+- A change that ships says so, in a change file: the version and the changelog come from
+  `.changeset/`, not from commit subjects (ADR 0028). The `v<version>` tag and the release's asset
+  names (`janus-engine-<triple>`, `janus-<triple>`, `janus-engine.wasm`, `SHA256SUMS`) are what SDKs
+  pin against — changing one is a superseding ADR, not a workflow edit — and no release step may need
+  a credential that outlives a workflow run (ADR 0028 decision 8, ADR 0029).
 - Documents are cited by path, so links are load-bearing too: every relative link in the repository's
   Markdown must resolve (`cargo run -p pact_janus_doc_links`, which CI runs), and moving a document
   means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md` and no

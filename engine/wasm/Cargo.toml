@@ -1,0 +1,31 @@
+[package]
+name = "pact_janus_engine_wasm"
+description = "The Pact Janus engine as a WASM component: the embedding for offline operations (ADR 0023 decision 2) — the kernel and the in-tree JSON content component behind the frozen byte-pipe, with no transports."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# What ships is this crate built for wasm32-wasip2:
+#   cargo build --release -p pact_janus_engine_wasm --target wasm32-wasip2
+# A workspace member all the same, for the workspace's version and lockfile. On the host it builds
+# to nothing (src/lib.rs says why).
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+# The benchmark harness's world: the pipe, plus an interface that runs a compiled plan inside the
+# guest (benchmarks/janus). Never in a released artifact.
+bench = []
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+pact_janus_component_json = { path = "../component-json" }
+serde_json = "1"
+wit-bindgen = "0.60"
+
+# Not the workspace's: its `unsafe_code = "deny"` cannot hold over the bindings wit-bindgen
+# generates, which export `extern "C"` functions by name. Nothing hand-written here is unsafe.
+[lints.clippy]
+all = { level = "warn", priority = -1 }

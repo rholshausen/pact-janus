@@ -39,21 +39,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
-      # To push the data point to the gh-pages branch. Nothing else in this repository's CI writes.
+      # To push the data point to the gh-pages branch, and nothing else.
       contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip2
-      # Three builds, three target directories: the harness is its own workspace, so is the engine
-      # as a WASM component, and janus-engine comes from the root one.
+      # Two workspaces, two target directories: the harness is its own, and janus-engine and the
+      # engine as a WASM component come from the root one.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             . -> target
             benchmarks/janus -> target
-            benchmarks/janus/engine-wasm -> target
       - name: Build prerequisites
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
       # The harness is outside the root workspace, so nothing else in CI builds or tests it.

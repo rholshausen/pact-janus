@@ -4,8 +4,8 @@
 //!   the work costs with no boundary to cross.
 //! - **subprocess**: `janus-engine` over its stdio framing (ADR 0003's artifact 3), the embedding
 //!   both SDKs ship.
-//! - **wasm**: the engine as a WASM component under wasmtime (ADR 0003's artifact 1, built for
-//!   this task in `engine-wasm/`). It has no transports (no threads for the exchange loop), so it
+//! - **wasm**: the engine as a WASM component under wasmtime (ADR 0003's artifact 1, the
+//!   crate in `engine/wasm/`). It has no transports (no threads for the exchange loop), so it
 //!   runs only what the kernel does without I/O. Every scenario that needs a mock server or a provider is absent from
 //!   its results because the embedding cannot run it, not because it was skipped.
 //!
@@ -820,13 +820,23 @@ fn main() {
       root.join("target/release/janus-engine")
     }
   };
-  let guest_dir = root.join("benchmarks/janus/engine-wasm");
+  // The engine component with its benchmark-only interface: the crate a release ships, built with
+  // the feature no release turns on.
   run(
-    &guest_dir,
+    &root,
     "cargo",
-    &["build", "--release", "--target", "wasm32-wasip2"],
+    &[
+      "build",
+      "--release",
+      "-p",
+      "pact_janus_engine_wasm",
+      "--features",
+      "bench",
+      "--target",
+      "wasm32-wasip2",
+    ],
   );
-  let guest = guest_dir.join("target/wasm32-wasip2/release/janus_engine_wasm.wasm");
+  let guest = root.join("target/wasm32-wasip2/release/pact_janus_engine_wasm.wasm");
   let env = Env { engine_binary };
 
   for (kind, stack) in [(Kind::Native, "native"), (Kind::Subprocess, "subprocess")] {
