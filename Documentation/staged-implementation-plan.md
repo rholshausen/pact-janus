@@ -192,6 +192,36 @@ Engineering with no dependency on a community answer. All of it happens in this 
   here and recorded as an ADR.
   *Exit:* a tagged release publishes signed binaries for at least five triples and the WASM artifact,
   and an SDK resolves one by version.
+  *Done 2026-10-12.* The release is [v0.1.0](https://github.com/rholshausen/pact-janus/releases/tag/v0.1.0),
+  built from `f91e51c`: `janus-engine` and `janus` for `x86_64-unknown-linux-musl`,
+  `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin` and
+  `x86_64-pc-windows-msvc`, `janus-engine.wasm`, and a `SHA256SUMS` over them. Each binary was checked
+  for dynamic dependencies and run on a runner of its own operating system before it was staged. All
+  twelve files carry a build provenance attestation naming `release.yml` at that commit, and
+  `gh attestation verify` passes on each. The TypeScript SDK resolves it: `sdks/engine-release.json`
+  pins 0.1.0 and the engine's digest for each triple, and with `JANUS_ENGINE_RELEASE=1` its suite
+  fetched the Linux binary, checked it against the pin and passed all 89 tests on it.
+  Two decisions came with it. How a release's version is decided is
+  [ADR 0028](decisions/0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md):
+  change files read by knope, a release made by merging the pull request that consumes them, and no
+  credential that outlives a workflow run. The signing scheme is
+  [ADR 0029](decisions/0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md):
+  keyless attestations, and a digest the SDK pins beside the version. The WASM artifact is the
+  `engine/wasm` crate, and the world it ships exports the pipe alone: the benchmark harness's
+  interface is behind a feature no release builds with.
+  What the exit did not foresee:
+  - knope refuses a change file that names no package, so a change nobody who pins the engine could
+    notice is declared in the pull request's description (`No-Changeset: <why>`), not by an empty
+    file. And before 1.0 knope moves the numbers one place down, so the first version had to be given
+    to it;
+  - a component's export names are not symbols a native linker accepts, so `engine/wasm` is a
+    workspace member that is empty on any target but wasm32, with lints of its own;
+  - the released Linux binaries are musl builds, and the trend S0.3 records measures a glibc build of
+    the same commit. Nobody has measured the difference;
+  - Windows on ARM is not built.
+  Left for S0.10: the resolver is the TypeScript suite's, run by hand on one platform. The JVM SDK
+  has none, no CI job resolves a release, and the pin was written by copying five digests, which is
+  the tool S0.10 owes.
 - **S0.5 Rename-ready under the codename** — **S**. "Janus" stays, everywhere, until §7.1 is
   answered, which is expected late (§3's preamble). What stage 0 does is make the rename a mechanical
   change rather than an archaeology: every surface the name reaches is defined in one place per
