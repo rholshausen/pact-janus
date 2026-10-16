@@ -33,6 +33,7 @@ on:
       - engine/wasm/**
       - tools/engine-pin/**
       - sdks/engine-release.json
+      - .github/scripts/without-rust.sh
   workflow_dispatch:
 
 permissions:
@@ -385,8 +386,9 @@ jobs:
 
   sdks:
     # Staged plan S0.10's exit, on the real thing: both SDK suites, on each operating system a
-    # release is resolved on, with no Rust toolchain, resolving the release just published through
-    # the pin just written — fetched, checked against its digest and run. The SDKs are the ones
+    # release is resolved on, with no Rust toolchain reachable (without-rust.sh), resolving the
+    # release just published through the pin just written — fetched, checked against its digest
+    # and run. The SDKs are the ones
     # this commit holds, so nothing has drifted from the engine.
     needs: [plan, pin]
     if: needs.plan.outputs.publish == 'true'
@@ -400,15 +402,6 @@ jobs:
       JANUS_ENGINE_RELEASE: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: No Rust toolchain
-        run: |
-          if command -v rustup >/dev/null; then rustup self uninstall -y; fi
-          for tool in cargo rustc rustup; do
-            if command -v "$tool"; then
-              echo "::error::$tool is still installed."
-              exit 1
-            fi
-          done
       - uses: actions/download-artifact@v4
         with:
           name: engine-pin
@@ -430,10 +423,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: TypeScript SDK
         working-directory: sdks/typescript
-        run: npm ci && npm test
+        run: ../../.github/scripts/without-rust.sh bash -c 'npm ci && npm test'
       - name: JVM SDK
         working-directory: sdks/jvm
-        run: ./gradlew test
+        run: ../../.github/scripts/without-rust.sh ./gradlew test
 
   propose-pin:
     # The pin goes to main as a pull request, reviewed like any other change to what the SDKs run.

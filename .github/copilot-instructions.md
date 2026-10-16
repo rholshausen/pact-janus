@@ -171,8 +171,8 @@ any other digest. Both SDK suites do so with `JANUS_ENGINE_RELEASE=1` (S0.10;
 `sdks/typescript/test/engine-release.ts`, and `EngineRelease.java` in the JVM SDK's tests, which
 Gradle's `resolveEngine` runs), so a contributor needs no Rust toolchain, and build from the tree
 otherwise; `JANUS_ENGINE` overrides both. The pin is never edited by hand: after publishing,
-`release.yml` writes it, runs both suites against the release with no Rust installed, and pushes it as
-the `engine-pin` branch to open a pull request from. By hand:
+`release.yml` writes it, runs both suites against the release with no Rust toolchain reachable, and
+pushes it as the `engine-pin` branch to open a pull request from. By hand:
 
 ```bash
 cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin
@@ -180,6 +180,9 @@ cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA
 
 The one test that still builds Rust is the TypeScript CSV consumer's (`third-party/janus-csv`);
 `JANUS_CSV_COMPONENT` names a `janus_csv.wasm` built elsewhere instead, as CI's `sdks` job does.
+CI runs the suites through `.github/scripts/without-rust.sh <command>`, which leaves every directory
+holding `cargo`, `rustc` or `rustup` off `PATH` and checks they no longer run; run a suite through it
+locally to see what still reaches for Rust.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to
