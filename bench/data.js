@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792129483957,
+  "lastUpdate": 1792129485966,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -2796,6 +2796,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21731,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "741588470b75856ddb5cc5824db77823d28e8c29",
+          "message": "feat: S0.11 the SDK gates and the executable specification ship with the engine\n\nEvery release now carries janus-sdk-gates-<triple> for the five triples and\njanus-spec.tar.gz (ADR 0030, extending ADR 0028 decision 9): 17 files. A\ncheckout holding one SDK directory runs its conformance, thinness and\nbindings gates from those files alone, which release.yml's new sdk-gates job\nproves on every rehearsal and before every publish.\n\n- tools/conformance, tools/thinness and tools/bindings move their commands\n  into their libraries and take --spec <dir> (a checkout or an unpacked\n  janus-spec.tar.gz) in place of the source path compiled into them;\n  tools/sdk-gates is the three as one binary.\n- janus-spec.tar.gz is the corpora, the conformance suite, the behavioural\n  specification, sdks/bindings.json and its schema sets, at their paths here,\n  made by `git archive` (.github/scripts/janus-spec.sh).\n- Each SDK keeps its own thinness.json, with paths relative to it; with none\n  named, the audit measures every sdks/*/thinness.json side by side.\n- Both SDKs' drivers read JANUS_SPEC for the conformance cases and schemas.\n- The Change file workflow counts the gates' sources and the specification's\n  files as shipped.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-16T16:31:07+11:00",
+          "tree_id": "79355d29920c7010cd839b6f8d89e7be7af684b7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/741588470b75856ddb5cc5824db77823d28e8c29"
+        },
+        "date": 1792129485364,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 29501,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 22056,
             "unit": "requests per second",
             "extra": "engines 4"
           }
