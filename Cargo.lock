@@ -2099,6 +2099,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_sdk_gates"
+version = "0.1.0"
+dependencies = [
+ "pact_janus_bindings",
+ "pact_janus_conformance",
+ "pact_janus_thinness",
+]
+
+[[package]]
 name = "pact_janus_thinness"
 version = "0.1.0"
 dependencies = [

@@ -44,7 +44,11 @@ dependencies {
 
 tasks.test {
   useJUnitPlatform()
-  systemProperty("janus.specs", rootProject.projectDir.resolve("../../Documentation/specs").canonicalPath)
+  // The spec schemas: from JANUS_SPEC, an unpacked janus-spec.tar.gz, when it names one (staged plan
+  // S0.11), and from this repository otherwise.
+  val spec = System.getenv("JANUS_SPEC")?.takeIf { it.isNotEmpty() }?.let(::File)
+    ?: rootProject.projectDir.resolve("../..")
+  systemProperty("janus.specs", spec.resolve("Documentation/specs").canonicalPath)
 }
 
 class BindingsConfig(private val schemas: File, private val out: File, private val pkg: String) :

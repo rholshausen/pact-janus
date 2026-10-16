@@ -301,6 +301,31 @@ Engineering with no dependency on a community answer. All of it happens in this 
   SDK runs the same gates from another repository against a pinned engine version.
   *Exit:* a checkout containing only one SDK directory runs its conformance, thinness and bindings
   checks from the release artifacts alone, in CI.
+  *Done 2026-10-16.* Every release carries `janus-sdk-gates-<triple>` for the five triples and
+  `janus-spec.tar.gz`, which makes 17 files
+  ([ADR 0030](decisions/0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md),
+  which extends ADR 0028 decision 9). The binary's subcommands are the three tools, whose commands
+  now live in their libraries. The archive is the executable specification at its paths here: the
+  corpora, the conformance suite, the behavioural specification, `sdks/bindings.json` and the schema
+  sets it names, made by `git archive`. Each tool now takes `--spec <dir>`, a checkout or an
+  unpacked archive, in place of the path compiled into it. The SDKs' drivers read `JANUS_SPEC` the
+  same way, and each SDK keeps its own `thinness.json`.
+  `release.yml`'s `sdk-gates` job is the exit. It checks out `sdks/typescript` or `sdks/jvm` and
+  nothing else, takes the engine, the gates and the specification from the release's own files, and
+  runs all three gates. `publish` needs it, and every rehearsal runs it on the files a release would
+  publish. Rehearsed by hand first, with Rust hidden: the conformance suite, 47 of 47 cases in each
+  language; thinness; and bindings regenerated with no difference. CI's `Change file` workflow now
+  counts the gates' sources and the specification's files as shipped.
+  What the exit did not foresee:
+  - regenerating bindings needs the SDK's own generator: Node with `npm ci`, or a JDK with Gradle.
+    The gates binary drives the generator and does not replace it, so "no Rust" is not "no tools".
+    Staging is written under `--spec`, which has to be writable;
+  - a sparse checkout has no root `.gitignore`, so the job diffs only the generated tree;
+  - three things in a lone SDK still point outside it, and are S2.9's. The generated files' header
+    says to regenerate with `cargo run -p pact_janus_bindings`, and changing it changes every
+    generated file. The engine pin is `sdks/engine-release.json`, where ADR 0029 puts it in the SDK's
+    own source. And the TypeScript CSV consumer test and the default conformance-report path reach
+    into the repository; `JANUS_CSV_COMPONENT` and `JANUS_CONFORMANCE_REPORT` cover them for now.
 - **S0.12 Prune the prototype** — **S**. Spike code is deleted and each `FINDINGS.md` kept, in place,
   so ADR links hold; the phase reports and the project plan move under `Documentation/prototype/`,
   with links updated; the charter and the decision log stay where they are. The README describes the
@@ -471,7 +496,7 @@ SDK implements it, and the SDK specification covers only the consumer side.
 - **S1.14 The provider side of the SDK specification** — **M**. A provider section of
   `behavioural-spec.json` and conformance cases for it: verify-in-test, state handlers and request
   filters as loopback hooks, selecting pacts by selector, publishing results, and the per-variant
-  result surface. The thinness layers for it in `sdks/thinness.json`.
+  result surface. The thinness layers for it in each SDK's `thinness.json`.
   *Exit:* the conformance lint passes with provider ids; both drivers run the provider cases.
 - **S1.15 JVM and JavaScript provider integrations** — **L**. A JUnit 5 provider runner and a
   `Verifier`-shaped API for Jest and Vitest, over the subprocess, from generated bindings, under the
@@ -510,7 +535,7 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 - **S2.5 A compatibility facade** for today's pact-js and pact-jvm DSLs — **L**, so most existing
   consumer tests need only mechanical changes (SDK spec §6's classification). The facade is the
   hand-written layer most likely to grow matching logic, so it is its own layer in
-  `sdks/thinness.json` with its own budget, and a `kept`/`changed`/`dropped` verdict per old primitive
+  each SDK's `thinness.json`, with its own budget, and a `kept`/`changed`/`dropped` verdict per old primitive
   is published as the migration note.
   *Exit:* the example suites of pact-js and pact-jvm run on the facade.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance

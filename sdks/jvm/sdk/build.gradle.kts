@@ -98,9 +98,11 @@ tasks.test {
   environment("RUST_LOG", System.getenv("RUST_LOG") ?: "warn")
   // Contracts the end-to-end tests write land under the build directory, never in the source tree.
   systemProperty("janus.test.contracts", layout.buildDirectory.dir("contracts").get().asFile.path)
-  // The shared conformance suite (plan task 6.4): the corpus both SDKs run, and where this run's
-  // report goes for `cargo run -p pact_janus_conformance -- check` to read.
-  systemProperty("janus.conformance.suite", repoRoot.resolve("conformance").path)
+  // The shared conformance suite (plan task 6.4): the corpus both SDKs run — from JANUS_SPEC, an
+  // unpacked janus-spec.tar.gz, when it names one (staged plan S0.11) — and where this run's report
+  // goes for `janus-sdk-gates conformance check` to read.
+  val spec = System.getenv("JANUS_SPEC")?.takeIf { it.isNotEmpty() }?.let(::File) ?: repoRoot
+  systemProperty("janus.conformance.suite", spec.resolve("conformance").path)
   systemProperty("janus.conformance.report",
       System.getenv("JANUS_CONFORMANCE_REPORT") ?: repoRoot.resolve("target/conformance/jvm.json").path)
   testLogging {

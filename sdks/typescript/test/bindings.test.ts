@@ -2,10 +2,12 @@
 // types: these tests pin the properties spike 1.1's bindings round found and the SDK relies on.
 
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { contract, protocol, protocolVocabulary, shape } from "../src/generated/index.js";
+import { specRoot } from "./conformance/cases.js";
 
-const specs = new URL("../../../Documentation/specs/", import.meta.url);
+const specs = new URL("Documentation/specs/", pathToFileURL(`${specRoot}/`));
 
 describe("generated bindings", () => {
   it("name every operation the frame schema knows", async () => {

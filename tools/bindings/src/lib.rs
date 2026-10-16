@@ -591,5 +591,7 @@ pub fn render_java_vocabularies(package: &str, vocabularies: &[Vocabulary]) -> R
   Ok(out)
 }
 
+pub mod cli;
+
 #[cfg(test)]
 mod tests;

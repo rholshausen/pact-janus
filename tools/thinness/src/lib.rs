@@ -3,9 +3,10 @@
 //! The RFC's claim is that a Janus SDK is thin — that the protocol, the generated bindings and the
 //! engine take the weight, and what is left in each language is a DSL surface and some glue. That is
 //! a claim about a ratio, so it needs a number, and a number that goes stale the moment an SDK
-//! changes is worse than none. This crate is the measurement, re-runnable: it reads
-//! `sdks/thinness.json`, counts every source file by layer, and holds the hand-written layers to a
-//! budget.
+//! changes is worse than none. This crate is the measurement, re-runnable: it reads the
+//! `thinness.json` an SDK keeps at its root, counts every source file by layer, and holds the
+//! hand-written layers to a budget. The manifest lives with the SDK, not beside it, so the audit runs
+//! wherever the SDK does — here, or in a repository of its own once it graduates (staged plan S0.11).
 //!
 //! Two rules keep the number honest. **Every source file must be claimed by exactly one layer** — an
 //! unclassified file is an error, not a silent omission, so a new file forces somebody to say which
@@ -20,6 +21,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+
+pub mod cli;
 
 /// The layers, in the order they are reported. `generated` and `tests` carry no budget: generated
 /// code is not a cost an SDK maintainer pays, and tests are not part of the surface a user installs.
@@ -107,28 +110,33 @@ impl fmt::Display for Error {
   }
 }
 
-/// Read `sdks/thinness.json`, relative to the repository root.
-pub fn load_manifest(repo_root: &Path) -> Result<Vec<Sdk>, Error> {
-  let path = repo_root.join("sdks/thinness.json");
-  let text = fs::read_to_string(&path).map_err(|e| Error::Io(format!("{}: {e}", path.display())))?;
+/// The file an SDK's layers are declared in, at the SDK's root.
+pub const MANIFEST: &str = "thinness.json";
+
+/// Read one SDK's `thinness.json`. The SDK is the directory the manifest is in.
+pub fn load_manifest(path: &Path) -> Result<Sdk, Error> {
+  let text = fs::read_to_string(path).map_err(|e| Error::Io(format!("{}: {e}", path.display())))?;
   let document: Value =
     serde_json::from_str(&text).map_err(|e| Error::Manifest(format!("{}: {e}", path.display())))?;
-
-  let entries = document
-    .get("sdks")
-    .and_then(Value::as_array)
-    .ok_or_else(|| Error::Manifest("thinness.json: 'sdks' must be an array".to_string()))?;
-
-  entries.iter().map(sdk_from).collect()
+  let root = path.parent().map(Path::to_path_buf).unwrap_or_default();
+  let root = if root.as_os_str().is_empty() {
+    PathBuf::from(".")
+  } else {
+    root
+  };
+  sdk_from(&document, root).map_err(|e| match e {
+    Error::Manifest(message) => Error::Manifest(format!("{}: {message}", path.display())),
+    other => other,
+  })
 }
 
-fn sdk_from(entry: &Value) -> Result<Sdk, Error> {
+fn sdk_from(entry: &Value, root: PathBuf) -> Result<Sdk, Error> {
   let string = |key: &str| -> Result<String, Error> {
     entry
       .get(key)
       .and_then(Value::as_str)
       .map(str::to_string)
-      .ok_or_else(|| Error::Manifest(format!("thinness.json: an sdk is missing '{key}'")))
+      .ok_or_else(|| Error::Manifest(format!("missing '{key}'")))
   };
   let strings = |key: &str| -> Vec<String> {
     entry
@@ -187,7 +195,7 @@ fn sdk_from(entry: &Value) -> Result<Sdk, Error> {
   Ok(Sdk {
     name,
     language: string("language")?,
-    root: PathBuf::from(string("root")?),
+    root,
     extensions: strings("extensions"),
     ignore: strings("ignore"),
     layers,
@@ -196,8 +204,8 @@ fn sdk_from(entry: &Value) -> Result<Sdk, Error> {
 }
 
 /// Count one SDK.
-pub fn measure(repo_root: &Path, sdk: &Sdk) -> Result<Measured, Error> {
-  let root = repo_root.join(&sdk.root);
+pub fn measure(sdk: &Sdk) -> Result<Measured, Error> {
+  let root = sdk.root.clone();
   let mut files = Vec::new();
   collect(&root, &root, sdk, &mut files)?;
   files.sort();
@@ -372,5 +380,35 @@ mod tests {
       Some("idiomatic")
     );
     assert_eq!(layer_of(Path::new("src/other/Thing.java"), &sdk), None);
+  }
+
+  #[test]
+  fn an_sdk_is_the_directory_its_manifest_is_in() {
+    let dir = std::env::temp_dir().join(format!("thinness-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("src")).unwrap();
+    std::fs::write(dir.join("src/a.ts"), "// a\nexport const a = 1;\n").unwrap();
+    std::fs::write(dir.join("stray.ts"), "export const b = 2;\n").unwrap();
+    std::fs::write(
+      dir.join(MANIFEST),
+      r#"{ "name": "t", "language": "TypeScript", "extensions": [".ts"],
+           "layers": { "idiomatic": ["src"] }, "budgets": { "idiomatic": 1 } }"#,
+    )
+    .unwrap();
+
+    let sdk = load_manifest(&dir.join(MANIFEST)).unwrap();
+    let measured = measure(&sdk).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+
+    assert_eq!(sdk.root, dir);
+    assert_eq!(
+      measured.by_layer["idiomatic"],
+      Count {
+        files: 1,
+        lines: 2,
+        code: 1
+      }
+    );
+    assert_eq!(measured.unclassified, vec![PathBuf::from("stray.ts")]);
+    assert!(measured.over_budget().is_empty());
   }
 }

@@ -38,7 +38,8 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
 > Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2, S0.3,
 > S0.4 (v0.1.0 is released; a change that ships carries a change file), S0.10 (both SDK suites
-> run with no Rust toolchain, against a released engine they resolve by its pinned digest).
+> run with no Rust toolchain, against a released engine they resolve by its pinned digest), S0.11
+> (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
@@ -92,9 +93,10 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  and for the specs' worked examples — tools/bindings, the binding-generation
                  pipeline (task 6.1), tools/conformance, the conformance suite's checker
                  (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK
-                 by layer — tools/doc-links, the documentation link check (S0.12) — and
+                 by layer from the SDK's own thinness.json — tools/doc-links, the documentation link check (S0.12) — and
                  tools/engine-pin, which writes sdks/engine-release.json from a release's
-                 attested SHA256SUMS (S0.10)
+                 attested SHA256SUMS (S0.10). tools/sdk-gates is the first three as the one
+                 binary a release ships, `janus-sdk-gates` (S0.11, ADR 0030)
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -140,11 +142,14 @@ The SDK conformance suite (plan task 6.4, ADR 0017) is one corpus under `conform
 SDKs run as part of those test commands, each writing a report to `target/conformance/`:
 `cargo run -p pact_janus_conformance -- lint` checks the corpus (a conformance id in
 `behavioural-spec.json` with no case fails), and `-- check target/conformance/*.json` checks that
-each SDK accounted for every case and passed it. See `conformance/README.md`.
+each SDK accounted for every case and passed it. See `conformance/README.md`. The checkers read the
+repository from the working directory, or from `--spec <dir>`; `JANUS_SPEC` tells the SDKs' drivers
+the same. Either may be an unpacked `janus-spec.tar.gz` from a release (S0.11, ADR 0030).
 
 The thinness audit (plan task 6.5) makes the "SDKs are thin" claim a command:
 `cargo run -p pact_janus_thinness` prints each SDK's lines by layer, and `-- check` (which CI runs)
-fails if a hand-written layer exceeds its budget in `sdks/thinness.json`, or if any SDK source file
+fails if a hand-written layer exceeds its budget in the SDK's `thinness.json` (`sdks/<sdk>/`, paths
+relative to it), or if any SDK source file
 belongs to no layer. A new file needs a layer; raising a budget belongs in the commit message.
 
 Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects. A
@@ -162,7 +167,8 @@ to move to it; `minor`, they can do something new; `patch`, a fix. Before 1.0, `
 minor version and the other two the patch. The body is the changelog entry, written for an SDK
 maintainer deciding whether to move a pin. A release is prepared as a pull request (the
 `Prepare release` workflow, or `knope prepare-release` by hand) and made by merging it: `release.yml`
-builds `janus-engine` and `janus` for five target triples and `janus-engine.wasm`, checks that each
+builds `janus-engine`, `janus` and `janus-sdk-gates` for five target triples, `janus-engine.wasm` and
+`janus-spec.tar.gz`, runs each SDK's gates from those files alone, checks that each
 binary is statically linked and runs, attests every file, and only then tags `v<version>` and
 publishes. It rehearses everything but the publishing on any pull request that touches it. Never push
 a `v*` tag by hand, and never hand-edit `CHANGELOG.md`. An SDK resolves a released engine from
@@ -192,6 +198,7 @@ and fails on any diff:
 ```bash
 cargo run -p pact_janus_bindings -- generate                    # both SDKs
 cargo run -p pact_janus_bindings -- generate --only typescript  # or --only jvm
+janus-sdk-gates bindings --spec <unpacked janus-spec> generate --only jvm --sdk .   # one SDK, from a release
 ```
 
 The `janus` CLI (`cli/src/main.rs`, plan task 5.5) drives the engine **through the protocol** — it
@@ -274,7 +281,8 @@ stderr (stdout stays frames-only).
   `conformance/`, which every SDK runs (ADR 0017).
 - A change that ships says so, in a change file: the version and the changelog come from
   `.changeset/`, not from commit subjects (ADR 0028). The `v<version>` tag and the release's asset
-  names (`janus-engine-<triple>`, `janus-<triple>`, `janus-engine.wasm`, `SHA256SUMS`) are what SDKs
+  names (`janus-engine-<triple>`, `janus-<triple>`, `janus-sdk-gates-<triple>`, `janus-engine.wasm`,
+  `janus-spec.tar.gz`, `SHA256SUMS`; ADR 0030) are what SDKs
   pin against — changing one is a superseding ADR, not a workflow edit — and no release step may need
   a credential that outlives a workflow run (ADR 0028 decision 8, ADR 0029).
 - Documents are cited by path, so links are load-bearing too: every relative link in the repository's

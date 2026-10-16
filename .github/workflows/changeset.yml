@@ -25,9 +25,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # What a release ships: the engine and CLI sources and what they are built from, and the
-      # corpora and the conformance suite, which say what the engine does. A test, a tool, a
-      # document or a workflow is not in it.
+      # What a release ships: the engine and CLI sources and what they are built from; the corpora
+      # and the conformance suite, which say what the engine does; and, since S0.11, the gates an
+      # SDK's CI runs (janus-sdk-gates and the three tools it is) and the rest of janus-spec.tar.gz —
+      # the spec schemas, the behavioural specification and the binding manifest. Any other test,
+      # tool, document or workflow is not in it.
       - name: A change to what ships carries a change file
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -36,7 +38,7 @@ jobs:
         run: |
           changed="$(git diff --name-only "$BASE"...HEAD)"
           added="$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')"
-          shipped="$(grep -E '^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/)' <<<"$changed" || true)"
+          shipped="$(grep -E '^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/|tools/(sdk-gates|conformance|thinness|bindings)/(src/|Cargo\.toml$)|Documentation/specs/[^/]+/schemas/|Documentation/specs/sdk-specification/behavioural-spec\.json$|sdks/bindings\.json$)' <<<"$changed" || true)"
 
           if [ -z "$shipped" ]; then
             echo "Nothing a release ships changed."
