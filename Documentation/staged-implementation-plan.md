@@ -259,6 +259,34 @@ Engineering with no dependency on a community answer. All of it happens in this 
   released `janus-engine` from S0.4's pipeline, verified by checksum (X.1), with `cargo build` kept as
   the developer fallback (`JANUS_ENGINE` already overrides). An SDK contributor needs no Rust toolchain.
   *Exit:* both SDK suites pass in a CI job with no Rust toolchain installed.
+  *Done 2026-10-16.* CI's `sdks` job runs both suites on Linux, macOS and Windows after removing
+  rustup and checking that `cargo`, `rustc` and `rustup` are gone. Main's engine can be ahead of the
+  pinned release, so the engine there is this tree's, built by an `engine` job and handed over as a
+  file: a change to the engine and an SDK can still land in one pull request. The release itself is
+  resolved where nothing can have drifted from it, right after it is published. `release.yml` writes
+  the pin, and both suites resolve the release through it with `JANUS_ENGINE_RELEASE=1` and no Rust,
+  on x86_64 and aarch64 Linux, Apple silicon and Windows. The pin is then pushed as the `engine-pin`
+  branch to open a pull request from, as `prepare-release.yml` pushes `release`. A plain local run
+  still builds from the tree, and `JANUS_ENGINE_RELEASE=1` is the opt-in.
+  The tool S0.4 owed is `tools/engine-pin`. It downloads a release's `SHA256SUMS`, writes nothing
+  unless `gh attestation verify` passes on it, and writes `sdks/engine-release.json` from the digests
+  in it. Run on v0.1.0, it wrote the five digests that had been copied by hand. On a rehearsal,
+  `release.yml` checks that it reproduces the checked-in pin. The JVM resolver is `EngineRelease`, in
+  the JVM SDK's tests: the TypeScript one's cases and cache, run by Gradle's `resolveEngine`. Gradle
+  now chooses the engine the way the Vitest setup does, and runs cargo only when it builds from the
+  tree. Before, it ran cargo even when `JANUS_ENGINE` named an engine.
+  What the exit did not foresee:
+  - one TypeScript test, the CSV consumer, builds a Rust component (`third-party/janus-csv`).
+    `JANUS_CSV_COMPONENT` now names a `janus_csv.wasm` built elsewhere, and CI's `engine` job builds
+    one;
+  - GitHub's runners ship rustup, so "no Rust toolchain installed" means removing it;
+  - the conformance checker finds the corpus by a path compiled into it, so it cannot be handed to
+    another job as a binary. The SDK jobs upload their reports, and a `conformant` job with Rust checks
+    each operating system's pair. The thinness check reads only the repository and moved to `checks`.
+    Both are S0.11's to ship as binaries;
+  - no runner resolves the x86_64 macOS engine, because `macos-latest` is Apple silicon;
+  - X.1's logged `JANUS_ENGINE` override belongs to the SDKs' own runtime resolution, which they do
+    not have yet: today only their tests resolve an engine.
 - **S0.11 The corpora, the conformance suite and the checkers ship with the engine** — **S**. Every
   engine release carries `corpora/` and `conformance/` as a versioned artifact, and the checkers an
   SDK's CI runs (`tools/conformance`, `tools/thinness`, `tools/bindings`) as binaries, so a graduated

@@ -2025,6 +2025,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_engine_pin"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pact_janus_engine_wasm"
 version = "0.1.0"
 dependencies = [

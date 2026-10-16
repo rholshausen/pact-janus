@@ -1,5 +1,5 @@
 {
-  "$comment": "The released janus-engine the SDKs resolve when they are not building one from this tree (staged plan S0.4 and S0.10, X.1; ADR 0029 decision 3): a version, and the SHA-256 of the engine binary for each target triple, keyed by the release's asset name. The digests are copied from that release's SHA256SUMS after `gh attestation verify` has passed on it, and a resolver refuses any download whose digest is not here.",
+  "$comment": "The released janus-engine the SDKs resolve when they are not building one from this tree (staged plan S0.4 and S0.10, X.1; ADR 0029 decision 3): a version, and the SHA-256 of the engine binary for each target triple, keyed by the release's asset name. Written by `cargo run -p pact_janus_engine_pin -- <version>`, which reads the digests from that release's SHA256SUMS once `gh attestation verify` has passed on it; never edited by hand. A resolver refuses any download whose digest is not here.",
   "repository": "rholshausen/pact-janus",
   "version": "0.1.0",
   "sha256": {

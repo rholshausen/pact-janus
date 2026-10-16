@@ -49,7 +49,8 @@ Three sources are the source of truth and take precedence over this file when th
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
 > plan is the live one: work happens against its item ids (`S0.1`, `S1.4`, …), starting with stage 0a.
 > Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2, S0.3,
-> S0.4 (v0.1.0 is released; a change that ships carries a change file).
+> S0.4 (v0.1.0 is released; a change that ships carries a change file), S0.10 (both SDK suites
+> run with no Rust toolchain, against a released engine they resolve by its pinned digest).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -104,7 +105,8 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  pipeline (task 6.1), tools/conformance, the conformance suite's checker
                  (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it reads
                  sdks/thinness.json, counts each SDK by layer and budgets the hand-written ones —
-                 and tools/doc-links, the documentation link check (S0.12)
+                 tools/doc-links, the documentation link check (S0.12) — and tools/engine-pin, which
+                 writes sdks/engine-release.json from a release's attested SHA256SUMS (S0.10)
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -200,8 +202,19 @@ binary is statically linked and runs, attests every file, and only then tags `v<
 publishes. It rehearses everything but the publishing on any pull request that touches it. Never push
 a `v*` tag by hand, and never hand-edit `CHANGELOG.md`. An SDK resolves a released engine from
 `sdks/engine-release.json` — a version and a SHA-256 per target triple — and refuses a download with
-any other digest; the TypeScript suite does so with `JANUS_ENGINE_RELEASE=1`
-(`sdks/typescript/test/engine-release.ts`) and builds from the tree otherwise.
+any other digest. Both SDK suites do so with `JANUS_ENGINE_RELEASE=1` (S0.10;
+`sdks/typescript/test/engine-release.ts`, and `EngineRelease.java` in the JVM SDK's tests, which
+Gradle's `resolveEngine` runs), so a contributor needs no Rust toolchain, and build from the tree
+otherwise; `JANUS_ENGINE` overrides both. The pin is never edited by hand: after publishing,
+`release.yml` writes it, runs both suites against the release with no Rust installed, and pushes it as
+the `engine-pin` branch to open a pull request from. By hand:
+
+```bash
+cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin
+```
+
+The one test that still builds Rust is the TypeScript CSV consumer's (`third-party/janus-csv`);
+`JANUS_CSV_COMPONENT` names a `janus_csv.wasm` built elsewhere instead, as CI's `sdks` job does.
 
 Generated protocol bindings (plan task 6.1) — both SDKs' typed views of the spec schemas
 `sdks/bindings.json` names, checked in and **never hand-edited**. Regenerate after any change to
