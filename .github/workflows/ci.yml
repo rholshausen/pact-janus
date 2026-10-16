@@ -188,8 +188,9 @@ jobs:
 
   sdks:
     # Each SDK's own lint, tests and build, on Linux, macOS and Windows (staged plan S0.2), with no
-    # Rust toolchain installed (S0.10): an SDK contributor needs Node or a JDK and an engine, and
-    # nothing else. The engine is this tree's, from the job above, since an SDK change here may need
+    # Rust toolchain reachable (S0.10): an SDK contributor needs Node or a JDK and an engine, and
+    # nothing else. The runners ship one, so the suites run through without-rust.sh, which leaves it
+    # off PATH and shows that cargo no longer runs; a step that still reaches for it fails. The engine is this tree's, from the job above, since an SDK change here may need
     # an engine change in the same pull request; the pinned release is resolved instead after each
     # release (release.yml). Both suites drive it as a subprocess (plan task 6.2), so this is also
     # where spawning the engine, speaking frames over its stdio and its exit on stdin EOF are
@@ -203,17 +204,6 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      # The runners ship rustup. Removed, and checked gone, so a step that still reaches for cargo
-      # fails here rather than passing on a toolchain no SDK contributor is asked to have.
-      - name: No Rust toolchain
-        run: |
-          if command -v rustup >/dev/null; then rustup self uninstall -y; fi
-          for tool in cargo rustc rustup; do
-            if command -v "$tool"; then
-              echo "::error::$tool is still installed."
-              exit 1
-            fi
-          done
       - uses: actions/download-artifact@v4
         with:
           name: engine-${{ runner.os }}
@@ -241,10 +231,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: TypeScript SDK
         working-directory: sdks/typescript
-        run: npm ci && npm run lint && npm test && npm run build
+        run: ../../.github/scripts/without-rust.sh bash -c 'npm ci && npm run lint && npm test && npm run build'
       - name: JVM SDK
         working-directory: sdks/jvm
-        run: ./gradlew build
+        run: ../../.github/scripts/without-rust.sh ./gradlew build
       # Each suite above also ran the shared conformance suite and wrote its report (plan task 6.4).
       - uses: actions/upload-artifact@v4
         with:
@@ -329,7 +319,10 @@ jobs:
           fi
       # Plan task 4.5: the protocol-level client drives janus-engine frame by frame with no SDK in
       # the way — spawn, handshake, a consumer run through the mock, exit on stdin EOF. Spike 1.3
-      # left exactly that open on Windows.
+      # left exactly that open on Windows. Its setup asks cargo for the engine, within a test hook's
+      # time limit, so the engine is built first: a cold build does not fit.
+      - name: Build janus-engine
+        run: cargo build --package pact_janus_cli --bin janus-engine
       - name: Protocol client (janus-engine over stdio)
         working-directory: cli/tests/janus-engine-node
         run: npm ci && npm test

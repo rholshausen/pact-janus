@@ -76,7 +76,7 @@ the change files gathered so far add up to.
    GitHub release together. Do not push the tag yourself.
 3. Open the pull request that moves the SDKs' pin. After publishing, the same workflow writes
    `sdks/engine-release.json` for the new release (`engine-pin`, below), runs both SDK suites against
-   the release on every operating system with no Rust toolchain installed, and pushes the result as
+   the release on every operating system with no Rust toolchain reachable, and pushes the result as
    the `engine-pin` branch. Its summary links to the pull request. To write a pin by hand, with `gh`
    signed in:
   ```

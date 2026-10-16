@@ -259,8 +259,9 @@ Engineering with no dependency on a community answer. All of it happens in this 
   released `janus-engine` from S0.4's pipeline, verified by checksum (X.1), with `cargo build` kept as
   the developer fallback (`JANUS_ENGINE` already overrides). An SDK contributor needs no Rust toolchain.
   *Exit:* both SDK suites pass in a CI job with no Rust toolchain installed.
-  *Done 2026-10-16.* CI's `sdks` job runs both suites on Linux, macOS and Windows after removing
-  rustup and checking that `cargo`, `rustc` and `rustup` are gone. Main's engine can be ahead of the
+  *Done 2026-10-16.* CI's `sdks` job runs both suites on Linux, macOS and Windows through
+  `.github/scripts/without-rust.sh`, which leaves every directory holding `cargo`, `rustc` or
+  `rustup` off `PATH` and checks that none of them runs before it starts a suite. Main's engine can be ahead of the
   pinned release, so the engine there is this tree's, built by an `engine` job and handed over as a
   file: a change to the engine and an SDK can still land in one pull request. The release itself is
   resolved where nothing can have drifted from it, right after it is published. `release.yml` writes
@@ -279,7 +280,14 @@ Engineering with no dependency on a community answer. All of it happens in this 
   - one TypeScript test, the CSV consumer, builds a Rust component (`third-party/janus-csv`).
     `JANUS_CSV_COMPONENT` now names a `janus_csv.wasm` built elsewhere, and CI's `engine` job builds
     one;
-  - GitHub's runners ship rustup, so "no Rust toolchain installed" means removing it;
+  - GitHub's runners ship a Rust toolchain, and it cannot be removed the same way on each of them:
+    `rustup self uninstall` works on Linux and Windows, and the macOS runners' rustup is Homebrew's,
+    which refuses. So "no Rust toolchain installed" became "none reachable", made the same way on
+    every runner. The check runs the tools rather than looking them up, because bash remembers where
+    it last found a command, and the first attempt was fooled by a `rustup` it had just uninstalled;
+  - the protocol client's setup asks cargo for the engine within a test hook's two minutes. It never
+    built cold before, because the TypeScript suite had always built the engine first in the same
+    job. It now gets a build step of its own;
   - the conformance checker finds the corpus by a path compiled into it, so it cannot be handed to
     another job as a binary. The SDK jobs upload their reports, and a `conformant` job with Rust checks
     each operating system's pair. The thinness check reads only the repository and moved to `checks`.
