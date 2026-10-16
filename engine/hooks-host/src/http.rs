@@ -40,12 +40,20 @@ impl HookInvoker for HttpHooks {
       .and_then(Value::as_str)
       .unwrap_or("POST")
       .to_ascii_uppercase();
-    let body = match run.get("format").and_then(Value::as_str).unwrap_or("janus") {
+    // A configuration written before a rename names the context format by its earlier name, and
+    // still gets it (staged plan S0.5).
+    let context_format = pact_janus_kernel::persisted::HOOK_BODY_FORMAT;
+    let body = match run
+      .get("format")
+      .and_then(Value::as_str)
+      .unwrap_or(context_format.writes())
+    {
       "pact-state-change" => state_change_body(context),
-      "janus" => context.clone(),
+      format if context_format.reads(format) => context.clone(),
       other => {
         return Err(HookFailure::errored(format!(
-          "'{other}' is not a body format this engine knows ('janus', 'pact-state-change')"
+          "'{other}' is not a body format this engine knows ('{}', 'pact-state-change')",
+          context_format.writes()
         )));
       }
     };

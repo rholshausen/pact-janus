@@ -51,7 +51,8 @@ Three sources are the source of truth and take precedence over this file when th
 > Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2, S0.3,
 > S0.4 (v0.1.0 is released; a change that ships carries a change file), S0.10 (both SDK suites
 > run with no Rust toolchain, against a released engine they resolve by its pinned digest), S0.11
-> (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone).
+> (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone),
+> S0.5 (the codename is rename-ready: `Documentation/codename.md`, rehearsed weekly). Stage 0a is done.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -332,6 +333,13 @@ stderr (stdout stays frames-only).
   repository's Markdown must resolve, to a file and to a heading when it names one; moving or renaming
   a document means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md`
   and no code (S0.12): the findings stay where the ADRs cite them, and nothing new is added there.
+- **The codename is a codename.** "Janus" is renamed by one command, `.github/scripts/rename.sh <name>`,
+  which the weekly `Rename rehearsal` workflow runs on a throwaway checkout (S0.5, ADR 0031,
+  `Documentation/codename.md`). Anything new may carry the name; the script finds it. The exception
+  is a name the engine **reads back from a document that outlives it** — a `$format`, a media type,
+  an exported interface, something a user's configuration or script spells: define it in
+  `engine/kernel/src/persisted.rs` and read it with `reads()`, never against a literal, or documents
+  written before the rename stop being readable. The rehearsal cannot catch a literal: it renames it.
 
 ## Rust conventions
 

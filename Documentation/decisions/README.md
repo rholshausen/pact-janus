@@ -47,6 +47,7 @@ superseding ADR instead.
 | [0028](0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md) | Decide a release's version with change files, and release by merging the pull request that consumes them | accepted (decision 9 extended by 0030) |
 | [0029](0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md) | Attest what a release built, and let an SDK verify the digest it pins | accepted |
 | [0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md) | A release carries the SDK gates and the executable specification they run against | accepted |
+| [0031](0031-rename-by-a-rehearsed-rewrite-and-read-persisted-identifiers-under-every-spelling.md) | Rename by a rehearsed rewrite, and read persisted identifiers under every spelling | accepted |
 
 ## Decision backlog
 

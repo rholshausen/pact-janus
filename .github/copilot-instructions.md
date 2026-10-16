@@ -39,7 +39,8 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > Done so far: S0.12, S0.1 (the plan grammar is v1: every action is `namespace:name`), S0.13, S0.2, S0.3,
 > S0.4 (v0.1.0 is released; a change that ships carries a change file), S0.10 (both SDK suites
 > run with no Rust toolchain, against a released engine they resolve by its pinned digest), S0.11
-> (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone).
+> (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone),
+> S0.5 (the codename is rename-ready: `Documentation/codename.md`, rehearsed weekly). Stage 0a is done.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Repository layout
@@ -289,6 +290,10 @@ stderr (stdout stays frames-only).
   Markdown must resolve (`cargo run -p pact_janus_doc_links`, which CI runs), and moving a document
   means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md` and no
   code (S0.12): the findings stay where the ADRs cite them, and nothing new is added there.
+- The codename is renamed by `.github/scripts/rename.sh <name>`, rehearsed weekly (S0.5, ADR 0031,
+  `Documentation/codename.md`). A name the engine reads back from a stored document — a `$format`,
+  a media type, an exported interface, something a user's configuration or script spells — is
+  defined in `engine/kernel/src/persisted.rs` and read with `reads()`, never against a literal.
 
 ## Conventions
 

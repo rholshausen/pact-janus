@@ -40,8 +40,9 @@ pub struct Contract {
   pub metadata: Option<Metadata>,
 }
 
-/// The format token this crate writes and reads (contract-file spec §2.3).
-pub const FORMAT: &str = "janus-contract/1";
+/// The format token this crate writes (contract-file spec §2.3). It reads
+/// [`crate::persisted::CONTRACT_FORMAT`]'s every spelling.
+pub const FORMAT: &str = crate::persisted::CONTRACT_FORMAT.writes();
 
 /// A named party — consumer or provider. Member name and the path to `name` are fixed by
 /// contract-file spec §3.1 so brokers already deployed read them correctly.

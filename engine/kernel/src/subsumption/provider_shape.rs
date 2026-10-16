@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// The format token this module reads and writes (spec §2.4).
-pub const FORMAT: &str = "janus-provider-shape/1";
+pub const FORMAT: &str = crate::persisted::PROVIDER_SHAPE_FORMAT.writes();
 
 /// One part's shapes: slot name -> shape node, opaque here (spec §2.4).
 pub type ShapePart = BTreeMap<String, Value>;
@@ -117,11 +117,11 @@ pub fn read_provider_shape(bytes: &[u8]) -> Result<ProviderShape, crate::contrac
     .and_then(|value| value.get("$format").and_then(Value::as_str).map(str::to_string));
   match format.as_deref() {
     None => return Err(ContractError::NotAContract),
-    Some(FORMAT) => {}
+    Some(found) if crate::persisted::PROVIDER_SHAPE_FORMAT.reads(found) => {}
     Some(other) => {
-      // The major is the whole of `janus-provider-shape/<major>`: a different name is not a
-      // provider shape at all, a different major is one this checker cannot read (§8).
-      let unsupported_major = other.starts_with("janus-provider-shape/");
+      // The major is the whole of `<name>/<major>`: a different name is not a provider shape at
+      // all, a different major is one this checker cannot read (§8).
+      let unsupported_major = crate::persisted::PROVIDER_SHAPE_FORMAT.names_family(other);
       return Err(if unsupported_major {
         ContractError::VersionUnsupported {
           format: other.to_string(),

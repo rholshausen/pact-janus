@@ -79,7 +79,9 @@ pub fn compile(subject: &Subject) -> Result<Plan, ExplainError> {
       // ADR 0011: the document says what it is. A pact is never mistaken for a contract whose
       // shapes happen to be missing, and a contract is never fed to the v1–v4 compiler.
       match document.get("$format").and_then(Value::as_str) {
-        Some(format) if format == contract::FORMAT => janus(document, index, subject.variant.as_deref()),
+        Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
+          janus(document, index, subject.variant.as_deref())
+        }
         Some(other) => Err(ExplainError::NotReadable(format!(
           "'{other}' is not a format this engine reads (expected '{}')",
           contract::FORMAT

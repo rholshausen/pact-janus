@@ -1,0 +1,115 @@
+name: Rename rehearsal
+
+# Staged plan S0.5, ADR 0031: the codename stays until the community names the project, which is
+# expected late, and by then it is in every surface. So the rename is rehearsed, every week, on a
+# throwaway checkout: .github/scripts/rename.sh renames it to a placeholder across every surface
+# Documentation/codename.md lists and proves nothing is left, and then everything that has to pass
+# today has to pass renamed — the workspace's tests, both SDK suites and their conformance, the
+# thinness audit, the binding pipeline, the protocol client and the demo. A surface added without
+# being made renameable fails here, the week it lands, rather than on the day of the rename.
+#
+# It also proves the dual-spelling rule against something real: a component built under the
+# codename, before the rename, is loaded by the renamed engine through the renamed SDK.
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/scripts/rename.sh
+      - .github/workflows/rename-rehearsal.yml
+      - engine/kernel/src/persisted.rs
+      - engine/kernel/src/persisted/**
+      - Documentation/codename.md
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # One lowercase word the repository does not contain — not even here, which is why it is made
+  # from the run's number rather than spelled — and a different one every run.
+  PLACEHOLDER: rehearsal${{ github.run_number }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-wasip2
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      # Built under the codename, kept outside the checkout, and loaded after the rename: a
+      # component already in a registry when the name changes.
+      - name: A component built before the rename
+        working-directory: third-party/janus-csv
+        run: |
+          cargo build --release --target wasm32-wasip2
+          cp target/wasm32-wasip2/release/janus_csv.wasm "$RUNNER_TEMP/before-the-rename.wasm"
+      - name: Rename
+        run: .github/scripts/rename.sh "$PLACEHOLDER"
+      # The renamed names, as later steps need them.
+      - name: The renamed names
+        run: |
+          upper="$(tr '[:lower:]' '[:upper:]' <<<"$PLACEHOLDER")"
+          {
+            echo "CRATE=pact_${PLACEHOLDER}"
+            echo "${upper}_CSV_COMPONENT=$RUNNER_TEMP/before-the-rename.wasm"
+          } >> "$GITHUB_ENV"
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --no-fail-fast
+      - name: Third-party component
+        working-directory: third-party/${{ env.PLACEHOLDER }}-csv
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          cargo build --release --target wasm32-wasip2
+      # Its CSV consumer test loads the component built before the rename.
+      - name: TypeScript SDK
+        working-directory: sdks/typescript
+        run: npm ci && npm run lint && npm test && npm run build
+      - name: JVM SDK
+        working-directory: sdks/jvm
+        run: ./gradlew build
+      - name: SDKs are conformant
+        run: cargo run --package "${CRATE}_conformance" -- check target/conformance/typescript.json target/conformance/jvm.json
+      - name: SDKs are thin
+        run: cargo run --package "${CRATE}_thinness" -- check
+      # What the rename wrote into the generated bindings is what the pipeline writes from the
+      # renamed schemas. The rename is staged, so the index is the renamed tree to compare against.
+      - name: Bindings match their schemas
+        run: |
+          cargo run --package "${CRATE}_bindings" -- generate
+          if ! git diff --quiet -- sdks || [ -n "$(git ls-files --others --exclude-standard -- sdks)" ]; then
+            git diff --stat -- sdks
+            git ls-files --others --exclude-standard -- sdks
+            git diff -- sdks | head -200
+            echo "::error::Renamed bindings differ from what the pipeline generates from the renamed schemas."
+            exit 1
+          fi
+      - name: Protocol client
+        working-directory: cli/tests/${{ env.PLACEHOLDER }}-engine-node
+        run: npm ci && npm test
+      - name: The demo runs
+        run: |
+          (cd demo/web-app && npm ci)
+          demo/run.sh --ci
