@@ -71,8 +71,9 @@ the change files gathered so far add up to.
   # to set the version if required
   gh workflow run prepare-release.yml -f version=0.1.0
   ```
-2. Merge it. The **Release** workflow builds `janus-engine` and `janus` for five target triples and
-   the engine as a WASM component, attests every file, and then creates the `v<version>` tag and the
+2. Merge it. The **Release** workflow builds `janus-engine`, `janus` and `janus-sdk-gates` for five
+   target triples, the engine as a WASM component and `janus-spec.tar.gz` (ADR 0030), runs each SDK's
+   gates from those files alone, attests every file, and then creates the `v<version>` tag and the
    GitHub release together. Do not push the tag yourself.
 3. Open the pull request that moves the SDKs' pin. After publishing, the same workflow writes
    `sdks/engine-release.json` for the new release (`engine-pin`, below), runs both SDK suites against

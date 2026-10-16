@@ -1,6 +1,6 @@
 # 0028 — Decide a release's version with change files, and release by merging the pull request that consumes them
 
-- **Status**: accepted
+- **Status**: accepted (decision 9's list of what a release carries is extended by [ADR 0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md); its other terms and decisions 1–8 and 10 stand)
 - **Date**: 2026-10-12
 - **Plan tasks**: staged plan S0.4 (decides it), S0.10 and S0.11 (consume what it publishes), S2.9
   (the SDKs' releases leave with them)

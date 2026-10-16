@@ -7,7 +7,12 @@ import { join, resolve } from "node:path";
 import type { ComponentDeclaration } from "../../src/index.js";
 
 export const repoRoot = resolve(import.meta.dirname, "../../../..");
-export const suiteRoot = join(repoRoot, "conformance");
+/**
+ * Where the executable specification is: `JANUS_SPEC` — an unpacked `janus-spec.tar.gz` from the
+ * release the SDK pins, whose paths are this repository's — or this repository (staged plan S0.11).
+ */
+export const specRoot = process.env.JANUS_SPEC ? resolve(process.env.JANUS_SPEC) : repoRoot;
+export const suiteRoot = join(specRoot, "conformance");
 
 /** A shape-helper call in a case: `{ $: "each-like", args: [...], options: {...} }`. */
 export interface HelperCall {

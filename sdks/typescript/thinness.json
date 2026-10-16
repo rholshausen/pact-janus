@@ -1,0 +1,42 @@
+{
+  "$comment": "How this SDK's source divides into layers, for the thinness audit (plan task 6.5). Every source file under this directory must be claimed by exactly one layer — the tool fails on one that is not, so a new file is a classification decision somebody makes on purpose rather than a line that quietly lands in whichever bucket flatters the claim. Paths are relative to this file. Budgets apply to the hand-written layers only: 'generated' is not a cost an SDK maintainer pays, and 'tests' is not part of the surface a user installs. Measure with `janus-sdk-gates thinness` from this directory, or `cargo run -p pact_janus_thinness` from the repository root, which measures every SDK side by side (staged plan S0.11).",
+  "name": "pact-janus-typescript",
+  "language": "TypeScript",
+  "extensions": [
+    ".ts"
+  ],
+  "ignore": [
+    "node_modules",
+    "dist",
+    "build",
+    "eslint.config.ts",
+    "vitest.config.ts",
+    "scripts"
+  ],
+  "layers": {
+    "generated": [
+      "src/generated"
+    ],
+    "idiomatic": [
+      "src/index.ts",
+      "src/janus.ts",
+      "src/interaction.ts",
+      "src/shapes.ts",
+      "src/errors.ts"
+    ],
+    "embedding": [
+      "src/engine"
+    ],
+    "integration": [
+      "src/vitest.ts"
+    ],
+    "tests": [
+      "test"
+    ]
+  },
+  "budgets": {
+    "idiomatic": 700,
+    "embedding": 250,
+    "integration": 60
+  }
+}

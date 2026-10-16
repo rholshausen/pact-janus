@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+pub mod cli;
+
 /// What a run of the checker found. Empty `problems` is a pass.
 #[derive(Debug, Default)]
 pub struct Report {
