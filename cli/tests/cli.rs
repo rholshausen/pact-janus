@@ -497,7 +497,15 @@ fn order_shapes() -> String {
 /// provider's third shows up as the RFC's own two-line finding. The pact beside the provider
 /// froze one example as `equality` instead, which is a true finding about a narrower claim but
 /// not the sketch.
+///
+/// Written once per test process: the tests that read it run in parallel, and a rewrite truncates
+/// the file under a `janus check` another test has just started on it.
 fn order_consumer_contract() -> String {
+  static CONTRACT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+  CONTRACT.get_or_init(write_order_consumer_contract).clone()
+}
+
+fn write_order_consumer_contract() -> String {
   let path = temp("web-app.janus.json");
   let document = json!({ "$format": "janus-contract/1",
     "consumer": { "name": "web-app" },
