@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792126438961,
+  "lastUpdate": 1792126440665,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -2442,6 +2442,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 54655,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "83267ed5cf373ff3e08f1f02dcfcb58af57648a9",
+          "message": "fix: write the CLI tests' shared consumer contract once, not once per test\n\nSix tests in cli/tests/cli.rs each rewrote the same temporary contract file,\nand they run in parallel. `std::fs::write` truncates before it writes, so a\n`janus check` one test had started could read the file empty — \"EOF while\nparsing a value at line 1 column 0\", seen on CI's Linux runner. Latent since\ntask 7.4; the file is now written once per test process.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-16T15:40:41+11:00",
+          "tree_id": "e98e661825d4ff0b7e0bff9eaf0864b496eb8f5e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/83267ed5cf373ff3e08f1f02dcfcb58af57648a9"
+        },
+        "date": 1792126440340,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28643,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21731,
             "unit": "requests per second",
             "extra": "engines 4"
           }
