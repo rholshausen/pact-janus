@@ -116,6 +116,16 @@ impl HookInvoker for ScriptHooks {
       ctx
         .eval::<(), _>(JANUS_LIB)
         .map_err(|err| ScriptError::from(&ctx, err, "the janus library"))?;
+      // A script written before a rename calls the library by its earlier name (staged plan S0.5).
+      let global = crate::persisted::HOOK_SCRIPT_GLOBAL;
+      for earlier in global.earlier() {
+        ctx
+          .eval::<(), _>(format!(
+            "globalThis[{earlier:?}] = globalThis[{:?}];",
+            global.writes()
+          ))
+          .map_err(|err| ScriptError::from(&ctx, err, "the janus library"))?;
+      }
       ctx
         .eval::<(), _>(source)
         .map_err(|err| ScriptError::from(&ctx, err, "the hook source"))?;
@@ -282,6 +292,31 @@ mod tests {
       json!(["application/json"]),
       "the script read what was there and added to it"
     );
+  }
+
+  /// Staged plan S0.5: a script written before a rename still finds the library under the name it
+  /// was written against. Vacuous until a rename; the rename rehearsal runs it with spellings.
+  #[test]
+  fn a_script_written_before_a_rename_still_finds_the_library() {
+    let global = crate::persisted::HOOK_SCRIPT_GLOBAL;
+    assert_eq!(
+      run(
+        &format!("function hook(ctx) {{ {}.log('info', 'x'); }}", global.writes()),
+        request_context()
+      )
+      .expect("answers"),
+      InvokeResult::ok()
+    );
+    for earlier in global.earlier() {
+      let source = format!(
+        "function hook(ctx) {{ return {{ outcome: 'ok', changes: {{ 'parts.request.headers': {earlier}.slot({{}}) }} }}; }}"
+      );
+      assert_eq!(
+        run(&source, request_context()).expect(earlier).outcome(),
+        Outcome::Ok,
+        "{earlier}"
+      );
+    }
   }
 
   #[test]

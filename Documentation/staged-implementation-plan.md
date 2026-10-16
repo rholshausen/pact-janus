@@ -248,6 +248,35 @@ Engineering with no dependency on a community answer. All of it happens in this 
   *Exit:* the inventory above is complete and kept in one document; a rehearsal script renames the
   codename to a placeholder across every surface and the whole test suite, both SDKs' conformance runs
   and the demo pass; CI runs the rehearsal on a schedule so drift is caught.
+  *Done 2026-10-16.* The inventory is [`codename.md`](codename.md), and the decision is
+  [ADR 0031](decisions/0031-rename-by-a-rehearsed-rewrite-and-read-persisted-identifiers-under-every-spelling.md).
+  The rename is `.github/scripts/rename.sh <name>`. It rewrites `janus`, `Janus` and `JANUS` in every
+  text file, the record included, and moves every path that contains it. It then fails unless the
+  codename is left nowhere but the three exemptions: `CHANGELOG.md`, the earlier spellings, and the
+  repository's own name, which is S0.7's. The persisted identifiers are `engine/kernel/src/persisted.rs`.
+  Each is spelled once, as what it writes, and read under that spelling and every earlier one, which
+  the script records in `persisted/earlier.rs` before it rewrites.
+  The `Rename rehearsal` workflow runs weekly with a placeholder made from the run's number, and its
+  first run passed by hand: 548 files rewritten and 182 paths moved in three seconds. Then, renamed,
+  the workspace's clippy and its 680 tests passed, along with the third-party component, both SDK
+  suites, 47 of 47 conformance cases in each language, the thinness audit, bindings matching the
+  pipeline's own output, the protocol client and the demo. The TypeScript suite loaded a component
+  built before the rename.
+  With S0.5, stage 0a is done: every item but S0.6, which ADR 0027 decided, has met its exit, and
+  v0.1.0 installs on three operating systems.
+  What the exit did not foresee:
+  - the plan named four persisted identifiers, and there are seven. A component built before a
+    rename exports the old interface name, a provider's hook scripts call the library by the old
+    global, and its verifier configuration names the old body format. All three are read back from
+    something the engine did not write and cannot rewrite;
+  - the rehearsal cannot catch a reader that compares a stored name against a literal, because the
+    rename rewrites the literal with everything else and the reader passes. Review catches it, and
+    CLAUDE.md now says where such a name belongs;
+  - the placeholder cannot be written in the workflow, since the script refuses a name the
+    repository already contains, and the workflow is in the repository. It is made from the run's
+    number instead;
+  - the new name has to be one lowercase word. A hyphenated name, or one of two words, needs a
+    different spelling per surface and is a different rename. The inventory says so.
 - **S0.6 Where the build happens** — decided, [ADR 0027](decisions/0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md).
   **In this repository, on `main`, hardening the prototype in place**, with §2's table as the
   inventory of what is rewritten. The engine, specs, CLI, corpora, conformance suite and checkers stay

@@ -326,7 +326,9 @@ pub(crate) fn read_source(source: &ContractSource) -> Result<Vec<Source>, Verify
   let mut sources = Vec::with_capacity(source.contracts.len());
   for (index, doc) in source.contracts.iter().enumerate() {
     match doc.get("$format").and_then(Value::as_str) {
-      Some(format) if format == contract::FORMAT => sources.push(Source::Janus(read_contract(index, doc)?)),
+      Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
+        sources.push(Source::Janus(read_contract(index, doc)?))
+      }
       // A `$format` this engine does not know is never guessed at, even when the document also
       // looks pact-shaped: the member exists precisely to stop a reader guessing.
       Some(other) => {

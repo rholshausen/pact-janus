@@ -30,6 +30,7 @@ use pact_janus_kernel::component::{
   ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Loaded,
   MatcherComponent, SlotValue, media_type_matches,
 };
+use pact_janus_kernel::persisted::Persisted;
 use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -41,8 +42,9 @@ use wasmtime::component::{Component, ComponentExportIndex, InstancePre, Linker, 
 use wasmtime::{Config, Engine, Store, Trap};
 use wasmtime_wasi::{DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
-/// The interface the pipe world exports (`wit/component.wit`).
-const PIPE_INTERFACE: &str = "pact:janus-component/pipe@1.0.0";
+/// The interface the pipe world exports (`wit/component.wit`). A component built before a rename
+/// exports it under an earlier spelling, and still loads (staged plan S0.5).
+const PIPE_INTERFACE: Persisted = pact_janus_kernel::persisted::COMPONENT_INTERFACE;
 /// Epoch granularity. A deadline is a number of these, so it is exact to within one tick.
 const TICK: Duration = Duration::from_millis(10);
 /// Spec §3.4: every call has a deadline. A declaration's `limits.deadline-ms` overrides this.
@@ -187,12 +189,17 @@ impl WasmLoader {
     let pre = linker
       .instantiate_pre(&component)
       .map_err(|err| load_error(&format!("{what} cannot be linked: {err:#}")))?;
-    let call = component
-      .get_export_index(None, PIPE_INTERFACE)
-      .and_then(|interface| component.get_export_index(Some(&interface), "call"))
+    let call = std::iter::once(PIPE_INTERFACE.writes())
+      .chain(PIPE_INTERFACE.earlier().iter().copied())
+      .find_map(|spelling| {
+        component
+          .get_export_index(None, spelling)
+          .and_then(|interface| component.get_export_index(Some(&interface), "call"))
+      })
       .ok_or_else(|| {
         load_error(&format!(
-          "{what} does not export {PIPE_INTERFACE}#call (wit/component.wit)"
+          "{what} does not export {}#call (wit/component.wit)",
+          PIPE_INTERFACE.writes()
         ))
       })?;
     Ok(WasmComponent {
@@ -426,7 +433,12 @@ impl WasmComponent {
       .map_err(|err| self.synthesise(&err, "instantiating the component"))?;
     let call = instance
       .get_typed_func::<(Vec<u8>,), (Vec<u8>,)>(&mut store, self.call)
-      .map_err(|err| load_error(&format!("{PIPE_INTERFACE}#call has the wrong type: {err:#}")))?;
+      .map_err(|err| {
+        load_error(&format!(
+          "{}#call has the wrong type: {err:#}",
+          PIPE_INTERFACE.writes()
+        ))
+      })?;
     let mut exchange = |op: &str, body: Value| -> Result<Value, ComponentError> {
       let id = self.next_id.fetch_add(1, Ordering::Relaxed).to_string();
       let frame = json!({ "type": "request", "id": id, "op": op, "body": body });

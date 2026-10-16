@@ -102,7 +102,7 @@ pub fn read_provider_shapes(path: &str) -> Result<Vec<(String, Value)>, String> 
       Ok(document)
         if document["$format"]
           .as_str()
-          .is_some_and(|format| format.starts_with("janus-provider-shape/")) =>
+          .is_some_and(|format| pact_janus_kernel::persisted::PROVIDER_SHAPE_FORMAT.names_family(format)) =>
       {
         shapes.push((name, document))
       }

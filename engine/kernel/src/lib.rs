@@ -12,6 +12,7 @@ pub mod error;
 pub mod hooks;
 pub mod interaction_spec;
 pub mod legacy_pact;
+pub mod persisted;
 pub mod plan;
 pub mod protocol;
 pub mod shape;

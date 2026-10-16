@@ -24,6 +24,7 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::ComponentError;
+use pact_janus_kernel::persisted;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -36,10 +37,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 /// The manifest's `artifactType`: what makes a reference a Janus component rather than an image.
-pub const ARTIFACT_TYPE: &str = "application/vnd.pact.janus.component.v1";
+pub const ARTIFACT_TYPE: &str = persisted::COMPONENT_ARTIFACT_TYPE.writes();
 /// The config blob's media type — also the artifact type, to a reader that predates OCI 1.1's
 /// `artifactType` (OCI image spec, "Guidelines for Artifact Usage").
-pub const CONFIG_MEDIA_TYPE: &str = "application/vnd.pact.janus.component.config.v1+json";
+pub const CONFIG_MEDIA_TYPE: &str = persisted::COMPONENT_CONFIG_MEDIA_TYPE.writes();
 /// The layer carrying the component: the registered media type for WebAssembly, so any wasm-aware
 /// registry UI recognises it.
 pub const WASM_MEDIA_TYPE: &str = "application/wasm";
@@ -670,7 +671,11 @@ fn parse_manifest(
     .and_then(Value::as_str)
     .unwrap_or_default();
   let artifact_type = manifest.get("artifactType").and_then(Value::as_str);
-  if config_type != CONFIG_MEDIA_TYPE || artifact_type.is_some_and(|t| t != ARTIFACT_TYPE) {
+  // Every spelling either has had (staged plan S0.5): an artifact pushed before a rename stays
+  // pullable after it.
+  if !persisted::COMPONENT_CONFIG_MEDIA_TYPE.reads(config_type)
+    || artifact_type.is_some_and(|t| !persisted::COMPONENT_ARTIFACT_TYPE.reads(t))
+  {
     return Err(not_a_component(format!(
       "its artifact type is '{}'",
       artifact_type.unwrap_or(config_type)
@@ -850,6 +855,25 @@ mod tests {
       absolute("http://127.0.0.1:5000/v2/c", "https://elsewhere/u"),
       "https://elsewhere/u"
     );
+  }
+
+  /// Staged plan S0.5: after a rename, an artifact pushed under any earlier spelling is still a
+  /// component. Vacuous until a rename puts a spelling in `persisted/earlier.rs`; the rename
+  /// rehearsal is what runs it with one.
+  #[test]
+  fn a_component_pushed_under_an_earlier_name_is_still_a_component() {
+    let r = reference("localhost:5000", "c", Some("1"), None);
+    let layer = json!({ "mediaType": WASM_MEDIA_TYPE, "digest": D, "size": 3 });
+    let config_types = persisted::COMPONENT_CONFIG_MEDIA_TYPE.earlier().iter();
+    let artifact_types = persisted::COMPONENT_ARTIFACT_TYPE.earlier().iter();
+    for (config_type, artifact_type) in config_types.zip(artifact_types) {
+      let manifest = json!({ "schemaVersion": 2, "mediaType": MANIFEST_MEDIA_TYPE, "artifactType": artifact_type,
+                             "config": { "mediaType": config_type, "digest": D, "size": 2 }, "layers": [layer] });
+      assert!(
+        parse_manifest(&serde_json::to_vec(&manifest).unwrap(), &r, D).is_ok(),
+        "{artifact_type}"
+      );
+    }
   }
 
   #[test]
