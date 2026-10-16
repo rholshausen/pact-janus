@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792137948153,
+  "lastUpdate": 1792137950112,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -3150,6 +3150,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 22056,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "7ffba9f5f29cbd8cda33e67c24d3c6dca106fd11",
+          "message": "feat: S0.5 rename-ready under the codename\n\nThe codename is renamed by one command, `.github/scripts/rename.sh <name>`,\nand the `Rename rehearsal` workflow runs it every week on a throwaway\ncheckout (ADR 0031; the inventory is Documentation/codename.md).\n\n- The script rewrites janus/Janus/JANUS in every text file, the record\n  included, moves every path that contains it, and fails unless nothing is\n  left but CHANGELOG.md, the earlier spellings and the repository's own name\n  (S0.7's). It refuses a name that is not one lowercase word, or that the\n  repository already contains.\n- Persisted identifiers, names the engine reads back from documents that\n  outlive it, are engine/kernel/src/persisted.rs: each written under one\n  spelling and read under every earlier one, which the script records in\n  persisted/earlier.rs before it rewrites. Seven of them: a contract's and a\n  provider shape's $format, the OCI component artifact and config types, the\n  interface a component exports, the hook script global and the http hook's\n  body format. Their readers now call reads().\n- The rehearsal builds a component before renaming and loads it after, and\n  requires clippy, every test, both SDK suites and their conformance,\n  thinness, the binding pipeline, the protocol client and the demo to pass,\n  renamed. kernel tests/persisted.rs reads documents under each earlier\n  spelling, which only a rename provides.\n\nStage 0a is done.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-16T18:51:34+11:00",
+          "tree_id": "5d7c4d7cdeeca76476415849e057bc5eee0828cc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/7ffba9f5f29cbd8cda33e67c24d3c6dca106fd11"
+        },
+        "date": 1792137949624,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27144,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21512,
             "unit": "requests per second",
             "extra": "engines 4"
           }
