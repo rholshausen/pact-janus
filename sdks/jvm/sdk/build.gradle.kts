@@ -37,6 +37,13 @@ val repoRoot: File = rootProject.projectDir.resolve("../..").canonicalFile
 val engineName = if (System.getProperty("os.name").startsWith("Windows")) "janus-engine.exe" else "janus-engine"
 val engineBinary: File = repoRoot.resolve("target/debug/$engineName")
 
+// Which engine the tests drive (staged plan S0.10), as the TypeScript suite decides it: the one
+// JANUS_ENGINE names; the pinned release when JANUS_ENGINE_RELEASE asks for it, fetched and checked
+// against its digest, so no Rust toolchain is needed; otherwise this tree's build, which is what a
+// change to the engine and an SDK in one commit needs.
+val namedEngine: String? = System.getenv("JANUS_ENGINE")?.takeIf { it.isNotEmpty() }
+val releasedEngine = namedEngine == null && !System.getenv("JANUS_ENGINE_RELEASE").isNullOrEmpty()
+
 // The end-to-end tests drive the real engine, so they must never run against a stale one: cargo is
 // incremental, so asking it every time costs a no-op check when nothing changed.
 val buildEngine = tasks.register<Exec>("buildEngine") {
@@ -47,15 +54,47 @@ val buildEngine = tasks.register<Exec>("buildEngine") {
   outputs.upToDateWhen { false }
 }
 
+// The pin every SDK in this repository shares, and where the resolved engine's path is written.
+val enginePin: File = repoRoot.resolve("sdks/engine-release.json")
+val resolvedEngine = layout.buildDirectory.file("janus-engine/path")
+
+// The resolver is test code (src/test/.../engine/EngineRelease.java), so it is tested like the rest;
+// it is never part of the SDK a user installs. Asked every time: a cached engine whose digest still
+// matches costs a hash, and a cache emptied since is noticed.
+val resolveEngine = tasks.register<JavaExec>("resolveEngine") {
+  group = "build"
+  description = "Resolves the pinned, released janus-engine (sdks/engine-release.json) for the tests."
+  classpath = sourceSets["test"].runtimeClasspath
+  mainClass = "io.pact.janus.sdk.engine.EngineRelease"
+  args(enginePin.path, resolvedEngine.get().asFile.path)
+  inputs.file(enginePin).withPropertyName("enginePin")
+  outputs.file(resolvedEngine)
+  outputs.upToDateWhen { false }
+}
+
 tasks.test {
   useJUnitPlatform()
-  dependsOn(buildEngine)
-  // JANUS_ENGINE names the executable, as it does for the rest of the project; an explicit value
-  // in the environment wins, so a developer can point the suite at another build.
-  environment("JANUS_ENGINE", System.getenv("JANUS_ENGINE") ?: engineBinary.path)
-  // The engine is what these tests test. Without it as an input Gradle calls the task up to date
-  // after an engine change, and the conformance report it leaves behind is the old engine's.
-  inputs.file(engineBinary).withPropertyName("engineBinary")
+  // JANUS_ENGINE names the executable, as it does for the rest of the project. The engine is what
+  // these tests test: without it as an input Gradle calls the task up to date after an engine
+  // change, and the conformance report it leaves behind is the old engine's.
+  when {
+    namedEngine != null -> {
+      environment("JANUS_ENGINE", namedEngine)
+      inputs.file(namedEngine).withPropertyName("engineBinary")
+    }
+    releasedEngine -> {
+      dependsOn(resolveEngine)
+      val path = resolvedEngine
+      inputs.file(enginePin).withPropertyName("enginePin")
+      // Known only once resolveEngine has run.
+      doFirst { (this as Test).environment("JANUS_ENGINE", path.get().asFile.readText().trim()) }
+    }
+    else -> {
+      dependsOn(buildEngine)
+      environment("JANUS_ENGINE", engineBinary.path)
+      inputs.file(engineBinary).withPropertyName("engineBinary")
+    }
+  }
   environment("RUST_LOG", System.getenv("RUST_LOG") ?: "warn")
   // Contracts the end-to-end tests write land under the build directory, never in the source tree.
   systemProperty("janus.test.contracts", layout.buildDirectory.dir("contracts").get().asFile.path)

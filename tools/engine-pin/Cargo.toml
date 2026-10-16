@@ -1,0 +1,22 @@
+[package]
+name = "pact_janus_engine_pin"
+description = "Writes the SDKs' engine pin (staged plan S0.10, ADR 0029): a release's janus-engine digests, read from its SHA256SUMS once `gh attestation verify` has passed on it, into sdks/engine-release.json"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "engine-pin"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

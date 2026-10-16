@@ -1,0 +1,205 @@
+package io.pact.janus.sdk.engine;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Resolving a released {@code janus-engine} by version (staged plan S0.4 and S0.10, X.1; ADR 0029
+ * decision 3) — the JVM spelling of the TypeScript suite's {@code test/engine-release.ts}, and the
+ * same cache, so the two suites share one download.
+ *
+ * <p>The pin is {@code sdks/engine-release.json}: a version, and the SHA-256 of the engine for each
+ * target triple. Resolving is a download and a hash — the file for this platform, from that
+ * version's release, kept in a cache — and a file whose digest is not the pinned one is never run
+ * and never kept. Nothing here looks at {@code PATH}.
+ *
+ * <p>Test setup, not SDK: Gradle runs {@link #main} before the tests when
+ * {@code JANUS_ENGINE_RELEASE} is set, and hands the path it prints to them as {@code JANUS_ENGINE}.
+ */
+public final class EngineRelease {
+
+  /**
+   * A pin: {@code owner/name} of the repository whose releases hold the engine, the pinned
+   * release (null while there is none), and release asset name → the SHA-256 it must have, in hex.
+   */
+  public record Pin(String repository, String version, Map<String, String> sha256) {
+    public Pin {
+      sha256 = sha256 == null ? Map.of() : Map.copyOf(sha256);
+    }
+
+    /** Reads a pin file. */
+    public static Pin read(Path file) throws IOException {
+      return new ObjectMapper()
+          .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+          .readValue(file.toFile(), Pin.class);
+    }
+
+    String pinnedVersion() {
+      if (version == null || version.isEmpty()) {
+        throw new IllegalStateException("No janus-engine release is pinned yet (sdks/engine-release.json).");
+      }
+      return version;
+    }
+  }
+
+  private static final Map<String, String> TRIPLES = Map.of(
+      "linux/x64", "x86_64-unknown-linux-musl",
+      "linux/arm64", "aarch64-unknown-linux-musl",
+      "darwin/x64", "x86_64-apple-darwin",
+      "darwin/arm64", "aarch64-apple-darwin",
+      "win32/x64", "x86_64-pc-windows-msvc");
+
+  private EngineRelease() {}
+
+  /** This JVM's platform, spelled as Node spells it: {@code linux}, {@code darwin}, {@code win32}. */
+  static String platform() {
+    String name = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+    if (name.startsWith("windows")) {
+      return "win32";
+    }
+    if (name.startsWith("mac")) {
+      return "darwin";
+    }
+    return name;
+  }
+
+  /** This JVM's architecture, spelled as Node spells it: {@code x64}, {@code arm64}. */
+  static String arch() {
+    String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);
+    return switch (arch) {
+      case "amd64", "x86_64" -> "x64";
+      case "aarch64", "arm64" -> "arm64";
+      default -> arch;
+    };
+  }
+
+  /** What a release calls the engine for this platform (ADR 0028 decision 9). */
+  public static String engineAsset() {
+    return engineAsset(platform(), arch());
+  }
+
+  /** What a release calls the engine for a platform (ADR 0028 decision 9). */
+  public static String engineAsset(String platform, String arch) {
+    String triple = TRIPLES.get(platform + "/" + arch);
+    if (triple == null) {
+      throw new IllegalStateException("No janus-engine is released for " + platform + "/" + arch
+          + ". Build one and name it in JANUS_ENGINE.");
+    }
+    return "janus-engine-" + triple + (platform.equals("win32") ? ".exe" : "");
+  }
+
+  /** {@code JANUS_ENGINE_CACHE}, or {@code pact-janus/engines} in the user's cache directory. */
+  public static Path engineCache(Map<String, String> env) {
+    String configured = env.get("JANUS_ENGINE_CACHE");
+    if (configured != null && !configured.isEmpty()) {
+      return Path.of(configured);
+    }
+    Path home = Path.of(System.getProperty("user.home"));
+    Path caches = switch (platform()) {
+      case "win32" -> env.containsKey("LOCALAPPDATA")
+          ? Path.of(env.get("LOCALAPPDATA"))
+          : home.resolve("AppData").resolve("Local");
+      case "darwin" -> home.resolve("Library").resolve("Caches");
+      default -> env.containsKey("XDG_CACHE_HOME") ? Path.of(env.get("XDG_CACHE_HOME")) : home.resolve(".cache");
+    };
+    return caches.resolve("pact-janus").resolve("engines");
+  }
+
+  /** Where the pinned engine for this platform is, once resolved. Reads nothing and fetches nothing. */
+  public static Path enginePath(Pin pin, Path cacheDir) {
+    return cacheDir.resolve(pin.pinnedVersion()).resolve(engineAsset());
+  }
+
+  private static String sha256(byte[] bytes) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("This JVM has no SHA-256", e);
+    }
+  }
+
+  /**
+   * The pinned engine for this platform, as an executable on disk: from the cache if it is there
+   * with the pinned digest, from the release otherwise. Throws — and leaves nothing behind — if
+   * what the release serves is not what was pinned.
+   *
+   * @param baseUrl what a release's tag and asset name are appended to; null for the repository's
+   *     releases
+   */
+  public static Path resolve(Pin pin, Path cacheDir, String baseUrl) throws IOException, InterruptedException {
+    String version = pin.pinnedVersion();
+    String asset = engineAsset();
+    String expected = pin.sha256().get(asset);
+    if (expected == null) {
+      throw new IllegalStateException("janus-engine " + version + " is pinned with no digest for " + asset + ".");
+    }
+    Path path = enginePath(pin, cacheDir);
+    try {
+      if (sha256(Files.readAllBytes(path)).equals(expected)) {
+        return path;
+      }
+    } catch (NoSuchFileException absent) {
+      // Not resolved yet.
+    }
+
+    String base = baseUrl != null ? baseUrl : "https://github.com/" + pin.repository() + "/releases/download";
+    String url = base + "/v" + version + "/" + asset;
+    // A release asset is served by a redirect to wherever GitHub keeps it.
+    HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    HttpResponse<byte[]> response =
+        client.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+    if (response.statusCode() != 200) {
+      throw new IOException("janus-engine " + version + " could not be fetched from " + url
+          + ": HTTP " + response.statusCode());
+    }
+    byte[] bytes = response.body();
+    String actual = sha256(bytes);
+    if (!actual.equals(expected)) {
+      throw new IOException(url + " is not the janus-engine that was pinned: its SHA-256 is " + actual
+          + ", and the pin says " + expected + ".");
+    }
+    // Written beside its final name and moved into place, so a run that is interrupted, or two
+    // that overlap, never leave half an engine where the next one will look.
+    Files.createDirectories(path.getParent());
+    Path partial = path.resolveSibling(path.getFileName() + "." + ProcessHandle.current().pid() + ".partial");
+    Files.write(partial, bytes);
+    if (!partial.toFile().setExecutable(true, false)) {
+      Files.deleteIfExists(partial);
+      throw new IOException("Could not make " + partial + " executable");
+    }
+    Files.move(partial, path, StandardCopyOption.REPLACE_EXISTING);
+    return path;
+  }
+
+  /**
+   * {@code EngineRelease <pin file> <out file>}: resolves the pinned engine and writes its path to
+   * the out file, for Gradle to give the tests as {@code JANUS_ENGINE}.
+   */
+  public static void main(String[] args) throws Exception {
+    if (args.length != 2) {
+      System.err.println("usage: EngineRelease <engine-release.json> <out file>");
+      System.exit(2);
+    }
+    Pin pin = Pin.read(Path.of(args[0]));
+    Path engine = resolve(pin, engineCache(System.getenv()), null);
+    Path out = Path.of(args[1]);
+    Files.createDirectories(out.toAbsolutePath().getParent());
+    Files.writeString(out, engine.toString(), StandardCharsets.UTF_8);
+    System.out.println("janus-engine " + pin.version() + " (released): " + engine);
+  }
+}

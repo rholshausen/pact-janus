@@ -15,6 +15,11 @@ name: Release
 # dependencies, the WASM crate — and on demand, so the pipeline is not first exercised on the day it
 # matters. That includes the release pull request itself: the commit is built whole before it is
 # merged.
+#
+# After publishing, the SDKs' pin for the new release is written by the tool that verifies it, both
+# SDK suites resolve the release through it with no Rust toolchain, and it is pushed as a branch to
+# open a pull request from (staged plan S0.10). A change to that tool, or to the pin, rehearses
+# here too: the tool must reproduce the checked-in pin from the release it names.
 
 on:
   push:
@@ -26,6 +31,8 @@ on:
       - Cargo.lock
       - rust-toolchain.toml
       - engine/wasm/**
+      - tools/engine-pin/**
+      - sdks/engine-release.json
   workflow_dispatch:
 
 permissions:
@@ -323,3 +330,140 @@ jobs:
           for file in *; do
             gh attestation verify "$file" --repo "$GITHUB_REPOSITORY"
           done
+
+  pin:
+    # Staged plan S0.10, ADR 0029 decision 5: the SDKs' pin for what was just published, written by
+    # the tool that verifies the release's attested SHA256SUMS and reads the digests from it — the
+    # same command a maintainer runs by hand. On a rehearsal there is nothing new to pin, so the
+    # tool pins the release the SDKs already name, and must write exactly what is checked in.
+    needs: [plan, publish]
+    if: ${{ !cancelled() && needs.plan.outputs.build == 'true' && needs.publish.result != 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PUBLISH: ${{ needs.plan.outputs.publish }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-pin
+          workspaces: |
+            .
+            third-party/janus-csv
+      - name: Pin
+        run: |
+          if [ "$PUBLISH" = true ]; then
+            cargo run --locked --package pact_janus_engine_pin -- "$VERSION" --repo "$GITHUB_REPOSITORY"
+          else
+            pinned="$(jq -r .version sdks/engine-release.json)"
+            cargo run --locked --package pact_janus_engine_pin -- "$pinned"
+            if ! git diff --exit-code -- sdks/engine-release.json; then
+              echo "::error::engine-pin does not reproduce sdks/engine-release.json from release $pinned."
+              exit 1
+            fi
+          fi
+      # The one test fixture the SDK suites below cannot build without Rust.
+      - name: Build the CSV component
+        if: env.PUBLISH == 'true'
+        working-directory: third-party/janus-csv
+        run: cargo build --locked --release --target wasm32-wasip2
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH == 'true'
+        with:
+          name: engine-pin
+          path: |
+            sdks/engine-release.json
+            third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm
+          if-no-files-found: error
+
+  sdks:
+    # Staged plan S0.10's exit, on the real thing: both SDK suites, on each operating system a
+    # release is resolved on, with no Rust toolchain, resolving the release just published through
+    # the pin just written — fetched, checked against its digest and run. The SDKs are the ones
+    # this commit holds, so nothing has drifted from the engine.
+    needs: [plan, pin]
+    if: needs.plan.outputs.publish == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      JANUS_ENGINE_RELEASE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: No Rust toolchain
+        run: |
+          if command -v rustup >/dev/null; then rustup self uninstall -y; fi
+          for tool in cargo rustc rustup; do
+            if command -v "$tool"; then
+              echo "::error::$tool is still installed."
+              exit 1
+            fi
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine-pin
+          path: ${{ runner.temp }}/pin
+      - name: The pin just written
+        run: |
+          cp "$RUNNER_TEMP/pin/sdks/engine-release.json" sdks/engine-release.json
+          git diff -- sdks/engine-release.json
+          echo "JANUS_CSV_COMPONENT=$RUNNER_TEMP/pin/third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: TypeScript SDK
+        working-directory: sdks/typescript
+        run: npm ci && npm test
+      - name: JVM SDK
+        working-directory: sdks/jvm
+        run: ./gradlew test
+
+  propose-pin:
+    # The pin goes to main as a pull request, reviewed like any other change to what the SDKs run.
+    # Pushed as the `engine-pin` branch for a maintainer to open it from, as prepare-release.yml
+    # does, so that CI runs on it — it would not for a pull request this run's own token opened.
+    needs: [plan, sdks]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # To push the `engine-pin` branch. It cannot push to main, and opens no pull request.
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine-pin
+          path: ${{ runner.temp }}/pin
+      - name: Push the engine-pin branch
+        run: |
+          git switch -c engine-pin
+          cp "$RUNNER_TEMP/pin/sdks/engine-release.json" sdks/engine-release.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: the SDKs pin janus-engine $VERSION" -- sdks/engine-release.json
+          # Forced: an unmerged `engine-pin` branch from an earlier release is replaced.
+          git push --force origin engine-pin
+          {
+            echo "### The SDKs' pin for $VERSION is ready"
+            echo
+            echo "Both SDK suites passed against it on every runner above. [Open the pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...engine-pin?expand=1&title=chore:%20the%20SDKs%20pin%20janus-engine%20$VERSION)."
+          } >> "$GITHUB_STEP_SUMMARY"

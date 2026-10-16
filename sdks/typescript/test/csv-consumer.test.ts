@@ -2,7 +2,8 @@
 // SDK against the real engine, with the body handled by a third-party content component the
 // project declares — `third-party/janus-csv`, built here to wasm32-wasip2 and loaded by the engine
 // from its path. Nothing in the SDK knows what CSV is: it declares the body's type and the
-// component, and the engine does the rest.
+// component, and the engine does the rest. Where there is no Rust toolchain (staged plan S0.10),
+// JANUS_CSV_COMPONENT names a janus_csv.wasm built elsewhere, and nothing is built here.
 
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile } from "node:fs/promises";
@@ -59,12 +60,13 @@ describe("a CSV consumer, through a third-party content component", () => {
   let csv: ComponentDeclaration;
 
   beforeAll(() => {
-    execFileSync("cargo", ["build", "--release", "--target", "wasm32-wasip2"], { cwd: componentDir, stdio: "inherit" });
+    let built = process.env.JANUS_CSV_COMPONENT;
+    if (!built) {
+      execFileSync("cargo", ["build", "--release", "--target", "wasm32-wasip2"], { cwd: componentDir, stdio: "inherit" });
+      built = join(componentDir, "target/wasm32-wasip2/release/janus_csv.wasm");
+    }
     // Relative, as a project would write it: the SDK resolves it against the working directory.
-    csv = {
-      name: "csv",
-      source: { kind: "file", reference: relative(process.cwd(), join(componentDir, "target/wasm32-wasip2/release/janus_csv.wasm")) },
-    };
+    csv = { name: "csv", source: { kind: "file", reference: relative(process.cwd(), resolve(built)) } };
   }, 300_000);
 
   it("serves every variant as CSV and writes a contract that declares the type", async () => {

@@ -16,6 +16,7 @@ members = [
   "tools/thinness",
   "tools/bindings",
   "tools/doc-links",
+  "tools/engine-pin",
 ]
 # The benchmark harness is durable but standalone — it drags the whole
 # pact_ffi dependency tree, which the main workspace should not pay for.

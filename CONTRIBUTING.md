@@ -74,6 +74,15 @@ the change files gathered so far add up to.
 2. Merge it. The **Release** workflow builds `janus-engine` and `janus` for five target triples and
    the engine as a WASM component, attests every file, and then creates the `v<version>` tag and the
    GitHub release together. Do not push the tag yourself.
+3. Open the pull request that moves the SDKs' pin. After publishing, the same workflow writes
+   `sdks/engine-release.json` for the new release (`engine-pin`, below), runs both SDK suites against
+   the release on every operating system with no Rust toolchain installed, and pushes the result as
+   the `engine-pin` branch. Its summary links to the pull request. To write a pin by hand, with `gh`
+   signed in:
+  ```
+  cargo run -p pact_janus_engine_pin -- 0.1.0
+  ```
+   It refuses to write anything unless `gh attestation verify` passes on the release's `SHA256SUMS`.
 
 What a release's signature is, and how to check a download, is
 [ADR 0029](Documentation/decisions/0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md):
