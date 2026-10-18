@@ -89,5 +89,5 @@ What a release's signature is, and how to check a download, is
 [ADR 0029](Documentation/decisions/0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md):
 `sha256sum --check SHA256SUMS`, and `gh attestation verify <file> --repo rholshausen/pact-janus`.
 
-Conventions for AI-assisted work are in `CLAUDE.md` / `.github/copilot-instructions.md` — humans may
-find them a useful summary too.
+Conventions for AI-assisted work are in `AGENTS.md`, which Claude Code (through `CLAUDE.md`), GitHub
+Copilot and other agents read. Humans may find it a useful summary too.

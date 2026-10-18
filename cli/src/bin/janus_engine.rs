@@ -11,7 +11,7 @@
 //! The command line is `--help` and `--version` and nothing else: an SDK spawns this with no
 //! arguments, and everything it configures goes through the protocol.
 //!
-//! This binary is where the kernel's `tracing` facade goes somewhere (CLAUDE.md: "a subscriber is
+//! This binary is where the kernel's `tracing` facade goes somewhere (AGENTS.md: "a subscriber is
 //! an application concern, installed by whatever embeds the kernel"). `Engine::dispatch` traces
 //! every frame at `trace` level, so `RUST_LOG=trace janus-engine` shows exactly what crossed the
 //! wire in both directions.

@@ -1,6 +1,6 @@
 //! Structured errors for the contract model (contract-file spec §11).
 //!
-//! Deliberately not `anyhow`: CLAUDE.md's "errors are values" rule applies to everything that will
+//! Deliberately not `anyhow`: AGENTS.md's "errors are values" rule applies to everything that will
 //! eventually cross the engine boundary, and a contract-model error is exactly that kind of value —
 //! later protocol wiring lifts a `code()` straight into an `EngineError` frame (engine-protocol spec
 //! §10) without re-deriving the mapping.

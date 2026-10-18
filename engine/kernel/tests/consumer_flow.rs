@@ -6,7 +6,7 @@
 //! `finalise`, and assert the written contract.
 //!
 //! The HTTP client is hand-rolled (`std::net::TcpStream`, one GET, no body, an empty JSON object
-//! back): a request this trivial doesn't earn a new dependency, and CLAUDE.md keeps this
+//! back): a request this trivial doesn't earn a new dependency, and AGENTS.md keeps this
 //! prototype's dependency list part of the thin-SDK story it's telling.
 
 use pact_janus_component_http::HttpTransport;

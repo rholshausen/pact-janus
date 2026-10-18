@@ -2,7 +2,7 @@
 //! module is the **native binding** (spec §9.1) — traits and in-memory request/result documents,
 //! implemented by built-in component crates (`engine/component-http`, `engine/component-json`)
 //! that this crate deliberately does not depend on, so the kernel itself stays free of HTTP/JSON
-//! knowledge (CLAUDE.md's B3, kernel-boundary-review.md).
+//! knowledge (AGENTS.md's B3, kernel-boundary-review.md).
 //!
 //! Out of scope here, deliberately: the WASM and subprocess bindings themselves, which need a
 //! runtime this crate cannot depend on and which an embedding registers as a [`ComponentLoader`]

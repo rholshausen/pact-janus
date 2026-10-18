@@ -1,6 +1,6 @@
 //! A structured position, shared by every document model the kernel validates.
 //!
-//! Deliberately not `anyhow`: CLAUDE.md's "errors are values" rule applies to everything that will
+//! Deliberately not `anyhow`: AGENTS.md's "errors are values" rule applies to everything that will
 //! eventually cross the engine boundary, and a document-validation error is exactly that kind of
 //! value — later protocol wiring lifts these straight into an `EngineError` frame's `problems`
 //! (engine protocol spec §10.2) without re-deriving the mapping.

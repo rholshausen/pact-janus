@@ -58,7 +58,7 @@ jsonschema = { version = "0.51", default-features = false }
 # the sample's own tests, and deliberately not the thing under test.
 ureq = "3"
 # `#[test_log::test]` installs a tracing subscriber for the test, reading `RUST_LOG`, so
-# `RUST_LOG=debug cargo test -- --nocapture` (CLAUDE.md) has somewhere to send the kernel's own
+# `RUST_LOG=debug cargo test -- --nocapture` (AGENTS.md) has somewhere to send the kernel's own
 # tracing output without every test file rolling its own init helper.
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 

@@ -496,7 +496,7 @@ at, because the remedies are opposite:
 
 - **A `result` diff is a behaviour change.** The engine now accepts or rejects something it did not.
   Either the change is a bug, or it is a deliberate change to matching behaviour — in which case
-  `corpora/` changes in the same commit, which is the rule `CLAUDE.md` already states.
+  `corpora/` changes in the same commit, which is the rule `AGENTS.md` already states.
 - **A `plan.txt` diff with `result` unchanged is a plan change.** A newer compiler may legitimately
   emit a different plan — a better optimisation, a clearer structure — and §7 permits it. The remedy
   is to regenerate the snapshot and let the diff land in the pull request.

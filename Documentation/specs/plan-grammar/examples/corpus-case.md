@@ -119,7 +119,7 @@ Suppose a change to the `optional` compilation makes an absent member fail. The 
 ```
 
 **A `result` diff is never an acceptable optimisation.** The engine now rejects something it used to
-accept, and `CLAUDE.md`'s rule applies: a behaviour change without a corpus change is a bug, and a
+accept, and `AGENTS.md`'s rule applies: a behaviour change without a corpus change is a bug, and a
 corpus change is where the deliberate ones get argued for.
 
 ## 5. Red of the second kind: a snapshot diff

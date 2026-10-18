@@ -118,7 +118,7 @@ impl Engine {
   /// An engine wired to real components (plan task 4.5) — what an embedding (the CLI's subprocess
   /// binary, an SDK's native binding) builds so `start-transport` and the live exchange loop it
   /// drives have something to call. The kernel never depends on `transports`/`content`'s own
-  /// crates (CLAUDE.md's B3); this is the injection point that keeps it that way.
+  /// crates (AGENTS.md's B3); this is the injection point that keeps it that way.
   pub fn with_components(
     transports: HashMap<String, Arc<dyn TransportComponent>>,
     content: Option<Arc<dyn ContentComponent>>,

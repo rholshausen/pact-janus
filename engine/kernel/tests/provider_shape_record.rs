@@ -448,7 +448,7 @@ fn the_recorded_shape_finds_the_undeclared_variance_in_the_consumers_contract() 
 /// The document `samples/order-service/shapes/` holds is *this* recording, not a hand-written
 /// approximation of it — checked in because `janus check` needs a file to read (plan task 7.4)
 /// and a reader needs something to look at, asserted here because a checked-in artifact nobody
-/// regenerates is a corpus entry that has quietly stopped being true (CLAUDE.md: corpora are
+/// regenerates is a corpus entry that has quietly stopped being true (AGENTS.md: corpora are
 /// load-bearing). Regenerate it from this recording if the recorder's judgements change.
 #[test]
 fn the_checked_in_sample_shape_is_what_the_recorder_produces() {

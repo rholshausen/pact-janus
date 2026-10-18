@@ -1,5 +1,5 @@
 //! `bindings [--spec <dir>] generate [--only typescript|jvm [--sdk <dir>]]` — regenerates the SDKs'
-//! protocol bindings from the spec schemas (plan task 6.1): the one command CLAUDE.md's "regenerate
+//! protocol bindings from the spec schemas (plan task 6.1): the one command AGENTS.md's "regenerate
 //! them via the binding pipeline" means. Shared by this crate's own binary and `janus-sdk-gates
 //! bindings` (staged plan S0.11).
 //!

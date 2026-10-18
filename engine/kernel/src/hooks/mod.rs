@@ -12,7 +12,7 @@
 //! capability, exactly as component loaders are — ADR 0013). `exec` needs to spawn a process and
 //! `http` needs an HTTP client, neither of which belongs in a kernel that builds for every embedding, so
 //! both arrive as [`invoke::HookInvoker`]s the embedding registers — the same injection point
-//! transports already use, for the same reason (CLAUDE.md's B3). `component` hooks are answered by
+//! transports already use, for the same reason (AGENTS.md's B3). `component` hooks are answered by
 //! a registered [`crate::component::HookComponent`]. A configuration naming a kind the embedding
 //! did not register fails **before the first exchange** with `hook-unavailable` naming it, because
 //! a degraded run that silently skipped a signing hook is worse than no run.

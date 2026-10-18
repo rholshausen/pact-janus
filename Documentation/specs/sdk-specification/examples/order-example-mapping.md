@@ -1,6 +1,6 @@
 # Worked example — mapping the RFC's consumer test
 
-The RFC's own consumer example — the one CLAUDE.md names as this project's DSL reference surface — call
+The RFC's own consumer example — the one AGENTS.md names as this project's DSL reference surface — call
 by call, from DSL text to the behavioural-specification primitive it exercises to what that primitive
 produces. This file does not re-derive shape semantics: [shape-language's order-payload
 example](../../shape-language/examples/order-payload.md) already carries the same payload from DSL to

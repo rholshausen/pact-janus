@@ -76,13 +76,13 @@ Three layers, per the RFC, and each has exactly one obligation:
 1. **Generated bindings** — typed views of the protocol's own JSON Schemas (engine-protocol spec §2.3):
    request/result/event documents, shape and variant documents, error documents. Produced by the binding
    pipeline (task 6.1) from `Documentation/specs/*/schemas/`, the same schemas every other design ships,
-   and **never hand-edited** (CLAUDE.md's rule, restated because it is this layer's entire reason to
+   and **never hand-edited** (AGENTS.md's rule, restated because it is this layer's entire reason to
    exist: a hand-edited generated file is a second source of truth the pipeline cannot know about).
 2. **The idiomatic layer** — DSL, test-framework integration, docs. This is the only hand-written
    production code an SDK contains, and its role is exactly this and nothing more: **translate DSL calls
    into protocol operations and shape/plan documents, and translate protocol results and errors into
    language-native constructs.** No matching logic, no orchestration beyond the protocol's own operations
-   (CLAUDE.md architecture rule; RFC: "New engine features surface in an SDK by regenerating bindings and
+   (AGENTS.md architecture rule; RFC: "New engine features surface in an SDK by regenerating bindings and
    adding DSL sugar").
 3. **The conformance run** — executing task 6.4's suite, in this language, against a pinned engine
    version, in CI. This is what makes "conformant" (§7) a claim a build can fail, not a claim a maintainer
@@ -183,7 +183,7 @@ the source of truth.
 ## 4. Worked reference: the RFC's consumer example
 
 [`examples/order-example-mapping.md`](examples/order-example-mapping.md) walks the RFC's own consumer
-test — the one CLAUDE.md's TypeScript conventions already name as the DSL's reference surface
+test — the one AGENTS.md's TypeScript conventions already name as the DSL's reference surface
 (`optional`, `anyOf`, `oneOf`, `eachLike`, `janus.execute(interaction, async (mock, variant) => …)`) — call
 by call, from DSL text to the primitive entries it exercises to the protocol operations those entries
 resolve to at `execute` time:

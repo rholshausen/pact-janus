@@ -1,37 +1,50 @@
-# Copilot Instructions
+# AGENTS.md
 
-Pact Janus is a ground-up redesign of the [Pact](https://pact.io) contract testing framework per
-the [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146) — begun as a prototype of the
-RFC, now the real build, hardening that prototype in place (ADR 0027): one Rust reference engine
-behind a coarse-grained versioned protocol, thin language SDKs, interaction specs compiled to
-inspectable matching plans, a shape language with variant testing, and plugins as first-class components.
+Guidance for AI coding agents working in this repository: Claude Code, which reads it through
+`CLAUDE.md`'s import, GitHub Copilot (the coding agent and PR review), and any other agent that reads
+`AGENTS.md`. It is the only copy, so edit it here.
 
-Source of truth: `Documentation/staged-implementation-plan.md` (the plan for the real build, and the
-live one; item ids like "S1.4" refer to it), `Documentation/prototype/project-plan.md` (the phased plan
-the prototype was built to; task numbers like "1.6"/"G1" refer to it — it and the reports beside it are
-a finished record: cite them, do not update them), `Documentation/decisions/` (ADRs — don't re-litigate accepted ones in code; supersede them), and
-`Documentation/specs/` (Phase 2 design specs, normative for the code implementing them — the schemas
-they ship are the specified surface, not documentation of it; `engine-protocol/` from task 2.1 governs
-every frame crossing the engine boundary, `shape-language/` from task 2.2 governs shapes — what they
-admit, how they compose, and the variant dimensions they contribute — and `variant-semantics/` from
-task 2.3 governs variants — selection, naming, recording, and variant-bound provider state — and
-`plan-grammar/` from task 2.4 governs plans: the node grammar, the action set, the text forms
-`explain` prints, and the golden-corpus format, and `contract-file/` from task 2.5 governs the Janus
-contract — the recorded artifact's identity, its interaction record, how shapes and exercised variants
-are written down, and v1–v4 pact conversion; it is *not* a "pact v5", see ADR 0011 — and
-`component-interfaces/` from task 2.6 governs the four interfaces the kernel loads behind it: the pipe
-components speak, what they contribute, the native/WASM/subprocess bindings, and how out-of-tree components
-are distributed, sandboxed and resolved, and `lifecycle-hooks/` from task 2.7 governs the hook system
-around that interface — the points and what each is handed, ordering and failure semantics, the
-configuration a loader resolves before the engine sees it (ADR 0014), the four implementations, and the
-scripted-hook runtime (ADR 0015), and `subsumption-check/` from task 2.8 governs the
-`admits(provider) ⊆ admits(consumer)` walk — the composition rules on top of the shape language's
-comparability classes, the provider-shape artifact, the finding vocabulary and report format, and the
-warn/block policy with exemption scoping (ADR 0016), and `sdk-specification/` from task 2.9 governs
-what a Janus SDK is — the canonical, language-independent behavioural spec every idiomatic layer
-implements, the per-language style-guide skeleton, the compatibility-facade classification for
-today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync with
-`CLAUDE.md`.
+## Overview
+
+Pact Janus is a ground-up redesign of the [Pact](https://pact.io) contract testing framework, based on
+the [Pact MkII RFC](https://github.com/pact-foundation/roadmap/pull/146). It began as a prototype of
+the RFC and is now the real build, hardening that prototype in place (ADR 0027): a single
+Rust reference engine behind a coarse-grained versioned protocol, thin language SDKs, declarative
+interaction specs compiled to inspectable matching plans, a shape language with variant testing, and
+plugins as first-class components.
+
+Three sources are the source of truth and take precedence over this file when they conflict:
+
+- `Documentation/staged-implementation-plan.md` — the plan for the real build, and the live one;
+  item ids like "S1.4" refer to it. `Documentation/prototype/project-plan.md` — the phased plan the
+  prototype was built to; task numbers like "1.6" or "G1" refer to it. It is finished, and it and the
+  reports beside it are a record: cite them, do not update them.
+- `Documentation/decisions/` — ADRs. Every gate and contested design choice lands here. Do not
+  re-litigate an accepted ADR in code; propose a superseding ADR instead.
+- `Documentation/specs/` — the Phase 2 design specifications. Normative for the code that
+  implements them; the schemas they ship are the specified surface, not documentation of it.
+  `engine-protocol/` (task 2.1) governs every frame crossing the engine boundary;
+  `shape-language/` (task 2.2) governs shapes — what they admit, how they compose, and the
+  variant dimensions they contribute; `variant-semantics/` (task 2.3) governs variants — which
+  ones get selected, how they are named and recorded, and how they drive provider state;
+  `plan-grammar/` (task 2.4) governs plans — the node grammar, the action set, the text forms
+  `explain` prints, and the golden-corpus format; `contract-file/` (task 2.5) governs the Janus
+  contract — the recorded artifact's identity, its interaction record, how shapes and exercised
+  variants are written down, and v1–v4 pact conversion. It is **not** a "pact v5" (ADR 0011);
+  `component-interfaces/` (task 2.6) governs the four interfaces the kernel loads behind it —
+  transport, content, matcher/generator, hook — the pipe they speak, what a component contributes,
+  the three bindings, and how out-of-tree components are distributed, sandboxed and resolved;
+  `lifecycle-hooks/` (task 2.7) governs the hook *system* the hook interface sits inside — the point
+  vocabulary and each point's context and mutable set, ordering and failure semantics, the
+  configuration document the loader resolves before the engine sees it (ADR 0014), the four
+  implementations, and the scripted-hook runtime and its API (ADR 0015);
+  `subsumption-check/` (task 2.8) governs the `admits(provider) ⊆ admits(consumer)` walk — the
+  composition rules on top of the shape language's own comparability classes, the provider-shape
+  artifact, the finding vocabulary and report format, and the warn/block policy with exemption
+  scoping (ADR 0016); `sdk-specification/` (task 2.9) governs what a Janus SDK is — the canonical,
+  language-independent behavioural spec every idiomatic layer implements, the per-language
+  style-guide skeleton, the compatibility-facade classification for today's DSL, and what
+  "conformant" means (ADR 0017).
 
 > **Status**: the prototype is complete — Phases 0–9 of the project plan are done, and the staged plan
 > for the real build is `Documentation/staged-implementation-plan.md` (task 9.4). Since 2026-10-11 that
@@ -41,9 +54,11 @@ today's DSL, and what "conformant" means (ADR 0017)). Keep this file in sync wit
 > run with no Rust toolchain, against a released engine they resolve by its pinned digest), S0.11
 > (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone),
 > S0.5 (the codename is rename-ready: `Documentation/codename.md`, rehearsed weekly). Stage 0a is done.
+> In stage 1a: S1.1 (the differential harness runs in CI, and every verdict `janus verify` and today's
+> verifier disagree on is in `corpora/verifier/disagreements.json` with the item that closes it).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
-## Repository layout
+## Intended repository layout
 
 ```
 engine/          Rust workspace members: kernel, built-in component crates, hooks-host —
@@ -53,7 +68,7 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  outside the kernel because a WASM guest cannot host WASM (ADR 0013);
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
-cli/             `pact` CLI (verify, explain, upgrade, check)
+cli/             `janus` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
                  its protocol bindings (task 6.1)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bindings` project
@@ -95,12 +110,13 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  for the open-world rules every schema under Documentation/specs/ follows,
                  and for the specs' worked examples — tools/bindings, the binding-generation
                  pipeline (task 6.1), tools/conformance, the conformance suite's checker
-                 (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it counts each SDK
-                 by layer from the SDK's own thinness.json — tools/doc-links, the documentation link check (S0.12) — and
-                 tools/engine-pin, which writes sdks/engine-release.json from a release's
-                 attested SHA256SUMS (S0.10). tools/sdk-gates is the first three as the one
-                 binary a release ships, `janus-sdk-gates` (S0.11, ADR 0030). tools/verifier-diff
-                 is S1.1's differential harness: today's verifier and janus verify over corpora/verifier/
+                 (task 6.4), tools/thinness, the SDK thinness audit (task 6.5) — it reads
+                 each SDK's own thinness.json, counts it by layer and budgets the hand-written ones —
+                 tools/doc-links, the documentation link check (S0.12) — and tools/engine-pin, which
+                 writes sdks/engine-release.json from a release's attested SHA256SUMS (S0.10).
+                 tools/sdk-gates is the first three as the one binary a release ships,
+                 `janus-sdk-gates` (S0.11, ADR 0030). tools/verifier-diff is S1.1's differential
+                 harness: today's verifier and janus verify over corpora/verifier/
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -108,15 +124,15 @@ Documentation/   The staged plan, ADRs, specs and the charter; prototype/ is the
                  record — the project plan and each task's report, kept as written (S0.12)
 ```
 
-## Build, test, and lint commands
+## Build & test commands
 
-Rust — the Cargo workspace root is the repo root. One non-Rust build requirement: **libclang**,
-which `rquickjs`'s bindgen build needs — the kernel embeds QuickJS as the scripted-hook runtime
+Rust (workspace root at the repo root). One non-Rust build requirement: **libclang**, which
+`rquickjs`'s bindgen build needs — the kernel embeds QuickJS as the scripted-hook runtime
 (ADR 0015), including in the `wasm32-wasip2` build:
 
 ```bash
 cargo build                                  # build the workspace
-cargo test                                   # all tests
+cargo test                                   # run all tests
 cargo test --package <crate>                 # one crate
 cargo test --package <crate> -- name --exact # one test
 RUST_LOG=debug cargo test -- --nocapture     # with tracing output
@@ -126,12 +142,12 @@ cargo build --target wasm32-wasip2           # WASM component build (engine crat
 cargo build --release -p pact_janus_engine_wasm --target wasm32-wasip2   # the engine as a WASM component
 ```
 
-TypeScript — from `sdks/typescript/`:
+TypeScript (from `sdks/typescript/`):
 
 ```bash
 npm ci               # install (npm is the package manager)
 npm run build        # compile
-npm test             # Vitest
+npm test             # run tests (Vitest)
 npm run lint         # ESLint
 ```
 
@@ -140,21 +156,38 @@ npm run lint         # ESLint
 `Documentation/specs/sdk-specification/behavioural-spec.json` — change it there first; `STYLE.md`
 records how the TypeScript spelling expresses it.
 
-JVM — from `sdks/jvm/` (JDK 17): `./gradlew build test`.
+JVM (from `sdks/jvm/`, JDK 17): `./gradlew build test`.
 
-The SDK conformance suite (plan task 6.4, ADR 0017) is one corpus under `conformance/` that both
-SDKs run as part of those test commands, each writing a report to `target/conformance/`:
-`cargo run -p pact_janus_conformance -- lint` checks the corpus (a conformance id in
-`behavioural-spec.json` with no case fails), and `-- check target/conformance/*.json` checks that
-each SDK accounted for every case and passed it. See `conformance/README.md`. The checkers read the
-repository from the working directory, or from `--spec <dir>`; `JANUS_SPEC` tells the SDKs' drivers
-the same. Either may be an unpacked `janus-spec.tar.gz` from a release (S0.11, ADR 0030).
+The SDK conformance suite (plan task 6.4, ADR 0017) is one corpus under `conformance/` that **both**
+SDKs run as part of the test commands above, each writing a report to `target/conformance/`. The
+corpus is checked in; the reports are build artifacts:
 
-The thinness audit (plan task 6.5) makes the "SDKs are thin" claim a command:
-`cargo run -p pact_janus_thinness` prints each SDK's lines by layer, and `-- check` (which CI runs)
-fails if a hand-written layer exceeds its budget in the SDK's `thinness.json` (`sdks/<sdk>/`, paths
-relative to it), or if any SDK source file
-belongs to no layer. A new file needs a layer; raising a budget belongs in the commit message.
+```bash
+cargo test -p pact_janus_conformance          # the corpus against its schema and the spec's ids
+cargo run -p pact_janus_conformance -- lint   # the same, with a coverage summary
+cargo run -p pact_janus_conformance -- check target/conformance/*.json   # did each SDK pass it
+```
+
+The checkers read the repository from the working directory, so run them from its root, or name it
+with `--spec <dir>`; `JANUS_SPEC` tells the SDKs' own drivers the same. Either may instead be an
+unpacked `janus-spec.tar.gz` from a release, whose paths are the repository's (S0.11, ADR 0030).
+
+A conformance id in `behavioural-spec.json` with no case fails the lint, and a case that fails in
+either language fails CI. When a case and an SDK disagree and the specification does not settle it,
+change `behavioural-spec.json` first — `conformance/README.md` §7.
+
+The thinness audit (plan task 6.5) is the other claim made into a command: every SDK source file
+must be classified into a layer in its SDK's `thinness.json` (`sdks/<sdk>/thinness.json`, paths
+relative to it), and the hand-written layers stay inside a
+budget, so matching logic or orchestration creeping back into an SDK fails the build:
+
+```bash
+cargo run -p pact_janus_thinness              # the table, by layer, per SDK
+cargo run -p pact_janus_thinness -- check     # the same, as an exit code (CI runs this)
+```
+
+A new SDK source file with no layer is an error, not a default — say which layer it belongs to.
+Raising a budget is a decision that belongs in the commit message.
 
 The differential verification harness (S1.1) is "exactly as today" made into a number: it runs
 today's verifier (`pact_verifier_cli`, at the version `tools/verifier-diff/pact-verifier.json` pins)
@@ -167,6 +200,14 @@ entry nothing disagrees on any more, so a change that closes a gap deletes its e
 .github/scripts/pact-verifier.sh target/pact-verifier   # the pinned verifier, checksum verified
 cargo build -p pact_janus_cli --bin janus
 PACT_VERIFIER_CLI=target/pact-verifier/pact-verifier-linux-x86_64 cargo run -p pact_janus_verifier_diff -- run
+```
+
+The documentation link check (S0.12) holds every Markdown file in the repository to one rule: a
+relative link resolves to a file that exists, and to a heading in it when the link names one. It runs
+offline — links with a scheme are not fetched — and as part of `cargo test`:
+
+```bash
+cargo run -p pact_janus_doc_links             # every relative link, as an exit code (CI runs this)
 ```
 
 Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects. A
@@ -284,69 +325,84 @@ registry that tampers on request, and against a real one when `JANUS_OCI_REGISTR
 (`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this).
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0023, every SDK's primary embedding): built by the
-Rust commands above (`cargo build -p pact_janus_cli --bin janus-engine` targets it alone). Its
-protocol-level Node test client — plan task 4.5's "thin test client speaks the protocol directly,"
-not an SDK, and deliberately outside `sdks/` — lives at `cli/tests/janus-engine-node/`:
-`npm install` once, then `npm test` (rebuilds the binary itself in a `beforeAll`, so it never runs
-against a stale one). It installs the `tracing-subscriber` the kernel's own `tracing` facade needs;
+normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`
+targets it alone). Its own protocol-level Node test client — plan task 4.5's "thin test client
+speaks the protocol directly," not an SDK, and deliberately outside `sdks/` — lives at
+`cli/tests/janus-engine-node/`: `npm install` once, then `npm test` (rebuilds the binary itself
+via `cargo build` in a `beforeAll`, so it never runs against a stale one). It installs the
+`tracing-subscriber` the kernel's own `tracing` facade needs (this file's Rust conventions below);
 `RUST_LOG=trace janus-engine` logs every frame `Engine::dispatch` sees in both directions to
 stderr (stdout stays frames-only).
 
 ## Architecture rules
 
-- The kernel knows nothing about HTTP or JSON: transports, content handlers, matchers/generators and
-  hooks — including built-ins — are components behind the published component interfaces. Flag any
-  change that leaks protocol/content knowledge into the kernel.
-- Errors are values at the engine boundary; panics never cross the protocol. Sessions are the only
-  resource (no per-object cleanup calls). A plan node the engine's own compilers did not build (a
-  component's fragment, a plan document read back) is not trusted: every core action has a least
-  child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.
-- SDKs are thin: no matching logic or orchestration beyond the protocol operations. Generated protocol
-  bindings are never hand-edited — regenerate them.
-- Corpora are load-bearing: any matching-behaviour change must change `corpora/` in the same commit,
-  and any change to what an SDK's DSL does belongs in the behavioural specification and
-  `conformance/`, which every SDK runs (ADR 0017).
-- A change that ships says so, in a change file: the version and the changelog come from
+- **The kernel knows nothing about HTTP or JSON.** Transports, content handlers, matchers/generators and
+  hooks are components behind the interfaces in the component-interface spec — including the built-in
+  ones. If a change leaks protocol- or content-specific knowledge into the kernel, stop and flag it
+  (plan task 3.8 tracks exactly this).
+- **Errors are values at the engine boundary.** Panics must never cross the protocol; every operation
+  returns structured errors. Sessions are the only resource — no per-object cleanup calls. A plan node
+  the engine's own compilers did not build — a component's fragment, a plan document read back — is
+  not trusted: the interpreter reads an action's children by position, so every core action has a
+  least child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.
+- **SDKs are thin.** No matching logic, no orchestration beyond the protocol operations, in any SDK.
+  Generated protocol bindings are never hand-edited — regenerate them via the binding pipeline.
+- **Corpora are load-bearing.** Any change to matching behaviour must change `corpora/` in the same
+  commit. CI runs plans against the corpora; a behaviour change without a corpus change is a bug.
+  The same holds one layer up: a change to what an SDK's DSL does belongs in the behavioural
+  specification and `conformance/` — every SDK runs that corpus, and "conformant" means passing it
+  (ADR 0017).
+- **A change that ships says so, in a change file.** The version and the changelog come from
   `.changeset/`, not from commit subjects (ADR 0028). The `v<version>` tag and the release's asset
   names (`janus-engine-<triple>`, `janus-<triple>`, `janus-sdk-gates-<triple>`, `janus-engine.wasm`,
   `janus-spec.tar.gz`, `SHA256SUMS`; ADR 0030) are what SDKs
-  pin against — changing one is a superseding ADR, not a workflow edit — and no release step may need
+  pin against: changing one is a superseding ADR, not an edit to a workflow. No release step may need
   a credential that outlives a workflow run (ADR 0028 decision 8, ADR 0029).
-- Documents are cited by path, so links are load-bearing too: every relative link in the repository's
-  Markdown must resolve (`cargo run -p pact_janus_doc_links`, which CI runs), and moving a document
-  means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md` and no
-  code (S0.12): the findings stay where the ADRs cite them, and nothing new is added there.
-- The codename is renamed by `.github/scripts/rename.sh <name>`, rehearsed weekly (S0.5, ADR 0031,
-  `Documentation/codename.md`). A name the engine reads back from a stored document — a `$format`,
-  a media type, an exported interface, something a user's configuration or script spells — is
-  defined in `engine/kernel/src/persisted.rs` and read with `reads()`, never against a literal.
+- **Documents are cited by path, so links are load-bearing too.** Every relative link in the
+  repository's Markdown must resolve, to a file and to a heading when it names one; moving or renaming
+  a document means fixing what cites it in the same commit. `spikes/` holds each spike's `FINDINGS.md`
+  and no code (S0.12): the findings stay where the ADRs cite them, and nothing new is added there.
+- **The codename is a codename.** "Janus" is renamed by one command, `.github/scripts/rename.sh <name>`,
+  which the weekly `Rename rehearsal` workflow runs on a throwaway checkout (S0.5, ADR 0031,
+  `Documentation/codename.md`). Anything new may carry the name; the script finds it. The exception
+  is a name the engine **reads back from a document that outlives it** — a `$format`, a media type,
+  an exported interface, something a user's configuration or script spells: define it in
+  `engine/kernel/src/persisted.rs` and read it with `reads()`, never against a literal, or documents
+  written before the rename stop being readable. The rehearsal cannot catch a literal: it renames it.
 
-## Conventions
+## Rust conventions
 
-Rust:
-- Edition 2024, latest stable toolchain, `cargo clippy` clean.
-- `tracing`/`tracing-subscriber` for logging (not `log`); `tokio` for async (not on WASM paths).
-- Test helpers: `rstest`, `expectest`, `pretty_assertions` — prefer these to new utilities.
+- Rust edition 2024, latest stable toolchain; `cargo clippy` clean.
+- Logging via `tracing` / `tracing-subscriber` (not `log`); async via `tokio` (not on WASM paths).
+- Test helpers: `rstest`, `expectest`, `pretty_assertions` — follow these before introducing new ones.
   A command's output is tested as a snapshot: `trycmd` for cases that need nothing running, `snapbox`
   inside a Rust test for the rest. Elide text the engine owns (`corpora/` pins it).
-- Crates shipped as WASM components must build for `wasm32-wasip2`; keep native-only dependencies out
-  of them or behind target-gated features.
+- Engine crates that ship as WASM components must build for `wasm32-wasip2`; keep native-only
+  dependencies (`tokio`, `reqwest`, raw sockets) out of those crates or behind target-gated features.
 - Everything builds and is tested on Linux, macOS and Windows (S0.2; CI runs all three). Never read
-  meaning out of a path's separator or spell one in an expected value; no Unix-only API or `/bin/...`
-  path without a Windows answer. `.gitattributes` pins text to LF in every checkout.
+  meaning out of a path's separator or spell one in an expected value — compare components, or
+  normalise to `/` where the path is an identifier. No Unix-only API or `/bin/...` path without a
+  Windows answer. `.gitattributes` pins text to LF in every checkout; keep it that way.
 
-TypeScript / JavaScript:
-- TypeScript with `strict: true` for all SDK/tooling source; no `any` in exported API surfaces. Plain
-  JavaScript only in generated output.
-- ESM modules, active Node LTS, Vitest for tests, ESLint + Prettier for lint/format, lean
-  devDependencies.
-- The public DSL mirrors the RFC's consumer example (`optional`, `anyOf`, `oneOf`, `eachLike`,
-  `pact.execute(...)`); change the SDK specification first, then the code.
+## TypeScript / JavaScript conventions
 
-Commits follow Conventional Changelog style (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).
+- TypeScript everywhere in SDK and tooling source; `strict: true`, no `any` in exported API surfaces.
+  Plain JavaScript only in generated output.
+- ESM modules; target the active Node LTS.
+- Tests with Vitest; lint with ESLint + Prettier defaults. Keep devDependencies lean — this is a
+  prototype of a *thin* SDK, and every dependency is part of the story it tells.
+- The public DSL surface follows the RFC's consumer example (`optional`, `anyOf`, `oneOf`, `eachLike`,
+  `janus.execute(interaction, async (mock, variant) => …)`); changes to it belong in the SDK
+  specification first, not directly in code.
+
+## Commit messages
+
+Conventional Changelog format: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
 
 ## Reference material
 
-`pact-reference` (usually a sibling checkout) provides `pact_models` (dependency) and the v2 matching
-engine prototype (`rust/pact_matching/src/engine`, forked as the kernel starting point). Read for
-context; record provenance in the commit message when adapting code from it.
+- The RFC: pact-foundation/roadmap PR #146 (local checkout usually at `../roadmap/rfc/0000-pact-mkii.md`).
+- `pact-reference` (usually checked out as a sibling directory) supplies `pact_models` (v1–v4 pact file
+  model, a dependency) and the v2 matching engine prototype in `rust/pact_matching/src/engine` (forked as
+  the kernel starting point — see the reuse-inventory report and ADRs). Read it for context; do not copy
+  code from it without recording provenance in the commit message.

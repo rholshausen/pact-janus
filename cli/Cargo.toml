@@ -38,7 +38,7 @@ serde_json = "1"
 # JSON — the same choice the hook loader makes for `verifier.janus.yaml`, and the same crate,
 # already in the tree behind `pact_janus_hooks_host`.
 serde_yaml_ng = "0.10"
-# The CLI is where the kernel's `tracing` facade actually goes somewhere (CLAUDE.md: "a subscriber
+# The CLI is where the kernel's `tracing` facade actually goes somewhere (AGENTS.md: "a subscriber
 # is an application concern, installed by whatever embeds the kernel"). `janus-engine` installs it
 # so `RUST_LOG=trace` shows the frames `Engine::dispatch` traces on every call.
 tracing = "0.1"
