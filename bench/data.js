@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792291885081,
+  "lastUpdate": 1792291886579,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -4920,6 +4920,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 29222,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "feae5e0ac9aac40b1fdad50e377c734b6613a4b7",
+          "message": "feat: S1.1 a state callback that fails once, and a fresh provider per verifier\n\nToday's verifier retries a state-change call that gets a 5xx, 408 or 429,\neight times with a back-off from 500 ms; janus verify's http hook does not\nretry. The corpus could not see the difference: its failing callback failed\nevery time. The scripted provider gains a `fail-once` callback (a 503, then\nsuccess), and corpora/verifier/state-callbacks/fails-once shows it: today\npasses, janus verify fails with hook-http-failed. Two ledger entries, under\nS1.9.\n\nIt first showed nothing, because both verifiers shared one provider per case\nand today's verifier used up the single failure. Each verifier now gets a\nfreshly started provider, so nothing one does to a provider changes what the\nother sees. No other verdict moved: 177 agree, 19 known.\n\nThe plan: S1.9 records the behaviour exactly (8 retries, those statuses, no\nCLI or FFI setting; an environment override, PACT_PROVIDER_STATE_CHANGE_RETRIES,\nproposed upstream) and the decision it leaves, the http hook's retry default.\nS1.13's table covers behaviour with no flag as well.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T13:33:13+11:00",
+          "tree_id": "67f7e7d717792bd51b38048f0cbb4deb65605ec1",
+          "url": "https://github.com/rholshausen/pact-janus/commit/feae5e0ac9aac40b1fdad50e377c734b6613a4b7"
+        },
+        "date": 1792291886252,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27880,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21096,
             "unit": "requests per second",
             "extra": "engines 4"
           }
