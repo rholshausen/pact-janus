@@ -95,8 +95,8 @@ pub struct Judgement {
   pub stale: Vec<Entry>,
   /// Both verifiers failed to give a verdict: nothing was compared.
   pub unjudged: Vec<String>,
-  /// Today's verifier disagrees with the verdict the fixture's source records: the fixture, not
-  /// Janus, is wrong.
+  /// Today's verifier disagrees with the verdict the fixture's source records, for the run or for
+  /// what a broker case publishes: the fixture, not Janus, is wrong.
   pub fixture_problems: Vec<String>,
 }
 
@@ -174,6 +174,16 @@ pub fn judge(results: &[CaseResult], ledger: &Ledger) -> Judgement {
           .unwrap_or_default()
       ));
     }
+    for (key, expected) in &result.expected_published {
+      if let Some(compared) = result.compared.iter().find(|compared| &compared.key == key)
+        && compared.today != *expected
+      {
+        judgement.fixture_problems.push(format!(
+          "{} {key}: the source says the run publishes {expected}, and today's verifier published {}",
+          result.id, compared.today
+        ));
+      }
+    }
   }
   let ran: BTreeSet<&str> = results.iter().map(|result| result.id.as_str()).collect();
   judgement.stale = ledger
@@ -206,6 +216,8 @@ mod tests {
         janus_detail: None,
       }],
       expected: None,
+      expected_published: Default::default(),
+      broker: None,
     }
   }
 

@@ -1,0 +1,66 @@
+{
+  "broker": {
+    "expected-published": {
+      "pact-1.json": "pass",
+      "pact-2.json": "pass"
+    },
+    "verify": {
+      "provider-version": "1.0.0",
+      "publish": true
+    }
+  },
+  "description": "Verifying multiple Pact files via a Pact broker",
+  "expected": "pass",
+  "pacts": [
+    "pact-1.json",
+    "pact-2.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/basic"
+        },
+        "response": {
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "status": 200
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/with_params",
+          "query": {
+            "a": [
+              "1"
+            ],
+            "b": [
+              "2"
+            ]
+          }
+        },
+        "response": {
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V1/http_provider.feature",
+    "scenario": "Verifying multiple Pact files via a Pact broker",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

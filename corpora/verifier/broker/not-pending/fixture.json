@@ -1,0 +1,60 @@
+{
+  "description": "A pact the provider's main branch has verified before is not pending, so its failure fails the run",
+  "source": {
+    "semantics": "https://docs.pact.io/pact_broker/advanced_topics/pending_pacts"
+  },
+  "pacts": [
+    "../pacts/widget-admin.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/widgets/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1,
+              "name": "sprocket"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "broker": {
+    "results": [
+      {
+        "pact": "widget-admin.json",
+        "provider-version": "1.0.0",
+        "provider-branch": "main",
+        "success": true
+      }
+    ],
+    "verify": {
+      "selectors": [
+        {
+          "mainBranch": true
+        }
+      ],
+      "enable-pending": true,
+      "provider-version": "2.0.0",
+      "provider-branch": "main",
+      "publish": true
+    },
+    "expected-published": {
+      "widget-admin.json": "fail"
+    }
+  }
+}

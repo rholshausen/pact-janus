@@ -2,6 +2,251 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
+      "case": "broker/not-pending",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/not-pending",
+      "key": "0/published",
+      "today": "fail",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/not-pending",
+      "key": "run",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/not-selected",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/not-selected",
+      "key": "0/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/not-selected",
+      "key": "1/0",
+      "today": "absent",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/not-selected",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/order-service",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/order-service",
+      "key": "0/1",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/order-service",
+      "key": "0/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/order-service",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/pending",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/pending",
+      "key": "0/published",
+      "today": "fail",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/pending",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/pending-without-selectors",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/pending-without-selectors",
+      "key": "0/published",
+      "today": "fail",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/pending-without-selectors",
+      "key": "run",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/wip",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/wip",
+      "key": "0/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/wip",
+      "key": "1/0",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "broker/wip",
+      "key": "1/published",
+      "today": "fail",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "broker/wip",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/04-verifying-a-simple-http-request-via-a-pact-broker",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/04-verifying-a-simple-http-request-via-a-pact-broker",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/05-verifying-a-simple-http-request-via-a-pact-broker-with-publishing-results-enabled",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/05-verifying-a-simple-http-request-via-a-pact-broker-with-publishing-results-enabled",
+      "key": "0/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "compatibility-suite/v1/05-verifying-a-simple-http-request-via-a-pact-broker-with-publishing-results-enabled",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/06-verifying-multiple-pact-files-via-a-pact-broker",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/06-verifying-multiple-pact-files-via-a-pact-broker",
+      "key": "0/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "compatibility-suite/v1/06-verifying-multiple-pact-files-via-a-pact-broker",
+      "key": "1/0",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/06-verifying-multiple-pact-files-via-a-pact-broker",
+      "key": "1/published",
+      "today": "pass",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "compatibility-suite/v1/06-verifying-multiple-pact-files-via-a-pact-broker",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/07-incorrect-request-is-made-to-provider-via-a-pact-broker",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
+      "case": "compatibility-suite/v1/07-incorrect-request-is-made-to-provider-via-a-pact-broker",
+      "key": "0/published",
+      "today": "fail",
+      "janus": "absent",
+      "reason": "S1.3: janus verify publishes no verification results yet (ADR 0032's `publish` option)"
+    },
+    {
+      "case": "compatibility-suite/v1/07-incorrect-request-is-made-to-provider-via-a-pact-broker",
+      "key": "run",
+      "today": "fail",
+      "janus": "error",
+      "reason": "S1.3: janus verify cannot fetch pacts from a broker yet (ADR 0032's `broker` source)"
+    },
+    {
       "case": "compatibility-suite/v1/15-response-with-plain-text-body-positive-case",
       "key": "0/0",
       "today": "pass",

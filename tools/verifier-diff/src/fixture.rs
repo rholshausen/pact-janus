@@ -34,6 +34,118 @@ pub struct Fixture {
   /// Also run every interaction against mutated responses.
   #[serde(default, skip_serializing_if = "std::ops::Not::not")]
   pub mutations: bool,
+  /// Publish the pacts to a Pact Broker first, and have both verifiers fetch them from it, and
+  /// publish their results back, instead of reading them from files (S1.3).
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub broker: Option<BrokerSpec>,
+}
+
+/// A fixture verified from a Pact Broker: how its pacts are published, what was verified before the
+/// run, and how the verifiers fetch and publish. Every pact the fixture names is published, under
+/// names of its own for each verifier, so neither sees what the other did to the broker.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct BrokerSpec {
+  /// How a pact is published, by its file name. One not listed is published as consumer
+  /// version `1.0.0` on branch `main`.
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub publish: BTreeMap<String, Publication>,
+  /// Verification results published before the run, as an earlier provider build would have.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub results: Vec<PriorResult>,
+  /// How the verifiers fetch the pacts, and whether they publish.
+  #[serde(default)]
+  pub verify: BrokerVerify,
+  /// What the source says the run publishes for a pact, by its file name. Today's verifier is
+  /// held to it, as to `expected`.
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub expected_published: BTreeMap<String, Published>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct Publication {
+  #[serde(default = "first_version")]
+  pub version: String,
+  /// `None` publishes it on no branch.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub branch: Option<String>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub tags: Vec<String>,
+}
+
+impl Default for Publication {
+  fn default() -> Self {
+    Publication {
+      version: first_version(),
+      branch: Some(MAIN_BRANCH.to_string()),
+      tags: vec![],
+    }
+  }
+}
+
+pub const MAIN_BRANCH: &str = "main";
+
+fn first_version() -> String {
+  "1.0.0".to_string()
+}
+
+/// A verification result that was there before the run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PriorResult {
+  /// The pact it is for, by its file name.
+  pub pact: String,
+  pub provider_version: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub provider_branch: Option<String>,
+  pub success: bool,
+}
+
+/// The broker options both verifiers are given, in today's verifier's terms.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct BrokerVerify {
+  /// Consumer version selectors, as the broker reads them. None: the broker's default, the latest
+  /// pact from each consumer.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub selectors: Vec<Value>,
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub enable_pending: bool,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub include_wip_pacts_since: Option<String>,
+  #[serde(default = "first_version")]
+  pub provider_version: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub provider_branch: Option<String>,
+  /// Publish the results.
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub publish: bool,
+}
+
+impl Default for BrokerVerify {
+  fn default() -> Self {
+    BrokerVerify {
+      selectors: vec![],
+      enable_pending: false,
+      include_wip_pacts_since: None,
+      provider_version: first_version(),
+      provider_branch: None,
+      publish: false,
+    }
+  }
+}
+
+/// What a run published for a pact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Published {
+  /// A successful result.
+  Pass,
+  /// A failed result.
+  Fail,
+  /// No result.
+  Absent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

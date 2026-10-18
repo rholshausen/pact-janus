@@ -12,7 +12,9 @@
 //! and `import.json` lists every one. The suite's other assertions (a callback's calls, an error's
 //! wording) are about pact-reference's internals; the fixture keeps only the verdict.
 
-use crate::fixture::{Fixture, ProviderSpec, Route, RunVerdict, StateCallback};
+use crate::fixture::{
+  BrokerSpec, BrokerVerify, Fixture, ProviderSpec, Published, Route, RunVerdict, StateCallback,
+};
 use bytes::Bytes;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::{ContentType, JSON, TEXT, XML};
@@ -146,6 +148,11 @@ fn fixture_from(
   let mut expected = None;
   let mut changed = false;
   let mut verified = Vec::new();
+  // Pacts "verified from a Pact broker", by their position in `pacts`; and the scenario's other
+  // broker steps.
+  let mut from_broker = Vec::new();
+  let mut publish = false;
+  let mut published = Vec::new();
   // Every step from the first `Then` on is an assertion, whatever its keyword.
   let mut asserting = false;
 
@@ -180,7 +187,7 @@ fn fixture_from(
       let mut comments = HashMap::new();
       match how {
         "" => {}
-        " from a Pact broker" => return Err(Skip("S1.3: fetching pacts from a broker".to_string())),
+        " from a Pact broker" => from_broker.push(pacts.len()),
         ", but is marked pending" => pending = true,
         " with the following provider states defined:" => {
           pact_interaction.provider_states = states_from(&step.table)?;
@@ -207,7 +214,23 @@ fn fixture_from(
     } else if text == "a provider state callback is configured, but will return a failure" {
       callback = StateCallback::Fail;
     } else if text == "publishing of verification results is enabled" {
-      return Err(Skip("S1.3: publishing verification results".to_string()));
+      publish = true;
+    } else if text == "a verification result will NOT be published back" {
+      published.push((None, Published::Absent));
+    } else if let Some((outcome, number)) = text
+      .strip_prefix("a successful verification result will be published back for interaction ")
+      .map(|number| (Published::Pass, number))
+      .or_else(|| {
+        text
+          .strip_prefix("a failed verification result will be published back for the interaction ")
+          .map(|number| (Published::Fail, number))
+      })
+    {
+      // The suite writes the interaction as `{N}`.
+      published.push((
+        Some(parse_number(number.trim_matches(|c| c == '{' || c == '}'))?),
+        outcome,
+      ));
     } else if text.starts_with("a request filter is configured") {
       return Err(Skip("S1.9: request filters as hooks".to_string()));
     } else if text == "the verification is run" {
@@ -227,12 +250,57 @@ fn fixture_from(
       "the scenario starts no provider or verifies no pact".to_string(),
     ));
   }
+  let broker = if from_broker.is_empty() {
+    if publish || !published.is_empty() {
+      return Err(Skip(
+        "S1.3: publishing results for pacts read from files".to_string(),
+      ));
+    }
+    None
+  } else {
+    if from_broker.len() != pacts.len() {
+      return Err(Skip(
+        "S1.3: pacts from a broker and from files in one run".to_string(),
+      ));
+    }
+    let mut expected_published = std::collections::BTreeMap::new();
+    for (number, outcome) in published {
+      match number {
+        // "will NOT be published back": nothing, for any pact.
+        None => {
+          for (file, _) in &pacts {
+            expected_published.insert(file.clone(), outcome);
+          }
+        }
+        Some(number) => {
+          let position = verified
+            .iter()
+            .position(|verified| *verified == number)
+            .ok_or_else(|| {
+              Skip(format!(
+                "S1.1: the scenario expects a result for interaction {number}, which it does not verify"
+              ))
+            })?;
+          expected_published.insert(pacts[position].0.clone(), outcome);
+        }
+      }
+    }
+    Some(BrokerSpec {
+      verify: BrokerVerify {
+        publish,
+        ..BrokerVerify::default()
+      },
+      expected_published,
+      ..BrokerSpec::default()
+    })
+  };
   // Mutate an interaction's response once per feature: the first scenario that serves it unchanged,
   // with no states, and expects success. Every other scenario serving it would repeat the same cases.
   let mutations = expected == Some(RunVerdict::Pass)
     && !changed
     && callback == StateCallback::None
     && verified.len() == 1
+    && broker.is_none()
     && mutated.insert(verified[0]);
   Ok((
     Fixture {
@@ -245,6 +313,7 @@ fn fixture_from(
       },
       expected,
       mutations,
+      broker,
     },
     pacts,
   ))
@@ -671,6 +740,78 @@ Feature: Basic HTTP provider
     And a Pact file for interaction 1 is to be verified from a Pact broker
 "#;
 
+  const BROKER_FEATURE: &str = r#"
+Feature: Broker scenarios
+
+  Background:
+    Given the following HTTP interactions have been defined:
+      | No | method | path   | response | response body        |
+      | 1  | GET    | /basic | 200      | JSON: { "one": "a" } |
+      | 2  | GET    | /other | 200      | JSON: { "two": "b" } |
+
+  Scenario: Publishing what each pact got
+    Given a provider is started that returns the response from interaction 1
+    And a Pact file for interaction 1 is to be verified from a Pact broker
+    And a Pact file for interaction 2 is to be verified from a Pact broker
+    And publishing of verification results is enabled
+    When the verification is run
+    Then the verification will NOT be successful
+    And a successful verification result will be published back for interaction {1}
+    And a failed verification result will be published back for the interaction {2}
+
+  Scenario: Nothing published
+    Given a provider is started that returns the response from interaction 1
+    And a Pact file for interaction 1 is to be verified from a Pact broker
+    When the verification is run
+    Then the verification will be successful
+    And a verification result will NOT be published back
+
+  Scenario: From a broker and from a file
+    Given a provider is started that returns the response from interaction 1
+    And a Pact file for interaction 1 is to be verified from a Pact broker
+    And a Pact file for interaction 2 is to be verified
+    When the verification is run
+"#;
+
+  #[test]
+  fn a_broker_scenario_says_what_each_pact_publishes() {
+    let feature = parse_feature(BROKER_FEATURE);
+    let interactions = interactions_from(&feature.background[0].table, Path::new("unused")).unwrap();
+    let fixture = |index: usize| {
+      fixture_from(
+        &feature.scenarios[index],
+        &interactions,
+        PactSpecification::V1,
+        &mut BTreeSet::new(),
+        Path::new("unused"),
+      )
+    };
+
+    let (both, _) = fixture(0).ok().unwrap();
+    let broker = both.broker.unwrap();
+    assert!(broker.verify.publish);
+    assert_eq!(
+      broker.expected_published,
+      std::collections::BTreeMap::from([
+        ("pact-1.json".to_string(), Published::Pass),
+        ("pact-2.json".to_string(), Published::Fail),
+      ])
+    );
+
+    let (nothing, _) = fixture(1).ok().unwrap();
+    let broker = nothing.broker.unwrap();
+    assert!(!broker.verify.publish);
+    assert_eq!(
+      broker.expected_published.get("pact-1.json"),
+      Some(&Published::Absent)
+    );
+
+    let Err(Skip(reason)) = fixture(2) else {
+      panic!("a run from a broker and a file is skipped");
+    };
+    assert!(reason.starts_with("S1.3"), "{reason}");
+  }
+
   #[test]
   fn a_feature_is_read_into_steps_and_tables() {
     let feature = parse_feature(FEATURE);
@@ -721,16 +862,18 @@ Feature: Basic HTTP provider
     };
     assert_eq!(routes[0].response.status, 400);
 
-    let Err(Skip(reason)) = fixture_from(
+    let (via_broker, _) = fixture_from(
       &feature.scenarios[2],
       &interactions,
       PactSpecification::V1,
       &mut mutated,
       Path::new("unused"),
-    ) else {
-      panic!("a broker scenario is skipped");
-    };
-    assert!(reason.starts_with("S1.3"), "{reason}");
+    )
+    .ok()
+    .unwrap();
+    let broker = via_broker.broker.expect("a broker scenario is a broker fixture");
+    assert!(!broker.verify.publish);
+    assert!(!via_broker.mutations, "a broker fixture is not mutated");
   }
 
   #[test]

@@ -1,29 +1,9 @@
 {
   "$comment": "Written by `verifier-diff import-compatibility-suite`; regenerate rather than edit. Each skipped scenario names what will let it in.",
   "commit": "1acfa1ecbd9d63e4465c687b3cdd7e0d3ac5811c",
-  "imported": 29,
+  "imported": 33,
   "licence": "Apache-2.0",
   "skipped": [
-    {
-      "feature": "features/V1/http_provider.feature",
-      "reason": "S1.3: fetching pacts from a broker",
-      "scenario": "Verifying a simple HTTP request via a Pact broker"
-    },
-    {
-      "feature": "features/V1/http_provider.feature",
-      "reason": "S1.3: fetching pacts from a broker",
-      "scenario": "Verifying a simple HTTP request via a Pact broker with publishing results enabled"
-    },
-    {
-      "feature": "features/V1/http_provider.feature",
-      "reason": "S1.3: fetching pacts from a broker",
-      "scenario": "Verifying multiple Pact files via a Pact broker"
-    },
-    {
-      "feature": "features/V1/http_provider.feature",
-      "reason": "S1.3: fetching pacts from a broker",
-      "scenario": "Incorrect request is made to provider via a Pact broker"
-    },
     {
       "feature": "features/V1/http_provider.feature",
       "reason": "S1.9: request filters as hooks",

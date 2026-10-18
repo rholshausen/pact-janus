@@ -142,7 +142,10 @@ jobs:
     # tools/verifier-diff/pact-verifier.json) and janus verify, on every pact in corpora/verifier/
     # against the same provider, compared interaction by interaction. It fails on a disagreement the
     # ledger (corpora/verifier/disagreements.json) does not list, and on a listed one that has gone.
-    # Linux only: the pin names one asset, and the comparison does not depend on the platform.
+    # The broker cases (S1.3) publish their pacts to the Pact Broker pinned in
+    # tools/verifier-diff/pact-broker.json and fetch them from it.
+    # Linux only: the pin names one asset, the broker is a container, and the comparison does not
+    # depend on the platform.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -153,6 +156,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
       - name: Today's verifier, at the pinned version
         run: echo "PACT_VERIFIER_CLI=$(.github/scripts/pact-verifier.sh "$RUNNER_TEMP/pact-verifier")" >> "$GITHUB_ENV"
+      - name: The Pact Broker, at the pinned version
+        run: echo "VERIFIER_DIFF_BROKER=$(.github/scripts/pact-broker.sh start)" >> "$GITHUB_ENV"
       - name: Build janus
         run: cargo build --package pact_janus_cli --bin janus
       - name: Compare

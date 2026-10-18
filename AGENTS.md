@@ -197,12 +197,16 @@ today's verifier (`pact_verifier_cli`, at the version `tools/verifier-diff/pact-
 and `janus verify` on every pact in `corpora/verifier/` against the same provider, and compares the
 verdicts interaction by interaction. Every disagreement is in `corpora/verifier/disagreements.json`
 with the plan item or ADR that accounts for it, or CI's `verifier-diff` job fails — and so does an
-entry nothing disagrees on any more, so a change that closes a gap deletes its entries:
+entry nothing disagrees on any more, so a change that closes a gap deletes its entries. Its broker
+cases (S1.3) publish their pacts to the Pact Broker `tools/verifier-diff/pact-broker.json` pins, a
+container `.github/scripts/pact-broker.sh` starts, and compare what each run published too:
 
 ```bash
 .github/scripts/pact-verifier.sh target/pact-verifier   # the pinned verifier, checksum verified
+.github/scripts/pact-broker.sh start                     # the pinned broker (Docker); prints its URL
 cargo build -p pact_janus_cli --bin janus
-PACT_VERIFIER_CLI=target/pact-verifier/pact-verifier-linux-x86_64 cargo run -p pact_janus_verifier_diff -- run
+PACT_VERIFIER_CLI=target/pact-verifier/pact-verifier-linux-x86_64 \
+  cargo run -p pact_janus_verifier_diff -- run --broker http://127.0.0.1:9292
 ```
 
 The documentation link check (S0.12) holds every Markdown file in the repository to one rule: a

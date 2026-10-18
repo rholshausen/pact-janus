@@ -1,0 +1,59 @@
+{
+  "description": "A pact on a feature branch the selectors do not name is fetched as work in progress, and its failure does not fail the run",
+  "source": {
+    "semantics": "https://docs.pact.io/pact_broker/advanced_topics/wip_pacts"
+  },
+  "pacts": [
+    "../pacts/widget-web.json",
+    "../pacts/widget-admin.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/widgets/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1,
+              "name": "sprocket"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "broker": {
+    "publish": {
+      "widget-admin.json": {
+        "branch": "feature-colour"
+      }
+    },
+    "verify": {
+      "selectors": [
+        {
+          "mainBranch": true
+        }
+      ],
+      "enable-pending": true,
+      "include-wip-pacts-since": "2020-01-01",
+      "provider-version": "2.0.0",
+      "provider-branch": "main",
+      "publish": true
+    },
+    "expected-published": {
+      "widget-web.json": "pass"
+    }
+  }
+}

@@ -26,11 +26,12 @@ base64 = "0.22"
 bytes = "1"
 # The one real provider in the corpus, started in this process.
 pact_janus_sample_order_service = { path = "../../samples/order-service" }
+# The broker cases: seeding the broker, and the recording proxy in front of it. Already in the tree.
+ureq = "3"
 
 [dev-dependencies]
 pretty_assertions = "1"
 rstest = "0.26"
-ureq = "3"
 
 [lints]
 workspace = true

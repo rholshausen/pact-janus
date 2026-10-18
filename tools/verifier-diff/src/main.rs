@@ -6,12 +6,13 @@
 //!
 //! ```sh
 //! cargo build -p pact_janus_cli --bin janus
-//! cargo run -p pact_janus_verifier_diff -- run
+//! cargo run -p pact_janus_verifier_diff -- run --broker "$(.github/scripts/pact-broker.sh start)"
 //! cargo run -p pact_janus_verifier_diff -- import-compatibility-suite ../pact-compatibility-suite
 //! ```
 //!
 //! Exit status: 0 the disagreements are exactly the ledger's; 1 they are not; 2 it could not run.
 
+mod broker;
 mod fixture;
 mod import;
 mod ledger;
@@ -50,7 +51,10 @@ enum Command {
     /// Today's verifier (default: pact_verifier_cli on PATH)
     #[arg(long, value_name = "PATH", env = "PACT_VERIFIER_CLI")]
     pact_verifier: Option<PathBuf>,
-    /// Run a pact_verifier_cli other than the pinned version
+    /// The Pact Broker the broker cases run against (`.github/scripts/pact-broker.sh start` prints it)
+    #[arg(long, value_name = "URL", env = "VERIFIER_DIFF_BROKER")]
+    broker: Option<String>,
+    /// Run a pact_verifier_cli, or a broker, other than the pinned version
     #[arg(long)]
     any_version: bool,
     /// Only the cases whose id contains this text
@@ -86,6 +90,7 @@ fn main() -> ExitCode {
     Command::Run {
       janus,
       pact_verifier,
+      broker,
       any_version,
       filter,
       jobs,
@@ -97,6 +102,7 @@ fn main() -> ExitCode {
       &corpus,
       janus,
       pact_verifier,
+      broker,
       any_version,
       filter,
       jobs,
@@ -189,6 +195,7 @@ fn run(
   corpus: &Path,
   janus: Option<PathBuf>,
   pact_verifier: Option<PathBuf>,
+  broker: Option<String>,
   any_version: bool,
   filter: Option<String>,
   jobs: Option<usize>,
@@ -200,9 +207,30 @@ fn run(
   if let Some(filter) = &filter {
     cases.retain(|case| case.id.contains(filter.as_str()));
   }
+  let broker = match (broker, cases.iter().any(|case| case.broker.is_some())) {
+    (Some(url), true) => {
+      let broker = broker::Broker::new(&url);
+      let version = broker.version()?;
+      let pinned = broker::pinned_version(repo)?;
+      if version != pinned && !any_version {
+        return Err(format!(
+          "the broker at {url} is version {version}, and the ledger is kept against {pinned}: start the pinned one with .github/scripts/pact-broker.sh, or pass --any-version"
+        ));
+      }
+      Some(broker)
+    }
+    (None, true) => {
+      return Err(
+        "the corpus has broker cases, and no broker was named: start one with `.github/scripts/pact-broker.sh start` and pass its URL with --broker (or VERIFIER_DIFF_BROKER), or --filter them out"
+          .to_string(),
+      );
+    }
+    (_, false) => None,
+  };
   let tools = run::Tools {
     janus: janus.unwrap_or_else(|| beside_this_binary("janus")),
     today: pact_verifier.unwrap_or_else(|| PathBuf::from("pact_verifier_cli")),
+    broker,
   };
   if !tools.janus.exists() {
     return Err(format!(

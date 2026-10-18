@@ -1,0 +1,32 @@
+{
+  "consumer": {
+    "name": "widget-web"
+  },
+  "provider": {
+    "name": "widget-service"
+  },
+  "interactions": [
+    {
+      "description": "a request for widget 1, from the web app",
+      "request": {
+        "method": "GET",
+        "path": "/widgets/1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1,
+          "name": "sprocket"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

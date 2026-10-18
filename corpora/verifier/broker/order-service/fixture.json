@@ -1,0 +1,21 @@
+{
+  "description": "The sample provider's own v3 pact, fetched from the broker and verified against the sample provider, with the results published",
+  "source": "samples/order-service (plan tasks 5.4 and 5.6), as corpora/verifier/order-service, from a broker",
+  "pacts": [
+    "../../../../samples/order-service/pacts/web-app-order-service.json"
+  ],
+  "provider": {
+    "kind": "order-service"
+  },
+  "expected": "pass",
+  "broker": {
+    "verify": {
+      "provider-version": "2.0.0",
+      "provider-branch": "main",
+      "publish": true
+    },
+    "expected-published": {
+      "web-app-order-service.json": "pass"
+    }
+  }
+}
