@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792284239806,
+  "lastUpdate": 1792284241467,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -3858,6 +3858,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21397,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "1ee0beb8cb2b7de74054e225980ddf811b0b4626",
+          "message": "fix: help and usage errors name the program janus on Windows too\n\nclap takes the program's name from argv[0], which on Windows is janus.exe,\nso every Usage: line said `janus.exe ...` there and the trycmd snapshots of\nhelp and usage errors failed on the windows-latest job. The name is now\npinned with bin_name, in janus and in janus-engine. Reproduced and checked\non Linux by running copies of both binaries named *.exe.\n\nThe unreleased CLI change file gains a line for it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T11:35:02+11:00",
+          "tree_id": "f7a739fabdef00de748d13649b746091cde05323",
+          "url": "https://github.com/rholshausen/pact-janus/commit/1ee0beb8cb2b7de74054e225980ddf811b0b4626"
+        },
+        "date": 1792284240994,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 43390,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 35775,
             "unit": "requests per second",
             "extra": "engines 4"
           }
