@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792295547717,
+  "lastUpdate": 1792295549379,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -5628,6 +5628,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21228,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "dbf92de824857fab54c2a01fd46f87a1d290befb",
+          "message": "feat: S1.2 the broker client is the engine's: ADR 0032 and the protocol operations\n\nADR 0032 decides where the Pact Broker client lives. It is the engine's,\nbehind the protocol, so no host speaks the broker's API: a client in the CLI\nwould be rewritten by every SDK's provider integration (S1.15). It is a\nnative host capability, registered by janus and janus-engine as the hook\nimplementations are, so the kernel knows no HTTP and the offline WASM\nartifact has none. Verification fetches and publishes inside the run, so\npending status, publishing links and interaction ids never pass through a\nhost. Credentials travel in the request only; the engine never reads them\nfrom its environment and never repeats them.\n\nEngine-protocol spec:\n- §8.3: verification/verify takes a `broker` source (broker, provider,\n  consumer version selectors, provider branch and tags, pending, WIP) and a\n  `publish` option (each pact's result to its own link). A pending pact's\n  failures do not fail the run; a failed fetch ends the run with an error;\n  no pacts is pacts-not-found unless require-pacts is false. Replaces the\n  prototype's \"fetching from a broker is host business\".\n- §8.7: the broker descriptor (url, auth, S1.5's client options), the\n  credentials rule, and broker/publish-contracts in a broker session.\n- The `broker` capability, a fourth session kind, four event kinds, the\n  pacts-not-found code; broker.schema.json; the verification, events and\n  error schemas extended; examples/broker-verification.md, which the\n  example checker now validates.\n\nThe SDK bindings are regenerated: BrokerDescriptor, BrokerAuth,\nConsumerVersionSelector, PublishResults, VerifyOptions, PublishContracts.\n\nNo engine has a client until S1.3, so a broker source, a publish option and\nbroker/publish-contracts answer component-unavailable naming `broker`, as\nthe spec says; a broker source used to get operation-unsupported.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T14:48:16+11:00",
+          "tree_id": "7d80a866be9113dbe6779c605c2bf5956e4d2d2d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/dbf92de824857fab54c2a01fd46f87a1d290befb"
+        },
+        "date": 1792295548920,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 49253,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 42168,
             "unit": "requests per second",
             "extra": "engines 4"
           }
