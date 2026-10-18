@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792293195779,
+  "lastUpdate": 1792293197690,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -5274,6 +5274,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21096,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "178cb64886787258736b3662c79af4fa503c5957",
+          "message": "feat: S1.18 a regex in a v1-v4 pact matches the whole value\n\nToday's verifiers match a pact's regex against the whole value:\npact-reference with Oniguruma's is_match, pact-jvm with Kotlin's\nString.matches. Janus matched it anywhere, on the shape-language spec's\npremise that v1-v4 do, which S1.1's harness showed was wrong: \\d{4}-...Z\naccepted '2026-07-30T09:00:00Z-changed' and PENDING|SHIPPED accepted\n'NOT SHIPPED'.\n\n- The legacy compiler emits a pact's pattern anchored, ^(?:...)$, always,\n  since a pattern that looks anchored may not be (^a|b$ matches xb).\n  plan::legacy_anchored_pattern is the one place that says so.\n- janus upgrade writes the anchored pattern, so a converted pact keeps its\n  verdicts. Shapes are unchanged: a shape's regex matches anywhere.\n- Shape-language §4.2 no longer rests on v1-v4; plan-grammar §4.4 and\n  contract-file §8.2 say both readers anchor; the v3 upgrade example shows\n  the anchored output.\n- corpora: legacy/v3-regex-whole-value and legacy/upgrade-regex-anchored\n  (the pact and its upgraded contract refuse the same value); two snapshots\n  and one expected message now show the anchored pattern, no verdict moved.\n- The harness: the shippedAt disagreement is gone. The repeated-header one\n  (S3.3) moved from the negative case to the positive one, since the list\n  is now judged as a whole value; the ledger says so. 179 agree, 17 known.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T13:59:00+11:00",
+          "tree_id": "0c406f77500f1c8030acc3fdee298428bfc8a533",
+          "url": "https://github.com/rholshausen/pact-janus/commit/178cb64886787258736b3662c79af4fa503c5957"
+        },
+        "date": 1792293197086,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28888,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21228,
             "unit": "requests per second",
             "extra": "engines 4"
           }
