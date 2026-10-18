@@ -462,8 +462,9 @@ item in 1a is done when S1.1 agrees.
   *Exit:* a verification against a TLS provider with a client certificate behind a proxy, in CI; and
   S1.13's table has a `janus` column for every transport flag.
 - **S1.6 Close the 158 skipped pact-specification cases, and the body kinds the cases do not cover**
-  — **L**. XML and form-urlencoded content components, and multipart and raw binary bodies, which real
-  pacts carry though the specification cases do not. This pulls two things forward: **member order in
+  — **L**. Plain-text, XML and form-urlencoded content components, and multipart and raw binary
+  bodies, which real pacts carry though the specification cases do not. S1.1's first run found
+  plain text missing too: a `text/plain` body is `component-unavailable` today. This pulls two things forward: **member order in
   the document model** (finding 11, formerly stage 5), because XML children and form fields are
   ordered; and **retyping the legacy body compiler off `serde_json::Value`** (kernel-boundary review
   finding 5, closed on the premise that no v1–v4 pact body is non-JSON, which XML bodies disprove).
@@ -488,6 +489,9 @@ item in 1a is done when S1.1 agrees.
   hooks, hardened: the hooks host's credential redaction reviewed for production, script and `exec`
   hook timeouts and resource limits enforced, and a migration note for each verifier option they
   replace (S1.13).
+  One difference S1.1 found that no verdict shows: when a state-change call fails, today's verifier
+  retries it for about two minutes before failing the interaction, and the `http` hook does not retry
+  at all. The migration note says which a provider gets, and why.
   *Exit:* every state-change and request-filter option in S1.13's table maps to a hook, and the
   redaction rules (lifecycle-hooks spec §7.3) have a test per secret-bearing context member.
 - **S1.10 `match:content-type` in live runs** — **S**. The exchange and verification paths execute
@@ -530,6 +534,22 @@ item in 1a is done when S1.1 agrees.
   *Exit:* a corpus or conformance case for an unknown id and one for a filtered run; the snapshot in
   `cli/tests/cli.rs` (`a_filtered_run_says_so_in_its_summary`) changes with them; and a filtered run's
   verification result is never published as a success.
+
+- **S1.18 A regex in a v1–v4 pact matches the whole value, as it does today** — **S**, decided.
+  Found by S1.1's first run. The shape-language spec has `regex` match *anywhere* in a string, "exactly
+  as v1–v4 pacts behave" (shape-language spec §4.2), and the plan grammar lets one `match:regex` serve
+  both compilers on that basis (plan-grammar spec §4.4). The premise is wrong. pact-reference's native
+  builds match with Oniguruma's `is_match`, which requires the whole string to match (only its WASM
+  build searches), and pact-jvm uses Kotlin's `String.matches`, which does the same. So
+  `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z` accepts `2026-07-30T09:00:00Z-changed` under Janus and
+  refuses it today, and every legacy or upgraded pact with an unanchored pattern accepts more than it
+  does now. Decided (2026-10-18): the legacy compiler emits the pattern anchored (`^(?:…)$`), so every
+  v1–v4 verdict is today's; `janus upgrade` writes the anchored form, so an upgraded contract keeps the
+  pact's verdicts; and the shape language keeps its own rule, matching anywhere with explicit anchors,
+  with §4.2's rationale corrected now that it cannot rest on what v1–v4 do.
+  *Exit:* shape-language spec §4.2 and plan-grammar spec §4.4 say so; corpus cases for an unanchored
+  pattern in a v3 pact and in the contract it upgrades into; and S1.1's ledger entry for
+  `order-service/mutations/0/0/body/$.shippedAt/same-type` gone.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -627,6 +647,12 @@ The RFC's answer to optional fields, delivered to users.
   both SDKs under the conformance suite.
 - **S3.3 `http:media-type` and list-valued headers** (finding 1) — **M**, as namespaced operators the
   HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again.
+  List-valued headers stay here rather than in stage 1a, deliberately, though S1.1's ledger carries a
+  disagreement they account for (a repeated response header judged as one list). Treating header
+  values as lists has broken users more than once across the Pact implementations, in issues and
+  pull requests. The trouble is HTTP/1.x's comma-joined values, which only some headers define as
+  lists; HTTP/2 and later carry each field line separately and define field values precisely. So the
+  semantics are specified per HTTP version, and checked against those reports, before they change.
 - **S3.4 `upgrade` without the media-type narrowing** — **S**. It already reports the narrowing; with
   S3.3 it stops making it.
 - **S3.5 Variant failure reporting in each test framework** — **M**: one test per variant where the
@@ -783,7 +809,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
 | S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
 | S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |
-| S1.6 | The 158 skipped pact-specification cases (XML, form bodies, four uncovered rules); multipart and binary bodies; **member order in the document model** (moved from stage 5); the legacy body compiler typed to `serde_json::Value` | task 3.5; finding 11; kernel-boundary review 5 |
+| S1.6 | The 158 skipped pact-specification cases (XML, form bodies, four uncovered rules); plain-text, multipart and binary bodies; **member order in the document model** (moved from stage 5); the legacy body compiler typed to `serde_json::Value` | task 3.5; finding 11; kernel-boundary review 5 |
 | S1.7 | The `request`/`response` part names and the HTTP 500 mismatch reply in the kernel; the `produce-message`/`consume-message` hooks designed and not built | kernel-boundary review 8, 9; spike 1.5; design 2.7 |
 | S1.8 | Plugin-bearing v4 interactions have no path until S5.2 | new in this revision |
 | S1.10 | `match:content-type` runs with no detector in live exchanges and verification | third-party component report §4 |
@@ -791,6 +817,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.12 | Matching captured values as a protocol operation; `explain` loading components | findings 31, 23 |
 | S1.14 | The SDK specification and conformance suite have no provider side | new in this revision |
 | S1.17 | A filtered run that verified what it replayed — or replayed nothing, because no recorded variant has the id it named — has status `verified` and exits 0 | found rebuilding the CLI; variant-semantics spec §5.1 |
+| S1.18 | A regex matches anywhere in a value under Janus and the whole value under today's verifiers, so an unanchored pattern in a v1–v4 pact accepts more than it does today | S1.1's first run; shape-language spec §4.2 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |

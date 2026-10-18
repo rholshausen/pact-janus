@@ -1,0 +1,29 @@
+{
+  "consumer": {
+    "name": "c_7"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 6",
+      "request": {
+        "method": "GET",
+        "path": "/xml"
+      },
+      "response": {
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<values><one>A</one><two>B</two></values>",
+        "headers": {
+          "content-type": "application/xml"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "1.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

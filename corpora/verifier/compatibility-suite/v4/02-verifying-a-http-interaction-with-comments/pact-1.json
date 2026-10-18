@@ -1,0 +1,47 @@
+{
+  "consumer": {
+    "name": "c_1"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "compatibility-suite",
+        "text": [
+          "comment one",
+          "comment two"
+        ]
+      },
+      "description": "Interaction 0",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/basic"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "one": "a",
+            "two": "b"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

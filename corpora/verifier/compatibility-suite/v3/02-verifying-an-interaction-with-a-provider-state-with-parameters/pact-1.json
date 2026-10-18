@@ -1,0 +1,55 @@
+{
+  "consumer": {
+    "name": "c_1"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 0",
+      "providerStates": [
+        {
+          "name": "A user exists",
+          "params": {
+            "age": 22,
+            "name": "Bob"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/one"
+      },
+      "response": {
+        "body": {
+          "one": "a",
+          "two": "b"
+        },
+        "headers": {
+          "X-TEST": "1",
+          "content-type": "application/json"
+        },
+        "matchingRules": {
+          "header": {
+            "x-test": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{1,4}"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

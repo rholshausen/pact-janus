@@ -1,0 +1,29 @@
+{
+  "consumer": {
+    "name": "c_9"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 8",
+      "request": {
+        "method": "GET",
+        "path": "/form"
+      },
+      "response": {
+        "body": "a=1&b=2&c=3&d=4",
+        "headers": {
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "1.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

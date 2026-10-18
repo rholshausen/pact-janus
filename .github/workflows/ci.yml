@@ -137,6 +137,33 @@ jobs:
           cargo test
           cargo build --release --target wasm32-wasip2
 
+  verifier-diff:
+    # Staged plan S1.1: today's verifier (pact_verifier_cli, pinned in
+    # tools/verifier-diff/pact-verifier.json) and janus verify, on every pact in corpora/verifier/
+    # against the same provider, compared interaction by interaction. It fails on a disagreement the
+    # ledger (corpora/verifier/disagreements.json) does not list, and on a listed one that has gone.
+    # Linux only: the pin names one asset, and the comparison does not depend on the platform.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Today's verifier, at the pinned version
+        run: echo "PACT_VERIFIER_CLI=$(.github/scripts/pact-verifier.sh "$RUNNER_TEMP/pact-verifier")" >> "$GITHUB_ENV"
+      - name: Build janus
+        run: cargo build --package pact_janus_cli --bin janus
+      - name: Compare
+        run: cargo run --package pact_janus_verifier_diff -- run --json target/verifier-diff.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verifier-diff
+          path: target/verifier-diff.json
+          if-no-files-found: ignore
+
   engine:
     # What the SDK suites below drive, built from this tree on each operating system and handed to
     # them as a file, so that they need no Rust toolchain (staged plan S0.10). Linux also builds the

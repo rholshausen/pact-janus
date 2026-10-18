@@ -1,0 +1,32 @@
+{
+  "consumer": {
+    "name": "c_1"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 0",
+      "request": {
+        "method": "GET",
+        "path": "/basic"
+      },
+      "response": {
+        "body": {
+          "one": "a",
+          "two": "b"
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "1.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

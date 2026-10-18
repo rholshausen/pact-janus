@@ -1,0 +1,36 @@
+{
+  "description": "Response with multipart body (positive case)",
+  "expected": "pass",
+  "mutations": true,
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/multi"
+        },
+        "response": {
+          "body": {
+            "text": "--gc0p4Jq0M2Yt08jU534c0p\r\nContent-Type: text/plain\r\n\r\nThis is the body of the message.\r\n--gc0p4Jq0M2Yt08jU534c0p\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\nPGh0bWw+CiAgPGhlYWQ+CiAgPC9oZWFkPgogIDxib2R5PgogICAgPHA+VGhpcyBpcyB0aGUgYm9keSBvZiB0aGUgbWVzc2FnZS48L3A+CiAgPC9ib2R5Pgo8L2h0bWw+Cg==\r\n--gc0p4Jq0M2Yt08jU534c0p--"
+          },
+          "headers": {
+            "content-type": [
+              "multipart/mixed; boundary=gc0p4Jq0M2Yt08jU534c0p"
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V1/http_provider.feature",
+    "scenario": "Response with multipart body (positive case)",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

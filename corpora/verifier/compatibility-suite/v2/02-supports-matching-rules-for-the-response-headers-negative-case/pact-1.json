@@ -1,0 +1,39 @@
+{
+  "consumer": {
+    "name": "c_1"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 0",
+      "request": {
+        "method": "GET",
+        "path": "/one"
+      },
+      "response": {
+        "body": {
+          "one": "a",
+          "two": "b"
+        },
+        "headers": {
+          "X-TEST": "1",
+          "content-type": "application/json"
+        },
+        "matchingRules": {
+          "$.headers['x-test']": {
+            "match": "regex",
+            "regex": "\\d{1,4}"
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

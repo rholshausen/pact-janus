@@ -1,0 +1,8 @@
+{
+  "description": "The sample provider's own v3 pact, against the sample provider itself, with its v3 provider-state endpoint as the state callback; and every interaction's response mutated, against the scripted provider",
+  "source": "samples/order-service (plan tasks 5.4 and 5.6)",
+  "pacts": ["../../../samples/order-service/pacts/web-app-order-service.json"],
+  "provider": { "kind": "order-service" },
+  "expected": "pass",
+  "mutations": true
+}

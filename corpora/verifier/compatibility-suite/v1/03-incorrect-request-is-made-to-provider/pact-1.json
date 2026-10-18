@@ -1,0 +1,26 @@
+{
+  "consumer": {
+    "name": "c_2"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 1",
+      "request": {
+        "method": "GET",
+        "path": "/with_params",
+        "query": "a=1&b=2"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "1.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

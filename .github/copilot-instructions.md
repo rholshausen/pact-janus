@@ -61,7 +61,9 @@ sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bind
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
 sdks/engine-release.json  The released janus-engine an SDK resolves when it is not building one:
                  a version and a SHA-256 per target triple (ADR 0029)
-corpora/         Golden corpora: (spec or pact, expected plan, expected result)
+corpora/         Golden corpora: (spec or pact, expected plan, expected result); and verifier/,
+                 S1.1's fixture corpus — pacts with the providers that answer them — and its
+                 disagreement ledger, disagreements.json
 conformance/     The SDK conformance suite (task 6.4): one corpus of cases every SDK runs, in its
                  own language, against a pinned engine — ADR 0017's definition of "conformant".
                  Each SDK's driver lives with its tests; `tools/conformance` checks the corpus
@@ -97,7 +99,8 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  by layer from the SDK's own thinness.json — tools/doc-links, the documentation link check (S0.12) — and
                  tools/engine-pin, which writes sdks/engine-release.json from a release's
                  attested SHA256SUMS (S0.10). tools/sdk-gates is the first three as the one
-                 binary a release ships, `janus-sdk-gates` (S0.11, ADR 0030)
+                 binary a release ships, `janus-sdk-gates` (S0.11, ADR 0030). tools/verifier-diff
+                 is S1.1's differential harness: today's verifier and janus verify over corpora/verifier/
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -152,6 +155,19 @@ The thinness audit (plan task 6.5) makes the "SDKs are thin" claim a command:
 fails if a hand-written layer exceeds its budget in the SDK's `thinness.json` (`sdks/<sdk>/`, paths
 relative to it), or if any SDK source file
 belongs to no layer. A new file needs a layer; raising a budget belongs in the commit message.
+
+The differential verification harness (S1.1) is "exactly as today" made into a number: it runs
+today's verifier (`pact_verifier_cli`, at the version `tools/verifier-diff/pact-verifier.json` pins)
+and `janus verify` on every pact in `corpora/verifier/` against the same provider, and compares the
+verdicts interaction by interaction. Every disagreement is in `corpora/verifier/disagreements.json`
+with the plan item or ADR that accounts for it, or CI's `verifier-diff` job fails — and so does an
+entry nothing disagrees on any more, so a change that closes a gap deletes its entries:
+
+```bash
+.github/scripts/pact-verifier.sh target/pact-verifier   # the pinned verifier, checksum verified
+cargo build -p pact_janus_cli --bin janus
+PACT_VERIFIER_CLI=target/pact-verifier/pact-verifier-linux-x86_64 cargo run -p pact_janus_verifier_diff -- run
+```
 
 Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects. A
 pull request that changes what a release ships — the engine's or the CLI's sources or manifests,

@@ -24,6 +24,11 @@ readability:
   agreement/` compiles the same interaction both ways — a v1–v4 pact directly, and the equivalent
   hand-authored shape — and asserts they reach the same verdict (plan-grammar spec §4.4).
 
+`verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
+providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with
+`janus verify`, comparing the verdicts. It holds no `case.json`, so the corpus runner below does not
+read it.
+
 ## Running the corpus
 
 `cargo test -p pact_janus_corpus` is what CI runs: every case must match its `result` exactly, and

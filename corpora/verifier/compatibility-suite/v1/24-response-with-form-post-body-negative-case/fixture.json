@@ -1,0 +1,35 @@
+{
+  "description": "Response with form post body (negative case)",
+  "expected": "fail",
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/form"
+        },
+        "response": {
+          "body": {
+            "text": "a=1&b=2&c=33&d=4"
+          },
+          "headers": {
+            "content-type": [
+              "application/x-www-form-urlencoded"
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V1/http_provider.feature",
+    "scenario": "Response with form post body (negative case)",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

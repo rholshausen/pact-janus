@@ -1,0 +1,37 @@
+{
+  "description": "Verifying a HTTP interaction with comments",
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/basic"
+        },
+        "response": {
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V4/http_provider.feature",
+    "scenario": "Verifying a HTTP interaction with comments",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

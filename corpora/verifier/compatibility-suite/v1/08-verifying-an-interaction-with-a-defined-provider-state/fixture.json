@@ -1,0 +1,37 @@
+{
+  "description": "Verifying an interaction with a defined provider state",
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/basic"
+        },
+        "response": {
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "ok"
+  },
+  "source": {
+    "feature": "features/V1/http_provider.feature",
+    "scenario": "Verifying an interaction with a defined provider state",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

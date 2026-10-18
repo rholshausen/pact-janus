@@ -1,0 +1,29 @@
+{
+  "consumer": {
+    "name": "c_6"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 5",
+      "request": {
+        "method": "GET",
+        "path": "/plain"
+      },
+      "response": {
+        "body": "Hello World!",
+        "headers": {
+          "content-type": "text/plain"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "1.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

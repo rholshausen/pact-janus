@@ -1,0 +1,40 @@
+{
+  "consumer": {
+    "name": "c_1"
+  },
+  "interactions": [
+    {
+      "description": "Interaction 0",
+      "pending": true,
+      "request": {
+        "method": "GET",
+        "path": "/basic"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "one": "a",
+            "two": "b"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

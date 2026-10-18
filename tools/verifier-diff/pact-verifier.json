@@ -1,0 +1,11 @@
+{
+  "$comment": "The release of today's verifier (pact_verifier_cli) the harness compares against. CI downloads the asset for its platform and refuses one with any other digest; the harness refuses to run another version unless told to. Moving it can move the disagreement ledger, so it is a deliberate change: update the digests from the release's .sha256 files and rerun.",
+  "version": "1.3.5",
+  "release": "https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v1.3.5",
+  "assets": {
+    "x86_64-unknown-linux-gnu": {
+      "file": "pact-verifier-linux-x86_64.gz",
+      "sha256": "7580a7c0b9a1c4766acdbe1baae1236c1af7e030c2c3ee585959469d39bc91de"
+    }
+  }
+}
