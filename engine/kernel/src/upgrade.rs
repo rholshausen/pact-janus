@@ -1016,7 +1016,13 @@ fn map_rule(rule: &MatchingRule, example: &Value) -> Option<Value> {
     | MatchingRule::MinMaxType(_, _) => {
       json!({ "shape": "type", "example": example })
     }
-    MatchingRule::Regex(pattern) => json!({ "shape": "regex", "pattern": pattern, "example": example }),
+    // Anchored, so the contract keeps the pact's verdicts: a pact's regex matches the whole value,
+    // a shape's matches anywhere (S1.18).
+    MatchingRule::Regex(pattern) => json!({
+      "shape": "regex",
+      "pattern": plan::legacy_anchored_pattern(pattern),
+      "example": example
+    }),
     MatchingRule::Include(substring) => {
       json!({ "shape": "include", "substring": substring, "example": example })
     }

@@ -1,0 +1,49 @@
+(
+  :"get a delivery date" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/delivery',
+          '/delivery'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.date" (
+          %match:regex (
+            $.response.body.date => '2026-07-30 or later',
+            '^(?:\\d{4}-\\d{2}-\\d{2})$'
+          ) => ERROR(Expected '2026-07-30 or later' to match '^(?:\d{4}-\d{2}-\d{2})$')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

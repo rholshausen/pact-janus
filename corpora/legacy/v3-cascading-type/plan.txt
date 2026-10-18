@@ -43,7 +43,7 @@
               :"$.animals[*].phoneNumber" (
                 %match:regex (
                   ~>.phoneNumber,
-                  '\\d+'
+                  '^(?:\\d+)$'
                 )
               ),
               %legacy:only-entries (

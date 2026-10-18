@@ -338,9 +338,11 @@ with a name, a result and a line in the output.
 
 ### 4.4 The legacy family
 
-The v1–v4 compiler (design 3.5) emits from the same set. Most of it overlaps: shape spec §4.2 fixed
-`regex`'s dialect and anchoring to match v1–v4 exactly, so `match:regex` serves both compilers with
-one semantics. Where they differ is small and worth naming:
+The v1–v4 compiler (design 3.5) emits from the same set. Most of it overlaps: `match:regex` serves
+both compilers with one semantics, matching anywhere in the value (shape spec §4.2), and the v1–v4
+compiler emits a pact's pattern anchored, `^(?:…)$`, because today's verifiers match it against the
+whole value (staged plan S1.18). The pattern a plan prints is the one it matches. Where the two
+compilers differ is small and worth naming:
 
 The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
 "which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:

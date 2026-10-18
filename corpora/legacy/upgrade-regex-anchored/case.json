@@ -1,0 +1,100 @@
+{
+  "description": "a v3 pact's regex and the shape `janus upgrade` converts it into refuse the same value (staged plan S1.18): the pact's pattern matches the whole value, so the upgrade writes it anchored, and the shape, which matches anywhere, keeps the pact's verdict. Plan-grammar spec section 4.4's two-path agreement",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get a delivery date",
+          "request": {
+            "method": "GET",
+            "path": "/delivery"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "date": "2026-07-30"
+            },
+            "matchingRules": {
+              "body": {
+                "$.date": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "\\d{4}-\\d{2}-\\d{2}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a delivery date",
+      "parts": {
+        "request": {
+          "method": {
+            "shape": "equality",
+            "example": "GET"
+          },
+          "path": {
+            "shape": "equality",
+            "example": "/delivery"
+          }
+        },
+        "response": {
+          "status": {
+            "shape": "equality",
+            "example": 200
+          },
+          "body": {
+            "shape": "object",
+            "members": {
+              "date": {
+                "shape": "regex",
+                "pattern": "^(?:\\d{4}-\\d{2}-\\d{2})$",
+                "example": "2026-07-30"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/delivery",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": {
+      "date": "2026-07-30 or later"
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.date",
+        "message": "Expected '2026-07-30 or later' to match '^(?:\\d{4}-\\d{2}-\\d{2})$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

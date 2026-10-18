@@ -67,13 +67,13 @@ Five constructs, four outcomes. `$.id`, `$.status` and `$.customer.id` map strai
           "headers": { "shape": "object",
                        "members": { "Content-Type": { "shape": "each-like",
                                                       "items": { "shape": "regex",
-                                                                 "pattern": "application/json.*",
+                                                                 "pattern": "^(?:application/json.*)$",
                                                                  "example": "application/json" } } } },
           "body": { "shape": "object",
                     "members": {
                       "id": { "shape": "integer", "example": 42,
                               "generator": { "type": "RandomInt", "min": 1, "max": 100 } },
-                      "status": { "shape": "regex", "pattern": "PENDING|SHIPPED", "example": "PENDING" },
+                      "status": { "shape": "regex", "pattern": "^(?:PENDING|SHIPPED)$", "example": "PENDING" },
                       "total": { "shape": "number", "example": 10.0 },
                       "callbackUrl": { "shape": "equality", "example": "http://localhost:1234/orders/42" },
                       "customer": { "shape": "object",
@@ -98,6 +98,10 @@ Five constructs, four outcomes. `$.id`, `$.status` and `$.customer.id` map strai
           "boundaries": false } } } ],
   "metadata": { "writer": { "pact-janus": "0.1.0" } } }
 ```
+
+Each regex is written anchored, `^(?:…)$`: the pact's pattern matches the whole value, as today's
+verifiers match it, and a shape's matches anywhere (shape spec §4.2), so without the anchors
+`PENDING|SHIPPED` would accept `NOT SHIPPED` (spec §8.2, staged plan S1.18).
 
 No branch anywhere produced that selection. The shape contributes no variant dimensions, so the space
 has one member, every strategy agrees on it, and the base variant is the whole selection — the

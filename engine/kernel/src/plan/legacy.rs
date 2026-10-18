@@ -247,6 +247,17 @@ pub fn winning_rule(
 
 // --- a single rule -> a single match node ---
 
+/// A v1–v4 regex, as a pattern `match:regex` reads the way today's verifiers do: matching the whole
+/// value (staged plan S1.18). pact-reference matches with Oniguruma's `is_match`, which requires the
+/// match to span the string, and pact-jvm with Kotlin's `String.matches`; `match:regex` matches
+/// anywhere (shape-language spec §4.2), so the pattern is anchored here, where v1–v4 semantics live.
+///
+/// Always wrapped, never only when it looks unanchored: `^a|b$` starts with `^` and ends with `$`,
+/// yet `b$` alone matches `xb`. The group keeps an alternation inside the anchors.
+pub fn anchored_pattern(pattern: &str) -> String {
+  format!("^(?:{pattern})$")
+}
+
 /// One [`MatchingRule`] to one plan node. `example` is the expected value at this path, carried
 /// for the same reason the shape compiler carries one (plan-grammar spec §5.2): a mismatch message
 /// worth reading names what was expected, not just that something failed.
@@ -262,7 +273,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
     ),
     MatchingRule::Regex(pattern) => Node::action(
       "match:regex",
-      vec![resolve, Node::value(Literal::string(pattern))],
+      vec![resolve, Node::value(Literal::string(anchored_pattern(pattern)))],
     ),
     MatchingRule::Type => Node::action(
       "match:type",

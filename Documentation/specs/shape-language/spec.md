@@ -344,10 +344,15 @@ produced years of cross-language divergence:
   non-capturing and capturing groups, but no backreferences and no lookaround. It is what the engine's
   regex library implements natively, it is available in every SDK language, and it is what makes
   linear-time matching and (in principle) language containment decidable.
-- **Anchoring**: a pattern matches if it matches *anywhere* in the string, exactly as v1–v4 pacts
-  behave. Authors anchor explicitly with `^` and `$`. Choosing implicit full-match here would be the
-  better default in isolation, and would silently change the verdict of every upgraded pact file,
-  which is a worse thing to be right about.
+- **Anchoring**: a pattern matches if it matches *anywhere* in the string, as the `regex` crate's
+  `is_match` and most regex APIs do. Authors anchor explicitly with `^` and `$`, so a pattern says
+  in itself how much of the value it covers. v1–v4 pacts behave differently: today's verifiers
+  match a pact's pattern against the whole value (pact-reference with Oniguruma's `is_match`,
+  pact-jvm with Kotlin's `String.matches`). So both places that read a pact's pattern anchor it,
+  `^(?:…)$`: the v1–v4 compiler (plan-grammar spec §4.4) and the conversion (contract-file spec
+  §8.2), and an upgraded pact keeps its verdicts (staged plan S1.18). This section first gave
+  v1–v4 as the reason for matching anywhere; S1.1's differential harness showed that premise was
+  wrong.
 
 **`datetime`, `date`, `time`** admit strings that parse under `format`, whose pattern language is the
 one v3/v4 pact files already use (the Java `DateTimeFormatter` subset), so conversion is

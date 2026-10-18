@@ -465,7 +465,7 @@ slot, this position, this constraint", which is where a shape node goes.
 | *(no rule at a position)* | `equality` on the example | what v1–v4 already mean by an example with no rule; the conversion writes it down rather than changing it |
 | `equality` | `equality` | |
 | `type` | `type` | |
-| `regex` | `regex` | anchoring is unchanged — a pattern matches *anywhere* in the string, exactly as v1–v4 behave, because implicit full-match would be the better default in isolation and would silently change the verdict of every converted pact (shape spec §4.2) |
+| `regex` | `regex` | the pattern is written anchored, `^(?:…)$`: a pact's pattern matches the whole value, as today's verifiers match it, and a shape's matches anywhere (shape spec §4.2), so the anchors are what keep the converted pact's verdicts (staged plan S1.18). Always wrapped, never only when the pattern looks unanchored: `^a\|b$` starts with `^` and ends with `$`, yet `b$` alone matches `xb` |
 | `include` | `include` | |
 | `number`, `integer`, `decimal` | `number`, `integer`, `decimal` | |
 | `boolean`, `null` | `boolean`, `null` | |

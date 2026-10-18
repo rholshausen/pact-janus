@@ -43,7 +43,7 @@
               :"$.animals[*].phoneNumber" (
                 %match:regex (
                   ~>.phoneNumber => '333',
-                  '\\d+'
+                  '^(?:\\d+)$'
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:only-entries (
@@ -55,8 +55,8 @@
               :"$.animals[*].phoneNumber" (
                 %match:regex (
                   ~>.phoneNumber => 'abc',
-                  '\\d+'
-                ) => ERROR(Expected 'abc' to match '\d+')
+                  '^(?:\\d+)$'
+                ) => ERROR(Expected 'abc' to match '^(?:\d+)$')
               ) => BOOL(false),
               %legacy:only-entries (
                 ~> => {'phoneNumber': 'abc'},

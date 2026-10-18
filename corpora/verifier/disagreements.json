@@ -86,18 +86,18 @@
       "reason": "S1.6: a multipart body is refused as contract-invalid; today compares its parts"
     },
     {
-      "case": "compatibility-suite/v2/02-supports-matching-rules-for-the-response-headers-negative-case",
+      "case": "compatibility-suite/v2/01-supports-matching-rules-for-the-response-headers-positive-case",
       "key": "0/0",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 123ABC) reaches the plan as a list and one match:regex judges the whole list; today applies the rule to each value, and 123ABC fails it"
+      "today": "pass",
+      "janus": "fail",
+      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 1000) reaches the plan as one list, and one match:regex judges it, as a whole value since S1.18, so it fails \\d{1,4}; today applies the rule to each value, and both pass"
     },
     {
-      "case": "compatibility-suite/v2/02-supports-matching-rules-for-the-response-headers-negative-case",
+      "case": "compatibility-suite/v2/01-supports-matching-rules-for-the-response-headers-positive-case",
       "key": "run",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 123ABC) reaches the plan as a list and one match:regex judges the whole list; today applies the rule to each value, and 123ABC fails it"
+      "today": "pass",
+      "janus": "fail",
+      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 1000) reaches the plan as one list, and one match:regex judges it, as a whole value since S1.18, so it fails \\d{1,4}; today applies the rule to each value, and both pass"
     },
     {
       "case": "compatibility-suite/v4/01-verifying-a-pending-http-interaction",
@@ -105,20 +105,6 @@
       "today": "pass",
       "janus": "fail",
       "reason": "S1.3: Janus has no pending interactions, so a pending interaction's failure fails the run; today reports it and passes"
-    },
-    {
-      "case": "order-service/mutations/0/0/body/$.shippedAt/same-type",
-      "key": "0/0",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "S1.18: today's verifier matches a regex against the whole value (onig's is_match), so '…Z-changed' fails \\d{4}-…Z; Janus matches anywhere in the value, as the shape-language spec says v1–v4 do"
-    },
-    {
-      "case": "order-service/mutations/0/0/body/$.shippedAt/same-type",
-      "key": "run",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "S1.18: today's verifier matches a regex against the whole value (onig's is_match), so '…Z-changed' fails \\d{4}-…Z; Janus matches anywhere in the value, as the shape-language spec says v1–v4 do"
     },
     {
       "case": "state-callbacks/fails-once",

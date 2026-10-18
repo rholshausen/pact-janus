@@ -20,9 +20,9 @@ pub use interpret::{
   execute_with_content, outcome,
 };
 pub use legacy::{
-  LegacyRequest, LegacyResponse, compile_interaction as compile_legacy_interaction,
-  compile_request as compile_legacy_request, compile_response as compile_legacy_response,
-  winning_rule as legacy_winning_rule,
+  LegacyRequest, LegacyResponse, anchored_pattern as legacy_anchored_pattern,
+  compile_interaction as compile_legacy_interaction, compile_request as compile_legacy_request,
+  compile_response as compile_legacy_response, winning_rule as legacy_winning_rule,
 };
 pub use model::{
   DocumentKind, GRAMMAR_VERSION, Literal, Node, NodeKind, Plan, from_json, to_json as plan_json,

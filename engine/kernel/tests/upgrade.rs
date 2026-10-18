@@ -88,9 +88,11 @@ fn each_matcher_becomes_the_operator_the_table_names() {
   // No rule at a position is not a gap: it is what v1–v4 already meant by the example.
   assert_eq!(members["plain"], json!({ "shape": "equality", "example": "x" }));
   assert_eq!(members["typed"], json!({ "shape": "type", "example": "x" }));
+  // A pact's regex matches the whole value and a shape's matches anywhere, so the pattern is
+  // written anchored and the contract keeps the pact's verdicts (staged plan S1.18).
   assert_eq!(
     members["pattern"],
-    json!({ "shape": "regex", "pattern": "a.c", "example": "abc" })
+    json!({ "shape": "regex", "pattern": "^(?:a.c)$", "example": "abc" })
   );
   assert_eq!(
     members["part"],

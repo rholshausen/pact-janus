@@ -55,7 +55,8 @@ Three sources are the source of truth and take precedence over this file when th
 > (a release carries `janus-sdk-gates` and `janus-spec.tar.gz`, so one SDK runs its gates from them alone),
 > S0.5 (the codename is rename-ready: `Documentation/codename.md`, rehearsed weekly). Stage 0a is done.
 > In stage 1a: S1.1 (the differential harness runs in CI, and every verdict `janus verify` and today's
-> verifier disagree on is in `corpora/verifier/disagreements.json` with the item that closes it).
+> verifier disagree on is in `corpora/verifier/disagreements.json` with the item that closes it), and
+> S1.18 (a v1–v4 regex matches the whole value: the legacy compiler and `janus upgrade` anchor it).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

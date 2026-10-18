@@ -1,0 +1,70 @@
+{
+  "description": "a v1-v4 regex matches the whole value, as today's verifiers do (staged plan S1.18): \\d{4}-\\d{2}-\\d{2} refuses '2026-07-30 or later', which it would accept if it matched anywhere, so the compiler anchors the pattern",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get a delivery date",
+          "request": {
+            "method": "GET",
+            "path": "/delivery"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "date": "2026-07-30"
+            },
+            "matchingRules": {
+              "body": {
+                "$.date": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "\\d{4}-\\d{2}-\\d{2}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/delivery",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "date": "2026-07-30 or later"
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.date",
+        "message": "Expected '2026-07-30 or later' to match '^(?:\\d{4}-\\d{2}-\\d{2})$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

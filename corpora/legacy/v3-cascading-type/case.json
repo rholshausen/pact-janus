@@ -45,7 +45,7 @@
     "mismatches": [
       {
         "path": "~>.phoneNumber",
-        "message": "Expected 'abc' to match '\\d+'",
+        "message": "Expected 'abc' to match '^(?:\\d+)$'",
         "action": "match:regex"
       }
     ]
