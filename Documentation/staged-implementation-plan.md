@@ -454,8 +454,57 @@ item in 1a is done when S1.1 agrees.
   native crate that implements it, registered by both native binaries; per-pact pending status, the
   publishing link and the broker's interaction ids carried through the run; the `broker` capability;
   and the CLI's options for all of it, named in S1.13's table.
+  How it is tested was settled before the build (2026-10-19), because no one source covers it. The
+  published OpenAPI documents type shapes but not semantics, and are thinnest where the risk is; the
+  broker pacts today's clients publish record what those clients send, not what a broker returns.
+  So four layers, each catching what the others cannot:
+  1. **A real broker, with today's verifier beside us** — the gate. CI runs the Ruby broker
+     (`pactfoundation/pact-broker`, pinned by digest) as a service, as the OCI tests run `registry:2`,
+     and seeds it through its own API: pacts on branches and tags, deployments and releases recorded,
+     a failing result so a pact is pending, a new branch so another is WIP. S1.1's harness then runs
+     `pact_verifier_cli --broker-url` and `janus verify` against the same seeded broker, through a
+     recording proxy, and compares three things: the pacts each fetched, with their pending and WIP
+     flags and notices; the requests each sent; and the results each published, with the matrix
+     after. A disagreement goes in the ledger with what accounts for it, as S1.1's do. The same job
+     runs the broker behind basic auth and a bearer token, and fails if either credential appears in
+     a frame, event, summary or log (ADR 0032 decision 5). A weekly run against the latest image
+     catches the broker moving. CI's service containers are Linux-only, so this layer is too.
+  2. **Recorded responses** — layer 1 offline, on all three systems. The client crate's tests replay
+     responses recorded from the pinned broker; layer 1's job records them again and fails on any
+     diff, as the bindings are regenerated. The paths a broker cannot be asked to take — a 401, a
+     50x retried, a body that is not HAL, a base URL with a context path — are stub cases written by
+     hand, from the list `pact_verifier`'s own broker tests cover.
+  3. **A consumer pact of our own, verified.** The client crate's tests write a pact (`pact_consumer`)
+     from the client to the provider `Pact Broker`, using the Ruby broker's provider-state names where
+     one fits. It is verified in layer 1's job against the same broker, by today's verifier, each
+     state a seeding through the broker's API. A pact nobody verifies is a mock that agrees with
+     itself: `pact_verifier`'s broker pacts name the provider `PactBroker`, and Pact-JVM's pending and
+     WIP interactions (`PactBrokerClientPactSpec`) use states the Ruby broker does not define. Those
+     pacts are where ours takes its request bodies from, because what today's clients send is what
+     brokers accept in production; what they expect back is not evidence. Proposing ours upstream,
+     with the states it needs, is a follow-up, not the exit.
+  4. **A schema lint.** The requests the client sends and the responses it reads are validated
+     against PactFlow's OpenAPI document, with an unknown property an error: no published document
+     closes an object, so a misspelled selector would otherwise pass. It types `for-verification`'s
+     request (every selector, pending, WIP) and `contracts/publish` fully, which no other document
+     does; it omits fetching a pact and publishing results. The document is fetched, never committed
+     (its licence is SmartBear's): a pin file names its SwaggerHub registry URL
+     (`smartbear-public/pactflow_saas_api`, `?resolved=true`) and SHA-256, and the test refuses any
+     other digest, as `tools/verifier-diff/pact-verifier.json` pins today's verifier. Fetched
+     without a credential, the registry serves `98b1d720f`; the portal's current `115423c67` differs
+     from it on these operations only in their `operationId`s, and the pin moves when PactFlow makes
+     the current version public there, which is asked of them. Unreachable, the lint fails in CI and
+     skips locally, saying so. The Rust broker port's `openapi.json` covers the half PactFlow's omits
+     and is checked against both brokers by Drift, but it is not public yet, documents
+     `for-verification` as GET only and leaves `_links` untyped; it joins the lint, pinned the same
+     way, when it is public, with those two fixed.
+  Not used: the Rust port's `openapi-ruby.json`, inferred and mistyped where it matters (selectors an
+  object, booleans strings), and the Ruby broker's own `pact_broker_oas.yaml`, which has two paths.
+  The publishing link (`pb:publish-verification-results`), which no document describes, and what a
+  selector selects are layer 1's alone.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
-  included, and the broker's matrix shows the results per pair.
+  included, and the broker's matrix shows the results per pair; the client's consumer pact is verified
+  by that broker; and the schema lint passes against the pinned PactFlow document.
 - **S1.4 v3/v4 generators in verification** — **M**. The legacy path has no generator support:
   `upgrade` drops them with a `generator-dropped` finding, and verification never applies them.
   Today's verifiers apply `ProviderState` generators with values the state-change call returned,
