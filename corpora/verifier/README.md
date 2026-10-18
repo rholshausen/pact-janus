@@ -26,7 +26,7 @@ this one.
 | `description` | What the fixture is for |
 | `source` | Where it came from, for a reader |
 | `pacts` | Pact files, relative to the directory |
-| `provider` | `{ "kind": "order-service" }`: the sample provider, started with auth off, whose provider-state endpoint is the state callback. `{ "kind": "scripted", "state-callback": "none" \| "ok" \| "fail", "routes": [...] }`: the harness's own provider, answering each route |
+| `provider` | `{ "kind": "order-service" }`: the sample provider, started with auth off, whose provider-state endpoint is the state callback. `{ "kind": "scripted", "state-callback": "none" \| "ok" \| "fail" \| "fail-once", "routes": [...] }`: the harness's own provider, answering each route. `fail` answers every state call with a 500; `fail-once` answers the first with a 503 and the rest with success |
 | `expected` | `pass` or `fail`, when the source says what the run should conclude. Today's verifier is held to it, so a fixture it disagrees with is a fixture translated wrongly |
 | `mutations` | Also run every interaction against mutated responses |
 
@@ -34,6 +34,9 @@ The scripted provider recognises a request strictly by its example: method, path
 the route names, and the body when the route has one. It answers anything else with a 404, as pact's
 mock server does, so a verifier that sends the wrong request fails as it would against a real
 provider. When several routes recognise a request, the one whose `states` were just set up answers.
+
+Each verifier gets its own, freshly started provider, so nothing one verifier does to a provider (the
+states it set up, a callback it has already made fail) changes what the other sees.
 
 A mutation changes one thing in an interaction's response: the status, a header, a body value (to
 another of its type, or to another type), a member removed, an array emptied or lengthened, a member
@@ -44,6 +47,8 @@ the same one.
 ## What is here
 
 - `order-service/`: the sample provider's own v3 pact against the sample provider, and its mutations.
+- `state-callbacks/`: provider-state callbacks that misbehave in ways the compatibility suite does not
+  cover, such as `fails-once`, an endpoint that fails while it warms up.
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
   HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it.
   Generated: `cargo run -p pact_janus_verifier_diff -- import-compatibility-suite <checkout>`

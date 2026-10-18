@@ -489,9 +489,17 @@ item in 1a is done when S1.1 agrees.
   hooks, hardened: the hooks host's credential redaction reviewed for production, script and `exec`
   hook timeouts and resource limits enforced, and a migration note for each verifier option they
   replace (S1.13).
-  One difference S1.1 found that no verdict shows: when a state-change call fails, today's verifier
-  retries it for about two minutes before failing the interaction, and the `http` hook does not retry
-  at all. The migration note says which a provider gets, and why.
+  S1.1 found that the two treat a failing state-change call differently. Today's verifier retries a
+  state call that gets a 5xx, 408 or 429, eight times, waiting 500 ms and doubling each time (over
+  two minutes in all), and fails the interaction only then; any other status fails at once. Nothing
+  sets the count: `pact_verifier_cli` and the FFI both build the state executor with its default
+  (`HttpRequestProviderStateExecutor`, `retries: 8`), and `--retries` reaches broker requests only.
+  An environment override, `PACT_PROVIDER_STATE_CHANGE_RETRIES`, is proposed upstream, so the FFI
+  need not change. The `http` hook does not retry at all, so a state endpoint that fails once while
+  it warms up passes today and fails under Janus (`state-callbacks/fails-once` in S1.1's ledger).
+  The recommendation: an `http` hook takes a retry count with today's rule (the same statuses, the
+  same backoff), and a `state-setup` hook defaults to today's eight, so a provider moving over keeps
+  what it had. The default is the decision.
   *Exit:* every state-change and request-filter option in S1.13's table maps to a hook, and the
   redaction rules (lifecycle-hooks spec §7.3) have a test per secret-bearing context member.
 - **S1.10 `match:content-type` in live runs** — **S**. The exchange and verification paths execute
@@ -511,7 +519,9 @@ item in 1a is done when S1.1 agrees.
   interaction prints the fragment.
 - **S1.13 Flag parity with today's verifier CLI** — **S**, but it gates the stage. A table with a row
   per `pact_verifier_cli` and `pact-provider-verifier` option: the `janus` option, the hook, or
-  "dropped, because". The table is the migration note for providers.
+  "dropped, because". The table is the migration note for providers. Behaviour with no flag gets a
+  row too, where a provider relies on it: today's verifier retries a failed state call eight times
+  and nothing on its command line changes that (S1.9).
   *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.
 - **S1.17 A filtered run never reads as a pass** — **S**. Found while rebuilding the CLI before stage
   1a, and in neither the findings list nor the earlier revisions. `janus verify --variant <id>` with an

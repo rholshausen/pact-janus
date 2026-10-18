@@ -38,12 +38,13 @@ impl ScriptedProvider {
       let server = Arc::clone(&server);
       let stop = Arc::clone(&stop);
       let states = Mutex::new(Vec::<String>::new());
+      let failed_once = AtomicBool::new(false);
       std::thread::spawn(move || {
         for request in server.incoming_requests() {
           if stop.load(Ordering::Relaxed) {
             break;
           }
-          handle(request, &routes, callback, &states);
+          handle(request, &routes, callback, &states, &failed_once);
         }
       })
     };
@@ -79,6 +80,7 @@ fn handle(
   routes: &[Route],
   callback: StateCallback,
   states: &Mutex<Vec<String>>,
+  failed_once: &AtomicBool,
 ) {
   let mut body = Vec::new();
   let _ = request.as_reader().read_to_end(&mut body);
@@ -87,7 +89,10 @@ fn handle(
   if request.method() == &tiny_http::Method::Post && path == STATE_PATH {
     let response = match callback {
       StateCallback::Fail => text(500, "the provider state callback is configured to fail"),
-      StateCallback::None | StateCallback::Ok => {
+      StateCallback::FailOnce if !failed_once.swap(true, Ordering::Relaxed) => {
+        text(503, "the provider state callback is not ready yet; try again")
+      }
+      StateCallback::None | StateCallback::Ok | StateCallback::FailOnce => {
         let call: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
         let teardown = call["action"].as_str() == Some("teardown");
         if let Some(state) = call["state"]
@@ -383,5 +388,26 @@ mod tests {
       .unwrap();
     assert_eq!(status(format!("{}/x", provider.base_url())), 201);
     assert_eq!(status(format!("{}/nothing", provider.base_url())), 404);
+  }
+
+  #[test]
+  fn a_callback_that_fails_once_succeeds_when_asked_again() {
+    let provider = ScriptedProvider::start(vec![], StateCallback::FailOnce).unwrap();
+    let agent = ureq::Agent::new_with_config(
+      ureq::config::Config::builder()
+        .http_status_as_error(false)
+        .build(),
+    );
+    let setup = || {
+      agent
+        .post(format!("{}{STATE_PATH}", provider.base_url()))
+        .send(json!({ "state": "one", "params": {}, "action": "setup" }).to_string())
+        .unwrap()
+        .status()
+        .as_u16()
+    };
+    assert_eq!(setup(), 503);
+    assert_eq!(setup(), 200);
+    assert_eq!(setup(), 200);
   }
 }

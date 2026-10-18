@@ -13,5 +13,6 @@ reads it. A provider integration (staged plan S1.15) will be held to it.
 What the ledger says about this release, for anyone deciding whether `janus verify` can replace
 today's verifier yet: plain-text, XML, form, multipart and binary bodies are not verified (S1.6); a
 pending interaction fails the run (S1.3); a repeated response header is judged as one list (S3.3);
-and a regex matches anywhere in a value, where today's verifiers require the whole value to match
-(S1.18).
+a regex matches anywhere in a value, where today's verifiers require the whole value to match
+(S1.18); and a failed provider-state call is not retried, where today's verifier retries it eight
+times (S1.9).

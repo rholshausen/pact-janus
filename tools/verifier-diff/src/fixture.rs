@@ -67,6 +67,9 @@ pub enum StateCallback {
   Ok,
   /// Configured, and every setup call fails with a 500.
   Fail,
+  /// Configured, and the first call fails with a 503, as a state endpoint still warming up would;
+  /// every call after it succeeds. A verifier that retries passes; one that does not fails.
+  FailOnce,
 }
 
 /// One request the scripted provider recognises, and its answer.

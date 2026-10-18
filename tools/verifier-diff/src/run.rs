@@ -188,32 +188,31 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     }
   }
 
-  // The provider lives until both verifiers are done with it.
-  let (base_url, port, state_url, _scripted, _order_service) = match &case.provider {
-    CaseProvider::Scripted { routes, callback } => {
-      let provider = ScriptedProvider::start(routes.clone(), *callback)?;
-      let state = (*callback != StateCallback::None).then(|| format!("{}{STATE_PATH}", provider.base_url()));
-      (provider.base_url(), provider.port(), state, Some(provider), None)
-    }
-    CaseProvider::OrderService => {
-      let provider = pact_janus_sample_order_service::start(pact_janus_sample_order_service::Config {
-        token: None,
-        ..Default::default()
-      })
-      .map_err(|err| format!("starting the order-service: {err}"))?;
-      let base = provider.base_url().to_string();
-      let port = base
-        .rsplit(':')
-        .next()
-        .and_then(|port| port.parse().ok())
-        .unwrap_or(0);
-      let state = format!("{base}/_pact/provider-states");
-      (base, port, Some(state), None, Some(provider))
-    }
+  // Each verifier gets a provider of its own, freshly started: a provider remembers things — the
+  // states set up, a callback that has already failed once, the orders a state created — and what
+  // one verifier did to it must not decide what the other sees.
+  let (today_run, today) = {
+    let provider = Started::start(&case.provider)?;
+    run_today(
+      tools,
+      &files,
+      provider.port,
+      provider.state_url.as_deref(),
+      work,
+      &expected,
+    )
   };
-
-  let (today_run, today) = run_today(tools, &files, port, state_url.as_deref(), work, &expected);
-  let (janus_run, janus) = run_janus(tools, &files, &base_url, state_url.as_deref(), work, &expected);
+  let (janus_run, janus) = {
+    let provider = Started::start(&case.provider)?;
+    run_janus(
+      tools,
+      &files,
+      &provider.base_url,
+      provider.state_url.as_deref(),
+      work,
+      &expected,
+    )
+  };
 
   let mut compared = vec![Compared {
     key: "run".to_string(),
@@ -239,6 +238,53 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     compared,
     expected: case.expected,
   })
+}
+
+/// A case's provider, running until dropped.
+struct Started {
+  base_url: String,
+  port: u16,
+  state_url: Option<String>,
+  _scripted: Option<ScriptedProvider>,
+  _order_service: Option<pact_janus_sample_order_service::Provider>,
+}
+
+impl Started {
+  fn start(provider: &CaseProvider) -> Result<Started, String> {
+    match provider {
+      CaseProvider::Scripted { routes, callback } => {
+        let provider = ScriptedProvider::start(routes.clone(), *callback)?;
+        Ok(Started {
+          base_url: provider.base_url(),
+          port: provider.port(),
+          state_url: (*callback != StateCallback::None)
+            .then(|| format!("{}{STATE_PATH}", provider.base_url())),
+          _scripted: Some(provider),
+          _order_service: None,
+        })
+      }
+      CaseProvider::OrderService => {
+        let provider = pact_janus_sample_order_service::start(pact_janus_sample_order_service::Config {
+          token: None,
+          ..Default::default()
+        })
+        .map_err(|err| format!("starting the order-service: {err}"))?;
+        let base_url = provider.base_url().to_string();
+        let port = base_url
+          .rsplit(':')
+          .next()
+          .and_then(|port| port.parse().ok())
+          .unwrap_or(0);
+        Ok(Started {
+          state_url: Some(format!("{base_url}/_pact/provider-states")),
+          base_url,
+          port,
+          _scripted: None,
+          _order_service: Some(provider),
+        })
+      }
+    }
+  }
 }
 
 type Judged = (Verdict, Option<String>);

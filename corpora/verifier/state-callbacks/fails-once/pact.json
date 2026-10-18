@@ -1,0 +1,17 @@
+{
+  "consumer": { "name": "state-consumer" },
+  "provider": { "name": "state-provider" },
+  "interactions": [
+    {
+      "description": "a request that needs a provider state",
+      "providerStates": [ { "name": "an order exists", "params": { "id": "66" } } ],
+      "request": { "method": "GET", "path": "/orders/66" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "id": "66" }
+      }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "3.0.0" } }
+}
