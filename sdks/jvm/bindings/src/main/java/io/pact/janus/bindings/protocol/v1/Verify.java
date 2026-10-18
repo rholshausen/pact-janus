@@ -32,21 +32,23 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 public class Verify {
 
     /**
-     * Open, additive verification options (filtering, publishing intent, etc.).
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
      * 
      */
     @JsonProperty("options")
-    @JsonPropertyDescription("Open, additive verification options (filtering, publishing intent, etc.).")
-    private Map<String, Object> options;
+    @JsonPropertyDescription("Open, additive verification options (filtering, executed plans, publishing).")
+    private VerifyOptions options;
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
      * (Required)
      * 
      */
     @JsonProperty("source")
-    @JsonPropertyDescription("Where the contracts come from \u2014 Janus contracts or v1\u2013v4 pacts. Open vocabulary; v1 defines 'inline' \u2014 hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.")
+    @JsonPropertyDescription("Where the contracts come from \u2014 Janus contracts or v1\u2013v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md \u00a78.3, ADR 0032), behind the 'broker' capability.")
     private ContractSource source;
     /**
      * VerificationTarget
@@ -59,30 +61,34 @@ public class Verify {
     @JsonPropertyDescription("The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).")
     private VerificationTarget target;
     @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
-     * Open, additive verification options (filtering, publishing intent, etc.).
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
      * 
      */
     @JsonProperty("options")
-    public Map<String, Object> getOptions() {
+    public VerifyOptions getOptions() {
         return options;
     }
 
     /**
-     * Open, additive verification options (filtering, publishing intent, etc.).
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
      * 
      */
     @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
+    public void setOptions(VerifyOptions options) {
         this.options = options;
     }
 
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
      * (Required)
      * 
      */
@@ -94,7 +100,7 @@ public class Verify {
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
      * (Required)
      * 
      */
@@ -128,17 +134,17 @@ public class Verify {
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
+    public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
+    public void setAdditionalProperty(String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Verify.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("options");
@@ -176,7 +182,7 @@ public class Verify {
     }
 
     @Override
-    public boolean equals(java.lang.Object other) {
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }

@@ -21,8 +21,8 @@ arrive as EventFrames instead of PollResults.
   "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" } } }
 ```
 
-`→` start the run. The source is `inline` — the host fetched the pact itself (file, URL or
-broker; I/O stays out of the kernel). The target's transport bindings are open descriptor
+`→` start the run. The source is `inline`: the host read the pact itself, from a file or a URL.
+A broker is the engine's to reach, with a `broker` source ([broker-verification.md](broker-verification.md)). The target's transport bindings are open descriptor
 documents. The pact interior is sketched; its shape is design 2.5's:
 
 ```json

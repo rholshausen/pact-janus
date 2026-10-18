@@ -439,12 +439,21 @@ item in 1a is done when S1.1 agrees.
   operations** (`broker/*`: fetch by selectors, publish results, publish a contract or a provider
   shape) implemented by a native-only built-in component, so every embedding gets one client and the
   WASM offline artifact answers `component-unavailable`.
+  Decided in [ADR 0032](decisions/0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md):
+  the client is a native host capability, registered as the hook implementations are, and
+  verification fetches and publishes inside the run (a `broker` source and a `publish` option on
+  `verification/verify`), with `broker/publish-contracts` for consumers. Engine-protocol spec §8.3
+  and §8.7, `broker.schema.json`, and the `broker-verification.md` transcript; until S1.3 every
+  engine answers them with `component-unavailable` naming `broker`.
   *Exit:* the ADR, and the operations in the engine-protocol spec with schemas and examples.
 - **S1.3 Broker integration** — **L**. Fetching pacts by consumer version selectors; pending and
   work-in-progress pacts; publishing verification results keyed per consumer/provider pair (finding
   10, option A: `pairs` in the run summary); `can-i-deploy` unchanged; a `janus publish` verb (broker
   notes §11) for contracts, and later provider shapes (S4.3); compression on the publish path
-  (format review §8.2).
+  (format review §8.2). It builds what S1.2 specified: the kernel's broker-client trait and the
+  native crate that implements it, registered by both native binaries; per-pact pending status, the
+  publishing link and the broker's interaction ids carried through the run; the `broker` capability;
+  and the CLI's options for all of it, named in S1.13's table.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
   included, and the broker's matrix shows the results per pair.
 - **S1.4 v3/v4 generators in verification** — **M**. The legacy path has no generator support:

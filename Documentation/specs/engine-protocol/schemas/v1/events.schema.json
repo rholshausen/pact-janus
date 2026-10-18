@@ -24,7 +24,11 @@
             "verification/interaction-result",
             "verification/hook",
             "verification/executed-plan",
-            "verification/finished"
+            "verification/fetched",
+            "verification/published",
+            "verification/finished",
+            "broker/published",
+            "broker/finished"
           ]
         },
         "payload": { "type": "object" },

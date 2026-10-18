@@ -160,6 +160,13 @@ fn example_transcripts_validate_against_the_schemas() {
       ),
     ),
     (
+      "broker/publish-contracts",
+      (
+        Some("broker.schema.json#/$defs/PublishContracts"),
+        Some("broker.schema.json#/$defs/PublishContractsResult"),
+      ),
+    ),
+    (
       "events/poll",
       (
         Some("events.schema.json#/$defs/Poll"),

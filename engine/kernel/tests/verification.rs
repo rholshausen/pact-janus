@@ -564,15 +564,54 @@ fn a_source_the_engine_cannot_read_is_refused_by_kind() {
     "v-1",
     "verification/verify",
     json!({
-      "source": { "kind": "broker", "url": "https://broker.example" },
+      "source": { "kind": "carrier-pigeon" },
       "target": { "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } } ] },
     }),
   );
   assert_eq!(refused["error"]["code"], "operation-unsupported");
   assert_eq!(
     refused["error"]["details"]["op"],
-    "verification/verify (source kind: broker)"
+    "verification/verify (source kind: carrier-pigeon)"
   );
+}
+
+/// Spec §8.3 and §8.7, ADR 0032: the broker client is a native host capability, and an engine with
+/// none names the component for a broker source, for publishing, and for the broker operations.
+/// No embedding registers one until staged plan S1.3, so this is every engine's answer for now.
+#[test]
+fn an_engine_with_no_broker_client_names_the_component_for_everything_broker_shaped() {
+  let mut engine = engine_with_real_components();
+  let target =
+    json!({ "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } } ] });
+  let from_a_broker = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "broker", "broker": { "url": "https://broker.example" }, "provider": "p" },
+      "target": target,
+    }),
+  );
+  let publishing = send(
+    &mut engine,
+    "v-2",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [] },
+      "target": target,
+      "options": { "publish": { "provider-version": "1.0.0" } },
+    }),
+  );
+  let publishing_contracts = send(
+    &mut engine,
+    "v-3",
+    "broker/publish-contracts",
+    json!({ "broker": { "url": "https://broker.example" }, "consumer-version": "1.0.0", "contracts": [ {} ] }),
+  );
+  for refused in [from_a_broker, publishing, publishing_contracts] {
+    assert_eq!(refused["error"]["code"], "component-unavailable", "{refused}");
+    assert_eq!(refused["error"]["details"]["component"], "broker", "{refused}");
+  }
 }
 
 #[test]

@@ -37,7 +37,8 @@ passive/emissive interactions).
 11. [Compatibility policy](#11-compatibility-policy)
 
 Worked frame-by-frame transcripts — a consumer HTTP session, a verification run with its
-event stream, and the failure paths — live under [`examples/`](examples/); every frame in
+event stream, verifying from and publishing to a Pact Broker, and the failure paths — live under
+[`examples/`](examples/); every frame in
 them is validated against the schemas by `cargo test -p pact_janus_schema_compat`, so the
 examples are executable and cannot drift from the schemas.
 
@@ -418,6 +419,7 @@ Capabilities defined in v1:
 | `encoding` | both | Frame encoding negotiation (§3.4). Host: `{ "accepts": [name, …] }` in preference order. Engine: `{ "selected": name }`. Absent on either side means `json`. |
 | `provider-shape-recording` | engine | The `provider-shape-session/*` operations (§8.5) are available. Value `{}` — presence is the whole signal. |
 | `subsumption-check` | engine | The `subsumption/*` operations (§8.6) are available. Value `{}` — presence is the whole signal. |
+| `broker` | engine | The engine has a Pact Broker client: a `broker` source for `verification/verify`, its `publish` option, and the `broker/*` operations (§8.7, ADR 0032). Value `{}`. Only native embeddings register one; without it those answer `component-unavailable` naming `broker`. |
 | `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
@@ -464,7 +466,7 @@ own requests.
 
 ### 7.3 Session kinds
 
-v1 defines three kinds:
+v1 defines four kinds:
 
 - **Consumer session** (§8.2): drives mock/stub endpoints and message emission during a
   consumer test run, accumulates per-interaction verification status, and produces the Janus
@@ -474,6 +476,9 @@ v1 defines three kinds:
 - **Provider-shape session** (§8.5): accumulates what a provider's own tests produced into a
   provider-shape document. Created by `provider-shape-session/create`, ended by its
   `finalise`. It holds no transport and runs nothing — it is a place to put evidence.
+- **Broker session** (§8.7): one publication to a Pact Broker. Created by
+  `broker/publish-contracts`, reports on its stream, ends itself at the terminal event, as a
+  verification session does.
 
 New session kinds arrive as new operations plus capabilities, not as changes to existing
 ones: the provider-shape session is the worked example, behind the `provider-shape-recording`
@@ -498,8 +503,8 @@ binding, not in the protocol envelope.
 ## 8. Operation set
 
 Operation names are namespaced `<area>/<verb>`, kebab-case. v1 defines the areas `engine`
-(§5–6), `consumer-session`, `verification`, `provider-shape-session`, `subsumption`, `upgrade`
-and `events` (§9). The vocabulary is
+(§5–6), `consumer-session`, `verification`, `provider-shape-session`, `subsumption`, `upgrade`,
+`broker` and `events` (§9). The vocabulary is
 open: new operations may be added within a protocol version, gated by capability when a host
 must know in advance (§5.3); unknown operations are answered with `operation-unsupported`.
 
@@ -587,10 +592,11 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   the id of the event stream on which the run reports (§9). Progress, hook activity,
   per-interaction/per-variant results and the final summary are all events; the stream's
   terminal event carries the summary document and ends the session. `source` is an open
-  descriptor of where the contracts come from — v1 defines kind `"inline"` (the contract
-  documents — Janus contracts or v1–v4 pacts — are in the request); fetching from files, URLs
-  or a broker is host/CLI business in the
-  prototype, which also keeps I/O out of the WASM kernel. `target` describes the provider
+  descriptor of where the contracts come from. Kind `"inline"`: the contract documents — Janus
+  contracts or v1–v4 pacts — are in the request; reading files and URLs is the host's business.
+  Kind `"broker"`: the run fetches the pacts for verification of `provider` from a Pact Broker,
+  behind the `broker` capability (ADR 0032, which replaces this section's earlier rule that
+  fetching from a broker is host business). `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
   change configuration (design 2.7 owns hook config). `target.components` declares the project's
   components exactly as `consumer-session/create`'s `config.components` does; they are loaded, and
@@ -599,6 +605,23 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   parts-in wherever the parts come from: a wire-level transport binding and a
   `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
   MUST produce identical results for the same parts (spike 1.5, finding 6).
+- **A `broker` source** names the broker (§8.7's descriptor), the provider, its
+  `consumer-version-selectors` (passed to the broker as written), the provider version's
+  `provider-branch` and `provider-tags`, and whether to `include-pending` and
+  `include-wip-since` a date. The fetch happens in the run, so `verify` still answers at once,
+  and the run reports what it fetched as a `verification/fetched` event: each pact's consumer,
+  whether it is pending or work in progress, and the broker's notices. **A pending pact's
+  failures are reported and do not fail the run**; a work-in-progress pact is pending. A fetch
+  that fails ends the run as any run that cannot complete does (§9.6), with `status: failed` and
+  an `error`: `component-failed` naming `broker`, carrying the client's own error. A fetch that
+  finds no pacts ends it with `status: failed` and `pacts-not-found`, unless the source says
+  `require-pacts: false`.
+- **`options.publish`** (`provider-version`, and optionally `branch`, `tags`, `build-url`)
+  publishes each fetched pact's result to that pact's own link when the run ends, keyed by the
+  broker's interaction ids, which the run carries from the fetched documents into its results.
+  Each publication is a `verification/published` event, and the summary's `publication` lists
+  them. A publish that fails is reported and does not change the verdict. `publish` with an
+  `inline` source is refused before the run starts: an inline document has no link to publish to.
 - **`explain`** compiles one interaction (from a spec or a contract interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain
@@ -743,6 +766,38 @@ A `block` decision is an **answer, not an error** (§10.2's own distinction): th
 succeeded. What a `block` does to an exit code is the host's business — `janus check` maps it to
 exit 1, the code it uses for "the subject failed".
 
+### 8.7 The Pact Broker — `broker/*`
+
+Schema: [`schemas/v1/broker.schema.json`](schemas/v1/broker.schema.json). Decided by
+[ADR 0032](../../decisions/0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md):
+the broker client is the engine's, so no host speaks the broker's API, and it is a native host
+capability, so the kernel knows no HTTP. Behind the `broker` capability (§5.3). An engine without a
+client — the offline WASM artifact — knows these operations and answers each with
+`component-unavailable` naming `broker`, as it answers a `broker` source or a `publish` option.
+
+| Operation | Body → Result |
+|---|---|
+| `broker/publish-contracts` | `{ broker, consumer-version, contracts, branch?, tags?, build-url? }` → `{ session, stream }` |
+
+- **The broker descriptor** is what every broker-facing member takes: `url`, `auth` (`bearer` with
+  a `token`, or `basic` with a `username` and `password`) and `client`, the HTTP client options the
+  HTTP component's client half takes (TLS, proxies, timeouts, retries; staged plan S1.5), so one
+  configuration reaches the provider and the broker alike.
+- **Credentials travel in the request and nowhere else.** The engine MUST NOT read broker
+  credentials from its environment: a host reads them, by whatever names it supports, and passes
+  them. The engine MUST NOT repeat them in an event, a summary, an error or a log. It names the
+  broker by its URL with any user information removed, and the lifecycle-hooks spec's redaction
+  rules (§7.3) apply to everything it reports.
+- **`publish-contracts`** publishes Janus contracts or v1–v4 pacts, all for one consumer, for a
+  consumer version, with its branch, tags and build URL; a contract is published as the broker's
+  `pact` specification (ADR 0011 decision 6). It reaches the network, so it reports on a stream
+  rather than in its result: one `broker/published` event per contract, and a terminal
+  `broker/finished` carrying the outcome, which ends the broker session (§7.3).
+- **Not defined yet**, each a new operation in this area when something needs it: publishing a
+  provider shape, which no broker resource accepts ([broker notes](../../prototype/broker-integration-notes.md)
+  §2; staged plan S4.3), and fetching contracts or shapes for a decision over a broker's matrix.
+  `can-i-deploy` stays the broker's own.
+
 ## 9. Events and streams
 
 Delivery model fixed by [ADR 0005](../../decisions/0005-poll-based-event-delivery.md):
@@ -752,11 +807,12 @@ Schema: [`schemas/v1/events.schema.json`](schemas/v1/events.schema.json).
 ### 9.1 Streams
 
 A **stream** is an ordered sequence of events produced by work inside one session. v1 defines
-exactly one producer, the verification run; surfacing consumer-session transport activity the
-same way is the obvious next stream and, being a new operation plus event kinds, needs no
-protocol-version bump when it arrives.
+two producers, the verification run and the broker session's publication (§8.7); surfacing
+consumer-session transport activity the same way is the obvious next stream and, being a new
+operation plus event kinds, needs no protocol-version bump when it arrives.
 Stream ids are engine-assigned opaque strings, scoped to their session and handed to the
-host in the result of the operation that started the work (`verification/verify`). A stream
+host in the result of the operation that started the work (`verification/verify`,
+`broker/publish-contracts`). A stream
 ends when its final event has been *delivered*; polling an unknown or ended stream is
 answered with error `stream-not-found`.
 
@@ -816,14 +872,20 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
 | `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
+| `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` source, before the first interaction (§8.3) |
+| `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, or `failed` with an `error` | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
+| `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
+| `broker/finished` | the outcome: `status` (`published` or `failed`) and every contract's result | carries `last: true`; ends the broker session |
 
 The summary document the terminal event carries is the document a report is written from, so it
 names **who the run was about**: `consumers` and `providers`, positionally parallel, one entry per
 source document, plus `failures` naming the pair each failing variant belonged to. That is what
 makes a run attributable per pair by `subsumption/decide` (§8.6) — a summary that said "verified"
 without saying which consumer and which provider it verified could not be read back as an answer
-about either.
+about either. A run from a `broker` source also says, positionally beside `consumers`, which
+sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
+run, and, when it published, a `publication` entry per pact (§8.3).
 
 A run always ends its stream. One the engine cannot complete — a bug stopped it part way — still
 emits `verification/finished`, with `status: failed` and an `error` member holding an `EngineError`
@@ -854,7 +916,7 @@ a bug). An `EngineError` carries:
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
 | `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
-| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded`, `pacts-not-found` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
 
@@ -876,6 +938,11 @@ invalid" would send a reader to the wrong file.
 failures, `error` — the component's own error document, passed through opaquely: the kernel
 does not understand component error interiors and MUST NOT translate them (design 2.6 owns
 their shape).
+
+`pacts-not-found` is a `broker` source whose selectors selected nothing (§8.3): the selectors are
+the user's, so it is theirs to fix. A broker that cannot be reached, refuses the credentials or
+answers something the client cannot read is `component-failed` naming `broker`, with the client's
+own error document (`broker-unreachable`, `broker-refused`, `broker-response-invalid`) as `error`.
 
 A host encountering an unknown `code` applies its category's fallback; unknown `category`
 (or none) is treated as `internal`. Test-outcome information — mismatches, verification

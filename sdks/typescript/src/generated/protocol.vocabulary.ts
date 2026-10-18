@@ -4,6 +4,15 @@
  */
 
 /**
+ * Known values of `BrokerAuth.kind` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const BrokerAuthKind = {
+  Bearer: "bearer",
+  Basic: "basic",
+} as const;
+
+/**
  * Known values of `CheckResult.format` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -28,6 +37,7 @@ export const CompatibilityReportFormat = {
  */
 export const ContractSourceKind = {
   Inline: "inline",
+  Broker: "broker",
 } as const;
 
 /**
@@ -79,6 +89,7 @@ export const EngineErrorCode = {
   ContractInvalid: "contract-invalid",
   ContractVersionUnsupported: "contract-version-unsupported",
   VariantBudgetExceeded: "variant-budget-exceeded",
+  PactsNotFound: "pacts-not-found",
   ComponentUnavailable: "component-unavailable",
   ComponentFailed: "component-failed",
   Internal: "internal",
@@ -94,7 +105,11 @@ export const EventKind = {
   VerificationInteractionResult: "verification/interaction-result",
   VerificationHook: "verification/hook",
   VerificationExecutedPlan: "verification/executed-plan",
+  VerificationFetched: "verification/fetched",
+  VerificationPublished: "verification/published",
   VerificationFinished: "verification/finished",
+  BrokerPublished: "broker/published",
+  BrokerFinished: "broker/finished",
 } as const;
 
 /**

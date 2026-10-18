@@ -265,6 +265,11 @@ impl Engine {
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
+      // Spec §8.7: every engine knows the broker operations; one with no broker client answers
+      // them by naming the component. None registers a client until staged plan S1.3.
+      "broker/publish-contracts" => {
+        ResponseFrame::err(id, EngineError::broker_unavailable("publish contracts"))
+      }
       "verification/explain" => self.handle_explain(id, body),
       "provider-shape-session/create" => self.handle_create_recording(id, body),
       "provider-shape-session/observe" => self.handle_observe(id, body),
@@ -467,6 +472,21 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    // Spec §8.3: a broker source and the publish option need a broker client (ADR 0032), and no
+    // embedding registers one until staged plan S1.3. Refused before anything starts.
+    if req.source.kind == "broker" {
+      return ResponseFrame::err(id, EngineError::broker_unavailable("fetch pacts from a broker"));
+    }
+    if req
+      .options
+      .as_ref()
+      .is_some_and(|options| options.get("publish").is_some())
+    {
+      return ResponseFrame::err(
+        id,
+        EngineError::broker_unavailable("publish verification results"),
+      );
+    }
     let contracts = match verification::read_source(&req.source) {
       Ok(contracts) => contracts,
       Err(err) => return ResponseFrame::err(id, verify_error(err)),

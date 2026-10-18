@@ -167,9 +167,10 @@ pub struct Verify {
   pub options: Option<Value>,
 }
 
-/// Where the contracts come from. An open vocabulary whose v1 value is `inline`: files, URLs and
-/// brokers are the host's business in the prototype, which is also what keeps filesystem access
-/// out of a kernel that must build for `wasm32-wasip2`.
+/// Where the contracts come from. An open vocabulary. `inline` is read here; files and URLs are the
+/// host's business, which keeps filesystem access out of a kernel that must build for
+/// `wasm32-wasip2`. `broker` is fetched by a broker client, a native host capability (spec §8.3,
+/// ADR 0032), and refused by name before this is reached while no embedding registers one (S1.3).
 #[derive(Debug, Deserialize)]
 pub struct ContractSource {
   pub kind: String,

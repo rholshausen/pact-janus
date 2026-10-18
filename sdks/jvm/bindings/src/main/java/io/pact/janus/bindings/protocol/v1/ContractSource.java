@@ -21,16 +21,40 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * ContractSource
  * <p>
- * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.
+ * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "broker",
+    "consumer-version-selectors",
     "contracts",
-    "kind"
+    "include-pending",
+    "include-wip-since",
+    "kind",
+    "provider",
+    "provider-branch",
+    "provider-tags",
+    "require-pacts"
 })
 public class ContractSource {
 
+    /**
+     * BrokerDescriptor
+     * <p>
+     * Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them — not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.
+     * 
+     */
+    @JsonProperty("broker")
+    @JsonPropertyDescription("Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them \u2014 not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.")
+    private BrokerDescriptor broker;
+    /**
+     * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
+     * 
+     */
+    @JsonProperty("consumer-version-selectors")
+    @JsonPropertyDescription("For kind 'broker': which consumer versions' pacts. Absent means the broker's default.")
+    private List<ConsumerVersionSelector> consumerVersionSelectors;
     /**
      * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
      * 
@@ -39,14 +63,96 @@ public class ContractSource {
     @JsonPropertyDescription("For kind 'inline': the contract documents \u2014 Janus contracts or v1\u2013v4 pacts (any supported spec version).")
     private List<Map<String, Object>> contracts;
     /**
+     * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
+     * 
+     */
+    @JsonProperty("include-pending")
+    @JsonPropertyDescription("For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.")
+    private Boolean includePending;
+    /**
+     * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
+     * 
+     */
+    @JsonProperty("include-wip-since")
+    @JsonPropertyDescription("For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.")
+    private java.lang.String includeWipSince;
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("kind")
     private java.lang.String kind;
+    /**
+     * For kind 'broker': the provider whose pacts to fetch.
+     * 
+     */
+    @JsonProperty("provider")
+    @JsonPropertyDescription("For kind 'broker': the provider whose pacts to fetch.")
+    private java.lang.String provider;
+    /**
+     * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
+     * 
+     */
+    @JsonProperty("provider-branch")
+    @JsonPropertyDescription("For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.")
+    private java.lang.String providerBranch;
+    /**
+     * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
+     * 
+     */
+    @JsonProperty("provider-tags")
+    @JsonPropertyDescription("For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.")
+    private List<java.lang.String> providerTags;
+    /**
+     * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
+     * 
+     */
+    @JsonProperty("require-pacts")
+    @JsonPropertyDescription("For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.")
+    private Boolean requirePacts;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
+     * BrokerDescriptor
+     * <p>
+     * Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them — not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.
+     * 
+     */
+    @JsonProperty("broker")
+    public BrokerDescriptor getBroker() {
+        return broker;
+    }
+
+    /**
+     * BrokerDescriptor
+     * <p>
+     * Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them — not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.
+     * 
+     */
+    @JsonProperty("broker")
+    public void setBroker(BrokerDescriptor broker) {
+        this.broker = broker;
+    }
+
+    /**
+     * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
+     * 
+     */
+    @JsonProperty("consumer-version-selectors")
+    public List<ConsumerVersionSelector> getConsumerVersionSelectors() {
+        return consumerVersionSelectors;
+    }
+
+    /**
+     * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
+     * 
+     */
+    @JsonProperty("consumer-version-selectors")
+    public void setConsumerVersionSelectors(List<ConsumerVersionSelector> consumerVersionSelectors) {
+        this.consumerVersionSelectors = consumerVersionSelectors;
+    }
 
     /**
      * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
@@ -64,6 +170,42 @@ public class ContractSource {
     @JsonProperty("contracts")
     public void setContracts(List<Map<String, Object>> contracts) {
         this.contracts = contracts;
+    }
+
+    /**
+     * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
+     * 
+     */
+    @JsonProperty("include-pending")
+    public Boolean getIncludePending() {
+        return includePending;
+    }
+
+    /**
+     * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
+     * 
+     */
+    @JsonProperty("include-pending")
+    public void setIncludePending(Boolean includePending) {
+        this.includePending = includePending;
+    }
+
+    /**
+     * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
+     * 
+     */
+    @JsonProperty("include-wip-since")
+    public java.lang.String getIncludeWipSince() {
+        return includeWipSince;
+    }
+
+    /**
+     * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
+     * 
+     */
+    @JsonProperty("include-wip-since")
+    public void setIncludeWipSince(java.lang.String includeWipSince) {
+        this.includeWipSince = includeWipSince;
     }
 
     /**
@@ -86,6 +228,78 @@ public class ContractSource {
         this.kind = kind;
     }
 
+    /**
+     * For kind 'broker': the provider whose pacts to fetch.
+     * 
+     */
+    @JsonProperty("provider")
+    public java.lang.String getProvider() {
+        return provider;
+    }
+
+    /**
+     * For kind 'broker': the provider whose pacts to fetch.
+     * 
+     */
+    @JsonProperty("provider")
+    public void setProvider(java.lang.String provider) {
+        this.provider = provider;
+    }
+
+    /**
+     * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
+     * 
+     */
+    @JsonProperty("provider-branch")
+    public java.lang.String getProviderBranch() {
+        return providerBranch;
+    }
+
+    /**
+     * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
+     * 
+     */
+    @JsonProperty("provider-branch")
+    public void setProviderBranch(java.lang.String providerBranch) {
+        this.providerBranch = providerBranch;
+    }
+
+    /**
+     * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
+     * 
+     */
+    @JsonProperty("provider-tags")
+    public List<java.lang.String> getProviderTags() {
+        return providerTags;
+    }
+
+    /**
+     * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
+     * 
+     */
+    @JsonProperty("provider-tags")
+    public void setProviderTags(List<java.lang.String> providerTags) {
+        this.providerTags = providerTags;
+    }
+
+    /**
+     * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
+     * 
+     */
+    @JsonProperty("require-pacts")
+    public Boolean getRequirePacts() {
+        return requirePacts;
+    }
+
+    /**
+     * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
+     * 
+     */
+    @JsonProperty("require-pacts")
+    public void setRequirePacts(Boolean requirePacts) {
+        this.requirePacts = requirePacts;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -100,13 +314,45 @@ public class ContractSource {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ContractSource.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("broker");
+        sb.append('=');
+        sb.append(((this.broker == null)?"<null>":this.broker));
+        sb.append(',');
+        sb.append("consumerVersionSelectors");
+        sb.append('=');
+        sb.append(((this.consumerVersionSelectors == null)?"<null>":this.consumerVersionSelectors));
+        sb.append(',');
         sb.append("contracts");
         sb.append('=');
         sb.append(((this.contracts == null)?"<null>":this.contracts));
         sb.append(',');
+        sb.append("includePending");
+        sb.append('=');
+        sb.append(((this.includePending == null)?"<null>":this.includePending));
+        sb.append(',');
+        sb.append("includeWipSince");
+        sb.append('=');
+        sb.append(((this.includeWipSince == null)?"<null>":this.includeWipSince));
+        sb.append(',');
         sb.append("kind");
         sb.append('=');
         sb.append(((this.kind == null)?"<null>":this.kind));
+        sb.append(',');
+        sb.append("provider");
+        sb.append('=');
+        sb.append(((this.provider == null)?"<null>":this.provider));
+        sb.append(',');
+        sb.append("providerBranch");
+        sb.append('=');
+        sb.append(((this.providerBranch == null)?"<null>":this.providerBranch));
+        sb.append(',');
+        sb.append("providerTags");
+        sb.append('=');
+        sb.append(((this.providerTags == null)?"<null>":this.providerTags));
+        sb.append(',');
+        sb.append("requirePacts");
+        sb.append('=');
+        sb.append(((this.requirePacts == null)?"<null>":this.requirePacts));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -123,9 +369,17 @@ public class ContractSource {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.contracts == null)? 0 :this.contracts.hashCode()));
+        result = ((result* 31)+((this.includeWipSince == null)? 0 :this.includeWipSince.hashCode()));
+        result = ((result* 31)+((this.includePending == null)? 0 :this.includePending.hashCode()));
+        result = ((result* 31)+((this.requirePacts == null)? 0 :this.requirePacts.hashCode()));
+        result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
         result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
+        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.broker == null)? 0 :this.broker.hashCode()));
+        result = ((result* 31)+((this.consumerVersionSelectors == null)? 0 :this.consumerVersionSelectors.hashCode()));
+        result = ((result* 31)+((this.contracts == null)? 0 :this.contracts.hashCode()));
+        result = ((result* 31)+((this.providerBranch == null)? 0 :this.providerBranch.hashCode()));
+        result = ((result* 31)+((this.providerTags == null)? 0 :this.providerTags.hashCode()));
         return result;
     }
 
@@ -138,7 +392,7 @@ public class ContractSource {
             return false;
         }
         ContractSource rhs = ((ContractSource) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))));
+        return ((((((((((((this.includeWipSince == rhs.includeWipSince)||((this.includeWipSince!= null)&&this.includeWipSince.equals(rhs.includeWipSince)))&&((this.includePending == rhs.includePending)||((this.includePending!= null)&&this.includePending.equals(rhs.includePending))))&&((this.requirePacts == rhs.requirePacts)||((this.requirePacts!= null)&&this.requirePacts.equals(rhs.requirePacts))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.broker == rhs.broker)||((this.broker!= null)&&this.broker.equals(rhs.broker))))&&((this.consumerVersionSelectors == rhs.consumerVersionSelectors)||((this.consumerVersionSelectors!= null)&&this.consumerVersionSelectors.equals(rhs.consumerVersionSelectors))))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.providerBranch == rhs.providerBranch)||((this.providerBranch!= null)&&this.providerBranch.equals(rhs.providerBranch))))&&((this.providerTags == rhs.providerTags)||((this.providerTags!= null)&&this.providerTags.equals(rhs.providerTags))));
     }
 
 }

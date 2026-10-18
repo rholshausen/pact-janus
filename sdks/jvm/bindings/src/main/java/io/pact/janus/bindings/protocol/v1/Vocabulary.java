@@ -14,6 +14,16 @@ import java.util.List;
 public final class Vocabulary {
   private Vocabulary() {}
 
+  /** Known values of {@code BrokerAuth.kind}. */
+  public static final class BrokerAuthKind {
+    private BrokerAuthKind() {}
+
+    public static final String BEARER = "bearer";
+    public static final String BASIC = "basic";
+
+    public static final List<String> KNOWN = List.of(BEARER, BASIC);
+  }
+
   /** Known values of {@code CheckResult.format}. */
   public static final class CheckResultFormat {
     private CheckResultFormat() {}
@@ -40,8 +50,9 @@ public final class Vocabulary {
     private ContractSourceKind() {}
 
     public static final String INLINE = "inline";
+    public static final String BROKER = "broker";
 
-    public static final List<String> KNOWN = List.of(INLINE);
+    public static final List<String> KNOWN = List.of(INLINE, BROKER);
   }
 
   /** Known values of {@code Decision}. */
@@ -95,11 +106,12 @@ public final class Vocabulary {
     public static final String CONTRACT_INVALID = "contract-invalid";
     public static final String CONTRACT_VERSION_UNSUPPORTED = "contract-version-unsupported";
     public static final String VARIANT_BUDGET_EXCEEDED = "variant-budget-exceeded";
+    public static final String PACTS_NOT_FOUND = "pacts-not-found";
     public static final String COMPONENT_UNAVAILABLE = "component-unavailable";
     public static final String COMPONENT_FAILED = "component-failed";
     public static final String INTERNAL = "internal";
 
-    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
+    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, PACTS_NOT_FOUND, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
   }
 
   /** Known values of {@code Event.kind}. */
@@ -111,9 +123,13 @@ public final class Vocabulary {
     public static final String VERIFICATION_INTERACTION_RESULT = "verification/interaction-result";
     public static final String VERIFICATION_HOOK = "verification/hook";
     public static final String VERIFICATION_EXECUTED_PLAN = "verification/executed-plan";
+    public static final String VERIFICATION_FETCHED = "verification/fetched";
+    public static final String VERIFICATION_PUBLISHED = "verification/published";
     public static final String VERIFICATION_FINISHED = "verification/finished";
+    public static final String BROKER_PUBLISHED = "broker/published";
+    public static final String BROKER_FINISHED = "broker/finished";
 
-    public static final List<String> KNOWN = List.of(VERIFICATION_STARTED, VERIFICATION_INTERACTION_STARTED, VERIFICATION_INTERACTION_RESULT, VERIFICATION_HOOK, VERIFICATION_EXECUTED_PLAN, VERIFICATION_FINISHED);
+    public static final List<String> KNOWN = List.of(VERIFICATION_STARTED, VERIFICATION_INTERACTION_STARTED, VERIFICATION_INTERACTION_RESULT, VERIFICATION_HOOK, VERIFICATION_EXECUTED_PLAN, VERIFICATION_FETCHED, VERIFICATION_PUBLISHED, VERIFICATION_FINISHED, BROKER_PUBLISHED, BROKER_FINISHED);
   }
 
   /** Known values of {@code ExemptionResult.status}. */

@@ -3,6 +3,83 @@
  * `cargo run -p pact_janus_bindings -- generate`.
  */
 
+/**
+ * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
+ */
+export interface BrokerAuth {
+  kind: string;
+  password?: string;
+  token?: string;
+  username?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them — not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.
+ */
+export interface BrokerDescriptor {
+  auth?: BrokerAuth;
+  /**
+   * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.
+   */
+  client?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The broker's base URL.
+   */
+  url: string;
+  [k: string]: unknown;
+}
+
+/**
+ * One consumer version selector, passed to the broker as written: its vocabulary is the broker's (mainBranch, branch, matchingBranch, deployedOrReleased, deployed, released, environment, consumer, tag, latest, fallbackTag, fallbackBranch), and the engine does not interpret it.
+ */
+export interface ConsumerVersionSelector {
+  [k: string]: unknown;
+}
+
+/**
+ * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, published as the broker's 'pact' specification (ADR 0011 decision 6), all for the same consumer.
+ */
+export interface PublishContracts {
+  /**
+   * The consumer version's branch.
+   */
+  branch?: string;
+  broker: BrokerDescriptor;
+  /**
+   * The build that produced the contracts.
+   */
+  "build-url"?: string;
+  /**
+   * The consumer's application version these contracts belong to.
+   */
+  "consumer-version": string;
+  /**
+   * @minItems 1
+   */
+  contracts: [
+    {
+      [k: string]: unknown;
+    },
+    ...{
+      [k: string]: unknown;
+    }[]
+  ];
+  tags?: string[];
+  [k: string]: unknown;
+}
+
+/**
+ * The publish has started, in a broker session; its outcome arrives as events on 'stream' (spec.md §9). The terminal event, 'broker/finished', carries the outcome and ends the session.
+ */
+export interface PublishContractsResult {
+  session: string;
+  stream: string;
+  [k: string]: unknown;
+}
+
 export interface AddInteraction {
   /**
    * One complete interaction specification (designs 2.2/3.2).
@@ -800,16 +877,45 @@ export interface UpgradeFinding {
 }
 
 /**
- * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.
+ * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
  */
 export interface ContractSource {
+  broker?: BrokerDescriptor;
+  /**
+   * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
+   */
+  "consumer-version-selectors"?: ConsumerVersionSelector[];
   /**
    * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
    */
   contracts?: {
     [k: string]: unknown;
   }[];
+  /**
+   * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
+   */
+  "include-pending"?: boolean;
+  /**
+   * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
+   */
+  "include-wip-since"?: string;
   kind: string;
+  /**
+   * For kind 'broker': the provider whose pacts to fetch.
+   */
+  provider?: string;
+  /**
+   * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
+   */
+  "provider-branch"?: string;
+  /**
+   * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
+   */
+  "provider-tags"?: string[];
+  /**
+   * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
+   */
+  "require-pacts"?: boolean;
   [k: string]: unknown;
 }
 
@@ -860,6 +966,26 @@ export interface ExplainResult {
 }
 
 /**
+ * Publish each fetched pact's result to that pact's own link when the run ends (spec.md §8.3). Only for a source of kind 'broker': an inline document has no link to publish to. A publish that fails is reported per pact and does not change the verdict.
+ */
+export interface PublishResults {
+  /**
+   * The provider version's branch.
+   */
+  branch?: string;
+  /**
+   * The build that ran the verification.
+   */
+  "build-url"?: string;
+  /**
+   * The provider application version the results are for.
+   */
+  "provider-version": string;
+  tags?: string[];
+  [k: string]: unknown;
+}
+
+/**
  * The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).
  */
 export interface VerificationTarget {
@@ -885,14 +1011,17 @@ export interface TransportBinding {
 }
 
 export interface Verify {
-  /**
-   * Open, additive verification options (filtering, publishing intent, etc.).
-   */
-  options?: {
-    [k: string]: unknown;
-  };
+  options?: VerifyOptions;
   source: ContractSource;
   target: VerificationTarget;
+  [k: string]: unknown;
+}
+
+/**
+ * Open, additive verification options (filtering, executed plans, publishing).
+ */
+export interface VerifyOptions {
+  publish?: PublishResults;
   [k: string]: unknown;
 }
 

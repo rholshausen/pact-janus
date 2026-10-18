@@ -266,6 +266,17 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` naming `broker` (spec §8.7, ADR 0032): the broker client is a native
+  /// host capability, and this engine has none — the offline WASM artifact never does.
+  pub fn broker_unavailable(what: &str) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!("this engine has no Pact Broker client, so it cannot {what}"),
+      details: Some(serde_json::json!({ "component": "broker" })),
+    }
+  }
+
   /// `component-unavailable` for a declared component that could not be resolved, or a requirement
   /// nothing satisfies (component-interfaces spec §11.3): `details` says which case.
   pub fn component_unresolved(unavailable: &crate::component::Unavailable) -> Self {

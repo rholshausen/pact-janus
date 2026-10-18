@@ -24,6 +24,7 @@
         "contract-invalid",
         "contract-version-unsupported",
         "variant-budget-exceeded",
+        "pacts-not-found",
         "component-unavailable",
         "component-failed",
         "internal"

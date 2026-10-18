@@ -12,8 +12,12 @@
         "source": { "$ref": "#/$defs/ContractSource" },
         "target": { "$ref": "#/$defs/VerificationTarget" },
         "options": {
+          "title": "VerifyOptions",
           "type": "object",
-          "description": "Open, additive verification options (filtering, publishing intent, etc.)."
+          "description": "Open, additive verification options (filtering, executed plans, publishing).",
+          "properties": {
+            "publish": { "$ref": "#/$defs/PublishResults" }
+          }
         }
       }
     },
@@ -29,18 +33,80 @@
     },
     "ContractSource": {
       "title": "ContractSource",
-      "description": "Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary; v1 defines 'inline' — hosts fetch files/URLs/broker themselves in the prototype, keeping I/O out of the kernel.",
+      "description": "Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.",
       "type": "object",
       "required": ["kind"],
       "properties": {
         "kind": {
           "type": "string",
-          "x-known-values": ["inline"]
+          "x-known-values": ["inline", "broker"]
         },
         "contracts": {
           "type": "array",
           "description": "For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).",
           "items": { "type": "object" }
+        },
+        "broker": {
+          "$ref": "broker.schema.json#/$defs/BrokerDescriptor",
+          "description": "For kind 'broker': which broker, and how to reach it."
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For kind 'broker': the provider whose pacts to fetch."
+        },
+        "consumer-version-selectors": {
+          "type": "array",
+          "description": "For kind 'broker': which consumer versions' pacts. Absent means the broker's default.",
+          "items": { "$ref": "broker.schema.json#/$defs/ConsumerVersionSelector" }
+        },
+        "provider-branch": {
+          "type": "string",
+          "description": "For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending."
+        },
+        "provider-tags": {
+          "type": "array",
+          "description": "For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.",
+          "items": { "type": "string" }
+        },
+        "include-pending": {
+          "type": "boolean",
+          "default": false,
+          "description": "For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run."
+        },
+        "include-wip-since": {
+          "type": "string",
+          "description": "For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending."
+        },
+        "require-pacts": {
+          "type": "boolean",
+          "default": true,
+          "description": "For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes."
+        }
+      }
+    },
+    "PublishResults": {
+      "title": "PublishResults",
+      "description": "Publish each fetched pact's result to that pact's own link when the run ends (spec.md §8.3). Only for a source of kind 'broker': an inline document has no link to publish to. A publish that fails is reported per pact and does not change the verdict.",
+      "type": "object",
+      "required": ["provider-version"],
+      "properties": {
+        "provider-version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provider application version the results are for."
+        },
+        "branch": {
+          "type": "string",
+          "description": "The provider version's branch."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "build-url": {
+          "type": "string",
+          "description": "The build that ran the verification."
         }
       }
     },
