@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792288589408,
+  "lastUpdate": 1792288591213,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -4212,6 +4212,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 35775,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "30e7234152d51261dc18c31daa03274e24f978f9",
+          "message": "feat: S1.1 the differential verification harness and its fixture corpus\n\n\"Exactly as today\" is now a number. tools/verifier-diff runs today's\nverifier (pact_verifier_cli, pinned at 1.3.5 in\ntools/verifier-diff/pact-verifier.json) and janus verify on every pact in\ncorpora/verifier/ against the same provider, and compares the verdicts per\ninteraction and for the whole run. CI's new verifier-diff job runs it,\ninstalling the pinned verifier with .github/scripts/pact-verifier.sh, which\nrefuses any other digest.\n\n- The corpus: the order-service's v3 pact against the order-service itself;\n  the pact-compatibility-suite's HTTP provider scenarios V1-V4 (Apache-2.0,\n  commit 1acfa1e), each pact built with pact_models as the suite's own\n  harness builds it, 29 imported and 5 skipped with the plan item that lets\n  them in (S1.3 broker, S1.9 request filter); and deterministic mutations of\n  each interaction's response. 96 cases, 194 verdicts, in about two minutes.\n- The scripted provider recognises requests strictly by example, as pact's\n  mock server does, answers a fixture's routes, and takes provider states.\n- The ledger, corpora/verifier/disagreements.json, lists every disagreement\n  with the plan item or ADR that accounts for it. The run fails on one it\n  does not list, and on a listed one that has gone. Today: 177 agree, 17\n  known, nothing unexpected.\n\nWhat the first run found, in the plan:\n- S1.18 (new, decided): today's verifiers match a regex against the whole\n  value (Oniguruma's is_match in pact-reference, Kotlin's String.matches in\n  pact-jvm); the shape-language spec says v1-v4 match anywhere. The legacy\n  compiler and upgrade will anchor; shapes keep matching anywhere.\n- S1.6 gains plain-text bodies, which are component-unavailable today.\n- S1.9 notes that today's verifier retries a failing state call for about\n  two minutes and the http hook does not retry.\n- S3.3 keeps list-valued headers in stage 3, deliberately, with why.\n\njanus verify's summary lists failures but not passes, so passes are inferred\nfrom its counts, cross-checked; S1.3 needs per-variant results in it anyway.\ncargo test checks that every fixture and ledger entry reads, without a\nverifier installed. corpora/ ships in janus-spec.tar.gz, hence the change\nfile.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T12:44:44+11:00",
+          "tree_id": "5c60919078d362a66bc68d36f1747a6f534fd429",
+          "url": "https://github.com/rholshausen/pact-janus/commit/30e7234152d51261dc18c31daa03274e24f978f9"
+        },
+        "date": 1792288590664,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28289,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21709,
             "unit": "requests per second",
             "extra": "engines 4"
           }
