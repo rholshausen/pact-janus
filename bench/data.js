@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792365495307,
+  "lastUpdate": 1792365497358,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -5982,6 +5982,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 42168,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f419f4d6d927ba223e671e05aa93e098bb0e1f78",
+          "message": "docs: S1.3 how the broker integration is tested\n\nNo one source covers it, so S1.3 now names four layers and why each:\na real, pinned broker in CI with today's verifier beside janus verify\n(the gate: fetched pacts, requests, published results and the matrix\ncompared, credentials checked absent); responses recorded from it for\noffline tests on all three systems; a consumer pact of the client's own,\nverified against that broker; and a schema lint against PactFlow's\nOpenAPI document, fetched from the SwaggerHub registry by a pinned\ndigest and never committed. It records what was looked at and not\nused, and the exit now includes the consumer pact and the lint.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T10:13:15+11:00",
+          "tree_id": "2180ab03bd0f258671bdcd7941506d43266886f6",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f419f4d6d927ba223e671e05aa93e098bb0e1f78"
+        },
+        "date": 1792365496738,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28251,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21771,
             "unit": "requests per second",
             "extra": "engines 4"
           }
