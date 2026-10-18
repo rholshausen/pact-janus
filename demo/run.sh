@@ -140,7 +140,7 @@ typed "janus verify $contract --provider-url \$PROVIDER_URL --config order-servi
 status=0
 janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml | tee verify.log || status=$?
 expect "the first verification passes" test $status -eq 0
-janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml --json >verification.json || true
+janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml --output json >verification.json || true
 pause
 
 # --- 3 -------------------------------------------------------------------------------------------
@@ -189,7 +189,7 @@ typed "janus verify $contract --provider-url \$PROVIDER_URL --config order-servi
 status=0
 janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml || status=$?
 expect "the second verification passes" test $status -eq 0
-janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml --json >verification.json || true
+janus verify "$contract" --provider-url "$PROVIDER_URL" --config order-service/verifier.janus.yaml --output json >verification.json || true
 pause
 typed "janus check $contract --provider-shape order-service/shapes/ --verification verification.json"
 status=0

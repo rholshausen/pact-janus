@@ -825,6 +825,12 @@ makes a run attributable per pair by `subsumption/decide` (§8.6) — a summary 
 without saying which consumer and which provider it verified could not be read back as an answer
 about either.
 
+A run always ends its stream. One the engine cannot complete — a bug stopped it part way — still
+emits `verification/finished`, with `status: failed` and an `error` member holding an `EngineError`
+of code `internal` (§10.1); what it had tallied is lost, so `variants` and `failures` may be absent.
+A host can therefore poll until the terminal event with no timeout of its own: an empty poll means
+nothing happened within `wait-ms`, never that the run is gone.
+
 ## 10. Error taxonomy
 
 Schema: [`schemas/v1/engine-error.schema.json`](schemas/v1/engine-error.schema.json).

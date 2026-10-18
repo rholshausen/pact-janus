@@ -1,8 +1,8 @@
 //! The engine every native Janus binary starts from: `janus` (through [`crate::engine`]) and
-//! `janus-engine` (by `#[path]`, since the binaries share no library target) both call
-//! [`native_engine`], so the two cannot offer a host different capabilities. They did, until
-//! phase-9 finding 30: `janus-engine` registered no hook implementations, so a verification whose
-//! provider states came from an `http` hook ran through the CLI and through no SDK.
+//! `janus-engine` both call [`native_engine`], so the two cannot offer a host different
+//! capabilities. They did, until phase-9 finding 30: `janus-engine` registered no hook
+//! implementations, so a verification whose provider states came from an `http` hook ran through
+//! the CLI and through no SDK.
 //!
 //! What a native embedding brings is what the kernel deliberately lacks (lifecycle-hooks spec §8.5,
 //! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport and JSON

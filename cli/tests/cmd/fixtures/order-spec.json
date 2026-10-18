@@ -1,0 +1,4 @@
+{
+  "description": "a request for an order",
+  "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
+}

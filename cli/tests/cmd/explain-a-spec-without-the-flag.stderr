@@ -1,0 +1,2 @@
+janus explain: [..]
+  (if cli/tests/cmd/fixtures/order-spec.json is an interaction specification, pass --spec)

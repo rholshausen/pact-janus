@@ -202,27 +202,37 @@ cargo run -p pact_janus_bindings -- generate --only typescript  # or --only jvm
 janus-sdk-gates bindings --spec <unpacked janus-spec> generate --only jvm --sdk .   # one SDK, from a release
 ```
 
-The `janus` CLI (`cli/src/main.rs`, plan task 5.5) drives the engine **through the protocol** — it
-builds frames and reads frames back, never the kernel's Rust API, so anything a command cannot do
-is a finding about the protocol first:
+The `janus` CLI (`cli/`, plan task 5.5; its command line is declared once, with clap, in
+`cli/src/args.rs`) drives the engine **through the protocol** — it builds frames and reads frames
+back, never the kernel's Rust API, so anything a command cannot do is a finding about the protocol
+first:
 
 ```bash
 janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus.yaml]
-             [--variant <id>] [--explain-failures] [--json]
+             [--variant <id>] [--explain-failures] [--output text|json]
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
-            [--as-of <YYYY-MM-DD>] [--json]
+            [--as-of <YYYY-MM-DD>] [--output text|json]
 janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
-janus upgrade <pact.json> [--out <file>] [--json] [--quiet]
-janus component push <component.wasm> <reference> [--json]
-janus component pull <reference> [--digest <sha256:...>] [--json]
+janus upgrade <pact.json> [--write <file>] [--quiet] [--output text|json]
+janus component push <component.wasm> <reference> [--output text|json]
+janus component pull <reference> [--digest <sha256:...>] [--output text|json]
+janus completions <shell>
+janus version                      # every command also takes --log-level <level>
 ```
 
 Exit codes are part of the surface: `0` the command did what it was asked, `1` the *subject* failed
-(a verification found mismatches — an answer, not an error), `2` the command could not run.
+(a verification found mismatches — an answer, not an error), `2` the command could not run,
+which includes every usage error. The flag spellings are a surface too: S1.13 maps today's
+verifier options onto them, so renaming one is a breaking change with a change file. The CLI's
+own tests pin both: `cli/tests/cmd/` holds trycmd cases — every `--help`, the usage errors, the
+offline commands — and `cli/tests/cli.rs` the runs that need a provider or a registry, compared
+whole with snapbox where the output is the CLI's own. After a deliberate change,
+`TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff.
+
 `check` (plan task 7.4) decides rather than tests: it reads documents that already exist — the
 consumer contracts or v1–v4 pacts, the shapes a provider published, and the summaries
-`janus verify --json` wrote — and answers `can-i-deploy` over them, so it needs no provider
+`janus verify --output json` wrote — and answers `can-i-deploy` over them, so it needs no provider
 running. Its policy (design 2.8 §7) resolves in layers: the specification's defaults, then
 `--policy`'s document, then `--on-finding`/`--on-review`. `block` is exit 1 — the subject failed,
 not the command. Both severities default to `warn` (ADR 0016).
@@ -301,6 +311,8 @@ Rust:
 - Edition 2024, latest stable toolchain, `cargo clippy` clean.
 - `tracing`/`tracing-subscriber` for logging (not `log`); `tokio` for async (not on WASM paths).
 - Test helpers: `rstest`, `expectest`, `pretty_assertions` — prefer these to new utilities.
+  A command's output is tested as a snapshot: `trycmd` for cases that need nothing running, `snapbox`
+  inside a Rust test for the rest. Elide text the engine owns (`corpora/` pins it).
 - Crates shipped as WASM components must build for `wasm32-wasip2`; keep native-only dependencies out
   of them or behind target-gated features.
 - Everything builds and is tested on Linux, macOS and Windows (S0.2; CI runs all three). Never read

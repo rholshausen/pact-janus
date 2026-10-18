@@ -10,81 +10,61 @@
 //! not a display choice — deterministic bytes are what keep broker deduplication and git diffs
 //! honest. Anything that wants it readable can pipe it through `jq`.
 
-use crate::args::{Args, Spec};
+use crate::Outcome;
+use crate::args::{Output, UpgradeArgs};
 use crate::engine;
+use crate::error::{self, Error};
 use crate::io;
+use clap::error::ErrorKind;
 use serde_json::{Value, json};
-use std::process::ExitCode;
 
-pub const SPEC: Spec = Spec {
-  values: &["out"],
-  flags: &["quiet", "json"],
-};
+pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
+  // `--output json` puts the contract and its findings in one document on stdout, so there is no
+  // separate contract to write and no findings to silence.
+  if args.output == Output::Json {
+    for (given, flag) in [(args.write.is_some(), "--write <FILE>"), (args.quiet, "--quiet")] {
+      if given {
+        return Err(error::usage(
+          &["upgrade"],
+          ErrorKind::ArgumentConflict,
+          format!("the argument '--output json' cannot be used with '{flag}'"),
+        ));
+      }
+    }
+  }
 
-pub const USAGE: &str = "\
-usage: janus upgrade <pact.json> [options]
+  let pact = io::read_json(&args.pact)?;
+  let mut engine = engine::start()?;
+  let result = engine::call(&mut engine, "upgrade/pact", json!({ "pact": pact }))
+    .map_err(|err| format!("{}: {err}", args.pact.display()))?;
 
-  <pact.json>                a v1-v4 pact to convert
-  --out <file>               write the contract here (default: stdout)
-  --json                     print {contract, findings} as one JSON document
-  --quiet                    do not print findings
-
-A converted pact is honestly under-covered: it has one variant, because one example is
-one variant. Growing it is the consumer suite's job — and the reason to upgrade at all.
-Verifying a pact needs no conversion: `janus verify` reads v1-v4 pacts directly.";
-
-pub fn run(args: &Args) -> ExitCode {
-  let Some(path) = args.positionals().first() else {
-    return io::usage("upgrade", "missing <pact.json>", USAGE);
-  };
-  let pact = match io::read_json(path) {
-    Ok(pact) => pact,
-    Err(err) => return io::fail(&format!("janus upgrade: {err}")),
-  };
-
-  let mut engine = match engine::start() {
-    Ok(engine) => engine,
-    Err(err) => return io::fail(&format!("janus upgrade: {err}")),
-  };
-  let result = match engine::call(&mut engine, "upgrade/pact", json!({ "pact": pact })) {
-    Ok(result) => result,
-    Err(err) => return io::fail(&format!("janus upgrade: {path}: {err}")),
-  };
-
-  if args.flag("json") {
-    println!("{}", serde_json::to_string_pretty(&result).unwrap_or_default());
-    return ExitCode::SUCCESS;
+  if args.output == Output::Json {
+    outln!("{}", crate::output::pretty(&result));
+    return Ok(Outcome::Done);
   }
 
   // Canonical bytes, whichever way they leave: a contract's identity is its bytes, and a writer
   // that pretty-printed to a terminal and compacted to a file would be two writers.
-  let contract = match canonical(&result["contract"]) {
-    Ok(bytes) => bytes,
-    Err(err) => return io::fail(&format!("janus upgrade: {err}")),
-  };
-  match args.value("out") {
-    Some(out) => {
-      if let Err(err) = std::fs::write(out, &contract) {
-        return io::fail(&format!("janus upgrade: writing {out}: {err}"));
-      }
-      eprintln!("janus upgrade: wrote {out}");
+  let contract = canonical(&result["contract"])?;
+  match &args.write {
+    Some(path) => {
+      std::fs::write(path, &contract).map_err(|err| format!("writing {}: {err}", path.display()))?;
+      errln!("janus upgrade: wrote {}", path.display());
     }
-    None => {
-      use std::io::Write;
-      let _ = std::io::stdout().write_all(&contract);
-    }
+    None => crate::output::out_bytes(&contract),
   }
 
-  if !args.flag("quiet") {
+  if !args.quiet {
     report(&result["findings"]);
   }
-  ExitCode::SUCCESS
+  Ok(Outcome::Done)
 }
 
-fn canonical(contract: &Value) -> Result<Vec<u8>, String> {
+fn canonical(contract: &Value) -> Result<Vec<u8>, Error> {
   let contract: pact_janus_kernel::contract::Contract =
-    serde_json::from_value(contract.clone()).map_err(|err| err.to_string())?;
-  pact_janus_kernel::contract::write_canonical(&contract).map_err(|err| err.to_string())
+    serde_json::from_value(contract.clone()).map_err(|err| format!("the engine's contract: {err}"))?;
+  pact_janus_kernel::contract::write_canonical(&contract)
+    .map_err(|err| Error::Failed(format!("writing the contract: {err}")))
 }
 
 /// Findings, grouped by what they mean rather than listed flat: `lossy` is the contract now saying
@@ -93,8 +73,8 @@ fn canonical(contract: &Value) -> Result<Vec<u8>, String> {
 fn report(findings: &Value) {
   let findings = findings.as_array().cloned().unwrap_or_default();
   if findings.is_empty() {
-    eprintln!();
-    eprintln!("No findings: this conversion was exact.");
+    errln!();
+    errln!("No findings: this conversion was exact.");
     return;
   }
   for (kind, heading) in [
@@ -109,17 +89,17 @@ fn report(findings: &Value) {
     if group.is_empty() {
       continue;
     }
-    eprintln!();
-    eprintln!("{heading}");
+    errln!();
+    errln!("{heading}");
     for finding in group {
-      eprintln!(
+      errln!(
         "  {} at {}",
         finding["code"].as_str().unwrap_or("?"),
         finding["path"].as_str().unwrap_or("?")
       );
-      eprintln!("      {}", finding["message"].as_str().unwrap_or(""));
+      errln!("      {}", finding["message"].as_str().unwrap_or(""));
       if let Some(target) = finding["target"].as_str() {
-        eprintln!("      -> {target} in the contract");
+        errln!("      -> {target} in the contract");
       }
     }
   }

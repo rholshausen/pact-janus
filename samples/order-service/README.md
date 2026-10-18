@@ -227,7 +227,7 @@ The whole loop, as CI would run it:
 
 ```sh
 janus verify pacts/web-app-order-service.json --provider-url $URL --config verifier.janus.yaml \
-             --json > verified.json
+             --output json > verified.json
 janus check  pacts/web-app-order-service.json --provider-shape shapes/ \
              --verification verified.json --on-finding block
 ```

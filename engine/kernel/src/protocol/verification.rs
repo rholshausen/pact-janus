@@ -45,6 +45,7 @@
 
 use super::contributions::Contributions;
 use super::events::Stream;
+use super::frame::EngineError;
 use super::scope::Scope;
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
 use crate::common::ContentTypes;
@@ -465,18 +466,53 @@ pub(crate) fn start(
   let filter = Filter::from_options(options.as_ref());
   let executed_plans = ExecutedPlans::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
+  let crashed = crashed_summary(&sources, &filter);
   let thread = thread::spawn(move || {
-    run(
-      sources,
-      targets,
-      components,
-      hooks,
-      filter,
-      executed_plans,
-      thread_stream,
-    )
+    let stream = Arc::clone(&thread_stream);
+    guarded(&stream, crashed, move || {
+      run(
+        sources,
+        targets,
+        components,
+        hooks,
+        filter,
+        executed_plans,
+        thread_stream,
+      )
+    })
   });
   Run { stream, thread }
+}
+
+/// Run `body`, and if it panics, end the stream anyway (spec §9.6): a host polls until the terminal
+/// event, so a run that died without one would leave it waiting forever. The panic becomes the
+/// summary's `error`, the same `internal` code the dispatch boundary gives a panicking request
+/// (§10.1). A run that already finished its stream before panicking keeps the summary it sent.
+fn guarded(stream: &Stream, mut crashed: Value, body: impl FnOnce()) {
+  if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)) {
+    let detail = panic
+      .downcast_ref::<&str>()
+      .map(|text| text.to_string())
+      .or_else(|| panic.downcast_ref::<String>().cloned())
+      .unwrap_or_else(|| "no detail".to_string());
+    tracing::error!(stream = %stream.id(), %detail, "the verification run panicked");
+    let error = EngineError::internal(format!("the verification run stopped unexpectedly: {detail}"));
+    crashed["error"] = serde_json::to_value(error).unwrap_or(Value::Null);
+    stream.finish("verification/finished", crashed);
+  }
+}
+
+/// The summary a run that panicked ends with: who it was about and that it failed. What it had
+/// tallied died with it, so `variants` and `failures` are left out rather than reported as zero.
+fn crashed_summary(sources: &[Source], filter: &Filter) -> Value {
+  json!({
+    "status": "failed",
+    "contracts": sources.len(),
+    "consumers": sources.iter().map(|s| s.consumer().to_string()).collect::<Vec<_>>(),
+    "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
+    "interactions": sources.iter().map(Source::interactions).sum::<usize>(),
+    "filtered": filter.is_filtered(),
+  })
 }
 
 fn run(
@@ -1499,4 +1535,42 @@ fn recorded_request(variant: &contract::RecordedVariant) -> Option<Parts> {
   let mut parts: Parts = BTreeMap::new();
   parts.insert("request".to_string(), request.clone());
   Some(parts)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn a_run_that_panics_still_ends_its_stream_with_the_panic_as_its_error() {
+    let stream = Stream::new("s-1".to_string());
+    guarded(&stream, json!({ "status": "failed", "contracts": 1 }), || {
+      panic!("a bug in the run");
+    });
+    let events = stream.drain(10);
+    assert_eq!(events.len(), 1);
+    assert!(events[0].last);
+    assert_eq!(events[0].kind, "verification/finished");
+    assert_eq!(events[0].payload["status"], json!("failed"));
+    assert_eq!(events[0].payload["contracts"], json!(1));
+    assert_eq!(events[0].payload["error"]["code"], json!("internal"));
+    assert!(
+      events[0].payload["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("a bug in the run")),
+      "{:?}",
+      events[0].payload
+    );
+  }
+
+  #[test]
+  fn a_run_that_finishes_keeps_the_summary_it_sent() {
+    let stream = Stream::new("s-2".to_string());
+    guarded(&stream, json!({ "status": "failed" }), || {
+      stream.finish("verification/finished", json!({ "status": "verified" }));
+    });
+    let events = stream.drain(10);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].payload["status"], json!("verified"));
+  }
 }

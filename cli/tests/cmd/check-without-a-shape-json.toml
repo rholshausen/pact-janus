@@ -1,0 +1,3 @@
+bin.name = "janus"
+args = ["check", "samples/order-service/pacts/web-app-order-service.json", "--output", "json"]
+fs.cwd = "../../.."

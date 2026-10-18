@@ -1,0 +1,2 @@
+bin.name = "janus"
+args = ["completions", "bash"]

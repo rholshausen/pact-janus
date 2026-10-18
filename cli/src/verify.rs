@@ -11,74 +11,41 @@
 //! and a v1–v4 pact is read as one (plan task 5.4). Both are handed to the engine untouched, which
 //! is why `janus verify` needs no flag saying which kind of file it was given.
 
-use crate::args::{Args, Spec};
+use crate::Outcome;
+use crate::args::{Output, VerifyArgs};
 use crate::engine;
+use crate::error::Error;
 use crate::io;
 use serde_json::{Value, json};
-use std::process::ExitCode;
 
-pub const SPEC: Spec = Spec {
-  values: &["provider-url", "config", "variant", "transport"],
-  flags: &["explain-failures", "json"],
-};
+/// How long one `events/poll` may wait for something to happen. An empty answer only means
+/// nothing did within it: the run is over when its terminal event arrives, and only then (protocol
+/// spec §9.6 — a run that cannot complete still sends one).
+const POLL_WAIT_MS: u64 = 10_000;
 
-pub const USAGE: &str = "\
-usage: janus verify <contract-or-pact>... --provider-url <url> [options]
+pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
+  let documents = io::read_all_documents(&args.sources)?;
 
-  <contract-or-pact>...      Janus contract or v1-v4 pact files, or directories of them
-  --provider-url <url>       the provider under test
-  --config <file>            a verifier.janus.yaml (hooks: states, auth, anything else;
-                             components: the content and matcher components the contracts need)
-  --variant <id>             replay only this variant; repeatable. A filtered run is
-                             reported as filtered — a partial run is not a pass
-  --transport <kind>         transport to bind (default: http)
-  --explain-failures         print the executed plan for every variant that failed
-  --json                     print the run summary as JSON instead of prose";
-
-pub fn run(args: &Args) -> ExitCode {
-  let paths = args.positionals();
-  if paths.is_empty() {
-    return io::usage("verify", "missing <contract-or-pact>", USAGE);
-  }
-  let Some(provider_url) = args.value("provider-url") else {
-    return io::usage("verify", "missing --provider-url", USAGE);
-  };
-
-  let mut documents = Vec::new();
-  for path in paths {
-    match io::read_documents(path) {
-      Ok(found) => documents.extend(found),
-      Err(err) => return io::fail(&format!("janus verify: {err}")),
-    }
-  }
-  if documents.is_empty() {
-    return io::fail(&format!(
-      "janus verify: no contract or pact documents found in {}",
-      paths.join(", ")
-    ));
-  }
-
-  let hooks = match args.value("config") {
+  let hooks = match &args.config {
     None => None,
-    Some(path) => match pact_janus_hooks_host::loader::load(path) {
-      Ok(document) => Some(document),
-      Err(err) => return io::fail(&format!("janus verify: reading {path}: {err}")),
-    },
+    Some(path) => Some(
+      pact_janus_hooks_host::loader::load(path)
+        .map_err(|err| format!("reading {}: {err}", path.display()))?,
+    ),
   };
 
   let mut options = json!({});
-  let variants = args.values("variant");
-  if !variants.is_empty() {
-    options["variants"] = json!(variants);
+  if !args.variants.is_empty() {
+    options["variants"] = json!(args.variants);
   }
-  if args.flag("explain-failures") {
+  if args.explain_failures {
     options["executed-plan"] = json!("on-failure");
   }
 
   let mut target = json!({
     "transports": [{
-      "transport": args.value("transport").unwrap_or("http"),
-      "options": { "base-url": provider_url },
+      "transport": args.transport,
+      "options": { "base-url": args.provider_url },
     }]
   });
   if let Some(mut hooks) = hooks {
@@ -93,63 +60,54 @@ pub fn run(args: &Args) -> ExitCode {
     target["hooks"] = hooks;
   }
 
-  let mut engine = match engine::start() {
-    Ok(engine) => engine,
-    Err(err) => return io::fail(&format!("janus verify: {err}")),
-  };
+  let mut engine = engine::start()?;
   let started = engine::call(
     &mut engine,
     "verification/verify",
     json!({
-      "source": { "kind": "inline", "contracts": documents.iter().map(|(_, doc)| doc.clone()).collect::<Vec<_>>() },
+      "source": { "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() },
       "target": target,
       "options": options,
     }),
-  );
-  let started = match started {
-    Ok(result) => result,
-    Err(err) => return io::fail(&format!("janus verify: {err}")),
-  };
+  )?;
   let stream = started["stream"].as_str().unwrap_or_default().to_string();
 
-  let mut summary = Value::Null;
-  let json_output = args.flag("json");
-  loop {
-    let polled = match engine::call(
+  let text = args.output == Output::Text;
+  let summary = loop {
+    let polled = engine::call(
       &mut engine,
       "events/poll",
-      json!({ "streams": [stream], "wait-ms": 10_000 }),
-    ) {
-      Ok(polled) => polled,
-      Err(err) => return io::fail(&format!("janus verify: {err}")),
-    };
+      json!({ "streams": [stream], "wait-ms": POLL_WAIT_MS }),
+    )?;
     let events = polled["events"].as_array().cloned().unwrap_or_default();
-    for event in &events {
-      if !json_output {
-        report(event);
+    if events.is_empty() {
+      tracing::debug!(stream, "no events within {POLL_WAIT_MS}ms; still waiting");
+      continue;
+    }
+    let mut last = None;
+    for event in events {
+      if text {
+        report(&event);
       }
       if event["last"] == json!(true) {
-        summary = event["payload"].clone();
+        last = Some(event["payload"].clone());
       }
     }
-    if events.iter().any(|event| event["last"] == json!(true)) {
-      break;
+    if let Some(summary) = last {
+      break summary;
     }
-    if events.is_empty() {
-      return io::fail("janus verify: the run stopped producing events");
-    }
-  }
+  };
 
-  if json_output {
-    println!("{}", serde_json::to_string_pretty(&summary).unwrap_or_default());
+  if text {
+    outln!();
+    outln!("{}", render_summary(&summary));
   } else {
-    println!();
-    println!("{}", render_summary(&summary));
+    outln!("{}", crate::output::pretty(&summary));
   }
-  match summary["status"].as_str() {
-    Some("verified") => ExitCode::SUCCESS,
-    _ => ExitCode::from(1),
-  }
+  Ok(match summary["status"].as_str() {
+    Some("verified") => Outcome::Done,
+    _ => Outcome::SubjectFailed,
+  })
 }
 
 /// One event, rendered. The vocabulary is open (spec §9.6), so an unrecognised kind is *printed*
@@ -161,29 +119,30 @@ fn report(event: &Value) {
     "verification/started" => {
       let providers = join(&payload["providers"]);
       let formats = join(&payload["formats"]);
-      println!(
+      outln!(
         "Verifying {} interaction(s) in {} document(s) [{formats}] against {providers}",
-        payload["interactions"], payload["contracts"]
+        payload["interactions"],
+        payload["contracts"]
       );
       if payload["filtered"] == json!(true) {
-        println!("  (filtered run: not every recorded variant will be replayed)");
+        outln!("  (filtered run: not every recorded variant will be replayed)");
       }
-      println!();
+      outln!();
     }
     "verification/interaction-result" => {
       let description = payload["interaction"]["description"].as_str().unwrap_or("?");
       let variant = payload["variant"].as_str().unwrap_or("?");
       match payload["status"].as_str().unwrap_or("failed") {
-        "verified" => println!("  ok      {description} [{variant}]"),
+        "verified" => outln!("  ok      {description} [{variant}]"),
         "state-unavailable" => {
-          println!("  STATE   {description} [{variant}]");
-          println!("          the provider cannot reach a state this contract declares");
+          outln!("  STATE   {description} [{variant}]");
+          outln!("          the provider cannot reach a state this contract declares");
           print_error(&payload["error"]);
         }
         _ => {
-          println!("  FAILED  {description} [{variant}]");
+          outln!("  FAILED  {description} [{variant}]");
           for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
-            println!(
+            outln!(
               "          {}: {}",
               mismatch["path"].as_str().unwrap_or(""),
               mismatch["message"].as_str().unwrap_or("")
@@ -194,26 +153,26 @@ fn report(event: &Value) {
       }
     }
     "verification/warning" => {
-      println!("  warn    {}", payload["code"].as_str().unwrap_or("warning"));
+      outln!("  warn    {}", payload["code"].as_str().unwrap_or("warning"));
     }
     // `--explain-failures` is this event arriving: the executed plan for the variant that just
     // failed, printed where the failure is, rather than left for a second command to re-derive.
     "verification/executed-plan" => {
-      println!();
-      println!(
+      outln!();
+      outln!(
         "  --- executed plan: {} [{}] ---",
         payload["interaction"]["description"].as_str().unwrap_or("?"),
         payload["variant"].as_str().unwrap_or("?")
       );
       for line in payload["text"].as_str().unwrap_or("").lines() {
-        println!("  {line}");
+        outln!("  {line}");
       }
-      println!();
+      outln!();
     }
     "verification/hook" => {
       let outcome = payload["outcome"].as_str().unwrap_or("ok");
       if outcome != "continue" && outcome != "ok" {
-        println!(
+        outln!(
           "  hook    {} at {}: {outcome}",
           payload["hook"].as_str().unwrap_or("?"),
           payload["point"].as_str().unwrap_or("?")
@@ -224,7 +183,7 @@ fn report(event: &Value) {
     // The result line that follows says everything these two carry; printing them as well would
     // double every run's output for no reader's benefit.
     "verification/interaction-started" | "verification/finished" => {}
-    other => println!("  event   {other}: {payload}"),
+    other => outln!("  event   {other}: {payload}"),
   }
 }
 
@@ -232,32 +191,41 @@ fn print_error(error: &Value) {
   if error.is_null() {
     return;
   }
-  println!("          {}", engine::render_error(error).replace('\n', "\n  "));
+  outln!("          {}", engine::render_error(error).replace('\n', "\n  "));
 }
 
 fn render_summary(summary: &Value) -> String {
+  let status = summary["status"].as_str().unwrap_or("failed").to_uppercase();
   let variants = &summary["variants"];
-  // `variants.total` counts what the run reached. An aborted run reached less than it planned, and
-  // the rest is in the hook report as not run (lifecycle-hooks spec §10.2) — counted beside the
-  // tallies, never folded into them, so "of 0 variant(s)" does not read as a run with nothing in it.
-  let not_run = summary["hooks"]["aborted"]["exchanges-not-run"]
-    .as_u64()
-    .unwrap_or(0);
-  let mut text = format!(
-    "{}: {} verified, {} failed, {} state-unavailable, {} skipped{} (of {} variant(s) across {} interaction(s))",
-    summary["status"].as_str().unwrap_or("failed").to_uppercase(),
-    variants["verified"],
-    variants["failed"],
-    variants["state-unavailable"],
-    variants["skipped"],
-    if not_run > 0 {
-      format!(", {not_run} not run")
-    } else {
-      String::new()
-    },
-    variants["total"].as_u64().unwrap_or(0) + not_run,
-    summary["interactions"],
-  );
+  let mut text = if variants.is_object() {
+    // `variants.total` counts what the run reached. An aborted run reached less than it planned,
+    // and the rest is in the hook report as not run (lifecycle-hooks spec §10.2) — counted beside
+    // the tallies, never folded into them, so "of 0 variant(s)" does not read as a run with nothing
+    // in it.
+    let not_run = summary["hooks"]["aborted"]["exchanges-not-run"]
+      .as_u64()
+      .unwrap_or(0);
+    format!(
+      "{status}: {} verified, {} failed, {} state-unavailable, {} skipped{} (of {} variant(s) across {} interaction(s))",
+      variants["verified"],
+      variants["failed"],
+      variants["state-unavailable"],
+      variants["skipped"],
+      if not_run > 0 {
+        format!(", {not_run} not run")
+      } else {
+        String::new()
+      },
+      variants["total"].as_u64().unwrap_or(0) + not_run,
+      summary["interactions"],
+    )
+  } else {
+    // A run the engine could not complete has no tallies to report (protocol spec §9.6).
+    format!(
+      "{status}: the run did not complete ({} interaction(s) in {} document(s))",
+      summary["interactions"], summary["contracts"]
+    )
+  };
   if summary["filtered"] == json!(true) {
     text.push_str("\nThis was a filtered run: unreplayed variants are not passing ones.");
   }
@@ -277,6 +245,12 @@ fn render_summary(summary: &Value) -> String {
       None => text.push('.'),
     }
   }
+  if let Some(error) = summary.get("error").filter(|e| !e.is_null()) {
+    text.push_str(&format!(
+      "\nThe engine stopped the run:\n  {}",
+      engine::render_error(error).replace('\n', "\n  ")
+    ));
+  }
   text
 }
 
@@ -291,4 +265,29 @@ fn join(value: &Value) -> String {
         .join(", ")
     })
     .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::render_summary;
+  use pretty_assertions::assert_eq;
+  use serde_json::json;
+
+  /// A run the engine could not complete ends with a summary that has no tallies, and an error
+  /// (protocol spec §9.6). It reads as a failure with its cause, not as a run of nulls.
+  #[test]
+  fn a_run_that_did_not_complete_says_so_and_why() {
+    let summary = json!({
+      "status": "failed",
+      "contracts": 1,
+      "interactions": 2,
+      "error": { "code": "internal", "message": "the verification run stopped unexpectedly: boom" },
+    });
+    assert_eq!(
+      render_summary(&summary),
+      "FAILED: the run did not complete (2 interaction(s) in 1 document(s))\n\
+       The engine stopped the run:\n  \
+       internal: the verification run stopped unexpectedly: boom"
+    );
+  }
 }

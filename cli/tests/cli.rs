@@ -6,12 +6,18 @@
 //! These drive the *shipped executable*, not a library function, because the surface under test is
 //! the command: its flags, its output and its exit code. A CI script depends on all three, and a
 //! command whose exit code is only ever asserted from inside Rust is a command nobody has run.
+//!
+//! The cases here need something running first — a provider, a registry. Those that need nothing
+//! (help, usage errors, offline commands) are trycmd cases under `tests/cmd/`. Where a whole output
+//! is the CLI's own rendering it is compared whole, with snapbox; refresh those snapshots with
+//! `SNAPSHOTS=overwrite cargo test -p pact_janus_cli --test cli` and read the diff.
 
 #[path = "../../engine/component-host/tests/support/registry.rs"]
 mod registry;
 
 use pact_janus_sample_order_service::{Config, Provider, start};
 use serde_json::{Value, json};
+use snapbox::{assert_data_eq, str};
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
@@ -107,13 +113,20 @@ fn verify_replays_a_v3_pact_at_a_running_provider_and_exits_zero() {
     "--config",
     &config,
   ]);
-  let text = stdout(&output);
-  assert_eq!(code(&output), 0, "stdout: {text}\nstderr: {}", stderr(&output));
-  assert!(
-    text.contains("pact/3.0.0"),
-    "the run says what it verified: {text}"
+  assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+  // The run says what it verified, one line per variant, and the verdict.
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+
+  ok      a request for an order [base]
+  ok      a request for an order that does not exist [base]
+
+VERIFIED: 2 verified, 0 failed, 0 state-unavailable, 0 skipped (of 2 variant(s) across 2 interaction(s))
+
+"#]]
   );
-  assert!(text.contains("VERIFIED: 2 verified, 0 failed"), "{text}");
 }
 
 /// A verification that ran and found mismatches is a *successful operation* whose subject failed
@@ -132,16 +145,20 @@ fn verify_exits_one_and_names_the_position_when_the_provider_disagrees() {
     "--config",
     &config,
   ]);
-  let text = stdout(&output);
-  assert_eq!(code(&output), 1, "{text}");
-  assert!(text.contains("FAILED  a request for an order"), "{text}");
-  assert!(
-    text.contains("$.response.body.status: Expected 'SHIPPED' to equal 'CANCELLED'"),
-    "the mismatch names the position and both values: {text}"
-  );
-  assert!(
-    !text.contains("executed plan"),
-    "the executed plan is opt-in: {text}"
+  assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+  // The mismatch names the position and both values; the executed plan is opt-in, so absent.
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+
+  FAILED  a request for an order [base]
+          $.response.body.status: Expected 'SHIPPED' to equal 'CANCELLED'
+  ok      a request for an order that does not exist [base]
+
+FAILED: 1 verified, 1 failed, 0 state-unavailable, 0 skipped (of 2 variant(s) across 2 interaction(s))
+
+"#]]
   );
 }
 
@@ -181,6 +198,9 @@ fn explain_failures_prints_the_executed_plan_after_the_failure_it_explains() {
 
 /// A narrowed run must be reported as narrowed (variant-semantics spec §5.1): an unreplayed
 /// variant is not a passing one, and a summary that did not say so would read like one.
+///
+/// The snapshot records today's gap: a filter that matches nothing still reports `VERIFIED` and
+/// exits 0. Staged plan S1.17 changes both, and this snapshot with them.
 #[test]
 fn a_filtered_run_says_so_in_its_summary() {
   let provider = provider();
@@ -195,9 +215,18 @@ fn a_filtered_run_says_so_in_its_summary() {
     "--variant",
     "nothing-is-called-this",
   ]);
-  let text = stdout(&output);
-  assert!(text.contains("filtered run"), "{text}");
-  assert!(text.contains("2 skipped"), "{text}");
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+  (filtered run: not every recorded variant will be replayed)
+
+
+VERIFIED: 0 verified, 0 failed, 0 state-unavailable, 2 skipped (of 2 variant(s) across 2 interaction(s))
+This was a filtered run: unreplayed variants are not passing ones.
+
+"#]]
+  );
 }
 
 #[test]
@@ -234,7 +263,8 @@ fn verify_json_prints_the_summary_document_a_script_can_read() {
     provider.base_url(),
     "--config",
     &config,
-    "--json",
+    "--output",
+    "json",
   ]);
   let summary: Value = serde_json::from_str(&stdout(&output)).expect("the summary is JSON");
   assert_eq!(summary["status"], json!("verified"));
@@ -266,20 +296,39 @@ fn a_run_aborted_by_a_hook_says_what_the_hook_hit() {
     "--config",
     &config,
   ]);
-  let text = stdout(&output);
-  assert_eq!(code(&output), 1, "{text}\nstderr: {}", stderr(&output));
-  assert!(
-    text.contains("hook    auth at before-verification: failed\n          token-endpoint-unreachable:"),
-    "the hook's line carries its error: {text}"
+  assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+  // The hook's line carries its error, the summary names the cause, and what the abort left undone
+  // is counted, not dropped.
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+
+  hook    auth at before-verification: failed
+          token-endpoint-unreachable: http://127.0.0.1:[..]/oauth/token: [..]
+
+FAILED: 0 verified, 0 failed, 0 state-unavailable, 0 skipped, 2 not run (of 2 variant(s) across 2 interaction(s))
+The run was aborted by the 'auth' hook at before-verification:
+  token-endpoint-unreachable: http://127.0.0.1:[..]/oauth/token: [..]
+
+"#]]
   );
-  assert!(
-    text.contains("aborted by the 'auth' hook at before-verification:\n  token-endpoint-unreachable:"),
-    "the summary names the cause: {text}"
-  );
-  assert!(
-    text.contains("0 skipped, 2 not run (of 2 variant(s) across 2 interaction(s))"),
-    "what the abort left undone is counted, not dropped: {text}"
-  );
+}
+
+/// `janus ... | head` closes stdout early. The command still runs to its end and exits with its own
+/// answer, rather than panicking on the write that found the pipe gone.
+#[test]
+fn a_reader_that_stops_reading_is_not_a_crash() {
+  let mut child = Command::new(env!("CARGO_BIN_EXE_janus"))
+    .args(["explain", &order_pact(), "--plan"])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped())
+    .spawn()
+    .expect("the janus binary runs");
+  drop(child.stdout.take());
+  let output = child.wait_with_output().expect("janus exits");
+  assert_eq!(code(&output), 0, "{}", stderr(&output));
+  assert!(!stderr(&output).contains("panicked"), "{}", stderr(&output));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -432,12 +481,12 @@ fn upgrade_writes_canonical_bytes_and_reports_its_findings() {
 #[test]
 fn upgrade_writes_to_a_file_and_can_print_one_json_document_instead() {
   let out = temp("upgraded.json");
-  let output = janus(&["upgrade", &order_pact(), "--out", &out, "--quiet"]);
+  let output = janus(&["upgrade", &order_pact(), "--write", &out, "--quiet"]);
   assert_eq!(code(&output), 0, "{}", stderr(&output));
   let written = std::fs::read_to_string(&out).expect("the contract was written");
   assert!(written.starts_with("{\"$format\":"));
 
-  let json = janus(&["upgrade", &order_pact(), "--json"]);
+  let json = janus(&["upgrade", &order_pact(), "--output", "json"]);
   let document: Value = serde_json::from_str(&stdout(&json)).expect("one JSON document");
   assert!(document["contract"]["interactions"].is_array());
   assert!(document["findings"].is_array());
@@ -452,7 +501,7 @@ fn a_pact_and_the_contract_it_upgrades_into_verify_the_same_provider() {
   let config = state_config(&provider);
   let upgraded = temp("agreement.json");
 
-  let converted = janus(&["upgrade", &order_pact(), "--out", &upgraded, "--quiet"]);
+  let converted = janus(&["upgrade", &order_pact(), "--write", &upgraded, "--quiet"]);
   assert_eq!(code(&converted), 0, "{}", stderr(&converted));
 
   for source in [order_pact(), upgraded.clone()] {
@@ -478,10 +527,6 @@ fn a_pact_and_the_contract_it_upgrades_into_verify_the_same_provider() {
     );
   }
 }
-
-// ---------------------------------------------------------------------------------------------
-// The command surface itself
-// ---------------------------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------------------------
 // check (plan task 7.4)
@@ -574,7 +619,8 @@ fn check_combines_a_verification_result_with_the_findings_and_exits_one_when_blo
     provider.base_url(),
     "--config",
     &config,
-    "--json",
+    "--output",
+    "json",
   ]);
   assert_eq!(code(&verified), 0, "{}", stderr(&verified));
   std::fs::write(&verification, stdout(&verified)).expect("writing the summary");
@@ -653,7 +699,8 @@ fn check_json_prints_the_compatibility_report_a_script_can_read() {
     &order_consumer_contract(),
     "--provider-shape",
     &order_shapes(),
-    "--json",
+    "--output",
+    "json",
   ]);
   assert_eq!(code(&output), 0);
   let report: Value = serde_json::from_str(&stdout(&output)).expect("one JSON document");
@@ -679,7 +726,8 @@ fn check_without_a_provider_shape_says_which_provider_published_nothing() {
     provider.base_url(),
     "--config",
     &config,
-    "--json",
+    "--output",
+    "json",
   ]);
   std::fs::write(&verification, stdout(&verified)).expect("writing the summary");
 
@@ -699,61 +747,6 @@ fn check_without_a_provider_shape_says_which_provider_published_nothing() {
   );
   assert!(
     stderr(&output).contains("no provider shape supplied for 'order-service'"),
-    "{}",
-    stderr(&output)
-  );
-}
-
-#[test]
-fn check_refuses_a_policy_value_that_is_not_warn_or_block() {
-  let output = janus(&[
-    "check",
-    &order_consumer_contract(),
-    "--provider-shape",
-    &order_shapes(),
-    "--on-finding",
-    "maybe",
-  ]);
-  assert_eq!(code(&output), 2);
-  assert!(
-    stderr(&output).contains("--on-finding takes 'warn' or 'block'"),
-    "{}",
-    stderr(&output)
-  );
-}
-
-#[test]
-fn an_unknown_command_or_option_is_a_command_failure_with_the_usage() {
-  let unknown = janus(&["frobnicate"]);
-  assert_eq!(code(&unknown), 2);
-  assert!(stderr(&unknown).contains("unknown command 'frobnicate'"));
-  assert!(stderr(&unknown).contains("verify"), "the usage follows");
-
-  let bad_option = janus(&["verify", "x.json", "--nonsense"]);
-  assert_eq!(code(&bad_option), 2);
-  assert!(stderr(&bad_option).contains("unknown option '--nonsense'"));
-}
-
-#[test]
-fn every_command_explains_itself() {
-  for command in ["verify", "check", "explain", "upgrade"] {
-    let output = janus(&[command, "--help"]);
-    assert_eq!(code(&output), 0);
-    assert!(
-      stdout(&output).starts_with(&format!("usage: janus {command}")),
-      "{command}: {}",
-      stdout(&output)
-    );
-  }
-  assert!(stdout(&janus(&["version"])).contains("engine protocol v"));
-}
-
-#[test]
-fn verify_without_a_provider_url_is_a_usage_error_not_a_run() {
-  let output = janus(&["verify", &order_pact()]);
-  assert_eq!(code(&output), 2);
-  assert!(
-    stderr(&output).contains("missing --provider-url"),
     "{}",
     stderr(&output)
   );
@@ -925,7 +918,14 @@ fn a_pushed_component_verifies_a_csv_contract_pinned_by_digest_and_then_offline(
   let reference = format!("{}/janus-csv:1.0.0", registry.host);
   let pushed = janus_cached(
     &temp("oci-push-cache"),
-    &["component", "push", &csv_component(), &reference, "--json"],
+    &[
+      "component",
+      "push",
+      &csv_component(),
+      &reference,
+      "--output",
+      "json",
+    ],
   );
   assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
   let pushed: Value = serde_json::from_slice(&pushed.stdout).unwrap();

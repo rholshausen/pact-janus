@@ -1,0 +1,5 @@
+# An interaction specification cannot identify itself, so the refusal says which flag to pass.
+bin.name = "janus"
+args = ["explain", "cli/tests/cmd/fixtures/order-spec.json"]
+status.code = 2
+fs.cwd = "../../.."

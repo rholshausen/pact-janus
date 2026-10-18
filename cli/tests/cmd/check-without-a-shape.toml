@@ -1,0 +1,5 @@
+# The engine's report is elided; the line the CLI adds on stderr, naming the provider nothing was
+# supplied for, is what this case pins — in both output forms.
+bin.name = "janus"
+args = ["check", "samples/order-service/pacts/web-app-order-service.json"]
+fs.cwd = "../../.."

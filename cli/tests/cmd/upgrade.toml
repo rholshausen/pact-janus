@@ -1,0 +1,5 @@
+# The contract on stdout, findings on stderr, grouped by what they mean. A finding's message is the
+# engine's and is elided.
+bin.name = "janus"
+args = ["upgrade", "samples/order-service/pacts/web-app-order-service.json"]
+fs.cwd = "../../.."

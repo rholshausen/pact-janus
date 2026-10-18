@@ -509,6 +509,27 @@ item in 1a is done when S1.1 agrees.
   per `pact_verifier_cli` and `pact-provider-verifier` option: the `janus` option, the hook, or
   "dropped, because". The table is the migration note for providers.
   *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.
+- **S1.17 A filtered run never reads as a pass** — **S**. Found while rebuilding the CLI before stage
+  1a, and in neither the findings list nor the earlier revisions. `janus verify --variant <id>` with an
+  id no source records replays nothing, and reports `VERIFIED: 0 verified, 0 failed, 0
+  state-unavailable, 2 skipped` with exit 0: the run summary's status is `verified` whenever nothing
+  failed (`summary()` in `engine/kernel/src/protocol/verification.rs`). Variant-semantics spec §5.1
+  says a verifier "MUST report a filtered run as filtered — a partial run is not a pass". The run is
+  reported as filtered (`filtered: true`, and a line in the text), but its status and exit code still
+  say pass, so a mistyped id looks exactly like a narrowed run that passed. The verdict is also given
+  twice with two answers: `subsumption/decide` already treats a filtered run as a warning
+  (`verification-filtered`, engine-protocol spec §8.6), while `verify` treats it as verified. And S1.3
+  makes this worse: a run's results get published to a broker, and a filtered run must never be
+  published as a pass. Two decisions, both in the variant-semantics spec:
+  a filter naming an id that no source records is refused before the run starts, naming the id. That
+  is the author's typo, caught where they can fix it, as §6.5 does for bindings. And a filtered run
+  that verified everything it replayed carries a status other than `verified`, which the summary, the
+  CLI's exit code, `subsumption/decide` and S1.3's publishing all read the same way. S1.13 records
+  what today's verifiers do when a `--filter-*` option matches nothing, and S1.1 shows whether the two
+  agree, or names the difference in an ADR.
+  *Exit:* a corpus or conformance case for an unknown id and one for a filtered run; the snapshot in
+  `cli/tests/cli.rs` (`a_filtered_run_says_so_in_its_summary`) changes with them; and a filtered run's
+  verification result is never published as a success.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -769,6 +790,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.11 | Nothing in the module tree marks the legacy compiler as the permanent HTTP-shaped exception | kernel-boundary review 3, 6 |
 | S1.12 | Matching captured values as a protocol operation; `explain` loading components | findings 31, 23 |
 | S1.14 | The SDK specification and conformance suite have no provider side | new in this revision |
+| S1.17 | A filtered run that verified what it replayed — or replayed nothing, because no recorded variant has the id it named — has status `verified` and exits 0 | found rebuilding the CLI; variant-semantics spec §5.1 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |

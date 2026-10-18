@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+# The commands live in the library, so both binaries and the tests share one build of them.
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "janus"
 path = "src/main.rs"
@@ -39,6 +43,10 @@ serde_yaml_ng = "0.10"
 # so `RUST_LOG=trace` shows the frames `Engine::dispatch` traces on every call.
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# The command line (src/args.rs): flags, help, usage errors and their exit code, from one
+# declaration. clap_complete turns the same declaration into `janus completions <shell>`.
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+clap_complete = "4.6"
 
 [dev-dependencies]
 # A real provider on a real socket for the CLI's own tests: `janus verify` is only worth testing
@@ -48,6 +56,13 @@ pact_janus_sample_order_service = { path = "../samples/order-service" }
 # task 8.2) — the component host's own test registry, included by path. Both already in the tree.
 tiny_http = "0.12"
 sha2 = "0.10"
+# Snapshot tests of the command surface: trycmd runs the cases under tests/cmd/ (help, usage errors,
+# exit codes, offline commands), and snapbox compares whole outputs inside tests/cli.rs, where a
+# case needs a provider or a registry running first.
+trycmd = "1.2"
+snapbox = "1.2"
+rstest = "0.26"
+pretty_assertions = "1"
 
 [lints]
 workspace = true

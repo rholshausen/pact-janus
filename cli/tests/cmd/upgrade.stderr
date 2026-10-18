@@ -1,0 +1,48 @@
+
+LOSSY — the contract now says less than the pact did
+  request-query-opened at /interactions/0/request
+      [..]
+  request-query-opened at /interactions/1/request
+      [..]
+
+JUDGEMENT — the converter chose between readings the pact did not distinguish
+  rule-narrowed at /interactions/0/response/headers
+      [..]
+      -> /interactions/0/parts/response/headers in the contract
+  rule-narrowed at /interactions/1/response/headers
+      [..]
+      -> /interactions/1/parts/response/headers in the contract
+
+NOTE — worth reading
+  state-params-untyped at /interactions/0/providerStates
+      [..]
+  example-frozen-as-equality at /interactions/0/request/method
+      [..]
+      -> /interactions/0/parts/request/method in the contract
+  example-frozen-as-equality at /interactions/0/request/path
+      [..]
+      -> /interactions/0/parts/request/path in the contract
+  example-frozen-as-equality at /interactions/0/response/status
+      [..]
+      -> /interactions/0/parts/response/status in the contract
+  example-frozen-as-equality at /interactions/0/response/headers
+      [..]
+      -> /interactions/0/parts/response/headers in the contract
+  example-frozen-as-equality at /interactions/0/response/body
+      [..]
+      -> /interactions/0/parts/response/body in the contract
+  example-frozen-as-equality at /interactions/1/request/method
+      [..]
+      -> /interactions/1/parts/request/method in the contract
+  example-frozen-as-equality at /interactions/1/request/path
+      [..]
+      -> /interactions/1/parts/request/path in the contract
+  example-frozen-as-equality at /interactions/1/response/status
+      [..]
+      -> /interactions/1/parts/response/status in the contract
+  example-frozen-as-equality at /interactions/1/response/headers
+      [..]
+      -> /interactions/1/parts/response/headers in the contract
+  example-frozen-as-equality at /interactions/1/response/body
+      [..]
+      -> /interactions/1/parts/response/body in the contract
