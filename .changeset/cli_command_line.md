@@ -25,6 +25,8 @@ Everything else is new or fixed:
   state hook. It now waits until the run ends.
 - **A closed pipe is no longer a crash.** `janus verify ... | head` used to panic when `head`
   stopped reading. The command now runs to its end and exits with its own answer.
+- **Help and usage errors name the program `janus`** on every platform; on Windows they said
+  `janus.exe`. The same goes for `janus-engine`.
 - **`janus check --output json`** now prints the "no provider shape supplied for ..." warning on
   stderr, as the text form always did.
 - **New:** `--log-level <error|warn|info|debug|trace>` on every command (`RUST_LOG` still works when

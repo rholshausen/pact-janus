@@ -22,6 +22,8 @@ use tracing_subscriber::EnvFilter;
 
 fn main() {
   clap::Command::new("janus-engine")
+    // Not argv[0], which on Windows is `janus-engine.exe`.
+    .bin_name("janus-engine")
     .version(pact_janus_cli::VERSION.as_str())
     .about(
       "The Janus engine as a subprocess: protocol frames on standard input and output, logs on \

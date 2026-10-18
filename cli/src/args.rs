@@ -12,9 +12,12 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+// `bin_name` is pinned so help and usage errors say `janus` however the binary was invoked: clap
+// otherwise takes the name from argv[0], which on Windows is `janus.exe`.
 #[derive(Debug, Parser)]
 #[command(
   name = "janus",
+  bin_name = "janus",
   about = "Verify contracts and pacts against a provider, explain matching plans, upgrade pacts, \
            and decide whether a consumer can deploy",
   after_help = "Every command drives the same engine an SDK embeds. --log-level debug shows the \
