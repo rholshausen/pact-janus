@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792289134918,
+  "lastUpdate": 1792289136254,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -4566,6 +4566,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21709,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "60d1a8305581c72dc809869482a2207a01f4e6f5",
+          "message": "docs: one set of agent instructions, in AGENTS.md\n\nCLAUDE.md and .github/copilot-instructions.md said the same things twice and\nhad drifted apart in structure, so every change was two edits that did not\nalways apply. AGENTS.md is now the only copy: Claude Code reads it through\nCLAUDE.md, which is just `@AGENTS.md`, and GitHub Copilot (the coding agent\nand PR review) and other agents read it directly.\n\n- CLAUDE.md moves to AGENTS.md, history kept. Its opening says who reads it.\n- .github/copilot-instructions.md is deleted. Compared sentence by sentence,\n  it held nothing CLAUDE.md lacked, and one stale line (`pact.execute`).\n- CONTRIBUTING.md and the live comments and specs that cite the rules now\n  cite AGENTS.md. The prototype record, the ADRs and the finished S0.5 entry\n  are left as written; CLAUDE.md still resolves for them.\n- The status paragraph records S1.1 done: its CI job passed on its first\n  run, with every disagreement in the ledger.\n\nNo-Changeset: comments and documentation only; nothing a release ships changes behaviour.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-18T13:01:35+11:00",
+          "tree_id": "bb3ffcc3d68d4f6130340d3737e31eac18f6d60b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/60d1a8305581c72dc809869482a2207a01f4e6f5"
+        },
+        "date": 1792289135953,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 41128,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29222,
             "unit": "requests per second",
             "extra": "engines 4"
           }
