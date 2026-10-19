@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792386817455,
+  "lastUpdate": 1792386819000,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -9168,6 +9168,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21693,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "a534cd50ddce11104fb6f8dd37a3816ec6468fa4",
+          "message": "test: S1.3 a broker credential reaches the broker and appears nowhere else\n\nADR 0032 decision 5, end to end: cli/tests/cli.rs puts the pinned broker behind a door that\ndemands basic credentials or a bearer token (the OSS broker has no bearer tokens, so the door is a\nproxy for both), runs janus publish and janus verify --publish through it at trace, in text and\nJSON, and with a wrong credential, and fails if the secret or the Authorization header it became\nappears in anything printed. CI's broker step runs it.\n\nIt found two leaks, neither released:\n\n- the engine's trace log of each frame repeated the broker descriptor's auth; a logged frame now\n  keeps only an auth member's kind, and a url loses its user information;\n- the HTTP library's trace output dumps raw request bytes, Authorization included; janus and\n  janus-engine hold ureq_proto at debug, where headers are redacted, whatever is asked for.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T16:09:14+11:00",
+          "tree_id": "18a513f78373ed5d21e87ddea39eac0cdea41293",
+          "url": "https://github.com/rholshausen/pact-janus/commit/a534cd50ddce11104fb6f8dd37a3816ec6468fa4"
+        },
+        "date": 1792386818659,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25892,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21378,
             "unit": "requests per second",
             "extra": "engines 4"
           }
