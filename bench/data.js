@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792368575244,
+  "lastUpdate": 1792368577154,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -6336,6 +6336,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21771,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "a8bed6e20df8cbfa039f7bc8684d8d6566c47f87",
+          "message": "feat: S1.3 the differential harness verifies from a pinned Pact Broker\n\nThe first step of S1.3, before any client code: S1.1's harness now runs\nbroker fixtures against a real broker, so \"correct\" is fixed before the\ncode that has to meet it.\n\n- tools/verifier-diff/pact-broker.json pins the Ruby broker image\n  (2.121.2) by digest; .github/scripts/pact-broker.sh starts it, the\n  harness refuses another version, and CI's verifier-diff job runs it.\n- A fixture's `broker` member publishes its pacts (version, branch,\n  tags), seeds earlier verification results, and gives both verifiers\n  the same selectors, pending, WIP and publish options. Each verifier's\n  pacticipants carry a prefix of their own, so neither sees what the\n  other did to the broker.\n- A broker case is also compared on what each run published per pact\n  (`<pact>/published`), and an interaction not fetched is `absent`.\n- A recording proxy in front of the broker keeps every request each\n  verifier makes, in the run's JSON; recorded, not yet compared.\n- Fixtures: the compatibility suite's four broker scenarios (no longer\n  skipped), the order-service pact, pending, not pending, WIP, not\n  selected, and pending with no selectors.\n- 35 ledger entries, all S1.3: janus verify is given today's flag\n  spellings, which it does not have yet.\n\nFound doing it: pact_verifier_cli 1.3.5 ignores --enable-pending when\nno selectors are given (it uses the broker's older /latest endpoint),\nwhich broker/pending-without-selectors pins; and it reports a pending\npact's failures under `pendingErrors`, which the harness now reads.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T10:55:59+11:00",
+          "tree_id": "c856cd34d629dfa2da8221f2f34b50ab53712f97",
+          "url": "https://github.com/rholshausen/pact-janus/commit/a8bed6e20df8cbfa039f7bc8684d8d6566c47f87"
+        },
+        "date": 1792368576658,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28993,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21920,
             "unit": "requests per second",
             "extra": "engines 4"
           }
