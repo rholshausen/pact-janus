@@ -457,7 +457,7 @@ item in 1a is done when S1.1 agrees.
   How it is tested was settled before the build (2026-10-19), because no one source covers it. The
   published OpenAPI documents type shapes but not semantics, and are thinnest where the risk is; the
   broker pacts today's clients publish record what those clients send, not what a broker returns.
-  So four layers, each catching what the others cannot:
+  So four layers, each catching what the others cannot (the fourth since dropped):
   1. **A real broker, with today's verifier beside us** — the gate. CI runs the Ruby broker
      (`pactfoundation/pact-broker`, pinned by digest) as a service, as the OCI tests run `registry:2`,
      and seeds it through its own API: pacts on branches and tags, deployments and releases recorded,
@@ -483,25 +483,17 @@ item in 1a is done when S1.1 agrees.
      pacts are where ours takes its request bodies from, because what today's clients send is what
      brokers accept in production; what they expect back is not evidence. Proposing ours upstream,
      with the states it needs, is a follow-up, not the exit.
-  4. **A schema lint.** The requests the client sends and the responses it reads are validated
-     against PactFlow's OpenAPI document, with an unknown property an error: no published document
-     closes an object, so a misspelled selector would otherwise pass. It types `for-verification`'s
-     request (every selector, pending, WIP) and `contracts/publish` fully, which no other document
-     does; it omits fetching a pact and publishing results. The document is fetched, never committed
-     (its licence is SmartBear's): a pin file names its SwaggerHub registry URL
-     (`smartbear-public/pactflow_saas_api`, `?resolved=true`) and SHA-256, and the test refuses any
-     other digest, as `tools/verifier-diff/pact-verifier.json` pins today's verifier. Fetched
-     without a credential, the registry serves `98b1d720f`; the portal's current `115423c67` differs
-     from it on these operations only in their `operationId`s, and the pin moves when PactFlow makes
-     the current version public there, which is asked of them. Unreachable, the lint fails in CI and
-     skips locally, saying so. The Rust broker port's `openapi.json` covers the half PactFlow's omits
-     and is checked against both brokers by Drift, but it is not public yet, documents
-     `for-verification` as GET only and leaves `_links` untyped; it joins the lint, pinned the same
-     way, when it is public, with those two fixed.
-  Not used: the Rust port's `openapi-ruby.json`, inferred and mistyped where it matters (selectors an
-  object, booleans strings), and the Ruby broker's own `pact_broker_oas.yaml`, which has two paths.
-  The publishing link (`pb:publish-verification-results`), which no document describes, and what a
-  selector selects are layer 1's alone.
+  4. **A schema lint** against PactFlow's OpenAPI document, fetched and pinned by digest, never
+     committed. **Dropped (2026-10-19)**, once layers 1 to 3 were built against the real broker. What
+     it was for is covered there: every request the client sends is either compared with today's
+     verifier's (layer 1) or sent exactly to the pinned broker, which validates it (layer 3), and a
+     misspelled selector is the user's, since the client passes selectors through as written. It
+     also had gaps of its own: PactFlow's document omits fetching a pact and publishing results, and
+     its licence meant fetching it rather than committing it. Given up: nothing tests PactFlow's own
+     behaviour (its plan-limit 429, say); PactFlow runs the same broker beneath (2.122.0 on
+     2026-10-19), so the OSS broker stays the reference.
+  The publishing link (`pb:publish-verification-results`), which no published document describes,
+  and what a selector selects are layer 1's alone.
   Layer 2 is built (2026-10-19): one scenario (two consumers publish, the provider fetches with
   pending and WIP, publishes, fetches again, and a republish is refused) recorded from the pinned
   broker into `engine/broker-client/tests/recorded/`, with the broker's database ids renumbered so
@@ -522,9 +514,11 @@ item in 1a is done when S1.1 agrees.
   §8.7), and today every publication goes uncompressed. A reverse proxy's 1 MB cap (format review
   §8.2) is the deployment's to raise until the broker inflates request bodies, which is a change to
   propose upstream, not this item's exit.
+  Still to build from layer 1: the run behind basic auth and a bearer token that fails if either
+  credential appears in a frame, event, summary or log, and the weekly run against the latest image.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
-  included, and the broker's matrix shows the results per pair; the client's consumer pact is verified
-  by that broker; and the schema lint passes against the pinned PactFlow document.
+  included, and the broker's matrix shows the results per pair; and the client's consumer pact is
+  verified by that broker.
 - **S1.4 v3/v4 generators in verification** — **M**. The legacy path has no generator support:
   `upgrade` drops them with a `generator-dropped` finding, and verification never applies them.
   Today's verifiers apply `ProviderState` generators with values the state-change call returned,
