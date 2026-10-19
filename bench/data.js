@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792453255220,
+  "lastUpdate": 1792453257351,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -10584,6 +10584,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30342,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0d958a95297e857f9bd7b92e1e9c75b7172b6e96",
+          "message": "feat: every janus command that takes arguments prints its help when given none\n\nclap does not propagate arg_required_else_help from the top-level command, so\ncheck, explain, upgrade, publish, component push, component pull and completions\neach set it, as verify does. The exit code stays 2. usage.md pins each bare\ncommand's first line; help.md already pins the text whole.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T10:36:07+11:00",
+          "tree_id": "8585e801b33b92d7674b41aea07d2f05db703ba7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0d958a95297e857f9bd7b92e1e9c75b7172b6e96"
+        },
+        "date": 1792453256669,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 39817,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 28211,
             "unit": "requests per second",
             "extra": "engines 4"
           }
