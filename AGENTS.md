@@ -58,7 +58,10 @@ Three sources are the source of truth and take precedence over this file when th
 > verifier disagree on is in `corpora/verifier/disagreements.json` with the item that closes it), and
 > S1.18 (a v1–v4 regex matches the whole value: the legacy compiler and `janus upgrade` anchor it),
 > and S1.2 (ADR 0032: the broker client is a native host capability behind `verification/verify`'s
-> `broker` source and `publish` option and `broker/publish-contracts`; specified, built in S1.3).
+> `broker` source and `publish` option and `broker/publish-contracts`; specified, built in S1.3),
+> and S1.3 (`janus verify` fetches from a Pact Broker, with pending and WIP pacts, and publishes each
+> pact's result; `janus publish` publishes contracts; tested against the pinned broker, and weekly
+> against the latest).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -339,6 +342,11 @@ new broker pin, record it with the broker running and read the diff:
 ```bash
 RECORDINGS=overwrite JANUS_PACT_BROKER=http://127.0.0.1:9292 cargo test -p pact_janus_broker_client --test recorded
 ```
+
+The weekly `Latest Pact Broker` workflow runs every one of these broker checks against
+`pactfoundation/pact-broker:latest` (`PACT_BROKER_IMAGE` tells `pact-broker.sh` which image, and
+`JANUS_PACT_BROKER_ANY_VERSION=1` lets the recording be of another version), so a broker release
+that changes what clients see is found before the pin moves to it.
 
 The client also has a consumer pact of its own with the Pact Broker (`engine/broker-client/tests/pact.rs`,
 written with `pact_consumer`): every run writes it and checks the client against it, and with

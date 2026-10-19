@@ -6,15 +6,20 @@
 # kept against. It keeps its database in SQLite inside the container: stopping it forgets everything,
 # and nothing the harness does needs it to remember. Moving the pin is a change to that file, not to
 # this script.
+#
+# PACT_BROKER_IMAGE starts another image instead (the weekly `Latest Pact Broker` workflow passes
+# pactfoundation/pact-broker:latest), and PACT_BROKER_CONTAINER names the container, so a second
+# broker can run beside the pinned one.
 set -euo pipefail
 
-name=verifier-diff-broker
+name="${PACT_BROKER_CONTAINER:-verifier-diff-broker}"
 pin="$(git rev-parse --show-toplevel)/tools/verifier-diff/pact-broker.json"
 
 case "${1:-}" in
   start)
     port="${2:-9292}"
-    image="$(jq -r '"\(.image)@\(.digest)"' "$pin")"
+    image="${PACT_BROKER_IMAGE:-$(jq -r '"\(.image)@\(.digest)"' "$pin")}"
+    docker pull --quiet "$image" >&2
     docker rm -f "$name" >/dev/null 2>&1 || true
     docker run -d --name "$name" -p "127.0.0.1:$port:9292" \
       -e PACT_BROKER_DATABASE_URL=sqlite:////tmp/pact_broker.sqlite3 \

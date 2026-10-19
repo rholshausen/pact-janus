@@ -519,11 +519,27 @@ item in 1a is done when S1.1 agrees.
   is a proxy for both), and runs `janus publish` and `janus verify --publish` through it at `trace`,
   and with a wrong credential, failing if either appears in anything printed. It found two leaks
   before anything shipped: the engine's trace log of each frame repeated the descriptor's `auth`,
-  and the HTTP library's trace dump repeated the `Authorization` header. Still to build from layer
-  1: the weekly run against the latest image.
+  and the HTTP library's trace dump repeated the `Authorization` header. The weekly run is the
+  `Latest Pact Broker` workflow: every check above against `pactfoundation/pact-broker:latest`,
+  with the harness's `--any-version` and the recording made again and compared except for its
+  version line.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
   included, and the broker's matrix shows the results per pair; and the client's consumer pact is
   verified by that broker.
+  *Done 2026-10-19.* The harness's broker cases (six fixtures, and the compatibility suite's broker
+  steps) are published to the pinned broker and fetched from it by both verifiers, pending and WIP
+  included, and agree; what each run published is read back per pair, from each pact's latest
+  verification result, which is what the matrix shows, rather than from `/matrix` itself. The rest of
+  the corpus still runs from files, which tests nothing S1.3 added. The client's pact is verified by
+  the pinned broker in CI and by the latest one weekly. Not foreseen: the schema lint was dropped
+  (layer 4); the client's links are fetched from the broker the user named, as today's verifier does,
+  found by layer 2; compression cannot be used against any broker today (pact_broker#1062,
+  pact_broker-rs#11); the credentials run found two trace-level leaks; PactFlow answers a plan's
+  limit with a 429 that no retry passes, so a 429 is retried only with `Retry-After`; and
+  `pact_models` moved to 1.3.15 for its merge fix. Left out, each for when something needs it: the
+  per-pact `PUT` publish for brokers before 2.86.0, `--merge` and the git-reading options of
+  `pact-broker publish`, the HTTP client options in the broker descriptor (S1.5), proposing the
+  client's pact upstream, and `janus publish` for provider shapes (S4.3).
 - **S1.4 v3/v4 generators in verification** — **M**. The legacy path has no generator support:
   `upgrade` drops them with a `generator-dropped` finding, and verification never applies them.
   Today's verifiers apply `ProviderState` generators with values the state-change call returned,

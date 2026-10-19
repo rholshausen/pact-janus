@@ -1,0 +1,86 @@
+name: Latest Pact Broker
+
+# Staged plan S1.3: every check CI runs against the pinned Pact Broker (tools/verifier-diff/pact-broker.json),
+# run weekly against the newest image instead, so a broker release that changes what clients see is
+# found here rather than when the pin is next moved. Nothing here changes the repository: a failure
+# says what a newer broker does differently, and moving the pin to it is a deliberate change to that
+# file, made with what this run found. Every check runs even when one before it failed, so one run
+# reports everything that moved.
+
+on:
+  schedule:
+    - cron: "23 4 * * 1" # Mondays, 04:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  LATEST: pactfoundation/pact-broker:latest
+
+jobs:
+  latest-broker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Today's verifier, at the pinned version
+        run: echo "PACT_VERIFIER_CLI=$(.github/scripts/pact-verifier.sh "$RUNNER_TEMP/pact-verifier")" >> "$GITHUB_ENV"
+      - name: The latest Pact Broker
+        run: echo "VERIFIER_DIFF_BROKER=$(PACT_BROKER_IMAGE="$LATEST" .github/scripts/pact-broker.sh start)" >> "$GITHUB_ENV"
+      - name: Which broker this is
+        run: |
+          version="$(curl -fsS -D - -o /dev/null "$VERIFIER_DIFF_BROKER/" | tr -d '\r' | awk -F': ' 'tolower($1) == "x-pact-broker-version" { print $2 }')"
+          digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$LATEST")"
+          pinned="$(jq -r '."broker-version"' tools/verifier-diff/pact-broker.json)"
+          {
+            echo "## Pact Broker $version (pinned: $pinned)"
+            echo
+            echo "\`$digest\`"
+            echo
+            if [ "$version" = "$pinned" ]; then
+              echo "The latest image is the pinned broker's version, so this run checks what CI checks."
+            else
+              echo "The latest image is newer than the pin. If every check passed, the pin can move to it."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Build janus
+        run: cargo build --package pact_janus_cli --bin janus
+      - name: Compare
+        if: ${{ !cancelled() }}
+        run: cargo run --package pact_janus_verifier_diff -- run --any-version --json target/verifier-diff.json
+      - name: Publish to the broker, and verify from it
+        if: ${{ !cancelled() }}
+        run: cargo test --package pact_janus_cli --test cli -- broker
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+      - name: The broker client's own pact, verified by the broker
+        if: ${{ !cancelled() }}
+        run: cargo test --package pact_janus_broker_client --test pact -- --nocapture
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+      - name: The broker client's recording, made again
+        # The version line differs whenever the latest is newer than the pin; anything else that
+        # differs is the broker answering differently.
+        if: ${{ !cancelled() }}
+        run: |
+          cargo test --package pact_janus_broker_client --test recorded
+          git diff --output=target/recording.diff -- engine/broker-client/tests/recorded
+          git diff --exit-code -I '"pact-broker-version"' -- engine/broker-client/tests/recorded
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+          JANUS_PACT_BROKER_ANY_VERSION: "1"
+          RECORDINGS: overwrite
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: latest-pact-broker
+          path: |
+            target/verifier-diff.json
+            target/recording.diff
+          if-no-files-found: ignore

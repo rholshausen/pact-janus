@@ -11,7 +11,9 @@
 //! client makes must be the recorded one, in order, and what it concluded at each step must be what
 //! it concluded against the broker. `RECORDINGS=overwrite`, with `JANUS_PACT_BROKER` naming the
 //! pinned broker, records it again instead: CI does so in the job that starts the broker and fails
-//! on any difference, so the recording cannot drift from the broker it claims to be.
+//! on any difference, so the recording cannot drift from the broker it claims to be. The weekly run
+//! against the latest broker records against that one with `JANUS_PACT_BROKER_ANY_VERSION=1`, which
+//! waives the check that a recording is of the pinned version, and fails on any other difference.
 //!
 //! A recording is normalised so the same broker gives the same file: the broker's URL is written as
 //! `http://pact-broker.invalid` (the client fetches every link from the broker it was given, so a
@@ -540,10 +542,14 @@ fn the_client_does_what_it_did_against_the_pinned_broker() {
     .expect("the broker pin"),
   )
   .expect("json");
-  assert_eq!(
-    recording["pact-broker-version"], pinned["broker-version"],
-    "the recording is of another broker than the pinned one: record it again (RECORDINGS=overwrite)"
-  );
+  // The weekly run against the latest broker records against it, to see what moved; nothing it
+  // records is committed.
+  if std::env::var("JANUS_PACT_BROKER_ANY_VERSION").as_deref() != Ok("1") {
+    assert_eq!(
+      recording["pact-broker-version"], pinned["broker-version"],
+      "the recording is of another broker than the pinned one: record it again (RECORDINGS=overwrite)"
+    );
+  }
 
   let steps = recording["steps"].as_array().expect("steps");
   let exchanges: Vec<Value> = steps
