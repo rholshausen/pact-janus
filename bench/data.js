@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792453607257,
+  "lastUpdate": 1792453608765,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -10938,6 +10938,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 28211,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "80c4c55a76eab95cc5065f5c5dd18f8327da6b01",
+          "message": "fix: S1.3 the HTTP library's logging is capped at debug, not raised to it\n\nwithout_credentials added `ureq_proto=debug` to the EnvFilter, and a directive\nsets a target's level, so at --log-level warn every request logged its debug\nlines. The cap is now a second filter an event must also pass: the HTTP library\nlogs at the level asked for, and never at trace, where it dumps request bytes.\nBoth binaries install the one subscriber in cli/src/logging.rs, and its test\npins the levels.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T10:42:59+11:00",
+          "tree_id": "8b1595c86e71ebda1a7717f7c7b646f29fcda553",
+          "url": "https://github.com/rholshausen/pact-janus/commit/80c4c55a76eab95cc5065f5c5dd18f8327da6b01"
+        },
+        "date": 1792453608437,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 40023,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30120,
             "unit": "requests per second",
             "extra": "engines 4"
           }
