@@ -1,0 +1,4 @@
+# pact_consumer (the broker client's own consumer pact, staged plan S1.3) and every Pact verifier
+# send anonymous usage metrics unless this is set. A test run in this repository sends nothing.
+[env]
+PACT_DO_NOT_TRACK = "true"

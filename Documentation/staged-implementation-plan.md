@@ -509,6 +509,13 @@ item in 1a is done when S1.1 agrees.
   `pact_verifier`'s list. Writing them found a difference: today's verifier fetches every link from
   the broker it was given, keeping only the link's path and adding a missing context path, so a
   broker behind a proxy that writes an internal host still works; the client now does the same.
+  Layer 3 is built (2026-10-19): `engine/broker-client/tests/pact.rs` writes the client's pact with
+  the provider `Pact Broker` (eleven interactions: the index; for-verification with a pending pact
+  and with a WIP one; fetching each; the provider, its branch and tag; a verification result;
+  publishing contracts, and a republish refused), between the Ruby broker's own Condor and Pricing
+  Service with its state names, and CI verifies it against the pinned broker with today's verifier.
+  Requests are exact and responses match by type, on only what the client reads. Proposing it
+  upstream is still the follow-up.
   Compression, found while building `janus publish` (2026-10-19): the pinned broker (2.121.2) reads a
   gzipped body as JSON and answers 400, and no broker says it reads one, so the client compresses
   only when a broker says it can (RFC 7694: `Accept-Encoding` on a response; engine-protocol spec

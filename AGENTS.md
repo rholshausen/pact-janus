@@ -340,6 +340,12 @@ new broker pin, record it with the broker running and read the diff:
 RECORDINGS=overwrite JANUS_PACT_BROKER=http://127.0.0.1:9292 cargo test -p pact_janus_broker_client --test recorded
 ```
 
+The client also has a consumer pact of its own with the Pact Broker (`engine/broker-client/tests/pact.rs`,
+written with `pact_consumer`): every run writes it and checks the client against it, and with
+`JANUS_PACT_BROKER` and `PACT_VERIFIER_CLI` set, as in that job, today's verifier verifies it against the
+pinned broker, each provider state set up through the broker's API. `.cargo/config.toml` sets
+`PACT_DO_NOT_TRACK`, so no test run sends `pact_consumer`'s usage metrics.
+
 `janus publish` (S1.3) publishes through the engine's broker client (`broker/publish-contracts`), as
 `verify --broker-url` fetches through it: no command speaks the Pact Broker's API itself. Its live
 tests run against the pinned broker when `JANUS_PACT_BROKER` names it (CI's `verifier-diff` job), and

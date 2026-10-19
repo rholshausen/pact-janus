@@ -168,6 +168,13 @@ jobs:
         run: cargo test --package pact_janus_cli --test cli -- broker
         env:
           JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+      - name: The broker client's own pact, verified by the broker
+        # The client's consumer pact with the Pact Broker (S1.3's third layer), written by
+        # engine/broker-client/tests/pact.rs everywhere and verified here, by today's verifier, against
+        # the pinned broker, with each provider state set up through the broker's API.
+        run: cargo test --package pact_janus_broker_client --test pact -- --nocapture
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
       - name: The broker client's recording, made again
         # Every other job replays engine/broker-client/tests/recorded/pact-broker.json offline (S1.3's
         # second layer). Here it is recorded again from the pinned broker, and any difference fails:
