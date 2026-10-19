@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792453020528,
+  "lastUpdate": 1792453022678,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -10230,6 +10230,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21506,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9a95033c168eddc13908d1c03920c73e345cf93b",
+          "message": "feat: S1.3 verify's broker credentials also answer to --broker-*, and verify has short flags\n\n--user, --password and --token keep today's verifier spelling (S1.13), with\n--broker-user, --broker-password and --broker-token as visible aliases, so the help\nsays they are the broker's credentials and not the provider's. --log-level gets -l\n(today's verifier's short flag), verify's --provider-url -u and --output -o, and a\nbare `janus verify` prints its help, exit 2.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T10:32:33+11:00",
+          "tree_id": "2af4533108b9b42353930c9d06a3f3910da97b72",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9a95033c168eddc13908d1c03920c73e345cf93b"
+        },
+        "date": 1792453021944,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 36569,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30342,
             "unit": "requests per second",
             "extra": "engines 4"
           }
