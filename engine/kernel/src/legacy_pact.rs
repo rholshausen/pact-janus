@@ -55,6 +55,12 @@ pub fn read(
 /// downstream branches on the pact's version to find out what state an interaction needs.
 pub struct LegacyInteraction {
   pub description: String,
+  /// The interaction's id (`_id`): a Pact Broker adds one to every interaction it serves, and a
+  /// published result is keyed by it (engine-protocol spec §8.3).
+  pub id: Option<String>,
+  /// A v4 interaction marked pending: its failure is reported and does not fail the run, as a
+  /// pending pact's does.
+  pub pending: bool,
   pub provider_states: Vec<ProviderState>,
   pub request: HttpRequest,
   pub response: HttpResponse,
@@ -72,6 +78,8 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
     .filter_map(|interaction| {
       interaction.as_v4_http().map(|http| LegacyInteraction {
         description: http.description,
+        id: http.id,
+        pending: http.pending,
         provider_states: http.provider_states,
         request: http.request,
         response: http.response,

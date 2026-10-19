@@ -828,16 +828,35 @@ fn run_janus(
   };
 
   let failures = summary["failures"].as_array().cloned().unwrap_or_default();
+  // From a broker, the run verified the pacts it fetched, which the summary names (`consumers`);
+  // the rest the selectors did not select.
+  let fetched: Option<Vec<&str>> = matches!(source, Source::Broker { .. }).then(|| {
+    summary["consumers"]
+      .as_array()
+      .into_iter()
+      .flatten()
+      .filter_map(Value::as_str)
+      .collect()
+  });
+  let in_run = |entry: &Expected| {
+    fetched
+      .as_ref()
+      .is_none_or(|fetched| fetched.contains(&entry.consumer.as_str()))
+  };
   let variants = &summary["variants"];
   let counted = ["verified", "failed", "state-unavailable"]
     .iter()
     .map(|name| variants[name].as_u64().unwrap_or(0))
     .sum::<u64>();
-  let accounted = counted == expected.len() as u64 && variants["skipped"].as_u64().unwrap_or(0) == 0;
+  let accounted = counted == expected.iter().filter(|entry| in_run(entry)).count() as u64
+    && variants["skipped"].as_u64().unwrap_or(0) == 0;
 
   let judged = expected
     .iter()
     .map(|entry| {
+      if !in_run(entry) {
+        return (Verdict::Absent, Some("not fetched".to_string()));
+      }
       let index: usize = entry
         .key
         .rsplit('/')
@@ -863,6 +882,11 @@ fn run_janus(
             })
             .or_else(|| failure["error"]["code"].as_str().map(str::to_string))
             .or_else(|| failure["status"].as_str().map(str::to_string));
+          let detail = match (failure["pending"] == json!(true), detail) {
+            (true, Some(detail)) => Some(format!("pending: {detail}")),
+            (true, None) => Some("pending".to_string()),
+            (false, detail) => detail,
+          };
           (Verdict::Fail, detail)
         }
         None if accounted => (Verdict::Pass, None),

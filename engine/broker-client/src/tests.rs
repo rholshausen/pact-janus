@@ -1,0 +1,221 @@
+//! The client against a stub broker on a real socket: the requests it makes, in order, and what it
+//! makes of the answers. The client is tested against a real broker by the differential harness
+//! (`tools/verifier-diff`'s broker cases); these pin its own behaviour and its errors.
+
+use super::*;
+use pact_janus_kernel::broker::InteractionResult;
+use pretty_assertions::assert_eq;
+use rstest::rstest;
+use std::sync::{Arc, Mutex};
+
+/// One request the stub saw: method, path and JSON body.
+type Seen = Arc<Mutex<Vec<(String, String, Value)>>>;
+
+/// A broker that answers by path, with links back to itself, and records every request. `status`
+/// is what every request is answered with when it is not 200.
+fn stub(status: u16) -> (String, Seen) {
+  let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+  let base = format!("http://{}", server.server_addr().to_ip().unwrap());
+  let seen: Seen = Arc::default();
+  let record = Arc::clone(&seen);
+  let me = base.clone();
+  std::thread::spawn(move || {
+    for mut request in server.incoming_requests() {
+      let mut body = String::new();
+      let _ = request.as_reader().read_to_string(&mut body);
+      let path = request.url().to_string();
+      record.lock().unwrap().push((
+        request.method().as_str().to_string(),
+        path.clone(),
+        serde_json::from_str(&body).unwrap_or(Value::Null),
+      ));
+      let answer = match (status, path.as_str()) {
+        (200, "/") => json!({ "_links": {
+          "pb:provider-pacts-for-verification": { "href": format!("{me}/pacts/provider/{{provider}}/for-verification"), "templated": true }
+        } }),
+        (200, "/pacts/provider/order%20api/for-verification") => json!({ "_embedded": { "pacts": [{
+          "shortDescription": "latest from main",
+          "verificationProperties": { "pending": true, "wip": false, "notices": [{ "when": "before_verification", "text": "it is pending" }] },
+          "_links": { "self": { "href": format!("{me}/pacts/1") } }
+        }] } }),
+        (200, "/pacts/1") => json!({
+          "consumer": { "name": "web" }, "provider": { "name": "order api" }, "interactions": [],
+          "_links": {
+            "pb:provider": { "href": format!("{me}/pacticipants/order%20api") },
+            "pb:publish-verification-results": { "href": format!("{me}/pacts/1/verification-results") }
+          }
+        }),
+        (200, "/pacticipants/order%20api") => json!({ "_links": {
+          "pb:branch-version": { "href": format!("{me}/pacticipants/order%20api/branches/{{branch}}/versions/{{version}}") },
+          "pb:version-tag": { "href": format!("{me}/pacticipants/order%20api/versions/{{version}}/tags/{{tag}}") }
+        } }),
+        (200, _) => json!({}),
+        (_, _) => json!({ "errors": ["no, with s3cret in it"] }),
+      };
+      let _ = request.respond(
+        tiny_http::Response::from_string(answer.to_string())
+          .with_status_code(status)
+          .with_header(tiny_http::Header::from_bytes("Content-Type", "application/hal+json").unwrap()),
+      );
+    }
+  });
+  (base, seen)
+}
+
+fn descriptor(url: &str) -> BrokerDescriptor {
+  serde_json::from_value(json!({ "url": url, "auth": { "kind": "bearer", "token": "s3cret" } })).unwrap()
+}
+
+fn fetch_request(url: &str) -> FetchRequest {
+  FetchRequest {
+    broker: descriptor(url),
+    provider: "order api".to_string(),
+    selectors: vec![json!({ "mainBranch": true })],
+    provider_branch: Some("main".to_string()),
+    provider_tags: vec![],
+    include_pending: true,
+    include_wip_since: Some("2026-01-01".to_string()),
+  }
+}
+
+#[test]
+fn a_fetch_asks_as_todays_verifier_does_and_reads_pending_and_notices() {
+  let (url, seen) = stub(200);
+  let fetched = HalBrokerClient::new()
+    .fetch_for_verification(&fetch_request(&url))
+    .unwrap();
+
+  assert_eq!(fetched.len(), 1);
+  assert!(fetched[0].pending && !fetched[0].wip);
+  assert_eq!(fetched[0].notices, vec!["it is pending".to_string()]);
+  assert_eq!(fetched[0].document["consumer"]["name"], "web");
+  assert!(
+    fetched[0].handle["pb:publish-verification-results"].is_object(),
+    "the handle is the pact's links"
+  );
+
+  let seen = seen.lock().unwrap();
+  let requests: Vec<(&str, &str)> = seen.iter().map(|(m, p, _)| (m.as_str(), p.as_str())).collect();
+  assert_eq!(
+    requests,
+    vec![
+      ("GET", "/"),
+      ("POST", "/pacts/provider/order%20api/for-verification"),
+      ("GET", "/pacts/1"),
+    ]
+  );
+  assert_eq!(
+    seen[1].2,
+    json!({
+      "consumerVersionSelectors": [{ "mainBranch": true }],
+      "includePendingStatus": true,
+      "providerVersionBranch": "main",
+      "includeWipPactsSince": "2026-01-01",
+    })
+  );
+}
+
+#[test]
+fn a_publish_records_the_branch_and_tags_then_posts_the_result_keyed_by_interaction_id() {
+  let (url, seen) = stub(200);
+  let client = HalBrokerClient::new();
+  let fetched = client.fetch_for_verification(&fetch_request(&url)).unwrap();
+  let broker = descriptor(&url);
+  let tags = vec!["prod".to_string()];
+  client
+    .publish_results(&PublishRequest {
+      broker: &broker,
+      handle: &fetched[0].handle,
+      provider_version: "2.0.0",
+      branch: Some("main"),
+      tags: &tags,
+      build_url: Some("https://ci.example/1"),
+      success: false,
+      results: vec![
+        InteractionResult {
+          id: Some("i-1".to_string()),
+          description: "one".to_string(),
+          success: true,
+          mismatches: vec![],
+          error: None,
+        },
+        InteractionResult {
+          id: Some("i-2".to_string()),
+          description: "two".to_string(),
+          success: false,
+          mismatches: vec![json!({ "path": "$.response.body.colour", "message": "missing" })],
+          error: None,
+        },
+      ],
+    })
+    .unwrap();
+
+  let seen = seen.lock().unwrap();
+  let after_fetch: Vec<(&str, &str)> = seen[3..]
+    .iter()
+    .map(|(m, p, _)| (m.as_str(), p.as_str()))
+    .collect();
+  assert_eq!(
+    after_fetch,
+    vec![
+      ("GET", "/pacticipants/order%20api"),
+      ("PUT", "/pacticipants/order%20api/branches/main/versions/2.0.0"),
+      ("PUT", "/pacticipants/order%20api/versions/2.0.0/tags/prod"),
+      ("POST", "/pacts/1/verification-results"),
+    ]
+  );
+  let result = &seen.last().unwrap().2;
+  assert_eq!(result["success"], false);
+  assert_eq!(result["providerApplicationVersion"], "2.0.0");
+  assert_eq!(result["buildUrl"], "https://ci.example/1");
+  assert_eq!(
+    result["testResults"],
+    json!([
+      { "interactionId": "i-1", "interactionDescription": "one", "success": true },
+      { "interactionId": "i-2", "interactionDescription": "two", "success": false,
+        "mismatches": [{ "attribute": "body", "identifier": "$.colour", "description": "missing" }] }
+    ])
+  );
+}
+
+#[test]
+fn a_broker_that_says_no_is_refused_and_the_error_carries_no_credential() {
+  let (url, _) = stub(401);
+  let err = HalBrokerClient::new()
+    .fetch_for_verification(&fetch_request(&url))
+    .unwrap_err();
+  assert_eq!(err.code, "broker-refused");
+  assert_eq!(err.details.as_ref().unwrap()["status"], 401);
+  assert!(!err.message.contains("s3cret"), "{}", err.message);
+}
+
+#[test]
+fn a_broker_nobody_answers_for_is_unreachable() {
+  let err = HalBrokerClient::new()
+    .fetch_for_verification(&fetch_request("http://127.0.0.1:1"))
+    .unwrap_err();
+  assert_eq!(err.code, "broker-unreachable");
+}
+
+#[rstest]
+#[case(json!({ "path": "$.response.status", "message": "m" }), json!({ "attribute": "status", "description": "m" }))]
+#[case(json!({ "path": "$.response.headers.Content-Type", "message": "m" }), json!({ "attribute": "header", "identifier": "Content-Type", "description": "m" }))]
+#[case(json!({ "path": "$.response.headers['x-a.b']", "message": "m" }), json!({ "attribute": "header", "identifier": "x-a.b", "description": "m" }))]
+#[case(json!({ "path": "$.response.body", "message": "m" }), json!({ "attribute": "body", "identifier": "$", "description": "m" }))]
+#[case(json!({ "path": "$.response.body.items[0].id", "message": "m" }), json!({ "attribute": "body", "identifier": "$.items[0].id", "description": "m" }))]
+fn a_mismatch_is_put_in_the_brokers_terms(#[case] mismatch: Value, #[case] expected: Value) {
+  assert_eq!(broker_mismatch(&mismatch), expected);
+}
+
+#[test]
+fn basic_credentials_are_encoded_and_bearer_ones_passed_through() {
+  let basic: BrokerDescriptor = serde_json::from_value(json!({
+    "url": "http://b", "auth": { "kind": "basic", "username": "u", "password": "p" }
+  }))
+  .unwrap();
+  assert_eq!(authorization(&basic).as_deref(), Some("Basic dTpw"));
+  assert_eq!(
+    authorization(&descriptor("http://b")).as_deref(),
+    Some("Bearer s3cret")
+  );
+}

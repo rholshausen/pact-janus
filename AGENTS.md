@@ -69,6 +69,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  outside the kernel because it needs a filesystem, a process and a socket — and
                  component-host, the wasmtime loader for out-of-tree WASM components (task 8.1),
                  outside the kernel because a WASM guest cannot host WASM (ADR 0013);
+                 broker-client, the Pact Broker client the kernel's broker trait is implemented
+                 by (ADR 0032, S1.3), outside the kernel because it speaks HTTP;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
 cli/             `janus` CLI (verify, explain, upgrade, check)
@@ -274,6 +276,10 @@ first:
 ```bash
 janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus.yaml]
              [--variant <id>] [--explain-failures] [--output text|json]
+janus verify --broker-url <url> --provider-name <name> --provider-url <url>
+             [--consumer-version-selectors <json>]... [--enable-pending] [--include-wip-pacts-since <date>]
+             [--provider-version <v>] [--provider-branch <b>] [--provider-tags <t,...>] [--publish]
+             [--build-url <url>] [--user <u> --password <p> | --token <t>]   # today's spellings (S1.13)
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
             [--as-of <YYYY-MM-DD>] [--output text|json]

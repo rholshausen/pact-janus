@@ -6,6 +6,7 @@ members = [
   "engine/component-http",
   "engine/component-oauth2",
   "engine/hooks-host",
+  "engine/broker-client",
   "engine/component-host",
   "engine/wasm",
   "cli",

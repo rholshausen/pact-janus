@@ -576,8 +576,8 @@ fn a_source_the_engine_cannot_read_is_refused_by_kind() {
 }
 
 /// Spec §8.3 and §8.7, ADR 0032: the broker client is a native host capability, and an engine with
-/// none names the component for a broker source, for publishing, and for the broker operations.
-/// No embedding registers one until staged plan S1.3, so this is every engine's answer for now.
+/// none — the offline WASM artifact — names the component for a broker source, for publishing, and
+/// for the broker operations. `tests/broker.rs` has the engine with one.
 #[test]
 fn an_engine_with_no_broker_client_names_the_component_for_everything_broker_shaped() {
   let mut engine = engine_with_real_components();

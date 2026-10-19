@@ -41,8 +41,11 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 /// `components` is always declared (component-interfaces spec §10.1, ADR 0013): a host learns which
 /// loaders this embedding has from the handshake, not from a failure at interaction 40. An engine
 /// with no loader registered still says `["in-tree"]`.
-pub fn result(loaders: &[&str]) -> Value {
-  json!({
+///
+/// `broker` is declared only by an engine with a broker client registered (spec §8.7, ADR 0032):
+/// the native embeddings, never the offline WASM artifact.
+pub fn result(loaders: &[&str], broker: bool) -> Value {
+  let mut result = json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
     "capabilities": {
@@ -50,5 +53,9 @@ pub fn result(loaders: &[&str]) -> Value {
       "subsumption-check": {},
       "components": { "loaders": loaders },
     }
-  })
+  });
+  if broker {
+    result["capabilities"]["broker"] = json!({});
+  }
+  result
 }

@@ -144,3 +144,43 @@ $ janus upgrade no-such-pact.json
 janus upgrade: no-such-pact.json: [..]
 
 ```
+
+Verifying from a Pact Broker needs the provider whose pacts to fetch, and files and a broker are
+not mixed in one run.
+
+```console
+$ janus verify --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2
+? 2
+error: the following required arguments were not provided:
+  --provider-name <NAME>
+
+Usage: janus verify --provider-url <URL> --broker-url <URL> --provider-name <NAME> [CONTRACT_OR_PACT]...
+
+For more information, try '--help'.
+
+```
+
+```console
+$ janus verify pact.json --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2 --provider-name p
+? 2
+error: the argument '[CONTRACT_OR_PACT]...' cannot be used with '--broker-url <URL>'
+
+Usage: janus verify --provider-url <URL> --provider-name <NAME> <CONTRACT_OR_PACT>...
+
+For more information, try '--help'.
+
+```
+
+Publishing needs a broker to publish to, and the provider version the results are for.
+
+```console
+$ janus verify --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2 --provider-name p --publish
+? 2
+error: the following required arguments were not provided:
+  --provider-version <VERSION>
+
+Usage: janus verify --provider-url <URL> --broker-url <URL> --provider-name <NAME> --provider-version <VERSION> --publish [CONTRACT_OR_PACT]...
+
+For more information, try '--help'.
+
+```

@@ -7,8 +7,9 @@
 //! What a native embedding brings is what the kernel deliberately lacks (lifecycle-hooks spec §8.5,
 //! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport and JSON
 //! content components, the `exec` and `http` hook implementations, the built-in `oauth2` hook
-//! component, and the WASM loader for out-of-tree components (plan task 8.1). An engine handed none
-//! of those refuses a configuration naming them — by name, before a run starts.
+//! component, the WASM loader for out-of-tree components (plan task 8.1), and the Pact Broker
+//! client (ADR 0032, staged plan S1.3). An engine handed none of those refuses a configuration
+//! naming them — by name, before a run starts.
 
 use pact_janus_hooks_host::{ExecHooks, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
@@ -38,5 +39,6 @@ pub fn native_engine() -> Engine {
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
+  engine.register_broker_client(Arc::new(pact_janus_broker_client::HalBrokerClient::new()));
   engine
 }

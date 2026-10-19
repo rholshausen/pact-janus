@@ -1,0 +1,40 @@
+---
+default: minor
+---
+
+# `janus verify` and `janus-engine` verify from a Pact Broker, and publish results back
+
+Both native binaries now have a Pact Broker client (ADR 0032), and `engine/hello` declares the
+`broker` capability. The offline WASM artifact still has none, and still answers every
+broker-facing request with `component-unavailable` naming `broker`.
+
+- **`verification/verify` takes a source of kind `broker`.** The run fetches the pacts the
+  consumer version selectors choose, with pending and work-in-progress status, and reports them as
+  a `verification/fetched` event before verifying anything. A fetch that fails ends the run with
+  `component-failed` naming `broker`, carrying the client's own error (`broker-unreachable`,
+  `broker-refused`, `broker-response-invalid`). Selectors that select nothing end it with
+  `pacts-not-found`, unless the source says `require-pacts: false`.
+- **Pending pacts and pending interactions don't fail the run.** This covers a pending pact, a
+  work-in-progress pact, and a v4 interaction marked `pending` from any source, including a file.
+  Their results say `pending: true` and are still counted in `variants`. A broker run's summary
+  says per source whether it was `pending`.
+- **`options.publish` publishes each pact's result to that pact's own link** when the run ends,
+  keyed by the broker's interaction ids, which now ride in each interaction reference as `id`. It
+  records the provider version's branch and tags first. Each publication is a
+  `verification/published` event, and the summary lists them as `publication`. A publish that
+  fails is reported and does not change the verdict. `publish` with an `inline` source is refused
+  as `malformed-frame`.
+- **`janus verify` has today's broker options**, spelled as `pact_verifier_cli` spells them:
+  `--broker-url`, `--provider-name`, `--consumer-version-selectors`, `--enable-pending`,
+  `--include-wip-pacts-since`, `--provider-version`, `--provider-branch`, `--provider-tags`,
+  `--publish`, `--build-url`, and `--user`/`--password`/`--token`. The credentials can also come
+  from `PACT_BROKER_USERNAME`, `PACT_BROKER_PASSWORD` and `PACT_BROKER_TOKEN`. As with today's
+  verifier, pending and work-in-progress pacts are asked for only when selectors are given.
+
+`broker/publish-contracts` is not built yet. An engine with a client answers it with
+`operation-unsupported`.
+
+What the ledger says: every broker fixture now agrees with today's verifier, including what each run
+publishes, and so does the compatibility suite's pending v4 interaction. The disagreements left are
+plain-text, XML, form, multipart and binary bodies (S1.6), a repeated response header (S3.3), and a
+provider-state call that is not retried (S1.9).

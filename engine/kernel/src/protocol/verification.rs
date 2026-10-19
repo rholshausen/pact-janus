@@ -48,6 +48,9 @@ use super::events::Stream;
 use super::frame::EngineError;
 use super::scope::Scope;
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
+use crate::broker::{
+  BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, InteractionResult, PublishRequest,
+};
 use crate::common::ContentTypes;
 use crate::component::{ContentComponent, Parts, Send as SendRequest, Stop, TransportComponent, Unavailable};
 use crate::contract::{self, Contract};
@@ -169,13 +172,65 @@ pub struct Verify {
 
 /// Where the contracts come from. An open vocabulary. `inline` is read here; files and URLs are the
 /// host's business, which keeps filesystem access out of a kernel that must build for
-/// `wasm32-wasip2`. `broker` is fetched by a broker client, a native host capability (spec §8.3,
-/// ADR 0032), and refused by name before this is reached while no embedding registers one (S1.3).
+/// `wasm32-wasip2`. `broker` is fetched in the run by a broker client, a native host capability
+/// (spec §8.3, ADR 0032); an engine with none refuses it by name before the run starts.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ContractSource {
   pub kind: String,
   #[serde(default)]
   pub contracts: Vec<Value>,
+  /// For `broker`: which broker, and how to reach it.
+  #[serde(default)]
+  pub broker: Option<BrokerDescriptor>,
+  /// For `broker`: the provider whose pacts to fetch.
+  #[serde(default)]
+  pub provider: Option<String>,
+  #[serde(default)]
+  pub consumer_version_selectors: Vec<Value>,
+  #[serde(default)]
+  pub provider_branch: Option<String>,
+  #[serde(default)]
+  pub provider_tags: Vec<String>,
+  #[serde(default)]
+  pub include_pending: bool,
+  #[serde(default)]
+  pub include_wip_since: Option<String>,
+  #[serde(default = "pacts_required")]
+  pub require_pacts: bool,
+}
+
+fn pacts_required() -> bool {
+  true
+}
+
+impl ContractSource {
+  /// A `broker` source as the client's request, or what it is missing.
+  pub(crate) fn fetch_request(&self) -> Result<FetchRequest, VerifyError> {
+    let missing = |member: &str| VerifyError::SourceIncomplete(format!("a 'broker' source needs '{member}'"));
+    Ok(FetchRequest {
+      broker: self.broker.clone().ok_or_else(|| missing("broker"))?,
+      provider: self.provider.clone().ok_or_else(|| missing("provider"))?,
+      selectors: self.consumer_version_selectors.clone(),
+      provider_branch: self.provider_branch.clone(),
+      provider_tags: self.provider_tags.clone(),
+      include_pending: self.include_pending,
+      include_wip_since: self.include_wip_since.clone(),
+    })
+  }
+}
+
+/// `options.publish` (spec §8.3): publish each fetched pact's result to that pact's own link.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PublishOptions {
+  pub provider_version: String,
+  #[serde(default)]
+  pub branch: Option<String>,
+  #[serde(default)]
+  pub tags: Vec<String>,
+  #[serde(default)]
+  pub build_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -208,6 +263,8 @@ pub struct TransportBinding {
 pub enum VerifyError {
   /// `kind` names a source the engine cannot read (`file`, `broker`, …).
   SourceUnsupported(String),
+  /// A source of a known kind without a member that kind needs.
+  SourceIncomplete(String),
   /// The document is not a Janus contract at all (ADR 0011's identification).
   NotAContract {
     index: usize,
@@ -271,6 +328,17 @@ impl Source {
     }
   }
 
+  /// A v4 interaction marked pending.
+  fn interaction_pending(&self, index: usize) -> bool {
+    match self {
+      Source::Janus(_) => false,
+      Source::Legacy(pact) => pact
+        .interactions
+        .get(index)
+        .is_some_and(|interaction| interaction.pending),
+    }
+  }
+
   /// How many results this document will produce. A contract's interaction has as many as it
   /// recorded; a pact's interaction has exactly one, because a single example is a single variant
   /// (contract-file spec §8.3) — the degenerate case of the same arithmetic, not a special case
@@ -325,24 +393,29 @@ pub(crate) fn read_source(source: &ContractSource) -> Result<Vec<Source>, Verify
   if source.kind != "inline" {
     return Err(VerifyError::SourceUnsupported(source.kind.clone()));
   }
-  let mut sources = Vec::with_capacity(source.contracts.len());
-  for (index, doc) in source.contracts.iter().enumerate() {
-    match doc.get("$format").and_then(Value::as_str) {
-      Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
-        sources.push(Source::Janus(read_contract(index, doc)?))
-      }
-      // A `$format` this engine does not know is never guessed at, even when the document also
-      // looks pact-shaped: the member exists precisely to stop a reader guessing.
-      Some(other) => {
-        return Err(VerifyError::NotAContract {
-          index,
-          found: Some(other.to_string()),
-        });
-      }
-      None => sources.push(Source::Legacy(Box::new(read_legacy(index, doc)?))),
+  source
+    .contracts
+    .iter()
+    .enumerate()
+    .map(|(index, doc)| read_document(index, doc))
+    .collect()
+}
+
+/// One source document, identified before it is parsed: [`read_source`]'s rule, for a document
+/// from anywhere — inline, or fetched from a broker.
+pub(crate) fn read_document(index: usize, doc: &Value) -> Result<Source, VerifyError> {
+  match doc.get("$format").and_then(Value::as_str) {
+    Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
+      Ok(Source::Janus(read_contract(index, doc)?))
     }
+    // A `$format` this engine does not know is never guessed at, even when the document also
+    // looks pact-shaped: the member exists precisely to stop a reader guessing.
+    Some(other) => Err(VerifyError::NotAContract {
+      index,
+      found: Some(other.to_string()),
+    }),
+    None => Ok(Source::Legacy(Box::new(read_legacy(index, doc)?))),
   }
-  Ok(sources)
 }
 
 fn read_contract(index: usize, doc: &Value) -> Result<Contract, VerifyError> {
@@ -456,23 +529,72 @@ pub(crate) struct RunComponents {
   pub contributions: Arc<Contributions>,
 }
 
+/// What a run verifies: documents already read, or a broker to fetch them from inside the run
+/// (spec §8.3: `verify` answers at once, so the fetch cannot happen before it).
+pub(crate) enum Sources {
+  Read(Vec<Source>),
+  Broker(Box<BrokerFetch>),
+}
+
+pub(crate) struct BrokerFetch {
+  pub client: Arc<dyn BrokerClient>,
+  pub request: FetchRequest,
+  pub require_pacts: bool,
+  /// The run's scope, which every fetched document's requirements are checked against before
+  /// anything is verified, as an inline document's are before `verify` answers.
+  pub scope: Scope,
+}
+
+/// A run's broker, once it has fetched: the client, which broker, and how to publish.
+struct BrokerRun {
+  client: Arc<dyn BrokerClient>,
+  broker: BrokerDescriptor,
+  publish: Option<PublishOptions>,
+  /// Per source, in order: what the broker said about it.
+  fetched: Vec<FetchedPact>,
+}
+
 pub(crate) fn start(
-  sources: Vec<Source>,
+  sources: Sources,
   targets: Vec<Target>,
   components: RunComponents,
   hooks: Option<HookRunner>,
   options: Option<Value>,
+  publish: Option<PublishOptions>,
   stream: Arc<Stream>,
 ) -> Run {
   let filter = Filter::from_options(options.as_ref());
   let executed_plans = ExecutedPlans::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
-  let crashed = crashed_summary(&sources, &filter);
+  let crashed = match &sources {
+    Sources::Read(sources) => crashed_summary(sources, &filter),
+    Sources::Broker(_) => crashed_summary(&[], &filter),
+  };
   let thread = thread::spawn(move || {
     let stream = Arc::clone(&thread_stream);
     guarded(&stream, crashed, move || {
+      let (sources, broker) = match sources {
+        Sources::Read(sources) => (sources, None),
+        Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
+          Ok((sources, fetched)) => (
+            sources,
+            Some(BrokerRun {
+              client: fetch.client,
+              broker: fetch.request.broker,
+              publish,
+              fetched,
+            }),
+          ),
+          Err(summary) => {
+            stop_targets(&targets);
+            thread_stream.finish("verification/finished", summary);
+            return;
+          }
+        },
+      };
       run(
         sources,
+        broker,
         targets,
         components,
         hooks,
@@ -483,6 +605,60 @@ pub(crate) fn start(
     })
   });
   Run { stream, thread }
+}
+
+/// Fetch a broker source's pacts and read them (spec §8.3), reporting what was fetched as a
+/// `verification/fetched` event. A run that cannot get past this ends here: the summary it ends
+/// with is the `Err`.
+fn fetch_sources(
+  fetch: &BrokerFetch,
+  filter: &Filter,
+  stream: &Stream,
+) -> Result<(Vec<Source>, Vec<FetchedPact>), Value> {
+  let failed = |error: EngineError| {
+    let mut summary = crashed_summary(&[], filter);
+    summary["error"] = serde_json::to_value(error).unwrap_or(Value::Null);
+    summary
+  };
+  let fetched = fetch
+    .client
+    .fetch_for_verification(&fetch.request)
+    .map_err(|error| failed(EngineError::component_failed("broker", &error)))?;
+  stream.emit(
+    "verification/fetched",
+    json!({
+      "broker": fetch.request.broker.display_url(),
+      "pacts": fetched.iter().map(|pact| json!({
+        "consumer": pact.document["consumer"]["name"],
+        "pending": pact.pending,
+        "wip": pact.wip,
+        "notices": pact.notices,
+      })).collect::<Vec<_>>(),
+    }),
+  );
+  if fetched.is_empty() && fetch.require_pacts {
+    return Err(failed(EngineError::pacts_not_found(&fetch.request.provider)));
+  }
+  let mut sources = Vec::with_capacity(fetched.len());
+  for (index, pact) in fetched.iter().enumerate() {
+    let source =
+      read_document(index, &pact.document).map_err(|err| failed(super::engine::verify_error(err)))?;
+    source
+      .check(&fetch.scope)
+      .map_err(|unavailable| failed(EngineError::component_unresolved(&unavailable)))?;
+    sources.push(source);
+  }
+  Ok((sources, fetched))
+}
+
+fn stop_targets(targets: &[Target]) {
+  for target in targets {
+    if let Err(err) = target.component.stop(Stop {
+      instance: target.instance.clone(),
+    }) {
+      tracing::warn!(kind = %target.kind, instance = %target.instance, ?err, "transport did not stop cleanly");
+    }
+  }
 }
 
 /// Run `body`, and if it panics, end the stream anyway (spec §9.6): a host polls until the terminal
@@ -516,8 +692,10 @@ fn crashed_summary(sources: &[Source], filter: &Filter) -> Value {
   })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run(
   sources: Vec<Source>,
+  broker: Option<BrokerRun>,
   targets: Vec<Target>,
   components: RunComponents,
   hooks: Option<HookRunner>,
@@ -564,8 +742,16 @@ fn run(
     &stream,
   );
 
+  // Which results belong to which source, by position in `tally.results`: what a source's
+  // published result is made of. A source the run did not finish has none.
+  let mut ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(sources.len());
   if aborted.is_none() {
-    'sources: for source in &sources {
+    'sources: for (position, source) in sources.iter().enumerate() {
+      let first = tally.results.len();
+      let source_pending = broker
+        .as_ref()
+        .and_then(|broker| broker.fetched.get(position))
+        .is_some_and(|fetched| fetched.pending);
       for index in 0..source.interactions() {
         let flow = verify_prepared(
           source.prepare(index, &contributions),
@@ -577,6 +763,7 @@ fn run(
             executed_plans,
             stream: &stream,
             hooks: hooks.as_mut(),
+            pending: source_pending || source.interaction_pending(index),
           },
           &mut tally,
         );
@@ -585,8 +772,26 @@ fn run(
           break 'sources;
         }
       }
+      ranges.push(first..tally.results.len());
     }
   }
+
+  let publication = match &broker {
+    Some(broker) => publish(broker, &sources, &ranges, &tally, &stream),
+    None => vec![],
+  };
+  let report = Report {
+    tally: &tally,
+    sources: &sources,
+    interactions,
+    filter: &filter,
+    hooks: None,
+    aborted: &aborted,
+    pending: broker
+      .as_ref()
+      .map(|broker| broker.fetched.iter().map(|fetched| fetched.pending).collect()),
+    publication: &publication,
+  };
 
   if aborted.is_some() {
     // Everything the run did not reach is counted as not run, never folded into the failed tally
@@ -601,7 +806,10 @@ fn run(
   // aborted** (spec §3.8) — and it is handed the same summary document the terminal event carries,
   // so a reporting hook reads what the host reads. Nothing is mutable: a hook cannot revise a
   // verdict that has already been reached.
-  let summary_for_hooks = summary(&tally, &sources, interactions, &filter, hooks.as_ref(), &aborted);
+  let summary_for_hooks = summary(&Report {
+    hooks: hooks.as_ref(),
+    ..report.clone()
+  });
   if hooks
     .as_ref()
     .is_some_and(|runner| runner.has("after-verification"))
@@ -624,18 +832,70 @@ fn run(
   // session allocated is released when it ends, and the host learns it ended from that event. A
   // host that saw `finished` while a client instance was still open would be right to call it a
   // leak.
-  for target in &targets {
-    if let Err(err) = target.component.stop(Stop {
-      instance: target.instance.clone(),
-    }) {
-      tracing::warn!(kind = %target.kind, instance = %target.instance, ?err, "transport did not stop cleanly");
-    }
-  }
+  stop_targets(&targets);
 
   stream.finish(
     "verification/finished",
-    summary(&tally, &sources, interactions, &filter, hooks.as_ref(), &aborted),
+    summary(&Report {
+      hooks: hooks.as_ref(),
+      ..report
+    }),
   );
+}
+
+/// Publish each source's result to its own link (spec §8.3's `options.publish`), as a
+/// `verification/published` event each. What the summary's `publication` lists. A publish that
+/// fails is reported, and changes no verdict.
+fn publish(
+  broker: &BrokerRun,
+  sources: &[Source],
+  ranges: &[std::ops::Range<usize>],
+  tally: &Tally,
+  stream: &Stream,
+) -> Vec<Value> {
+  let Some(options) = &broker.publish else {
+    return vec![];
+  };
+  let mut publication = Vec::new();
+  for ((source, fetched), range) in sources.iter().zip(&broker.fetched).zip(ranges) {
+    let results: Vec<InteractionResult> = tally.results[range.clone()]
+      .iter()
+      .map(|payload| InteractionResult {
+        id: payload["interaction"]["id"].as_str().map(str::to_string),
+        description: payload["interaction"]["description"]
+          .as_str()
+          .unwrap_or_default()
+          .to_string(),
+        success: payload["status"] == json!("verified"),
+        mismatches: payload["mismatches"].as_array().cloned().unwrap_or_default(),
+        error: payload.get("error").filter(|error| !error.is_null()).cloned(),
+      })
+      .collect();
+    let request = PublishRequest {
+      broker: &broker.broker,
+      handle: &fetched.handle,
+      provider_version: &options.provider_version,
+      branch: options.branch.as_deref(),
+      tags: &options.tags,
+      build_url: options.build_url.as_deref(),
+      success: results.iter().all(|result| result.success),
+      results,
+    };
+    let mut entry = json!({ "consumer": source.consumer() });
+    match broker.client.publish_results(&request) {
+      Ok(()) => entry["outcome"] = json!("published"),
+      Err(error) => {
+        entry["outcome"] = json!("failed");
+        entry["error"] =
+          serde_json::to_value(EngineError::component_failed("broker", &error)).unwrap_or(Value::Null);
+      }
+    }
+    let mut event = entry.clone();
+    event["provider-version"] = json!(options.provider_version);
+    stream.emit("verification/published", event);
+    publication.push(entry);
+  }
+  publication
 }
 
 /// Run one point's hooks and emit each invocation as a `verification/hook` event (spec §10.1).
@@ -690,11 +950,20 @@ struct Tally {
   /// Variants the filter excluded. Counted, never reported as anything else: an unreplayed variant
   /// is not a passing one (variant-semantics spec §5.1).
   skipped: usize,
+  /// Of `failed` and `state_unavailable`, the variants that were pending (spec §8.3): reported,
+  /// counted, and not failing the run.
+  pending_failed: usize,
   failures: Vec<Value>,
+  /// Every result, in order: what a source's published result is made of.
+  results: Vec<Value>,
 }
 
 impl Tally {
   fn record(&mut self, payload: &Value) {
+    self.results.push(payload.clone());
+    if payload["pending"] == json!(true) && payload["status"] != json!("verified") {
+      self.pending_failed += 1;
+    }
     match payload["status"].as_str() {
       Some("verified") => self.verified += 1,
       Some("state-unavailable") => {
@@ -709,22 +978,41 @@ impl Tally {
   }
 }
 
+/// What the run summary is written from.
+#[derive(Clone)]
+struct Report<'a> {
+  tally: &'a Tally,
+  sources: &'a [Source],
+  interactions: usize,
+  filter: &'a Filter,
+  hooks: Option<&'a HookRunner>,
+  aborted: &'a Option<Abort>,
+  /// For a broker source: per source, whether it was pending.
+  pending: Option<Vec<bool>>,
+  /// For a run that published: per source, what happened.
+  publication: &'a [Value],
+}
+
 /// The run summary (protocol spec §9.6): the document the terminal event carries, the one
 /// `after-verification` is handed, and the one a report is written from.
-fn summary(
-  tally: &Tally,
-  sources: &[Source],
-  interactions: usize,
-  filter: &Filter,
-  hooks: Option<&HookRunner>,
-  aborted: &Option<Abort>,
-) -> Value {
+fn summary(report: &Report<'_>) -> Value {
+  let Report {
+    tally,
+    sources,
+    interactions,
+    filter,
+    hooks,
+    aborted,
+    ..
+  } = report;
   // `state-unavailable` fails the run by default (variant-semantics spec §6.7): the consumer
   // demonstrated it can handle that variant and the provider has not demonstrated it can produce
   // it, so reporting it as a pass would be the false confidence variant testing exists to remove.
   let failed = tally.failed + tally.state_unavailable;
+  // A pending variant's failure is reported and does not fail the run (spec §8.3).
+  let failing = failed - tally.pending_failed;
   let mut summary = json!({
-    "status": if failed == 0 && aborted.is_none() { "verified" } else { "failed" },
+    "status": if failing == 0 && aborted.is_none() { "verified" } else { "failed" },
     "contracts": sources.len(),
     // Who this run was about, positionally parallel, one entry per source document — the same
     // pairing `started` announces. The summary is the document a report is written from (below),
@@ -747,6 +1035,14 @@ fn summary(
     "failures": tally.failures,
   });
   let map = summary.as_object_mut().expect("a json! object literal");
+  // Positionally beside `consumers` (spec §9.6): which sources were pending, so a reader can tell
+  // a pending pact's failures from the ones that fail the run.
+  if let Some(pending) = &report.pending {
+    map.insert("pending".to_string(), json!(pending));
+  }
+  if !report.publication.is_empty() {
+    map.insert("publication".to_string(), json!(report.publication));
+  }
   if let Some(runner) = hooks
     && !runner.report.is_empty()
   {
@@ -772,6 +1068,17 @@ struct RunContext<'a> {
   executed_plans: ExecutedPlans,
   stream: &'a Stream,
   hooks: Option<&'a mut HookRunner>,
+  /// The interaction is pending — its pact is, or it is itself (a v4 interaction marked so): its
+  /// results say `pending: true`, and its failures do not fail the run (spec §8.3).
+  pending: bool,
+}
+
+impl RunContext<'_> {
+  fn mark(&self, payload: &mut Value) {
+    if self.pending {
+      payload["pending"] = json!(true);
+    }
+  }
 }
 
 /// One interaction, prepared for replay. **This is where the two source kinds stop differing**:
@@ -958,13 +1265,17 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
         .then(|| state.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
     })
     .collect();
-  let reference = json!({
+  let mut reference = json!({
     "contract": { "consumer": pact.consumer, "provider": pact.provider },
     "index": index,
     "description": interaction.description,
     "states": states.iter().map(|state| state.name.clone()).collect::<Vec<_>>(),
     "format": format,
   });
+  // The broker's id for the interaction, which a published result is keyed by (spec §8.3).
+  if let Some(id) = &interaction.id {
+    reference["id"] = json!(id);
+  }
   // v1–v4 pacts are HTTP request/response documents by their own specification, so there is
   // nothing to read a transport kind out of: the interaction has one.
   let transport = DEFAULT_TRANSPORT_KIND.to_string();
@@ -1104,9 +1415,10 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
 /// A variant that failed before any exchange happened: emitted and tallied exactly like one that
 /// ran, because a result a host never saw is a variant a report would silently drop.
 fn report_failure(ctx: &RunContext<'_>, tally: &mut Tally, reference: &Value, variant: &str, error: Value) {
-  let payload = json!({
+  let mut payload = json!({
     "interaction": reference, "variant": variant, "status": "failed", "error": error,
   });
+  ctx.mark(&mut payload);
   ctx
     .stream
     .emit("verification/interaction-result", payload.clone());
@@ -1232,9 +1544,10 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
     }
   }
 
-  let payload = result.unwrap_or_else(
+  let mut payload = result.unwrap_or_else(
     || json!({ "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed" }),
   );
+  ctx.mark(&mut payload);
 
   // The result is reported *before* teardown, not after: the exchange has its outcome by here —
   // teardown is even handed it, so it can differ after a failure (spec §3.7) — and a host

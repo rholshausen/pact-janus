@@ -79,7 +79,7 @@ alone:
                    "variant": "base", "status": "verified" } },
     { "stream": "s-1", "seq": 4, "kind": "verification/interaction-result",
       "payload": { "interaction": { "description": "a request for an order's tracking", "index": 0, "id": "d4e5f6" },
-                   "variant": "base", "status": "failed",
+                   "variant": "base", "status": "failed", "pending": true,
                    "mismatches": [ { "path": "$.response.status", "message": "Expected 404 to equal 200" } ] } } ] } }
 ```
 

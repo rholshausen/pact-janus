@@ -74,9 +74,9 @@ status, with its prefix and the proxy's address replaced by `{prefix}` and `{bro
 case's `broker` member of `run --json`'s output, and in `<case>/today|janus/broker-traffic.json`
 under `--keep`. It is recorded, not yet compared.
 
-`janus verify` is given today's option spellings (`--broker-url` and the rest), which it does not
-have yet, so every broker case's Janus side is an error until S1.3 builds it. S1.13 settles the
-spellings.
+`janus verify` is given today's option spellings (`--broker-url` and the rest), which it takes as
+they are (S1.13's table records them). Its summary names the pacts it fetched (`consumers`), so an
+interaction of a pact it did not fetch is `absent` there too.
 
 ## What is here
 

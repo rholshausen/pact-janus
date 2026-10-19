@@ -4,6 +4,7 @@
 //! It knows nothing about HTTP, JSON or any other transport/content type — those are components
 //! behind the component interfaces (see the component-interface design, plan task 2.6).
 
+pub mod broker;
 mod common;
 pub mod compatibility;
 pub mod component;

@@ -2116,11 +2116,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_broker_client"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "pact_janus_kernel",
+ "pretty_assertions",
+ "rstest 0.26.1",
+ "serde_json",
+ "tiny_http",
+ "tracing",
+ "ureq",
+]
+
+[[package]]
 name = "pact_janus_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
  "clap_complete",
+ "pact_janus_broker_client",
  "pact_janus_component_host",
  "pact_janus_component_http",
  "pact_janus_component_json",

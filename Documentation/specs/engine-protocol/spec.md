@@ -611,7 +611,9 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   `include-wip-since` a date. The fetch happens in the run, so `verify` still answers at once,
   and the run reports what it fetched as a `verification/fetched` event: each pact's consumer,
   whether it is pending or work in progress, and the broker's notices. **A pending pact's
-  failures are reported and do not fail the run**; a work-in-progress pact is pending. A fetch
+  failures are reported and do not fail the run**; a work-in-progress pact is pending, and so is
+  a v4 interaction marked `pending`, from any source. Each result of a pending pact or interaction
+  says `pending: true`, and is counted in `variants` like any other. A fetch
   that fails ends the run as any run that cannot complete does (§9.6), with `status: failed` and
   an `error`: `component-failed` naming `broker`, carrying the client's own error. A fetch that
   finds no pacts ends it with `status: failed` and `pacts-not-found`, unless the source says

@@ -17,6 +17,7 @@ use super::subsumption::{
   self as subsumption_ops, Check as SubsumptionCheck, Decide as SubsumptionDecide, SubsumptionError,
 };
 use super::verification::{self, Run, Target, Verify, VerifyError};
+use crate::broker::BrokerClient;
 use crate::component::{
   ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, Start, Stop, TransportComponent,
 };
@@ -77,6 +78,10 @@ pub struct Engine {
   /// behind it to end it on its own the way a verification run does.
   recordings: HashMap<String, RecordingSession>,
   next_recording: u64,
+  /// The Pact Broker client, when this embedding registered one (ADR 0032): a native host
+  /// capability, as the hook implementations are. With none, every broker-facing request is
+  /// `component-unavailable` naming `broker`, and `engine/hello` declares no `broker` capability.
+  broker: Option<Arc<dyn BrokerClient>>,
 }
 
 /// The version an in-tree component answers requirements with. In-tree components ship with the
@@ -112,6 +117,7 @@ impl Engine {
       next_verification: 0,
       recordings: HashMap::new(),
       next_recording: 0,
+      broker: None,
     }
   }
 
@@ -151,6 +157,7 @@ impl Engine {
       next_verification: 0,
       recordings: HashMap::new(),
       next_recording: 0,
+      broker: None,
     }
   }
 
@@ -183,6 +190,13 @@ impl Engine {
   /// embedding can do and a kernel that must build for `wasm32-wasip2` cannot.
   pub fn register_hook_invoker(&mut self, kind: impl Into<String>, invoker: Arc<dyn HookInvoker>) {
     self.hook_invokers.insert(kind.into(), invoker);
+  }
+
+  /// Register the Pact Broker client (spec §8.3, §8.7, ADR 0032): what a `broker` source fetches
+  /// with and `options.publish` publishes with. The native embeddings register one; the WASM
+  /// artifact cannot, and says so by not declaring the `broker` capability.
+  pub fn register_broker_client(&mut self, client: Arc<dyn BrokerClient>) {
+    self.broker = Some(client);
   }
 
   /// Register a hook component, answering `run: { kind: component, component: <name> }`.
@@ -266,10 +280,12 @@ impl Engine {
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
       // Spec §8.7: every engine knows the broker operations; one with no broker client answers
-      // them by naming the component. None registers a client until staged plan S1.3.
-      "broker/publish-contracts" => {
-        ResponseFrame::err(id, EngineError::broker_unavailable("publish contracts"))
-      }
+      // them by naming the component. One with a client cannot publish contracts until the rest
+      // of staged plan S1.3 builds it, and says that instead.
+      "broker/publish-contracts" => match self.broker {
+        None => ResponseFrame::err(id, EngineError::broker_unavailable("publish contracts")),
+        Some(_) => ResponseFrame::err(id, EngineError::operation_unsupported("broker/publish-contracts")),
+      },
       "verification/explain" => self.handle_explain(id, body),
       "provider-shape-session/create" => self.handle_create_recording(id, body),
       "provider-shape-session/observe" => self.handle_observe(id, body),
@@ -293,7 +309,7 @@ impl Engine {
         let loaders: Vec<&str> = std::iter::once("in-tree")
           .chain(self.loaders.iter().map(|loader| loader.name()))
           .collect();
-        ResponseFrame::ok(id, hello::result(&loaders))
+        ResponseFrame::ok(id, hello::result(&loaders, self.broker.is_some()))
       }
       None => ResponseFrame::err(
         id,
@@ -472,24 +488,51 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    // Spec §8.3: a broker source and the publish option need a broker client (ADR 0032), and no
-    // embedding registers one until staged plan S1.3. Refused before anything starts.
-    if req.source.kind == "broker" {
+    // Spec §8.3: a broker source and the publish option need a broker client (ADR 0032), and an
+    // engine with none refuses both before anything starts.
+    let from_broker = req.source.kind == "broker";
+    let publish = match req.options.as_ref().and_then(|options| options.get("publish")) {
+      None => None,
+      Some(publish) => match serde_json::from_value::<verification::PublishOptions>(publish.clone()) {
+        Ok(publish) => Some(publish),
+        Err(err) => {
+          return ResponseFrame::err(
+            id,
+            EngineError::malformed_frame(format!("options.publish: {err}")),
+          );
+        }
+      },
+    };
+    let client = self.broker.clone();
+    if from_broker && client.is_none() {
       return ResponseFrame::err(id, EngineError::broker_unavailable("fetch pacts from a broker"));
     }
-    if req
-      .options
-      .as_ref()
-      .is_some_and(|options| options.get("publish").is_some())
-    {
+    if publish.is_some() && client.is_none() {
       return ResponseFrame::err(
         id,
         EngineError::broker_unavailable("publish verification results"),
       );
     }
-    let contracts = match verification::read_source(&req.source) {
-      Ok(contracts) => contracts,
+    if publish.is_some() && !from_broker {
+      return ResponseFrame::err(
+        id,
+        EngineError::malformed_frame(
+          "options.publish needs a source of kind 'broker': an inline document has no link to publish to",
+        ),
+      );
+    }
+    let fetch = match from_broker.then(|| req.source.fetch_request()).transpose() {
+      Ok(fetch) => fetch,
       Err(err) => return ResponseFrame::err(id, verify_error(err)),
+    };
+    // A broker's pacts are read and checked in the run, once fetched; an inline source's here.
+    let contracts = if from_broker {
+      Vec::new()
+    } else {
+      match verification::read_source(&req.source) {
+        Ok(contracts) => contracts,
+        Err(err) => return ResponseFrame::err(id, verify_error(err)),
+      }
     };
 
     // Component-interfaces spec §2.3: load what the project declared, then collect the union of
@@ -552,13 +595,18 @@ impl Engine {
     let hooks = match &req.target.hooks {
       None => None,
       Some(document) => {
+        // A broker source names its provider, and no consumer until the fetch.
+        let provider = match &fetch {
+          Some(fetch) => Some(fetch.provider.clone()),
+          None => contracts.first().map(|source| source.provider().to_string()),
+        };
         let run = json!({
           "id": session,
           // The parties as the first contract names them: a run over contracts with different
           // parties is a host's decision to mix them, and a hook that needs to tell them apart
           // reads `interaction` rather than this.
           "consumer": contracts.first().map(|source| json!({ "name": source.consumer() })),
-          "provider": contracts.first().map(|source| json!({ "name": source.provider() })),
+          "provider": provider.map(|name| json!({ "name": name })),
         });
         match HookRunner::new(
           document,
@@ -576,17 +624,20 @@ impl Engine {
     };
 
     let stream = self.open_stream();
-    let run = verification::start(
-      contracts,
-      targets,
-      verification::RunComponents {
-        content: scope.content(),
-        contributions: scope.contributions(),
-      },
-      hooks,
-      req.options,
-      stream,
-    );
+    let components = verification::RunComponents {
+      content: scope.content(),
+      contributions: scope.contributions(),
+    };
+    let sources = match (fetch, client) {
+      (Some(request), Some(client)) => verification::Sources::Broker(Box::new(verification::BrokerFetch {
+        client,
+        request,
+        require_pacts: req.source.require_pacts,
+        scope,
+      })),
+      _ => verification::Sources::Read(contracts),
+    };
+    let run = verification::start(sources, targets, components, hooks, req.options, publish, stream);
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
@@ -892,11 +943,12 @@ fn explain_error(err: ExplainError) -> EngineError {
 /// [`VerifyError`] as the protocol's own error taxonomy (spec §10.2). Each arm is a different
 /// remedy: a source the engine cannot read is the host using an operation it doesn't have, a
 /// document that is not a contract is a user/authoring problem, and a transport is a component.
-fn verify_error(err: VerifyError) -> EngineError {
+pub(super) fn verify_error(err: VerifyError) -> EngineError {
   match err {
     VerifyError::SourceUnsupported(kind) => {
       EngineError::operation_unsupported(&format!("verification/verify (source kind: {kind})"))
     }
+    VerifyError::SourceIncomplete(message) => EngineError::malformed_frame(message),
     VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
     VerifyError::ContractInvalid { problems } => EngineError::contract_invalid(&problems),
   }

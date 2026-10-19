@@ -24,7 +24,13 @@ use serde_json::{Value, json};
 const POLL_WAIT_MS: u64 = 10_000;
 
 pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
-  let documents = io::read_all_documents(&args.sources)?;
+  let source = match &args.broker_url {
+    Some(url) => broker_source(args, url)?,
+    None => {
+      let documents = io::read_all_documents(&args.sources)?;
+      json!({ "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() })
+    }
+  };
 
   let hooks = match &args.config {
     None => None,
@@ -40,6 +46,20 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   }
   if args.explain_failures {
     options["executed-plan"] = json!("on-failure");
+  }
+  if args.publish {
+    // `requires_all` guarantees the version; the branch and tags are the provider version's.
+    let mut publish = json!({ "provider-version": args.provider_version });
+    if let Some(branch) = &args.provider_branch {
+      publish["branch"] = json!(branch);
+    }
+    if !args.provider_tags.is_empty() {
+      publish["tags"] = json!(args.provider_tags);
+    }
+    if let Some(build_url) = &args.build_url {
+      publish["build-url"] = json!(build_url);
+    }
+    options["publish"] = publish;
   }
 
   let mut target = json!({
@@ -65,7 +85,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     &mut engine,
     "verification/verify",
     json!({
-      "source": { "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() },
+      "source": source,
       "target": target,
       "options": options,
     }),
@@ -110,6 +130,54 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   })
 }
 
+/// A `broker` source (protocol spec §8.3) from the command line. The engine reads no credential
+/// from its environment (§8.7): the CLI does, by today's names, and passes them in the descriptor.
+fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
+  let mut selectors = Vec::with_capacity(args.consumer_version_selectors.len());
+  for selector in &args.consumer_version_selectors {
+    let parsed: Value = serde_json::from_str(selector)
+      .map_err(|err| format!("--consumer-version-selectors '{selector}' is not JSON: {err}"))?;
+    if !parsed.is_object() {
+      return Err(format!("--consumer-version-selectors '{selector}' is not a JSON object").into());
+    }
+    selectors.push(parsed);
+  }
+  let mut broker = json!({ "url": url });
+  if let Some(token) = &args.token {
+    broker["auth"] = json!({ "kind": "bearer", "token": token });
+  } else if let Some(user) = &args.user {
+    broker["auth"] =
+      json!({ "kind": "basic", "username": user, "password": args.password.clone().unwrap_or_default() });
+  }
+  // Today's verifier asks for pending and work-in-progress pacts only when it has selectors to
+  // send: with none, it fetches the latest pact from each consumer from an older endpoint that
+  // knows neither (corpora/verifier/broker/pending-without-selectors). The broker's own default for
+  // no selectors is the same pacts, so asking without them is what makes the two agree.
+  let selecting = !selectors.is_empty();
+  if !selecting && (args.enable_pending || args.include_wip_pacts_since.is_some()) {
+    tracing::warn!(
+      "--enable-pending and --include-wip-pacts-since need --consumer-version-selectors; without them, neither is asked for"
+    );
+  }
+  let mut source = json!({
+    "kind": "broker",
+    "broker": broker,
+    "provider": args.provider_name,
+    "consumer-version-selectors": selectors,
+    "include-pending": args.enable_pending && selecting,
+  });
+  if let Some(branch) = &args.provider_branch {
+    source["provider-branch"] = json!(branch);
+  }
+  if !args.provider_tags.is_empty() {
+    source["provider-tags"] = json!(args.provider_tags);
+  }
+  if let Some(since) = args.include_wip_pacts_since.as_ref().filter(|_| selecting) {
+    source["include-wip-since"] = json!(since);
+  }
+  Ok(source)
+}
+
 /// One event, rendered. The vocabulary is open (spec §9.6), so an unrecognised kind is *printed*
 /// rather than dropped: a host that silently ignored an event kind it did not know would hide
 /// exactly the information a newer engine added to tell it something.
@@ -139,6 +207,18 @@ fn report(event: &Value) {
           outln!("          the provider cannot reach a state this contract declares");
           print_error(&payload["error"]);
         }
+        _ if payload["pending"] == json!(true) => {
+          outln!("  PENDING {description} [{variant}]");
+          outln!("          failed, and pending: reported, and not failing the run");
+          for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
+            outln!(
+              "          {}: {}",
+              mismatch["path"].as_str().unwrap_or(""),
+              mismatch["message"].as_str().unwrap_or("")
+            );
+          }
+          print_error(&payload["error"]);
+        }
         _ => {
           outln!("  FAILED  {description} [{variant}]");
           for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
@@ -148,6 +228,38 @@ fn report(event: &Value) {
               mismatch["message"].as_str().unwrap_or("")
             );
           }
+          print_error(&payload["error"]);
+        }
+      }
+    }
+    "verification/fetched" => {
+      let pacts = payload["pacts"].as_array().cloned().unwrap_or_default();
+      outln!(
+        "Fetched {} pact(s) from {}",
+        pacts.len(),
+        payload["broker"].as_str().unwrap_or("the broker")
+      );
+      for pact in &pacts {
+        let consumer = pact["consumer"].as_str().unwrap_or("?");
+        let status = match (pact["wip"] == json!(true), pact["pending"] == json!(true)) {
+          (true, _) => " (work in progress, pending)",
+          (false, true) => " (pending)",
+          _ => "",
+        };
+        outln!("  {consumer}{status}");
+        for notice in pact["notices"].as_array().into_iter().flatten() {
+          outln!("    {}", notice.as_str().unwrap_or_default());
+        }
+      }
+      outln!();
+    }
+    "verification/published" => {
+      let consumer = payload["consumer"].as_str().unwrap_or("?");
+      let version = payload["provider-version"].as_str().unwrap_or("?");
+      match payload["outcome"].as_str() {
+        Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
+        _ => {
+          outln!("  PUBLISH FAILED for {consumer}'s result");
           print_error(&payload["error"]);
         }
       }

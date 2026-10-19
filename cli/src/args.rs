@@ -33,6 +33,8 @@ pub struct Cli {
   pub command: Command,
 }
 
+// One `Command` is parsed per process, so `verify`'s many options cost nothing worth boxing for.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Subcommand)]
 pub enum Command {
   /// Replay Janus contracts or v1-v4 pacts at a running provider
@@ -102,8 +104,12 @@ pub enum Output {
                         was aborted; 2 the command could not run."
 )]
 pub struct VerifyArgs {
-  /// Janus contracts or v1-v4 pact files, or directories of them
-  #[arg(required = true, value_name = "CONTRACT_OR_PACT")]
+  /// Janus contracts or v1-v4 pact files, or directories of them. Not with --broker-url
+  #[arg(
+    required_unless_present = "broker_url",
+    conflicts_with = "broker_url",
+    value_name = "CONTRACT_OR_PACT"
+  )]
   pub sources: Vec<PathBuf>,
 
   /// The base URL of the provider under test
@@ -131,6 +137,107 @@ pub struct VerifyArgs {
   /// text prints progress and a summary; json prints only the run summary document
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
+
+  // The Pact Broker options are spelled as today's verifier (pact_verifier_cli) spells them, so a
+  // provider's CI script moves by changing the command's name; staged plan S1.13's table records
+  // each. The credentials are read from today's environment variables too, and never logged.
+  /// Fetch the pacts to verify from this Pact Broker instead of from files
+  #[arg(
+    long,
+    value_name = "URL",
+    requires = "provider_name",
+    help_heading = "Pact Broker"
+  )]
+  pub broker_url: Option<String>,
+
+  /// The provider whose pacts to fetch
+  #[arg(
+    long,
+    value_name = "NAME",
+    requires = "broker_url",
+    help_heading = "Pact Broker"
+  )]
+  pub provider_name: Option<String>,
+
+  /// A consumer version selector, as the broker reads it, in JSON; repeatable
+  /// (https://docs.pact.io/pact_broker/advanced_topics/consumer_version_selectors)
+  #[arg(
+    long = "consumer-version-selectors",
+    value_name = "JSON",
+    requires = "broker_url",
+    help_heading = "Pact Broker"
+  )]
+  pub consumer_version_selectors: Vec<String>,
+
+  /// Ask the broker which pacts are pending: their failures are reported, and do not fail the run.
+  /// Only with --consumer-version-selectors, as today's verifier
+  #[arg(long, requires = "broker_url", help_heading = "Pact Broker")]
+  pub enable_pending: bool,
+
+  /// Also verify the work-in-progress pacts published since this date (YYYY-MM-DD); they are
+  /// pending. Only with --consumer-version-selectors, as today's verifier
+  #[arg(
+    long,
+    value_name = "DATE",
+    requires = "broker_url",
+    help_heading = "Pact Broker"
+  )]
+  pub include_wip_pacts_since: Option<String>,
+
+  /// The provider version being verified, which --publish publishes results for
+  #[arg(long, value_name = "VERSION", help_heading = "Pact Broker")]
+  pub provider_version: Option<String>,
+
+  /// The provider version's branch, which the broker decides pending status from
+  #[arg(long, value_name = "BRANCH", help_heading = "Pact Broker")]
+  pub provider_branch: Option<String>,
+
+  /// The provider version's tags, comma-separated
+  #[arg(
+    long,
+    value_name = "TAGS",
+    value_delimiter = ',',
+    help_heading = "Pact Broker"
+  )]
+  pub provider_tags: Vec<String>,
+
+  /// Publish each pact's result back to the broker
+  #[arg(long, requires_all = ["broker_url", "provider_version"], help_heading = "Pact Broker")]
+  pub publish: bool,
+
+  /// The build that ran this verification, recorded with each published result
+  #[arg(long, value_name = "URL", help_heading = "Pact Broker")]
+  pub build_url: Option<String>,
+
+  /// The broker's username, for basic authentication
+  #[arg(
+    long,
+    value_name = "USER",
+    env = "PACT_BROKER_USERNAME",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub user: Option<String>,
+
+  /// The broker's password, for basic authentication
+  #[arg(
+    long,
+    value_name = "PASSWORD",
+    env = "PACT_BROKER_PASSWORD",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub password: Option<String>,
+
+  /// A bearer token for the broker; used instead of --user when both are given
+  #[arg(
+    long,
+    value_name = "TOKEN",
+    env = "PACT_BROKER_TOKEN",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub token: Option<String>,
 }
 
 #[derive(Debug, Args)]

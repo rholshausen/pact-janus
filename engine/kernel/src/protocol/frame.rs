@@ -277,6 +277,17 @@ impl EngineError {
     }
   }
 
+  /// `pacts-not-found` (spec §8.3, §10.2): a `broker` source whose selectors selected nothing. The
+  /// selectors are the user's, so it is theirs to fix.
+  pub fn pacts_not_found(provider: &str) -> Self {
+    EngineError {
+      code: "pacts-not-found".to_string(),
+      category: "document".to_string(),
+      message: format!("the broker has no pacts for '{provider}' that the consumer version selectors select"),
+      details: Some(serde_json::json!({ "provider": provider })),
+    }
+  }
+
   /// `component-unavailable` for a declared component that could not be resolved, or a requirement
   /// nothing satisfies (component-interfaces spec §11.3): `details` says which case.
   pub fn component_unresolved(unavailable: &crate::component::Unavailable) -> Self {
