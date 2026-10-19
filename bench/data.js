@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792384247132,
+  "lastUpdate": 1792384249334,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -8106,6 +8106,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21903,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2afc74f288b61ccda9d1ad2d9d7a91067b6a79b6",
+          "message": "test: S1.3 the broker client replays a scenario recorded from the pinned broker\n\nThe second test layer: one scenario (a v3 pact and a Janus contract published, fetched with\npending and WIP, results published, fetched again, a changed republish refused) recorded from\nPact Broker 2.121.2 into engine/broker-client/tests/recorded/, and replayed offline on every\nsystem: each request must be the recorded one, and each step's conclusion the recorded one. The\nbroker's URL, timestamps and database ids are normalised, so a recording is the same file however\noften it is made; CI's verifier-diff job records it again and fails on any difference.\n\nThe hand-written cases from pact_verifier's own list: a body that is not JSON, a broker too old\nfor pacts-for-verification, a selection that is not HAL or selects nothing, selectors refused with\na 400, and a broker at a context path.\n\nThey found a difference, fixed here: today's verifier fetches every link from the broker it was\ngiven, keeping the link's path and query and adding a missing context path, so a broker behind a\nproxy that writes an internal host still works. The client now does the same, with pact_verifier's\nown cases (normalize_path_inner, resolve_path_test).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T15:26:49+11:00",
+          "tree_id": "f2e2ee5f9b0d7926c29e603c69a17b25406d7f0d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2afc74f288b61ccda9d1ad2d9d7a91067b6a79b6"
+        },
+        "date": 1792384248648,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 40576,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30142,
             "unit": "requests per second",
             "extra": "engines 4"
           }
