@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792386203751,
+  "lastUpdate": 1792386205613,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -8814,6 +8814,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 39820,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "060c3c4f132d653c7d7f1ecf9b285b17fe18ad21",
+          "message": "docs: S1.3 drops the schema lint against PactFlow's OpenAPI document\n\nLayers 1 to 3 test against the real OSS broker: every request the client sends is compared with\ntoday's verifier's or sent exactly to the pinned broker, which validates it, and selectors are the\nuser's, passed through as written. The lint's own gaps (PactFlow's document omits fetching a pact\nand publishing results, and could only be fetched, not committed) made it the weakest layer. What\nis given up is any test of PactFlow's own behaviour; PactFlow runs the same broker beneath.\n\nThe exit no longer names the lint, and the text says what is still to build from layer 1: the run\nbehind basic auth and a bearer token, and the weekly run against the latest image.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T15:57:42+11:00",
+          "tree_id": "4f60fdc29a4477775cc9a436862a090e502ef7c8",
+          "url": "https://github.com/rholshausen/pact-janus/commit/060c3c4f132d653c7d7f1ecf9b285b17fe18ad21"
+        },
+        "date": 1792386205114,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 29353,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21693,
             "unit": "requests per second",
             "extra": "engines 4"
           }
