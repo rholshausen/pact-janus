@@ -24,8 +24,13 @@
 //! responses alike, so every link the client follows is still one the recording served. The
 //! scenario's pacticipants are deleted before it is recorded, so it starts from nothing however
 //! often it runs.
+//!
+//! A published contract's `content`, which the broker's API takes as base64, is held decoded: the
+//! recording can be read, and the codename in a contract's `$format` is renamed with the rest of
+//! the repository (`.github/scripts/rename.sh`), as the renamed engine writes it.
 
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL;
 use pact_janus_broker_client::HalBrokerClient;
 use pact_janus_kernel::broker::{
@@ -262,7 +267,8 @@ type Exchanges = Arc<Mutex<Vec<Value>>>;
 const KEPT_HEADERS: [&str; 3] = ["content-type", "accept-encoding", "retry-after"];
 
 /// A request body as the recording compares it: the engine's own version is not the broker's
-/// business, and changes every release.
+/// business, and changes every release; and a published contract's content is decoded, so the
+/// recording holds the document rather than its base64.
 fn normalised_request(body: &str) -> Value {
   let mut body: Value = match serde_json::from_str(body) {
     Ok(body) => body,
@@ -271,6 +277,17 @@ fn normalised_request(body: &str) -> Value {
   };
   if body["verifiedBy"]["version"].is_string() {
     body["verifiedBy"]["version"] = json!("{engine-version}");
+  }
+  if let Some(contracts) = body["contracts"].as_array_mut() {
+    for contract in contracts {
+      let decoded = contract["content"]
+        .as_str()
+        .and_then(|content| BASE64.decode(content).ok())
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+      if let Some(document) = decoded {
+        contract["content"] = document;
+      }
+    }
   }
   body
 }

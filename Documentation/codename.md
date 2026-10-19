@@ -111,16 +111,20 @@ rename is complete.
    ones. The rest of this inventory needs no decision of its own.
 2. On a branch: `.github/scripts/rename.sh <name>`. It records the earlier spellings, rewrites, moves,
    and fails unless nothing is left.
-3. A `major` change file saying what users change: the binaries, the environment variables, the
+3. `TRYCMD=overwrite cargo test -p pact_<name>_cli --test cmd`. The CLI's help is wrapped to a
+   width, so a name of another length breaks its lines at other words; the diff this writes moves
+   line breaks and changes no word, as the rehearsal checks.
+4. A `major` change file saying what users change: the binaries, the environment variables, the
    packages, the cache directory. Persisted documents are unaffected, which the change file says
    too.
-4. Review, merge and release as usual. One major version later, empty `earlier.rs`.
+5. Review, merge and release as usual. One major version later, empty `earlier.rs`.
 
 ## The rehearsal
 
 `.github/workflows/rename-rehearsal.yml`, weekly, on demand, and on any pull request that changes the
 script, the persisted identifiers or this document. It builds the CSV component under the codename,
-renames to a placeholder (`rehearsal<run number>`), and then requires the workspace's clippy and
+renames to a placeholder (`rehearsal<run number>`), rewraps the CLI's help snapshots and fails if
+that changed more than where their lines break, and then requires the workspace's clippy and
 tests, the third-party component, both SDK suites, their conformance, the thinness audit, the binding
 pipeline, the protocol client and the demo to pass, renamed. The renamed TypeScript suite loads the
 component built before the rename, so the dual-spelling rule is tested against a real artifact. The
