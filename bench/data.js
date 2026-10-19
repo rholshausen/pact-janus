@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792387628983,
+  "lastUpdate": 1792387630391,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -9522,6 +9522,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21378,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9317b79cb3da763b95b8af99de00d9fc0d6d9173",
+          "message": "feat: S1.3 is done: the broker checks run weekly against the latest Pact Broker\n\nThe Latest Pact Broker workflow runs every check CI runs against the pinned broker against\npactfoundation/pact-broker:latest, weekly and on demand: the differential harness (--any-version),\nthe live publish, verify and credentials tests, the client's pact verified by the broker, and the\nrecording made again and compared except for its version line. Every check runs even when one\nbefore it failed, and the run's summary names the broker's version and digest beside the pin.\nNothing it does changes the repository: moving the pin stays a deliberate change.\n\npact-broker.sh takes PACT_BROKER_IMAGE and PACT_BROKER_CONTAINER, so another image can run beside\nthe pinned one, and the recording test takes JANUS_PACT_BROKER_ANY_VERSION=1. Rehearsed locally\nagainst a second broker; today the latest image is the pinned one.\n\nS1.3's Done line records what its exit did not foresee and what was left out.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T16:23:03+11:00",
+          "tree_id": "0c1ff57df891723e91f2aad6b4b2c2d87279c92b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9317b79cb3da763b95b8af99de00d9fc0d6d9173"
+        },
+        "date": 1792387630128,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 37798,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29999,
             "unit": "requests per second",
             "extra": "engines 4"
           }
