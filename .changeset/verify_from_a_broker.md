@@ -39,6 +39,10 @@ broker-facing request with `component-unavailable` naming `broker`.
   `--broker-user`/`--broker-password`/`--broker-token`. The credentials can also come
   from `PACT_BROKER_USERNAME`, `PACT_BROKER_PASSWORD` and `PACT_BROKER_TOKEN`. As with today's
   verifier, pending and work-in-progress pacts are asked for only when selectors are given.
+- **Short flags, and help for a bare `janus verify`.** Every command's `--log-level` is also `-l`,
+  as today's verifier spells it, and `janus verify`'s `--provider-url` is also `-u` and its
+  `--output` `-o`. Today's verifier reads `-u` as a pact URL (`--url`), so a moved script that
+  passes one gets a usage error. `janus verify` with no arguments prints its help and exits 2.
 - **No credential is logged, at any level.** At `trace`, `janus` and `janus-engine` log every frame
   with each broker descriptor's `auth` reduced to its `kind`, and each `url` without user
   information. The HTTP library's own logging stops at `debug`, where it redacts headers, because
