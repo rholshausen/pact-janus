@@ -282,7 +282,7 @@ janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus
 janus verify --broker-url <url> --provider-name <name> --provider-url <url>
              [--consumer-version-selectors <json>]... [--enable-pending] [--include-wip-pacts-since <date>]
              [--provider-version <v>] [--provider-branch <b>] [--provider-tags <t,...>] [--publish]
-             [--build-url <url>] [--user <u> --password <p> | --token <t>]   # today's spellings (S1.13)
+             [--build-url <url>] [--user <u> --password <p> | --token <t>]   # today's spellings (S1.13); --broker-* aliases
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
             [--as-of <YYYY-MM-DD>] [--output text|json]

@@ -25,7 +25,7 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
   -h, --help               Print help
   -V, --version            Print version
@@ -46,16 +46,16 @@ Arguments:
                          --broker-url
 
 Options:
-      --log-level <LEVEL>   How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>   How much to log on standard error. Without it, RUST_LOG is read; the
                             default is warn [possible values: error, warn, info, debug, trace]
-      --provider-url <URL>  The base URL of the provider under test
+  -u, --provider-url <URL>  The base URL of the provider under test
       --config <FILE>       A verifier configuration (verifier.janus.yaml): the hooks that set up
                             provider states or authenticate, and the components the contracts need
       --variant <ID>        Replay only this variant; repeatable. The run is reported as filtered,
                             because a partial run is not a pass
       --transport <KIND>    The transport to bind to the provider [default: http]
       --explain-failures    Print the executed plan for every variant that fails
-      --output <FORMAT>     text prints progress and a summary; json prints only the run summary
+  -o, --output <FORMAT>     text prints progress and a summary; json prints only the run summary
                             document [default: text] [possible values: text, json]
   -h, --help                Print help
 
@@ -84,12 +84,14 @@ Pact Broker:
       --build-url <URL>
           The build that ran this verification, recorded with each published result
       --user <USER>
-          The broker's username, for basic authentication [env: PACT_BROKER_USERNAME]
+          The broker's username, for basic authentication [env: PACT_BROKER_USERNAME] [alias:
+          --broker-user]
       --password <PASSWORD>
-          The broker's password, for basic authentication [env: PACT_BROKER_PASSWORD]
+          The broker's password, for basic authentication [env: PACT_BROKER_PASSWORD] [alias:
+          --broker-password]
       --token <TOKEN>
           A bearer token for the broker; used instead of --user when both are given [env:
-          PACT_BROKER_TOKEN]
+          PACT_BROKER_TOKEN] [alias: --broker-token]
 
 Exit status: 0 verified; 1 the provider failed verification, or the run was aborted; 2 the command
 could not run.
@@ -106,7 +108,7 @@ Arguments:
   <CONTRACT_OR_PACT>...  Consumer contracts or v1-v4 pacts, or directories of them
 
 Options:
-      --log-level <LEVEL>      How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>      How much to log on standard error. Without it, RUST_LOG is read; the
                                default is warn [possible values: error, warn, info, debug, trace]
       --provider-shape <PATH>  A provider shape document, or a directory of them; repeatable
       --verification <FILE>    A run summary written by `janus verify --output json`; repeatable
@@ -141,7 +143,7 @@ Arguments:
 
 Options:
       --index <N>          Which interaction of a contract or pact, counting from 0
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
       --variant <ID>       Compile for this recorded variant of a Janus contract
       --spec               Read the document as an interaction specification, which cannot identify
@@ -166,7 +168,7 @@ Arguments:
   <PACT>  The v1-v4 pact to convert
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
       --write <FILE>       Write the contract to this file instead of standard output
       --quiet              Do not print the findings
@@ -191,7 +193,7 @@ Arguments:
 
 Options:
   -a, --consumer-app-version <VERSION>  The version of the consumer these contracts belong to
-      --log-level <LEVEL>               How much to log on standard error. Without it, RUST_LOG is
+  -l, --log-level <LEVEL>               How much to log on standard error. Without it, RUST_LOG is
                                         read; the default is warn [possible values: error, warn,
                                         info, debug, trace]
       --branch <BRANCH>                 The consumer version's branch
@@ -232,7 +234,7 @@ Commands:
   help  Print this message or the help of the given subcommand(s)
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
   -h, --help               Print help
 
@@ -256,7 +258,7 @@ Arguments:
   <REFERENCE>       Where to publish it: registry/repository:tag
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
       --output <FORMAT>    text prints a summary and the declaration to paste; json prints one
                            document [default: text] [possible values: text, json]
@@ -275,7 +277,7 @@ Arguments:
 
 Options:
       --digest <sha256:...>  The manifest digest the artifact must match
-      --log-level <LEVEL>    How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>    How much to log on standard error. Without it, RUST_LOG is read; the
                              default is warn [possible values: error, warn, info, debug, trace]
       --output <FORMAT>      text prints a summary and the declaration to paste; json prints one
                              document [default: text] [possible values: text, json]
@@ -294,7 +296,7 @@ Arguments:
            zsh]
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
   -h, --help               Print help
 

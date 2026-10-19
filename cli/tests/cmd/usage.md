@@ -27,7 +27,7 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-      --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: error, warn, info, debug, trace]
   -h, --help               Print help
   -V, --version            Print version
@@ -45,6 +45,72 @@ error: unrecognized subcommand 'frobnicate'
 Usage: janus [OPTIONS] <COMMAND>
 
 For more information, try '--help'.
+
+```
+
+`janus verify` with nothing else prints its help.
+
+```console
+$ janus verify
+? 2
+Replay Janus contracts or v1-v4 pacts at a running provider
+
+Usage: janus verify [OPTIONS] --provider-url <URL> [CONTRACT_OR_PACT]...
+
+Arguments:
+  [CONTRACT_OR_PACT]...  Janus contracts or v1-v4 pact files, or directories of them. Not with
+                         --broker-url
+
+Options:
+  -l, --log-level <LEVEL>   How much to log on standard error. Without it, RUST_LOG is read; the
+                            default is warn [possible values: error, warn, info, debug, trace]
+  -u, --provider-url <URL>  The base URL of the provider under test
+      --config <FILE>       A verifier configuration (verifier.janus.yaml): the hooks that set up
+                            provider states or authenticate, and the components the contracts need
+      --variant <ID>        Replay only this variant; repeatable. The run is reported as filtered,
+                            because a partial run is not a pass
+      --transport <KIND>    The transport to bind to the provider [default: http]
+      --explain-failures    Print the executed plan for every variant that fails
+  -o, --output <FORMAT>     text prints progress and a summary; json prints only the run summary
+                            document [default: text] [possible values: text, json]
+  -h, --help                Print help
+
+Pact Broker:
+      --broker-url <URL>
+          Fetch the pacts to verify from this Pact Broker instead of from files
+      --provider-name <NAME>
+          The provider whose pacts to fetch
+      --consumer-version-selectors <JSON>
+          A consumer version selector, as the broker reads it, in JSON; repeatable
+          (https://docs.pact.io/pact_broker/advanced_topics/consumer_version_selectors)
+      --enable-pending
+          Ask the broker which pacts are pending: their failures are reported, and do not fail the
+          run. Only with --consumer-version-selectors, as today's verifier
+      --include-wip-pacts-since <DATE>
+          Also verify the work-in-progress pacts published since this date (YYYY-MM-DD); they are
+          pending. Only with --consumer-version-selectors, as today's verifier
+      --provider-version <VERSION>
+          The provider version being verified, which --publish publishes results for
+      --provider-branch <BRANCH>
+          The provider version's branch, which the broker decides pending status from
+      --provider-tags <TAGS>
+          The provider version's tags, comma-separated
+      --publish
+          Publish each pact's result back to the broker
+      --build-url <URL>
+          The build that ran this verification, recorded with each published result
+      --user <USER>
+          The broker's username, for basic authentication [env: PACT_BROKER_USERNAME] [alias:
+          --broker-user]
+      --password <PASSWORD>
+          The broker's password, for basic authentication [env: PACT_BROKER_PASSWORD] [alias:
+          --broker-password]
+      --token <TOKEN>
+          A bearer token for the broker; used instead of --user when both are given [env:
+          PACT_BROKER_TOKEN] [alias: --broker-token]
+
+Exit status: 0 verified; 1 the provider failed verification, or the run was aborted; 2 the command
+could not run.
 
 ```
 

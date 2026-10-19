@@ -35,7 +35,8 @@ broker-facing request with `component-unavailable` naming `broker`.
 - **`janus verify` has today's broker options**, spelled as `pact_verifier_cli` spells them:
   `--broker-url`, `--provider-name`, `--consumer-version-selectors`, `--enable-pending`,
   `--include-wip-pacts-since`, `--provider-version`, `--provider-branch`, `--provider-tags`,
-  `--publish`, `--build-url`, and `--user`/`--password`/`--token`. The credentials can also come
+  `--publish`, `--build-url`, and `--user`/`--password`/`--token`, which also answer to
+  `--broker-user`/`--broker-password`/`--broker-token`. The credentials can also come
   from `PACT_BROKER_USERNAME`, `PACT_BROKER_PASSWORD` and `PACT_BROKER_TOKEN`. As with today's
   verifier, pending and work-in-progress pacts are asked for only when selectors are given.
 - **No credential is logged, at any level.** At `trace`, `janus` and `janus-engine` log every frame

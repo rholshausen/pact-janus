@@ -26,7 +26,7 @@ use std::path::PathBuf;
 )]
 pub struct Cli {
   /// How much to log on standard error. Without it, RUST_LOG is read; the default is warn
-  #[arg(long, global = true, value_enum, value_name = "LEVEL")]
+  #[arg(long, short = 'l', global = true, value_enum, value_name = "LEVEL")]
   pub log_level: Option<LogLevel>,
 
   #[command(subcommand)]
@@ -104,7 +104,8 @@ pub enum Output {
 #[derive(Debug, Args)]
 #[command(
   after_help = "Exit status: 0 verified; 1 the provider failed verification, or the run \
-                        was aborted; 2 the command could not run."
+                        was aborted; 2 the command could not run.",
+  arg_required_else_help = true
 )]
 pub struct VerifyArgs {
   /// Janus contracts or v1-v4 pact files, or directories of them. Not with --broker-url
@@ -116,7 +117,7 @@ pub struct VerifyArgs {
   pub sources: Vec<PathBuf>,
 
   /// The base URL of the provider under test
-  #[arg(long, value_name = "URL")]
+  #[arg(long, short = 'u', value_name = "URL")]
   pub provider_url: String,
 
   /// A verifier configuration (verifier.janus.yaml): the hooks that set up provider states or
@@ -138,7 +139,7 @@ pub struct VerifyArgs {
   pub explain_failures: bool,
 
   /// text prints progress and a summary; json prints only the run summary document
-  #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
+  #[arg(long, short = 'o', value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
 
   // The Pact Broker options are spelled as today's verifier (pact_verifier_cli) spells them, so a
@@ -215,6 +216,7 @@ pub struct VerifyArgs {
   /// The broker's username, for basic authentication
   #[arg(
     long,
+    visible_alias = "broker-user",
     value_name = "USER",
     env = "PACT_BROKER_USERNAME",
     hide_env_values = true,
@@ -225,6 +227,7 @@ pub struct VerifyArgs {
   /// The broker's password, for basic authentication
   #[arg(
     long,
+    visible_alias = "broker-password",
     value_name = "PASSWORD",
     env = "PACT_BROKER_PASSWORD",
     hide_env_values = true,
@@ -235,6 +238,7 @@ pub struct VerifyArgs {
   /// A bearer token for the broker; used instead of --user when both are given
   #[arg(
     long,
+    visible_alias = "broker-token",
     value_name = "TOKEN",
     env = "PACT_BROKER_TOKEN",
     hide_env_values = true,
