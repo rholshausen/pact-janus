@@ -3,10 +3,14 @@
 //! fetched, the run verifies; what the run concluded, it publishes. Faking it here pins the run's
 //! side of that — pending, publishing, a fetch that fails, credentials kept out of every event —
 //! without a broker; the native client is tested against a real one by the differential harness.
+//! The same fake takes a consumer's contracts (`broker/publish-contracts`, spec §8.7), for the
+//! engine's side of that: what it checks before anything is published, and what it reports.
 
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
-use pact_janus_kernel::broker::{BrokerClient, FetchRequest, FetchedPact, PublishRequest};
+use pact_janus_kernel::broker::{
+  BrokerClient, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact, PublishRequest,
+};
 use pact_janus_kernel::component::{ComponentError, TransportComponent};
 use pact_janus_kernel::protocol::Engine;
 use serde_json::{Value, json};
@@ -27,21 +31,28 @@ fn send(engine: &mut Engine, id: &str, op: &str, body: Value) -> Value {
 struct FakeBroker {
   pacts: Vec<FetchedPact>,
   fail_fetch: bool,
+  fail_publish: bool,
   fetched: Mutex<Vec<FetchRequest>>,
   published: Mutex<Vec<Value>>,
+  /// Each publication of contracts, with every contract's content parsed back.
+  publications: Mutex<Vec<Value>>,
+}
+
+fn refused(message: &str) -> ComponentError {
+  ComponentError {
+    code: "broker-refused".to_string(),
+    category: "component".to_string(),
+    message: message.to_string(),
+    source: None,
+    details: None,
+  }
 }
 
 impl BrokerClient for FakeBroker {
   fn fetch_for_verification(&self, request: &FetchRequest) -> Result<Vec<FetchedPact>, ComponentError> {
     self.fetched.lock().unwrap().push(request.clone());
     if self.fail_fetch {
-      return Err(ComponentError {
-        code: "broker-refused".to_string(),
-        category: "component".to_string(),
-        message: "the broker answered 401".to_string(),
-        source: None,
-        details: None,
-      });
+      return Err(refused("the broker answered 401"));
     }
     Ok(self.pacts.clone())
   }
@@ -57,6 +68,30 @@ impl BrokerClient for FakeBroker {
       })).collect::<Vec<_>>(),
     }));
     Ok(())
+  }
+
+  fn publish_contracts(
+    &self,
+    request: &ContractsToPublish<'_>,
+  ) -> Result<ContractsPublished, ComponentError> {
+    self.publications.lock().unwrap().push(json!({
+      "consumer": request.consumer,
+      "consumer-version": request.consumer_version,
+      "branch": request.branch,
+      "tags": request.tags,
+      "build-url": request.build_url,
+      "contracts": request.contracts.iter().map(|contract| json!({
+        "provider": contract.provider,
+        "content": serde_json::from_slice::<Value>(&contract.content).unwrap(),
+        "starts": String::from_utf8_lossy(&contract.content[..11.min(contract.content.len())]),
+      })).collect::<Vec<_>>(),
+    }));
+    if self.fail_publish {
+      return Err(refused("the broker answered 409"));
+    }
+    Ok(ContractsPublished {
+      notices: vec!["published for web-app version 2.7.0".to_string()],
+    })
   }
 }
 
@@ -395,4 +430,187 @@ fn a_pending_v4_interactions_failure_does_not_fail_the_run() {
   assert_eq!(results[0]["status"], "failed");
   assert_eq!(results[0]["pending"], true);
   assert_eq!(events.last().unwrap()["payload"]["status"], "verified");
+}
+
+// ---------------------------------------------------------------------------------------------
+// broker/publish-contracts
+// ---------------------------------------------------------------------------------------------
+
+/// A Janus contract from `web-app` to `stock-api`.
+fn janus_contract() -> Value {
+  json!({
+    "$format": "janus-contract/1",
+    "consumer": { "name": "web-app" },
+    "provider": { "name": "stock-api" },
+    "interactions": [{
+      "description": "a request for stock",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": { "method": { "shape": "equality", "example": "GET" },
+                     "path": { "shape": "equality", "example": "/stock/1" } },
+        "response": { "status": { "shape": "equality", "example": 200 } }
+      },
+      "selection": {
+        "variants": [{
+          "id": "base", "origin": "base", "assignment": [],
+          "parts": {
+            "request": { "method": { "content": "GET" }, "path": { "content": "/stock/1" } },
+            "response": { "status": { "content": 200 } }
+          }
+        }],
+        "report": { "space": { "size": 1, "dimensions": 0 } }
+      },
+      "x-from-a-newer-writer": true
+    }]
+  })
+}
+
+/// Publish `contracts` and drain the broker session's stream; the response, then its events.
+fn publish_contracts(engine: &mut Engine, contracts: Vec<Value>) -> (Value, Vec<Value>) {
+  let started = send(
+    engine,
+    "b-1",
+    "broker/publish-contracts",
+    json!({
+      "broker": { "url": "https://user:hunter2@broker.example", "auth": { "kind": "bearer", "token": "s3cret-token" } },
+      "consumer-version": "2.7.0",
+      "branch": "main",
+      "tags": ["rc"],
+      "build-url": "https://ci.example/377",
+      "contracts": contracts,
+    }),
+  );
+  let Some(stream) = started["ok"]["stream"].as_str().map(str::to_string) else {
+    return (started, vec![]);
+  };
+  let mut events = Vec::new();
+  for attempt in 0..100 {
+    let polled = send(
+      engine,
+      &format!("p-{attempt}"),
+      "events/poll",
+      json!({ "streams": [stream], "wait-ms": 200 }),
+    );
+    let batch = polled["ok"]["events"].as_array().cloned().unwrap_or_default();
+    let done = batch.iter().any(|event| event["last"] == json!(true));
+    events.extend(batch);
+    if done {
+      break;
+    }
+  }
+  (started, events)
+}
+
+#[test]
+fn a_consumers_contracts_are_published_together_and_reported_one_by_one() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let pact = json!({
+    "consumer": { "name": "web-app" }, "provider": { "name": "order-api" },
+    "interactions": [{ "description": "a request", "request": { "method": "GET", "path": "/" },
+                       "response": { "status": 200 } }],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  });
+  let (started, events) = publish_contracts(&mut engine, vec![pact.clone(), janus_contract()]);
+  assert!(
+    started["ok"]["session"].as_str().unwrap().starts_with("bs-"),
+    "{started}"
+  );
+
+  let publications = broker.publications.lock().unwrap();
+  assert_eq!(publications.len(), 1, "one publication for both contracts");
+  let publication = &publications[0];
+  assert_eq!(publication["consumer"], "web-app");
+  assert_eq!(publication["consumer-version"], "2.7.0");
+  assert_eq!(publication["branch"], "main");
+  assert_eq!(publication["tags"], json!(["rc"]));
+  assert_eq!(publication["build-url"], "https://ci.example/377");
+  assert_eq!(publication["contracts"][0]["provider"], "order-api");
+  assert_eq!(publication["contracts"][0]["content"], pact);
+  assert_eq!(publication["contracts"][1]["provider"], "stock-api");
+  // The document as the host sent it, members this engine does not know included, and still
+  // opening with `$format`.
+  assert_eq!(publication["contracts"][1]["content"], janus_contract());
+  assert_eq!(publication["contracts"][1]["starts"], r#"{"$format":"#);
+
+  let kinds: Vec<&str> = events.iter().map(|e| e["kind"].as_str().unwrap()).collect();
+  assert_eq!(
+    kinds,
+    vec!["broker/published", "broker/published", "broker/finished"]
+  );
+  assert_eq!(
+    events[0]["payload"],
+    json!({ "consumer": "web-app", "provider": "order-api", "outcome": "published" })
+  );
+  let finished = &events[2]["payload"];
+  assert_eq!(finished["status"], "published");
+  assert_eq!(finished["broker"], "https://broker.example");
+  assert_eq!(finished["consumer-version"], "2.7.0");
+  assert_eq!(
+    finished["notices"],
+    json!(["published for web-app version 2.7.0"])
+  );
+  assert_eq!(finished["contracts"][1]["provider"], "stock-api");
+}
+
+#[test]
+fn a_publication_the_broker_refuses_fails_every_contract_and_never_shows_a_credential() {
+  let broker = Arc::new(FakeBroker {
+    fail_publish: true,
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(broker));
+  let (_, events) = publish_contracts(&mut engine, vec![janus_contract()]);
+  let finished = &events.last().unwrap()["payload"];
+  assert_eq!(finished["status"], "failed");
+  assert_eq!(finished["error"]["code"], "component-failed");
+  assert_eq!(finished["error"]["details"]["component"], "broker");
+  assert_eq!(finished["error"]["details"]["error"]["code"], "broker-refused");
+  assert_eq!(finished["contracts"][0]["outcome"], "failed");
+  assert_eq!(events[0]["payload"]["outcome"], "failed");
+  let everything = serde_json::to_string(&events).unwrap();
+  assert!(
+    !everything.contains("s3cret-token") && !everything.contains("hunter2"),
+    "{everything}"
+  );
+}
+
+#[test]
+fn contracts_from_two_consumers_are_refused_before_anything_is_published() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let mut other = janus_contract();
+  other["consumer"]["name"] = json!("mobile-app");
+  let (refused, events) = publish_contracts(&mut engine, vec![janus_contract(), other]);
+  assert_eq!(refused["error"]["code"], "malformed-frame", "{refused}");
+  let message = refused["error"]["message"].as_str().unwrap();
+  assert!(
+    message.contains("contracts/1") && message.contains("mobile-app"),
+    "{message}"
+  );
+  assert!(events.is_empty());
+  assert!(broker.publications.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_document_that_cannot_be_verified_cannot_be_published_and_is_named_by_its_position() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let (not_a_contract, _) =
+    publish_contracts(&mut engine, vec![janus_contract(), json!({ "hello": "world" })]);
+  assert_eq!(
+    not_a_contract["error"]["code"], "contract-version-unsupported",
+    "{not_a_contract}"
+  );
+  assert_eq!(not_a_contract["error"]["details"]["index"], 1);
+
+  let mut invalid = janus_contract();
+  invalid["interactions"][0]["description"] = json!(7);
+  let (invalid, _) = publish_contracts(&mut engine, vec![invalid]);
+  assert_eq!(invalid["error"]["code"], "contract-invalid", "{invalid}");
+  let pointer = invalid["error"]["details"]["problems"][0]["pointer"]
+    .as_str()
+    .unwrap();
+  assert!(pointer.starts_with("/contracts/0/interactions/0"), "{pointer}");
+  assert!(broker.publications.lock().unwrap().is_empty());
 }

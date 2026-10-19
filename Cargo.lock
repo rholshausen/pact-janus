@@ -2120,6 +2120,7 @@ name = "pact_janus_broker_client"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "flate2",
  "pact_janus_kernel",
  "pretty_assertions",
  "rstest 0.26.1",

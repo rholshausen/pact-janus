@@ -1,5 +1,5 @@
-//! The `janus` CLI: `verify`, `check`, `explain`, `upgrade` and `component`, over the *same engine*
-//! every SDK speaks to.
+//! The `janus` CLI: `verify`, `check`, `explain`, `upgrade`, `publish` and `component`, over the
+//! *same engine* every SDK speaks to.
 //!
 //! Nothing here reaches into the kernel's Rust API to do its work. Each command builds protocol
 //! frames and reads frames back ([`engine`]), which is what makes this CLI evidence rather than a
@@ -32,6 +32,7 @@ mod error;
 mod explain;
 pub mod framing;
 mod io;
+mod publish;
 pub mod register;
 mod upgrade;
 mod verify;
@@ -108,6 +109,7 @@ fn dispatch(command: Command) -> Result<Outcome, Error> {
     Command::Check(args) => check::run(&args),
     Command::Explain(args) => explain::run(&args),
     Command::Upgrade(args) => upgrade::run(&args),
+    Command::Publish(args) => publish::run(&args),
     Command::Component(command) => component::run(&command),
     Command::Completions(args) => {
       let mut command = Cli::command();

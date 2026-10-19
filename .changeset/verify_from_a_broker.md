@@ -31,9 +31,6 @@ broker-facing request with `component-unavailable` naming `broker`.
   from `PACT_BROKER_USERNAME`, `PACT_BROKER_PASSWORD` and `PACT_BROKER_TOKEN`. As with today's
   verifier, pending and work-in-progress pacts are asked for only when selectors are given.
 
-`broker/publish-contracts` is not built yet. An engine with a client answers it with
-`operation-unsupported`.
-
 What the ledger says: every broker fixture now agrees with today's verifier, including what each run
 publishes, and so does the compatibility suite's pending v4 interaction. The disagreements left are
 plain-text, XML, form, multipart and binary bodies (S1.6), a repeated response header (S3.3), and a

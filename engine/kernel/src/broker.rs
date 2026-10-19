@@ -3,9 +3,10 @@
 //! The broker client is the engine's, so no host speaks the broker's API, and it is a native host
 //! capability, so the kernel knows no HTTP. This module is the seam between the two: a trait in the
 //! broker's own terms — fetch the pacts for verification for these selectors, publish this result
-//! for a pact that was fetched — which a native crate implements over the broker's HAL API and the
-//! native embeddings register ([`crate::protocol::Engine::register_broker_client`]). An engine with
-//! none answers every broker-facing request with `component-unavailable` naming `broker`.
+//! for a pact that was fetched, publish these contracts — which a native crate implements over the
+//! broker's HAL API and the native embeddings register
+//! ([`crate::protocol::Engine::register_broker_client`]). An engine with none answers every
+//! broker-facing request with `component-unavailable` naming `broker`.
 //!
 //! What a client fetched comes back with a `handle`: whatever the client needs to find that pact
 //! again when the run publishes its result (its HAL links, for the native client). The kernel
@@ -126,6 +127,35 @@ pub struct InteractionResult {
   pub error: Option<Value>,
 }
 
+/// A consumer's contracts, to publish for one of its versions (spec §8.7's `broker/publish-contracts`).
+#[derive(Debug, Clone)]
+pub struct ContractsToPublish<'a> {
+  pub broker: &'a BrokerDescriptor,
+  /// The consumer every contract belongs to.
+  pub consumer: &'a str,
+  pub consumer_version: &'a str,
+  pub branch: Option<&'a str>,
+  pub tags: &'a [String],
+  pub build_url: Option<&'a str>,
+  pub contracts: &'a [ContractToPublish],
+}
+
+/// One contract: its provider, and the bytes to publish, which the broker stores as they are.
+#[derive(Debug, Clone)]
+pub struct ContractToPublish {
+  pub provider: String,
+  /// The document as UTF-8 JSON. A Janus contract and a v1–v4 pact alike: the client publishes
+  /// both as the broker's `pact` specification (ADR 0011 decision 6).
+  pub content: Vec<u8>,
+}
+
+/// What the broker said about a publication it accepted.
+#[derive(Debug, Clone, Default)]
+pub struct ContractsPublished {
+  /// The broker's notices, as text: what it created, and what to do next.
+  pub notices: Vec<String>,
+}
+
 /// The broker client a native embedding registers. Blocking: it is called from a run's own thread,
 /// which already blocks on every replayed request.
 pub trait BrokerClient: Send + Sync {
@@ -137,6 +167,11 @@ pub trait BrokerClient: Send + Sync {
 
   /// Publish one pact's result to that pact's own link.
   fn publish_results(&self, request: &PublishRequest<'_>) -> Result<(), ComponentError>;
+
+  /// Publish a consumer's contracts for one of its versions, all together: the broker accepts or
+  /// refuses them as one publication.
+  fn publish_contracts(&self, request: &ContractsToPublish<'_>)
+  -> Result<ContractsPublished, ComponentError>;
 }
 
 #[cfg(test)]

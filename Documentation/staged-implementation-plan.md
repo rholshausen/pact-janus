@@ -502,6 +502,12 @@ item in 1a is done when S1.1 agrees.
   object, booleans strings), and the Ruby broker's own `pact_broker_oas.yaml`, which has two paths.
   The publishing link (`pb:publish-verification-results`), which no document describes, and what a
   selector selects are layer 1's alone.
+  Compression, found while building `janus publish` (2026-10-19): the pinned broker (2.121.2) reads a
+  gzipped body as JSON and answers 400, and no broker says it reads one, so the client compresses
+  only when a broker says it can (RFC 7694: `Accept-Encoding` on a response; engine-protocol spec
+  §8.7), and today every publication goes uncompressed. A reverse proxy's 1 MB cap (format review
+  §8.2) is the deployment's to raise until the broker inflates request bodies, which is a change to
+  propose upstream, not this item's exit.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
   included, and the broker's matrix shows the results per pair; the client's consumer pact is verified
   by that broker; and the schema lint passes against the pinned PactFlow document.

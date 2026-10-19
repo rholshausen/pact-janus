@@ -792,9 +792,20 @@ client — the offline WASM artifact — knows these operations and answers each
   rules (§7.3) apply to everything it reports.
 - **`publish-contracts`** publishes Janus contracts or v1–v4 pacts, all for one consumer, for a
   consumer version, with its branch, tags and build URL; a contract is published as the broker's
-  `pact` specification (ADR 0011 decision 6). It reaches the network, so it reports on a stream
-  rather than in its result: one `broker/published` event per contract, and a terminal
-  `broker/finished` carrying the outcome, which ends the broker session (§7.3).
+  `pact` specification (ADR 0011 decision 6). The engine reads every document as `verify` reads an
+  inline one before it publishes any, so a document that is neither is refused in the response
+  (`contract-version-unsupported` or `contract-invalid`, with pointers under `/contracts`), as are
+  documents naming two consumers (`malformed-frame`). What it publishes is the document as the host
+  sent it, members it does not know included: compact JSON, members in name order, so `$format`
+  still comes first. It reaches the network, so it reports on a stream rather than in its result:
+  one `broker/published` event per contract, and a terminal `broker/finished` carrying the outcome,
+  which ends the broker session (§7.3). The broker accepts or refuses a publication whole, so every
+  contract shares its outcome. A refusal, or a broker that cannot be reached, is `failed` with
+  `component-failed` naming `broker`, as a fetch that fails is (§8.3).
+- **Compression.** A client sends a publication gzipped only when the broker has said it reads
+  one (RFC 7694: an `Accept-Encoding` naming `gzip` on a response), and sends it again uncompressed
+  if the broker then answers 415. No broker says so today, and the Pact Broker reads a gzipped body
+  as JSON and refuses it, so in practice publications go uncompressed (staged plan S1.3).
 - **Not defined yet**, each a new operation in this area when something needs it: publishing a
   provider shape, which no broker resource accepts ([broker notes](../../prototype/broker-integration-notes.md)
   §2; staged plan S4.3), and fetching contracts or shapes for a decision over a broker's matrix.
@@ -878,7 +889,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, or `failed` with an `error` | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 | `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
-| `broker/finished` | the outcome: `status` (`published` or `failed`) and every contract's result | carries `last: true`; ends the broker session |
+| `broker/finished` | the outcome: `status` (`published` or `failed`), the broker (its URL, without credentials), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed | carries `last: true`; ends the broker session |
 
 The summary document the terminal event carries is the document a report is written from, so it
 names **who the run was about**: `consumers` and `providers`, positionally parallel, one entry per

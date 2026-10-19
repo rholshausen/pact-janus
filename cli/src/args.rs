@@ -45,6 +45,8 @@ pub enum Command {
   Explain(ExplainArgs),
   /// Convert a v1-v4 pact into a Janus contract, and say what the conversion could not carry
   Upgrade(UpgradeArgs),
+  /// Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
+  Publish(PublishArgs),
   /// Publish a WASM component to an OCI registry, or fetch one and say what it is
   #[command(subcommand)]
   Component(ComponentCommand),
@@ -62,6 +64,7 @@ impl Command {
       Command::Check(_) => "check",
       Command::Explain(_) => "explain",
       Command::Upgrade(_) => "upgrade",
+      Command::Publish(_) => "publish",
       Command::Component(ComponentCommand::Push(_)) => "component push",
       Command::Component(ComponentCommand::Pull(_)) => "component pull",
       Command::Completions(_) => "completions",
@@ -352,6 +355,89 @@ pub struct UpgradeArgs {
   /// holding both
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
+}
+
+// The options are spelled as today's publisher (`pact-broker publish`, the Pact Broker client)
+// spells them, short forms included, so a consumer's CI script moves by changing the command's
+// name. Its `-h` for --branch is clap's help here, so --branch has no short form. Not carried:
+// --auto-detect-version-properties and --tag-with-git-branch, which read git and CI variables,
+// and --merge, which the protocol has no member for.
+#[derive(Debug, Args)]
+#[command(
+  after_help = "Every contract is published as the broker's 'pact' specification, which every \
+                        Pact Broker accepts. Contracts from several consumers are published one \
+                        consumer at a time, each for the same version.\n\nExit status: 0 \
+                        published; 2 something was not published (the broker refused it or could \
+                        not be reached), or the command could not run."
+)]
+pub struct PublishArgs {
+  /// Janus contracts or v1-v4 pact files, or directories of them
+  #[arg(required = true, value_name = "CONTRACT_OR_PACT")]
+  pub sources: Vec<PathBuf>,
+
+  /// The version of the consumer these contracts belong to
+  #[arg(short = 'a', long, value_name = "VERSION")]
+  pub consumer_app_version: String,
+
+  /// The consumer version's branch
+  #[arg(long, value_name = "BRANCH")]
+  pub branch: Option<String>,
+
+  /// A tag for the consumer version; repeatable, or comma-separated
+  #[arg(short = 't', long = "tag", value_name = "TAG", value_delimiter = ',')]
+  pub tags: Vec<String>,
+
+  /// The build that produced the contracts
+  #[arg(long, value_name = "URL")]
+  pub build_url: Option<String>,
+
+  /// text prints what was published and the broker's notices; json prints one document
+  #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
+  pub output: Output,
+
+  /// The Pact Broker's base URL
+  #[arg(
+    short = 'b',
+    long,
+    value_name = "URL",
+    env = "PACT_BROKER_BASE_URL",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_base_url: String,
+
+  /// The broker's username, for basic authentication
+  #[arg(
+    short = 'u',
+    long,
+    value_name = "USER",
+    env = "PACT_BROKER_USERNAME",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_username: Option<String>,
+
+  /// The broker's password, for basic authentication
+  #[arg(
+    short = 'p',
+    long,
+    value_name = "PASSWORD",
+    env = "PACT_BROKER_PASSWORD",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_password: Option<String>,
+
+  /// A bearer token for the broker; used instead of --broker-username when both are given
+  #[arg(
+    short = 'k',
+    long,
+    value_name = "TOKEN",
+    env = "PACT_BROKER_TOKEN",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_token: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]

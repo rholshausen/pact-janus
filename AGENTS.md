@@ -285,6 +285,9 @@ janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <
             [--as-of <YYYY-MM-DD>] [--output text|json]
 janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
 janus upgrade <pact.json> [--write <file>] [--quiet] [--output text|json]
+janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>
+              [--branch <b>] [--tag <t>]... [--build-url <url>]
+              [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings
 janus component push <component.wasm> <reference> [--output text|json]
 janus component pull <reference> [--digest <sha256:...>] [--output text|json]
 janus completions <shell>
@@ -327,6 +330,11 @@ one nobody declared, fails before anything runs, as `component-unavailable` nami
 third-party component is `third-party/janus-csv`: its own workspace, built with
 `cargo build --release --target wasm32-wasip2` from its directory, and built again by the tests
 that load it.
+
+`janus publish` (S1.3) publishes through the engine's broker client (`broker/publish-contracts`), as
+`verify --broker-url` fetches through it: no command speaks the Pact Broker's API itself. Its live
+tests run against the pinned broker when `JANUS_PACT_BROKER` names it (CI's `verifier-diff` job), and
+skip otherwise.
 
 `janus component push|pull` (plan task 8.2) is the one command that does not speak the protocol —
 publishing is not an engine operation. `push` writes the artifact's config from the component's own

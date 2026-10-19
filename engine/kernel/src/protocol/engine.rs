@@ -3,6 +3,7 @@
 //! additional rules" beyond the call pipe itself) — JSON bytes in, JSON bytes out — deliberately
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
+use super::broker::{self as broker_ops, PublishContracts};
 use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
 use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
@@ -82,6 +83,10 @@ pub struct Engine {
   /// capability, as the hook implementations are. With none, every broker-facing request is
   /// `component-unavailable` naming `broker`, and `engine/hello` declares no `broker` capability.
   broker: Option<Arc<dyn BrokerClient>>,
+  /// Broker sessions by id (spec §7.3's fourth kind): one publication each, ended at its terminal
+  /// event as a verification session is, and pruned by [`Engine::handle_poll`] on the same edge.
+  publications: HashMap<String, Run>,
+  next_publication: u64,
 }
 
 /// The version an in-tree component answers requirements with. In-tree components ship with the
@@ -118,6 +123,8 @@ impl Engine {
       recordings: HashMap::new(),
       next_recording: 0,
       broker: None,
+      publications: HashMap::new(),
+      next_publication: 0,
     }
   }
 
@@ -158,6 +165,8 @@ impl Engine {
       recordings: HashMap::new(),
       next_recording: 0,
       broker: None,
+      publications: HashMap::new(),
+      next_publication: 0,
     }
   }
 
@@ -279,13 +288,7 @@ impl Engine {
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
-      // Spec §8.7: every engine knows the broker operations; one with no broker client answers
-      // them by naming the component. One with a client cannot publish contracts until the rest
-      // of staged plan S1.3 builds it, and says that instead.
-      "broker/publish-contracts" => match self.broker {
-        None => ResponseFrame::err(id, EngineError::broker_unavailable("publish contracts")),
-        Some(_) => ResponseFrame::err(id, EngineError::operation_unsupported("broker/publish-contracts")),
-      },
+      "broker/publish-contracts" => self.handle_publish_contracts(id, body),
       "verification/explain" => self.handle_explain(id, body),
       "provider-shape-session/create" => self.handle_create_recording(id, body),
       "provider-shape-session/observe" => self.handle_observe(id, body),
@@ -326,6 +329,7 @@ impl Engine {
     self.sessions.end_all();
     self.streams.clear();
     self.verifications.clear();
+    self.publications.clear();
     self.recordings.clear();
     self.shut_down = true;
     tracing::info!("engine/shutdown: all sessions released");
@@ -643,6 +647,30 @@ impl Engine {
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
   }
 
+  /// `broker/publish-contracts` (spec §8.7): check the contracts, start the publication in a broker
+  /// session, and answer with the session and its stream. Every engine knows the operation; one
+  /// with no broker client answers it by naming the component.
+  fn handle_publish_contracts(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: PublishContracts = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(client) = self.broker.clone() else {
+      return ResponseFrame::err(id, EngineError::broker_unavailable("publish contracts"));
+    };
+    let publication = match req.prepare() {
+      Ok(publication) => publication,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    self.next_publication += 1;
+    let session = format!("bs-{}", self.next_publication);
+    let stream = self.open_stream();
+    let run = broker_ops::start(client, publication, stream);
+    let stream_id = run.stream.id().to_string();
+    self.publications.insert(session.clone(), run);
+    ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
+  }
+
   /// Allocate and register a stream for work a session is about to start (spec §9.1: ids are
   /// engine-assigned, opaque and scoped to their session). The caller keeps the returned handle to
   /// emit on; the engine keeps its twin so `events/poll` can find it.
@@ -870,6 +898,19 @@ impl Engine {
           && run.thread.join().is_err()
         {
           tracing::error!(session = %session, "the verification run's thread panicked");
+        }
+      }
+      let publications: Vec<String> = self
+        .publications
+        .iter()
+        .filter(|(_, run)| run.stream.id() == stream_id)
+        .map(|(session, _)| session.clone())
+        .collect();
+      for session in publications {
+        if let Some(run) = self.publications.remove(&session)
+          && run.thread.join().is_err()
+        {
+          tracing::error!(session = %session, "the publication's thread panicked");
         }
       }
     }

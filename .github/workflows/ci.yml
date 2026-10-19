@@ -162,6 +162,12 @@ jobs:
         run: cargo build --package pact_janus_cli --bin janus
       - name: Compare
         run: cargo run --package pact_janus_verifier_diff -- run --json target/verifier-diff.json
+      - name: Publish to the broker, and verify from it
+        # `janus publish` a pact and a Janus contract, then `janus verify --broker-url` over what the
+        # broker serves back (S1.3). The same tests skip wherever JANUS_PACT_BROKER is unset.
+        run: cargo test --package pact_janus_cli --test cli -- broker
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

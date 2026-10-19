@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_broker_client"
-description = "The Pact Broker client (staged plan S1.3, ADR 0032): the kernel's broker trait over the broker's HAL API — fetching pacts for verification and publishing results. A native host capability, registered by both native binaries, because the kernel knows no HTTP."
+description = "The Pact Broker client (staged plan S1.3, ADR 0032): the kernel's broker trait over the broker's HAL API — fetching pacts for verification, publishing results, and publishing contracts. A native host capability, registered by both native binaries, because the kernel knows no HTTP."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,6 +15,8 @@ serde_json = "1"
 ureq = "3"
 # Basic credentials. Already in the tree.
 base64 = "0.22"
+# A publication to a broker that reads compressed bodies. Already in the tree, through ureq.
+flate2 = "1"
 tracing = "0.1"
 
 [dev-dependencies]

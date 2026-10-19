@@ -3,7 +3,7 @@
 //! (`tools/verifier-diff`'s broker cases); these pin its own behaviour and its errors.
 
 use super::*;
-use pact_janus_kernel::broker::InteractionResult;
+use pact_janus_kernel::broker::{ContractToPublish, InteractionResult};
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 use std::sync::{Arc, Mutex};
@@ -218,4 +218,223 @@ fn basic_credentials_are_encoded_and_bearer_ones_passed_through() {
     authorization(&descriptor("http://b")).as_deref(),
     Some("Bearer s3cret")
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Publishing contracts
+// ---------------------------------------------------------------------------------------------
+
+/// How the publishing stub behaves.
+#[derive(Clone, Default)]
+struct Publishing {
+  /// The index's `Accept-Encoding`, when it sends one (RFC 7694).
+  accept_encoding: Option<&'static str>,
+  /// Answer a gzipped publication with 415, as a broker that cannot read one should.
+  refuse_gzip: bool,
+  /// The index has no `pb:publish-contracts` link, as before Pact Broker 2.86.0.
+  no_link: bool,
+  /// What the publication is answered with, when not 200 and the notices below.
+  refusal: Option<(u16, Value)>,
+}
+
+/// One request the publishing stub saw: method, path, its `Content-Encoding`, and its body,
+/// decompressed.
+type Recorded = Arc<Mutex<Vec<(String, String, Option<String>, Value)>>>;
+
+fn publishing_stub(behaviour: Publishing) -> (String, Recorded) {
+  let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+  let base = format!("http://{}", server.server_addr().to_ip().unwrap());
+  let seen: Recorded = Arc::default();
+  let record = Arc::clone(&seen);
+  let me = base.clone();
+  std::thread::spawn(move || {
+    for mut request in server.incoming_requests() {
+      let mut bytes = Vec::new();
+      let _ = request.as_reader().read_to_end(&mut bytes);
+      let encoding = request
+        .headers()
+        .iter()
+        .find(|header| header.field.equiv("content-encoding"))
+        .map(|header| header.value.as_str().to_string());
+      let body = match encoding.as_deref() {
+        Some("gzip") => {
+          let mut text = String::new();
+          let _ =
+            std::io::Read::read_to_string(&mut flate2::read::GzDecoder::new(bytes.as_slice()), &mut text);
+          text
+        }
+        _ => String::from_utf8_lossy(&bytes).to_string(),
+      };
+      let path = request.url().to_string();
+      record.lock().unwrap().push((
+        request.method().as_str().to_string(),
+        path.clone(),
+        encoding.clone(),
+        serde_json::from_str(&body).unwrap_or(Value::Null),
+      ));
+      let (status, answer) = match path.as_str() {
+        "/" if behaviour.no_link => (200, json!({ "_links": {} })),
+        "/" => (
+          200,
+          json!({ "_links": { "pb:publish-contracts": { "href": format!("{me}/contracts/publish") } } }),
+        ),
+        _ if behaviour.refuse_gzip && encoding.as_deref() == Some("gzip") => (415, json!({})),
+        _ => behaviour.refusal.clone().unwrap_or((
+          200,
+          json!({ "notices": [
+            { "type": "success", "text": "Pact successfully published for web version 1.0.0 and provider order api." },
+            { "type": "prompt", "text": "  Next steps:" }
+          ] }),
+        )),
+      };
+      let mut response = tiny_http::Response::from_string(answer.to_string())
+        .with_status_code(status)
+        .with_header(tiny_http::Header::from_bytes("Content-Type", "application/hal+json").unwrap());
+      if let (Some(accept), "/") = (behaviour.accept_encoding, path.as_str()) {
+        response = response.with_header(tiny_http::Header::from_bytes("Accept-Encoding", accept).unwrap());
+      }
+      let _ = request.respond(response);
+    }
+  });
+  (base, seen)
+}
+
+fn contracts() -> Vec<ContractToPublish> {
+  vec![
+    ContractToPublish {
+      provider: "order api".to_string(),
+      content: br#"{"consumer":{"name":"web"},"interactions":[],"provider":{"name":"order api"}}"#.to_vec(),
+    },
+    ContractToPublish {
+      provider: "stock api".to_string(),
+      content: br#"{"$format":"janus-contract/1","consumer":{"name":"web"},"interactions":[],"provider":{"name":"stock api"}}"#.to_vec(),
+    },
+  ]
+}
+
+fn publish(url: &str) -> Result<ContractsPublished, ComponentError> {
+  let broker = descriptor(url);
+  let tags = vec!["v1".to_string()];
+  HalBrokerClient::new().publish_contracts(&ContractsToPublish {
+    broker: &broker,
+    consumer: "web",
+    consumer_version: "1.0.0",
+    branch: Some("main"),
+    tags: &tags,
+    build_url: Some("https://ci.example/7"),
+    contracts: &contracts(),
+  })
+}
+
+#[test]
+fn a_publication_posts_every_contract_as_a_pact_in_one_request_as_todays_clients_do() {
+  let (url, seen) = publishing_stub(Publishing::default());
+  let published = publish(&url).unwrap();
+  assert_eq!(
+    published.notices,
+    vec![
+      "Pact successfully published for web version 1.0.0 and provider order api.".to_string(),
+      "  Next steps:".to_string(),
+    ]
+  );
+
+  let seen = seen.lock().unwrap();
+  let requests: Vec<(&str, &str)> = seen.iter().map(|(m, p, _, _)| (m.as_str(), p.as_str())).collect();
+  assert_eq!(requests, vec![("GET", "/"), ("POST", "/contracts/publish")]);
+  assert_eq!(seen[1].2, None, "nothing said the broker reads a compressed body");
+  let encoded: Vec<String> = contracts()
+    .iter()
+    .map(|contract| BASE64.encode(&contract.content))
+    .collect();
+  assert_eq!(
+    seen[1].3,
+    json!({
+      "pacticipantName": "web",
+      "pacticipantVersionNumber": "1.0.0",
+      "branch": "main",
+      "tags": ["v1"],
+      "buildUrl": "https://ci.example/7",
+      "contracts": [
+        { "consumerName": "web", "providerName": "order api", "specification": "pact",
+          "contentType": "application/json", "content": encoded[0] },
+        { "consumerName": "web", "providerName": "stock api", "specification": "pact",
+          "contentType": "application/json", "content": encoded[1] },
+      ],
+    })
+  );
+}
+
+#[test]
+fn a_broker_that_says_it_reads_gzip_is_sent_the_publication_compressed() {
+  let (url, seen) = publishing_stub(Publishing {
+    accept_encoding: Some("gzip"),
+    ..Publishing::default()
+  });
+  publish(&url).unwrap();
+  let seen = seen.lock().unwrap();
+  assert_eq!(seen[1].2.as_deref(), Some("gzip"));
+  assert_eq!(
+    seen[1].3["pacticipantName"], "web",
+    "the body decompresses to the same request"
+  );
+}
+
+#[test]
+fn a_compressed_publication_refused_as_unsupported_is_sent_again_uncompressed() {
+  let (url, seen) = publishing_stub(Publishing {
+    accept_encoding: Some("gzip"),
+    refuse_gzip: true,
+    ..Publishing::default()
+  });
+  publish(&url).unwrap();
+  let seen = seen.lock().unwrap();
+  let encodings: Vec<Option<&str>> = seen[1..].iter().map(|(_, _, e, _)| e.as_deref()).collect();
+  assert_eq!(encodings, vec![Some("gzip"), None]);
+}
+
+#[test]
+fn a_broker_older_than_the_publish_contracts_api_is_named_as_such() {
+  let (url, _) = publishing_stub(Publishing {
+    no_link: true,
+    ..Publishing::default()
+  });
+  let err = publish(&url).unwrap_err();
+  assert_eq!(err.code, "broker-response-invalid");
+  assert!(err.message.contains("2.86.0"), "{}", err.message);
+}
+
+#[test]
+fn a_publication_the_broker_will_not_take_is_refused_in_its_own_words() {
+  let (url, _) = publishing_stub(Publishing {
+    refusal: Some((
+      409,
+      json!({
+        "notices": [{ "type": "error", "text": "Cannot change the content of the pact for web version 1.0.0" }],
+        "errors": { "contracts": ["Cannot change the content of the pact for web version 1.0.0"] }
+      }),
+    )),
+    ..Publishing::default()
+  });
+  let err = publish(&url).unwrap_err();
+  assert_eq!(err.code, "broker-refused");
+  assert_eq!(err.details.as_ref().unwrap()["status"], 409);
+  assert!(
+    err
+      .message
+      .ends_with("with 409: contracts: Cannot change the content of the pact for web version 1.0.0"),
+    "{}",
+    err.message
+  );
+}
+
+#[rstest]
+#[case("gzip", true)]
+#[case("identity, GZIP", true)]
+#[case("gzip;q=0.5, identity", true)]
+#[case("x-gzip", true)]
+#[case("gzip;q=0", false)]
+#[case("identity", false)]
+#[case("", false)]
+fn accept_encoding_names_gzip_only_with_a_weight_above_zero(#[case] value: &str, #[case] names: bool) {
+  assert_eq!(names_gzip(value), names);
 }

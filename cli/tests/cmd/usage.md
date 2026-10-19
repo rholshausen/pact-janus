@@ -19,6 +19,8 @@ Commands:
   explain      Print the plan the engine will execute for one interaction
   upgrade      Convert a v1-v4 pact into a Janus contract, and say what the conversion could not
                carry
+  publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
+               consumer
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
@@ -180,6 +182,20 @@ error: the following required arguments were not provided:
   --provider-version <VERSION>
 
 Usage: janus verify --provider-url <URL> --broker-url <URL> --provider-name <NAME> --provider-version <VERSION> --publish [CONTRACT_OR_PACT]...
+
+For more information, try '--help'.
+
+```
+
+Publishing contracts needs the consumer version they belong to.
+
+```console
+$ janus publish pact.json --broker-base-url http://127.0.0.1:2
+? 2
+error: the following required arguments were not provided:
+  --consumer-app-version <VERSION>
+
+Usage: janus publish --consumer-app-version <VERSION> --broker-base-url <URL> <CONTRACT_OR_PACT>...
 
 For more information, try '--help'.
 

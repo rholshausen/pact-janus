@@ -15,6 +15,10 @@
 //! Also here: the subsumption operations ([`subsumption`], plan task 7.4) — the walk design 2.8
 //! §3 defines, and the `can-i-deploy` decision over its reports — session-less, like `upgrade`.
 //!
+//! Also here: `broker/publish-contracts` ([`broker`], staged plan S1.3) — a consumer's contracts
+//! published to a Pact Broker through the broker client a native embedding registers, reported on
+//! a stream as a verification run is.
+//!
 //! Also here: `verification/explain` ([`explain`], plan task 5.5) — one interaction compiled to a
 //! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
 //! the session-less v1–v4 conversion ([`crate::upgrade`]).
@@ -24,6 +28,7 @@
 //! here — `start-transport` only drives passive HTTP today, one armed exchange at a time per
 //! transport instance, which is what a sequential `serve-variant` loop actually needs.
 
+mod broker;
 mod consumer_session;
 mod contributions;
 mod engine;

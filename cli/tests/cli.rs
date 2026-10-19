@@ -1,7 +1,8 @@
 //! Plan task 5.5: the `janus` CLI, run as a binary — `verify`, `explain` and `upgrade` against a
 //! real provider on a real socket — and plan task 7.4's `check`, which is the one command whose
 //! subject is a *decision* over documents rather than a running provider. Plan task 8.2 adds
-//! `component push|pull`, and a verification whose component comes from an OCI registry.
+//! `component push|pull`, and a verification whose component comes from an OCI registry. Staged plan
+//! S1.3 adds `publish`, and a verification from the Pact Broker it published to.
 //!
 //! These drive the *shipped executable*, not a library function, because the surface under test is
 //! the command: its flags, its output and its exit code. A CI script depends on all three, and a
@@ -526,6 +527,149 @@ fn a_pact_and_the_contract_it_upgrades_into_verify_the_same_provider() {
       stdout(&output)
     );
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// publish, and verify from a broker (staged plan S1.3)
+// ---------------------------------------------------------------------------------------------
+
+/// The Pact Broker `JANUS_PACT_BROKER` names: CI's `verifier-diff` job starts the pinned one
+/// (`.github/scripts/pact-broker.sh start`). With none, the tests that need it say so and pass.
+fn pact_broker() -> Option<String> {
+  std::env::var("JANUS_PACT_BROKER")
+    .ok()
+    .filter(|url| !url.is_empty())
+}
+
+/// A name no earlier run left in the broker, which keeps what it already holds.
+fn unique(name: &str) -> String {
+  let nanos = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|elapsed| elapsed.as_nanos())
+    .unwrap_or_default();
+  format!("{name}-{}-{nanos}", std::process::id())
+}
+
+/// The loop a consumer and a provider run between them through a broker: the consumer publishes a
+/// v3 pact and the Janus contract it upgrades into, and the provider verifies both, fetched back.
+/// What the broker serves is not what was published (it adds its links, and an `_id` to every
+/// interaction), so this is the test that a Janus contract survives the round trip.
+#[test]
+fn a_pact_and_a_contract_published_to_a_broker_verify_when_fetched_back() {
+  let Some(broker) = pact_broker() else {
+    eprintln!("skipped: JANUS_PACT_BROKER names no Pact Broker");
+    return;
+  };
+  let provider = provider();
+  let config = state_config(&provider);
+  let provider_name = unique("order-service");
+  let pact_consumer = unique("web-app");
+  let contract_consumer = unique("web-app-janus");
+
+  let mut pact: Value =
+    serde_json::from_str(&std::fs::read_to_string(order_pact()).expect("the pact")).expect("json");
+  pact["consumer"]["name"] = json!(pact_consumer);
+  pact["provider"]["name"] = json!(provider_name);
+  let pact_file = temp("published-pact.json");
+  std::fs::write(&pact_file, pact.to_string()).expect("writing the pact");
+  let contract_file = temp("published-contract.json");
+  let converted = janus(&["upgrade", &pact_file, "--write", &contract_file, "--quiet"]);
+  assert_eq!(code(&converted), 0, "{}", stderr(&converted));
+  let mut contract: Value =
+    serde_json::from_str(&std::fs::read_to_string(&contract_file).expect("the contract")).expect("json");
+  contract["consumer"]["name"] = json!(contract_consumer);
+  std::fs::write(&contract_file, contract.to_string()).expect("writing the contract");
+
+  let published = janus(&[
+    "publish",
+    &pact_file,
+    &contract_file,
+    "--consumer-app-version",
+    "1.0.0",
+    "--branch",
+    "main",
+    "--broker-base-url",
+    &broker,
+  ]);
+  assert_eq!(
+    code(&published),
+    0,
+    "{}\n{}",
+    stdout(&published),
+    stderr(&published)
+  );
+  for consumer in [&pact_consumer, &contract_consumer] {
+    assert!(
+      stdout(&published).contains(&format!("published {consumer} -> {provider_name}")),
+      "{}",
+      stdout(&published)
+    );
+  }
+
+  let verified = janus(&[
+    "verify",
+    "--broker-url",
+    &broker,
+    "--provider-name",
+    &provider_name,
+    "--consumer-version-selectors",
+    r#"{"branch":"main"}"#,
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--output",
+    "json",
+  ]);
+  let summary: Value = serde_json::from_str(&stdout(&verified))
+    .unwrap_or_else(|err| panic!("{err}: {}\n{}", stdout(&verified), stderr(&verified)));
+  assert_eq!(code(&verified), 0, "{summary:#}\n{}", stderr(&verified));
+  let mut consumers: Vec<&str> = summary["pairs"]
+    .as_array()
+    .expect("pairs")
+    .iter()
+    .map(|pair| {
+      assert_eq!(pair["status"], "verified", "{pair}");
+      pair["consumer"].as_str().unwrap()
+    })
+    .collect();
+  consumers.sort();
+  assert_eq!(
+    consumers,
+    vec![pact_consumer.as_str(), contract_consumer.as_str()]
+  );
+}
+
+#[test]
+fn publishing_to_a_broker_nobody_answers_for_fails_and_names_it() {
+  let output = janus(&[
+    "publish",
+    &order_pact(),
+    "--consumer-app-version",
+    "1.0.0",
+    "--broker-base-url",
+    "http://u:hunter2@127.0.0.1:1",
+  ]);
+  assert_eq!(code(&output), 2, "{}", stdout(&output));
+  assert!(
+    stdout(&output).contains("FAILED    web-app -> order-service"),
+    "{}",
+    stdout(&output)
+  );
+  assert!(
+    stdout(&output).contains("broker-unreachable"),
+    "{}",
+    stdout(&output)
+  );
+  assert!(
+    stderr(&output).contains("janus publish: the broker did not accept web-app's contracts"),
+    "{}",
+    stderr(&output)
+  );
+  assert!(
+    !stdout(&output).contains("hunter2") && !stderr(&output).contains("hunter2"),
+    "a credential in the output"
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -9,7 +9,15 @@
 //!   selected pact by its `self` link;
 //! - **publish**: the provider version's branch and tags through the pact's `pb:provider`, then
 //!   the result to the pact's own `pb:publish-verification-results` link, one entry per
-//!   interaction, keyed by the broker's interaction ids.
+//!   interaction, keyed by the broker's interaction ids;
+//! - **publish contracts**: the index's `pb:publish-contracts` link, with every contract in one
+//!   `POST`, each as the broker's `pact` specification (ADR 0011 decision 6), as Pact-JVM and the
+//!   Pact Broker client publish today.
+//!
+//! A publication is compressed only when the broker says it can read one so (RFC 7694: an
+//! `Accept-Encoding` naming `gzip` on the index's response), and sent again uncompressed if it then
+//! answers 415. No broker says so today: Pact Broker 2.121.2 reads a gzipped body as JSON and
+//! refuses it (staged plan S1.3).
 //!
 //! Every failure is a value, the client's own error document (engine-protocol spec §10.2):
 //! `broker-unreachable` when nothing answered, `broker-refused` when the broker said no, and
@@ -21,7 +29,10 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use pact_janus_kernel::broker::{BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, PublishRequest};
+use pact_janus_kernel::broker::{
+  BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
+  PublishRequest,
+};
 use pact_janus_kernel::component::ComponentError;
 use serde_json::{Map, Value, json};
 use std::time::Duration;
@@ -156,6 +167,100 @@ impl BrokerClient for HalBrokerClient {
     self.send(broker, "POST", &absolute(broker, link), Some(&payload(request)))?;
     Ok(())
   }
+
+  fn publish_contracts(
+    &self,
+    request: &ContractsToPublish<'_>,
+  ) -> Result<ContractsPublished, ComponentError> {
+    let broker = request.broker;
+    let index = self.exchange(broker, "GET", &broker.url, None, false)?;
+    let link = href(&index.document, "pb:publish-contracts").ok_or_else(|| {
+      invalid(
+        broker,
+        "the broker's index has no 'pb:publish-contracts' link: publishing contracts needs Pact Broker 2.86.0 or later",
+      )
+    })?;
+    let url = absolute(broker, &link);
+
+    let mut body = Map::new();
+    body.insert("pacticipantName".to_string(), json!(request.consumer));
+    body.insert(
+      "pacticipantVersionNumber".to_string(),
+      json!(request.consumer_version),
+    );
+    if let Some(branch) = request.branch {
+      body.insert("branch".to_string(), json!(branch));
+    }
+    if !request.tags.is_empty() {
+      body.insert("tags".to_string(), json!(request.tags));
+    }
+    if let Some(build_url) = request.build_url {
+      body.insert("buildUrl".to_string(), json!(build_url));
+    }
+    let contracts: Vec<Value> = request
+      .contracts
+      .iter()
+      .map(|contract| {
+        json!({
+          "consumerName": request.consumer,
+          "providerName": contract.provider,
+          "specification": "pact",
+          "contentType": "application/json",
+          "content": BASE64.encode(&contract.content),
+        })
+      })
+      .collect();
+    body.insert("contracts".to_string(), Value::Array(contracts));
+    let body = Value::Object(body);
+
+    let answer = match self.exchange(broker, "POST", &url, Some(&body), index.accepts_gzip) {
+      Err(error) if index.accepts_gzip && error.details.as_ref().is_some_and(|d| d["status"] == 415) => {
+        tracing::debug!("the broker refused a compressed publication; sending it again uncompressed");
+        self.exchange(broker, "POST", &url, Some(&body), false)?
+      }
+      answer => answer?,
+    };
+    Ok(ContractsPublished {
+      notices: answer.document["notices"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|notice| notice["text"].as_str().map(str::to_string))
+        .collect(),
+    })
+  }
+}
+
+/// A broker's answer: the document, and whether it said it reads gzipped request bodies.
+struct Answer {
+  document: Value,
+  accepts_gzip: bool,
+}
+
+/// Whether an `Accept-Encoding` value names gzip with a weight above zero (RFC 7694 §3).
+fn names_gzip(value: &str) -> bool {
+  value.split(',').any(|coding| {
+    let mut parts = coding.split(';');
+    let name = parts.next().unwrap_or_default().trim();
+    let refused = parts.any(|parameter| {
+      parameter
+        .trim()
+        .strip_prefix("q=")
+        .and_then(|weight| weight.trim().parse::<f32>().ok())
+        .is_some_and(|weight| weight == 0.0)
+    });
+    (name.eq_ignore_ascii_case("gzip") || name.eq_ignore_ascii_case("x-gzip")) && !refused
+  })
+}
+
+fn gzip(bytes: &[u8]) -> Vec<u8> {
+  use flate2::Compression;
+  use flate2::write::GzEncoder;
+  use std::io::Write;
+  let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+  // Writing to a Vec cannot fail.
+  let _ = encoder.write_all(bytes);
+  encoder.finish().unwrap_or_default()
 }
 
 /// The verification result the broker reads (its `VerificationContract`): the outcome, who verified
@@ -230,8 +335,26 @@ impl HalBrokerClient {
     url: &str,
     body: Option<&Value>,
   ) -> Result<Value, ComponentError> {
+    self
+      .exchange(broker, method, url, body, false)
+      .map(|answer| answer.document)
+  }
+
+  /// [`HalBrokerClient::send`], with the body gzipped when `compress` says so, and what the
+  /// broker's answer said about compression.
+  fn exchange(
+    &self,
+    broker: &BrokerDescriptor,
+    method: &str,
+    url: &str,
+    body: Option<&Value>,
+    compress: bool,
+  ) -> Result<Answer, ComponentError> {
     let shown = pact_janus_kernel::broker::without_userinfo(url);
-    let payload = body.map(|body| serde_json::to_vec(body).unwrap_or_default());
+    let payload = body.map(|body| {
+      let bytes = serde_json::to_vec(body).unwrap_or_default();
+      if compress { gzip(&bytes) } else { bytes }
+    });
     let mut last = None;
     for attempt in 1..=ATTEMPTS {
       if attempt > 1 {
@@ -247,6 +370,9 @@ impl HalBrokerClient {
         );
       if payload.is_some() {
         request = request.header("content-type", "application/json");
+        if compress {
+          request = request.header("content-encoding", "gzip");
+        }
       }
       if let Some(authorization) = authorization(broker) {
         request = request.header("authorization", authorization);
@@ -270,6 +396,12 @@ impl HalBrokerClient {
         Ok(Ok(response)) => response,
       };
       let status = response.status().as_u16();
+      let accepts_gzip = response
+        .headers()
+        .get_all("accept-encoding")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .any(names_gzip);
       let text = response.body_mut().read_to_string().unwrap_or_default();
       if status >= 500 || status == 429 {
         tracing::debug!(%method, url = %shown, attempt, status, "the broker is unavailable");
@@ -280,14 +412,22 @@ impl HalBrokerClient {
         return Err(refused(broker, method, &shown, status, &text));
       }
       if text.trim().is_empty() {
-        return Ok(Value::Null);
+        return Ok(Answer {
+          document: Value::Null,
+          accepts_gzip,
+        });
       }
-      return serde_json::from_str(&text).map_err(|err| {
-        invalid(
-          broker,
-          &format!("{method} {shown} answered something that is not JSON: {err}"),
-        )
-      });
+      return serde_json::from_str(&text)
+        .map(|document| Answer {
+          document,
+          accepts_gzip,
+        })
+        .map_err(|err| {
+          invalid(
+            broker,
+            &format!("{method} {shown} answered something that is not JSON: {err}"),
+          )
+        });
     }
     Err(last.unwrap_or_else(|| unreachable(broker, &format!("{method} {shown}"))))
   }
@@ -390,16 +530,9 @@ fn unreachable(broker: &BrokerDescriptor, message: &str) -> ComponentError {
 fn refused(broker: &BrokerDescriptor, method: &str, url: &str, status: u16, body: &str) -> ComponentError {
   // The broker's own explanation, when it gave one, is the most useful thing to show.
   let said: Option<String> = serde_json::from_str::<Value>(body).ok().and_then(|value| {
-    value["errors"]
-      .as_array()
-      .map(|errors| {
-        errors
-          .iter()
-          .map(|e| e.as_str().map_or_else(|| e.to_string(), str::to_string))
-          .collect::<Vec<_>>()
-          .join("; ")
-      })
+    errors(&value["errors"])
       .or_else(|| value["error"]["message"].as_str().map(str::to_string))
+      .or_else(|| value["error"].as_str().map(str::to_string))
       .or_else(|| value["title"].as_str().map(str::to_string))
   });
   let message = match &said {
@@ -410,6 +543,27 @@ fn refused(broker: &BrokerDescriptor, method: &str, url: &str, status: u16, body
     None => format!("the Pact Broker answered {method} {url} with {status}"),
   };
   error(broker, "broker-refused", message, json!({ "status": status }))
+}
+
+/// The broker's `errors`, as one line: a list of messages, or, from a request it would not accept,
+/// messages by the member they are about (`{"contracts": ["..."]}`).
+fn errors(errors: &Value) -> Option<String> {
+  let text = |value: &Value| value.as_str().map_or_else(|| value.to_string(), str::to_string);
+  let said: Vec<String> = match errors {
+    Value::Array(messages) => messages.iter().map(text).collect(),
+    Value::Object(members) => members
+      .iter()
+      .flat_map(|(member, messages)| match messages {
+        Value::Array(messages) => messages
+          .iter()
+          .map(|message| format!("{member}: {}", text(message)))
+          .collect::<Vec<_>>(),
+        message => vec![format!("{member}: {}", text(message))],
+      })
+      .collect(),
+    _ => return None,
+  };
+  (!said.is_empty()).then(|| said.join("; "))
 }
 
 fn invalid(broker: &BrokerDescriptor, message: &str) -> ComponentError {

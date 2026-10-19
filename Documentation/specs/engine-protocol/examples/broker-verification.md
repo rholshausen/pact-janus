@@ -170,7 +170,8 @@ contract's interior is sketched; its shape is design 2.5's:
   "body": { "streams": ["s-2"], "wait-ms": 500 } }
 ```
 
-`←` one event per contract, and the terminal event, which ends the broker session:
+`←` one event per contract, and the terminal event, which ends the broker session. It names the
+broker by its URL alone, and carries what the broker said, as text:
 
 ```json
 { "type": "response", "id": "r-6",
@@ -178,6 +179,9 @@ contract's interior is sketched; its shape is design 2.5's:
     { "stream": "s-2", "seq": 1, "kind": "broker/published",
       "payload": { "consumer": "web-app", "provider": "order-api", "outcome": "published" } },
     { "stream": "s-2", "seq": 2, "kind": "broker/finished", "last": true,
-      "payload": { "status": "published",
-                   "contracts": [ { "consumer": "web-app", "provider": "order-api", "outcome": "published" } ] } } ] } }
+      "payload": { "status": "published", "broker": "https://broker.example.com",
+                   "consumer": "web-app", "consumer-version": "2.7.0+8d1e44b",
+                   "contracts": [ { "consumer": "web-app", "provider": "order-api", "outcome": "published" } ],
+                   "notices": [ "Created web-app version 2.7.0+8d1e44b with branch main",
+                                "Pact successfully published for web-app version 2.7.0+8d1e44b and provider order-api." ] } } ] } }
 ```

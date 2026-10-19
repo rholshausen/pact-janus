@@ -17,6 +17,8 @@ Commands:
   explain      Print the plan the engine will execute for one interaction
   upgrade      Convert a v1-v4 pact into a Janus contract, and say what the conversion could not
                carry
+  publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
+               consumer
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
@@ -175,6 +177,46 @@ Options:
 A converted pact has one variant per interaction, because one example is one variant; growing it is
 the consumer test suite's job. Verifying a pact needs no conversion: janus verify reads v1-v4 pacts
 directly.
+
+```
+
+```console
+$ janus publish --help
+Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
+
+Usage: janus publish [OPTIONS] --consumer-app-version <VERSION> --broker-base-url <URL> <CONTRACT_OR_PACT>...
+
+Arguments:
+  <CONTRACT_OR_PACT>...  Janus contracts or v1-v4 pact files, or directories of them
+
+Options:
+  -a, --consumer-app-version <VERSION>  The version of the consumer these contracts belong to
+      --log-level <LEVEL>               How much to log on standard error. Without it, RUST_LOG is
+                                        read; the default is warn [possible values: error, warn,
+                                        info, debug, trace]
+      --branch <BRANCH>                 The consumer version's branch
+  -t, --tag <TAG>                       A tag for the consumer version; repeatable, or
+                                        comma-separated
+      --build-url <URL>                 The build that produced the contracts
+      --output <FORMAT>                 text prints what was published and the broker's notices;
+                                        json prints one document [default: text] [possible values:
+                                        text, json]
+  -h, --help                            Print help
+
+Pact Broker:
+  -b, --broker-base-url <URL>       The Pact Broker's base URL [env: PACT_BROKER_BASE_URL]
+  -u, --broker-username <USER>      The broker's username, for basic authentication [env:
+                                    PACT_BROKER_USERNAME]
+  -p, --broker-password <PASSWORD>  The broker's password, for basic authentication [env:
+                                    PACT_BROKER_PASSWORD]
+  -k, --broker-token <TOKEN>        A bearer token for the broker; used instead of --broker-username
+                                    when both are given [env: PACT_BROKER_TOKEN]
+
+Every contract is published as the broker's 'pact' specification, which every Pact Broker accepts.
+Contracts from several consumers are published one consumer at a time, each for the same version.
+
+Exit status: 0 published; 2 something was not published (the broker refused it or could not be
+reached), or the command could not run.
 
 ```
 

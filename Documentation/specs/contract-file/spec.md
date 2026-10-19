@@ -570,7 +570,10 @@ specification:
 
 One operational note that is not a format concern but bites before any format limit does: brokers
 behind a reverse proxy commonly cap request bodies well below the size a large contract can reach. The
-answer is compression on the publish path, not a different file format.
+answer is compression on the publish path, not a different file format. It needs a broker that reads
+a compressed body, and today's Pact Broker does not, so a publisher compresses only when the broker
+says it can (engine-protocol spec §8.7), and until brokers do, the proxy's cap is the deployment's to
+raise.
 
 ## 10. Versioning and stability
 
