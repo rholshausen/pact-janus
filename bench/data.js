@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792385925178,
+  "lastUpdate": 1792385927288,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -8460,6 +8460,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30142,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2e219d8173b7410b070925f94f74d56ff93e4c0c",
+          "message": "test: S1.3 the broker client's own pact with the Pact Broker, verified by the broker\n\nThe third test layer: engine/broker-client/tests/pact.rs writes the client's consumer pact with\nthe provider \"Pact Broker\" (pact_consumer) and checks the client against it on every system; in\nCI's verifier-diff job today's verifier verifies it against the pinned broker, each provider state\nset up through the broker's API by an endpoint of the test's own. Eleven interactions: the index;\npacts for verification with a pending pact and with a work-in-progress one, and fetching each; the\nprovider, its branch and tag; a verification result; publishing contracts, and a changed republish\nrefused. The parties and state names are the Ruby broker's own (Condor, the Pricing Service), so the\npact can be proposed upstream as it stands. Requests are exact; responses match by type, on only\nwhat the client reads.\n\npact_consumer is pinned to 1.4.10, the release that reads the pact_models the kernel uses, with no\ndefault features (no plugin driver). pact_models moves from 1.3.14 to 1.3.15, whose one change is\nthe fix for interactions duplicated on merge (pact-reference #550), which the pact's scenarios hit;\nthe kernel reads pacts and never merges them, and the corpora and the differential harness are\nunchanged. .cargo/config.toml sets PACT_DO_NOT_TRACK, so no test run sends pact_consumer's usage\nmetrics.\n\nNo-Changeset: test-only, and the one shipped dependency that moves changes only pact merging, which\nthe engine never does.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T15:54:05+11:00",
+          "tree_id": "d40971a3d72ecdfa9b2ad6937ee2efbd4ad5b94e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2e219d8173b7410b070925f94f74d56ff93e4c0c"
+        },
+        "date": 1792385926605,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 48229,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 39820,
             "unit": "requests per second",
             "extra": "engines 4"
           }
