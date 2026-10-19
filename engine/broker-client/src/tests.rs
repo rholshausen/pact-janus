@@ -516,3 +516,194 @@ fn a_5xx_is_retried_until_the_attempts_run_out() {
   assert_eq!(err.details.as_ref().unwrap()["status"], 500);
   assert_eq!(*asked.lock().unwrap(), 3);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Links
+// ---------------------------------------------------------------------------------------------
+
+/// pact_verifier's own cases (`resolve_path_test`, `normalize_path_inner`'s, and the context-path
+/// fetches), as today's verifier resolves them.
+#[rstest]
+#[case("http://b:1234", "http://b:1234/pacts/1", "http://b:1234/pacts/1")]
+#[case("http://b:1234", "http://elsewhere.internal/pacts/1", "http://b:1234/pacts/1")]
+#[case("http://b:1234", "/pacts/1", "http://b:1234/pacts/1")]
+#[case("http://b:1234", "pacts/1", "http://b:1234/pacts/1")]
+#[case("http://b:1234/", "pacts/1", "http://b:1234/pacts/1")]
+#[case("http://b/broker", "http://b/broker/pacts/1", "http://b/broker/pacts/1")]
+#[case(
+  "http://b/broker",
+  "http://elsewhere.internal/pacts/provider/Example%20API/for-verification",
+  "http://b/broker/pacts/provider/Example%20API/for-verification"
+)]
+#[case(
+  "http://b/broker",
+  "http://elsewhere.internal/broker/pacts/1",
+  "http://b/broker/pacts/1"
+)]
+#[case("http://b/broker/", "/pacts/1", "http://b/broker/pacts/1")]
+#[case("http://b/broker", "/brokerage/pacts/1", "http://b/broker/brokerage/pacts/1")]
+#[case("http://b/broker", "pacts/1", "http://b/broker/pacts/1")]
+#[case(
+  "http://b/broker",
+  "http://elsewhere.internal/broker/pacts?page=2&size=10",
+  "http://b/broker/pacts?page=2&size=10"
+)]
+#[case("http://b/broker", "http://elsewhere.internal", "http://b/broker/")]
+fn a_link_is_fetched_from_the_broker_the_user_named(
+  #[case] broker: &str,
+  #[case] link: &str,
+  #[case] fetched: &str,
+) {
+  assert_eq!(absolute(&descriptor(broker), link), fetched);
+}
+
+// ---------------------------------------------------------------------------------------------
+// What a real broker cannot be asked to do (staged plan S1.3, layer 2's hand-written cases)
+// ---------------------------------------------------------------------------------------------
+
+/// A broker that answers each path in `routes` with its status, content type and body, in which
+/// `{me}` is the stub's own URL, and 404 to anything else; it records every request's method and
+/// path, query included.
+fn routes(routes: Vec<(&'static str, u16, &'static str, &'static str)>) -> (String, Arc<Mutex<Vec<String>>>) {
+  let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+  let base = format!("http://{}", server.server_addr().to_ip().unwrap());
+  let seen = Arc::new(Mutex::new(Vec::new()));
+  let record = Arc::clone(&seen);
+  let me = base.clone();
+  std::thread::spawn(move || {
+    for request in server.incoming_requests() {
+      let path = request.url().to_string();
+      record
+        .lock()
+        .unwrap()
+        .push(format!("{} {path}", request.method().as_str()));
+      let (status, content_type, body) = routes
+        .iter()
+        .find(|(route, ..)| *route == path)
+        .map(|(_, status, content_type, body)| (*status, *content_type, body.replace("{me}", &me)))
+        .unwrap_or((404, "application/json", "{}".to_string()));
+      let _ = request.respond(
+        tiny_http::Response::from_string(body)
+          .with_status_code(status)
+          .with_header(tiny_http::Header::from_bytes("Content-Type", content_type).unwrap()),
+      );
+    }
+  });
+  (base, seen)
+}
+
+const INDEX: &str = r#"{ "_links": { "pb:provider-pacts-for-verification": { "href": "{me}/pacts/provider/{provider}/for-verification", "templated": true } } }"#;
+
+fn fetch_from(url: &str) -> Result<Vec<FetchedPact>, ComponentError> {
+  HalBrokerClient::new().fetch_for_verification(&fetch_request(url))
+}
+
+#[test]
+fn a_body_that_is_not_json_is_an_answer_the_client_cannot_read() {
+  let (url, _) = routes(vec![("/", 200, "text/html", "<html>This is not JSON</html>")]);
+  let err = fetch_from(&url).unwrap_err();
+  assert_eq!(err.code, "broker-response-invalid");
+  assert!(err.message.contains("is not JSON"), "{}", err.message);
+}
+
+#[test]
+fn a_broker_without_the_pacts_for_verification_api_is_named_as_too_old() {
+  let (url, _) = routes(vec![("/", 200, "application/hal+json", r#"{ "_links": {} }"#)]);
+  let err = fetch_from(&url).unwrap_err();
+  assert_eq!(err.code, "broker-response-invalid");
+  assert!(
+    err.message.contains("pb:provider-pacts-for-verification"),
+    "{}",
+    err.message
+  );
+}
+
+#[test]
+fn a_selection_that_is_not_hal_is_an_answer_the_client_cannot_read() {
+  let (url, _) = routes(vec![
+    ("/", 200, "application/hal+json", INDEX),
+    (
+      "/pacts/provider/order%20api/for-verification",
+      200,
+      "application/hal+json",
+      r#"{ "_links": { "self": { "href": "{me}/pacts/provider/order%20api/for-verification" } } }"#,
+    ),
+  ]);
+  let err = fetch_from(&url).unwrap_err();
+  assert_eq!(err.code, "broker-response-invalid");
+  assert!(err.message.contains("'_embedded.pacts'"), "{}", err.message);
+}
+
+#[test]
+fn selectors_the_broker_will_not_take_are_refused_in_its_own_words() {
+  let (url, _) = routes(vec![
+    ("/", 200, "application/hal+json", INDEX),
+    (
+      "/pacts/provider/order%20api/for-verification",
+      400,
+      "application/json",
+      r#"{ "errors": { "consumerVersionSelectors.0": ["mainBranch must be true"] } }"#,
+    ),
+  ]);
+  let err = fetch_from(&url).unwrap_err();
+  assert_eq!(err.code, "broker-refused");
+  assert_eq!(err.details.as_ref().unwrap()["status"], 400);
+  assert!(
+    err
+      .message
+      .ends_with("with 400: consumerVersionSelectors.0: mainBranch must be true"),
+    "{}",
+    err.message
+  );
+}
+
+#[test]
+fn a_selection_of_nothing_is_no_pacts_not_an_error() {
+  let (url, _) = routes(vec![
+    ("/", 200, "application/hal+json", INDEX),
+    (
+      "/pacts/provider/order%20api/for-verification",
+      200,
+      "application/hal+json",
+      r#"{ "_embedded": { "pacts": [] } }"#,
+    ),
+  ]);
+  assert!(fetch_from(&url).unwrap().is_empty());
+}
+
+/// A broker at a context path, behind a proxy that does not tell it so: its links name a host the
+/// client cannot reach and leave the context path out. Today's verifier fetches each from the
+/// broker it was given, and so does this client.
+#[test]
+fn a_broker_at_a_context_path_is_reached_through_it_whatever_host_its_links_name() {
+  let (base, seen) = routes(vec![
+    (
+      "/broker",
+      200,
+      "application/hal+json",
+      r#"{ "_links": { "pb:provider-pacts-for-verification": { "href": "http://broker.internal:9292/pacts/provider/{provider}/for-verification", "templated": true } } }"#,
+    ),
+    (
+      "/broker/pacts/provider/order%20api/for-verification",
+      200,
+      "application/hal+json",
+      r#"{ "_embedded": { "pacts": [{ "verificationProperties": {}, "_links": { "self": { "href": "http://broker.internal:9292/pacts/1?ref=x" } } }] } }"#,
+    ),
+    (
+      "/broker/pacts/1?ref=x",
+      200,
+      "application/hal+json",
+      r#"{ "consumer": { "name": "web" }, "provider": { "name": "order api" }, "interactions": [] }"#,
+    ),
+  ]);
+  let fetched = fetch_from(&format!("{base}/broker")).unwrap();
+  assert_eq!(fetched[0].document["consumer"]["name"], "web");
+  assert_eq!(
+    *seen.lock().unwrap(),
+    vec![
+      "GET /broker",
+      "POST /broker/pacts/provider/order%20api/for-verification",
+      "GET /broker/pacts/1?ref=x",
+    ]
+  );
+}

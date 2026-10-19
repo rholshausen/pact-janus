@@ -24,6 +24,9 @@ broker-facing request with `component-unavailable` naming `broker`.
   `verification/published` event, and the summary lists them as `publication`. A publish that
   fails is reported and does not change the verdict. `publish` with an `inline` source is refused
   as `malformed-frame`.
+- **Every link is fetched from the broker you named**, as today's verifier does. Of a link the broker
+  writes, only the path and query are kept, and the broker URL's context path is added when the link
+  lacks it. So a broker behind a proxy that writes links with an internal host name still works.
 - **The client retries only what waiting can fix.** A broker that does not answer, or answers
   with a 5xx, is tried three times in all, with a short backoff. A 429 is retried only when it carries
   `Retry-After`, after that delay. PactFlow answers 429 for a plan's limit, and no retry gets past

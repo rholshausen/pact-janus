@@ -168,6 +168,16 @@ jobs:
         run: cargo test --package pact_janus_cli --test cli -- broker
         env:
           JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+      - name: The broker client's recording, made again
+        # Every other job replays engine/broker-client/tests/recorded/pact-broker.json offline (S1.3's
+        # second layer). Here it is recorded again from the pinned broker, and any difference fails:
+        # record it with the same command and commit the result.
+        run: |
+          cargo test --package pact_janus_broker_client --test recorded
+          git diff --exit-code -- engine/broker-client/tests/recorded
+        env:
+          JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}
+          RECORDINGS: overwrite
       - uses: actions/upload-artifact@v4
         if: always()
         with:

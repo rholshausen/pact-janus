@@ -331,6 +331,15 @@ third-party component is `third-party/janus-csv`: its own workspace, built with
 `cargo build --release --target wasm32-wasip2` from its directory, and built again by the tests
 that load it.
 
+The broker client's own tests replay a scenario recorded from the pinned broker
+(`engine/broker-client/tests/recorded/pact-broker.json`, offline, on every system); CI's
+`verifier-diff` job records it again and fails on any difference. After a deliberate change, or a
+new broker pin, record it with the broker running and read the diff:
+
+```bash
+RECORDINGS=overwrite JANUS_PACT_BROKER=http://127.0.0.1:9292 cargo test -p pact_janus_broker_client --test recorded
+```
+
 `janus publish` (S1.3) publishes through the engine's broker client (`broker/publish-contracts`), as
 `verify --broker-url` fetches through it: no command speaks the Pact Broker's API itself. Its live
 tests run against the pinned broker when `JANUS_PACT_BROKER` names it (CI's `verifier-diff` job), and

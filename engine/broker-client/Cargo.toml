@@ -24,6 +24,8 @@ pretty_assertions = "1"
 rstest = "0.26"
 # A broker stub on a real socket, for the client's own tests. Already in the tree.
 tiny_http = "0.12"
+# A recording's timestamps, normalised (tests/recorded.rs). Already in the tree.
+regex = "1"
 
 [lints]
 workspace = true

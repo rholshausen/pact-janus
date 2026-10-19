@@ -24,6 +24,9 @@
 //! `broker-response-invalid` when it answered something this client cannot read. The broker is
 //! named in them by its URL with user information removed, and no credential appears in any.
 //!
+//! Every link the broker writes is fetched from the broker the user named, as today's verifier
+//! does: an absolute link keeps only its path and query ([`absolute`]).
+//!
 //! The HTTP client options in the broker descriptor (TLS, proxies, timeouts; staged plan S1.5) are
 //! not read yet: the HTTP component's client half does not take them either.
 
@@ -518,18 +521,47 @@ fn expand(broker: &BrokerDescriptor, link: &str, values: &[(&str, &str)]) -> Str
   absolute(broker, &url)
 }
 
-/// A link as an absolute URL: the broker writes absolute links, but a relative one is the broker's
-/// own path.
+/// Where a link the broker wrote is fetched from: always the broker the user named, as today's
+/// verifier does. Of an absolute link only the path and query are kept, because a broker behind a
+/// proxy often writes links with a host its clients cannot reach. When the broker's URL has a context
+/// path (`https://example.com/broker`) and a link's path does not start with it, the context path is
+/// put in front of it; a relative link is relative to the context path.
 fn absolute(broker: &BrokerDescriptor, link: &str) -> String {
-  if link.contains("://") {
-    link.to_string()
-  } else {
-    format!(
-      "{}/{}",
-      broker.url.trim_end_matches('/'),
-      link.trim_start_matches('/')
-    )
+  let (origin, context) = split_origin(&broker.url);
+  let context = context
+    .split(['?', '#'])
+    .next()
+    .unwrap_or_default()
+    .trim_end_matches('/');
+  let path = match link.split_once("://") {
+    Some(_) => {
+      let (_, path) = split_origin(link);
+      if path.is_empty() { "/" } else { path }
+    }
+    None => link,
+  };
+  if !path.starts_with('/') {
+    return format!("{origin}{context}/{path}");
   }
+  let within = path == context
+    || path
+      .strip_prefix(context)
+      .is_some_and(|rest| rest.starts_with(['/', '?', '#']));
+  if context.is_empty() || within {
+    format!("{origin}{path}")
+  } else {
+    format!("{origin}{context}{path}")
+  }
+}
+
+/// `scheme://authority` and the rest (`/path?query`, or empty) of an absolute URL. A URL with no
+/// scheme is all rest.
+fn split_origin(url: &str) -> (&str, &str) {
+  let Some((scheme, rest)) = url.split_once("://") else {
+    return ("", url);
+  };
+  let end = scheme.len() + 3 + rest.find(['/', '?', '#']).unwrap_or(rest.len());
+  url.split_at(end)
 }
 
 fn encode(segment: &str) -> String {

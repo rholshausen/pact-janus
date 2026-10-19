@@ -502,6 +502,13 @@ item in 1a is done when S1.1 agrees.
   object, booleans strings), and the Ruby broker's own `pact_broker_oas.yaml`, which has two paths.
   The publishing link (`pb:publish-verification-results`), which no document describes, and what a
   selector selects are layer 1's alone.
+  Layer 2 is built (2026-10-19): one scenario (two consumers publish, the provider fetches with
+  pending and WIP, publishes, fetches again, and a republish is refused) recorded from the pinned
+  broker into `engine/broker-client/tests/recorded/`, with the broker's database ids renumbered so
+  a recording is the same file however often it is made, and the hand-written cases from
+  `pact_verifier`'s list. Writing them found a difference: today's verifier fetches every link from
+  the broker it was given, keeping only the link's path and adding a missing context path, so a
+  broker behind a proxy that writes an internal host still works; the client now does the same.
   Compression, found while building `janus publish` (2026-10-19): the pinned broker (2.121.2) reads a
   gzipped body as JSON and answers 400, and no broker says it reads one, so the client compresses
   only when a broker says it can (RFC 7694: `Accept-Encoding` on a response; engine-protocol spec

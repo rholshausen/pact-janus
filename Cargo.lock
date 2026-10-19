@@ -2123,6 +2123,7 @@ dependencies = [
  "flate2",
  "pact_janus_kernel",
  "pretty_assertions",
+ "regex",
  "rstest 0.26.1",
  "serde_json",
  "tiny_http",
