@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792372304209,
+  "lastUpdate": 1792372306299,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -7044,6 +7044,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21832,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3c0bd6b06f548b4672c83173843ecaab938d049a",
+          "message": "feat: S1.3 a run's summary counts its variants per source document\n\nPhase 9 finding 10, option A, decided in ADR 0033 and built.\n\n- The verification summary gains `pairs`, positionally parallel to\n  `consumers`/`providers`: per source document its consumer, provider,\n  status (verified, failed, incomplete) and its own variant counts,\n  which the run-level `variants` adds up. A pending document that\n  failed is `failed` there; the run's `status` is what forgives it.\n- Per source document rather than per (consumer, provider): a broker\n  run's main and deployed pacts for one consumer are different matrix\n  rows, and a sum would hide which one failed.\n- subsumption/decide reads the entries: a pair's counts are its\n  entries' added up, present whenever one run covered it, so janus\n  check reports counts for multi-contract runs. A summary from before\n  `pairs` is read as it was.\n- ADR 0033 indexed and dropped from the backlog; spec §9.6, the broker\n  worked example and subsumption.schema.json's descriptions updated,\n  and the bindings regenerated (doc comments only).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T12:07:11+11:00",
+          "tree_id": "0ba2d99b7e2a8cdf9b36e9b67f0c58bb3458c3a0",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3c0bd6b06f548b4672c83173843ecaab938d049a"
+        },
+        "date": 1792372305614,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 32912,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30274,
             "unit": "requests per second",
             "extra": "engines 4"
           }
