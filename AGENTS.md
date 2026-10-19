@@ -377,11 +377,11 @@ via `cargo build` in a `beforeAll`, so it never runs against a stale one). It in
 `tracing-subscriber` the kernel's own `tracing` facade needs (this file's Rust conventions below);
 `RUST_LOG=trace janus-engine` logs every frame `Engine::dispatch` sees in both directions to
 stderr (stdout stays frames-only), with every broker credential redacted: an `auth` member keeps
-only its `kind` and a `url` loses its user information. Both binaries also hold the HTTP library's
-own logging at `debug` whatever is asked for, because at `trace` it dumps request bytes,
-`Authorization` headers included. `cli/tests/cli.rs` runs both commands at `trace` behind an
-authenticating door in front of the pinned broker and fails if a credential appears in anything
-they print.
+only its `kind` and a `url` loses its user information. Both binaries also cap the HTTP library's
+own logging at `debug` however much is asked for (`cli/src/logging.rs`), because at `trace` it dumps
+request bytes, `Authorization` headers included. `cli/tests/cli.rs` runs both commands at `trace`
+behind an authenticating door in front of the pinned broker and fails if a credential appears in
+anything they print.
 
 ## Architecture rules
 

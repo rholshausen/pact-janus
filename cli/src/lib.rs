@@ -32,6 +32,7 @@ mod error;
 mod explain;
 pub mod framing;
 mod io;
+pub mod logging;
 mod publish;
 pub mod register;
 mod upgrade;
@@ -132,33 +133,12 @@ fn clap_exit(err: &clap::Error) -> ExitCode {
   ExitCode::from(u8::try_from(err.exit_code()).unwrap_or(COMMAND_FAILED))
 }
 
-/// Logs go to stderr so stdout stays the command's answer. `--log-level` wins; without it `RUST_LOG`
-/// is read, so the finer directives a maintainer reaches for still work; the default is `warn`.
-/// Colour only when stderr is a terminal and `NO_COLOR` is unset (no-color.org).
+/// `--log-level` wins; without it `RUST_LOG` is read, so the finer directives a maintainer reaches
+/// for still work; the default is `warn`.
 fn init_tracing(level: Option<LogLevel>) {
   use tracing_subscriber::EnvFilter;
-  let filter = match level {
+  logging::to_stderr(match level {
     Some(level) => EnvFilter::new(level.as_str()),
     None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
-  };
-  let filter = without_credentials(filter);
-  tracing_subscriber::fmt()
-    .with_env_filter(filter)
-    .with_writer(std::io::stderr)
-    .with_ansi(stderr_supports_colour())
-    .init();
-}
-
-/// `filter`, with what would log a credential held back however much was asked for: at `trace`,
-/// the HTTP library dumps every request's bytes, the broker's `Authorization` header among them
-/// (engine-protocol spec §8.7: a credential is never repeated in a log). Its `debug` is kept, and
-/// redacts headers. `janus` and `janus-engine` share the rule.
-pub fn without_credentials(filter: tracing_subscriber::EnvFilter) -> tracing_subscriber::EnvFilter {
-  filter.add_directive("ureq_proto=debug".parse().expect("a valid directive"))
-}
-
-/// Whether logs on stderr may be coloured: `janus` and `janus-engine` share the rule.
-pub fn stderr_supports_colour() -> bool {
-  use std::io::IsTerminal;
-  std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none_or(|value| value.is_empty())
+  });
 }

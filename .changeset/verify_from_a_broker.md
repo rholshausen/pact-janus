@@ -48,7 +48,8 @@ broker-facing request with `component-unavailable` naming `broker`.
 - **No credential is logged, at any level.** At `trace`, `janus` and `janus-engine` log every frame
   with each broker descriptor's `auth` reduced to its `kind`, and each `url` without user
   information. The HTTP library's own logging stops at `debug`, where it redacts headers, because
-  its `trace` output dumps raw request bytes, `Authorization` included.
+  its `trace` output dumps raw request bytes, `Authorization` included. Below `debug` it follows
+  the level asked for, like everything else.
 
 What the ledger says: every broker fixture now agrees with today's verifier, including what each run
 publishes, and so does the compatibility suite's pending v4 interaction. The disagreements left are

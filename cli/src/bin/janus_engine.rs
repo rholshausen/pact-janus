@@ -31,13 +31,9 @@ fn main() {
     )
     .get_matches();
 
-  tracing_subscriber::fmt()
-    .with_writer(std::io::stderr)
-    .with_ansi(pact_janus_cli::stderr_supports_colour())
-    .with_env_filter(pact_janus_cli::without_credentials(
-      EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-    ))
-    .init();
+  pact_janus_cli::logging::to_stderr(
+    EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+  );
 
   tracing::info!(
     pid = std::process::id(),
