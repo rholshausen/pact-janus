@@ -75,6 +75,24 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+      # The CLI's help is wrapped to a width, so a name of another length breaks its lines at other
+      # words, and the help snapshots no longer match. Rewrapping them is part of the rename; changing
+      # their text is not. So they are written again from the renamed CLI, and must read word for word
+      # as the renamed snapshots did.
+      - name: CLI help rewraps
+        run: |
+          TRYCMD=overwrite cargo test --package "${CRATE}_cli" --test cmd
+          words() { tr -s '[:space:]' ' '; }
+          changed=0
+          while IFS= read -r file; do
+            if [ "$(git show ":$file" | words)" != "$(words < "$file")" ]; then
+              git diff -- "$file"
+              echo "::error file=$file::The renamed CLI's output differs from the renamed snapshot in more than where lines break."
+              changed=1
+            fi
+          done < <(git diff --name-only -- cli/tests/cmd)
+          git diff --stat -- cli/tests/cmd
+          exit "$changed"
       - name: Test
         run: cargo test --no-fail-fast
       - name: Third-party component

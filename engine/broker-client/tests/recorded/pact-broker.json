@@ -215,7 +215,39 @@
               "contracts": [
                 {
                   "consumerName": "recorded-web",
-                  "content": "eyJjb25zdW1lciI6eyJuYW1lIjoicmVjb3JkZWQtd2ViIn0sImludGVyYWN0aW9ucyI6W3siZGVzY3JpcHRpb24iOiJhIHJlcXVlc3QgZm9yIG9yZGVyIDEiLCJwcm92aWRlclN0YXRlIjoib3JkZXIgMSBleGlzdHMiLCJyZXF1ZXN0Ijp7Im1ldGhvZCI6IkdFVCIsInBhdGgiOiIvb3JkZXJzLzEifSwicmVzcG9uc2UiOnsiYm9keSI6eyJpZCI6MSwic3RhdHVzIjoiU0hJUFBFRCJ9LCJoZWFkZXJzIjp7IkNvbnRlbnQtVHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifSwic3RhdHVzIjoyMDB9fV0sIm1ldGFkYXRhIjp7InBhY3RTcGVjaWZpY2F0aW9uIjp7InZlcnNpb24iOiIzLjAuMCJ9fSwicHJvdmlkZXIiOnsibmFtZSI6InJlY29yZGVkLW9yZGVyLWFwaSJ9fQ==",
+                  "content": {
+                    "consumer": {
+                      "name": "recorded-web"
+                    },
+                    "interactions": [
+                      {
+                        "description": "a request for order 1",
+                        "providerState": "order 1 exists",
+                        "request": {
+                          "method": "GET",
+                          "path": "/orders/1"
+                        },
+                        "response": {
+                          "body": {
+                            "id": 1,
+                            "status": "SHIPPED"
+                          },
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "status": 200
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "pactSpecification": {
+                        "version": "3.0.0"
+                      }
+                    },
+                    "provider": {
+                      "name": "recorded-order-api"
+                    }
+                  },
                   "contentType": "application/json",
                   "providerName": "recorded-order-api",
                   "specification": "pact"
@@ -571,7 +603,72 @@
               "contracts": [
                 {
                   "consumerName": "recorded-mobile",
-                  "content": "eyIkZm9ybWF0IjoiamFudXMtY29udHJhY3QvMSIsImNvbnN1bWVyIjp7Im5hbWUiOiJyZWNvcmRlZC1tb2JpbGUifSwiaW50ZXJhY3Rpb25zIjpbeyJkZXNjcmlwdGlvbiI6ImEgcmVxdWVzdCBmb3Igb3JkZXIgMSdzIHRyYWNraW5nIiwicGFydHMiOnsicmVxdWVzdCI6eyJtZXRob2QiOnsiZXhhbXBsZSI6IkdFVCIsInNoYXBlIjoiZXF1YWxpdHkifSwicGF0aCI6eyJleGFtcGxlIjoiL29yZGVycy8xL3RyYWNraW5nIiwic2hhcGUiOiJlcXVhbGl0eSJ9fSwicmVzcG9uc2UiOnsic3RhdHVzIjp7ImV4YW1wbGUiOjIwMCwic2hhcGUiOiJlcXVhbGl0eSJ9fX0sInNlbGVjdGlvbiI6eyJyZXBvcnQiOnsic3BhY2UiOnsiZGltZW5zaW9ucyI6MCwic2l6ZSI6MX19LCJ2YXJpYW50cyI6W3siYXNzaWdubWVudCI6W10sImlkIjoiYmFzZSIsIm9yaWdpbiI6ImJhc2UiLCJwYXJ0cyI6eyJyZXF1ZXN0Ijp7Im1ldGhvZCI6eyJjb250ZW50IjoiR0VUIn0sInBhdGgiOnsiY29udGVudCI6Ii9vcmRlcnMvMS90cmFja2luZyJ9fSwicmVzcG9uc2UiOnsic3RhdHVzIjp7ImNvbnRlbnQiOjIwMH19fX1dfSwidHJhbnNwb3J0Ijp7ImtpbmQiOiJodHRwIiwibW9kZSI6InBhc3NpdmUifX1dLCJwcm92aWRlciI6eyJuYW1lIjoicmVjb3JkZWQtb3JkZXItYXBpIn19",
+                  "content": {
+                    "$format": "janus-contract/1",
+                    "consumer": {
+                      "name": "recorded-mobile"
+                    },
+                    "interactions": [
+                      {
+                        "description": "a request for order 1's tracking",
+                        "parts": {
+                          "request": {
+                            "method": {
+                              "example": "GET",
+                              "shape": "equality"
+                            },
+                            "path": {
+                              "example": "/orders/1/tracking",
+                              "shape": "equality"
+                            }
+                          },
+                          "response": {
+                            "status": {
+                              "example": 200,
+                              "shape": "equality"
+                            }
+                          }
+                        },
+                        "selection": {
+                          "report": {
+                            "space": {
+                              "dimensions": 0,
+                              "size": 1
+                            }
+                          },
+                          "variants": [
+                            {
+                              "assignment": [],
+                              "id": "base",
+                              "origin": "base",
+                              "parts": {
+                                "request": {
+                                  "method": {
+                                    "content": "GET"
+                                  },
+                                  "path": {
+                                    "content": "/orders/1/tracking"
+                                  }
+                                },
+                                "response": {
+                                  "status": {
+                                    "content": 200
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "transport": {
+                          "kind": "http",
+                          "mode": "passive"
+                        }
+                      }
+                    ],
+                    "provider": {
+                      "name": "recorded-order-api"
+                    }
+                  },
                   "contentType": "application/json",
                   "providerName": "recorded-order-api",
                   "specification": "pact"
@@ -927,6 +1024,7 @@
                   "mainBranch": true
                 }
               ],
+              "contracts": null,
               "includePendingStatus": true,
               "includeWipPactsSince": "2020-01-01",
               "providerVersionBranch": "main"
@@ -1473,7 +1571,9 @@
         },
         {
           "request": {
-            "body": {},
+            "body": {
+              "contracts": null
+            },
             "method": "PUT",
             "path": "/pacticipants/recorded-order-api/branches/main/versions/3.0.0"
           },
@@ -1505,7 +1605,9 @@
         },
         {
           "request": {
-            "body": {},
+            "body": {
+              "contracts": null
+            },
             "method": "PUT",
             "path": "/pacticipants/recorded-order-api/versions/3.0.0/tags/prod"
           },
@@ -1541,6 +1643,7 @@
           "request": {
             "body": {
               "buildUrl": "https://ci.example/2",
+              "contracts": null,
               "providerApplicationVersion": "3.0.0",
               "success": true,
               "testResults": [
@@ -1703,7 +1806,9 @@
         },
         {
           "request": {
-            "body": {},
+            "body": {
+              "contracts": null
+            },
             "method": "PUT",
             "path": "/pacticipants/recorded-order-api/branches/main/versions/3.0.0"
           },
@@ -1735,7 +1840,9 @@
         },
         {
           "request": {
-            "body": {},
+            "body": {
+              "contracts": null
+            },
             "method": "PUT",
             "path": "/pacticipants/recorded-order-api/versions/3.0.0/tags/prod"
           },
@@ -1771,6 +1878,7 @@
           "request": {
             "body": {
               "buildUrl": "https://ci.example/2",
+              "contracts": null,
               "providerApplicationVersion": "3.0.0",
               "success": false,
               "testResults": [
@@ -2057,6 +2165,7 @@
                   "mainBranch": true
                 }
               ],
+              "contracts": null,
               "includePendingStatus": true,
               "includeWipPactsSince": "2020-01-01",
               "providerVersionBranch": "main"
@@ -2719,7 +2828,39 @@
               "contracts": [
                 {
                   "consumerName": "recorded-web",
-                  "content": "eyJjb25zdW1lciI6eyJuYW1lIjoicmVjb3JkZWQtd2ViIn0sImludGVyYWN0aW9ucyI6W3siZGVzY3JpcHRpb24iOiJhIHJlcXVlc3QgZm9yIG9yZGVyIDEiLCJwcm92aWRlclN0YXRlIjoib3JkZXIgMSBleGlzdHMiLCJyZXF1ZXN0Ijp7Im1ldGhvZCI6IkdFVCIsInBhdGgiOiIvb3JkZXJzLzEifSwicmVzcG9uc2UiOnsiYm9keSI6eyJpZCI6MSwic3RhdHVzIjoiQ0FOQ0VMTEVEIn0sImhlYWRlcnMiOnsiQ29udGVudC1UeXBlIjoiYXBwbGljYXRpb24vanNvbiJ9LCJzdGF0dXMiOjIwMH19XSwibWV0YWRhdGEiOnsicGFjdFNwZWNpZmljYXRpb24iOnsidmVyc2lvbiI6IjMuMC4wIn19LCJwcm92aWRlciI6eyJuYW1lIjoicmVjb3JkZWQtb3JkZXItYXBpIn19",
+                  "content": {
+                    "consumer": {
+                      "name": "recorded-web"
+                    },
+                    "interactions": [
+                      {
+                        "description": "a request for order 1",
+                        "providerState": "order 1 exists",
+                        "request": {
+                          "method": "GET",
+                          "path": "/orders/1"
+                        },
+                        "response": {
+                          "body": {
+                            "id": 1,
+                            "status": "CANCELLED"
+                          },
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "status": 200
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "pactSpecification": {
+                        "version": "3.0.0"
+                      }
+                    },
+                    "provider": {
+                      "name": "recorded-order-api"
+                    }
+                  },
                   "contentType": "application/json",
                   "providerName": "recorded-order-api",
                   "specification": "pact"
