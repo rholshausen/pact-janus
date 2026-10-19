@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792380353162,
+  "lastUpdate": 1792380354716,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -7398,6 +7398,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30274,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "5d7f8a00cd5d63752deaadc73ec413cffb0e72d2",
+          "message": "feat: S1.3 janus publish publishes a consumer's contracts to a Pact Broker\n\nbroker/publish-contracts is built (engine-protocol spec §8.7, ADR 0032): the kernel's broker\ntrait gains publish_contracts, the native client posts every contract to the index's\npb:publish-contracts link as the broker's 'pact' specification, and the engine reports the\noutcome in a broker session: one broker/published per contract, then broker/finished with the\nbroker's notices. Documents are read as verify reads them before anything is published, and are\npublished as sent.\n\njanus publish drives it with pact-broker publish's spellings and environment variables.\n\nCompression: the pinned broker (2.121.2) refuses a gzipped body with a 400 and advertises no\nAccept-Encoding, so the client gzips only when a broker says it can (RFC 7694) and resends\nuncompressed after a 415. Recorded in S1.3, the protocol spec and the contract-file spec.\n\nA live test publishes a pact and its upgraded Janus contract to the pinned broker and verifies\nboth back from it; CI's verifier-diff job runs it with JANUS_PACT_BROKER.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T14:21:37+11:00",
+          "tree_id": "d04eff1e5ca901dbca9b87aff04feb969ed7b7a9",
+          "url": "https://github.com/rholshausen/pact-janus/commit/5d7f8a00cd5d63752deaadc73ec413cffb0e72d2"
+        },
+        "date": 1792380354357,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28831,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21879,
             "unit": "requests per second",
             "extra": "engines 4"
           }
