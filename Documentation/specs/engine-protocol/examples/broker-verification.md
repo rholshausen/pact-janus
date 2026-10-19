@@ -93,7 +93,8 @@ alone:
 `←` each pact's result goes to that pact's own link, keyed by the broker's interaction ids, which the
 run carried from the fetched documents (`id` above). `mobile-app`'s interaction failed, and its
 pact is pending, so the run passes: the failure is reported and published, and does not fail it.
-The summary says which sources were pending, and what was published:
+The summary says which sources were pending, each source's own counts (`pairs`, ADR 0033), and
+what was published:
 
 ```json
 { "type": "response", "id": "r-4",
@@ -107,6 +108,10 @@ The summary says which sources were pending, and what was published:
                    "consumers": ["web-app", "mobile-app"], "providers": ["order-api", "order-api"],
                    "pending": [false, true],
                    "variants": { "total": 2, "verified": 1, "failed": 1, "state-unavailable": 0, "skipped": 0 },
+                   "pairs": [ { "consumer": "web-app", "provider": "order-api", "status": "verified",
+                                "variants": { "total": 1, "verified": 1, "failed": 0, "state-unavailable": 0, "skipped": 0 } },
+                              { "consumer": "mobile-app", "provider": "order-api", "status": "failed",
+                                "variants": { "total": 1, "verified": 0, "failed": 1, "state-unavailable": 0, "skipped": 0 } } ],
                    "publication": [ { "consumer": "web-app", "outcome": "published" },
                                     { "consumer": "mobile-app", "outcome": "published" } ] } } ] } }
 ```

@@ -56,11 +56,11 @@ public class VerificationView {
     @JsonPropertyDescription("'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' \u2014 no supplied result covers this pair.")
     private java.lang.String status;
     /**
-     * The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.
+     * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
      * 
      */
     @JsonProperty("variants")
-    @JsonPropertyDescription("The covering run's own variant counts, passed through unchanged \u2014 present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.")
+    @JsonPropertyDescription("The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.")
     private Map<String, Object> variants;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
@@ -124,7 +124,7 @@ public class VerificationView {
     }
 
     /**
-     * The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.
+     * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
      * 
      */
     @JsonProperty("variants")
@@ -133,7 +133,7 @@ public class VerificationView {
     }
 
     /**
-     * The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.
+     * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
      * 
      */
     @JsonProperty("variants")

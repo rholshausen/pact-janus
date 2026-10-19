@@ -885,7 +885,12 @@ names **who the run was about**: `consumers` and `providers`, positionally paral
 source document, plus `failures` naming the pair each failing variant belonged to. That is what
 makes a run attributable per pair by `subsumption/decide` (§8.6) — a summary that said "verified"
 without saying which consumer and which provider it verified could not be read back as an answer
-about either. A run from a `broker` source also says, positionally beside `consumers`, which
+about either. Positionally parallel too, `pairs` gives each source document's own part of the run
+([ADR 0033](../../decisions/0033-count-a-runs-variants-per-source-document-in-its-summary.md)):
+its `consumer` and `provider`, its `status` (`verified`, `failed`, or `incomplete` when the run
+stopped before finishing it) and its own `variants`, which the run-level `variants` adds up. A
+pending source that failed is `failed` there; whether that fails the run is the run's `status`. A
+run from a `broker` source also says, positionally beside `consumers`, which
 sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
 run, and, when it published, a `publication` entry per pact (§8.3).
 

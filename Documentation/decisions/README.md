@@ -49,6 +49,7 @@ superseding ADR instead.
 | [0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md) | A release carries the SDK gates and the executable specification they run against | accepted |
 | [0031](0031-rename-by-a-rehearsed-rewrite-and-read-persisted-identifiers-under-every-spelling.md) | Rename by a rehearsed rewrite, and read persisted identifiers under every spelling | accepted |
 | [0032](0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md) | Speak to the Pact Broker through protocol operations backed by a native host capability | accepted |
+| [0033](0033-count-a-runs-variants-per-source-document-in-its-summary.md) | Count a run's variants per source document in its summary | accepted |
 
 ## Decision backlog
 
@@ -59,8 +60,6 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
   edit (ADR 0011 decision 6; scoped in the [format review](../prototype/contract-file-format-review.md) §8.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)
-- Per-pair verification summaries (`pairs` in the run summary) — the broker notes §11 chose the shape;
-  Phase 9 finding 10 (task 9.4)
 - A consumer's test verdict reaching the engine (`report-variant`), so the engine, not each SDK,
   withholds a dishonest contract — Phase 9 findings 4 and 5 (task 9.4)
 - Operator-level substitution in place of whole-slot plan fragments — ADR 0022's tripwire, Phase 9

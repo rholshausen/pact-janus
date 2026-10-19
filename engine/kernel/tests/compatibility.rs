@@ -546,9 +546,9 @@ fn a_pair_nobody_verified_warns_and_a_filtered_run_says_so() {
   assert!(reason_codes(filtered).contains(&"verification-filtered".to_string()));
 }
 
-/// A run covering several contracts is attributed per pair by its own `consumers`/`providers` and
-/// `failures` — and its variant counts, which belong to the whole run, are left out rather than
-/// divided between pairs.
+/// A summary from before `pairs` (ADR 0033): a run covering several contracts is attributed per
+/// pair by its own `consumers`/`providers` and `failures` — and its variant counts, which belong to
+/// the whole run, are left out rather than divided between pairs.
 #[test]
 fn a_run_over_two_contracts_is_attributed_to_each_pair_separately() {
   let mut engine = engine();
@@ -576,6 +576,40 @@ fn a_run_over_two_contracts_is_attributed_to_each_pair_separately() {
   assert_eq!(report["decision"], json!("block"));
   assert_eq!(report["summary"]["blocked"], json!(1));
   assert_eq!(report["summary"]["warned"], json!(1));
+}
+
+/// ADR 0033: a summary's `pairs` gives each pair its own counts, so a run over several contracts
+/// reports them per pair — added up when the run verified two documents between the same parties,
+/// as a broker run over a consumer's main and deployed pacts does.
+#[test]
+fn a_run_with_pairs_reports_each_pairs_own_counts() {
+  let mut engine = engine();
+  let pair = checked_pair(&mut engine);
+  let counts = |verified: u64, failed: u64| json!({ "total": verified + failed, "verified": verified, "failed": failed, "state-unavailable": 0, "skipped": 0 });
+  let summary = json!({ "status": "failed", "contracts": 3,
+    "consumers": ["order-consumer", "order-consumer", "billing-sync"],
+    "providers": ["order-service", "order-service", "order-service"],
+    "interactions": 3, "filtered": false,
+    "variants": counts(7, 1),
+    "pairs": [
+      { "consumer": "order-consumer", "provider": "order-service", "status": "verified", "variants": counts(3, 0) },
+      { "consumer": "order-consumer", "provider": "order-service", "status": "verified", "variants": counts(2, 0) },
+      { "consumer": "billing-sync", "provider": "order-service", "status": "failed", "variants": counts(2, 1) }
+    ],
+    "failures": [ { "interaction": { "contract": { "consumer": "billing-sync", "provider": "order-service" } },
+                    "variant": "v-1", "status": "failed" } ] });
+
+  let (report, text) = decide(
+    &mut engine,
+    json!({ "pairs": [ pair,
+                       { "consumer": { "name": "billing-sync" }, "provider": { "name": "order-service" } } ],
+            "verification": [summary] }),
+  );
+  assert_eq!(report["pairs"][0]["verification"]["status"], json!("verified"));
+  assert_eq!(report["pairs"][0]["verification"]["variants"], counts(5, 0));
+  assert_eq!(report["pairs"][1]["verification"]["status"], json!("failed"));
+  assert_eq!(report["pairs"][1]["verification"]["variants"], counts(2, 1));
+  assert!(text.contains("5 of 5"), "{text}");
 }
 
 /// The RFC's per-provider adoption path: a provider that publishes no shape gets replay-only

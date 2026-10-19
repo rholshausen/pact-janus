@@ -242,6 +242,19 @@ fn a_pending_pacts_failure_is_reported_and_published_and_does_not_fail_the_run()
     json!([{ "consumer": "web", "outcome": "published" }, { "consumer": "admin", "outcome": "published" }])
   );
   assert_eq!(of_kind(&events, "verification/published").len(), 2);
+  // ADR 0033: each source's own counts, which add up to the run's.
+  assert_eq!(summary["pairs"][0]["consumer"], "web");
+  assert_eq!(summary["pairs"][0]["status"], "verified");
+  assert_eq!(summary["pairs"][0]["variants"]["verified"], 1);
+  assert_eq!(
+    summary["pairs"][1]["status"], "failed",
+    "a pending pact that failed still failed"
+  );
+  assert_eq!(summary["pairs"][1]["variants"]["failed"], 1);
+  let total: u64 = (0..2)
+    .map(|i| summary["pairs"][i]["variants"]["total"].as_u64().unwrap())
+    .sum();
+  assert_eq!(json!(total), summary["variants"]["total"]);
 
   let published = broker.published.lock().unwrap();
   assert_eq!(published[0]["handle"], json!({ "pact": "web" }));

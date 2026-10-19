@@ -742,12 +742,14 @@ fn run(
     &stream,
   );
 
-  // Which results belong to which source, by position in `tally.results`: what a source's
-  // published result is made of. A source the run did not finish has none.
-  let mut ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(sources.len());
+  // What each source's part of the run was: its results, by position in `tally.results`, and the
+  // variants the filter skipped in it. What its `pairs` entry counts and its published result is
+  // made of (ADR 0033). A source the run never reached has none.
+  let mut ran: Vec<SourceRun> = Vec::with_capacity(sources.len());
   if aborted.is_none() {
     'sources: for (position, source) in sources.iter().enumerate() {
       let first = tally.results.len();
+      let skipped = tally.skipped;
       let source_pending = broker
         .as_ref()
         .and_then(|broker| broker.fetched.get(position))
@@ -769,15 +771,24 @@ fn run(
         );
         if let Flow::Abort(abort) = flow {
           aborted = Some(abort);
+          ran.push(SourceRun {
+            results: first..tally.results.len(),
+            skipped: tally.skipped - skipped,
+            complete: false,
+          });
           break 'sources;
         }
       }
-      ranges.push(first..tally.results.len());
+      ran.push(SourceRun {
+        results: first..tally.results.len(),
+        skipped: tally.skipped - skipped,
+        complete: true,
+      });
     }
   }
 
   let publication = match &broker {
-    Some(broker) => publish(broker, &sources, &ranges, &tally, &stream),
+    Some(broker) => publish(broker, &sources, &ran, &tally, &stream),
     None => vec![],
   };
   let report = Report {
@@ -791,6 +802,7 @@ fn run(
       .as_ref()
       .map(|broker| broker.fetched.iter().map(|fetched| fetched.pending).collect()),
     publication: &publication,
+    ran: &ran,
   };
 
   if aborted.is_some() {
@@ -849,7 +861,7 @@ fn run(
 fn publish(
   broker: &BrokerRun,
   sources: &[Source],
-  ranges: &[std::ops::Range<usize>],
+  ran: &[SourceRun],
   tally: &Tally,
   stream: &Stream,
 ) -> Vec<Value> {
@@ -857,8 +869,11 @@ fn publish(
     return vec![];
   };
   let mut publication = Vec::new();
-  for ((source, fetched), range) in sources.iter().zip(&broker.fetched).zip(ranges) {
-    let results: Vec<InteractionResult> = tally.results[range.clone()]
+  // Only a source the run finished: a partial result published as the pact's would be a verdict
+  // on interactions nobody verified.
+  let finished = ran.iter().filter(|run| run.complete);
+  for ((source, fetched), run) in sources.iter().zip(&broker.fetched).zip(finished) {
+    let results: Vec<InteractionResult> = tally.results[run.results.clone()]
       .iter()
       .map(|payload| InteractionResult {
         id: payload["interaction"]["id"].as_str().map(str::to_string),
@@ -978,6 +993,52 @@ impl Tally {
   }
 }
 
+/// One source's part of a run (ADR 0033).
+struct SourceRun {
+  /// Its results, by position in [`Tally::results`].
+  results: std::ops::Range<usize>,
+  /// Its variants the filter excluded.
+  skipped: usize,
+  /// Whether the run got to the end of it: a hook that aborts the run part way leaves the source
+  /// it was in incomplete.
+  complete: bool,
+}
+
+/// One source's entry in the summary's `pairs` (ADR 0033): who it was between, how it went, and
+/// its own variant counts, which the run-level `variants` adds up.
+fn pair_entry(source: &Source, run: Option<&SourceRun>, results: &[Value]) -> Value {
+  let results = run.map_or(&[][..], |run| &results[run.results.clone()]);
+  let count = |status: &str| {
+    results
+      .iter()
+      .filter(|result| result["status"] == json!(status))
+      .count()
+  };
+  let verified = count("verified");
+  let state_unavailable = count("state-unavailable");
+  let failed = results.len() - verified - state_unavailable;
+  let skipped = run.map_or(0, |run| run.skipped);
+  let status = if failed + state_unavailable > 0 {
+    "failed"
+  } else if run.is_some_and(|run| run.complete) {
+    "verified"
+  } else {
+    "incomplete"
+  };
+  json!({
+    "consumer": source.consumer(),
+    "provider": source.provider(),
+    "status": status,
+    "variants": {
+      "total": results.len() + skipped,
+      "verified": verified,
+      "failed": failed,
+      "state-unavailable": state_unavailable,
+      "skipped": skipped,
+    },
+  })
+}
+
 /// What the run summary is written from.
 #[derive(Clone)]
 struct Report<'a> {
@@ -991,6 +1052,8 @@ struct Report<'a> {
   pending: Option<Vec<bool>>,
   /// For a run that published: per source, what happened.
   publication: &'a [Value],
+  /// Per source the run reached, its part of it.
+  ran: &'a [SourceRun],
 }
 
 /// The run summary (protocol spec §9.6): the document the terminal event carries, the one
@@ -1043,6 +1106,18 @@ fn summary(report: &Report<'_>) -> Value {
   if !report.publication.is_empty() {
     map.insert("publication".to_string(), json!(report.publication));
   }
+  // Positionally beside `consumers` (ADR 0033, Phase 9 finding 10): each source's own counts,
+  // which a pair's report and a broker's matrix row are about.
+  map.insert(
+    "pairs".to_string(),
+    Value::Array(
+      sources
+        .iter()
+        .enumerate()
+        .map(|(position, source)| pair_entry(source, report.ran.get(position), &tally.results))
+        .collect(),
+    ),
+  );
   if let Some(runner) = hooks
     && !runner.report.is_empty()
   {

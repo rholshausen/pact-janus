@@ -7,7 +7,7 @@
 use crate::contract::Party;
 use crate::subsumption::{Action, Exemption, NOT_PUBLISHED, Severity, SubsumptionPolicy, SubsumptionReport};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 /// The format token this module writes.
 pub const FORMAT: &str = "janus-compatibility-report/1";
@@ -152,9 +152,10 @@ pub struct VerificationView {
   pub runs: usize,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub filtered: Option<bool>,
-  /// The covering run's own `variants` counts, passed through unchanged — and present only when
-  /// one run covered this pair alone. A run over four contracts reports one set of counts for all
-  /// four, and splitting them between pairs is not something this document can honestly do.
+  /// The variants the covering run replayed for this pair: its `pairs` entries' counts, added up
+  /// when it verified more than one document between these two (ADR 0033). Present only when one
+  /// run covered the pair — two runs' counts are two answers, not one — and, for a summary from
+  /// before `pairs`, only when that run covered this pair alone.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub variants: Option<Value>,
 }
@@ -645,10 +646,11 @@ fn worst_verdict(left: &'static str, right: &str) -> &'static str {
 
 /// What the supplied verification summaries say about one pair.
 ///
-/// A summary names the pairs it covered in `consumers`/`providers`, positionally parallel, and
-/// its `failures` name the pair each failing variant belonged to. That is enough to attribute a
-/// multi-contract run per pair; the variant *counts* are not, and are passed through only when
-/// one run covered this pair alone.
+/// A summary names the pairs it covered in `pairs` (ADR 0033): one entry per source document, with
+/// its own status and variant counts. A summary from before `pairs` names them in
+/// `consumers`/`providers`, positionally parallel, and its `failures` the pair each failing variant
+/// belonged to — enough for the status, and for the counts only when the run covered this pair
+/// alone.
 fn verification_for(verifications: &[Value], consumer: &str, provider: &str) -> VerificationView {
   let mut runs = 0;
   let mut status = "unknown";
@@ -674,6 +676,25 @@ fn verification_for(verifications: &[Value], consumer: &str, provider: &str) -> 
     }
     runs += 1;
     filtered = Some(filtered.unwrap_or(false) || summary["filtered"] == Value::Bool(true));
+
+    if let Some(entries) = summary.get("pairs").and_then(Value::as_array) {
+      let mine: Vec<&Value> = entries
+        .iter()
+        .filter(|entry| entry["consumer"] == json!(consumer) && entry["provider"] == json!(provider))
+        .collect();
+      variants = (runs == 1).then(|| added_up(&mine));
+      let this = mine.iter().filter_map(|entry| entry["status"].as_str()).fold(
+        "verified",
+        |worst, status| match status {
+          "failed" => worst_status(worst, "failed"),
+          "incomplete" => worst_status(worst, "incomplete"),
+          _ => worst,
+        },
+      );
+      status = worst_status(status, this);
+      continue;
+    }
+
     if pairs.len() == 1 && runs == 1 {
       variants = summary.get("variants").cloned();
     } else {
@@ -706,6 +727,19 @@ fn verification_for(verifications: &[Value], consumer: &str, provider: &str) -> 
     filtered,
     variants,
   }
+}
+
+/// Several `pairs` entries' variant counts as one set: a run that verified two documents between
+/// the same two parties replayed both documents' variants for that pair.
+fn added_up(entries: &[&Value]) -> Value {
+  let mut total = serde_json::Map::new();
+  for entry in entries {
+    for (name, count) in entry["variants"].as_object().into_iter().flatten() {
+      let sum = total.get(name).and_then(Value::as_u64).unwrap_or(0) + count.as_u64().unwrap_or(0);
+      total.insert(name.clone(), json!(sum));
+    }
+  }
+  Value::Object(total)
 }
 
 fn worst_status(left: &'static str, right: &'static str) -> &'static str {

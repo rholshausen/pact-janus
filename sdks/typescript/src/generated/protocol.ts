@@ -616,7 +616,7 @@ export interface Decide {
     [k: string]: unknown;
   }[];
   /**
-   * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.
+   * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
    */
   verification?: {
     [k: string]: unknown;
@@ -814,7 +814,7 @@ export interface VerificationView {
    */
   status: string;
   /**
-   * The covering run's own variant counts, passed through unchanged — present only when one run covered this pair alone. A run over four contracts reports one set of counts for all four, and splitting them between pairs is not something this document can honestly do.
+   * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
    */
   variants?: {
     [k: string]: unknown;

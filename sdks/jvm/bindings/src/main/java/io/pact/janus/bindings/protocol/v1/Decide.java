@@ -59,11 +59,11 @@ public class Decide {
     @JsonPropertyDescription("Subsumption policy layers (design 2.8 \u00a77.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.")
     private List<Map<String, Object>> policy;
     /**
-     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.
+     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
      * 
      */
     @JsonProperty("verification")
-    @JsonPropertyDescription("Verification run summaries, exactly as the terminal event of a run carries them (spec.md \u00a79.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.")
+    @JsonPropertyDescription("Verification run summaries, exactly as the terminal event of a run carries them (spec.md \u00a79.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.")
     private List<Map<String, Object>> verification;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
@@ -135,7 +135,7 @@ public class Decide {
     }
 
     /**
-     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.
+     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
      * 
      */
     @JsonProperty("verification")
@@ -144,7 +144,7 @@ public class Decide {
     }
 
     /**
-     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'consumers'/'providers' members and its 'failures'.
+     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
      * 
      */
     @JsonProperty("verification")
