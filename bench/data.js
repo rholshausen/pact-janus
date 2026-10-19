@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792371028867,
+  "lastUpdate": 1792371030991,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -6690,6 +6690,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21920,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "1f5fd9ca757a33e1a7e502c6231239c0cd498beb",
+          "message": "feat: S1.3 janus verify fetches from a Pact Broker and publishes results\n\nADR 0032 built: the broker client is the engine's, behind the protocol,\nand a native host capability.\n\n- engine/kernel/src/broker.rs: the BrokerClient trait, in the broker's\n  terms (fetch the pacts for verification; publish a fetched pact's\n  result), and the broker descriptor, whose credentials never reach\n  Debug, an event, a summary or an error.\n- verification/verify: a `broker` source is fetched inside the run and\n  reported as verification/fetched; a failed fetch ends the run as\n  component-failed naming broker, an empty one as pacts-not-found\n  (unless require-pacts: false). options.publish posts each pact's\n  result to its own link, keyed by the broker's interaction ids (now in\n  each legacy interaction reference as `id`), as verification/published\n  events and the summary's `publication`.\n- Pending: a pending or WIP pact's failures, and a v4 interaction\n  marked pending from any source, are reported with `pending: true`,\n  counted, and do not fail the run. The summary says per source\n  whether it was pending.\n- engine/broker-client: the HAL client, asking as pact_verifier does;\n  its errors are broker-unreachable, broker-refused and\n  broker-response-invalid. Registered by both native binaries, so\n  engine/hello declares `broker`; the WASM artifact still has none.\n- janus verify: today's broker flags, in pact_verifier_cli's spellings,\n  with credentials from PACT_BROKER_USERNAME/PASSWORD/TOKEN. Pending and\n  WIP are asked for only with selectors, as today's verifier does.\n- broker/publish-contracts is not built yet: an engine with a client\n  answers operation-unsupported.\n\nThe differential harness now agrees with today's verifier on every\nbroker case, published results included, and on the suite's pending v4\ninteraction: all 36 S1.3 ledger entries are deleted. The broker traffic\nof the two matches request for request but for today's extra GET of\nthe for-verification link.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T11:45:55+11:00",
+          "tree_id": "45f3f1e5195dfe6170b0c6f4d01031b3bf5b793b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/1f5fd9ca757a33e1a7e502c6231239c0cd498beb"
+        },
+        "date": 1792371030338,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28574,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21832,
             "unit": "requests per second",
             "extra": "engines 4"
           }
