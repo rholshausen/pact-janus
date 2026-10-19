@@ -38,6 +38,10 @@ broker-facing request with `component-unavailable` naming `broker`.
   `--publish`, `--build-url`, and `--user`/`--password`/`--token`. The credentials can also come
   from `PACT_BROKER_USERNAME`, `PACT_BROKER_PASSWORD` and `PACT_BROKER_TOKEN`. As with today's
   verifier, pending and work-in-progress pacts are asked for only when selectors are given.
+- **No credential is logged, at any level.** At `trace`, `janus` and `janus-engine` log every frame
+  with each broker descriptor's `auth` reduced to its `kind`, and each `url` without user
+  information. The HTTP library's own logging stops at `debug`, where it redacts headers, because
+  its `trace` output dumps raw request bytes, `Authorization` included.
 
 What the ledger says: every broker fixture now agrees with today's verifier, including what each run
 publishes, and so does the compatibility suite's pending v4 interaction. The disagreements left are

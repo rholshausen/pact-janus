@@ -222,10 +222,14 @@ impl Engine {
   /// wire" can live without instrumenting each binding separately. The embedding installs the
   /// subscriber (this crate ships only the `tracing` facade); `janus-engine` is one such embedding.
   pub fn dispatch(&mut self, bytes: &[u8]) -> Vec<u8> {
-    tracing::trace!(frame = %String::from_utf8_lossy(bytes), "frame in");
+    if tracing::enabled!(tracing::Level::TRACE) {
+      tracing::trace!(frame = %loggable(bytes), "frame in");
+    }
     let response = self.dispatch_bytes(bytes);
     let out = serde_json::to_vec(&response).expect("ResponseFrame is always representable as JSON");
-    tracing::trace!(frame = %String::from_utf8_lossy(&out), "frame out");
+    if tracing::enabled!(tracing::Level::TRACE) {
+      tracing::trace!(frame = %loggable(&out), "frame out");
+    }
     out
   }
 
@@ -919,6 +923,41 @@ impl Engine {
   }
 }
 
+/// A frame as the trace log shows it, with every credential taken out (spec §8.7: the engine never
+/// repeats one in a log). A host's broker descriptor carries them, so an `auth` member keeps its
+/// `kind` and nothing else, and a `url` loses any user information. Bytes that are not JSON are
+/// shown by their length, since nothing says what they hold.
+fn loggable(bytes: &[u8]) -> String {
+  fn redact(value: &mut Value) {
+    match value {
+      Value::Object(members) => {
+        for (name, member) in members.iter_mut() {
+          match (name.as_str(), member) {
+            ("auth", Value::Object(auth)) => {
+              for (field, secret) in auth.iter_mut() {
+                if field != "kind" {
+                  *secret = json!("***");
+                }
+              }
+            }
+            ("url", Value::String(url)) => *url = crate::broker::without_userinfo(url),
+            (_, member) => redact(member),
+          }
+        }
+      }
+      Value::Array(items) => items.iter_mut().for_each(redact),
+      _ => {}
+    }
+  }
+  match serde_json::from_slice::<Value>(bytes) {
+    Ok(mut frame) => {
+      redact(&mut frame);
+      frame.to_string()
+    }
+    Err(_) => format!("<{} bytes that are not JSON>", bytes.len()),
+  }
+}
+
 /// An operation's request body, governed by the operation's schema (spec §4.1): a body that
 /// doesn't match it is `malformed-frame`, same as an envelope violation (§4.4).
 fn parse_body<T: DeserializeOwned>(body: Value) -> Result<T, EngineError> {
@@ -1031,6 +1070,28 @@ fn stop_targets(targets: &[Target]) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn a_logged_frame_carries_no_credential() {
+    let frame = json!({
+      "type": "request", "id": "r-1", "op": "broker/publish-contracts",
+      "body": {
+        "broker": { "url": "https://bob:hunter2@broker.example", "auth": { "kind": "basic", "username": "bob", "password": "hunter2" } },
+        "nested": [{ "broker": { "url": "https://broker.example", "auth": { "kind": "bearer", "token": "s3cret" } } }]
+      }
+    });
+    let logged = loggable(&serde_json::to_vec(&frame).unwrap());
+    assert!(
+      !logged.contains("hunter2") && !logged.contains("s3cret") && !logged.contains("bob"),
+      "{logged}"
+    );
+    assert!(
+      logged.contains(r#""kind":"basic""#) && logged.contains(r#""kind":"bearer""#),
+      "{logged}"
+    );
+    assert!(logged.contains("https://broker.example"), "{logged}");
+    assert_eq!(loggable(b"token=s3cret"), "<12 bytes that are not JSON>");
+  }
 
   /// `events/poll` at the dispatch boundary. The stream's own guarantees (ordering, `seq`,
   /// backpressure) are [`super::events`]'s tests; these cover what only dispatch can show —

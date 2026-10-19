@@ -514,8 +514,13 @@ item in 1a is done when S1.1 agrees.
   §8.7), and today every publication goes uncompressed. A reverse proxy's 1 MB cap (format review
   §8.2) is the deployment's to raise until the broker inflates request bodies, which is a change to
   propose upstream, not this item's exit.
-  Still to build from layer 1: the run behind basic auth and a bearer token that fails if either
-  credential appears in a frame, event, summary or log, and the weekly run against the latest image.
+  The credentials run is built (2026-10-19): `cli/tests/cli.rs` puts the pinned broker behind a door
+  that demands basic credentials or a bearer token (the OSS broker has no bearer tokens, so the door
+  is a proxy for both), and runs `janus publish` and `janus verify --publish` through it at `trace`,
+  and with a wrong credential, failing if either appears in anything printed. It found two leaks
+  before anything shipped: the engine's trace log of each frame repeated the descriptor's `auth`,
+  and the HTTP library's trace dump repeated the `Authorization` header. Still to build from layer
+  1: the weekly run against the latest image.
   *Exit:* S1.1's harness runs the fixture corpus fetched from a real broker, pending and WIP semantics
   included, and the broker's matrix shows the results per pair; and the client's consumer pact is
   verified by that broker.

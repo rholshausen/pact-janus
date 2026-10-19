@@ -640,6 +640,183 @@ fn a_pact_and_a_contract_published_to_a_broker_verify_when_fetched_back() {
   );
 }
 
+/// The broker behind a door: a proxy in front of `broker` that forwards a request only when it
+/// carries `authorization`, and without it, and answers 401 to anything else. The OSS broker has
+/// basic authentication and no bearer tokens, so this is how one broker is put behind both.
+fn behind_a_door(broker: &str, authorization: String) -> String {
+  let server = tiny_http::Server::http("127.0.0.1:0").expect("the door binds");
+  let url = format!("http://{}", server.server_addr().to_ip().expect("an IP address"));
+  let broker = broker.trim_end_matches('/').to_string();
+  std::thread::spawn(move || {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+      .http_status_as_error(false)
+      .build()
+      .into();
+    for mut request in server.incoming_requests() {
+      let header = |name: &str| {
+        request
+          .headers()
+          .iter()
+          .find(|header| header.field.as_str().as_str().eq_ignore_ascii_case(name))
+          .map(|header| header.value.as_str().to_string())
+      };
+      if header("authorization").as_deref() != Some(authorization.as_str()) {
+        let _ = request
+          .respond(tiny_http::Response::from_string(r#"{"error":"Unauthorized"}"#).with_status_code(401));
+        continue;
+      }
+      let mut forwarded = ureq::http::Request::builder()
+        .method(request.method().as_str())
+        .uri(format!("{broker}{}", request.url()));
+      for name in ["accept", "content-type"] {
+        if let Some(value) = header(name) {
+          forwarded = forwarded.header(name, value);
+        }
+      }
+      let mut body = Vec::new();
+      let _ = request.as_reader().read_to_end(&mut body);
+      let (status, content_type, text) = match agent.run(forwarded.body(body).expect("a request")) {
+        Ok(mut response) => (
+          response.status().as_u16(),
+          response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("application/json")
+            .to_string(),
+          response.body_mut().read_to_string().unwrap_or_default(),
+        ),
+        Err(err) => (502, "text/plain".to_string(), err.to_string()),
+      };
+      let _ = request.respond(
+        tiny_http::Response::from_string(text)
+          .with_status_code(status)
+          .with_header(tiny_http::Header::from_bytes("Content-Type", content_type).expect("a header")),
+      );
+    }
+  });
+  url
+}
+
+/// ADR 0032 decision 5, end to end: a broker credential reaches the broker and appears nowhere
+/// else. Each command runs with every log on, so what it prints is every event, the summary,
+/// every error, every frame the engine saw and every log line; none may carry the secret, nor the
+/// `Authorization` header it became. Basic credentials arrive by flag; the token arrives by
+/// today's environment variable.
+#[rstest::rstest]
+#[case::basic("basic")]
+#[case::bearer("bearer")]
+fn a_broker_credential_reaches_the_broker_and_appears_nowhere_else(#[case] kind: &str) {
+  use base64::Engine as _;
+  let Some(broker) = pact_broker() else {
+    eprintln!("skipped: JANUS_PACT_BROKER names no Pact Broker");
+    return;
+  };
+  let user = "janus-user";
+  let secret = unique("s3cret");
+  let wrong = unique("not-the-s3cret");
+  let header = |secret: &str| match kind {
+    "basic" => format!(
+      "Basic {}",
+      base64::engine::general_purpose::STANDARD.encode(format!("{user}:{secret}"))
+    ),
+    _ => format!("Bearer {secret}"),
+  };
+  let door = behind_a_door(&broker, header(&secret));
+  let run = |args: &[&str], secret: &str| -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_janus"));
+    command
+      .args(args)
+      .args(["--log-level", "trace"])
+      .env_remove("PACT_BROKER_TOKEN")
+      .env_remove("PACT_BROKER_USERNAME")
+      .env_remove("PACT_BROKER_PASSWORD");
+    let publishing = args.first() == Some(&"publish");
+    match (kind, publishing) {
+      ("basic", true) => command.args(["--broker-username", user, "--broker-password", secret]),
+      ("basic", false) => command.args(["--user", user, "--password", secret]),
+      _ => command.env("PACT_BROKER_TOKEN", secret),
+    };
+    let output = command.output().expect("the janus binary runs");
+    let everything = format!("{}{}", stdout(&output), stderr(&output));
+    for leaked in [secret.to_string(), header(secret)] {
+      assert!(
+        !everything.contains(&leaked),
+        "janus {} printed a credential:
+{everything}",
+        args[0]
+      );
+    }
+    output
+  };
+
+  let provider = provider();
+  let config = state_config(&provider);
+  let provider_name = unique("order-service");
+  let mut pact: Value =
+    serde_json::from_str(&std::fs::read_to_string(order_pact()).expect("the pact")).expect("json");
+  pact["consumer"]["name"] = json!(unique("web-app"));
+  pact["provider"]["name"] = json!(provider_name);
+  let pact_file = temp(&format!("{kind}-door-pact.json"));
+  std::fs::write(&pact_file, pact.to_string()).expect("writing the pact");
+
+  let published = run(
+    &[
+      "publish",
+      &pact_file,
+      "--consumer-app-version",
+      "1.0.0",
+      "--branch",
+      "main",
+      "--broker-base-url",
+      &door,
+    ],
+    &secret,
+  );
+  assert_eq!(
+    code(&published),
+    0,
+    "{}\n{}",
+    stdout(&published),
+    stderr(&published)
+  );
+
+  let verify = |output: &str| {
+    vec![
+      "verify".to_string(),
+      "--broker-url".to_string(),
+      door.clone(),
+      "--provider-name".to_string(),
+      provider_name.clone(),
+      "--consumer-version-selectors".to_string(),
+      r#"{"branch":"main"}"#.to_string(),
+      "--provider-url".to_string(),
+      provider.base_url().to_string(),
+      "--config".to_string(),
+      config.clone(),
+      "--provider-version".to_string(),
+      "2.0.0".to_string(),
+      "--publish".to_string(),
+      "--output".to_string(),
+      output.to_string(),
+    ]
+  };
+  for output in ["text", "json"] {
+    let args = verify(output);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let verified = run(&args, &secret);
+    assert_eq!(code(&verified), 0, "{}\n{}", stdout(&verified), stderr(&verified));
+    assert!(stdout(&verified).contains("published"), "{}", stdout(&verified));
+  }
+
+  // The wrong credential is refused, and is not repeated either.
+  let args = verify("text");
+  let args: Vec<&str> = args.iter().map(String::as_str).collect();
+  let refused = run(&args, &wrong);
+  assert_eq!(code(&refused), 1, "{}\n{}", stdout(&refused), stderr(&refused));
+  assert!(stdout(&refused).contains("with 401"), "{}", stdout(&refused));
+}
+
 #[test]
 fn publishing_to_a_broker_nobody_answers_for_fails_and_names_it() {
   let output = janus(&[

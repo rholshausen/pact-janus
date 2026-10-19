@@ -164,7 +164,9 @@ jobs:
         run: cargo run --package pact_janus_verifier_diff -- run --json target/verifier-diff.json
       - name: Publish to the broker, and verify from it
         # `janus publish` a pact and a Janus contract, then `janus verify --broker-url` over what the
-        # broker serves back (S1.3). The same tests skip wherever JANUS_PACT_BROKER is unset.
+        # broker serves back (S1.3); and both behind basic auth and a bearer token, at trace, failing
+        # if a credential appears in anything printed. The same tests skip wherever
+        # JANUS_PACT_BROKER is unset.
         run: cargo test --package pact_janus_cli --test cli -- broker
         env:
           JANUS_PACT_BROKER: ${{ env.VERIFIER_DIFF_BROKER }}

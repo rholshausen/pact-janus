@@ -141,11 +141,20 @@ fn init_tracing(level: Option<LogLevel>) {
     Some(level) => EnvFilter::new(level.as_str()),
     None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
   };
+  let filter = without_credentials(filter);
   tracing_subscriber::fmt()
     .with_env_filter(filter)
     .with_writer(std::io::stderr)
     .with_ansi(stderr_supports_colour())
     .init();
+}
+
+/// `filter`, with what would log a credential held back however much was asked for: at `trace`,
+/// the HTTP library dumps every request's bytes, the broker's `Authorization` header among them
+/// (engine-protocol spec §8.7: a credential is never repeated in a log). Its `debug` is kept, and
+/// redacts headers. `janus` and `janus-engine` share the rule.
+pub fn without_credentials(filter: tracing_subscriber::EnvFilter) -> tracing_subscriber::EnvFilter {
+  filter.add_directive("ureq_proto=debug".parse().expect("a valid directive"))
 }
 
 /// Whether logs on stderr may be coloured: `janus` and `janus-engine` share the rule.
