@@ -24,6 +24,11 @@ broker-facing request with `component-unavailable` naming `broker`.
   `verification/published` event, and the summary lists them as `publication`. A publish that
   fails is reported and does not change the verdict. `publish` with an `inline` source is refused
   as `malformed-frame`.
+- **The client retries only what waiting can fix.** A broker that does not answer, or answers
+  with a 5xx, is tried three times in all, with a short backoff. A 429 is retried only when it carries
+  `Retry-After`, after that delay. PactFlow answers 429 for a plan's limit, and no retry gets past
+  that. A `Retry-After` longer than 10 seconds is reported at once, with the delay, rather than waited
+  for. Everything else the broker refuses is reported at once as `broker-refused`.
 - **`janus verify` has today's broker options**, spelled as `pact_verifier_cli` spells them:
   `--broker-url`, `--provider-name`, `--consumer-version-selectors`, `--enable-pending`,
   `--include-wip-pacts-since`, `--provider-version`, `--provider-branch`, `--provider-tags`,

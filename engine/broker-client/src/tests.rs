@@ -438,3 +438,81 @@ fn a_publication_the_broker_will_not_take_is_refused_in_its_own_words() {
 fn accept_encoding_names_gzip_only_with_a_weight_above_zero(#[case] value: &str, #[case] names: bool) {
   assert_eq!(names_gzip(value), names);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Retrying
+// ---------------------------------------------------------------------------------------------
+
+/// A broker that gives `answers` in turn (a status, and a `Retry-After` when it sends one), then 200
+/// `{}`, and counts what it was asked.
+fn answering(answers: Vec<(u16, Option<&'static str>)>) -> (String, Arc<Mutex<usize>>) {
+  let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+  let base = format!("http://{}", server.server_addr().to_ip().unwrap());
+  let asked = Arc::new(Mutex::new(0));
+  let count = Arc::clone(&asked);
+  std::thread::spawn(move || {
+    let mut answers = answers.into_iter();
+    for request in server.incoming_requests() {
+      *count.lock().unwrap() += 1;
+      let (status, retry_after) = answers.next().unwrap_or((200, None));
+      let body = if status == 200 {
+        "{}".to_string()
+      } else {
+        json!({ "error": format!("answered {status}") }).to_string()
+      };
+      let mut response = tiny_http::Response::from_string(body).with_status_code(status);
+      if let Some(retry_after) = retry_after {
+        response = response.with_header(tiny_http::Header::from_bytes("Retry-After", retry_after).unwrap());
+      }
+      let _ = request.respond(response);
+    }
+  });
+  (base, asked)
+}
+
+#[test]
+fn a_429_with_no_retry_after_is_a_limit_and_is_not_retried() {
+  let (url, asked) = answering(vec![(429, None)]);
+  let err = HalBrokerClient::new()
+    .send(&descriptor(&url), "GET", &url, None)
+    .unwrap_err();
+  assert_eq!(err.code, "broker-refused");
+  assert_eq!(err.details.as_ref().unwrap()["status"], 429);
+  assert!(err.message.ends_with("with 429: answered 429"), "{}", err.message);
+  assert_eq!(*asked.lock().unwrap(), 1);
+}
+
+#[test]
+fn a_429_that_says_when_to_retry_is_tried_again_then() {
+  let (url, asked) = answering(vec![(429, Some("0"))]);
+  HalBrokerClient::new()
+    .send(&descriptor(&url), "GET", &url, None)
+    .unwrap();
+  assert_eq!(*asked.lock().unwrap(), 2);
+}
+
+#[test]
+fn a_retry_after_longer_than_the_client_waits_is_reported_at_once() {
+  let (url, asked) = answering(vec![(503, Some("120"))]);
+  let err = HalBrokerClient::new()
+    .send(&descriptor(&url), "GET", &url, None)
+    .unwrap_err();
+  assert_eq!(err.code, "broker-refused");
+  assert_eq!(err.details.as_ref().unwrap()["retry-after"], 120);
+  assert!(err.message.contains("tried again in 120s"), "{}", err.message);
+  assert_eq!(*asked.lock().unwrap(), 1);
+}
+
+#[test]
+fn a_5xx_is_retried_until_the_attempts_run_out() {
+  let (url, asked) = answering(vec![
+    (502, None),
+    (503, Some("Wed, 21 Oct 2026 07:28:00 GMT")),
+    (500, None),
+  ]);
+  let err = HalBrokerClient::new()
+    .send(&descriptor(&url), "GET", &url, None)
+    .unwrap_err();
+  assert_eq!(err.details.as_ref().unwrap()["status"], 500);
+  assert_eq!(*asked.lock().unwrap(), 3);
+}

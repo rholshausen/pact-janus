@@ -39,10 +39,15 @@ use std::time::Duration;
 
 const HAL: &str = "application/hal+json, application/json";
 
-/// How many times a request the broker answered with a 5xx, a 429 or nothing at all is tried in all.
-/// Today's verifier retries more (eight, with doubling delays); three keeps a run that cannot reach
-/// its broker from waiting minutes to say so. S1.5 makes it an option.
+/// How many times a request is tried in all, when nothing answered it, the broker answered a 5xx,
+/// or it answered 429 and said when to try again. Today's verifier retries more (eight, with
+/// doubling delays); three keeps a run that cannot reach its broker from waiting minutes to say so.
+/// S1.5 makes it an option.
 const ATTEMPTS: u32 = 3;
+
+/// The longest `Retry-After` the client waits for. A broker that asks for longer is reported at
+/// once, with what it asked, rather than holding a run for it.
+const LONGEST_RETRY_AFTER: Duration = Duration::from_secs(10);
 
 pub struct HalBrokerClient {
   agent: ureq::Agent,
@@ -237,6 +242,12 @@ struct Answer {
   accepts_gzip: bool,
 }
 
+/// A `Retry-After` in delta-seconds (RFC 9110 §10.2.3). The HTTP-date form is not read: the
+/// client's own backoff stands in for it.
+fn parse_retry_after(value: &str) -> Option<Duration> {
+  value.trim().parse::<u64>().ok().map(Duration::from_secs)
+}
+
 /// Whether an `Accept-Encoding` value names gzip with a weight above zero (RFC 7694 §3).
 fn names_gzip(value: &str) -> bool {
   value.split(',').any(|coding| {
@@ -356,10 +367,12 @@ impl HalBrokerClient {
       if compress { gzip(&bytes) } else { bytes }
     });
     let mut last = None;
+    let mut wait = None;
     for attempt in 1..=ATTEMPTS {
-      if attempt > 1 {
-        std::thread::sleep(Duration::from_millis(500 * u64::from(attempt - 1)));
+      if let Some(wait) = wait.take() {
+        std::thread::sleep(wait);
       }
+      let backoff = Duration::from_millis(500 * u64::from(attempt));
       let mut request = ureq::http::Request::builder()
         .method(method)
         .uri(url)
@@ -391,6 +404,7 @@ impl HalBrokerClient {
             broker,
             &format!("{method} {shown}: {}", redacted(broker, &err.to_string())),
           ));
+          wait = Some(backoff);
           continue;
         }
         Ok(Ok(response)) => response,
@@ -402,10 +416,34 @@ impl HalBrokerClient {
         .iter()
         .filter_map(|value| value.to_str().ok())
         .any(names_gzip);
+      let retry_after = response
+        .headers()
+        .get("retry-after")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
       let text = response.body_mut().read_to_string().unwrap_or_default();
-      if status >= 500 || status == 429 {
-        tracing::debug!(%method, url = %shown, attempt, status, "the broker is unavailable");
+      // A 429 is retried only when the broker says when to: PactFlow answers 429 for a plan's limit
+      // (a new integration past the maximum), which no wait changes. A 5xx is retried with the
+      // client's own backoff, unless the broker asked for a delay of its own.
+      if status >= 500 || (status == 429 && retry_after.is_some()) {
+        let delay = match retry_after.as_deref().map(parse_retry_after) {
+          None | Some(None) => backoff,
+          Some(Some(delay)) if delay <= LONGEST_RETRY_AFTER => delay,
+          Some(Some(delay)) => {
+            let mut error = refused(broker, method, &shown, status, &text);
+            error.message.push_str(&format!(
+              " (it asked to be tried again in {}s, longer than this client waits)",
+              delay.as_secs()
+            ));
+            if let Some(details) = error.details.as_mut() {
+              details["retry-after"] = json!(delay.as_secs());
+            }
+            return Err(error);
+          }
+        };
+        tracing::debug!(%method, url = %shown, attempt, status, ?delay, "the broker is unavailable");
         last = Some(refused(broker, method, &shown, status, &text));
+        wait = Some(delay);
         continue;
       }
       if !(200..300).contains(&status) {
