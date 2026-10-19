@@ -254,7 +254,8 @@ pub struct VerifyArgs {
                         to warn.\n\nThis command reads documents and decides; it never contacts \
                         the provider. Verify first (janus verify ... --output json > result.json) \
                         and pass the result with --verification: a pair with no verification \
-                        result is reported as unverified, which is not a pass."
+                        result is reported as unverified, which is not a pass.",
+  arg_required_else_help = true
 )]
 pub struct CheckArgs {
   /// Consumer contracts or v1-v4 pacts, or directories of them
@@ -306,9 +307,12 @@ impl Severity {
 }
 
 #[derive(Debug, Args)]
-#[command(after_help = "To see why a live verification failed, use janus verify \
+#[command(
+  after_help = "To see why a live verification failed, use janus verify \
                         --explain-failures instead: it prints the executed plan against what the \
-                        provider actually sent.")]
+                        provider actually sent.",
+  arg_required_else_help = true
+)]
 pub struct ExplainArgs {
   /// An interaction specification, a Janus contract, or a v1-v4 pact
   #[arg(value_name = "DOCUMENT")]
@@ -340,7 +344,8 @@ pub struct ExplainArgs {
 #[command(
   after_help = "A converted pact has one variant per interaction, because one example is \
                         one variant; growing it is the consumer test suite's job. Verifying a pact \
-                        needs no conversion: janus verify reads v1-v4 pacts directly."
+                        needs no conversion: janus verify reads v1-v4 pacts directly.",
+  arg_required_else_help = true
 )]
 pub struct UpgradeArgs {
   /// The v1-v4 pact to convert
@@ -372,7 +377,8 @@ pub struct UpgradeArgs {
                         Pact Broker accepts. Contracts from several consumers are published one \
                         consumer at a time, each for the same version.\n\nExit status: 0 \
                         published; 2 something was not published (the broker refused it or could \
-                        not be reached), or the command could not run."
+                        not be reached), or the command could not run.",
+  arg_required_else_help = true
 )]
 pub struct PublishArgs {
   /// Janus contracts or v1-v4 pact files, or directories of them
@@ -462,6 +468,7 @@ pub enum ComponentCommand {
 }
 
 #[derive(Debug, Args)]
+#[command(arg_required_else_help = true)]
 pub struct PushArgs {
   /// The component to publish
   #[arg(value_name = "COMPONENT_WASM")]
@@ -477,6 +484,7 @@ pub struct PushArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(arg_required_else_help = true)]
 pub struct PullArgs {
   /// What to fetch: registry/repository:tag, or registry/repository@sha256:...
   #[arg(value_name = "REFERENCE")]
@@ -493,7 +501,8 @@ pub struct PullArgs {
 
 #[derive(Debug, Args)]
 #[command(
-  after_help = "For example, for bash: janus completions bash > ~/.local/share/bash-completion/completions/janus"
+  after_help = "For example, for bash: janus completions bash > ~/.local/share/bash-completion/completions/janus",
+  arg_required_else_help = true
 )]
 pub struct CompletionsArgs {
   /// The shell to generate the script for
