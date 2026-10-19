@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792449638916,
+  "lastUpdate": 1792449640479,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -9876,6 +9876,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 29999,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3302d687e7dd764544b8ecb4c9439cc391ac87cb",
+          "message": "fix: the rename rehearsal rewraps the CLI's help and renames recorded contracts\n\nThe weekly rehearsal failed on two tests after S1.3.\n\nThe CLI's help is wrapped to a width, so a name of another length breaks its\nlines at other words and the trycmd snapshots no longer match. The rehearsal\nnow rewrites them from the renamed CLI and fails unless they read word for word\nas the renamed snapshots did; Documentation/codename.md adds the same step to\nrenaming for real.\n\nThe broker client's recording held each published contract as the base64 the\nbroker's API takes, so the rename could not reach the codename in its\n$format. The recording now holds the contract decoded, re-recorded against the\npinned broker.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T09:26:56+11:00",
+          "tree_id": "9694828db237c187314688ce8a046001e8e69605",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3302d687e7dd764544b8ecb4c9439cc391ac87cb"
+        },
+        "date": 1792449640181,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28215,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21506,
             "unit": "requests per second",
             "extra": "engines 4"
           }
