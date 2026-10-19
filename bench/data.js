@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792382201324,
+  "lastUpdate": 1792382202863,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -7752,6 +7752,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21879,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d206f4557fe71d1eaa3005d3c0b2a60e7a2f30c0",
+          "message": "fix: S1.3 the broker client retries a 429 only when the broker says when\n\nPactFlow answers 429 when a publication would create an integration past the plan's limit, and\nno retry gets past that. The client now retries a 429 only when it carries Retry-After, after that\ndelay; a 5xx keeps the client's own backoff unless the broker asks for a delay of its own; and a\nRetry-After longer than 10 seconds is reported at once, with the delay, rather than waited for.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-19T14:42:11+11:00",
+          "tree_id": "3cc7f258c0fd9a2fa803dfd33485166be3ee95e6",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d206f4557fe71d1eaa3005d3c0b2a60e7a2f30c0"
+        },
+        "date": 1792382202521,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27626,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21903,
             "unit": "requests per second",
             "extra": "engines 4"
           }
