@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792458342849,
+  "lastUpdate": 1792458345143,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -11646,6 +11646,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21486,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0f33682e29bee578028e7d6385b50767054ce136",
+          "message": "fix: the broker recording normalises the engine version in the broker's echo of a result\n\nThe recording wrote the engine's version as {engine-version} in the\nverification result the client publishes, but not in the broker's 201\nanswer, which echoes verifiedBy back. A release moving the version\ntherefore changed the recording, and CI's re-record failed on the\nrelease PR. Response bodies now get the same normalisation.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T11:50:53+11:00",
+          "tree_id": "de3eabcb4f4f53a850182539c82b2ee342414dc8",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0f33682e29bee578028e7d6385b50767054ce136"
+        },
+        "date": 1792458344364,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28538,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21765,
             "unit": "requests per second",
             "extra": "engines 4"
           }
