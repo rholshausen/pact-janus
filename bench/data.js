@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792459557813,
+  "lastUpdate": 1792459560939,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -12000,6 +12000,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21765,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41898282+github-actions[bot]@users.noreply.github.com",
+            "name": "github-actions[bot]",
+            "username": "github-actions[bot]"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "79f09d6af69b2a1f0044e77474fc5f38490aa6ed",
+          "message": "chore: release 0.2.0",
+          "timestamp": "2026-10-20T12:21:26+11:00",
+          "tree_id": "362620dfa584c8ad505abb2dbf71c4f5ef01d478",
+          "url": "https://github.com/rholshausen/pact-janus/commit/79f09d6af69b2a1f0044e77474fc5f38490aa6ed"
+        },
+        "date": 1792459559232,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 31006,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 22932,
             "unit": "requests per second",
             "extra": "engines 4"
           }
