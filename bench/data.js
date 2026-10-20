@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792475186629,
+  "lastUpdate": 1792475188927,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -13062,6 +13062,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21341,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "5db014a1a66d0ab9a7be1220bf817209f4b04e0c",
+          "message": "feat: S1.4 a v1–v4 pact's request generators are applied in verification\n\nADR 0034. The v1–v4 generator vocabulary is the generator component `pact`,\nbuilt into the kernel behind generator/generate and producing values with\npact_models, as today's verifier does. Verifying a pact generates the request's\npath, headers, query and JSON body after state setup and before before-request;\nresponse generators are not applied, as today.\n\nA state-setup hook result carries `values`, and the pact-state-change format\nreads a JSON object reply as them, so a state endpoint that returns {\"id\": 1234}\nfeeds ${id} unchanged. A generator that produces nothing keeps the recorded\nvalue, as today, and the run emits a generator-failed verification/warning.\n\nS1.1's corpus gains four generators/ fixtures (pact-reference's issue #441 case,\na state-change reply into a path and header, every value generator from the\ncompatibility suite, and an expression with nothing to read); the harness's\nroutes gain `patterns` and its state callback a `values` answer. All agree with\ntoday's verifier; janus from before this disagreed on all but the last.\n\nSpecs: lifecycle-hooks §3.2, §4.4, §8.4, §10.2; component-interfaces §7.3 and\n§11.1 (unknown-generator, generate-failed); the verification/warning event,\nemitted since the prototype, now in the protocol's event table and schema, with\nthe bindings regenerated. Generators in contracts are the new item S1.19.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T16:33:02+11:00",
+          "tree_id": "f9cb2b823af26259e7c5031b2521e8165178036a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/5db014a1a66d0ab9a7be1220bf817209f4b04e0c"
+        },
+        "date": 1792475188195,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28390,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21584,
             "unit": "requests per second",
             "extra": "engines 4"
           }
