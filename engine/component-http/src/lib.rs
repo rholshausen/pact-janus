@@ -406,11 +406,24 @@ impl TransportComponent for HttpTransport {
       .build();
     let agent: ureq::Agent = config.into();
 
+    // The HTTP library hides a URL's path below `trace`, since it cannot know which paths are
+    // secret. These come from the contract, so they are logged in full, without any user
+    // information the base URL carries.
+    let method = outbound.method_ref().map(ToString::to_string).unwrap_or_default();
+    let url = outbound
+      .uri_ref()
+      .map(|uri| pact_janus_kernel::broker::without_userinfo(&uri.to_string()))
+      .unwrap_or_default();
+    tracing::debug!(%method, %url, "sending the request to the provider");
     let response = agent
       .run(outbound.body(body.as_slice()).map_err(|err| {
         ComponentError::transport_failed(format!("could not build the outbound request: {err}"))
       })?)
-      .map_err(|err| ComponentError::transport_failed(err.to_string()))?;
+      .map_err(|err| {
+        tracing::debug!(%method, %url, error = %err, "the provider did not answer");
+        ComponentError::transport_failed(err.to_string())
+      })?;
+    tracing::debug!(%method, %url, status = response.status().as_u16(), "the provider answered");
 
     if !req.await_reply {
       return Ok(SendResult { reply: None });

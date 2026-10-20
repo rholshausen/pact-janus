@@ -393,6 +393,9 @@ impl HalBrokerClient {
       if let Some(authorization) = authorization(broker) {
         request = request.header("authorization", authorization);
       }
+      // The HTTP library hides a URL's path below `trace`; the broker's are HAL links with no
+      // secret in them, so they are logged in full, without user information.
+      tracing::debug!(%method, url = %shown, attempt, "sending the request to the broker");
       let sent = match &payload {
         Some(payload) => request
           .body(payload.as_slice())
@@ -413,6 +416,7 @@ impl HalBrokerClient {
         Ok(Ok(response)) => response,
       };
       let status = response.status().as_u16();
+      tracing::debug!(%method, url = %shown, attempt, status, "the broker answered");
       let accepts_gzip = response
         .headers()
         .get_all("accept-encoding")

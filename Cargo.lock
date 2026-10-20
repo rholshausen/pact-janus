@@ -2332,6 +2332,7 @@ dependencies = [
  "pretty_assertions",
  "serde_json",
  "tiny_http",
+ "tracing",
  "ureq",
 ]
 
