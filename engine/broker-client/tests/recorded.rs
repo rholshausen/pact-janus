@@ -18,12 +18,12 @@
 //! A recording is normalised so the same broker gives the same file: the broker's URL is written as
 //! `http://pact-broker.invalid` (the client fetches every link from the broker it was given, so a
 //! replay is served from its own), timestamps as one fixed instant, and the engine's version in a
-//! published result as `{engine-version}`. The broker's database ids, which no deletion resets (a
-//! verification result's number, and the consumer version id inside a pact link's base64
-//! `metadata` segment), are numbered from 1 in the order they first appear, in requests and
-//! responses alike, so every link the client follows is still one the recording served. The
-//! scenario's pacticipants are deleted before it is recorded, so it starts from nothing however
-//! often it runs.
+//! published result, and in the broker's echo of it, as `{engine-version}`. The broker's database
+//! ids, which no deletion resets (a verification result's number, and the consumer version id
+//! inside a pact link's base64 `metadata` segment), are numbered from 1 in the order they first
+//! appear, in requests and responses alike, so every link the client follows is still one the
+//! recording served. The scenario's pacticipants are deleted before it is recorded, so it starts
+//! from nothing however often it runs.
 //!
 //! A published contract's `content`, which the broker's API takes as base64, is held decoded: the
 //! recording can be read, and the codename in a contract's `$format` is renamed with the rest of
@@ -266,8 +266,8 @@ type Exchanges = Arc<Mutex<Vec<Value>>>;
 /// The response headers the client reads; the rest would only make a recording noisier.
 const KEPT_HEADERS: [&str; 3] = ["content-type", "accept-encoding", "retry-after"];
 
-/// A request body as the recording compares it: the engine's own version is not the broker's
-/// business, and changes every release; and a published contract's content is decoded, so the
+/// A request body as the recording compares it: without the engine's own version, which is not
+/// the broker's business; and a published contract's content is decoded, so the
 /// recording holds the document rather than its base64.
 fn normalised_request(body: &str) -> Value {
   let mut body: Value = match serde_json::from_str(body) {
@@ -275,9 +275,7 @@ fn normalised_request(body: &str) -> Value {
     Err(_) if body.is_empty() => return Value::Null,
     Err(_) => return Value::String(body.to_string()),
   };
-  if body["verifiedBy"]["version"].is_string() {
-    body["verifiedBy"]["version"] = json!("{engine-version}");
-  }
+  without_engine_version(&mut body);
   if let Some(contracts) = body["contracts"].as_array_mut() {
     for contract in contracts {
       let decoded = contract["content"]
@@ -290,6 +288,15 @@ fn normalised_request(body: &str) -> Value {
     }
   }
   body
+}
+
+/// A verification result with the engine's version written as `{engine-version}`: the client
+/// publishes it, and the broker echoes it back in its answer, so it is in requests and responses
+/// alike, and changes every release.
+fn without_engine_version(body: &mut Value) {
+  if body["verifiedBy"]["version"].is_string() {
+    body["verifiedBy"]["version"] = json!("{engine-version}");
+  }
 }
 
 /// What a recording writes in place of what differs from one recording to the next.
@@ -358,7 +365,9 @@ impl Normaliser {
   /// A body as a recording holds it: JSON when it is JSON.
   fn body(&mut self, body: &str) -> Value {
     let body = self.text(body);
-    serde_json::from_str(&body).unwrap_or(Value::String(body))
+    let mut body = serde_json::from_str(&body).unwrap_or(Value::String(body));
+    without_engine_version(&mut body);
+    body
   }
 }
 

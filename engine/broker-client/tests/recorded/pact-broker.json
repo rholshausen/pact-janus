@@ -1691,7 +1691,7 @@
               "verificationDate": "2000-01-01T00:00:00+00:00",
               "verifiedBy": {
                 "implementation": "Pact Janus",
-                "version": "0.1.0"
+                "version": "{engine-version}"
               }
             },
             "headers": {
@@ -1938,7 +1938,7 @@
               "verificationDate": "2000-01-01T00:00:00+00:00",
               "verifiedBy": {
                 "implementation": "Pact Janus",
-                "version": "0.1.0"
+                "version": "{engine-version}"
               }
             },
             "headers": {
