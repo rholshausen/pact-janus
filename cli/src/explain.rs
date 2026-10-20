@@ -15,6 +15,7 @@ use crate::Outcome;
 use crate::args::ExplainArgs;
 use crate::engine;
 use crate::error::Error;
+use crate::highlight;
 use crate::io;
 use pact_janus_kernel::plan::{self, CapturedValues};
 use serde_json::{Value, json};
@@ -66,7 +67,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
       Ok(Outcome::Done)
     }
     None => {
-      outln!("{}", result["text"].as_str().unwrap_or_default());
+      outln_styled!("{}", highlight::plan(result["text"].as_str().unwrap_or_default()));
       Ok(Outcome::Done)
     }
   }
@@ -86,7 +87,7 @@ fn executed(document: &Value, values_path: &Path) -> Result<Outcome, Error> {
   let values: BTreeMap<String, Value> = map.into_iter().collect();
   let plan = plan::from_json(document).map_err(|err| format!("the engine's plan document: {err}"))?;
   let executed = plan::execute(&plan, &CapturedValues::from_json(&values));
-  outln!("{}", plan::render_executed(&executed));
+  outln_styled!("{}", highlight::plan(&plan::render_executed(&executed)));
   Ok(match plan::outcome(&executed).0 {
     plan::Status::Matched => Outcome::Done,
     plan::Status::Mismatched => Outcome::SubjectFailed,

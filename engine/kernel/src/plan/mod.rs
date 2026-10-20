@@ -11,6 +11,7 @@ mod legacy;
 mod model;
 mod render;
 mod resolve;
+mod tokens;
 mod value;
 
 pub use actions::{RESERVED_NAMESPACES, is_component_action};
@@ -29,4 +30,5 @@ pub use model::{
 };
 pub use render::{executed as render_executed, pretty as render_pretty};
 pub use resolve::{CapturedValues, ContentDetector, Resolver};
+pub use tokens::{Token, TokenKind, tokens};
 pub use value::{RuntimeValue, navigate};

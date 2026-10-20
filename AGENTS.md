@@ -304,7 +304,9 @@ verifier options onto them, so renaming one is a breaking change with a change f
 own tests pin both: `cli/tests/cmd/` holds trycmd cases — every `--help`, the usage errors, the
 offline commands — and `cli/tests/cli.rs` the runs that need a provider or a registry, compared
 whole with snapbox where the output is the CLI's own. After a deliberate change,
-`TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff.
+`TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff. On a terminal, `explain`
+and `--explain-failures` colour the plan (plan-grammar spec §3.3: `cli/src/highlight.rs`, over the
+kernel's `plan::tokens`); the tests run without colour whatever `CLICOLOR_FORCE` says.
 
 `check` (plan task 7.4) decides rather than tests: it reads documents that already exist — the
 consumer contracts or v1–v4 pacts, the shapes a provider published, and the summaries

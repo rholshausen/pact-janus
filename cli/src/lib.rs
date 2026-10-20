@@ -31,6 +31,7 @@ mod engine;
 mod error;
 mod explain;
 pub mod framing;
+mod highlight;
 mod io;
 pub mod logging;
 mod publish;

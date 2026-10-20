@@ -21,6 +21,8 @@ fn cli_cases() {
     // Help wraps to the terminal; a test has none, and a CI runner's COLUMNS must not decide.
     .env("COLUMNS", "100")
     .env("RUST_LOG", "off")
+    // Nor may a CLICOLOR_FORCE in the environment colour the help or a plan.
+    .env("NO_COLOR", "1")
     .case("tests/cmd/*.md")
     .case("tests/cmd/*.toml");
 }

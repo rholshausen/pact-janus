@@ -22,8 +22,16 @@ use snapbox::{assert_data_eq, str};
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+/// `janus`, with no colour whatever the environment the tests run in asks for: what it prints is
+/// compared as text. `explain_colours_the_plan_only_where_it_is_asked_for` asks for it.
+fn janus_command() -> Command {
+  let mut command = Command::new(env!("CARGO_BIN_EXE_janus"));
+  command.env_remove("CLICOLOR_FORCE");
+  command
+}
+
 fn janus(args: &[&str]) -> Output {
-  Command::new(env!("CARGO_BIN_EXE_janus"))
+  janus_command()
     .args(args)
     .output()
     .expect("the janus binary runs")
@@ -320,7 +328,7 @@ The run was aborted by the 'auth' hook at before-verification:
 /// answer, rather than panicking on the write that found the pipe gone.
 #[test]
 fn a_reader_that_stops_reading_is_not_a_crash() {
-  let mut child = Command::new(env!("CARGO_BIN_EXE_janus"))
+  let mut child = janus_command()
     .args(["explain", &order_pact(), "--plan"])
     .stdout(std::process::Stdio::piped())
     .stderr(std::process::Stdio::piped())
@@ -346,6 +354,44 @@ fn explain_compiles_a_pact_interaction_without_being_told_what_it_is() {
   assert!(text.contains(":\"a request for an order\""), "{text}");
   assert!(text.contains("%match:equality"), "{text}");
   assert!(text.contains("$.response.body.status"), "{text}");
+}
+
+/// Plan-grammar spec §3.3: the plan is coloured where colour is wanted, and the colour is all that
+/// differs. A test has no terminal, so it asks with `CLICOLOR_FORCE`, as a CI log does; `NO_COLOR`
+/// still wins.
+#[test]
+fn explain_colours_the_plan_only_where_it_is_asked_for() {
+  let explain = |env: &[(&str, &str)]| {
+    let mut command = janus_command();
+    command.args(["explain", &order_pact()]).env_remove("NO_COLOR");
+    for (key, value) in env {
+      command.env(key, value);
+    }
+    stdout(&command.output().expect("the janus binary runs"))
+  };
+  let plain = explain(&[]);
+  let coloured = explain(&[("CLICOLOR_FORCE", "1")]);
+  assert!(!plain.contains('\u{1b}'), "{plain}");
+  assert!(
+    coloured.contains("\u{1b}[1m\u{1b}[36m%match:equality\u{1b}[0m"),
+    "{coloured:?}"
+  );
+  assert_eq!(without_styling(&coloured), plain);
+  assert_eq!(explain(&[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")]), plain);
+}
+
+/// `text` without its ANSI SGR sequences, the only ones the CLI writes.
+fn without_styling(text: &str) -> String {
+  let mut out = String::new();
+  let mut rest = text;
+  while let Some(at) = rest.find("\u{1b}[") {
+    out.push_str(&rest[..at]);
+    let after = &rest[at + 2..];
+    let end = after.find('m').map_or(after.len(), |end| end + 1);
+    rest = &after[end..];
+  }
+  out.push_str(rest);
+  out
 }
 
 #[test]
@@ -724,7 +770,7 @@ fn a_broker_credential_reaches_the_broker_and_appears_nowhere_else(#[case] kind:
   };
   let door = behind_a_door(&broker, header(&secret));
   let run = |args: &[&str], secret: &str| -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_janus"));
+    let mut command = janus_command();
     command
       .args(args)
       .args(["--log-level", "trace"])
@@ -1211,7 +1257,7 @@ fn verify_without_the_component_fails_before_the_run_naming_what_is_missing() {
 
 /// `janus`, with its own component cache: what is or is not already cached is the subject here.
 fn janus_cached(cache: &str, args: &[&str]) -> Output {
-  Command::new(env!("CARGO_BIN_EXE_janus"))
+  janus_command()
     .args(args)
     .env("JANUS_COMPONENT_CACHE", cache)
     .output()

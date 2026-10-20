@@ -232,6 +232,15 @@ A node with no ` => ` was **not executed**. That is a fact worth reading — it 
 skipped or an earlier failure left the value unavailable — and it is why §2.4 requires laziness to be
 declared rather than incidental.
 
+### 3.3 Styling on a terminal
+
+A host printing either form to a terminal MAY style it, colouring each piece by what it is: a sigil,
+a value, a result. Styling only wraps the text: with it removed, what remains MUST be exactly the
+form above. The form is never styled where it is recorded or read by a program — the
+`verification/explain` result, the `verification/executed-plan` event, a corpus snapshot, a file, a
+pipe — and a host honours its platform's conventions for turning styling off and on (`NO_COLOR`,
+`CLICOLOR_FORCE`). The engine never styles; it does not know where its text is going.
+
 ## 4. The action set
 
 ### 4.1 Naming and namespacing

@@ -15,6 +15,7 @@ use crate::Outcome;
 use crate::args::{Output, VerifyArgs};
 use crate::engine;
 use crate::error::Error;
+use crate::highlight;
 use crate::io;
 use serde_json::{Value, json};
 
@@ -276,8 +277,8 @@ fn report(event: &Value) {
         payload["interaction"]["description"].as_str().unwrap_or("?"),
         payload["variant"].as_str().unwrap_or("?")
       );
-      for line in payload["text"].as_str().unwrap_or("").lines() {
-        outln!("  {line}");
+      for line in highlight::plan(payload["text"].as_str().unwrap_or("")).lines() {
+        outln_styled!("  {line}");
       }
       outln!();
     }

@@ -25,6 +25,14 @@ macro_rules! outln {
   };
 }
 
+/// `outln!` for text carrying ANSI styling ([`crate::highlight`]): written as it is where stdout
+/// shows colour, and stripped of it everywhere else.
+macro_rules! outln_styled {
+  ($($arg:tt)*) => {
+    $crate::output::out_styled(format_args!($($arg)*))
+  };
+}
+
 /// `eprintln!`, minus the panic.
 macro_rules! errln {
   () => {
@@ -37,6 +45,14 @@ macro_rules! errln {
 
 pub fn out(line: std::fmt::Arguments) {
   write_line(&STDOUT_GONE, &mut std::io::stdout().lock(), line);
+}
+
+pub fn out_styled(line: std::fmt::Arguments) {
+  write_line(
+    &STDOUT_GONE,
+    &mut anstream::AutoStream::auto(std::io::stdout().lock()),
+    line,
+  );
 }
 
 pub fn err(line: std::fmt::Arguments) {
