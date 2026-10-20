@@ -1701,6 +1701,7 @@ dependencies = [
  "pact_janus_kernel",
  "serde_json",
  "tiny_http",
+ "tracing",
  "ureq",
 ]
 
