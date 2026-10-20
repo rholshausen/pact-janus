@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792470363860,
+  "lastUpdate": 1792470365646,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -12708,6 +12708,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21073,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "6ca0f39929209673c5ce93f226b454caea18eb74",
+          "message": "fix: a contract's executed plan shows the response it was scored on\n\nA shape-compiled plan carries both parts, but verification resolves it against\nthe provider's reply alone, so the request half of the executed plan resolved\nevery path to absence and printed as failing. Only the response is scored, so\nthe verification/executed-plan event's text is now that subtree: the same as a\nv1–v4 pact's, and the plan that decided the verdict.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T15:21:40+11:00",
+          "tree_id": "ec7bead8a2e9776ea8d82a4dd606f77d48b62264",
+          "url": "https://github.com/rholshausen/pact-janus/commit/6ca0f39929209673c5ce93f226b454caea18eb74"
+        },
+        "date": 1792470365273,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27539,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21341,
             "unit": "requests per second",
             "extra": "engines 4"
           }
