@@ -28,6 +28,9 @@ bytes = "1"
 pact_janus_sample_order_service = { path = "../../samples/order-service" }
 # The broker cases: seeding the broker, and the recording proxy in front of it. Already in the tree.
 ureq = "3"
+# A route's patterns: the values a generator produces, recognised by form rather than by example.
+# Already in the tree.
+regex = "1"
 
 [dev-dependencies]
 pretty_assertions = "1"

@@ -118,7 +118,7 @@
         "config": { "type": "object" },
         "context": {
           "type": "object",
-          "description": "What the generator is allowed to know — the variant assignment, values already produced in this interaction. Open vocabulary. Ambient state (a clock, randomness) comes from the component's own runtime under its grants, not from here."
+          "description": "What the generator is allowed to know — the variant assignment, values already produced in this interaction. Open vocabulary. Ambient state (a clock, randomness) comes from the component's own runtime under its grants, not from here. Known members: 'example', the value recorded where the generated one will go, whose type a generator may keep; 'provider-state', the exchange's provider-state values (spec.md §7.3)."
         }
       }
     },

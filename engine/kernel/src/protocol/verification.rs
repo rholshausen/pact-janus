@@ -52,10 +52,12 @@ use crate::broker::{
   BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, InteractionResult, PublishRequest,
 };
 use crate::common::ContentTypes;
-use crate::component::{ContentComponent, Parts, Send as SendRequest, Stop, TransportComponent, Unavailable};
+use crate::component::{
+  ContentComponent, PactGenerators, Parts, Send as SendRequest, Stop, TransportComponent, Unavailable,
+};
 use crate::contract::{self, Contract};
 use crate::error::Problem;
-use crate::hooks::{HookRunner, Occurrence, PointOutcome};
+use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
 use crate::legacy_pact::{self, LegacyInteraction};
 use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
@@ -738,7 +740,7 @@ fn run(
     "before-verification",
     &Occurrence::default(),
     None,
-    &mut Map::new(),
+    &mut ExchangeScratch::default(),
     &stream,
   );
 
@@ -835,7 +837,7 @@ fn run(
       "after-verification",
       &occurrence,
       None,
-      &mut Map::new(),
+      &mut ExchangeScratch::default(),
       &stream,
     );
   }
@@ -921,11 +923,11 @@ fn run_point(
   point: &str,
   occurrence: &Occurrence,
   parts: Option<&mut Parts>,
-  exchange_data: &mut Map<String, Value>,
+  exchange: &mut ExchangeScratch,
   stream: &Stream,
 ) -> Option<Abort> {
   let runner = hooks?;
-  let outcome = runner.run_point(point, occurrence, parts, exchange_data, &mut |payload| {
+  let outcome = runner.run_point(point, occurrence, parts, exchange, &mut |payload| {
     stream.emit("verification/hook", payload);
   });
   match outcome {
@@ -1199,6 +1201,11 @@ struct Ready {
   /// The bytes the consumer actually sent (variant-semantics spec §5.2) — a contract's recorded
   /// variant or a pact's own request example. Never re-derived from a shape on either path.
   request: Parts,
+  /// A v1–v4 pact's own request, kept when it has generators to apply (ADR 0034): the request
+  /// sent is generated from it once the exchange's states are set up, since a `ProviderState`
+  /// generator reads what they returned. `None` on the shape path, and for a pact request with
+  /// none, which replays `request` as it stands.
+  generate_from: Option<Box<pact_models::v4::http_parts::HttpRequest>>,
   /// Pinned to this variant on the shape path, compiled from matching rules on the v1–v4 path.
   plan: plan::Plan,
   /// How the reply becomes the values `plan` resolves against. A function rather than a flag
@@ -1295,6 +1302,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         content_types: interaction.content_types.clone().unwrap_or_default(),
         states: states.unwrap_or_default(),
         request,
+        generate_from: None,
         warnings,
         interaction: json!({
           "description": interaction.description,
@@ -1382,6 +1390,8 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       content_types: ContentTypes::new(),
       states,
       request: legacy_pact::request_parts(&interaction.request),
+      generate_from: legacy_pact::has_request_generators(&interaction.request)
+        .then(|| Box::new(interaction.request.clone())),
       warnings: Vec::new(),
       interaction: json!({
         "description": interaction.description,
@@ -1514,7 +1524,7 @@ struct Exchange<'a> {
 /// runs whether the exchange passed, failed or never ran, because the state a failed exchange left
 /// behind is exactly the state that will make the next variant fail for the wrong reason.
 fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContext<'_>) -> (Value, Flow) {
-  let mut exchange_data = Map::new();
+  let mut scratch = ExchangeScratch::default();
   let base = Occurrence {
     interaction: Some(exchange.ready.interaction.clone()),
     variant: Some(json!({
@@ -1540,7 +1550,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
       state: Some(serde_json::to_value(state).unwrap_or(Value::Null)),
       ..base.clone()
     };
-    let (status, aborted) = hook_point(ctx, "state-setup", &occurrence, None, &mut exchange_data);
+    let (status, aborted) = hook_point(ctx, "state-setup", &occurrence, None, &mut scratch);
     if let Some(abort) = aborted {
       flow = Flow::Abort(abort.clone());
       result = Some(hook_failure_payload(
@@ -1565,11 +1575,16 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   }
 
   // 2. before-request, then the exchange itself. The request is the recorded one, cloned because
-  //    `before-request` may rewrite it and the recording must survive the run unchanged.
-  let mut parts = (result.is_none()).then(|| exchange.ready.request.clone());
+  //    `before-request` may rewrite it and the recording must survive the run unchanged; or, for a
+  //    pact with request generators, generated now that the states have answered (ADR 0034), so a
+  //    `before-request` hook signs the request that is actually sent.
+  let mut parts = (result.is_none()).then(|| match &exchange.ready.generate_from {
+    None => exchange.ready.request.clone(),
+    Some(request) => generated_request(exchange, request, &scratch, ctx),
+  });
 
   if let (None, Some(request)) = (&result, parts.as_mut()) {
-    let (status, aborted) = hook_point(ctx, "before-request", &base, Some(request), &mut exchange_data);
+    let (status, aborted) = hook_point(ctx, "before-request", &base, Some(request), &mut scratch);
     if let Some(abort) = aborted {
       flow = Flow::Abort(abort.clone());
       result = Some(hook_failure_payload(
@@ -1613,7 +1628,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   //    matching would be editing the evidence, and matching has already happened by here anyway.
   if let Some(inbound) = reply {
     let mut parts = inbound;
-    let (_, aborted) = hook_point(ctx, "after-response", &base, Some(&mut parts), &mut exchange_data);
+    let (_, aborted) = hook_point(ctx, "after-response", &base, Some(&mut parts), &mut scratch);
     if let Some(abort) = aborted {
       flow = Flow::Abort(abort);
     }
@@ -1650,13 +1665,46 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
       exchange: Some(json!({ "id": exchange.id, "outcome": outcome })),
       ..base.clone()
     };
-    let (_, aborted) = hook_point(ctx, "state-teardown", &occurrence, None, &mut exchange_data);
+    let (_, aborted) = hook_point(ctx, "state-teardown", &occurrence, None, &mut scratch);
     if let Some(abort) = aborted {
       flow = Flow::Abort(abort);
     }
   }
 
   (payload, flow)
+}
+
+/// A pact's request with its generators applied (ADR 0034), in the wire vocabulary a transport
+/// sends. The provider-state values are every state's `params` in order, then whatever the
+/// `state-setup` hooks returned: today's precedence (lifecycle-hooks spec §3.2). A generator that
+/// produced nothing leaves the recorded value and says so, before the result it qualifies.
+fn generated_request(
+  exchange: &Exchange<'_>,
+  request: &pact_models::v4::http_parts::HttpRequest,
+  scratch: &ExchangeScratch,
+  ctx: &RunContext<'_>,
+) -> Parts {
+  let mut provider_state = Map::new();
+  for state in &exchange.ready.states {
+    for (name, value) in state.params.iter().flatten() {
+      provider_state.insert(name.clone(), value.clone());
+    }
+  }
+  provider_state.extend(scratch.values.iter().map(|(k, v)| (k.clone(), v.clone())));
+
+  let (generated, failures) = legacy_pact::generate_request(request, &provider_state, &PactGenerators);
+  for failure in failures {
+    tracing::warn!(target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was sent");
+    ctx.stream.emit(
+      "verification/warning",
+      json!({
+        "code": "generator-failed",
+        "interaction": exchange.reference, "variant": exchange.ready.variant,
+        "target": failure.target, "generator": failure.generator, "message": failure.message,
+      }),
+    );
+  }
+  legacy_pact::request_parts(&generated)
 }
 
 /// What a point's hooks decided about this exchange, with the abort separated out because it ends
@@ -1672,13 +1720,13 @@ fn hook_point(
   point: &str,
   occurrence: &Occurrence,
   parts: Option<&mut Parts>,
-  exchange_data: &mut Map<String, Value>,
+  exchange: &mut ExchangeScratch,
 ) -> (HookStatus, Option<Abort>) {
   let stream = ctx.stream;
   let Some(runner) = ctx.hooks.as_mut() else {
     return (HookStatus::Continue, None);
   };
-  let outcome = runner.run_point(point, occurrence, parts, exchange_data, &mut |payload| {
+  let outcome = runner.run_point(point, occurrence, parts, exchange, &mut |payload| {
     stream.emit("verification/hook", payload);
   });
   match outcome {

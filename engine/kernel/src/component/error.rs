@@ -74,6 +74,40 @@ impl ComponentError {
     }
   }
 
+  /// `unknown-generator` (spec §11.1): a generator this component does not provide.
+  pub fn unknown_generator(name: &str) -> Self {
+    ComponentError {
+      code: "unknown-generator".to_string(),
+      category: "document".to_string(),
+      message: format!("no generator '{name}'"),
+      source: None,
+      details: Some(serde_json::json!({ "generator": name })),
+    }
+  }
+
+  /// `invalid-config` (spec §11.1): the configuration this call carried is not one the component
+  /// can act on.
+  pub fn invalid_config(name: &str, message: impl Into<String>) -> Self {
+    ComponentError {
+      code: "invalid-config".to_string(),
+      category: "document".to_string(),
+      message: message.into(),
+      source: None,
+      details: Some(serde_json::json!({ "name": name })),
+    }
+  }
+
+  /// `generate-failed` (spec §11.1): the generator could not produce a value from what it was given.
+  pub fn generate_failed(generator: &str, message: impl Into<String>) -> Self {
+    ComponentError {
+      code: "generate-failed".to_string(),
+      category: "document".to_string(),
+      message: message.into(),
+      source: None,
+      details: Some(serde_json::json!({ "generator": generator })),
+    }
+  }
+
   /// `internal` (spec §11.1): the component's own bug.
   pub fn internal(message: impl Into<String>) -> Self {
     ComponentError {

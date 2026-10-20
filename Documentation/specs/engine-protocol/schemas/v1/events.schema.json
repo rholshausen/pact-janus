@@ -23,6 +23,7 @@
             "verification/interaction-started",
             "verification/interaction-result",
             "verification/hook",
+            "verification/warning",
             "verification/executed-plan",
             "verification/fetched",
             "verification/published",

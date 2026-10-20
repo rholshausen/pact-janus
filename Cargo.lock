@@ -2420,6 +2420,7 @@ dependencies = [
 name = "pact_janus_kernel"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "base64 0.22.1",
  "jsonschema",
  "pact_janus_component_http",
@@ -2486,6 +2487,7 @@ dependencies = [
  "pact_janus_sample_order_service",
  "pact_models",
  "pretty_assertions",
+ "regex",
  "rstest 0.26.1",
  "serde",
  "serde_json",

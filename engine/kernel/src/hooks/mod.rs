@@ -34,5 +34,5 @@ pub use config::{HookConfig, HookEntry, RunSpec, When};
 pub use invoke::{HookFailure, HookInvoker, InvokeResult, Outcome};
 pub use points::{Policy, Scope, point};
 pub use report::{HookReport, Invocation};
-pub use runner::{ConfigError, HookRunner, Occurrence, PointOutcome};
+pub use runner::{ConfigError, ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 pub use script::ScriptHooks;

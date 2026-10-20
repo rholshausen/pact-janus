@@ -50,6 +50,15 @@ pub enum PointOutcome {
   Abort { hook: String, error: Value },
 }
 
+/// What one exchange's hooks leave behind for the rest of it (spec §4.4, §3.2): each hook's `data`,
+/// keyed by its name, and the provider-state values `state-setup` hooks returned, merged in the
+/// order they ran. Both end with the exchange.
+#[derive(Debug, Clone, Default)]
+pub struct ExchangeScratch {
+  pub data: Map<String, Value>,
+  pub values: Map<String, Value>,
+}
+
 /// What an occurrence of a point is *about*: the facts a `when` selector can name and the context
 /// members the point carries. Assembled by the caller (the verification run), because only it knows
 /// where it is.
@@ -149,8 +158,8 @@ impl HookRunner {
   }
 
   /// Invoke every hook at `point` that this occurrence admits. `parts` is the parts in flight,
-  /// mutated in place by whatever changes are declared, permitted and applied; `exchange_data`
-  /// accumulates exchange-scope `data`. Every invocation is handed to `emit` as a
+  /// mutated in place by whatever changes are declared, permitted and applied; `exchange`
+  /// accumulates exchange-scope `data` and provider-state `values`. Every invocation is handed to `emit` as a
   /// `verification/hook` event payload before the next one runs, so a host watching the stream
   /// sees hook activity as it happens rather than at the end.
   pub fn run_point(
@@ -158,7 +167,7 @@ impl HookRunner {
     point_name: &str,
     occurrence: &Occurrence,
     parts: Option<&mut Parts>,
-    exchange_data: &mut Map<String, Value>,
+    exchange: &mut ExchangeScratch,
     emit: &mut dyn FnMut(Value),
   ) -> PointOutcome {
     let Some(point) = point(point_name) else {
@@ -188,7 +197,7 @@ impl HookRunner {
         continue;
       }
 
-      let outcome = self.invoke_entry(point, entry, occurrence, parts, exchange_data, emit);
+      let outcome = self.invoke_entry(point, entry, occurrence, parts, exchange, emit);
       match outcome {
         PointOutcome::Continue => continue,
         // "remaining hooks at the point do not run" (spec §5.2)
@@ -205,11 +214,11 @@ impl HookRunner {
     entry: &HookEntry,
     occurrence: &Occurrence,
     parts: &mut Parts,
-    exchange_data: &mut Map<String, Value>,
+    exchange: &mut ExchangeScratch,
     emit: &mut dyn FnMut(Value),
   ) -> PointOutcome {
     let deadline_ms = entry.timeout_ms(point);
-    let context = self.context(point, entry, occurrence, parts, exchange_data, deadline_ms);
+    let context = self.context(point, entry, occurrence, parts, &exchange.data, deadline_ms);
     let started = Instant::now();
 
     let answered = match entry.run.kind() {
@@ -234,13 +243,14 @@ impl HookRunner {
       changed: Vec::new(),
       duration_ms: 0,
       data: None,
+      values: None,
       error: None,
     };
 
     let mut outcome = match answered {
       Ok(result) => {
         invocation.outcome = result.outcome();
-        self.absorb(entry, &result, occurrence, exchange_data, &mut invocation);
+        self.absorb(entry, &result, exchange, &mut invocation);
         match result.outcome() {
           Outcome::Ok | Outcome::Skipped => {
             match apply_changes(&result, entry, point, parts) {
@@ -336,10 +346,21 @@ impl HookRunner {
     &mut self,
     entry: &HookEntry,
     result: &InvokeResult,
-    occurrence: &Occurrence,
-    exchange_data: &mut Map<String, Value>,
+    exchange: &mut ExchangeScratch,
     invocation: &mut Invocation,
   ) {
+    // Provider-state values mean something at `state-setup` only (spec §3.2). A later member
+    // replaces an earlier one: today's verifiers' precedence.
+    if invocation.point == "state-setup"
+      && let Some(values) = &result.values
+    {
+      if entry.report_data {
+        invocation.values = Some(Value::Object(values.clone()));
+      }
+      exchange
+        .values
+        .extend(values.iter().map(|(key, value)| (key.clone(), value.clone())));
+    }
     let Some(data) = result.data.clone() else {
       return;
     };
@@ -354,8 +375,7 @@ impl HookRunner {
         self.run_data.insert(entry.name.clone(), data);
       }
       _ => {
-        let _ = occurrence;
-        exchange_data.insert(entry.name.clone(), data);
+        exchange.data.insert(entry.name.clone(), data);
       }
     }
   }

@@ -44,7 +44,7 @@ impl ScriptedProvider {
           if stop.load(Ordering::Relaxed) {
             break;
           }
-          handle(request, &routes, callback, &states, &failed_once);
+          handle(request, &routes, &callback, &states, &failed_once);
         }
       })
     };
@@ -78,7 +78,7 @@ impl Drop for ScriptedProvider {
 fn handle(
   mut request: tiny_http::Request,
   routes: &[Route],
-  callback: StateCallback,
+  callback: &StateCallback,
   states: &Mutex<Vec<String>>,
   failed_once: &AtomicBool,
 ) {
@@ -92,7 +92,7 @@ fn handle(
       StateCallback::FailOnce if !failed_once.swap(true, Ordering::Relaxed) => {
         text(503, "the provider state callback is not ready yet; try again")
       }
-      StateCallback::None | StateCallback::Ok | StateCallback::FailOnce => {
+      StateCallback::None | StateCallback::Ok | StateCallback::FailOnce | StateCallback::Values(_) => {
         let call: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
         let teardown = call["action"].as_str() == Some("teardown");
         if let Some(state) = call["state"]
@@ -101,7 +101,13 @@ fn handle(
         {
           states.lock().expect("states").push(state.to_string());
         }
-        text(200, "{}")
+        match callback {
+          // Today's verifier reads values only from a reply that says it is JSON.
+          StateCallback::Values(values) if !teardown => {
+            json(200, &serde_json::Value::Object(values.clone()).to_string())
+          }
+          _ => text(200, "{}"),
+        }
       }
     };
     let _ = request.respond(response);
@@ -169,14 +175,35 @@ pub fn choose<'a>(routes: &'a [Route], incoming: &Incoming, set_up: &[String]) -
 
 fn recognises(route: &Route, incoming: &Incoming) -> bool {
   let example = &route.request;
-  if !example.method.eq_ignore_ascii_case(&incoming.method) || example.path != incoming.path {
+  let pattern = |position: &str| example.patterns.get(position).map(|pattern| whole(pattern));
+  if !example.method.eq_ignore_ascii_case(&incoming.method) {
     return false;
   }
-  let expected_query = example.query.clone().unwrap_or_default();
-  if expected_query != incoming.query {
+  let path_matches = match pattern("path") {
+    Some(regex) => regex.is_match(&incoming.path),
+    None => example.path == incoming.path,
+  };
+  if !path_matches {
     return false;
   }
+
+  let mut expected_query = example.query.clone().unwrap_or_default();
+  let mut actual_query = incoming.query.clone();
+  for name in expected_query.keys().cloned().collect::<Vec<_>>() {
+    if let Some(regex) = pattern(&format!("query.{name}")) {
+      let actual = actual_query.remove(&name).unwrap_or_default();
+      if actual.is_empty() || !actual.iter().all(|value| regex.is_match(value)) {
+        return false;
+      }
+      expected_query.remove(&name);
+    }
+  }
+  if expected_query != actual_query {
+    return false;
+  }
+
   for (name, values) in &example.headers {
+    let regex = pattern(&format!("headers.{name}"));
     let name = name.to_ascii_lowercase();
     let actual: Vec<String> = incoming
       .headers
@@ -184,6 +211,12 @@ fn recognises(route: &Route, incoming: &Incoming) -> bool {
       .filter(|(field, _)| *field == name)
       .flat_map(|(_, value)| split_header(&name, value))
       .collect();
+    if let Some(regex) = regex {
+      if actual.is_empty() || !actual.iter().all(|value| regex.is_match(value)) {
+        return false;
+      }
+      continue;
+    }
     let expected: Vec<String> = values
       .iter()
       .flat_map(|value| split_header(&name, value))
@@ -192,13 +225,45 @@ fn recognises(route: &Route, incoming: &Incoming) -> bool {
       return false;
     }
   }
+
   match &example.body {
     None => true,
     Some(Body::Json(expected)) => {
-      serde_json::from_slice::<serde_json::Value>(&incoming.body).is_ok_and(|actual| &actual == expected)
+      let Ok(mut actual) = serde_json::from_slice::<serde_json::Value>(&incoming.body) else {
+        return false;
+      };
+      let mut expected = expected.clone();
+      for (position, regex) in &example.patterns {
+        let Some(pointer) = position.strip_prefix("body") else {
+          continue;
+        };
+        let Some(value) = actual.pointer_mut(pointer) else {
+          return false;
+        };
+        let text = match &*value {
+          serde_json::Value::String(text) => text.clone(),
+          other => other.to_string(),
+        };
+        if !whole(regex).is_match(&text) {
+          return false;
+        }
+        // Recognised by its pattern, so neither side's value is compared any further.
+        *value = serde_json::Value::Null;
+        if let Some(value) = expected.pointer_mut(pointer) {
+          *value = serde_json::Value::Null;
+        }
+      }
+      actual == expected
     }
     Some(body) => body.bytes() == incoming.body,
   }
+}
+
+/// `pattern`, anchored so it must match the whole value. A fixture's pattern that does not parse is
+/// a broken fixture, so it matches nothing and the route is never chosen.
+fn whole(pattern: &str) -> regex::Regex {
+  regex::Regex::new(&format!("^(?:{pattern})$"))
+    .unwrap_or_else(|_| regex::Regex::new("[^\\s\\S]").expect("a valid regex"))
 }
 
 /// A header's values as pact compares them: split on commas, trimmed; a content type compared by
@@ -227,6 +292,11 @@ fn respond(route: &Route) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
 
 fn text(status: u16, body: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
   tiny_http::Response::from_data(body.as_bytes().to_vec()).with_status_code(status)
+}
+
+fn json(status: u16, body: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+  let header = tiny_http::Header::from_bytes("Content-Type", "application/json").expect("a valid header");
+  text(status, body).with_header(header)
 }
 
 /// `/a%20b?x=1&y` as `("/a b", {x: ["1"], y: [""]})`.
@@ -284,6 +354,7 @@ mod tests {
         query: None,
         headers: BTreeMap::new(),
         body: None,
+        patterns: BTreeMap::new(),
       },
       response: ResponseSpec {
         status,
@@ -365,6 +436,77 @@ mod tests {
     incoming.headers.clear();
     assert!(choose(&routes, &incoming, &[]).is_none(), "a missing header");
     assert!(choose(&routes, &get("/basic"), &[]).is_none(), "a missing query");
+  }
+
+  #[test]
+  fn a_generated_value_is_recognised_by_its_pattern() {
+    let mut expected = route(&[], "/orders/1", 200);
+    expected.request.query = Some(BTreeMap::from([("v1".to_string(), vec!["0".to_string()])]));
+    expected.request.headers = BTreeMap::from([("X-Test".to_string(), vec!["0".to_string()])]);
+    expected.request.body = Some(Body::Json(json!({ "one": "a", "two": "b" })));
+    expected.request.patterns = BTreeMap::from([
+      ("path".to_string(), "/orders/\\d+".to_string()),
+      ("query.v1".to_string(), "\\d+".to_string()),
+      ("headers.X-Test".to_string(), "\\d+".to_string()),
+      ("body/one".to_string(), "\\d+".to_string()),
+    ]);
+    let routes = vec![expected];
+
+    let mut incoming = get("/orders/1234?v1=7");
+    incoming.headers = vec![("x-test".to_string(), "42".to_string())];
+    incoming.body = br#"{ "one": 300, "two": "b" }"#.to_vec();
+    assert!(choose(&routes, &incoming, &[]).is_some());
+
+    incoming.body = br#"{ "one": "a", "two": "b" }"#.to_vec();
+    assert!(
+      choose(&routes, &incoming, &[]).is_none(),
+      "the recorded body value is not generated"
+    );
+    incoming.body = br#"{ "one": 300, "two": "c" }"#.to_vec();
+    assert!(
+      choose(&routes, &incoming, &[]).is_none(),
+      "the rest of the body is still exact"
+    );
+    incoming.body = br#"{ "one": 300, "two": "b" }"#.to_vec();
+    incoming.headers = vec![("x-test".to_string(), "x".to_string())];
+    assert!(
+      choose(&routes, &incoming, &[]).is_none(),
+      "a header not of the pattern's form"
+    );
+    incoming.headers = vec![("x-test".to_string(), "42".to_string())];
+    incoming.path = "/orders/abc".to_string();
+    assert!(
+      choose(&routes, &incoming, &[]).is_none(),
+      "a path not of the pattern's form"
+    );
+  }
+
+  #[test]
+  fn a_values_callback_answers_setup_with_json_values() {
+    let values = serde_json::Map::from_iter([("id".to_string(), json!(1234))]);
+    let provider = ScriptedProvider::start(vec![], StateCallback::Values(values)).unwrap();
+    let agent = ureq::Agent::new_with_config(
+      ureq::config::Config::builder()
+        .http_status_as_error(false)
+        .build(),
+    );
+    let call = |action: &str| {
+      let mut response = agent
+        .post(format!("{}{STATE_PATH}", provider.base_url()))
+        .send(json!({ "state": "one", "params": {}, "action": action }).to_string())
+        .unwrap();
+      let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+      (content_type, response.body_mut().read_to_string().unwrap())
+    };
+    assert_eq!(
+      call("setup"),
+      (Some("application/json".to_string()), r#"{"id":1234}"#.to_string())
+    );
+    assert_eq!(call("teardown").1, "{}", "values are a setup's answer");
   }
 
   #[test]

@@ -43,6 +43,7 @@ impl HookInvoker for HttpHooks {
     // A configuration written before a rename names the context format by its earlier name, and
     // still gets it (staged plan S0.5).
     let context_format = pact_janus_kernel::persisted::HOOK_BODY_FORMAT;
+    let state_change = run.get("format").and_then(Value::as_str) == Some("pact-state-change");
     let body = match run
       .get("format")
       .and_then(Value::as_str)
@@ -111,6 +112,10 @@ impl HookInvoker for HttpHooks {
       return Ok(InvokeResult::ok());
     }
 
+    if state_change {
+      return state_change_result(&text);
+    }
+
     match serde_json::from_str::<Value>(&text) {
       Ok(document) => InvokeResult::parse(&document).map_err(|message| HookFailure {
         outcome: Outcome::Errored,
@@ -132,6 +137,29 @@ impl HookInvoker for HttpHooks {
         ..InvokeResult::default()
       }),
     }
+  }
+}
+
+/// A state-change endpoint's 2xx reply, read as today's verifiers read it (spec §8.4, ADR 0034): a
+/// JSON object is the provider-state values a `ProviderState` generator reads, unless it has an
+/// `outcome`, which makes it a hook result (so an endpoint can still answer `unsupported`). Any
+/// other body is `ok` with nothing to add, which is what today's verifiers make of it.
+fn state_change_result(text: &str) -> Result<InvokeResult, HookFailure> {
+  match serde_json::from_str::<Value>(text) {
+    Ok(document @ Value::Object(_)) if document.get("outcome").is_some() => InvokeResult::parse(&document)
+      .map_err(|message| HookFailure {
+        outcome: Outcome::Errored,
+        error: json!({
+          "code": "hook-result-invalid",
+          "message": message,
+          "details": { "body": excerpt(text) },
+        }),
+      }),
+    Ok(Value::Object(values)) => Ok(InvokeResult {
+      values: Some(values),
+      ..InvokeResult::ok()
+    }),
+    _ => Ok(InvokeResult::ok()),
   }
 }
 
@@ -192,5 +220,32 @@ mod tests {
   fn a_state_with_no_parameters_still_sends_an_object() {
     let context = json!({ "point": "state-setup", "state": { "name": "no orders exist" } });
     assert_eq!(state_change_body(&context)["params"], json!({}));
+  }
+
+  #[test]
+  fn a_state_change_reply_object_is_the_provider_state_values() {
+    let result = state_change_result(r#"{"id": 1234, "name": "Mary"}"#).unwrap();
+    assert_eq!(result.outcome(), Outcome::Ok);
+    assert_eq!(
+      result.values.map(Value::Object),
+      Some(json!({ "id": 1234, "name": "Mary" })),
+      "what today's verifiers hand a ProviderState generator"
+    );
+  }
+
+  #[test]
+  fn a_state_change_reply_with_an_outcome_is_a_hook_result() {
+    let result = state_change_result(r#"{"outcome": "unsupported", "error": {"message": "no"}}"#).unwrap();
+    assert_eq!(result.outcome(), Outcome::Unsupported);
+    assert_eq!(result.values, None);
+  }
+
+  #[test]
+  fn any_other_state_change_reply_is_ok_with_no_values() {
+    for body in ["OK", "[1, 2]", "42", "{not json"] {
+      let result = state_change_result(body).unwrap();
+      assert_eq!(result.outcome(), Outcome::Ok, "{body}");
+      assert_eq!(result.values, None, "{body}");
+    }
   }
 }

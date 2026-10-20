@@ -11,6 +11,9 @@ authors.workspace = true
 # Kernel crates must stay buildable for wasm32-wasip2: no tokio/reqwest/native-only
 # dependencies here except behind target-gated features.
 pact_models = "1.3"
+# The error type `pact_models`' `GenerateValue` trait returns, which the built-in generator
+# component's adapter implements (ADR 0034). Already in the tree through `pact_models`.
+anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 # `raw_value`: a response's `ok` document is carried pre-serialised, so a contract inside it keeps
 # its schema member order (contract-file spec §2.4) rather than a `Value` map's sorted one.

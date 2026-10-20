@@ -552,6 +552,18 @@ debug the wrong thing.
 `context` carries what the generator is allowed to know — the variant assignment, values already
 produced in this interaction — and its members are an open vocabulary. A generator that needs ambient
 state (a clock, randomness) gets it from its own runtime under its grants (§10.4), not from the engine.
+Two members are known ([ADR 0034](../../decisions/0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md)):
+
+- **`example`**: the value recorded where the generated one will go. A generator may keep its type, as a
+  v1–v4 `RandomInt` generating into a string produces a string.
+- **`provider-state`**: the exchange's provider-state values (lifecycle-hooks spec §3.2), what a
+  `ProviderState` generator's expression reads.
+
+Every engine has one generator component built in, `pact`, answering for the v1–v4 vocabulary:
+`pact:RandomInt`, `pact:RandomDecimal`, `pact:RandomHexadecimal`, `pact:RandomString`, `pact:Regex`,
+`pact:Uuid`, `pact:Date`, `pact:Time`, `pact:DateTime`, `pact:RandomBoolean` and `pact:ProviderState`,
+each configured by the members a pact gives that generator (its `type` aside). Verifying a v1–v4 pact
+applies its request generators through it.
 
 ### 7.4 Contributing variant dimensions
 
@@ -889,12 +901,13 @@ second error shape at that boundary would only need translating.
 | Category | v1 codes |
 |---|---|
 | `protocol` | `malformed-frame`, `handshake-required`, `operation-unsupported`, `protocol-version-unsupported` |
-| `document` | `unsupported-content-type`, `decode-failed`, `encode-failed`, `unknown-operator`, `unknown-action`, `invalid-config` |
+| `document` | `unsupported-content-type`, `decode-failed`, `encode-failed`, `unknown-operator`, `unknown-action`, `unknown-generator`, `invalid-config`, `generate-failed` |
 | `component` | `transport-failed`, `hook-failed`, `capability-denied`, `unavailable` |
 | `internal` | `internal` |
 
-`details` conventions: `operation-unsupported` carries `op`; `unknown-operator`/`unknown-action` carry
-the name; `decode-failed` carries `content-type` and, where it has one, a `path`; `capability-denied`
+`details` conventions: `operation-unsupported` carries `op`; `unknown-operator`/`unknown-action`/
+`unknown-generator` carry the name; `generate-failed` (a generator that cannot produce a value from what
+it was given, such as a provider-state expression naming a value nobody provided) carries the generator; `decode-failed` carries `content-type` and, where it has one, a `path`; `capability-denied`
 carries the grant it wanted.
 
 ### 11.2 When the component produces no error

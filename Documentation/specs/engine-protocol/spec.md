@@ -884,6 +884,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/interaction-started` | interaction ref, variant | |
 | `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
+| `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034) | before the result it qualifies; a warning never changes a verdict |
 | `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
 | `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` source, before the first interaction (§8.3) |
 | `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, or `failed` with an `error` | one per pact, when `options.publish` asks (§8.3) |

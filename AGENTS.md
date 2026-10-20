@@ -61,7 +61,9 @@ Three sources are the source of truth and take precedence over this file when th
 > `broker` source and `publish` option and `broker/publish-contracts`; specified, built in S1.3),
 > and S1.3 (`janus verify` fetches from a Pact Broker, with pending and WIP pacts, and publishes each
 > pact's result; `janus publish` publishes contracts; tested against the pinned broker, and weekly
-> against the latest).
+> against the latest), and S1.4 (ADR 0034: a v1–v4 pact's request generators are applied before
+> sending, through the built-in `pact` generator component, and a state-change reply's values reach
+> its `ProviderState` generators; contracts are S1.19).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

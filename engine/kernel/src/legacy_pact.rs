@@ -18,16 +18,25 @@
 //! request in the wire vocabulary a transport's `send` consumes, and [`header_captures`], the
 //! reply's headers in the single-valued form design 3.5's plans resolve against.
 
-use crate::component::{Part, Parts, SlotValue};
+use crate::component::{
+  ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
+};
 use crate::contract::{ContractError, Problem};
 use crate::plan::{CapturedValues, LegacyRequest, LegacyResponse, RuntimeValue};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
+use pact_models::generators::{
+  ContentTypeHandler, GenerateValue, Generator, GeneratorCategory, GeneratorTestMode, JsonHandler,
+  NoopVariantMatcher, VariantMatcher,
+};
+use pact_models::http_parts::HttpPart;
 use pact_models::pact::Pact;
+use pact_models::path_exp::DocPath;
 use pact_models::provider_states::ProviderState;
 use pact_models::v4::http_parts::{HttpRequest, HttpResponse};
-use serde_json::Value;
+use serde_json::{Map, Value, json};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::panic::RefUnwindSafe;
 
@@ -245,6 +254,236 @@ pub fn request_parts(request: &HttpRequest) -> Parts {
   let mut parts: Parts = Parts::new();
   parts.insert("request".to_string(), part);
   parts
+}
+
+/// The request categories a provider-side run generates into, in the order today's verifier applies
+/// them.
+const REQUEST_CATEGORIES: [GeneratorCategory; 4] = [
+  GeneratorCategory::PATH,
+  GeneratorCategory::HEADER,
+  GeneratorCategory::QUERY,
+  GeneratorCategory::BODY,
+];
+
+/// Whether `request` has a generator a provider-side run applies (ADR 0034): any but the consumer
+/// side's own (`MockServerURL`).
+pub fn has_request_generators(request: &HttpRequest) -> bool {
+  REQUEST_CATEGORIES.iter().any(|category| {
+    request
+      .build_generators(category)
+      .values()
+      .any(|generator| generator.corresponds_to_mode(&GeneratorTestMode::Provider))
+  })
+}
+
+/// One generator that produced no value, so the recorded one was sent (ADR 0034 decision 5).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeneratorFailure {
+  /// Where the value would have gone, as a plan path: `$.request.path`,
+  /// `$.request.headers.x-trace`, `$.request.body.items[0].id`.
+  pub target: String,
+  /// The generator, qualified: `pact:ProviderState`.
+  pub generator: String,
+  pub message: String,
+}
+
+/// `request` with its generators applied, as today's verifier applies them before sending
+/// (`pact_matching::generate_request` in provider mode; ADR 0034 decision 2): the path, each
+/// header and query parameter, and every JSON body value a generator's path resolves to. Values
+/// come from `generators`, asked once per target with the recorded value as `example` and
+/// `provider_state` as the exchange's provider-state values. A target whose generator fails keeps
+/// its recorded value and is reported, not fatal: today's verifier keeps it silently.
+pub fn generate_request(
+  request: &HttpRequest,
+  provider_state: &Map<String, Value>,
+  generators: &dyn GeneratorComponent,
+) -> (HttpRequest, Vec<GeneratorFailure>) {
+  let mut request = request.clone();
+  let mut failures = Vec::new();
+  let state = Value::Object(provider_state.clone());
+  let ask = |generator: &Generator, example: Value| generate_one(generators, generator, example, &state);
+
+  for (_, generator) in provider_side(&request, &GeneratorCategory::PATH) {
+    match ask(&generator, Value::String(request.path.clone())) {
+      Ok(value) => request.path = text_of(&value),
+      Err(err) => failures.push(failure("$.request.path", &generator, err)),
+    }
+  }
+
+  for (key, generator) in provider_side(&request, &GeneratorCategory::HEADER) {
+    let Some(name) = key.first_field() else { continue };
+    let target = format!("$.request.headers.{}", name.to_ascii_lowercase());
+    let headers = request.headers.get_or_insert_with(HashMap::new);
+    let existing = headers.keys().find(|k| k.eq_ignore_ascii_case(name)).cloned();
+    // A header generates one value from its first, as `GenerateValue<Vec<String>>` does.
+    let example = existing
+      .as_ref()
+      .and_then(|k| headers.get(k))
+      .and_then(|values| values.first().cloned())
+      .unwrap_or_default();
+    match ask(&generator, Value::String(example)) {
+      Ok(value) => {
+        headers.insert(
+          existing.unwrap_or_else(|| name.to_string()),
+          vec![text_of(&value)],
+        );
+      }
+      Err(err) => failures.push(failure(&target, &generator, err)),
+    }
+  }
+
+  for (key, generator) in provider_side(&request, &GeneratorCategory::QUERY) {
+    let Some(name) = key.first_field() else { continue };
+    let target = format!("$.request.query.{name}");
+    let query = request.query.get_or_insert_with(HashMap::new);
+    let values = query
+      .get(name)
+      .cloned()
+      .unwrap_or_else(|| vec![Some(String::new())]);
+    let mut generated = Vec::with_capacity(values.len());
+    for value in values {
+      match ask(&generator, Value::String(value.clone().unwrap_or_default())) {
+        Ok(new) => generated.push(Some(text_of(&new))),
+        Err(err) => {
+          failures.push(failure(&target, &generator, err));
+          generated.push(value);
+        }
+      }
+    }
+    query.insert(name.to_string(), generated);
+  }
+
+  let body_generators = provider_side(&request, &GeneratorCategory::BODY);
+  if !body_generators.is_empty()
+    && let OptionalBody::Present(bytes, content_type, encoding) = &request.body
+  {
+    let is_json = request.content_type().is_some_and(|ct| ct.is_json());
+    match serde_json::from_slice::<Value>(bytes) {
+      Ok(document) if is_json => {
+        let mut handler = JsonHandler { value: document };
+        let matcher: Box<dyn VariantMatcher + Send + Sync> = NoopVariantMatcher.boxed();
+        for (key, generator) in &body_generators {
+          let target = body_target(key);
+          let asking = Asking {
+            ask: &ask,
+            generator,
+            failures: RefCell::new(Vec::new()),
+          };
+          handler.apply_key(key, &asking, &HashMap::new(), &matcher);
+          failures.extend(
+            asking
+              .failures
+              .into_inner()
+              .into_iter()
+              .map(|err| failure(&target, generator, err)),
+          );
+        }
+        request.body = OptionalBody::Present(
+          handler.value.to_string().into_bytes().into(),
+          content_type.clone(),
+          *encoding,
+        );
+      }
+      _ => {
+        // XML and form bodies arrive with S1.6's content components; until then such a body is
+        // sent as recorded and every generator on it says so.
+        let media_type = request
+          .content_type()
+          .map(|ct| ct.to_string())
+          .unwrap_or_else(|| "an unknown content type".to_string());
+        for (key, generator) in &body_generators {
+          failures.push(GeneratorFailure {
+            target: body_target(key),
+            generator: PactGenerators::qualified(&generator.name()),
+            message: format!(
+              "a body generator applies to a JSON body, and this body is {media_type}; the recorded value was sent"
+            ),
+          });
+        }
+      }
+    }
+  }
+
+  (request, failures)
+}
+
+/// A category's generators that run on the provider side, in a stable order so the same pact
+/// generates in the same order every run.
+fn provider_side(request: &HttpRequest, category: &GeneratorCategory) -> Vec<(DocPath, Generator)> {
+  let mut generators: Vec<(DocPath, Generator)> = request
+    .build_generators(category)
+    .into_iter()
+    .filter(|(_, generator)| generator.corresponds_to_mode(&GeneratorTestMode::Provider))
+    .collect();
+  generators.sort_by_key(|(path, _)| path.to_string());
+  generators
+}
+
+/// Ask the generator component for one value (component-interfaces spec §7.3).
+fn generate_one(
+  generators: &dyn GeneratorComponent,
+  generator: &Generator,
+  example: Value,
+  provider_state: &Value,
+) -> Result<Value, ComponentError> {
+  let mut config = generator
+    .to_json()
+    .and_then(|json| json.as_object().cloned())
+    .unwrap_or_default();
+  config.remove("type");
+  generators
+    .generate(Generate {
+      generator: PactGenerators::qualified(&generator.name()),
+      config: Some(Value::Object(config)),
+      context: Some(json!({ "example": example, "provider-state": provider_state })),
+    })
+    .map(|result| result.value)
+}
+
+/// The generator component, in the form `pact_models`' body handler asks for a value: it resolves
+/// the generator's path to every value it names, and this answers for each of them, keeping what
+/// went wrong, which the handler would otherwise drop.
+struct Asking<'a, F: Fn(&Generator, Value) -> Result<Value, ComponentError>> {
+  ask: &'a F,
+  generator: &'a Generator,
+  failures: RefCell<Vec<ComponentError>>,
+}
+
+impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<Value> for Asking<'_, F> {
+  fn generate_value(
+    &self,
+    value: &Value,
+    _context: &HashMap<&str, Value>,
+    _matcher: &Box<dyn VariantMatcher + Send + Sync>,
+  ) -> anyhow::Result<Value> {
+    (self.ask)(self.generator, value.clone()).map_err(|err| {
+      let message = err.message.clone();
+      self.failures.borrow_mut().push(err);
+      anyhow::anyhow!(message)
+    })
+  }
+}
+
+fn failure(target: &str, generator: &Generator, err: ComponentError) -> GeneratorFailure {
+  GeneratorFailure {
+    target: target.to_string(),
+    generator: PactGenerators::qualified(&generator.name()),
+    message: err.message,
+  }
+}
+
+/// A body generator's path as a plan path: `$.items[0].id` is `$.request.body.items[0].id`.
+fn body_target(key: &DocPath) -> String {
+  let path = key.to_string();
+  format!("$.request.body{}", path.strip_prefix('$').unwrap_or(&path))
+}
+
+/// A generated value as the text a path, header or query parameter carries.
+fn text_of(value: &Value) -> String {
+  match value {
+    Value::String(text) => text.clone(),
+    other => other.to_string(),
+  }
 }
 
 /// The pact's own recorded response, in the same wire vocabulary [`request_parts`] uses — status,

@@ -170,7 +170,7 @@ pub enum ProviderSpec {
 }
 
 /// Whether the verifiers are given a provider-state callback, and how it answers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum StateCallback {
   /// None configured.
@@ -182,6 +182,9 @@ pub enum StateCallback {
   /// Configured, and the first call fails with a 503, as a state endpoint still warming up would;
   /// every call after it succeeds. A verifier that retries passes; one that does not fails.
   FailOnce,
+  /// Configured, and every setup call answers with these provider-state values as a JSON object,
+  /// which is what a `ProviderState` generator reads (`{"values": {"id": 1234}}`; ADR 0034).
+  Values(serde_json::Map<String, Value>),
 }
 
 /// One request the scripted provider recognises, and its answer.
@@ -210,6 +213,11 @@ pub struct RequestExample {
   /// The body the request must carry; `None` accepts any.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: Option<Body>,
+  /// Values a generator produces, recognised by a regular expression the whole value must match
+  /// rather than by example: `path`, `query.<name>`, `headers.<name>`, or `body<JSON pointer>`
+  /// (`body/one`). What the example has at that position is ignored.
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub patterns: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -295,6 +303,7 @@ impl Route {
         }),
         headers: headers_of(&request.headers),
         body: request_body,
+        patterns: BTreeMap::new(),
       },
       response: ResponseSpec {
         status: response.status,

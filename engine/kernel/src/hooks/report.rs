@@ -56,6 +56,9 @@ pub struct Invocation {
   pub duration_ms: u64,
   /// Only ever `Some` when the entry set `report-data` (spec §7.3).
   pub data: Option<Value>,
+  /// A `state-setup` hook's provider-state values; like `data`, only when the entry set
+  /// `report-data` (spec §3.2).
+  pub values: Option<Value>,
   pub error: Option<Value>,
 }
 
@@ -83,6 +86,9 @@ impl Invocation {
     record.insert("duration-ms".to_string(), json!(self.duration_ms));
     if let Some(data) = &self.data {
       record.insert("data".to_string(), data.clone());
+    }
+    if let Some(values) = &self.values {
+      record.insert("values".to_string(), values.clone());
     }
     if let Some(error) = &self.error {
       record.insert("error".to_string(), error.clone());
@@ -156,6 +162,7 @@ mod tests {
       changed: vec!["parts.request.headers".to_string()],
       duration_ms: 3,
       data: None,
+      values: None,
       error: None,
     }
   }

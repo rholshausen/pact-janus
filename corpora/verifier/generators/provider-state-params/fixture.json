@@ -1,0 +1,36 @@
+{
+  "description": "A provider state's own parameter feeds a ProviderState path generator: the pact records /api/hello/James, the state's params say name is John, and both verifiers ask for /api/hello/John",
+  "source": "pact-reference's verifier test support_passing_provider_state_params_to_provider_state_generator (issue #441); staged plan S1.4, ADR 0034",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "User exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/api/hello/John"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "name": "John"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

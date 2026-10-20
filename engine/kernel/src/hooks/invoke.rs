@@ -66,6 +66,9 @@ pub struct InvokeResult {
   pub outcome: Option<Outcome>,
   pub changes: Map<String, Value>,
   pub data: Option<Value>,
+  /// Provider-state values (spec §3.2, ADR 0034): read at `state-setup` only, and the one member
+  /// of a result the engine itself uses rather than passing on.
+  pub values: Option<Map<String, Value>>,
   pub error: Option<Value>,
 }
 
@@ -106,10 +109,16 @@ impl InvokeResult {
       Some(Value::Object(changes)) => changes.clone(),
       Some(_) => return Err("'changes' must be an object of context path -> value".to_string()),
     };
+    let values = match object.get("values") {
+      None | Some(Value::Null) => None,
+      Some(Value::Object(values)) => Some(values.clone()),
+      Some(_) => return Err("'values' must be an object of provider-state values".to_string()),
+    };
     Ok(InvokeResult {
       outcome,
       changes,
       data: object.get("data").cloned(),
+      values,
       error: object.get("error").cloned(),
     })
   }

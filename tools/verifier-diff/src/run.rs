@@ -140,7 +140,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
       routes,
     } => CaseProvider::Scripted {
       routes: routes.clone(),
-      callback: *state_callback,
+      callback: state_callback.clone(),
     },
     ProviderSpec::OrderService => CaseProvider::OrderService,
   };
@@ -551,7 +551,7 @@ impl Started {
   fn start(provider: &CaseProvider) -> Result<Started, String> {
     match provider {
       CaseProvider::Scripted { routes, callback } => {
-        let provider = ScriptedProvider::start(routes.clone(), *callback)?;
+        let provider = ScriptedProvider::start(routes.clone(), callback.clone())?;
         Ok(Started {
           base_url: provider.base_url(),
           port: provider.port(),

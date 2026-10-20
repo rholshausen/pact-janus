@@ -548,6 +548,24 @@ item in 1a is done when S1.1 agrees.
   v1–v4 generator vocabulary becomes one, applied by the legacy compiler.
   *Exit:* the generator cases from pact-reference's verifier tests pass in S1.1's harness, with a
   state-change response feeding a `ProviderState` generator end to end.
+  *Done 2026-10-20* ([ADR 0034](decisions/0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md)).
+  The vocabulary is the generator component `pact`, built into the kernel behind `generator/generate`,
+  producing values with `pact_models` as today's verifier does. The legacy path generates the request's
+  path, headers, query and JSON body after state setup and before `before-request`; response
+  generators are not applied, as they are not today. A `state-setup` hook result carries `values`, and
+  `pact-state-change` reads a JSON object reply as them, so a state endpoint written for today's
+  verifiers feeds `${id}` unchanged. S1.1's corpus has four `generators/` fixtures, all agreeing with
+  today's verifier: pact-reference's one generator case (issue #441, a state parameter into the path),
+  a state-change reply into a path and a header, every value generator from the compatibility suite's
+  fixtures in a body and a random one in a header and a query, and a `ProviderState` expression with
+  nothing to read. Run against `janus` from before this, every one of them but the last disagreed.
+  The harness's routes gained `patterns`, recognising a generated value by its form, and its state
+  callback a `values` answer. Not foreseen: a generator that produces nothing keeps the recorded
+  value, as today, and is now reported as a `generator-failed` warning; a `pact-state-change` reply
+  that is not JSON is `ok` (today's reading) where it was a hook failure; and `verification/warning`,
+  emitted since the prototype, had no row in the protocol spec's event table, and now has one. Left
+  out: generators for contracts, which `upgrade` still drops (S1.19), and for XML and form bodies,
+  which arrive with S1.6's content components and warn until then.
 - **S1.5 The HTTP component's client half, rewritten** — **M**. Async and thread-free (the same
   executor seam S2.1 uses). TLS with custom CA bundles, client certificates and an insecure mode;
   HTTP and HTTPS proxies; request timeouts; HTTP/1.1 and HTTP/2; today's `--request-timeout`,
@@ -653,6 +671,21 @@ item in 1a is done when S1.1 agrees.
   *Exit:* shape-language spec §4.2 and plan-grammar spec §4.4 say so; corpus cases for an unanchored
   pattern in a v3 pact and in the contract it upgrades into; and S1.1's ledger entry for
   `order-service/mutations/0/0/body/$.shippedAt/same-type` gone.
+
+- **S1.19 Generators in contracts** — **M**. S1.4 applies a v1–v4 pact's request generators, and
+  `janus upgrade` still drops them (`generator-dropped`), so a pact with a `ProviderState` path
+  verifies as today and the contract it upgrades into replays the recorded path. The shape language
+  reserves a `generator` member naming a component (shape-language spec §3.4), and S1.4 built the
+  component: `upgrade` writes a v1–v4 generator onto the slot's shape, naming `pact:<type>` and its
+  configuration, verification applies a contract's request generators as the legacy path does,
+  and the mock applies response generators when it serves (variant-semantics spec §5.2's replay by
+  example gains its exception, and S2.3's fresh-per-exchange question is answered with it). Design
+  first: the `generator` member's form, and whether a generated slot's recorded value is still the
+  variant's evidence.
+  *Exit:* an upgraded pact with request generators verifies as the pact does in S1.1's harness, with
+  no `generator-dropped` left for the vocabulary `pact` provides; corpus cases for a generated
+  request slot and a generated response slot; and a consumer conformance case for a served
+  generated value.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -921,6 +954,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.14 | The SDK specification and conformance suite have no provider side | new in this revision |
 | S1.17 | A filtered run that verified what it replayed — or replayed nothing, because no recorded variant has the id it named — has status `verified` and exits 0 | found rebuilding the CLI; variant-semantics spec §5.1 |
 | S1.18 | A regex matches anywhere in a value under Janus and the whole value under today's verifiers, so an unanchored pattern in a v1–v4 pact accepts more than it does today | S1.1's first run; shape-language spec §4.2 |
+| S1.19 | `upgrade` drops v1–v4 generators, so a contract replays a recorded value where its pact generated one; a shape's `generator` member is parsed and never applied | S1.4; ADR 0034 decision 6 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |

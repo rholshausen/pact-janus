@@ -213,6 +213,14 @@ rather than two: "I cannot produce that" is a contract finding whose remedy is a
 "my setup script threw" is a bug whose remedy is a fix. A summary that conflates them sends the reader to
 the wrong team.
 
+An `ok` result may also carry **`values`**: an object of provider-state values, such as the id of the
+order the hook just created ([ADR 0034](../../decisions/0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md)).
+They are what a v1–v4 pact's `ProviderState` generators read. The exchange's **provider-state values**
+are every state's resolved `params`, in the interaction's state order, then every `values` a
+`state-setup` hook returned, in the order the hooks ran, a later member replacing an earlier one. That
+is today's verifiers' precedence. Like `data` (§4.4), `values` is cleared when the exchange ends.
+`values` returned at any other point is ignored.
+
 ### 3.3 `before-request`
 
 Runs after state setup, immediately before the outbound parts leave the engine, for every exchange whose
@@ -376,6 +384,10 @@ that produced it. Cleared per exchange, so nothing leaks into the next variant b
 reasoning that makes state setup re-run.
 
 `data` is **not** reported by default (§10.2): a hook's scratch is where credentials naturally land.
+
+`data` is for hooks; the engine never reads it. What a state handler returns for the engine to use is
+`values` (§3.2), a separate member for that reason: the engine reads it, and nothing else of a hook's
+output is in the generator context.
 
 ## 5. Failure semantics
 
@@ -624,9 +636,13 @@ endpoint; a 2xx response with a JSON result body is the result, a 2xx with an em
 `format: pact-state-change` sends the v3/v4 provider-state body instead — `{ "state", "params", "action" }`
 with `action` `"setup"` or `"teardown"` from the point — so **an existing state-change endpoint keeps
 working unchanged**. That is B5's actual migration test: a provider that has a state endpoint today
-should be verifiable by Janus by naming it in a config file, not by rewriting it. The response is read the
-same way, which means a v3 endpoint that returns nothing is `ok` and one that returns
-`{"outcome": "unsupported", …}` reaches the state-unavailable path without knowing what Janus is.
+should be verifiable by Janus by naming it in a config file, not by rewriting it. The response is read
+the way today's verifiers read it: a 2xx whose body is a JSON object with no `outcome` member is
+`{ "outcome": "ok", "values": <the object> }`, the provider-state values a `ProviderState` generator reads
+(§3.2). A v3 endpoint that returns `{"id": 1234}` therefore feeds `${id}` as it does today. One that
+returns nothing is `ok`, and one that returns `{"outcome": "unsupported", …}` is a result, which reaches
+the state-unavailable path without the endpoint knowing what Janus is. Any other 2xx body (text, or JSON
+that is not an object) is `ok` with no values, as today's verifiers treat it.
 
 Availability depends on the embedding's network access, which for the WASM-embedded engine is a grant and
 not a given (§8.5).
@@ -751,7 +767,7 @@ variant it belonged to, its duration, and **the context paths it changed — nam
 That last choice is the point of the document. "Which hook rewrote this header" is the question a hook
 system either answers or spends the rest of its life not answering, and the answer needs the path; the
 value would put a signed header, a token or a body into every log that carries a summary. `data` appears
-only when the entry set `report-data`, for the same reason (§7.3).
+only when the entry set `report-data`, for the same reason (§7.3), and so does `values` (§3.2).
 
 Hooks that never ran are absent, and hooks that ran and changed nothing are present with an empty
 `changed` — the difference matters, because only one of the two means a selector is wrong.

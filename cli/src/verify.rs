@@ -266,7 +266,12 @@ fn report(event: &Value) {
       }
     }
     "verification/warning" => {
-      outln!("  warn    {}", payload["code"].as_str().unwrap_or("warning"));
+      let code = payload["code"].as_str().unwrap_or("warning");
+      match (payload["target"].as_str(), payload["message"].as_str()) {
+        (Some(target), Some(message)) => outln!("  warn    {code} at {target}: {message}"),
+        (None, Some(message)) => outln!("  warn    {code}: {message}"),
+        _ => outln!("  warn    {code}"),
+      }
     }
     // `--explain-failures` is this event arriving: the executed plan for the variant that just
     // failed, printed where the failure is, rather than left for a second command to re-derive.

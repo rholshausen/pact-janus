@@ -1,0 +1,398 @@
+{
+  "description": "Every value generator a provider-side run applies, in a request body, and a random integer in a header and in a query parameter. The provider recognises each generated value by its form, so a verifier that sent the recorded value instead gets a 404",
+  "source": "the pact compatibility suite's V3 generators.feature and http_generators.feature, and their fixtures (basic.json, *-generator.json); ADR 0034",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/random-int",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d+"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/random-decimal",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d+\\.\\d+"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/random-hexadecimal",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "[0-9A-F]{6}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/random-string",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "[A-Za-z0-9]{6}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/regex",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d{1,8}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/date",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d{4}-\\d{2}-\\d{2}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/time",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d{2}:\\d{2}:\\d{2}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/date-time",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}[+-]\\d{4}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/uuid",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/generators/random-boolean",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "patterns": {
+            "body/one": "true|false"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/generators/header",
+          "headers": {
+            "X-TEST": [
+              "0"
+            ]
+          },
+          "patterns": {
+            "headers.X-TEST": "\\d+"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/generators/query",
+          "query": {
+            "v1": [
+              "0"
+            ]
+          },
+          "patterns": {
+            "query.v1": "\\d+"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ok": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

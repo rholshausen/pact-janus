@@ -29,7 +29,7 @@ this one.
 | `description` | What the fixture is for |
 | `source` | Where it came from, for a reader |
 | `pacts` | Pact files, relative to the directory |
-| `provider` | `{ "kind": "order-service" }`: the sample provider, started with auth off, whose provider-state endpoint is the state callback. `{ "kind": "scripted", "state-callback": "none" \| "ok" \| "fail" \| "fail-once", "routes": [...] }`: the harness's own provider, answering each route. `fail` answers every state call with a 500; `fail-once` answers the first with a 503 and the rest with success |
+| `provider` | `{ "kind": "order-service" }`: the sample provider, started with auth off, whose provider-state endpoint is the state callback. `{ "kind": "scripted", "state-callback": "none" \| "ok" \| "fail" \| "fail-once" \| { "values": {...} }, "routes": [...] }`: the harness's own provider, answering each route. `fail` answers every state call with a 500; `fail-once` answers the first with a 503 and the rest with success; `values` answers every setup call with that JSON object, the provider-state values a `ProviderState` generator reads |
 | `expected` | `pass` or `fail`, when the source says what the run should conclude. Today's verifier is held to it, so a fixture it disagrees with is a fixture translated wrongly |
 | `mutations` | Also run every interaction against mutated responses |
 | `broker` | Fetch the pacts from a Pact Broker instead of files, and publish results back (below) |
@@ -38,6 +38,13 @@ The scripted provider recognises a request strictly by its example: method, path
 the route names, and the body when the route has one. It answers anything else with a 404, as pact's
 mock server does, so a verifier that sends the wrong request fails as it would against a real
 provider. When several routes recognise a request, the one whose `states` were just set up answers.
+
+A value a generator produces cannot be recognised by example, since it changes on every run. A route's
+request may name `patterns` for those: a regular expression the whole value must match, keyed by its
+position, `path`, `query.<name>`, `headers.<name>`, or `body` followed by a JSON pointer (`body/one`).
+The example's value at that position is ignored, and everything else is still recognised strictly, so
+a verifier that sends the recorded value where a generated one belongs still gets a 404. The
+`generators/` fixtures (staged plan S1.4) use them.
 
 Each verifier gets its own, freshly started provider, so nothing one verifier does to a provider (the
 states it set up, a callback it has already made fail) changes what the other sees.

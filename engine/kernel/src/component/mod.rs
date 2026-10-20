@@ -16,6 +16,7 @@
 
 mod content;
 mod error;
+mod generator;
 mod hook;
 mod loader;
 mod matcher;
@@ -27,6 +28,7 @@ pub use content::{
   Compile, CompileResult, ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult,
 };
 pub use error::ComponentError;
+pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators};
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
   ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,

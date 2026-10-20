@@ -104,6 +104,7 @@ export const EventKind = {
   VerificationInteractionStarted: "verification/interaction-started",
   VerificationInteractionResult: "verification/interaction-result",
   VerificationHook: "verification/hook",
+  VerificationWarning: "verification/warning",
   VerificationExecutedPlan: "verification/executed-plan",
   VerificationFetched: "verification/fetched",
   VerificationPublished: "verification/published",

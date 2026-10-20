@@ -1,0 +1,36 @@
+{
+  "description": "A ProviderState generator names a value neither the state's params nor its state-change reply provide. Both verifiers send the recorded path; janus verify also warns (generator-failed)",
+  "source": "pact_models' generate_value_from_context, whose error today's verifier ignores; ADR 0034 decision 5",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "an order exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/orders/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

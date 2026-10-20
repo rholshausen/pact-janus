@@ -1,0 +1,43 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "description": "a request whose generator has nothing to read",
+      "providerStates": [
+        {
+          "name": "an order exists"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/1",
+        "generators": {
+          "path": {
+            "type": "ProviderState",
+            "expression": "/orders/${id}",
+            "dataType": "STRING"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

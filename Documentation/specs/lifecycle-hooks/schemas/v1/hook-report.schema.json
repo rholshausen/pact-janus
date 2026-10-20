@@ -60,6 +60,10 @@
           "type": "object",
           "description": "The hook's own output, present only when its entry set 'report-data' (spec.md §7.3)."
         },
+        "values": {
+          "type": "object",
+          "description": "The provider-state values a state-setup hook returned (spec.md §3.2), present only when its entry set 'report-data' (spec.md §7.3)."
+        },
         "effect": {
           "type": "string",
           "description": "What the outcome did to the run, after 'on-failure' was applied. Present when the outcome was not 'ok', so that a warning that was configured to be a warning is distinguishable from one that was silently treated as such.",

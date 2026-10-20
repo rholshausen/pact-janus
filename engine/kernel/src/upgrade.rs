@@ -846,9 +846,10 @@ impl Conversion {
   }
 
   /// v1–v4 generators produce values; the shape language's `generator` member names a *component*
-  /// that does, and no component in this prototype implements the v1–v4 generator vocabulary.
-  /// Dropping one is lossy but never dangerous: it weakens what a contract can *produce*, never
-  /// what it *accepts*.
+  /// that does. The engine's built-in `pact` component implements the v1–v4 vocabulary (ADR 0034),
+  /// and verifying a pact applies it, but writing a generator onto a shape and applying it for a
+  /// contract is staged plan S1.19. Until then dropping one is lossy but never dangerous: it
+  /// weakens what a contract can *produce*, never what it *accepts*.
   fn generators(&mut self, generators: &Generators, pointer: &str) {
     if generators.is_empty() {
       return;
@@ -859,8 +860,8 @@ impl Conversion {
       "lossy",
       pointer.to_string(),
       format!(
-        "{count} generator(s) were dropped: the contract format names a generator *component*, and \
-         none implements the v1–v4 generator vocabulary yet. What the contract accepts is unchanged"
+        "{count} generator(s) were dropped: a contract does not carry generators yet (staged plan \
+         S1.19), though verifying the pact applies them. What the contract accepts is unchanged"
       ),
     ));
   }

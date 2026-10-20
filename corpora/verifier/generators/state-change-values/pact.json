@@ -1,0 +1,64 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "description": "a request for the order the state created",
+      "providerStates": [
+        {
+          "name": "an order exists"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/1",
+        "headers": {
+          "X-Order": "1"
+        },
+        "generators": {
+          "path": {
+            "type": "ProviderState",
+            "expression": "/orders/${id}",
+            "dataType": "STRING"
+          },
+          "header": {
+            "X-Order": {
+              "type": "ProviderState",
+              "expression": "${id}",
+              "dataType": "STRING"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1234
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

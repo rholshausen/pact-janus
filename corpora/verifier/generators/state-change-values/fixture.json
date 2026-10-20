@@ -1,0 +1,45 @@
+{
+  "description": "The state-change call answers {\"id\": 1234}, and that value reaches a ProviderState generator in the path and in a header: the pact records /orders/1, and both verifiers ask for /orders/1234",
+  "source": "staged plan S1.4's exit; pact_verifier's make_state_change_request, which reads a JSON object reply as provider-state values; ADR 0034",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "id": 1234
+      }
+    },
+    "routes": [
+      {
+        "states": [
+          "an order exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/orders/1234",
+          "headers": {
+            "X-Order": [
+              "1234"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1234
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}
