@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792464979177,
+  "lastUpdate": 1792464980760,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -12354,6 +12354,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 22932,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ced015bd006e654d93bc09dfa45907cc7fdedf57",
+          "message": "fix: the Janus benchmarks' lockfile records component-http's tracing dependency\n\nbenchmarks/janus is its own workspace with its own Cargo.lock, which bb162a0\ndid not update, so the Benchmarks workflow's --locked build failed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T13:41:18+11:00",
+          "tree_id": "c2375c84ad4b885f732b108997426d2878b59300",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ced015bd006e654d93bc09dfa45907cc7fdedf57"
+        },
+        "date": 1792464980432,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28333,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21073,
             "unit": "requests per second",
             "extra": "engines 4"
           }
