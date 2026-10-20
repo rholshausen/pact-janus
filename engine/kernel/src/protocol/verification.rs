@@ -1786,14 +1786,16 @@ fn drive(
     }
   };
 
-  // The whole executed tree, not just the response subtree that was scored: `explain --executed`
-  // is a diagnosis tool, and what the request replayed as is part of the diagnosis.
+  // The response subtree that was scored, not the whole tree. The resolver holds only the reply,
+  // so a shape-compiled plan's request half resolves every path to absence and would show the
+  // request failing, when the verdict never looked at it. A v1–v4 plan is the response alone, so
+  // this is also what makes the two paths read the same.
   let executed = executed_plans.wants(matched).then(|| {
     json!({
       "interaction": reference,
       "variant": variant,
       "status": if matched { "verified" } else { "failed" },
-      "text": plan::render_executed(&executed),
+      "text": plan::render_executed(response),
       "plan": plan::plan_json(&exchange.ready.plan),
     })
   });

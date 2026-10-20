@@ -205,6 +205,38 @@ fn explain_failures_prints_the_executed_plan_after_the_failure_it_explains() {
   );
 }
 
+/// A contract's plan is compiled from both parts, but only the response is scored, and only the
+/// reply is there to resolve against. The executed plan is the scored response, as a pact's is,
+/// and not a request half whose every check fails on a value it was never given.
+#[test]
+fn explain_failures_shows_only_the_response_a_contract_was_scored_on() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let pact = broken_pact("broken-upgraded.json");
+  let contract = temp("broken-upgraded.janus.json");
+  let upgraded = janus(&["upgrade", &pact, "--write", &contract, "--quiet"]);
+  assert_eq!(code(&upgraded), 0, "stderr: {}", stderr(&upgraded));
+  let output = janus(&[
+    "verify",
+    &contract,
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--explain-failures",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 1, "{text}");
+  assert!(
+    text.contains("$.response.body.status => 'SHIPPED'"),
+    "the executed plan carries the response: {text}"
+  );
+  assert!(
+    !text.contains(":request") && !text.contains("<absent>"),
+    "and no request half resolved against nothing: {text}"
+  );
+}
+
 /// A narrowed run must be reported as narrowed (variant-semantics spec §5.1): an unreplayed
 /// variant is not a passing one, and a summary that did not say so would read like one.
 ///
