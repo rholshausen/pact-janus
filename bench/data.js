@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792455153374,
+  "lastUpdate": 1792455155929,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -11292,6 +11292,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30120,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "7135a2c76676e54b7566fd4c21347b58c610c627",
+          "message": "feat: explain and verify --explain-failures colour the plan on a terminal\n\nPlan-grammar spec §3.3 (new): a host may style either text form on a terminal,\nso long as removing the styling leaves the form exactly; nothing recorded or read\nby a program is styled, and the engine never styles.\n\nThe kernel reads a rendered plan back as tokens (plan::tokens), beside the\nrenderer; a test reads every corpus snapshot with it, nothing lost and nothing\nunrecognised. The CLI styles the tokens (src/highlight.rs) and writes them\nthrough anstream, already in the tree behind clap: colour on a terminal unless\nNO_COLOR or TERM=dumb, anywhere with CLICOLOR_FORCE. The CLI's tests now run\nwithout colour whatever CLICOLOR_FORCE says, which also fixes help.md's\nsnapshots when it is set.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-20T11:07:58+11:00",
+          "tree_id": "7e4a4ff4ca37d36d7bcfd70713dd0f2679d0c748",
+          "url": "https://github.com/rholshausen/pact-janus/commit/7135a2c76676e54b7566fd4c21347b58c610c627"
+        },
+        "date": 1792455155285,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28172,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21486,
             "unit": "requests per second",
             "extra": "engines 4"
           }
