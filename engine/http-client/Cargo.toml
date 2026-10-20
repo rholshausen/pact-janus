@@ -1,0 +1,34 @@
+[package]
+name = "pact_janus_http_client"
+description = "The native HTTP client every outbound request of the engine goes through (ADR 0035, staged plan S1.5): the HTTP transport's drive role and the Pact Broker client. Async and thread-free behind an executor seam, configured by the HTTP client options document (component-interfaces spec §5.6)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Today's verifier's client, with today's verifier's features: rustls on the ring provider and the
+# platform verifier, no gzip, no system proxy settings beyond the environment. HTTP/2 is the one
+# addition (ADR 0035 decision 1). Already in the tree through pact_models, as are h2 and tokio.
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "http2"] }
+# Only to install ring as the process's default provider when nothing has, as today's verifier
+# does: reqwest built without a provider refuses to build a client otherwise.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+# The native executor: a current-thread runtime, which starts no thread (ADR 0035 decision 2).
+tokio = { version = "1", default-features = false, features = ["rt", "time", "net"] }
+http = "1"
+serde_json = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.26"
+pact_janus_test_servers = { path = "../../tools/test-servers" }
+# An HTTP/2 server for the tests that speak it, on its own runtime. All three already in the tree.
+h2 = "0.4"
+tokio = { version = "1", default-features = false, features = ["rt", "net"] }
+bytes = "1"
+
+[lints]
+workspace = true

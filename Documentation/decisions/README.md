@@ -51,6 +51,7 @@ superseding ADR instead.
 | [0032](0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md) | Speak to the Pact Broker through protocol operations backed by a native host capability | accepted |
 | [0033](0033-count-a-runs-variants-per-source-document-in-its-summary.md) | Count a run's variants per source document in its summary | accepted |
 | [0034](0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md) | Apply a pact's request generators through a generator component, fed by provider-state values | accepted |
+| [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted |
 
 ## Decision backlog
 

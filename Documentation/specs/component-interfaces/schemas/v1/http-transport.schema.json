@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/component/v1/http-transport.schema.json",
+  "title": "HttpTransport",
+  "description": "The built-in HTTP transport's start options, in each role, and the HTTP client options the drive role and the broker descriptor share (spec.md §5.6, ADR 0035). The transport interface leaves a transport's options to the transport; these are the built-in one's.",
+  "$defs": {
+    "ServeOptions": {
+      "title": "HttpServeOptions",
+      "description": "Where a served mock listens. Port 0 lets the system choose; the endpoint descriptor says which it chose.",
+      "type": "object",
+      "properties": {
+        "host": { "type": "string", "description": "The address to bind. Default 127.0.0.1." },
+        "port": { "type": "integer", "minimum": 0, "description": "The port to bind. Default 0." }
+      }
+    },
+    "DriveOptions": {
+      "title": "HttpDriveOptions",
+      "description": "Where a driven instance sends, what it adds to every request, and how it connects. Options the instance cannot act on fail transport/start with 'invalid-config' naming the member, so a run with a misconfigured provider fails before anything is sent.",
+      "type": "object",
+      "required": ["base-url"],
+      "properties": {
+        "base-url": {
+          "type": "string",
+          "description": "An http or https URL. Its path prefixes every request's path: today's verifier's base path."
+        },
+        "headers": {
+          "type": "object",
+          "description": "Header name to value, added to every request and replacing a header of the same name, in any case, that the interaction carries: today's verifier's --header. Applied as the request is sent, after 'before-request' hooks. Values are never repeated in a log.",
+          "additionalProperties": { "type": "string" }
+        },
+        "client": { "$ref": "#/$defs/ClientOptions" }
+      }
+    },
+    "ClientOptions": {
+      "title": "HttpClientOptions",
+      "description": "How a client connects: the 'client' member of the HTTP transport's drive options and of the engine protocol's broker descriptor, so one configuration means the same thing to a provider and a broker. Every member is optional; a member the client does not know is ignored.",
+      "type": "object",
+      "properties": {
+        "tls": { "$ref": "#/$defs/TlsOptions" },
+        "proxy": { "$ref": "#/$defs/ProxyOptions" },
+        "timeouts": {
+          "title": "HttpTimeouts",
+          "type": "object",
+          "properties": {
+            "request-ms": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How long a whole request may take, answer included. Default: 5000 for a provider (today's verifier's), 60000 for a broker. A transport/send that carries a shorter timeout-ms is bounded by that."
+            },
+            "connect-ms": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How long connecting may take, the TLS handshake included. Default: bounded only by request-ms."
+            }
+          }
+        },
+        "http-version": {
+          "type": "string",
+          "description": "'1.1' speaks HTTP/1.1 only (the default, today's verifier's); '2' speaks HTTP/2 only, by ALPN over TLS and with prior knowledge in the clear; 'negotiate' offers both by ALPN over TLS and speaks HTTP/1.1 in the clear.",
+          "x-known-values": ["1.1", "2", "negotiate"]
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many times a client that retries tries a request again. The broker client does (default 2: a request with no answer, a 5xx, or a 429 that says when). A provider request is never retried: a verification observes the provider's first answer."
+        }
+      }
+    },
+    "TlsOptions": {
+      "title": "HttpTlsOptions",
+      "description": "Which servers to trust, and how to prove who the client is. Certificates and keys are PEM text, never paths: a host reads the files.",
+      "type": "object",
+      "properties": {
+        "ca-certificates": {
+          "type": "array",
+          "description": "PEM text, each possibly a bundle, trusted beside the platform's roots rather than instead of them.",
+          "items": { "type": "string" }
+        },
+        "client-certificate": {
+          "title": "HttpClientCertificate",
+          "type": "object",
+          "description": "Presented when a server asks for one. 'certificate' may be a chain, leaf first. 'key' is a credential: never repeated in an event, an error or a log.",
+          "required": ["certificate", "key"],
+          "properties": {
+            "certificate": { "type": "string" },
+            "key": { "type": "string" }
+          }
+        },
+        "insecure": {
+          "type": "boolean",
+          "description": "Accept any server certificate: today's verifier's --disable-ssl-verification. Default false."
+        }
+      }
+    },
+    "ProxyOptions": {
+      "title": "HttpProxyOptions",
+      "description": "Where requests go on their way. Absent, or kind 'environment': HTTPS_PROXY, HTTP_PROXY, ALL_PROXY and NO_PROXY where the engine runs, as today's verifier and curl read them. 'none': straight to the server. 'url': through 'url', except to the hosts 'no-proxy' names.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "x-known-values": ["environment", "none", "url"]
+        },
+        "url": {
+          "type": "string",
+          "description": "For kind 'url': an http URL. User information in it is never repeated in a log."
+        },
+        "no-proxy": {
+          "type": "array",
+          "description": "For kind 'url': hosts, domains (a leading '.' matches subdomains), addresses and CIDR blocks reached directly, in NO_PROXY's syntax.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

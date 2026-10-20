@@ -38,6 +38,36 @@ pub struct Fixture {
   /// publish their results back, instead of reading them from files (S1.3).
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub broker: Option<BrokerSpec>,
+  /// How both verifiers reach the provider, given to each in its own spelling (S1.5).
+  #[serde(default, skip_serializing_if = "ConnectionSpec::is_default")]
+  pub connection: ConnectionSpec,
+}
+
+/// The provider-connection options both verifiers are given (S1.5), in today's verifier's terms:
+/// `--base-path`, `--header`, `--request-timeout` and `--disable-ssl-verification`, which
+/// `janus verify` spells the same way.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ConnectionSpec {
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub base_path: Option<String>,
+  /// Header name to value, each given as `--header NAME=VALUE`.
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub headers: BTreeMap<String, String>,
+  /// Milliseconds.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub request_timeout: Option<u64>,
+  /// Serve the provider over TLS, with a certificate from an authority nothing trusts.
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub tls: bool,
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub disable_ssl_verification: bool,
+}
+
+impl ConnectionSpec {
+  pub fn is_default(&self) -> bool {
+    self == &ConnectionSpec::default()
+  }
 }
 
 /// A fixture verified from a Pact Broker: how its pacts are published, what was verified before the
@@ -221,9 +251,13 @@ pub struct RequestExample {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ResponseSpec {
   pub status: u16,
+  /// How long the provider takes to answer, in milliseconds: a slow provider, for the request
+  /// timeout cases.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub delay_ms: Option<u64>,
   #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
   pub headers: BTreeMap<String, Vec<String>>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -307,6 +341,7 @@ impl Route {
       },
       response: ResponseSpec {
         status: response.status,
+        delay_ms: None,
         headers,
         body: present(&response.body, response_type).map(|(bytes, json)| Body::from_bytes(&bytes, json)),
       },

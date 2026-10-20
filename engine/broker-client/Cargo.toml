@@ -10,17 +10,21 @@ authors.workspace = true
 [dependencies]
 pact_janus_kernel = { path = "../kernel" }
 serde_json = "1"
-# Blocking, as the hooks' `http` implementation is: the client is called from a run's own thread,
-# which blocks on every replayed request anyway. Already in the tree.
-ureq = "3"
+# The engine's one HTTP client (ADR 0035), configured by the descriptor's `client` options, and
+# the request and response types it takes. Called from a run's own thread, which blocks on it.
+pact_janus_http_client = { path = "../http-client" }
+http = "1"
 # Basic credentials. Already in the tree.
 base64 = "0.22"
-# A publication to a broker that reads compressed bodies. Already in the tree, through ureq.
+# A publication to a broker that reads compressed bodies. Already in the tree.
 flate2 = "1"
 tracing = "0.1"
 
 [dev-dependencies]
 pretty_assertions = "1"
+# The recording proxy's and the pact verification's own client, deliberately not the client under
+# test. Already in the tree.
+ureq = "3"
 rstest = "0.26"
 # A broker stub on a real socket, for the client's own tests. Already in the tree.
 tiny_http = "0.12"

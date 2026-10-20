@@ -1,0 +1,20 @@
+[package]
+name = "pact_janus_test_servers"
+description = "Servers for tests that need a network (staged plan S1.5): a certificate authority made per test, a TLS provider that can demand a client certificate, and a forward proxy that records what it carried. Test-only: nothing that ships depends on it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+# Certificates made per test: pure Rust, on the ring provider the engine already uses.
+rcgen = { version = "0.14.10", default-features = false, features = ["ring", "pem"] }
+# The TLS provider's server side: the rustls the engine's client is built on.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+# A certificate's validity, around today: rcgen's own date type.
+time = { version = "0.3", default-features = false, features = ["std"] }
+
+[lints]
+workspace = true

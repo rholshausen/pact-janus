@@ -1,0 +1,48 @@
+{
+  "description": "--base-path prefixes the pact's path, and each --header replaces the pact's header of the same name and is added to every request: the provider answers only /api/orders/1 carrying the configured token and tenant",
+  "source": "staged plan S1.5; pact_verifier_cli's provider options, which janus verify spells the same way; ADR 0035",
+  "pacts": [
+    "pact.json"
+  ],
+  "connection": {
+    "base-path": "/api",
+    "headers": {
+      "Authorization": "Bearer configured",
+      "X-Tenant": "acme"
+    }
+  },
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/api/orders/1",
+          "headers": {
+            "Authorization": [
+              "Bearer configured"
+            ],
+            "X-Tenant": [
+              "acme"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

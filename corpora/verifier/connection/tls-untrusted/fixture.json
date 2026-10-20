@@ -1,0 +1,36 @@
+{
+  "description": "The same provider fails without --disable-ssl-verification: its certificate is not trusted",
+  "source": "staged plan S1.5; pact_verifier_cli's provider options, which janus verify spells the same way; ADR 0035",
+  "pacts": [
+    "pact.json"
+  ],
+  "connection": {
+    "tls": true
+  },
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

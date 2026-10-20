@@ -128,7 +128,10 @@
                 "type": "string",
                 "x-known-values": ["http"]
               },
-              "options": { "type": "object" }
+              "options": {
+                "type": "object",
+                "description": "The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6)."
+              }
             }
           }
         },

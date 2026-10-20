@@ -63,7 +63,10 @@ Three sources are the source of truth and take precedence over this file when th
 > pact's result; `janus publish` publishes contracts; tested against the pinned broker, and weekly
 > against the latest), and S1.4 (ADR 0034: a v1–v4 pact's request generators are applied before
 > sending, through the built-in `pact` generator component, and a state-change reply's values reach
-> its `ProviderState` generators; contracts are S1.19).
+> its `ProviderState` generators; contracts are S1.19), and S1.5 (ADR 0035: providers and brokers
+> are reached through one async, thread-free HTTP client, `engine/http-client`, configured by the
+> HTTP client options; `janus verify` takes today's transport options and TLS, proxy and HTTP/2 ones,
+> and `Documentation/verifier-migration.md` maps each).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -76,6 +79,9 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  outside the kernel because a WASM guest cannot host WASM (ADR 0013);
                  broker-client, the Pact Broker client the kernel's broker trait is implemented
                  by (ADR 0032, S1.3), outside the kernel because it speaks HTTP;
+                 http-client, the one HTTP client the HTTP transport's drive role and the broker
+                 client send through (ADR 0035, S1.5): reqwest on a current-thread runtime, which
+                 starts no thread, configured by the HTTP client options (component-interfaces §5.6);
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
 cli/             `janus` CLI (verify, explain, upgrade, check)
@@ -127,6 +133,9 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  tools/sdk-gates is the first three as the one binary a release ships,
                  `janus-sdk-gates` (S0.11, ADR 0030). tools/verifier-diff is S1.1's differential
                  harness: today's verifier and janus verify over corpora/verifier/
+                 tools/test-servers holds the servers tests that need a network share (S1.5): a
+                 certificate authority made per test, a TLS provider that can demand a client
+                 certificate, and a forward proxy that records what it carried.
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -281,6 +290,9 @@ first:
 ```bash
 janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus.yaml]
              [--variant <id>] [--explain-failures] [--output text|json]
+             [--base-path <p>] [-H <KEY=VALUE>]... [--request-timeout <ms>] [--connect-timeout <ms>]
+             [--disable-ssl-verification] [--ca-cert <pem>]... [--client-cert <pem> --client-key <pem>]
+             [--proxy <url> [--no-proxy <hosts>]] [--http-version 1.1|2|negotiate]   # S1.5, ADR 0035
 janus verify --broker-url <url> --provider-name <name> --provider-url <url>
              [--consumer-version-selectors <json>]... [--enable-pending] [--include-wip-pacts-since <date>]
              [--provider-version <v>] [--provider-branch <b>] [--provider-tags <t,...>] [--publish]

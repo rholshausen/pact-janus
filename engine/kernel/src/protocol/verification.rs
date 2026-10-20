@@ -151,11 +151,6 @@ impl Filter {
   }
 }
 
-/// How long one replayed request waits for the provider before it counts as a failure of that
-/// variant. A run must terminate even when a provider hangs; the host's own timeout would
-/// otherwise be the only thing that ends it, and it has no way to attribute the hang to a variant.
-const SEND_TIMEOUT_MS: u64 = 30_000;
-
 /// The default transport kind for an interaction that records none. Contract-file spec §4.3 makes
 /// the binding optional, and the whole prototype's default is HTTP.
 const DEFAULT_TRANSPORT_KIND: &str = "http";
@@ -1786,15 +1781,22 @@ fn drive(
     instance: target.instance.clone(),
     parts: request,
     await_reply: true,
-    timeout_ms: Some(SEND_TIMEOUT_MS),
+    // How long a provider may take is the drive instance's own configuration (ADR 0035
+    // decision 5): the HTTP transport's request timeout, today's 5 s unless the host says
+    // otherwise. A run still ends when a provider hangs: a transport that waited forever would be
+    // stopped by the component host's per-call deadline (component-interfaces spec §3.4), and the
+    // hang reported as this variant's failure.
+    timeout_ms: None,
   });
   let reply = match sent {
     Ok(result) => result.reply,
     Err(error) => {
       tracing::warn!(%variant, ?error, "the provider could not be driven for this variant");
+      // The protocol's `component-failed` (spec §10.2), whose message carries the component's own,
+      // so a host can say why a request got no answer without reading the component's document.
+      let error = EngineError::component_failed(&format!("transport/{}", target.kind), &error);
       return Err(json!({
-        "interaction": reference, "variant": variant, "status": "failed",
-        "error": { "code": "component-failed", "component": format!("transport/{}", target.kind), "error": error },
+        "interaction": reference, "variant": variant, "status": "failed", "error": error,
       }));
     }
   };
@@ -1802,10 +1804,12 @@ fn drive(
     // Spec §5.2: "no reply expected" and "reply expected but absent" are different observations,
     // and this is the second one — a transport that answered a driven `send` with no reply cannot
     // be matched against a response shape.
+    let error = EngineError::component_failed(
+      &format!("transport/{}", target.kind),
+      &crate::component::ComponentError::synthesised("no-reply", "the transport returned no reply to match"),
+    );
     return Err(json!({
-      "interaction": reference, "variant": variant, "status": "failed",
-      "error": { "code": "component-failed", "component": format!("transport/{}", target.kind),
-                 "error": { "code": "no-reply", "message": "the transport returned no reply to match" } },
+      "interaction": reference, "variant": variant, "status": "failed", "error": error,
     }));
   };
 

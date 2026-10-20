@@ -9,16 +9,16 @@ authors.workspace = true
 
 [dependencies]
 pact_janus_kernel = { path = "../kernel" }
-# Purely synchronous (blocking recv_timeout maps directly onto poll-inbound's timeout-ms), so this
-# component needs no async runtime at all.
+# The serve role's server, blocking (recv_timeout maps directly onto poll-inbound's timeout-ms),
+# until S2.1 rewrites it on the drive role's executor.
 tiny_http = "0.12"
-# The drive role's client. Blocking like the rest of this component (a `send` is one request and
-# its reply, which is exactly what the interface asks for), so no async runtime enters the tree —
-# `reqwest`'s blocking API would have brought tokio along for the same job.
-ureq = "3"
+# The drive role's client: the engine's one HTTP client, async behind an executor seam
+# (ADR 0035), and the request and response types it takes.
+pact_janus_http_client = { path = "../http-client" }
+http = "1"
 serde_json = "1"
 # Query strings, both directions: decoded into the slot on the serve side, encoded from it on the
-# drive side. Already in the tree through ureq.
+# drive side. Already in the tree through url.
 form_urlencoded = "1"
 base64 = "0.22"
 tracing = "0.1"

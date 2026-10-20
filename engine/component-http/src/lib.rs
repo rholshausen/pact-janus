@@ -9,12 +9,16 @@
 //! expected but absent" are different observations applies to whole operations too, so a driven
 //! instance asked to poll says so by name rather than returning "nothing arrived" forever.
 //!
-//! Purely synchronous — [`tiny_http`]'s blocking `recv_timeout` maps directly onto
-//! `poll-inbound`'s `timeout-ms`, and a [`ureq`] call is one request and its reply, which is
-//! exactly what `send` asks for — so no async runtime is needed at all.
+//! The two halves are rewritten separately (staged plan §3). The drive half ([`drive`], S1.5) sends
+//! through the engine's one HTTP client, which is async behind an executor seam and starts no
+//! thread (ADR 0035). The serve half is still [`tiny_http`]'s blocking server, whose `recv_timeout`
+//! maps directly onto `poll-inbound`'s `timeout-ms`, until S2.1 rewrites it on the same executor.
+
+mod drive;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use drive::DriveInstance;
 use pact_janus_kernel::component::{
   ComponentError, ContentSlots, Dispose, DisposeResult, Inbound, Part, Parts, PollInbound, PollInboundResult,
   Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult, TransportComponent,
@@ -30,7 +34,9 @@ use std::time::Duration;
 /// `operation-unsupported` from the instance alone.
 enum Instance {
   Serve(ServeInstance),
-  Drive(DriveInstance),
+  /// Shared so that a `send` can wait on its provider without holding the lock over every
+  /// instance.
+  Drive(Arc<DriveInstance>),
 }
 
 struct ServeInstance {
@@ -39,13 +45,6 @@ struct ServeInstance {
   server: Arc<tiny_http::Server>,
   pending: HashMap<String, tiny_http::Request>,
   next_event: u64,
-}
-
-/// The drive role's whole state: where to send. No connection pool is kept deliberately — a
-/// `send` carries its own `timeout-ms`, so the agent that honours it is built per call (spec §5.2),
-/// and a verification run's cost is dominated by the provider, not by a TCP handshake.
-struct DriveInstance {
-  base_url: String,
 }
 
 /// One live instance per `start` (spec §3.4: the engine names instances, one component answers all
@@ -64,7 +63,7 @@ impl HttpTransport {
 /// Decode a slot's tagged `content` to raw bytes — the transport's own version of
 /// `pact_janus_component_json`'s `slot_text` (a different domain, base64/text/absent rather than
 /// JSON-vs-not, so not worth sharing a helper crate over).
-fn slot_bytes(value: &SlotValue) -> Result<Vec<u8>, ComponentError> {
+pub(crate) fn slot_bytes(value: &SlotValue) -> Result<Vec<u8>, ComponentError> {
   match value.encoded.as_deref() {
     Some("base64") => {
       let text = value
@@ -97,7 +96,7 @@ fn text_slot(text: impl Into<String>) -> SlotValue {
 /// they are folded to lower case — the one spelling a shape can name them by (shape spec §3.6).
 /// Query parameter names are case-sensitive, in HTTP and in every v1–v4 pact, so they keep theirs.
 #[derive(Clone, Copy)]
-enum Names {
+pub(crate) enum Names {
   FoldCase,
   AsSent,
 }
@@ -105,7 +104,10 @@ enum Names {
 /// Build a `{name: [values...]}` slot (headers, query — spec's own worked example shape, and
 /// `legacy.rs`'s existing `query`/`headers` slot vocabulary) from possibly-repeated name/value
 /// pairs, grouping names as it goes.
-fn multi_map_slot<'a>(entries: impl Iterator<Item = (&'a str, &'a str)>, names: Names) -> SlotValue {
+pub(crate) fn multi_map_slot<'a>(
+  entries: impl Iterator<Item = (&'a str, &'a str)>,
+  names: Names,
+) -> SlotValue {
   let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
   for (name, value) in entries {
     let name = match names {
@@ -217,53 +219,9 @@ fn serve_instance<'a>(
   }
 }
 
-/// Turn a `request` part into an outbound request builder: method, `base-url` + path, the query
-/// slot re-encoded, and every header value. The slot vocabulary is the same one `request_parts`
-/// produces on the serve side — this function and that one are each other's inverse, which is what
-/// makes a mock's recording replayable at a provider.
-fn build_request(base_url: &str, part: &Part) -> Result<ureq::http::request::Builder, ComponentError> {
-  let method = part
-    .get("method")
-    .and_then(|slot| slot.content.as_str())
-    .unwrap_or("GET")
-    .to_ascii_uppercase();
-  let path = part
-    .get("path")
-    .and_then(|slot| slot.content.as_str())
-    .unwrap_or("/");
-  let query = part.get("query").map(query_string).unwrap_or_default();
-
-  let mut url = format!("{base_url}{path}");
-  if !query.is_empty() {
-    url.push('?');
-    url.push_str(&query);
-  }
-
-  let mut builder = ureq::http::Request::builder().method(method.as_str()).uri(&url);
-  if let Some(headers_slot) = part.get("headers")
-    && let Value::Object(headers) = &headers_slot.content
-  {
-    for (name, values) in headers {
-      for value in values.as_array().into_iter().flatten().filter_map(Value::as_str) {
-        builder = builder.header(name.as_str(), value);
-      }
-    }
-  }
-  // The body's own content type travels with the body slot (spec §6's bytes/document boundary),
-  // not in the headers slot, so it is applied here rather than lost.
-  if let Some(content_type) = part.get("body").and_then(|slot| slot.content_type.as_deref())
-    && !builder
-      .headers_ref()
-      .is_some_and(|headers| headers.contains_key("content-type"))
-  {
-    builder = builder.header("content-type", content_type);
-  }
-  Ok(builder)
-}
-
 /// `{name: [values...]}` back to `name=value&name=value`, in the slot's own (sorted) order so the
 /// same recorded request replays byte-identically every time.
-fn query_string(slot: &SlotValue) -> String {
+pub(crate) fn query_string(slot: &SlotValue) -> String {
   let Value::Object(query) = &slot.content else {
     return slot.content.as_str().unwrap_or_default().to_string();
   };
@@ -274,60 +232,6 @@ fn query_string(slot: &SlotValue) -> String {
     }
   }
   pairs.finish()
-}
-
-/// The provider's response as a `response` part — the same slot vocabulary the mock side records,
-/// body base64-tagged because a transport carries bytes and never decides what they mean
-/// (spec §4, §5.4).
-fn reply_parts(mut response: ureq::http::Response<ureq::Body>) -> Result<Parts, ComponentError> {
-  let status = response.status().as_u16();
-  let headers: Vec<(String, String)> = response
-    .headers()
-    .iter()
-    .map(|(name, value)| {
-      (
-        name.as_str().to_string(),
-        String::from_utf8_lossy(value.as_bytes()).to_string(),
-      )
-    })
-    .collect();
-  let content_type = headers
-    .iter()
-    .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
-    .map(|(_, value)| value.clone());
-  let body = response
-    .body_mut()
-    .read_to_vec()
-    .map_err(|err| ComponentError::transport_failed(format!("could not read the response body: {err}")))?;
-
-  let mut response_part: Part = Part::new();
-  response_part.insert(
-    "status".to_string(),
-    SlotValue {
-      content: Value::from(status),
-      encoded: None,
-      content_type: None,
-    },
-  );
-  response_part.insert(
-    "headers".to_string(),
-    multi_map_slot(
-      headers.iter().map(|(n, v)| (n.as_str(), v.as_str())),
-      Names::FoldCase,
-    ),
-  );
-  response_part.insert(
-    "body".to_string(),
-    SlotValue {
-      content: Value::String(BASE64.encode(&body)),
-      encoded: Some("base64".to_string()),
-      content_type,
-    },
-  );
-
-  let mut parts: Parts = Parts::new();
-  parts.insert("response".to_string(), response_part);
-  Ok(parts)
 }
 
 impl TransportComponent for HttpTransport {
@@ -370,10 +274,10 @@ impl TransportComponent for HttpTransport {
   /// is no way to speak HTTP without a response arriving) and reports no reply, which is the
   /// honest reading of "fire and forget" for this kind rather than an invented empty reply.
   fn send(&self, req: Send) -> Result<SendResult, ComponentError> {
-    let base_url = {
+    let drive = {
       let instances = self.instances.lock().expect("instance lock poisoned");
       match instances.get(&req.instance) {
-        Some(Instance::Drive(drive)) => drive.base_url.clone(),
+        Some(Instance::Drive(drive)) => Arc::clone(drive),
         Some(Instance::Serve(_)) => {
           return Err(ComponentError::operation_unsupported(
             "transport/send (serve role)",
@@ -391,46 +295,11 @@ impl TransportComponent for HttpTransport {
     let request_part = req.parts.get("request").ok_or_else(|| {
       ComponentError::transport_failed("send parts must carry a 'request' part for an HTTP request")
     })?;
-    let outbound = build_request(&base_url, request_part)?;
-    let body = match request_part.get("body") {
-      Some(slot) => slot_bytes(slot)?,
-      None => Vec::new(),
-    };
-
-    // A fresh agent per call: it is what carries this `send`'s own `timeout-ms`, and
-    // `http_status_as_error(false)` is not optional here — a 404 or a 500 is the observation a
-    // verification run exists to make, never a transport failure.
-    let config = ureq::Agent::config_builder()
-      .http_status_as_error(false)
-      .timeout_global(req.timeout_ms.map(Duration::from_millis))
-      .build();
-    let agent: ureq::Agent = config.into();
-
-    // The HTTP library hides a URL's path below `trace`, since it cannot know which paths are
-    // secret. These come from the contract, so they are logged in full, without any user
-    // information the base URL carries.
-    let method = outbound.method_ref().map(ToString::to_string).unwrap_or_default();
-    let url = outbound
-      .uri_ref()
-      .map(|uri| pact_janus_kernel::broker::without_userinfo(&uri.to_string()))
-      .unwrap_or_default();
-    tracing::debug!(%method, %url, "sending the request to the provider");
-    let response = agent
-      .run(outbound.body(body.as_slice()).map_err(|err| {
-        ComponentError::transport_failed(format!("could not build the outbound request: {err}"))
-      })?)
-      .map_err(|err| {
-        tracing::debug!(%method, %url, error = %err, "the provider did not answer");
-        ComponentError::transport_failed(err.to_string())
-      })?;
-    tracing::debug!(%method, %url, status = response.status().as_u16(), "the provider answered");
-
+    let reply = drive.send(request_part, req.timeout_ms.map(Duration::from_millis))?;
     if !req.await_reply {
       return Ok(SendResult { reply: None });
     }
-    Ok(SendResult {
-      reply: Some(reply_parts(response)?),
-    })
+    Ok(SendResult { reply: Some(reply) })
   }
 
   fn poll_inbound(&self, req: PollInbound) -> Result<PollInboundResult, ComponentError> {
@@ -570,25 +439,30 @@ impl HttpTransport {
     Ok(StartResult { endpoint })
   }
 
-  /// The drive role (plan task 5.1): nothing is bound and nothing is connected — `start` only
-  /// records where this instance sends. The endpoint descriptor echoes the target back, so a host
-  /// that let the component normalise the URL can see what it settled on (spec §5.1: an endpoint
-  /// descriptor is never assumed to be a URL, but for HTTP it is one).
+  /// The drive role (plan task 5.1): nothing is bound and nothing is connected — `start` reads the
+  /// options and builds the client, so options it cannot act on fail the run before it starts. The
+  /// endpoint descriptor echoes the target back, so a host that let the component normalise the URL
+  /// can see what it settled on (spec §5.1: an endpoint descriptor is never assumed to be a URL, but
+  /// for HTTP it is one).
   fn start_drive(&self, req: Start) -> Result<StartResult, ComponentError> {
-    let options = req.options.unwrap_or_default();
-    let base_url = options
-      .get("base-url")
-      .and_then(Value::as_str)
-      .ok_or_else(|| ComponentError::transport_failed("a drive-role HTTP instance needs options.base-url"))?
-      .trim_end_matches('/')
-      .to_string();
-
-    let endpoint = serde_json::json!({ "kind": req.kind, "base-url": base_url });
+    let none = serde_json::Map::new();
+    let options = match &req.options {
+      None => &none,
+      Some(Value::Object(options)) => options,
+      Some(_) => {
+        return Err(ComponentError::invalid_config(
+          "http",
+          "the drive options must be an object",
+        ));
+      }
+    };
+    let drive = DriveInstance::from_options(options)?;
+    let endpoint = serde_json::json!({ "kind": req.kind, "base-url": drive.base_url() });
     self
       .instances
       .lock()
       .expect("instance lock poisoned")
-      .insert(req.instance, Instance::Drive(DriveInstance { base_url }));
+      .insert(req.instance, Instance::Drive(Arc::new(drive)));
     Ok(StartResult { endpoint })
   }
 }

@@ -112,6 +112,20 @@
       "today": "pass",
       "janus": "fail",
       "reason": "S1.9: the state callback answers 503 once; today's verifier retries a state call that gets a 5xx, 408 or 429 (eight times, from 500 ms) and passes, and janus verify's http hook does not retry"
+    },
+    {
+      "case": "connection/header-case",
+      "key": "run",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0035: a --header replaces the pact's header of the same name in any case, as HTTP compares names; today's verifier keeps a pact header whose name differs in case from the option's, and sends the recorded token"
+    },
+    {
+      "case": "connection/header-case",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0035: a --header replaces the pact's header of the same name in any case, as HTTP compares names; today's verifier keeps a pact header whose name differs in case from the option's, and sends the recorded token"
     }
   ]
 }

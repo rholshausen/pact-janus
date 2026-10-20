@@ -110,6 +110,183 @@ fn broken_pact(name: &str) -> String {
 // verify
 // ---------------------------------------------------------------------------------------------
 
+/// A v3 pact with one interaction and no provider state, for a provider these tests stand up
+/// themselves.
+fn secure_orders_pact() -> String {
+  let path = temp("secure-orders-pact.json");
+  std::fs::write(
+    &path,
+    json!({
+      "consumer": { "name": "web-app" },
+      "provider": { "name": "secure-orders" },
+      "interactions": [{
+        "description": "a request for an order",
+        "request": { "method": "GET", "path": "/orders/1" },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "body": { "id": 1, "status": "NEW" }
+        }
+      }],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    })
+    .to_string(),
+  )
+  .expect("writing the pact");
+  path
+}
+
+/// An HTTPS provider answering [`secure_orders_pact`] at `/api`, to a request that carries the
+/// token, demanding a client certificate from `clients` when there is one.
+fn secure_orders(
+  authority: &pact_janus_test_servers::Authority,
+  clients: Option<&pact_janus_test_servers::Authority>,
+  token: &str,
+) -> pact_janus_test_servers::TlsProvider {
+  use pact_janus_test_servers::Response;
+  let expected = format!("Bearer {token}");
+  pact_janus_test_servers::TlsProvider::start(
+    &authority.server(&["127.0.0.1", "localhost"]),
+    clients,
+    move |request| match (request.method.as_str(), request.target.as_str()) {
+      ("GET", "/api/orders/1") if request.header("authorization") == Some(expected.as_str()) => {
+        Response::json(200, r#"{"id":1,"status":"NEW"}"#)
+      }
+      ("GET", "/api/orders/1") => Response::json(401, "{}"),
+      _ => Response::json(404, "{}"),
+    },
+  )
+}
+
+fn pem_file(name: &str, pem: &str) -> String {
+  let path = temp(name);
+  std::fs::write(&path, pem).expect("writing a PEM file");
+  path
+}
+
+/// Staged plan S1.5's exit: a verification against a TLS provider that demands a client
+/// certificate, reached through a proxy, with today's `--base-path` and `--header` beside it.
+/// It runs with every log on: the client's private key and the header's token appear in nothing
+/// it prints (ADR 0035).
+#[test]
+fn verify_reaches_a_tls_provider_that_demands_a_client_certificate_through_a_proxy() {
+  let authority = pact_janus_test_servers::Authority::new("Provider CA");
+  let token = unique("t0ken");
+  let provider = secure_orders(&authority, Some(&authority), &token);
+  let proxy = pact_janus_test_servers::Proxy::start();
+  let client = authority.client("verifier");
+  let ca = pem_file("provider-ca.pem", authority.certificate());
+  let certificate = pem_file("verifier.pem", &client.certificate);
+  let key = pem_file("verifier-key.pem", &client.key);
+  let header = format!("Authorization=Bearer {token}");
+
+  let output = janus(&[
+    "verify",
+    &secure_orders_pact(),
+    "--provider-url",
+    &provider.base_url,
+    "--base-path",
+    "/api",
+    "-H",
+    &header,
+    "--ca-cert",
+    &ca,
+    "--client-cert",
+    &certificate,
+    "--client-key",
+    &key,
+    "--proxy",
+    &proxy.url,
+    "--log-level",
+    "trace",
+  ]);
+  assert_eq!(code(&output), 0, "{}\n{}", stdout(&output), stderr(&output));
+  assert!(
+    stdout(&output).contains("VERIFIED: 1 verified, 0 failed"),
+    "{}",
+    stdout(&output)
+  );
+
+  let authority_of = provider.base_url.trim_start_matches("https://");
+  assert_eq!(proxy.carried(), vec![format!("CONNECT {authority_of} HTTP/1.1")]);
+  assert!(
+    provider
+      .handshakes()
+      .iter()
+      .all(|handshake| handshake.client_certificate),
+    "{:?}",
+    provider.handshakes()
+  );
+  let everything = format!("{}{}", stdout(&output), stderr(&output));
+  let key_body = client.key.lines().nth(1).expect("a PEM key has a body");
+  assert!(!everything.contains(key_body), "the client key was printed");
+  assert!(!everything.contains(&token), "the header's token was printed");
+}
+
+/// A certificate nothing trusts fails each request, by name; `--disable-ssl-verification` accepts
+/// it, as today's verifier's does.
+#[test]
+fn verify_trusts_a_provider_certificate_only_when_told_to() {
+  let authority = pact_janus_test_servers::Authority::new("Untrusted CA");
+  let token = unique("t0ken");
+  let provider = secure_orders(&authority, None, &token);
+  let header = format!("Authorization=Bearer {token}");
+  let args = [
+    "verify",
+    &secure_orders_pact(),
+    "--provider-url",
+    &provider.base_url,
+    "--base-path",
+    "api/",
+    "--header",
+    &header,
+  ];
+
+  let refused = janus(&args);
+  assert_eq!(code(&refused), 1, "{}\n{}", stdout(&refused), stderr(&refused));
+  assert!(
+    stdout(&refused).contains("could not connect") && stdout(&refused).contains("certificate"),
+    "{}",
+    stdout(&refused)
+  );
+
+  let mut insecure = args.to_vec();
+  insecure.push("--disable-ssl-verification");
+  let accepted = janus(&insecure);
+  assert_eq!(code(&accepted), 0, "{}\n{}", stdout(&accepted), stderr(&accepted));
+}
+
+/// Without `--proxy`, the environment's proxy is used, as today's verifier and curl use it.
+#[test]
+fn verify_reaches_the_provider_through_the_environments_proxy() {
+  let authority = pact_janus_test_servers::Authority::new("Provider CA");
+  let token = unique("t0ken");
+  let provider = secure_orders(&authority, None, &token);
+  let proxy = pact_janus_test_servers::Proxy::start();
+  let ca = pem_file("environment-ca.pem", authority.certificate());
+  let header = format!("Authorization=Bearer {token}");
+  let output = janus_command()
+    .args([
+      "verify",
+      &secure_orders_pact(),
+      "--provider-url",
+      &provider.base_url,
+      "--base-path",
+      "/api",
+      "-H",
+      &header,
+      "--ca-cert",
+      &ca,
+    ])
+    .env("HTTPS_PROXY", &proxy.url)
+    .env_remove("NO_PROXY")
+    .env_remove("no_proxy")
+    .output()
+    .expect("the janus binary runs");
+  assert_eq!(code(&output), 0, "{}\n{}", stdout(&output), stderr(&output));
+  assert_eq!(proxy.carried().len(), 1, "{:?}", proxy.carried());
+}
+
 #[test]
 fn verify_replays_a_v3_pact_at_a_running_provider_and_exits_zero() {
   let provider = provider();

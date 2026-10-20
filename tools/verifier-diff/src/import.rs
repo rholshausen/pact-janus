@@ -314,6 +314,7 @@ fn fixture_from(
       expected,
       mutations,
       broker,
+      connection: Default::default(),
     },
     pacts,
   ))

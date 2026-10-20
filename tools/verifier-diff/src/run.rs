@@ -13,7 +13,8 @@
 
 use crate::broker::{self, Broker, RecordingProxy, Traffic};
 use crate::fixture::{
-  self, BrokerSpec, BrokerVerify, Fixture, ProviderSpec, Published, Route, RunVerdict, StateCallback,
+  self, BrokerSpec, BrokerVerify, ConnectionSpec, Fixture, ProviderSpec, Published, Route, RunVerdict,
+  StateCallback,
 };
 use crate::mutate;
 use crate::provider::{STATE_PATH, ScriptedProvider};
@@ -39,6 +40,8 @@ pub struct Case {
   pub provider: CaseProvider,
   pub expected: Option<RunVerdict>,
   pub broker: Option<BrokerSpec>,
+  /// How both verifiers reach the provider.
+  pub connection: ConnectionSpec,
 }
 
 pub enum CaseProvider {
@@ -169,6 +172,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
             },
             expected: None,
             broker: None,
+            connection: fixture.connection.clone(),
           });
         }
       }
@@ -182,6 +186,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
       provider,
       expected: fixture.expected,
       broker: fixture.broker.clone(),
+      connection: fixture.connection.clone(),
     },
   );
   Ok(cases)
@@ -295,9 +300,10 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
   // states set up, a callback that has already failed once, the orders a state created — and what
   // one verifier did to it must not decide what the other sees.
   let (today_run, today) = {
-    let provider = Started::start(&case.provider)?;
+    let provider = Started::start(&case.provider, &case.connection)?;
     run_today(
       tools,
+      &case.connection,
       &Source::Files(&files),
       provider.port,
       provider.state_url.as_deref(),
@@ -306,9 +312,10 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     )
   };
   let (janus_run, janus) = {
-    let provider = Started::start(&case.provider)?;
+    let provider = Started::start(&case.provider, &case.connection)?;
     run_janus(
       tools,
+      &case.connection,
       &Source::Files(&files),
       &provider.base_url,
       provider.state_url.as_deref(),
@@ -485,7 +492,7 @@ fn broker_side(
     .unwrap_or_default();
   let expected = expected_of(&renamed);
 
-  let provider = Started::start(&case.provider)?;
+  let provider = Started::start(&case.provider, &case.connection)?;
   let proxy = RecordingProxy::start(broker.base_url())?;
   let source = Source::Broker {
     url: proxy.base_url(),
@@ -500,6 +507,7 @@ fn broker_side(
   let (run, interactions) = match side {
     Side::Today => run_today(
       tools,
+      &case.connection,
       &source,
       provider.port,
       provider.state_url.as_deref(),
@@ -508,6 +516,7 @@ fn broker_side(
     ),
     Side::Janus => run_janus(
       tools,
+      &case.connection,
       &source,
       &provider.base_url,
       provider.state_url.as_deref(),
@@ -545,10 +554,31 @@ struct Started {
   state_url: Option<String>,
   _scripted: Option<ScriptedProvider>,
   _order_service: Option<pact_janus_sample_order_service::Provider>,
+  _tls: Option<pact_janus_test_servers::TlsProvider>,
 }
 
 impl Started {
-  fn start(provider: &CaseProvider) -> Result<Started, String> {
+  /// The case's provider, served over TLS when the connection says so: a TLS front, with a
+  /// certificate nothing trusts, passes each request on to the provider as it arrived. The
+  /// provider-state callback stays plain HTTP, as today's verifier calls it without the provider's
+  /// TLS options.
+  fn start(provider: &CaseProvider, connection: &ConnectionSpec) -> Result<Started, String> {
+    let mut started = Started::plain(provider)?;
+    if connection.tls {
+      let front = tls_front(&started.base_url);
+      started.port = front
+        .base_url
+        .rsplit(':')
+        .next()
+        .and_then(|port| port.parse().ok())
+        .unwrap_or(0);
+      started.base_url = front.base_url.clone();
+      started._tls = Some(front);
+    }
+    Ok(started)
+  }
+
+  fn plain(provider: &CaseProvider) -> Result<Started, String> {
     match provider {
       CaseProvider::Scripted { routes, callback } => {
         let provider = ScriptedProvider::start(routes.clone(), callback.clone())?;
@@ -559,6 +589,7 @@ impl Started {
             .then(|| format!("{}{STATE_PATH}", provider.base_url())),
           _scripted: Some(provider),
           _order_service: None,
+          _tls: None,
         })
       }
       CaseProvider::OrderService => {
@@ -579,6 +610,7 @@ impl Started {
           port,
           _scripted: None,
           _order_service: Some(provider),
+          _tls: None,
         })
       }
     }
@@ -586,6 +618,79 @@ impl Started {
 }
 
 type Judged = (Verdict, Option<String>);
+
+/// The provider-connection options, in today's verifier's spelling, which `janus verify` shares
+/// (S1.5). Where the provider is (`--hostname`/`--port`/`--transport` today, `--provider-url` for
+/// janus) is each runner's own.
+fn connection_args(command: &mut Command, connection: &ConnectionSpec) {
+  if let Some(path) = &connection.base_path {
+    command.args(["--base-path", path]);
+  }
+  for (name, value) in &connection.headers {
+    command.arg("--header").arg(format!("{name}={value}"));
+  }
+  if let Some(ms) = connection.request_timeout {
+    command.args(["--request-timeout", &ms.to_string()]);
+  }
+  if connection.disable_ssl_verification {
+    command.arg("--disable-ssl-verification");
+  }
+}
+
+/// An HTTPS front for a plain provider: each request is passed on as it arrived, and the provider's
+/// answer passed back.
+fn tls_front(plain: &str) -> pact_janus_test_servers::TlsProvider {
+  use pact_janus_test_servers::{Authority, Response, TlsProvider};
+  let authority = Authority::new("verifier-diff untrusted CA");
+  let agent: ureq::Agent = ureq::Agent::config_builder()
+    .http_status_as_error(false)
+    .max_redirects(0)
+    .build()
+    .into();
+  let plain = plain.to_string();
+  TlsProvider::start(
+    &authority.server(&["127.0.0.1", "localhost"]),
+    None,
+    move |request| {
+      let mut forwarded = ureq::http::Request::builder()
+        .method(request.method.as_str())
+        .uri(format!("{plain}{}", request.target));
+      for (name, value) in &request.headers {
+        if !["host", "content-length", "connection"].contains(&name.to_ascii_lowercase().as_str()) {
+          forwarded = forwarded.header(name.as_str(), value.as_str());
+        }
+      }
+      let answered = forwarded
+        .body(request.body.clone())
+        .map_err(|err| err.to_string())
+        .and_then(|forwarded| agent.run(forwarded).map_err(|err| err.to_string()));
+      match answered {
+        Ok(mut response) => Response {
+          status: response.status().as_u16(),
+          headers: response
+            .headers()
+            .iter()
+            .filter(|(name, _)| {
+              !["content-length", "transfer-encoding", "connection"].contains(&name.as_str())
+            })
+            .map(|(name, value)| {
+              (
+                name.to_string(),
+                String::from_utf8_lossy(value.as_bytes()).to_string(),
+              )
+            })
+            .collect(),
+          body: response.body_mut().read_to_vec().unwrap_or_default(),
+        },
+        Err(err) => Response {
+          status: 502,
+          headers: vec![],
+          body: format!("the TLS front could not reach the provider: {err}").into_bytes(),
+        },
+      }
+    },
+  )
+}
 
 /// The broker options, in today's verifier's spelling. `janus verify` is given the same spelling:
 /// S1.13 maps today's options onto janus's, and until a janus option exists its absence is the
@@ -614,6 +719,7 @@ fn broker_args(command: &mut Command, url: &str, provider: &str, verify: &Broker
 
 fn run_today(
   tools: &Tools,
+  connection: &ConnectionSpec,
   source: &Source,
   port: u16,
   state_url: Option<&str>,
@@ -654,6 +760,10 @@ fn run_today(
   if let Some(url) = state_url {
     command.args(["--state-change-url", url]);
   }
+  if connection.tls {
+    command.args(["--transport", "https"]);
+  }
+  connection_args(&mut command, connection);
   let output = match command.output() {
     Ok(output) => output,
     Err(err) => {
@@ -769,6 +879,7 @@ fn mismatch_text(mismatch: &Value) -> String {
 
 fn run_janus(
   tools: &Tools,
+  connection: &ConnectionSpec,
   source: &Source,
   base_url: &str,
   state_url: Option<&str>,
@@ -788,6 +899,7 @@ fn run_janus(
     } => broker_args(&mut command, url, provider, verify),
   }
   command.args(["--provider-url", base_url, "--output", "json"]);
+  connection_args(&mut command, connection);
   command.env("RUST_LOG", "off");
   if let Some(url) = state_url {
     let config = work.join("verifier.janus.yaml");

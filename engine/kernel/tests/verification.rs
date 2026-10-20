@@ -478,9 +478,12 @@ fn an_unreachable_provider_fails_the_variant_with_the_components_own_error() {
   let results = results(&events);
   assert_eq!(results[0]["status"], json!("failed"));
   assert_eq!(results[0]["error"]["code"], json!("component-failed"));
-  assert_eq!(results[0]["error"]["component"], json!("transport/http"));
+  assert_eq!(
+    results[0]["error"]["details"]["component"],
+    json!("transport/http")
+  );
   assert!(
-    results[0]["error"]["error"].is_object(),
+    results[0]["error"]["details"]["error"].is_object(),
     "the component's own error document is passed through, not translated: {results:?}"
   );
   assert_eq!(summary(&events)["status"], json!("failed"));

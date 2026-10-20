@@ -894,6 +894,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "h2"
+version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d29020232d6aa3fb1daca64c1127cf662cf97f254ae16c18c05b8ab635fc118"
+dependencies = [
+ "atomic-waker",
+ "bytes",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "http",
+ "indexmap",
+ "slab",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -995,6 +1014,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
+ "h2",
  "http",
  "http-body",
  "httparse",
@@ -1698,11 +1718,12 @@ version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "form_urlencoded",
+ "http",
+ "pact_janus_http_client",
  "pact_janus_kernel",
  "serde_json",
  "tiny_http",
  "tracing",
- "ureq",
 ]
 
 [[package]]
@@ -1724,6 +1745,18 @@ dependencies = [
  "serde_yaml_ng",
  "tracing",
  "ureq",
+]
+
+[[package]]
+name = "pact_janus_http_client"
+version = "0.2.0"
+dependencies = [
+ "http",
+ "reqwest",
+ "rustls",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2102,6 +2135,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
+ "h2",
  "http",
  "http-body",
  "http-body-util",
@@ -2756,6 +2790,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0c85f2c3ef0b1cd58b36682f4b17aaa995f0e5db534d85692b4903abce21f67"
 dependencies = [
  "rustls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.7.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "libc",
+ "pin-project-lite",
  "tokio",
 ]
 

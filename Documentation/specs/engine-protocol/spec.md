@@ -598,7 +598,11 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   behind the `broker` capability (ADR 0032, which replaces this section's earlier rule that
   fetching from a broker is host business). `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
-  change configuration (design 2.7 owns hook config). `target.components` declares the project's
+  change configuration (design 2.7 owns hook config). Each binding is started in the `drive` role
+  before `verify` answers, so options its transport cannot act on fail the call with
+  `component-failed`, never the run's first request (the HTTP transport's options:
+  component-interfaces spec [§5.6](../component-interfaces/spec.md#56-the-built-in-http-transports-options)).
+  `target.components` declares the project's
   components exactly as `consumer-session/create`'s `config.components` does; they are loaded, and
   the union of every contract's `requires` checked against them and the in-tree components (design
   2.6 §2.3), before `verify` answers. For message interactions, matching is
@@ -783,8 +787,12 @@ client — the offline WASM artifact — knows these operations and answers each
 
 - **The broker descriptor** is what every broker-facing member takes: `url`, `auth` (`bearer` with
   a `token`, or `basic` with a `username` and `password`) and `client`, the HTTP client options the
-  HTTP component's client half takes (TLS, proxies, timeouts, retries; staged plan S1.5), so one
-  configuration reaches the provider and the broker alike.
+  HTTP transport's drive role takes (TLS, proxies, timeouts, retries; component-interfaces spec
+  [§5.6](../component-interfaces/spec.md#56-the-built-in-http-transports-options), ADR 0035), so one
+  configuration reaches the provider and the broker alike. With no `client`, a broker is reached
+  through the platform's trust store and the environment's proxies, as today's verifier reaches it.
+  A `client` the engine cannot act on fails the operation with `component-failed` naming `broker`,
+  carrying `invalid-config` with the member's pointer.
 - **Credentials travel in the request and nowhere else.** The engine MUST NOT read broker
   credentials from its environment: a host reads them, by whatever names it supports, and passes
   them. The engine MUST NOT repeat them in an event, a summary, an error or a log. It names the

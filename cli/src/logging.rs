@@ -27,9 +27,11 @@ where
 }
 
 /// `filter`, with what would log a credential held back however much was asked for: at `trace`,
-/// the HTTP library dumps every request's bytes, the broker's `Authorization` header among them
-/// (engine-protocol spec §8.7: a credential is never repeated in a log). Its `debug` is kept, and
-/// redacts headers.
+/// an HTTP library may dump a request's bytes, a broker's `Authorization` header or a provider's
+/// custom headers among them (engine-protocol spec §8.7: a credential is never repeated in a log).
+/// The engine's own client (ADR 0035) is reqwest over hyper, h2 and rustls; the hooks' `http`
+/// implementation and the tests' own clients are ureq. Their `debug` is kept, and says nothing
+/// secret.
 ///
 /// The cap is a second filter an event must also pass, not a directive in `filter`: a directive
 /// sets the target's level, so `ureq_proto=debug` would log its `debug` at `warn` too.
@@ -40,7 +42,12 @@ where
   filter.and(
     Targets::new()
       .with_default(LevelFilter::TRACE)
-      .with_target("ureq_proto", LevelFilter::DEBUG),
+      .with_target("ureq_proto", LevelFilter::DEBUG)
+      .with_target("reqwest", LevelFilter::DEBUG)
+      .with_target("hyper", LevelFilter::DEBUG)
+      .with_target("hyper_util", LevelFilter::DEBUG)
+      .with_target("h2", LevelFilter::DEBUG)
+      .with_target("rustls", LevelFilter::DEBUG),
   )
 }
 
@@ -115,5 +122,38 @@ mod tests {
     #[case] expected: Vec<&str>,
   ) {
     assert_eq!(logged(filter), expected);
+  }
+
+  /// The engine's own client (ADR 0035) is held to `debug` too, at every layer beneath it.
+  #[test]
+  fn the_engines_http_client_never_logs_at_trace() {
+    for target in [
+      "reqwest::connect",
+      "hyper::proto::h1::io",
+      "hyper_util::client::legacy::pool",
+      "h2::codec::framed_write",
+      "rustls::client::hs",
+    ] {
+      let captured = Captured::default();
+      tracing::subscriber::with_default(
+        subscriber(EnvFilter::new("trace"), captured.clone(), false),
+        || {
+          // A target is a literal to `tracing`, so each is spelled out.
+          match target {
+            "reqwest::connect" => tracing::trace!(target: "reqwest::connect", "client-trace"),
+            "hyper::proto::h1::io" => tracing::trace!(target: "hyper::proto::h1::io", "client-trace"),
+            "hyper_util::client::legacy::pool" => {
+              tracing::trace!(target: "hyper_util::client::legacy::pool", "client-trace")
+            }
+            "h2::codec::framed_write" => tracing::trace!(target: "h2::codec::framed_write", "client-trace"),
+            _ => tracing::trace!(target: "rustls::client::hs", "client-trace"),
+          }
+          tracing::debug!(target: "hyper::proto::h1::io", "client-debug");
+        },
+      );
+      let text = String::from_utf8(captured.0.lock().expect("the buffer").clone()).expect("utf-8");
+      assert!(!text.contains("client-trace"), "{target}: {text}");
+      assert!(text.contains("client-debug"), "{target}: {text}");
+    }
   }
 }

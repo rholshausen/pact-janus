@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-const MARKERS: [&str; 26] = [
+const MARKERS: [&str; 28] = [
   "component-hello",
   "component-hello-result",
   "component-config",
@@ -44,6 +44,8 @@ const MARKERS: [&str; 26] = [
   "matcher-compare",
   "matcher-compare-result",
   "variant-space-result",
+  "http-drive-options",
+  "http-client-options",
 ];
 
 const COMPONENT: &str = "https://pact.io/janus/component/v1";
@@ -78,6 +80,8 @@ fn schema_for(marker: &str) -> Option<String> {
     "matcher-compare" => format!("{COMPONENT}/matcher.schema.json#/$defs/Compare"),
     "matcher-compare-result" => format!("{COMPONENT}/matcher.schema.json#/$defs/CompareResult"),
     "variant-space-result" => format!("{COMPONENT}/matcher.schema.json#/$defs/VariantSpaceResult"),
+    "http-drive-options" => format!("{COMPONENT}/http-transport.schema.json#/$defs/DriveOptions"),
+    "http-client-options" => format!("{COMPONENT}/http-transport.schema.json#/$defs/ClientOptions"),
     // Documents this design carries but does not own.
     "capability" => format!("{PROTOCOL}/hello.schema.json#/$defs/Capabilities"),
     "engine-error" => format!("{PROTOCOL}/engine-error.schema.json"),

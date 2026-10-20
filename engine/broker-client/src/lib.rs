@@ -27,11 +27,15 @@
 //! Every link the broker writes is fetched from the broker the user named, as today's verifier
 //! does: an absolute link keeps only its path and query ([`absolute`]).
 //!
-//! The HTTP client options in the broker descriptor (TLS, proxies, timeouts; staged plan S1.5) are
-//! not read yet: the HTTP component's client half does not take them either.
+//! Every request goes through the engine's one HTTP client (ADR 0035), configured by the broker
+//! descriptor's `client` member, the same HTTP client options the HTTP transport's drive role takes
+//! (component-interfaces spec §5.6): TLS, proxies, timeouts and how many times to retry. With none,
+//! the broker is reached as today's verifier reaches it: the platform's trust store and the
+//! environment's proxies.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use pact_janus_http_client::{Defaults, HttpClient};
 use pact_janus_kernel::broker::{
   BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
   PublishRequest,
@@ -42,19 +46,23 @@ use std::time::Duration;
 
 const HAL: &str = "application/hal+json, application/json";
 
-/// How many times a request is tried in all, when nothing answered it, the broker answered a 5xx,
-/// or it answered 429 and said when to try again. Today's verifier retries more (eight, with
-/// doubling delays); three keeps a run that cannot reach its broker from waiting minutes to say so.
-/// S1.5 makes it an option.
-const ATTEMPTS: u32 = 3;
+/// How many times a request is tried again, when nothing answered it, the broker answered a 5xx,
+/// or it answered 429 and said when to try again, unless the descriptor's `client.retries` says.
+/// Today's verifier retries more (eight, with doubling delays); three attempts keep a run that
+/// cannot reach its broker from waiting minutes to say so.
+const DEFAULT_RETRIES: u32 = 2;
+
+/// How long one request to the broker may take, unless the descriptor's
+/// `client.timeouts.request-ms` says.
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The longest `Retry-After` the client waits for. A broker that asks for longer is reported at
 /// once, with what it asked, rather than holding a run for it.
 const LONGEST_RETRY_AFTER: Duration = Duration::from_secs(10);
 
-pub struct HalBrokerClient {
-  agent: ureq::Agent,
-}
+/// The client holds nothing between calls: every operation builds an HTTP client from its own
+/// descriptor's options, since each names its broker and may configure it differently.
+pub struct HalBrokerClient;
 
 impl Default for HalBrokerClient {
   fn default() -> Self {
@@ -64,20 +72,42 @@ impl Default for HalBrokerClient {
 
 impl HalBrokerClient {
   pub fn new() -> Self {
-    HalBrokerClient {
-      agent: ureq::Agent::config_builder()
-        .http_status_as_error(false)
-        .timeout_global(Some(Duration::from_secs(60)))
-        .build()
-        .into(),
-    }
+    HalBrokerClient
   }
+}
+
+/// The HTTP client a descriptor's `client` options describe. Options it cannot act on are the
+/// host's mistake, named by member: `invalid-config`, never a request that went wrong.
+fn connect(broker: &BrokerDescriptor) -> Result<HttpClient, ComponentError> {
+  HttpClient::from_value(
+    broker.client.as_ref(),
+    Defaults {
+      request_timeout: DEFAULT_REQUEST_TIMEOUT,
+      retries: DEFAULT_RETRIES,
+      user_agent: format!("pact-janus/{}", pact_janus_kernel::ENGINE_VERSION),
+    },
+  )
+  .map_err(|err| {
+    let member = err
+      .pointer
+      .map(|pointer| format!(" /client{pointer}"))
+      .unwrap_or_default();
+    ComponentError::invalid_config(
+      "broker",
+      format!(
+        "the broker descriptor's{member} {} (broker {})",
+        err.message,
+        broker.display_url()
+      ),
+    )
+  })
 }
 
 impl BrokerClient for HalBrokerClient {
   fn fetch_for_verification(&self, request: &FetchRequest) -> Result<Vec<FetchedPact>, ComponentError> {
     let broker = &request.broker;
-    let index = self.send(broker, "GET", &broker.url, None)?;
+    let client = connect(broker)?;
+    let index = self.send(&client, broker, "GET", &broker.url, None)?;
     let link = href(&index, "pb:provider-pacts-for-verification").ok_or_else(|| {
       invalid(
         broker,
@@ -98,7 +128,7 @@ impl BrokerClient for HalBrokerClient {
     if let Some(since) = &request.include_wip_since {
       body.insert("includeWipPactsSince".to_string(), json!(since));
     }
-    let selected = self.send(broker, "POST", &url, Some(&Value::Object(body)))?;
+    let selected = self.send(&client, broker, "POST", &url, Some(&Value::Object(body)))?;
     let pacts = selected["_embedded"]["pacts"].as_array().ok_or_else(|| {
       invalid(
         broker,
@@ -111,7 +141,7 @@ impl BrokerClient for HalBrokerClient {
       let link = pact["_links"]["self"]["href"]
         .as_str()
         .ok_or_else(|| invalid(broker, "a selected pact has no 'self' link"))?;
-      let document = self.send(broker, "GET", &absolute(broker, link), None)?;
+      let document = self.send(&client, broker, "GET", &absolute(broker, link), None)?;
       let properties = &pact["verificationProperties"];
       fetched.push(FetchedPact {
         handle: document["_links"].clone(),
@@ -131,6 +161,7 @@ impl BrokerClient for HalBrokerClient {
 
   fn publish_results(&self, request: &PublishRequest<'_>) -> Result<(), ComponentError> {
     let broker = request.broker;
+    let client = connect(broker)?;
     let links = request.handle;
     if request.branch.is_some() || !request.tags.is_empty() {
       let provider_link = links["pb:provider"]["href"].as_str().ok_or_else(|| {
@@ -139,7 +170,7 @@ impl BrokerClient for HalBrokerClient {
           "the pact has no 'pb:provider' link to record the provider version on",
         )
       })?;
-      let provider = self.send(broker, "GET", &absolute(broker, provider_link), None)?;
+      let provider = self.send(&client, broker, "GET", &absolute(broker, provider_link), None)?;
       if let Some(branch) = request.branch {
         let link = href(&provider, "pb:branch-version").ok_or_else(|| {
           invalid(
@@ -152,7 +183,7 @@ impl BrokerClient for HalBrokerClient {
           &link,
           &[("branch", branch), ("version", request.provider_version)],
         );
-        self.send(broker, "PUT", &url, Some(&json!({})))?;
+        self.send(&client, broker, "PUT", &url, Some(&json!({})))?;
       }
       for tag in request.tags {
         let link = href(&provider, "pb:version-tag").ok_or_else(|| {
@@ -166,13 +197,19 @@ impl BrokerClient for HalBrokerClient {
           &link,
           &[("version", request.provider_version), ("tag", tag)],
         );
-        self.send(broker, "PUT", &url, Some(&json!({})))?;
+        self.send(&client, broker, "PUT", &url, Some(&json!({})))?;
       }
     }
     let link = links["pb:publish-verification-results"]["href"]
       .as_str()
       .ok_or_else(|| invalid(broker, "the pact has no 'pb:publish-verification-results' link"))?;
-    self.send(broker, "POST", &absolute(broker, link), Some(&payload(request)))?;
+    self.send(
+      &client,
+      broker,
+      "POST",
+      &absolute(broker, link),
+      Some(&payload(request)),
+    )?;
     Ok(())
   }
 
@@ -181,7 +218,8 @@ impl BrokerClient for HalBrokerClient {
     request: &ContractsToPublish<'_>,
   ) -> Result<ContractsPublished, ComponentError> {
     let broker = request.broker;
-    let index = self.exchange(broker, "GET", &broker.url, None, false)?;
+    let client = connect(broker)?;
+    let index = self.exchange(&client, broker, "GET", &broker.url, None, false)?;
     let link = href(&index.document, "pb:publish-contracts").ok_or_else(|| {
       invalid(
         broker,
@@ -221,10 +259,10 @@ impl BrokerClient for HalBrokerClient {
     body.insert("contracts".to_string(), Value::Array(contracts));
     let body = Value::Object(body);
 
-    let answer = match self.exchange(broker, "POST", &url, Some(&body), index.accepts_gzip) {
+    let answer = match self.exchange(&client, broker, "POST", &url, Some(&body), index.accepts_gzip) {
       Err(error) if index.accepts_gzip && error.details.as_ref().is_some_and(|d| d["status"] == 415) => {
         tracing::debug!("the broker refused a compressed publication; sending it again uncompressed");
-        self.exchange(broker, "POST", &url, Some(&body), false)?
+        self.exchange(&client, broker, "POST", &url, Some(&body), false)?
       }
       answer => answer?,
     };
@@ -344,13 +382,14 @@ impl HalBrokerClient {
   /// client's own error.
   fn send(
     &self,
+    client: &HttpClient,
     broker: &BrokerDescriptor,
     method: &str,
     url: &str,
     body: Option<&Value>,
   ) -> Result<Value, ComponentError> {
     self
-      .exchange(broker, method, url, body, false)
+      .exchange(client, broker, method, url, body, false)
       .map(|answer| answer.document)
   }
 
@@ -358,6 +397,7 @@ impl HalBrokerClient {
   /// broker's answer said about compression.
   fn exchange(
     &self,
+    client: &HttpClient,
     broker: &BrokerDescriptor,
     method: &str,
     url: &str,
@@ -371,12 +411,12 @@ impl HalBrokerClient {
     });
     let mut last = None;
     let mut wait = None;
-    for attempt in 1..=ATTEMPTS {
+    for attempt in 1..=client.retries().saturating_add(1) {
       if let Some(wait) = wait.take() {
         std::thread::sleep(wait);
       }
       let backoff = Duration::from_millis(500 * u64::from(attempt));
-      let mut request = ureq::http::Request::builder()
+      let mut request = http::Request::builder()
         .method(method)
         .uri(url)
         .header("accept", HAL)
@@ -396,13 +436,10 @@ impl HalBrokerClient {
       // The HTTP library hides a URL's path below `trace`; the broker's are HAL links with no
       // secret in them, so they are logged in full, without user information.
       tracing::debug!(%method, url = %shown, attempt, "sending the request to the broker");
-      let sent = match &payload {
-        Some(payload) => request
-          .body(payload.as_slice())
-          .map(|request| self.agent.run(request)),
-        None => request.body(()).map(|request| self.agent.run(request)),
-      };
-      let mut response = match sent {
+      let sent = request
+        .body(payload.clone().unwrap_or_default())
+        .map(|request| client.run(request, None));
+      let response = match sent {
         Err(err) => return Err(unreachable(broker, &format!("building {method} {shown}: {err}"))),
         Ok(Err(err)) => {
           tracing::debug!(%method, url = %shown, attempt, error = %err, "the broker did not answer");
@@ -428,7 +465,7 @@ impl HalBrokerClient {
         .get("retry-after")
         .and_then(|value| value.to_str().ok())
         .map(str::to_string);
-      let text = response.body_mut().read_to_string().unwrap_or_default();
+      let text = String::from_utf8_lossy(response.body()).to_string();
       // A 429 is retried only when the broker says when to: PactFlow answers 429 for a plan's limit
       // (a new integration past the maximum), which no wait changes. A 5xx is retried with the
       // client's own backoff, unless the broker asked for a delay of its own.

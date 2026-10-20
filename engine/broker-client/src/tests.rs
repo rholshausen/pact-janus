@@ -66,6 +66,11 @@ fn descriptor(url: &str) -> BrokerDescriptor {
   serde_json::from_value(json!({ "url": url, "auth": { "kind": "bearer", "token": "s3cret" } })).unwrap()
 }
 
+/// One `GET` through the client a descriptor's options describe, retries and all.
+fn get(broker: &BrokerDescriptor, url: &str) -> Result<Value, ComponentError> {
+  HalBrokerClient::new().send(&connect(broker)?, broker, "GET", url, None)
+}
+
 fn fetch_request(url: &str) -> FetchRequest {
   FetchRequest {
     broker: descriptor(url),
@@ -473,9 +478,7 @@ fn answering(answers: Vec<(u16, Option<&'static str>)>) -> (String, Arc<Mutex<us
 #[test]
 fn a_429_with_no_retry_after_is_a_limit_and_is_not_retried() {
   let (url, asked) = answering(vec![(429, None)]);
-  let err = HalBrokerClient::new()
-    .send(&descriptor(&url), "GET", &url, None)
-    .unwrap_err();
+  let err = get(&descriptor(&url), &url).unwrap_err();
   assert_eq!(err.code, "broker-refused");
   assert_eq!(err.details.as_ref().unwrap()["status"], 429);
   assert!(err.message.ends_with("with 429: answered 429"), "{}", err.message);
@@ -485,18 +488,14 @@ fn a_429_with_no_retry_after_is_a_limit_and_is_not_retried() {
 #[test]
 fn a_429_that_says_when_to_retry_is_tried_again_then() {
   let (url, asked) = answering(vec![(429, Some("0"))]);
-  HalBrokerClient::new()
-    .send(&descriptor(&url), "GET", &url, None)
-    .unwrap();
+  get(&descriptor(&url), &url).unwrap();
   assert_eq!(*asked.lock().unwrap(), 2);
 }
 
 #[test]
 fn a_retry_after_longer_than_the_client_waits_is_reported_at_once() {
   let (url, asked) = answering(vec![(503, Some("120"))]);
-  let err = HalBrokerClient::new()
-    .send(&descriptor(&url), "GET", &url, None)
-    .unwrap_err();
+  let err = get(&descriptor(&url), &url).unwrap_err();
   assert_eq!(err.code, "broker-refused");
   assert_eq!(err.details.as_ref().unwrap()["retry-after"], 120);
   assert!(err.message.contains("tried again in 120s"), "{}", err.message);
@@ -510,9 +509,7 @@ fn a_5xx_is_retried_until_the_attempts_run_out() {
     (503, Some("Wed, 21 Oct 2026 07:28:00 GMT")),
     (500, None),
   ]);
-  let err = HalBrokerClient::new()
-    .send(&descriptor(&url), "GET", &url, None)
-    .unwrap_err();
+  let err = get(&descriptor(&url), &url).unwrap_err();
   assert_eq!(err.details.as_ref().unwrap()["status"], 500);
   assert_eq!(*asked.lock().unwrap(), 3);
 }
@@ -706,4 +703,28 @@ fn a_broker_at_a_context_path_is_reached_through_it_whatever_host_its_links_name
       "GET /broker/pacts/1?ref=x",
     ]
   );
+}
+
+#[test]
+fn the_descriptor_says_how_many_times_to_retry() {
+  let (url, asked) = answering(vec![(502, None), (503, None)]);
+  let mut broker = descriptor(&url);
+  broker.client = Some(json!({ "retries": 0 }));
+  let err = get(&broker, &url).unwrap_err();
+  assert_eq!(err.details.as_ref().unwrap()["status"], 502);
+  assert_eq!(*asked.lock().unwrap(), 1);
+}
+
+#[test]
+fn client_options_the_client_cannot_act_on_are_named_by_member() {
+  let mut broker = descriptor("http://user:pass@broker.example");
+  broker.client = Some(json!({ "tls": { "ca-certificates": ["not PEM"] } }));
+  let err = get(&broker, "http://broker.example").unwrap_err();
+  assert_eq!(err.code, "invalid-config");
+  assert!(
+    err.message.contains("/client/tls/ca-certificates/0"),
+    "{}",
+    err.message
+  );
+  assert!(!err.message.contains("pass"), "{}", err.message);
 }

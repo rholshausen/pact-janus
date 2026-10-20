@@ -354,6 +354,12 @@ reply. A transport that cannot honour `await-reply: true` for its kind MUST answ
 `operation-unsupported` rather than returning an empty reply, because "no reply expected" and "reply
 expected but absent" are different observations about a provider.
 
+`timeout-ms` bounds the send. A transport may have a timeout of its own, configured when it was
+started; the HTTP transport's is `timeouts.request-ms` (§5.6). When a send carries `timeout-ms` as
+well, the shorter one applies. Verification sends none: how long a provider may take is the drive
+instance's configuration, which a host sets (ADR 0035 decision 5). The engine's own call deadline
+(§3.4) applies on top of either.
+
 ### 5.3 Receiving
 
 `poll-inbound` returns the next arrived traffic, or nothing if none arrived within `timeout-ms`. The
@@ -402,6 +408,69 @@ knowledge B3 keeps out of it (plan task 3.8). So a transport **declares** it, as
 When the engine produces parts for a transport — a reply, or a request it sends — it passes a declared
 content slot's value through the content component to encode it, and every other slot as its plain
 JSON value. A transport that declares no content slots is handed plain values only.
+
+### 5.6 The built-in HTTP transport's options
+
+The interface leaves a transport's `start` options to the transport. The built-in HTTP transport's
+are specified here, because hosts write them, and because its client options are also the broker
+descriptor's `client` (engine-protocol spec §8.7). Schema:
+[`schemas/v1/http-transport.schema.json`](schemas/v1/http-transport.schema.json); decided by
+[ADR 0035](../../decisions/0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md).
+
+In the `serve` role the options are `host` and `port` (§5 worked example). In the `drive` role
+they are:
+
+- `base-url`, required: an `http` or `https` URL. Its path prefixes every request's path, so it is
+  today's verifier's base path.
+- `headers`: name to value, added to every request. Each replaces any header of the same name, in
+  any case, that the interaction carries; this is today's verifier's `--header`. They are applied
+  as the request is sent, after `before-request` hooks, as today's are applied after a request
+  filter. Their values are never repeated in a log.
+- `client`: the **HTTP client options**, below.
+
+```json http-drive-options
+{ "base-url": "https://orders.internal:8443/api",
+  "headers": { "X-Tenant": "acme" },
+  "client": { "timeouts": { "request-ms": 10000 } } }
+```
+
+The HTTP client options say how a client connects. Every member is optional, and a member the client
+does not know is ignored, as in every open document.
+
+- `tls.ca-certificates`: PEM text, each item possibly a bundle, trusted beside the platform's roots
+  rather than instead of them. `tls.client-certificate`: `{ certificate, key }` as PEM text, presented
+  when a server asks for one. `tls.insecure`: accept any server certificate, today's verifier's
+  `--disable-ssl-verification`. Certificates and keys are **text, never paths**: the host reads the
+  files, so the engine needs no filesystem for them, and a key is never repeated in an event, an
+  error or a log.
+- `proxy`: absent, or `{ "kind": "environment" }`, uses `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`
+  and `NO_PROXY` where the engine runs, as today's verifier and curl do. `{ "kind": "none" }`
+  connects directly. `{ "kind": "url", "url", "no-proxy"? }` goes through that proxy, except to the
+  hosts `no-proxy` lists, in `NO_PROXY`'s syntax.
+- `timeouts.request-ms`: how long a whole request may take, answer included (default 5000 for a
+  provider, which is today's verifier's, and 60 000 for a broker). `timeouts.connect-ms`: how long
+  connecting may take, the TLS handshake included.
+- `http-version`: `"1.1"` (the default: today's verifier speaks only HTTP/1.1); `"2"`, HTTP/2 only,
+  by ALPN over TLS and with prior knowledge in the clear; `"negotiate"`, offering both by ALPN over
+  TLS and HTTP/1.1 in the clear.
+- `retries`: how many times a client that retries tries a request again. The broker client does
+  (default 2). A provider request is never retried, because a verification observes the provider's
+  first answer.
+
+```json http-client-options
+{ "tls": { "ca-certificates": ["-----BEGIN CERTIFICATE-----\nMIIB…\n-----END CERTIFICATE-----\n"],
+           "client-certificate": { "certificate": "-----BEGIN CERTIFICATE-----\nMIIC…\n-----END CERTIFICATE-----\n",
+                                   "key": "-----BEGIN PRIVATE KEY-----\nMIIE…\n-----END PRIVATE KEY-----\n" } },
+  "proxy": { "kind": "url", "url": "http://proxy.internal:3128", "no-proxy": ["localhost", ".internal"] },
+  "timeouts": { "request-ms": 10000, "connect-ms": 2000 },
+  "http-version": "negotiate" }
+```
+
+Options the transport cannot act on (a URL that is not `http` or `https`, a certificate that does
+not parse, a version it does not speak) fail `transport/start` with `invalid-config`, naming the
+member by pointer (`/client/tls/ca-certificates/0`). Verification starts every target before the
+run, so a misconfigured provider fails the call rather than its first request (engine-protocol
+spec §8.3).
 
 ## 6. The content interface
 

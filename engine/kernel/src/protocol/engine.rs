@@ -925,8 +925,11 @@ impl Engine {
 
 /// A frame as the trace log shows it, with every credential taken out (spec §8.7: the engine never
 /// repeats one in a log). A host's broker descriptor carries them, so an `auth` member keeps its
-/// `kind` and nothing else, and a `url` loses any user information. Bytes that are not JSON are
-/// shown by their length, since nothing says what they hold.
+/// `kind` and nothing else, and a `url` loses any user information. The HTTP client options carry
+/// a client certificate's private key, whose `key` is hidden, and a transport binding's options
+/// carry headers for every request to the provider, today's `--header`, which is how a token is
+/// usually passed, so their values are hidden (ADR 0035). Bytes that are not JSON are shown by
+/// their length, since nothing says what they hold.
 fn loggable(bytes: &[u8]) -> String {
   fn redact(value: &mut Value) {
     match value {
@@ -938,6 +941,19 @@ fn loggable(bytes: &[u8]) -> String {
                 if field != "kind" {
                   *secret = json!("***");
                 }
+              }
+            }
+            ("client-certificate", Value::Object(pair)) => {
+              if let Some(key) = pair.get_mut("key") {
+                *key = json!("***");
+              }
+            }
+            ("transports", Value::Array(bindings)) => {
+              for binding in bindings.iter_mut() {
+                if let Some(Value::Object(headers)) = binding.pointer_mut("/options/headers") {
+                  headers.values_mut().for_each(|value| *value = json!("***"));
+                }
+                redact(binding);
               }
             }
             ("url", Value::String(url)) => *url = crate::broker::without_userinfo(url),
@@ -1091,6 +1107,36 @@ mod tests {
     );
     assert!(logged.contains("https://broker.example"), "{logged}");
     assert_eq!(loggable(b"token=s3cret"), "<12 bytes that are not JSON>");
+  }
+
+  /// ADR 0035: the HTTP client options carry a private key, and a transport binding's headers are
+  /// how a provider's token is usually passed. Neither is logged; what is not secret still is.
+  #[test]
+  fn a_logged_frame_carries_no_client_key_or_provider_header_value() {
+    let client = json!({ "tls": {
+      "ca-certificates": ["-----BEGIN CERTIFICATE-----ca"],
+      "client-certificate": { "certificate": "-----BEGIN CERTIFICATE-----mine", "key": "-----BEGIN PRIVATE KEY-----s3cret" }
+    } });
+    let frame = json!({
+      "type": "request", "id": "r-1", "op": "verification/verify",
+      "body": {
+        "source": { "kind": "broker", "broker": { "url": "https://broker.example", "client": client } },
+        "target": { "transports": [{ "transport": "http", "options": {
+          "base-url": "https://provider.example",
+          "headers": { "Authorization": "Bearer hunter2" },
+          "client": client
+        } }] }
+      }
+    });
+    let logged = loggable(&serde_json::to_vec(&frame).unwrap());
+    assert!(
+      !logged.contains("s3cret") && !logged.contains("hunter2"),
+      "{logged}"
+    );
+    assert!(
+      logged.contains(r#""Authorization":"***""#) && logged.contains("BEGIN CERTIFICATE-----mine"),
+      "{logged}"
+    );
   }
 
   /// `events/poll` at the dispatch boundary. The stream's own guarantees (ordering, `seq`,

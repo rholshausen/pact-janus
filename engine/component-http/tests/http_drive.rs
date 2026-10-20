@@ -402,3 +402,149 @@ fn stopping_a_drive_instance_releases_it() {
     err.message
   );
 }
+
+fn start_drive_with(
+  transport: &HttpTransport,
+  instance: &str,
+  options: Value,
+) -> Result<Value, pact_janus_kernel::component::ComponentError> {
+  transport
+    .start(Start {
+      instance: instance.to_string(),
+      kind: "http".to_string(),
+      role: "drive".to_string(),
+      options: Some(options),
+    })
+    .map(|started| started.endpoint)
+}
+
+fn header_slot(headers: Value) -> SlotValue {
+  SlotValue {
+    content: headers,
+    encoded: None,
+    content_type: None,
+  }
+}
+
+/// Staged plan S1.5, today's `--header`: an instance's headers go on every request, and replace an
+/// interaction's header of the same name whatever case either is written in.
+#[test]
+fn the_instances_headers_replace_the_interactions_whatever_their_case() {
+  let (base_url, received) = stub_provider("204 No Content", &[], b"");
+  let transport = HttpTransport::new();
+  start_drive_with(
+    &transport,
+    "t-1",
+    json!({ "base-url": base_url, "headers": { "Authorization": "Bearer configured", "X-Run": "ci" } }),
+  )
+  .unwrap();
+  send(
+    &transport,
+    "t-1",
+    request_parts(vec![
+      ("method", text_slot("GET")),
+      ("path", text_slot("/orders")),
+      (
+        "headers",
+        header_slot(json!({ "authorization": ["Bearer recorded"], "accept": ["application/json"] })),
+      ),
+    ]),
+    true,
+  );
+  let sent = received.recv_timeout(Duration::from_secs(5)).unwrap();
+  let values = |name: &str| -> Vec<String> {
+    sent
+      .headers
+      .iter()
+      .filter(|(header, _)| header.eq_ignore_ascii_case(name))
+      .map(|(_, value)| value.clone())
+      .collect()
+  };
+  assert_eq!(values("authorization"), vec!["Bearer configured"]);
+  assert_eq!(values("x-run"), vec!["ci"]);
+  assert_eq!(values("accept"), vec!["application/json"]);
+  // Unless the interaction says otherwise, the engine names itself, as today's verifier does.
+  assert_eq!(
+    values("user-agent"),
+    vec![format!("pact-janus/{}", pact_janus_kernel::ENGINE_VERSION)]
+  );
+}
+
+/// Today's `--base-path`: a path in `base-url` prefixes every request's.
+#[test]
+fn a_path_in_the_base_url_prefixes_every_request() {
+  let (base_url, received) = stub_provider("204 No Content", &[], b"");
+  let transport = HttpTransport::new();
+  start_drive(&transport, "t-1", &format!("{base_url}/api/v1/"));
+  send(
+    &transport,
+    "t-1",
+    request_parts(vec![("method", text_slot("GET")), ("path", text_slot("/orders"))]),
+    true,
+  );
+  let sent = received.recv_timeout(Duration::from_secs(5)).unwrap();
+  assert_eq!(sent.request_line, "GET /api/v1/orders HTTP/1.1");
+}
+
+/// A request is bounded by the instance's own request timeout (ADR 0035 decision 5): a provider that
+/// never answers fails the request, not the run.
+#[test]
+fn a_provider_that_never_answers_fails_the_request_at_the_instances_timeout() {
+  let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+  let base_url = format!("http://{}", listener.local_addr().unwrap());
+  thread::spawn(move || {
+    for mut stream in listener.incoming().flatten() {
+      thread::spawn(move || {
+        let mut buffer = [0u8; 1024];
+        while stream.read(&mut buffer).is_ok_and(|read| read > 0) {}
+      });
+    }
+  });
+  let transport = HttpTransport::new();
+  start_drive_with(
+    &transport,
+    "t-1",
+    json!({ "base-url": base_url, "client": { "timeouts": { "request-ms": 100 } } }),
+  )
+  .unwrap();
+  let err = transport
+    .send(Send {
+      instance: "t-1".to_string(),
+      parts: request_parts(vec![("method", text_slot("GET")), ("path", text_slot("/slow"))]),
+      await_reply: true,
+      timeout_ms: None,
+    })
+    .expect_err("nothing answers");
+  assert_eq!(err.code, "transport-failed");
+  assert!(err.message.contains("no answer within 100 ms"), "{}", err.message);
+}
+
+/// Options the instance cannot act on fail `start`, naming the member, so a misconfigured provider
+/// fails the run before anything is sent.
+#[test]
+fn options_the_instance_cannot_act_on_fail_the_start_by_member() {
+  let transport = HttpTransport::new();
+  for (options, member) in [
+    (json!({ "base-url": "ftp://provider" }), "/base-url"),
+    (
+      json!({ "base-url": "http://provider", "headers": ["X-Run: ci"] }),
+      "/headers",
+    ),
+    (
+      json!({ "base-url": "http://provider", "headers": { "X-Run": 1 } }),
+      "/headers/X-Run",
+    ),
+    (
+      json!({ "base-url": "http://provider", "client": { "tls": { "ca-certificates": ["not PEM"] } } }),
+      "/client/tls/ca-certificates/0",
+    ),
+    (
+      json!({ "base-url": "http://provider", "client": { "http-version": "3" } }),
+      "/client/http-version",
+    ),
+  ] {
+    let err = start_drive_with(&transport, "t-1", options).expect_err("the options are wrong");
+    assert_eq!(err.code, "invalid-config");
+    assert!(err.message.contains(member), "{member}: {}", err.message);
+  }
+}

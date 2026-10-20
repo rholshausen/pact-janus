@@ -276,6 +276,9 @@ fn split_header(name: &str, value: &str) -> Vec<String> {
 }
 
 fn respond(route: &Route) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+  if let Some(delay) = route.response.delay_ms {
+    std::thread::sleep(std::time::Duration::from_millis(delay));
+  }
   let body = route.response.body.as_ref().map(Body::bytes).unwrap_or_default();
   let mut response = tiny_http::Response::from_data(body).with_status_code(route.response.status);
   // One header line per value, as pact's mock server sends them: a header that is a list arrives
@@ -358,6 +361,7 @@ mod tests {
       },
       response: ResponseSpec {
         status,
+        delay_ms: None,
         headers: BTreeMap::new(),
         body: None,
       },

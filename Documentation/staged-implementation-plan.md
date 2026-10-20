@@ -572,6 +572,34 @@ item in 1a is done when S1.1 agrees.
   `--custom-header` and base-path options. None of this exists in the prototype.
   *Exit:* a verification against a TLS provider with a client certificate behind a proxy, in CI; and
   S1.13's table has a `janus` column for every transport flag.
+  *Done 2026-10-21* ([ADR 0035](decisions/0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md)).
+  One client, `engine/http-client`, is what the HTTP transport's drive role and the broker client
+  send through. It is today's verifier's stack (reqwest, rustls on ring, the platform verifier),
+  already in the tree through `pact_models`. It runs on a current-thread runtime with names
+  resolved inside the request, so it starts no thread; a Linux test counts the process's threads
+  around a request. One document configures it, the HTTP client options (component-interfaces spec
+  §5.6, `http-transport.schema.json`): TLS roots, a client certificate and an insecure mode;
+  proxies (the environment's by default, one named, or none); request and connect timeouts; HTTP/1.1,
+  HTTP/2 or negotiated; retries. It is the drive options' `client` and the broker descriptor's. The
+  drive options add `base-url` (whose path is the base path) and `headers`. `janus verify` takes
+  today's `--base-path`, `--header`, `--request-timeout` and `--disable-ssl-verification`, with
+  their environment variables, and adds `--ca-cert`, `--client-cert`/`--client-key`, `--proxy`,
+  `--no-proxy`, `--connect-timeout` and `--http-version`. The exit's verification is
+  `cli/tests/cli.rs`: a TLS provider demanding a client certificate, through a proxy, at `trace`,
+  with neither the key nor the header's token printed. It runs on all three systems. S1.13's table
+  is `Documentation/verifier-migration.md`, with every transport option of both of today's
+  verifiers. S1.1's corpus has six `connection/` fixtures. Five agree with today's verifier, and
+  the sixth is a deliberate difference in the ledger. The whole corpus, broker cases included,
+  changed no verdict. Not foreseen: the prototype's client asked providers for gzip and trusted its
+  own bundled roots, both unlike today's verifier, and both now as it does. Today's `--header`
+  replaces a pact's header only when the names are written in the same case, which Janus does not
+  copy (`connection/header-case`, ADR 0035). A transport failure's variant error was not the
+  protocol's `component-failed`, and had no message, so `janus verify` printed only the code; it
+  now says why. The kernel's fixed 30 s per request became the transport's 5 s, today's default.
+  Left out: the `http` hook, still on its own client (S1.9); flags for a broker's TLS, and today's
+  `--hostname`/`--port`/`--transport` spellings (S1.13); the server half (S2.1). HTTP/2 is tested
+  with prior knowledge in the clear and by what ALPN offers over TLS; no test provider answers in
+  HTTP/2 over TLS.
 - **S1.6 Close the 158 skipped pact-specification cases, and the body kinds the cases do not cover**
   — **L**. Plain-text, XML and form-urlencoded content components, and multipart and raw binary
   bodies, which real pacts carry though the specification cases do not. S1.1's first run found
@@ -611,6 +639,12 @@ item in 1a is done when S1.1 agrees.
   The recommendation: an `http` hook takes a retry count with today's rule (the same statuses, the
   same backoff), and a `state-setup` hook defaults to today's eight, so a provider moving over keeps
   what it had. The default is the decision.
+  S1.5 found two more. The `http` hook is still on its own client (`ureq`), so it cannot reach a
+  state endpoint behind the provider's mutual TLS or private CA. It moves onto `engine/http-client`,
+  and an `http` hook entry takes a `client` member, the HTTP client options (ADR 0035). And the
+  engine's `trace` log of each frame repeats a hook entry's `config` and its `run.headers` and
+  `run.env`, which §7.3 says appear nowhere. The frame redaction (`loggable` in the protocol
+  dispatcher) must cover them as it covers a broker's `auth`.
   *Exit:* every state-change and request-filter option in S1.13's table maps to a hook, and the
   redaction rules (lifecycle-hooks spec §7.3) have a test per secret-bearing context member.
 - **S1.10 `match:content-type` in live runs** — **S**. The exchange and verification paths execute
@@ -630,7 +664,8 @@ item in 1a is done when S1.1 agrees.
   interaction prints the fragment.
 - **S1.13 Flag parity with today's verifier CLI** — **S**, but it gates the stage. A table with a row
   per `pact_verifier_cli` and `pact-provider-verifier` option: the `janus` option, the hook, or
-  "dropped, because". The table is the migration note for providers. Behaviour with no flag gets a
+  "dropped, because". The table is the migration note for providers:
+  [`verifier-migration.md`](verifier-migration.md), whose provider-connection rows S1.5 filled. Behaviour with no flag gets a
   row too, where a provider relies on it: today's verifier retries a failed state call eight times
   and nothing on its command line changes that (S1.9).
   *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.

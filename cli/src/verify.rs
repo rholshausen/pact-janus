@@ -66,7 +66,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   let mut target = json!({
     "transports": [{
       "transport": args.transport,
-      "options": { "base-url": args.provider_url },
+      "options": provider_options(args)?,
     }]
   });
   if let Some(mut hooks) = hooks {
@@ -129,6 +129,80 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     Some("verified") => Outcome::Done,
     _ => Outcome::SubjectFailed,
   })
+}
+
+/// The HTTP transport's drive options (component-interfaces spec §5.6) from the command line:
+/// `base-url` with `--base-path` after it, `--header`s, and the HTTP client options. Certificates
+/// and keys are read here and passed as text (ADR 0035 decision 3): the engine reads no file for
+/// them. Only what was asked for is sent, so the engine's defaults are the defaults.
+fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
+  let mut base_url = args.provider_url.trim_end_matches('/').to_string();
+  if let Some(path) = args.base_path.as_deref().map(|path| path.trim_matches('/'))
+    && !path.is_empty()
+  {
+    base_url.push('/');
+    base_url.push_str(path);
+  }
+  let mut options = json!({ "base-url": base_url });
+  if !args.headers.is_empty() {
+    // A later --header of the same name replaces an earlier one, as today's verifier's map does.
+    let mut headers = serde_json::Map::new();
+    for (name, value) in &args.headers {
+      headers.retain(|existing, _| !existing.eq_ignore_ascii_case(name));
+      headers.insert(name.clone(), json!(value));
+    }
+    options["headers"] = Value::Object(headers);
+  }
+
+  let pem = |flag: &str, path: &std::path::Path| {
+    std::fs::read_to_string(path).map_err(|err| Error::from(format!("{flag} {}: {err}", path.display())))
+  };
+  let mut client = serde_json::Map::new();
+  let mut tls = serde_json::Map::new();
+  if !args.ca_certs.is_empty() {
+    let certificates = args
+      .ca_certs
+      .iter()
+      .map(|path| pem("--ca-cert", path))
+      .collect::<Result<Vec<_>, _>>()?;
+    tls.insert("ca-certificates".to_string(), json!(certificates));
+  }
+  if let (Some(certificate), Some(key)) = (&args.client_cert, &args.client_key) {
+    tls.insert(
+      "client-certificate".to_string(),
+      json!({ "certificate": pem("--client-cert", certificate)?, "key": pem("--client-key", key)? }),
+    );
+  }
+  if args.disable_ssl_verification {
+    tls.insert("insecure".to_string(), json!(true));
+  }
+  if !tls.is_empty() {
+    client.insert("tls".to_string(), Value::Object(tls));
+  }
+  if let Some(proxy) = &args.proxy {
+    let mut proxy = json!({ "kind": "url", "url": proxy });
+    if !args.no_proxy.is_empty() {
+      proxy["no-proxy"] = json!(args.no_proxy);
+    }
+    client.insert("proxy".to_string(), proxy);
+  }
+  let mut timeouts = serde_json::Map::new();
+  if let Some(ms) = args.request_timeout {
+    timeouts.insert("request-ms".to_string(), json!(ms));
+  }
+  if let Some(ms) = args.connect_timeout {
+    timeouts.insert("connect-ms".to_string(), json!(ms));
+  }
+  if !timeouts.is_empty() {
+    client.insert("timeouts".to_string(), Value::Object(timeouts));
+  }
+  if let Some(version) = args.http_version {
+    client.insert("http-version".to_string(), json!(version.as_str()));
+  }
+  if !client.is_empty() {
+    options["client"] = Value::Object(client);
+  }
+  Ok(options)
 }
 
 /// A `broker` source (protocol spec §8.3) from the command line. The engine reads no credential

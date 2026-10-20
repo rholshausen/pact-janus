@@ -20,7 +20,7 @@
         },
         "client": {
           "type": "object",
-          "description": "HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike."
+          "description": "HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike."
         }
       }
     },

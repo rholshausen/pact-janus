@@ -7,6 +7,7 @@ members = [
   "engine/component-oauth2",
   "engine/hooks-host",
   "engine/broker-client",
+  "engine/http-client",
   "engine/component-host",
   "engine/wasm",
   "cli",
@@ -20,6 +21,7 @@ members = [
   "tools/engine-pin",
   "tools/sdk-gates",
   "tools/verifier-diff",
+  "tools/test-servers",
 ]
 # The benchmark harness is durable but standalone — it drags the whole
 # pact_ffi dependency tree, which the main workspace should not pay for.

@@ -68,6 +68,9 @@ sha2 = "0.10"
 # it forwards with ureq, and checks a basic credential's encoding. Both already in the tree.
 ureq = "3"
 base64 = "0.22"
+# A TLS provider that demands a client certificate, the authority that issues it, and a proxy
+# (staged plan S1.5's exit). Test-only.
+pact_janus_test_servers = { path = "../tools/test-servers" }
 # Snapshot tests of the command surface: trycmd runs the cases under tests/cmd/ (help, usage errors,
 # exit codes, offline commands), and snapbox compares whole outputs inside tests/cli.rs, where a
 # case needs a provider or a registry running first.

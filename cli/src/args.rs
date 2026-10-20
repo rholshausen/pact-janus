@@ -94,6 +94,46 @@ impl LogLevel {
   }
 }
 
+/// Which HTTP versions `verify` speaks to the provider (the HTTP client options' `http-version`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum HttpVersion {
+  #[value(name = "1.1")]
+  Http1,
+  #[value(name = "2")]
+  Http2,
+  Negotiate,
+}
+
+impl HttpVersion {
+  pub fn as_str(self) -> &'static str {
+    match self {
+      HttpVersion::Http1 => "1.1",
+      HttpVersion::Http2 => "2",
+      HttpVersion::Negotiate => "negotiate",
+    }
+  }
+}
+
+/// `--header KEY=VALUE`, as today's verifier reads it: split at the first `=`, the name and value
+/// as HTTP allows them. The value is not repeated in an error, since it is usually a credential.
+fn header(text: &str) -> Result<(String, String), String> {
+  let (name, value) = text
+    .split_once('=')
+    .ok_or_else(|| "a header is KEY=VALUE".to_string())?;
+  let name = name.trim();
+  let valid_name = !name.is_empty()
+    && name
+      .bytes()
+      .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte));
+  if !valid_name {
+    return Err(format!("'{name}' is not a header name"));
+  }
+  if value.bytes().any(|byte| byte.is_ascii_control() && byte != b'\t') {
+    return Err(format!("the value of '{name}' has a control character in it"));
+  }
+  Ok((name.to_string(), value.to_string()))
+}
+
 /// How a command prints its result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Output {
@@ -141,6 +181,99 @@ pub struct VerifyArgs {
   /// text prints progress and a summary; json prints only the run summary document
   #[arg(long, short = 'o', value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
+
+  // How the provider is reached (staged plan S1.5, ADR 0035). Today's verifier's options keep its
+  // spellings and environment variables (Documentation/verifier-migration.md records each); the
+  // rest do what it cannot. They configure the provider connection only, as today's do.
+  /// A path to put in front of every request's path
+  #[arg(
+    long,
+    value_name = "PATH",
+    env = "PACT_PROVIDER_BASE_PATH",
+    help_heading = "Provider connection"
+  )]
+  pub base_path: Option<String>,
+
+  /// A header for every request to the provider, replacing the interaction's own of that name;
+  /// repeatable
+  #[arg(
+    long = "header",
+    short = 'H',
+    value_name = "KEY=VALUE",
+    value_parser = header,
+    help_heading = "Provider connection"
+  )]
+  pub headers: Vec<(String, String)>,
+
+  /// How long a request to the provider may take, in milliseconds [default: 5000]
+  #[arg(
+    long,
+    value_name = "MS",
+    env = "PACT_PROVIDER_REQUEST_TIMEOUT",
+    value_parser = clap::value_parser!(u64).range(1..),
+    help_heading = "Provider connection"
+  )]
+  pub request_timeout: Option<u64>,
+
+  /// How long connecting to the provider may take, in milliseconds
+  #[arg(
+    long,
+    value_name = "MS",
+    value_parser = clap::value_parser!(u64).range(1..),
+    help_heading = "Provider connection"
+  )]
+  pub connect_timeout: Option<u64>,
+
+  /// Accept any certificate the provider presents
+  #[arg(long, help_heading = "Provider connection")]
+  pub disable_ssl_verification: bool,
+
+  /// A PEM file of CA certificates to trust beside the system's; repeatable
+  #[arg(long = "ca-cert", value_name = "FILE", help_heading = "Provider connection")]
+  pub ca_certs: Vec<PathBuf>,
+
+  /// A PEM certificate (or chain) to present when the provider asks for one
+  #[arg(
+    long,
+    value_name = "FILE",
+    requires = "client_key",
+    help_heading = "Provider connection"
+  )]
+  pub client_cert: Option<PathBuf>,
+
+  /// The PEM private key of --client-cert
+  #[arg(
+    long,
+    value_name = "FILE",
+    requires = "client_cert",
+    help_heading = "Provider connection"
+  )]
+  pub client_key: Option<PathBuf>,
+
+  /// Reach the provider through this proxy. Without it, HTTPS_PROXY, HTTP_PROXY, ALL_PROXY and
+  /// NO_PROXY are read
+  #[arg(long, value_name = "URL", help_heading = "Provider connection")]
+  pub proxy: Option<String>,
+
+  /// Hosts to reach directly rather than through --proxy, comma-separated, as NO_PROXY
+  #[arg(
+    long,
+    value_name = "HOSTS",
+    value_delimiter = ',',
+    requires = "proxy",
+    help_heading = "Provider connection"
+  )]
+  pub no_proxy: Vec<String>,
+
+  /// The HTTP versions to speak to the provider: 1.1, as today's verifier; 2 only; or negotiate,
+  /// offering both over TLS [default: 1.1]
+  #[arg(
+    long,
+    value_enum,
+    value_name = "VERSION",
+    help_heading = "Provider connection"
+  )]
+  pub http_version: Option<HttpVersion>,
 
   // The Pact Broker options are spelled as today's verifier (pact_verifier_cli) spells them, so a
   // provider's CI script moves by changing the command's name; staged plan S1.13's table records

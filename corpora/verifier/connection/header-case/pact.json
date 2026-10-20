@@ -1,0 +1,34 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "orders"
+  },
+  "interactions": [
+    {
+      "description": "a request for an order",
+      "request": {
+        "method": "GET",
+        "path": "/orders/1",
+        "headers": {
+          "authorization": "Bearer recorded"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

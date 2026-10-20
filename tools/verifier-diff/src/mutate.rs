@@ -237,6 +237,7 @@ mod tests {
   fn response(body: Option<Body>) -> ResponseSpec {
     ResponseSpec {
       status: 200,
+      delay_ms: None,
       headers: BTreeMap::from([("Content-Type".to_string(), vec!["application/json".to_string()])]),
       body,
     }

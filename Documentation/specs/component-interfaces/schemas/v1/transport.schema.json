@@ -22,7 +22,7 @@
         },
         "options": {
           "type": "object",
-          "description": "Transport-specific configuration. An open document this specification deliberately does not describe."
+          "description": "Transport-specific configuration. An open document the interface leaves to each transport; the built-in HTTP transport's are http-transport.schema.json's (spec.md §5.6)."
         }
       }
     },
@@ -60,7 +60,7 @@
         "timeout-ms": {
           "type": "integer",
           "minimum": 0,
-          "description": "How long to wait for the reply. The engine's own call deadline (spec.md §3.4) still applies on top."
+          "description": "How long the send may take. A transport's own configured timeout, when shorter, applies first (spec.md §5.2); the engine's own call deadline (spec.md §3.4) still applies on top."
         }
       }
     },
