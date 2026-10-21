@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792541434729,
+  "lastUpdate": 1792541436418,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -13770,6 +13770,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 28497,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8f2789c0c390af20d98972eb841056127336dde9",
+          "message": "docs: split S1.6 into a body kind per item, S1.6 and S1.20 to S1.24\n\nS1.6 was every body kind at once (L). It is now plain-text and binary bodies\n(S), the two that need nothing new in the document model. Member order and the\nlegacy body compiler's retyping, which form and XML both need, become S1.20,\nafter S1.11. Form-urlencoded and XML follow as S1.21 and S1.22, and multipart,\nwhich compares each part through the others' components, comes last as S1.23.\nEach closes its own S1.1 ledger entries, so each can be marked done on its own.\n\nMeasured first: of the 158 skipped pact-specification cases, 156 are XML, and\ntwo carry a janus:skip blaming unanchored regexes, which S1.18 anchored; both\npass without it, and S1.6 removes the markers. So the \"no janus:skip left\" exit\nmoves to S1.22. The four matching rules the legacy compiler refuses (Values,\nEachKey, EachValue, ArrayContains) were in S1.6's findings row though no case\ncovers them; they are S1.24.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T11:05:31+11:00",
+          "tree_id": "cb9c99ff5af450259a97322c11fe5b00ef19b83d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8f2789c0c390af20d98972eb841056127336dde9"
+        },
+        "date": 1792541436073,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27354,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20130,
             "unit": "requests per second",
             "extra": "engines 4"
           }
