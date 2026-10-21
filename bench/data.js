@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792543141709,
+  "lastUpdate": 1792543143358,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -14124,6 +14124,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20130,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "28e86c853aa12361c481a1da856cc62409dafadd",
+          "message": "fix: the SDK bindings carry S1.5's schema descriptions\n\nS1.5 reworded the broker descriptor's `client` description and described a\ntransport binding's `options`, pointing both at the HTTP client options. The\ngenerated TypeScript and JVM bindings carry descriptions as doc comments, and\nwere not regenerated, so CI's \"Bindings match their schemas\" step failed.\nRegenerated with `cargo run -p pact_janus_bindings -- generate`; doc comments\nonly.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T11:24:12+11:00",
+          "tree_id": "372773487eefbbd740a43dbb933fe6d25d8a58c8",
+          "url": "https://github.com/rholshausen/pact-janus/commit/28e86c853aa12361c481a1da856cc62409dafadd"
+        },
+        "date": 1792543143005,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27928,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21143,
             "unit": "requests per second",
             "extra": "engines 4"
           }
