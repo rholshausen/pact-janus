@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792565285162,
+  "lastUpdate": 1792565287353,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -15894,6 +15894,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21572,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "816e4b7c8c22e9e0b0412419ac6ef182cff22dc6",
+          "message": "fix: the built-in text component serves only a body that is a string\n\nS1.6's text component claims text/*, so a text/csv body of rows with no CSV\ncomponent declared stopped failing as component-unavailable: the content-type\ncheck found text, and the mock would only have failed later, with\nencode-failed, when it tried to write the rows. The TypeScript SDK's CSV\nconsumer test caught it in CI.\n\nThe text component's compile now refuses a shape that admits no string\n(objects, arrays, each-like, numbers, booleans, and the choices and wrappers\nof only those). The engine asks the in-tree component that handles a declared\nslot to compile its shape when the interaction arrives and before a\nverification starts, as it already asked declared components, and a failure\nis component-unavailable with reason compile-failed, naming content/<type>.\nScope::check now runs that and the declared components' fragment check\ntogether. A text/ body that is one string is still served as text with no\ncomponent declared; v1–v4 pacts do not go through this check.\n\nADR 0036 decision 1 and component-interfaces spec §6.3 say so, and the\nunreleased S1.6 change file is updated to match.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T17:34:07+11:00",
+          "tree_id": "02f2865b3390ce4c44e7589a77ff22af9ae11e08",
+          "url": "https://github.com/rholshausen/pact-janus/commit/816e4b7c8c22e9e0b0412419ac6ef182cff22dc6"
+        },
+        "date": 1792565286646,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 36090,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29781,
             "unit": "requests per second",
             "extra": "engines 4"
           }
