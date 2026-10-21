@@ -10,7 +10,9 @@ body as `contract-invalid`.
 
 - **A built-in `text` content component** decodes any `text/*` body as UTF-8 into a string, and
   encodes a string back. Every embedding registers it after JSON, `engine/hello` lists `content/text`,
-  and a component a project declares for a `text/` type still comes first.
+  and a component a project declares for a `text/` type still comes first. It serves only a body whose
+  shape admits a string: a `text/csv` body of rows with no CSV component declared is still refused as
+  `component-unavailable` when the interaction arrives, now with `reason: compile-failed`.
 - **A body no content component claims is now its octets**, the document model's bytes, wherever
   the engine decodes one. It used to be matched as absent. A Janus contract whose shape expected no
   body where the provider sends one of an unclaimed type now fails, as it should. A body that a

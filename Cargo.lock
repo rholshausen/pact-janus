@@ -2453,6 +2453,7 @@ dependencies = [
  "base64 0.22.1",
  "pact_janus_kernel",
  "pretty_assertions",
+ "rstest 0.24.0",
  "serde_json",
 ]
 

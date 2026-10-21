@@ -2,10 +2,13 @@
 //! their round trip (component-interfaces spec §6.2), and what it refuses.
 
 use pact_janus_component_text::TextContent;
-use pact_janus_kernel::component::{ContentComponent, ContentRegistry, Decode, Detect, Encode, SlotValue};
+use pact_janus_kernel::component::{
+  Compile, ContentComponent, ContentRegistry, Decode, Detect, Encode, SlotValue,
+};
 use pact_janus_kernel::plan::RuntimeValue;
 use pretty_assertions::assert_eq;
-use serde_json::json;
+use rstest::rstest;
+use serde_json::{Value, json};
 use std::sync::Arc;
 
 fn base64_slot(content: &str, content_type: &str) -> SlotValue {
@@ -120,6 +123,41 @@ fn a_document_that_is_not_a_string_does_not_encode() {
     })
     .expect_err("an object is not text");
   assert_eq!(error.code, "encode-failed");
+}
+
+fn compile(shape: Value) -> Result<(), String> {
+  TextContent::new()
+    .compile(Compile {
+      content_type: "text/plain".to_string(),
+      shape,
+      path: "$.response.body".to_string(),
+    })
+    .map(|result| assert!(result.fragment.is_none()))
+    .map_err(|error| error.code)
+}
+
+#[rstest]
+#[case::string(json!({ "shape": "string" }))]
+#[case::regex(json!({ "shape": "regex", "pattern": "a+", "example": "aa" }))]
+#[case::equality_of_a_string(json!({ "shape": "equality", "example": "hi" }))]
+#[case::nullable_string(json!({ "shape": "nullable", "of": { "shape": "string" } }))]
+#[case::any_of_with_a_string(json!({ "shape": "any-of", "options": [1, "one"] }))]
+#[case::one_of_with_a_string(json!({ "shape": "one-of", "alternatives": {
+  "n": { "shape": "integer" }, "s": { "shape": "string" } } }))]
+#[case::an_operator_it_does_not_know(json!({ "shape": "csv:row" }))]
+fn a_shape_that_admits_a_string_compiles_to_the_generic_plan(#[case] shape: Value) {
+  assert_eq!(compile(shape), Ok(()));
+}
+
+#[rstest]
+#[case::object(json!({ "shape": "object", "members": {} }))]
+#[case::each_like(json!({ "shape": "each-like", "items": { "shape": "string" }, "min": 1 }))]
+#[case::integer(json!({ "shape": "integer", "example": 4 }))]
+#[case::equality_of_a_number(json!({ "shape": "equality", "example": 4 }))]
+#[case::nullable_object(json!({ "shape": "nullable", "of": { "shape": "object", "members": {} } }))]
+#[case::any_of_numbers(json!({ "shape": "any-of", "options": [1, 2] }))]
+fn a_shape_that_admits_no_string_is_refused(#[case] shape: Value) {
+  assert_eq!(compile(shape), Err("encode-failed".to_string()));
 }
 
 #[test]

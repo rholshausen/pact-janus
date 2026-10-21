@@ -540,6 +540,13 @@ interaction arrives, beside its requirements (§2.3), and before a verification 
 The component's actions are executed through `matcher/apply` (§7), so a component that contributes a
 fragment using its own actions implements `matcher` as well as `content`.
 
+`compile` MAY instead fail, when the component cannot carry the slot's shape under this content type at
+all. The engine asks the component that handles each declared slot, in-tree or declared, at the same
+moments, and a failure is `component-unavailable` with `reason: compile-failed`, carrying the
+component's error. This lets a component that claims a family of types decline the members it cannot
+write: the built-in `text` component claims `text/*` and refuses a shape that admits no string, so a
+`text/csv` body of rows still needs a CSV component (ADR 0036).
+
 Two limits, found by task 8.4 and recorded rather than resolved (Phase 9 findings 21 and 22): `compile`
 is given the slot's shape and **not the variant**, so a fragment cannot pin a dimensional operator the
 way the engine's own compiler does for each variant; and the value a fragment resolves is the

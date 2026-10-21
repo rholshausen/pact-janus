@@ -358,14 +358,12 @@ impl Source {
   pub(crate) fn check(&self, scope: &Scope) -> Result<(), Unavailable> {
     match self {
       Source::Janus(contract) => contract.interactions.iter().try_for_each(|interaction| {
+        // Plan task 8.4: a fragment this engine cannot use fails the run before it starts, too.
         scope.check(
           interaction.requires.iter().flatten(),
           interaction.content_types.as_ref(),
-        )?;
-        // Plan task 8.4: a fragment this engine cannot use fails the run before it starts.
-        scope
-          .contributions()
-          .check(interaction.content_types.as_ref(), &interaction.parts)
+          &interaction.parts,
+        )
       }),
       Source::Legacy(_) => Ok(()),
     }

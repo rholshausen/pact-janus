@@ -37,7 +37,12 @@ learning what either is, and in a form S1.21 to S1.23 can reuse for form, XML an
    document that is not a string does not encode. It contributes no plan fragments and detects
    nothing. Every embedding registers it after JSON. Since the registry asks components in order, a
    component a project declares for a `text/` type comes first, as S1.22's XML component will for
-   `text/xml`.
+   `text/xml`. Claiming all of `text/*` must not satisfy a slot that needs another component, so its
+   `compile` refuses a shape that admits no string, and the engine asks the in-tree component that
+   handles a slot to compile it when the interaction arrives, as it asks a declared one
+   (component-interfaces spec §6.3). A `text/csv` body of rows with no CSV component declared is still
+   refused as `component-unavailable`, naming `content/text/csv`; a `text/csv` body that is one
+   string is served as text.
 2. **A content slot whose media type no component claims is its octets: a bytes document.** The
    document model has bytes (component-interfaces spec §6.1), and a body nobody can read is still a
    body. Until now such a slot was matched as absent. A component that claims the type and fails to
@@ -85,7 +90,9 @@ learning what either is, and in a form S1.21 to S1.23 can reuse for form, XML an
 
 - A v1–v4 pact with a text or binary body verifies as it does today. The spec cases for plain text,
   including the two regex cases S1.18 anchored, run with no `janus:skip`.
-- A Janus contract can declare a `text/` body and have it decoded and served. `engine/hello` lists
+- A Janus contract can declare a `text/` body that is a string and have it decoded and served, with
+  no component declared. A structured shape under a `text/` type still needs a component, as it did
+  before; S1.6 first shipped without that check, and the TypeScript SDK's CSV test caught it. `engine/hello` lists
   `content/text` among the in-tree components.
 - An unclaimed body is now present, as bytes, wherever the engine decodes one, not only on the v1–v4
   path. A shape that asks for such a body gets bytes rather than nothing. That is truer, and a shape

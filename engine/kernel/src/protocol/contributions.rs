@@ -114,6 +114,15 @@ impl Contributions {
     Ok(fragments)
   }
 
+  /// Whether a declared component claims `media_type`, and so is asked to compile its slots here.
+  pub fn claims(&self, media_type: &str) -> bool {
+    self.contributors.iter().any(|c| {
+      c.content
+        .as_ref()
+        .is_some_and(|content| content.handles(media_type))
+    })
+  }
+
   /// Checked when an interaction arrives, beside its requirements.
   pub fn check(
     &self,

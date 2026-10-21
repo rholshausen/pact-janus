@@ -96,7 +96,19 @@ impl ContentComponent for TextContent {
   }
 
   /// Nothing to contribute (spec §6.3): a text body is one string, which the generic plan handles.
-  fn compile(&self, _req: Compile) -> Result<CompileResult, ComponentError> {
+  /// A shape that admits no string at all, such as rows of a `text/csv` body, is refused: this
+  /// component cannot write it, and the slot needs a component for its type (ADR 0036).
+  fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
+    require_text(&req.content_type)?;
+    if !admits_a_string(&req.shape) {
+      return Err(ComponentError::encode_failed(
+        &req.content_type,
+        format!(
+          "the built-in text component writes a body as one string, and this shape ('{}') admits no string",
+          req.shape.get("shape").and_then(Value::as_str).unwrap_or("?")
+        ),
+      ));
+    }
     Ok(CompileResult {
       fragment: None,
       grammar_version: None,
@@ -107,5 +119,28 @@ impl ContentComponent for TextContent {
   /// components whose types have a signature (spec §6.5).
   fn detect(&self, _req: Detect) -> Result<DetectResult, ComponentError> {
     Err(ComponentError::operation_unsupported("content/detect"))
+  }
+}
+
+/// Whether a shape (shape-language spec §4) admits some string. Conservative: only a shape that can
+/// never be a string is refused, and an operator this component does not know is taken to admit one.
+fn admits_a_string(shape: &Value) -> bool {
+  let example_is_a_string = || shape.get("example").is_none_or(Value::is_string);
+  match shape.get("shape").and_then(Value::as_str) {
+    Some(
+      "object" | "array" | "each-like" | "each-entry" | "contains" | "number" | "integer" | "decimal"
+      | "boolean" | "null",
+    ) => false,
+    Some("equality" | "type") => example_is_a_string(),
+    Some("optional" | "nullable") => shape.get("of").is_none_or(admits_a_string),
+    Some("any-of") => shape
+      .get("options")
+      .and_then(Value::as_array)
+      .is_none_or(|options| options.iter().any(Value::is_string)),
+    Some("one-of") => shape
+      .get("alternatives")
+      .and_then(Value::as_object)
+      .is_none_or(|alternatives| alternatives.values().any(admits_a_string)),
+    _ => true,
   }
 }

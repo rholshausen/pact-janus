@@ -9,10 +9,12 @@
 use super::contributions::Contributions;
 use crate::common::{ContentTypes, Requirement};
 use crate::component::{
-  self, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, TransportComponent,
+  self, Compile, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, TransportComponent,
   Unavailable, check_requirements,
 };
+use crate::contract::ShapePart;
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub(crate) struct Scope {
@@ -94,19 +96,26 @@ impl Scope {
       .collect()
   }
 
-  /// Everything an interaction needs before it can run (spec §2.3): its requirements, and a content
-  /// component for every content type it declares (contract-file spec §5.5). Checked when the
-  /// interaction arrives, never when its first body does.
+  /// Everything an interaction needs before it can run (spec §2.3): its requirements, a content
+  /// component for every content type it declares (contract-file spec §5.5) that can carry the
+  /// slot's shape, and every plan fragment a declared component contributes for its slots (plan
+  /// task 8.4). Checked when the interaction arrives, never when its first body does.
+  ///
+  /// An in-tree component is asked to `compile` the slot's shape here (spec §6.3), as a declared one
+  /// is by [`Contributions::check`], so one that claims a whole family of types can refuse a shape
+  /// it cannot carry: the built-in `text` component claims `text/*`, and a `text/csv` body of rows
+  /// still needs a CSV component (ADR 0036).
   pub fn check<'a>(
     &self,
     requirements: impl IntoIterator<Item = &'a Requirement>,
     content_types: Option<&ContentTypes>,
+    parts: &BTreeMap<String, ShapePart>,
   ) -> Result<(), Unavailable> {
     check_requirements(requirements, &self.resolved, &self.in_tree, &self.loaders)?;
     for (part, slots) in content_types.into_iter().flatten() {
       for (slot, media_type) in slots {
-        if self.content.route(media_type).is_none() {
-          let component = format!("content/{media_type}");
+        let component = format!("content/{media_type}");
+        let Some(content) = self.content.route(media_type) else {
           return Err(Unavailable {
             message: format!(
               "'{part}.{slot}' is declared as '{media_type}', and no loaded content component handles it; declare one in the project's components"
@@ -114,9 +123,30 @@ impl Scope {
             details: json!({ "component": component, "content-type": media_type, "part": part, "slot": slot }),
             component,
           });
+        };
+        if self.contributions.claims(media_type) {
+          continue;
         }
+        let Some(shape) = parts.get(part).and_then(|slots| slots.get(slot)) else {
+          continue;
+        };
+        content
+          .compile(Compile {
+            content_type: media_type.clone(),
+            shape: shape.clone(),
+            path: format!("$.{part}.{slot}"),
+          })
+          .map_err(|error| Unavailable {
+            message: format!(
+              "'{part}.{slot}' is declared as '{media_type}', and the in-tree component that handles it cannot carry its shape: {}; declare a component for '{media_type}' in the project's components",
+              error.message
+            ),
+            details: json!({ "component": component, "content-type": media_type, "part": part, "slot": slot,
+                             "reason": "compile-failed", "error": error }),
+            component,
+          })?;
       }
     }
-    Ok(())
+    self.contributions.check(content_types, parts)
   }
 }

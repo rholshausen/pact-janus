@@ -156,16 +156,16 @@ impl ConsumerSession {
     let mut spec = interaction_spec::parse(interaction)?;
     // Component-interfaces spec §2.3: what an interaction cannot run without is checked when it
     // arrives, while the author is looking at it — not when its first body does.
-    self
-      .scope
-      .check(spec.requires.iter().flatten(), spec.content_types.as_ref())
-      .map_err(AddInteractionError::Unavailable)?;
-    // And any plan fragment a declared component contributes for its slots (plan task 8.4): one
+    // So is any plan fragment a declared component contributes for its slots (plan task 8.4): one
     // written against a grammar this engine cannot read fails here, naming the skew.
     let raw_parts = raw_parts(interaction);
-    let contributions = self.scope.contributions();
-    contributions
-      .check(spec.content_types.as_ref(), &raw_parts)
+    self
+      .scope
+      .check(
+        spec.requires.iter().flatten(),
+        spec.content_types.as_ref(),
+        &raw_parts,
+      )
       .map_err(AddInteractionError::Unavailable)?;
     // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
     // §6.5): the reference resolves against this interaction's variant space, which does not exist
@@ -180,6 +180,7 @@ impl ConsumerSession {
         Err(problems) => return Err(InteractionSpecError { problems }.into()),
       }
     }
+    let contributions = self.scope.contributions();
     let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
     self.next_handle += 1;
