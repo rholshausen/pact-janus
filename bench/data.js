@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792543465603,
+  "lastUpdate": 1792543467147,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -14478,6 +14478,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21143,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3412e5c41fd6ad192af6a7b784f11bba769d3aeb",
+          "message": "fix: a request the provider could not answer is reported once, on one line\n\njanus verify printed a variant's component-failed error with its details as a\nJSON line beneath it, and the engine logged the same failure again at warn, in\nRust's debug format. The line now ends with the component's own code in\nbrackets, which is all the JSON added; --output json still carries the whole\nerror. The engine logs a failed variant, a transport failure or mismatches, at\ndebug, since the run's result event reports it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T11:40:33+11:00",
+          "tree_id": "0b9538c84e3b3a88efabffefe1133de1f624d152",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3412e5c41fd6ad192af6a7b784f11bba769d3aeb"
+        },
+        "date": 1792543466851,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 40220,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29663,
             "unit": "requests per second",
             "extra": "engines 4"
           }
