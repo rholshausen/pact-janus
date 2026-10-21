@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792540997290,
+  "lastUpdate": 1792540999478,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -13416,6 +13416,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21584,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ca5162bc2013ce0e535fcab4ee8116079b4a82e2",
+          "message": "feat: S1.5 providers and brokers are reached through one async HTTP client\n\nADR 0035. engine/http-client is the one client the HTTP transport's drive role\nand the broker client send through: reqwest on rustls with ring and the platform\nverifier, today's verifier's stack, already in the tree through pact_models. It\nruns on a current-thread runtime with names resolved inside the request, so it\nstarts no thread; a Linux test counts the process's threads around a request.\n\nOne document configures it, the HTTP client options (component-interfaces spec\n§5.6, http-transport.schema.json): TLS roots, a client certificate and an\ninsecure mode; proxies (the environment's by default, one named, or none);\nrequest and connect timeouts; HTTP/1.1, HTTP/2 or negotiated; retries. It is the\ndrive options' `client` and the broker descriptor's. The drive options add\n`base-url`, whose path is the base path, and `headers`, which replace the\ninteraction's own of the same name in any case. Certificates and keys are PEM\ntext; the frame trace log hides a key and every provider header value.\n\njanus verify takes today's --base-path, --header, --request-timeout and\n--disable-ssl-verification, with their environment variables, and adds\n--ca-cert, --client-cert/--client-key, --proxy, --no-proxy, --connect-timeout\nand --http-version. Documentation/verifier-migration.md is S1.13's table, with\nevery transport option of both of today's verifiers filled in.\n\nBreaking: verification's sends carry no timeout-ms, so a provider request is\nbounded by the transport's request timeout, 5 s by default as today, where the\nkernel's was 30 s. A variant whose request could not be sent now carries the\nprotocol's component-failed error, with a message saying why.\n\nThe exit's verification is in cli/tests/cli.rs: a TLS provider demanding a\nclient certificate, through a proxy, at trace, printing neither the key nor the\nheader's token. tools/test-servers holds the authority, TLS provider and proxy\nthe tests share. S1.1's corpus gains six connection/ fixtures; five agree with\ntoday's verifier, and connection/header-case is a deliberate difference in the\nledger. The whole corpus changed no verdict.\n\nFound: the prototype's client asked providers for gzip and trusted its own\nbundled roots, both now as today's verifier. The hooks' trace-log redaction gap\nand the http hook's client are added to S1.9.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T10:56:06+11:00",
+          "tree_id": "3535aae04eccead1522f2807fa684102e705db69",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ca5162bc2013ce0e535fcab4ee8116079b4a82e2"
+        },
+        "date": 1792540998785,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 40517,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 28497,
             "unit": "requests per second",
             "extra": "engines 4"
           }
