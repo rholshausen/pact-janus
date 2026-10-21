@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792558925810,
+  "lastUpdate": 1792558927416,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -15186,6 +15186,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20140,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "e3cf39ba68bc60027de7f29f0c8f1df749b857dc",
+          "message": "feat: S1.6 text and binary bodies verify, through a text component and bytes\n\nADR 0036. A v1–v4 pact whose body was plain text failed as\ncomponent-unavailable, and a binary one as contract-invalid; today's verifier\npasses both.\n\n- engine/component-text is a built-in content component for text/*: it decodes\n  UTF-8 octets to a string and encodes a string back, whatever the charset\n  says. Every embedding registers it after JSON, and engine/hello lists it.\n- A content slot no component claims now decodes to bytes rather than absent.\n  One a component claims and cannot decode is still absent.\n- The legacy layer reads a body by the pact's content type, as today's\n  verifier picks a body matcher: JSON as a document, a binary type as bytes,\n  other text as a string (bytes when not UTF-8), and XML, form and multipart\n  refused until S1.21 to S1.23. A text or bytes body compiles to one value at\n  $: its rules, or match:equality.\n- A reply's body is decoded as the pact's type, and a new legacy action,\n  legacy:body-type, fails a reply whose content type disagrees, with today's\n  message. It is emitted only when the pact names no Content-Type header, so\n  six legacy corpus snapshots show it now; their results are unchanged.\n- A bytes mismatch names the first byte that differs.\n- A corpus case may carry bytes through an optional `encoded` map\n  (plan-grammar spec §6.1). New corpus cases cover text, regex text and\n  binary bodies; corpora/verifier/bodies/ adds the harness fixtures, and the\n  four S1.6 entries leave the disagreement ledger.\n\nThe plan gains S1.25 (janus upgrade converts text and binary bodies) and S6.5\n(charsets other than UTF-8, in the text component).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T15:47:40+11:00",
+          "tree_id": "11561b2d312220e3177a2f2511ddd861e90f39f4",
+          "url": "https://github.com/rholshausen/pact-janus/commit/e3cf39ba68bc60027de7f29f0c8f1df749b857dc"
+        },
+        "date": 1792558927048,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28298,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21616,
             "unit": "requests per second",
             "extra": "engines 4"
           }
