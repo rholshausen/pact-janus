@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792563929947,
+  "lastUpdate": 1792563931483,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -15540,6 +15540,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21616,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "a862fdb4818e876cdadc8ec08a8229606af26d83",
+          "message": "fix: a bytes value in a plan shows its length and base64\n\nThe text forms printed a bytes value as `<8 byte(s)>`, which said nothing\nabout the bytes, and `<...>` already means `<absent>` in mismatch messages.\nThey now print `BYTES(8, iVBORw0KGgo=)`, as the forked pact_matching engine\ndid: the length, then the base64, which is how a v1–v4 pact and the protocol\ncarry the bytes. The base64 is cut after 48 characters (the first 36 octets,\non a 4-character boundary) and ends in `...`, which no base64 alphabet holds.\n\nOne function in plan/render.rs prints bytes for the pretty and executed forms\nand for mismatch messages; the highlighter's lexer reads the new form as a\nliteral. Plan-grammar spec §3.1 states the form, and the two binary-body\ncorpus cases are re-accepted with it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T17:20:49+11:00",
+          "tree_id": "649d863fc9927a70be678ebb688be341f1e08ce0",
+          "url": "https://github.com/rholshausen/pact-janus/commit/a862fdb4818e876cdadc8ec08a8229606af26d83"
+        },
+        "date": 1792563931182,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28564,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21572,
             "unit": "requests per second",
             "extra": "engines 4"
           }
