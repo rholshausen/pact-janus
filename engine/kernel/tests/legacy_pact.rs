@@ -1,7 +1,7 @@
 //! Plan task 3.1: v1–v4 pact reading via `pact_models`, exercised against real-world fixtures
 //! (`tests/fixtures/legacy-pacts/README.md`) rather than only synthetic ones.
 
-use pact_janus_kernel::legacy_pact;
+use pact_janus_kernel::legacy::pact as legacy_pact;
 use pact_models::PactSpecification;
 use rstest::rstest;
 use std::path::PathBuf;

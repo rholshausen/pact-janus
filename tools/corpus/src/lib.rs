@@ -18,7 +18,8 @@
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::error::Problem;
 use pact_janus_kernel::interaction_spec;
-use pact_janus_kernel::legacy_pact;
+use pact_janus_kernel::legacy::compile::compile_interaction;
+use pact_janus_kernel::legacy::pact as legacy_pact;
 use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, Status};
 use serde::Deserialize;
 use serde_json::Value;
@@ -289,8 +290,7 @@ fn compile_input(input: &Input) -> Result<(Plan, String), Refusal> {
         legacy_pact::legacy_request(&interaction.request).map_err(|err| err.to_string())?;
       let legacy_response =
         legacy_pact::legacy_response(&interaction.response).map_err(|err| err.to_string())?;
-      let plan =
-        plan::compile_legacy_interaction(&interaction.description, &legacy_request, &legacy_response);
+      let plan = compile_interaction(&interaction.description, &legacy_request, &legacy_response);
       Ok((plan, interaction.description.clone()))
     }
     other => Err(format!("unknown input kind '{other}'").into()),

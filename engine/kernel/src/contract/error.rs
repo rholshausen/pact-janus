@@ -8,7 +8,7 @@
 pub use crate::error::Problem;
 
 /// A structured failure reading or writing a contract-shaped document — a Janus contract or, via
-/// [`crate::legacy_pact`], a v1–v4 pact (engine protocol spec's `ContractSource` covers both).
+/// [`crate::legacy::pact`], a v1–v4 pact (engine protocol spec's `ContractSource` covers both).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContractError {
   /// Identification (contract-file spec §2.3) found no `$format` member: this is not a Janus

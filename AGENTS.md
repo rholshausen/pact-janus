@@ -66,7 +66,9 @@ Three sources are the source of truth and take precedence over this file when th
 > its `ProviderState` generators; contracts are S1.19), and S1.5 (ADR 0035: providers and brokers
 > are reached through one async, thread-free HTTP client, `engine/http-client`, configured by the
 > HTTP client options; `janus verify` takes today's transport options and TLS, proxy and HTTP/2 ones,
-> and `Documentation/verifier-migration.md` maps each).
+> and `Documentation/verifier-migration.md` maps each), and S1.11 (the v1–v4 compatibility layer is
+> `engine/kernel/src/legacy/`, the kernel's one HTTP- and JSON-shaped module, and a test holds the rest
+> of the kernel to it).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -404,7 +406,11 @@ anything they print.
 - **The kernel knows nothing about HTTP or JSON.** Transports, content handlers, matchers/generators and
   hooks are components behind the interfaces in the component-interface spec — including the built-in
   ones. If a change leaks protocol- or content-specific knowledge into the kernel, stop and flag it
-  (plan task 3.8 tracks exactly this).
+  (plan task 3.8 tracks exactly this). The one exception is `engine/kernel/src/legacy/`, the v1–v4
+  compatibility layer: a v1–v4 pact is HTTP and JSON by specification, so reading one, compiling its
+  matching rules and upgrading it live there and nowhere else (S1.11). Outside it, the kernel names
+  no `pact_models` type but the two `engine/kernel/tests/boundary.rs` allows. A new use is either moved
+  behind the boundary or added there with its reason.
 - **Errors are values at the engine boundary.** Panics must never cross the protocol; every operation
   returns structured errors. Sessions are the only resource — no per-object cleanup calls. A plan node
   the engine's own compilers did not build — a component's fragment, a plan document read back — is

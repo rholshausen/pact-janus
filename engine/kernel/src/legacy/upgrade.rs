@@ -17,20 +17,21 @@
 //! verifier should never reach for it, and nothing in `protocol::verification` does.
 //!
 //! **Precedence is not reimplemented here.** Which declared rule governs a position, and whether
-//! it cascaded, is [`plan::legacy_winning_rule`]'s answer — the same one plans get. A converter
+//! it cascaded, is [`winning_rule`]'s answer — the same one plans get. A converter
 //! that scored rules its own way could produce a contract that verifies differently from the pact
 //! it came from, which is exactly what plan-grammar spec §4.4's two-path agreement rule forbids.
 //!
-//! Permanently v1–v4-shaped, and deliberately a sibling of [`crate::legacy_pact`] rather than a
-//! module under `contract/`: this half of the kernel is the compatibility layer, and
-//! `kernel-boundary-review.md`'s findings 3 and 6 asked that the module tree say so.
+//! Permanently v1–v4-shaped, and so inside the v1–v4 boundary ([`crate::legacy`]) rather than
+//! under `contract/`: this half of the kernel is the compatibility layer, and
+//! `kernel-boundary-review.md`'s findings 3 and 6 asked that the module tree say so (S1.11).
 
+use super::compile::{anchored_pattern, winning_rule};
+use super::pact::{self as legacy_pact, LegacyInteraction};
 use crate::common::{Requirement, State, Transport};
 use crate::contract::{
   self, Contract, ContractError, Interaction, Party, Problem, RecordedSelection, RecordedVariant,
   ResolvedState, ShapePart,
 };
-use crate::legacy_pact::{self, LegacyInteraction};
 use crate::plan;
 use crate::variant::{self, SamplingPolicy};
 use pact_models::generators::Generators;
@@ -459,9 +460,7 @@ impl Conversion {
   fn status_slot(&mut self, response: &HttpResponse, at: &str, requires: &mut Vec<Requirement>) -> Value {
     let at = Where::slot(at, "response", "status");
     let example = Value::from(response.status);
-    let Some((list, _)) =
-      plan::legacy_winning_rule(&response.matching_rules, "status", &["$".to_string()], false)
-    else {
+    let Some((list, _)) = winning_rule(&response.matching_rules, "status", &["$".to_string()], false) else {
       self.frozen(&at, 1);
       return json!({ "shape": "equality", "example": example });
     };
@@ -489,7 +488,7 @@ impl Conversion {
   }
 
   fn scalar_slot(&mut self, rules: &MatchingRules, category: &str, example: &Value, at: &Where) -> Value {
-    let list = plan::legacy_winning_rule(rules, category, &["$".to_string()], false);
+    let list = winning_rule(rules, category, &["$".to_string()], false);
     self.shape_for(list.map(|(list, _)| list), example, at)
   }
 
@@ -548,7 +547,7 @@ impl Conversion {
       let mut shapes = Vec::with_capacity(values.len());
       for (index, value) in values.iter().enumerate() {
         let fragments = vec!["$".to_string(), name.clone(), index.to_string()];
-        let list = plan::legacy_winning_rule(rules, category, &fragments, case_insensitive);
+        let list = winning_rule(rules, category, &fragments, case_insensitive);
         let example = Value::String(value.clone());
         let entry = member.push(&format!("/{index}"), &format!("/entries/{index}"));
         shapes.push(self.shape_for(list.map(|(list, _)| list), &example, &entry));
@@ -645,7 +644,7 @@ impl Conversion {
   }
 
   fn body_shape(&mut self, rules: &MatchingRules, value: &Value, ctx: &BodyCtx) -> Value {
-    let list = plan::legacy_winning_rule(rules, "body", &ctx.fragments, false);
+    let list = winning_rule(rules, "body", &ctx.fragments, false);
     match value {
       Value::Object(members) => self.object_shape(rules, members, list, ctx),
       Value::Array(items) => self.array_shape(rules, items, list, ctx),
@@ -1021,7 +1020,7 @@ fn map_rule(rule: &MatchingRule, example: &Value) -> Option<Value> {
     // a shape's matches anywhere (S1.18).
     MatchingRule::Regex(pattern) => json!({
       "shape": "regex",
-      "pattern": plan::legacy_anchored_pattern(pattern),
+      "pattern": anchored_pattern(pattern),
       "example": example
     }),
     MatchingRule::Include(substring) => {

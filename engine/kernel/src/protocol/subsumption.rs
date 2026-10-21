@@ -131,7 +131,7 @@ pub fn decide(request: &Decide) -> Result<(CompatibilityReport, String), Subsump
 /// A v1–v4 pact is converted here rather than refused, for the reason plan task 5.4 gives about
 /// verification: the pact a consumer published years ago is the document a provider actually has,
 /// and refusing to check it would make the loop reachable only by teams who had already migrated
-/// — exactly the wrong way round. The conversion is [`crate::upgrade`]'s, findings and all; a
+/// — exactly the wrong way round. The conversion is [`crate::legacy::upgrade`]'s, findings and all; a
 /// host that wants to read those calls `upgrade/pact` itself, which is why they are not smuggled
 /// into this result.
 fn consumer_contract(document: &Value) -> Result<(Contract, String), SubsumptionError> {
@@ -154,10 +154,11 @@ fn consumer_contract(document: &Value) -> Result<(Contract, String), Subsumption
       error: ContractError::NotAContract,
     });
   }
-  let upgraded = crate::upgrade::pact("contract", document).map_err(|error| SubsumptionError::Document {
-    member: "contract",
-    error,
-  })?;
+  let upgraded =
+    crate::legacy::upgrade::pact("contract", document).map_err(|error| SubsumptionError::Document {
+      member: "contract",
+      error,
+    })?;
   let version = document
     .pointer("/metadata/pactSpecification/version")
     .or_else(|| document.pointer("/metadata/pact-specification/version"))

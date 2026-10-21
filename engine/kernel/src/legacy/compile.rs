@@ -34,7 +34,7 @@
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
 
-use super::model::{Literal, Node};
+use crate::plan::{self as model, Literal, Node};
 use crate::shape::path;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
 use pact_models::path_exp::{DocPath, PathToken};
@@ -44,7 +44,7 @@ use std::collections::BTreeMap;
 /// A v1–v4 request, decoded down to the parts this compiler needs. Query/header decoding from the
 /// wire (a raw query string, a `Vec<String>` per repeated header) is a transport concern (design
 /// 2.6, plan task 4.2) — this compiler only ever sees already-decoded maps, matching
-/// [`super::resolve::CapturedValues`]'s own "never decode wire bytes" rule.
+/// [`crate::plan::CapturedValues`]'s own "never decode wire bytes" rule.
 pub struct LegacyRequest {
   pub method: String,
   pub path: String,
@@ -73,7 +73,7 @@ pub struct LegacyResponse {
 }
 
 /// Compile a v1–v4 request to a plan.
-pub fn compile_request(req: &LegacyRequest) -> super::model::Plan {
+pub fn compile_request(req: &LegacyRequest) -> model::Plan {
   let mut slots = vec![
     Node::container(
       Some("method".to_string()),
@@ -104,15 +104,15 @@ pub fn compile_request(req: &LegacyRequest) -> super::model::Plan {
   if let Some(node) = compile_body_slot(req.body.as_ref(), &req.matching_rules, "request") {
     slots.push(node);
   }
-  super::model::Plan {
-    grammar: super::model::GRAMMAR_VERSION,
+  model::Plan {
+    grammar: model::GRAMMAR_VERSION,
     root: Node::container(Some("request".to_string()), slots),
     variant: None,
   }
 }
 
 /// Compile a v1–v4 response to a plan.
-pub fn compile_response(res: &LegacyResponse) -> super::model::Plan {
+pub fn compile_response(res: &LegacyResponse) -> model::Plan {
   let mut slots = Vec::new();
   slots.push(Node::container(
     Some("status".to_string()),
@@ -132,15 +132,15 @@ pub fn compile_response(res: &LegacyResponse) -> super::model::Plan {
   if let Some(node) = compile_body_slot(res.body.as_ref(), &res.matching_rules, "response") {
     slots.push(node);
   }
-  super::model::Plan {
-    grammar: super::model::GRAMMAR_VERSION,
+  model::Plan {
+    grammar: model::GRAMMAR_VERSION,
     root: Node::container(Some("response".to_string()), slots),
     variant: None,
   }
 }
 
 /// A whole interaction — request and response together — as one plan, described the way
-/// [`super::compile::compile`] labels a shape-compiled interaction's root: mirrors
+/// [`crate::plan::compile`] labels a shape-compiled interaction's root: mirrors
 /// [`compile_request`]/[`compile_response`]'s own root containers as its two children, so a v1–v4
 /// interaction's overall verdict (both sides, not just one) is one plan a golden-corpus case (plan
 /// task 3.7) or `explain` can render and execute in a single pass.
@@ -148,11 +148,11 @@ pub fn compile_interaction(
   description: &str,
   request: &LegacyRequest,
   response: &LegacyResponse,
-) -> super::model::Plan {
+) -> model::Plan {
   let request_plan = compile_request(request);
   let response_plan = compile_response(response);
-  super::model::Plan {
-    grammar: super::model::GRAMMAR_VERSION,
+  model::Plan {
+    grammar: model::GRAMMAR_VERSION,
     root: Node::container(
       Some(description.to_string()),
       vec![request_plan.root, response_plan.root],
@@ -519,7 +519,7 @@ fn compile_body_slot(body: Option<&Value>, rules: &MatchingRules, part: &str) ->
   ))
 }
 
-/// Where a compiled node resolves its value from — [`super::compile`]'s own `Cursor`, duplicated
+/// Where a compiled node resolves its value from — [`crate::plan::compile`]'s own `Cursor`, duplicated
 /// rather than shared: this compiler's `BodyCtx` and that one's `Ctx` diverge in every other field
 /// (rule fragments vs. dimension ids), so the two structs are unrelated even though this one enum
 /// happens to coincide.
@@ -697,7 +697,7 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 /// (`expect:count` plus one compiled container per literal index) to the rule-driven form: the
 /// rule's own node, plus (when there is a first element to serve as one) a `flow:for-each` compiling
 /// that one element once as a template and applying it to every actual element at run time —
-/// exactly [`compile.rs`](super::compile)'s `each-like`, with the item shape replaced by whatever
+/// exactly [`compile.rs`](crate::plan::compile)'s `each-like`, with the item shape replaced by whatever
 /// rule cascades into the template's own path.
 fn compile_body_array(items: &[Value], ctx: &BodyCtx) -> Vec<Node> {
   match ctx.best() {

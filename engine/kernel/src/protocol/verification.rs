@@ -59,7 +59,8 @@ use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
-use crate::legacy_pact::{self, LegacyInteraction};
+use crate::legacy::compile::compile_response as compile_legacy_response;
+use crate::legacy::pact::{self as legacy_pact, LegacyInteraction, RequestTemplate};
 use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
 use crate::variant::params;
 use serde::Deserialize;
@@ -442,24 +443,23 @@ fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
       found: legacy_hint(doc),
     });
   }
-  let pact =
-    crate::legacy_pact::read(&format!("source.contracts[{index}]"), doc).map_err(|err| match err {
-      contract::ContractError::Invalid { problems } => VerifyError::ContractInvalid {
-        problems: problems
-          .into_iter()
-          .map(|problem| Problem {
-            pointer: format!("/source/contracts/{index}{}", problem.pointer),
-            message: problem.message,
-          })
-          .collect(),
-      },
-      other => VerifyError::ContractInvalid {
-        problems: vec![Problem {
-          pointer: format!("/source/contracts/{index}"),
-          message: other.to_string(),
-        }],
-      },
-    })?;
+  let pact = legacy_pact::read(&format!("source.contracts[{index}]"), doc).map_err(|err| match err {
+    contract::ContractError::Invalid { problems } => VerifyError::ContractInvalid {
+      problems: problems
+        .into_iter()
+        .map(|problem| Problem {
+          pointer: format!("/source/contracts/{index}{}", problem.pointer),
+          message: problem.message,
+        })
+        .collect(),
+    },
+    other => VerifyError::ContractInvalid {
+      problems: vec![Problem {
+        pointer: format!("/source/contracts/{index}"),
+        message: other.to_string(),
+      }],
+    },
+  })?;
   Ok(LegacyPact {
     consumer: pact.consumer().name,
     provider: pact.provider().name,
@@ -1200,7 +1200,7 @@ struct Ready {
   /// sent is generated from it once the exchange's states are set up, since a `ProviderState`
   /// generator reads what they returned. `None` on the shape path, and for a pact request with
   /// none, which replays `request` as it stands.
-  generate_from: Option<Box<pact_models::v4::http_parts::HttpRequest>>,
+  generate_from: Option<Box<RequestTemplate>>,
   /// Pinned to this variant on the shape path, compiled from matching rules on the v1–v4 path.
   plan: plan::Plan,
   /// How the reply becomes the values `plan` resolves against. A function rather than a flag
@@ -1380,13 +1380,12 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       variant: LEGACY_VARIANT.to_string(),
       origin: json!(crate::variant::Origin::Base),
       assignment: json!([]),
-      plan: plan::compile_legacy_response(&response),
+      plan: compile_legacy_response(&response),
       resolve: legacy_resolver,
       content_types: ContentTypes::new(),
       states,
       request: legacy_pact::request_parts(&interaction.request),
-      generate_from: legacy_pact::has_request_generators(&interaction.request)
-        .then(|| Box::new(interaction.request.clone())),
+      generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
       warnings: Vec::new(),
       interaction: json!({
         "description": interaction.description,
@@ -1675,7 +1674,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
 /// produced nothing leaves the recorded value and says so, before the result it qualifies.
 fn generated_request(
   exchange: &Exchange<'_>,
-  request: &pact_models::v4::http_parts::HttpRequest,
+  request: &RequestTemplate,
   scratch: &ExchangeScratch,
   ctx: &RunContext<'_>,
 ) -> Parts {
@@ -1687,7 +1686,7 @@ fn generated_request(
   }
   provider_state.extend(scratch.values.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-  let (generated, failures) = legacy_pact::generate_request(request, &provider_state, &PactGenerators);
+  let (generated, failures) = request.generate(&provider_state, &PactGenerators);
   for failure in failures {
     tracing::warn!(target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was sent");
     ctx.stream.emit(
@@ -1699,7 +1698,7 @@ fn generated_request(
       }),
     );
   }
-  legacy_pact::request_parts(&generated)
+  generated
 }
 
 /// What a point's hooks decided about this exchange, with the abort separated out because it ends

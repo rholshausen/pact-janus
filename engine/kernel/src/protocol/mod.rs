@@ -21,7 +21,7 @@
 //!
 //! Also here: `verification/explain` ([`explain`], plan task 5.5) — one interaction compiled to a
 //! plan, from whichever of the three documents a plan is ever compiled from — and `upgrade/pact`,
-//! the session-less v1–v4 conversion ([`crate::upgrade`]).
+//! the session-less v1–v4 conversion ([`crate::legacy::upgrade`]).
 //!
 //! Not yet implemented — later tasks, not silently dropped: emissive (message) interactions and routing one inbound request
 //! across several concurrently armed interactions (variant-semantics spec §4.1) are also not

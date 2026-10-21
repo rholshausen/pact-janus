@@ -12,13 +12,12 @@ pub mod contract;
 pub mod error;
 pub mod hooks;
 pub mod interaction_spec;
-pub mod legacy_pact;
+pub mod legacy;
 pub mod persisted;
 pub mod plan;
 pub mod protocol;
 pub mod shape;
 pub mod subsumption;
-pub mod upgrade;
 pub mod variant;
 
 /// The engine version, as reported over the engine protocol.

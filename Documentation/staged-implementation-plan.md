@@ -667,6 +667,17 @@ item in 1a is done when S1.1 agrees.
   module tree.
   *Exit:* the kernel crate has no `pact_models::v4::http_parts` import outside that boundary, and a CI
   grep says so.
+  *Done 2026-10-21.* The boundary is a module, `engine/kernel/src/legacy/`, whose `mod.rs` states the
+  exception. A crate would have needed the kernel, and the kernel it: the compiler builds the
+  kernel's plan nodes, and the verification path calls the compiler. It holds `pact`, the reader (was
+  `legacy_pact.rs`); `compile`, the matching-rule compiler (was `plan/legacy.rs`); and `upgrade`, which
+  was `upgrade.rs`, since converting a v1–v4 pact needs the same knowledge. The check is
+  `engine/kernel/tests/boundary.rs`, part of `cargo test` on all three systems, and stricter than the
+  exit asked. Outside `legacy/`, any `pact_models` use fails it unless its list allows it, and the list
+  has two entries, neither HTTP nor a pact document: the generator vocabulary of the built-in `pact`
+  generator component, and the `datetime` operator's format check. Not foreseen: S1.4 had put a
+  `pact_models` request in the verification path, to apply its generators once states were set up. It
+  is now an opaque `legacy::pact::RequestTemplate`. No behaviour changed, and nothing an engine pin sees.
 - **S1.12 Two protocol gaps `explain` hit** — **S**. Matching captured values becomes a protocol
   operation (finding 31), and `explain` loads the components a run would (finding 23), so what it
   prints is the plan `verify` runs.
@@ -765,7 +776,7 @@ item in 1a is done when S1.1 agrees.
   and its mutation gone; and a v3 pact with XML, form, multipart and binary bodies agrees with
   today's verifier in S1.1, which was S1.6's combined exit.
 - **S1.24 The v3/v4 matching rules the legacy compiler refuses** — **S**. `Values`, `EachKey`,
-  `EachValue` and `ArrayContains` compile to a deliberate error node (`plan/legacy.rs`'s module
+  `EachValue` and `ArrayContains` compile to a deliberate error node (`legacy/compile.rs`'s module
   docs), so a pact that uses them fails where today's verifier passes it. No pact-specification case
   covers them, which is why the 158 skipped cases never counted them. This was in S1.6's row of the
   findings table, and has nothing to do with body kinds.
@@ -1028,7 +1039,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S0.5 | The codename reaches every surface, with no inventory and no rehearsal of the rename; the persisted identifiers (`janus-contract/1`, `janus-provider-shape/1`, the OCI media types, the broker `specification` value) need a dual-spelling rule | ADR 0011, ADR 0021 |
 | S0.13 | A shape operator spelled in a reserved namespace compiles to that core action; the interpreter indexes an action's children without checking there are enough, and fragment validation checks names only | found landing S0.1; plan grammar §4.5, §5.3; the errors-are-values rule |
 | S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
-| S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
+| S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/legacy/upgrade.rs` |
 | S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |
 | S1.6 | Plain-text and binary bodies; split from the rest of the body kinds on 2026-10-21 | task 3.5; S1.1's first run |
 | S1.7 | The `request`/`response` part names and the HTTP 500 mismatch reply in the kernel; the `produce-message`/`consume-message` hooks designed and not built | kernel-boundary review 8, 9; spike 1.5; design 2.7 |

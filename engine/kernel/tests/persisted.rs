@@ -23,7 +23,8 @@ fn document(path: &str) -> Value {
 /// The sample consumer's v3 pact, upgraded: a contract as this engine writes it.
 fn contract() -> Value {
   let pact = document("samples/order-service/pacts/web-app-order-service.json");
-  let upgraded = pact_janus_kernel::upgrade::pact("web-app-order-service.json", &pact).expect("upgrades");
+  let upgraded =
+    pact_janus_kernel::legacy::upgrade::pact("web-app-order-service.json", &pact).expect("upgrades");
   serde_json::from_slice(&contract::write_canonical(&upgraded.contract).expect("writes")).expect("reads")
 }
 

@@ -7,7 +7,7 @@
 //! verifies the same provider the pact verifies lives in `legacy_verification.rs`, where the
 //! provider is.
 
-use pact_janus_kernel::upgrade::{self, Finding};
+use pact_janus_kernel::legacy::upgrade::{self, Finding};
 use serde_json::{Value, json};
 
 fn fixture(name: &str) -> Value {

@@ -16,13 +16,16 @@
 //! that path needs live here too, because both are v1–v4-shaped and this module is the kernel's
 //! v1–v4 adapter (kernel-boundary-review.md findings 3 and 6): [`request_parts`], the recorded
 //! request in the wire vocabulary a transport's `send` consumes, and [`header_captures`], the
-//! reply's headers in the single-valued form design 3.5's plans resolve against.
+//! reply's headers in the single-valued form design 3.5's plans resolve against. A request with
+//! generators to apply is kept as a [`RequestTemplate`], so the verification path never holds a
+//! `pact_models` type (the module docs of [`crate::legacy`]).
 
+use super::compile::{LegacyRequest, LegacyResponse};
 use crate::component::{
   ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
 };
 use crate::contract::{ContractError, Problem};
-use crate::plan::{CapturedValues, LegacyRequest, LegacyResponse, RuntimeValue};
+use crate::plan::{CapturedValues, RuntimeValue};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
@@ -267,13 +270,37 @@ const REQUEST_CATEGORIES: [GeneratorCategory; 4] = [
 
 /// Whether `request` has a generator a provider-side run applies (ADR 0034): any but the consumer
 /// side's own (`MockServerURL`).
-pub fn has_request_generators(request: &HttpRequest) -> bool {
+fn has_request_generators(request: &HttpRequest) -> bool {
   REQUEST_CATEGORIES.iter().any(|category| {
     request
       .build_generators(category)
       .values()
       .any(|generator| generator.corresponds_to_mode(&GeneratorTestMode::Provider))
   })
+}
+
+/// A pact's recorded request, kept because it has generators to apply when it is sent (ADR 0034):
+/// a `ProviderState` generator reads what the exchange's states returned, so the request is
+/// generated after they are set up. Opaque outside the v1–v4 boundary.
+#[derive(Debug, Clone)]
+pub struct RequestTemplate(HttpRequest);
+
+impl RequestTemplate {
+  /// The request, when it has a generator the provider side runs; `None` replays it as recorded.
+  pub fn of(request: &HttpRequest) -> Option<RequestTemplate> {
+    has_request_generators(request).then(|| RequestTemplate(request.clone()))
+  }
+
+  /// The request with its generators applied, as the parts a transport sends, and every generator
+  /// that produced nothing.
+  pub fn generate(
+    &self,
+    provider_state: &Map<String, Value>,
+    generators: &dyn GeneratorComponent,
+  ) -> (Parts, Vec<GeneratorFailure>) {
+    let (generated, failures) = generate_request(&self.0, provider_state, generators);
+    (request_parts(&generated), failures)
+  }
 }
 
 /// One generator that produced no value, so the recorded one was sent (ADR 0034 decision 5).
@@ -293,7 +320,7 @@ pub struct GeneratorFailure {
 /// come from `generators`, asked once per target with the recorded value as `example` and
 /// `provider_state` as the exchange's provider-state values. A target whose generator fails keeps
 /// its recorded value and is reported, not fatal: today's verifier keeps it silently.
-pub fn generate_request(
+fn generate_request(
   request: &HttpRequest,
   provider_state: &Map<String, Value>,
   generators: &dyn GeneratorComponent,

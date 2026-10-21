@@ -19,7 +19,8 @@
 use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::interaction_spec;
-use crate::legacy_pact;
+use crate::legacy::compile::compile_interaction;
+use crate::legacy::pact as legacy_pact;
 use crate::plan::{self, Assignment, Plan};
 use serde::Deserialize;
 use serde_json::Value;
@@ -161,9 +162,5 @@ fn legacy(document: &Value, index: usize) -> Result<Plan, ExplainError> {
     .map_err(|err| ExplainError::NotReadable(err.to_string()))?;
   let response = legacy_pact::legacy_response(&interaction.response)
     .map_err(|err| ExplainError::NotReadable(err.to_string()))?;
-  Ok(plan::compile_legacy_interaction(
-    &interaction.description,
-    &request,
-    &response,
-  ))
+  Ok(compile_interaction(&interaction.description, &request, &response))
 }

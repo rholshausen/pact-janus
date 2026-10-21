@@ -23,8 +23,8 @@ use crate::component::{
   ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, Start, Stop, TransportComponent,
 };
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
+use crate::legacy::upgrade;
 use crate::subsumption::CheckError;
-use crate::upgrade;
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};

@@ -8,7 +8,7 @@
 //!
 //! **Known gaps, excluded rather than silently miscounted.** [`skip_reason`] names every case this
 //! compiler cannot yet be expected to pass. Most are a scope decision recorded in
-//! `engine/kernel/src/plan/legacy.rs`'s module docs: non-JSON bodies (XML — content components are
+//! `engine/kernel/src/legacy/compile.rs`'s module docs: non-JSON bodies (XML — content components are
 //! design 2.6/plan task 4.2, not built yet), and the handful of matching rules with zero coverage in
 //! this corpus (`Values`, `EachKey`, `EachValue`, `ArrayContains`) that compile to a deliberate `error`
 //! node — these are excluded by a rule, since they cover every v2/v3/v4 duplicate of the same
@@ -17,7 +17,8 @@
 //! specific to that single case rather than a category of them. A case that isn't skipped is
 //! expected to pass; the assertion at the bottom enforces that.
 
-use pact_janus_kernel::plan::{self, CapturedValues, LegacyRequest, LegacyResponse, RuntimeValue, Status};
+use pact_janus_kernel::legacy::compile::{self, LegacyRequest, LegacyResponse};
+use pact_janus_kernel::plan::{self, CapturedValues, RuntimeValue, Status};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -208,7 +209,7 @@ fn run_case(case: &Case) -> Result<(), String> {
       body: body_of(&case.expected),
       matching_rules: rules,
     };
-    let plan = plan::compile_legacy_request(&req);
+    let plan = compile::compile_request(&req);
     let mut resolver = CapturedValues::new();
     resolver = resolver.capture(
       "$.request.method",
@@ -239,7 +240,7 @@ fn run_case(case: &Case) -> Result<(), String> {
       body: body_of(&case.expected),
       matching_rules: rules,
     };
-    let plan = plan::compile_legacy_response(&res);
+    let plan = compile::compile_response(&res);
     let mut resolver = CapturedValues::new();
     resolver = resolver.capture(
       "$.response.status",
