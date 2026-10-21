@@ -26,7 +26,7 @@ pub enum TokenKind {
   String,
   /// `42`, `-1.5`.
   Number,
-  /// `true`, `false`, `NULL`, `<3 byte(s)>`.
+  /// `true`, `false`, `NULL`, `BYTES(3, AQID)`.
   Literal,
   /// The executed form's `=>`.
   Arrow,
@@ -162,12 +162,8 @@ impl<'a> Scanner<'a> {
       rest.starts_with(word) && !rest[word.len()..].starts_with(|c: char| c.is_ascii_alphanumeric())
     }) {
       self.push(TokenKind::Literal, word.len());
-    } else if first == '<'
-      && rest
-        .find(" byte(s)>")
-        .is_some_and(|at| rest[1..at].bytes().all(|b| b.is_ascii_digit()))
-    {
-      self.push(TokenKind::Literal, rest.find('>').map_or(rest.len(), |at| at + 1));
+    } else if let Some(len) = bytes_len(rest) {
+      self.push(TokenKind::Literal, len);
     } else {
       self.push(TokenKind::Plain, first.len_utf8());
     }
@@ -214,6 +210,22 @@ fn quoted_len(rest: &str, quote: char) -> usize {
     }
   }
   rest.len()
+}
+
+/// How long a bytes value is when `rest` starts with one (spec §3.1): `BYTES(`, a length, `, `, base64
+/// that may end in `...`, and `)`.
+fn bytes_len(rest: &str) -> Option<usize> {
+  let body = rest.strip_prefix("BYTES(")?;
+  let (length, tail) = body.split_once(", ")?;
+  if length.is_empty() || !length.bytes().all(|b| b.is_ascii_digit()) {
+    return None;
+  }
+  let close = tail.find(')')?;
+  let encoded = tail[..close].strip_suffix("...").unwrap_or(&tail[..close]);
+  encoded
+    .bytes()
+    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+    .then_some("BYTES(".len() + length.len() + ", ".len() + close + 1)
 }
 
 #[cfg(test)]
@@ -275,6 +287,20 @@ mod tests {
         (Arrow, "=>"),
         (Plain, " "),
         (Pass, "BOOL(true)"),
+        (Plain, "\n)"),
+      ]
+    );
+  }
+
+  #[test]
+  fn a_bytes_value_is_one_literal_whole_or_cut() {
+    assert_eq!(
+      kinds("(\n  BYTES(4, AQIDQQ==),\n  BYTES(2048, iVBORw0K...)\n)"),
+      vec![
+        (Plain, "(\n  "),
+        (Literal, "BYTES(4, AQIDQQ==)"),
+        (Plain, ",\n  "),
+        (Literal, "BYTES(2048, iVBORw0K...)"),
         (Plain, "\n)"),
       ]
     );

@@ -39,7 +39,7 @@
       :body (
         %match:equality (
           $.response.body,
-          <8 byte(s)>
+          BYTES(8, iVBORw0KGgo=)
         )
       )
     )

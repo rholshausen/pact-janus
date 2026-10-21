@@ -269,6 +269,25 @@ mod fragments {
 )"#;
     pretty_assertions::assert_eq!(super::render_one(&node), expected);
   }
+
+  /// Spec §3.1: the length, then the base64, cut after 48 characters (36 octets) and ended `...`.
+  #[test]
+  fn bytes_render_with_their_length_and_base64() {
+    let short = Node::value(Literal::bytes(b"<foo>test</foo>"));
+    pretty_assertions::assert_eq!(super::render_one(&short), "BYTES(15, PGZvbz50ZXN0PC9mb28+)");
+
+    let exactly_shown = Node::value(Literal::bytes(&[0u8; 36]));
+    pretty_assertions::assert_eq!(
+      super::render_one(&exactly_shown),
+      format!("BYTES(36, {})", "A".repeat(48))
+    );
+
+    let cut = Node::value(Literal::bytes(&[0u8; 37]));
+    pretty_assertions::assert_eq!(
+      super::render_one(&cut),
+      format!("BYTES(37, {}...)", "A".repeat(48))
+    );
+  }
 }
 
 /// Renders a single [`Node`] as a whole document (the same envelope [`render_pretty`] wraps a

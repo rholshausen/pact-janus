@@ -1226,7 +1226,7 @@ fn display(value: &RuntimeValue) -> String {
     RuntimeValue::Bool(b) => b.to_string(),
     RuntimeValue::Number(n) => n.to_string(),
     RuntimeValue::String(s) => format!("'{s}'"),
-    RuntimeValue::Bytes(bytes) => format!("<{} byte(s)>", bytes.len()),
+    RuntimeValue::Bytes(bytes) => super::render::render_bytes(bytes),
     RuntimeValue::Entry { key, .. } => format!("entry '{key}'"),
     RuntimeValue::Array(_) | RuntimeValue::Object(_) => {
       serde_json::to_string(&value.to_json()).unwrap_or_default()

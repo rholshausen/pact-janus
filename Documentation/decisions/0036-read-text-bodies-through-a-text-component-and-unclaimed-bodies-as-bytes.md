@@ -90,8 +90,9 @@ learning what either is, and in a form S1.21 to S1.23 can reuse for form, XML an
 - An unclaimed body is now present, as bytes, wherever the engine decodes one, not only on the v1–v4
   path. A shape that asks for such a body gets bytes rather than nothing. That is truer, and a shape
   that needs the body read still needs a component, which a requirement still demands.
-- A bytes mismatch names the first byte that differs, since two bodies of the same size otherwise
-  read as `<n byte(s)>` twice.
+- A bytes mismatch names the first byte that differs, since the text forms show a bytes value as its
+  length and at most 48 characters of its base64 (plan-grammar spec §3.1), and two large bodies that
+  differ past that show the same prefix.
 - A JSON pact with no `Content-Type` header now shows the type check in `explain`. It was always
   today's behaviour; the plan only says so now.
 - Plan grammar v1 gains `legacy:body-type`, the first action v0 never had, so it has no v0 name.

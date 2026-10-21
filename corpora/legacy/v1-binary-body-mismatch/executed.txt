@@ -38,9 +38,9 @@
       ) => BOOL(true),
       :body (
         %match:equality (
-          $.response.body => <8 byte(s)>,
-          <8 byte(s)>
-        ) => ERROR(Expected <8 byte(s)> to equal <8 byte(s)>, differing from byte 7)
+          $.response.body => BYTES(8, iVBORw0KGvU=),
+          BYTES(8, iVBORw0KGgo=)
+        ) => ERROR(Expected BYTES(8, iVBORw0KGvU=) to equal BYTES(8, iVBORw0KGgo=), differing from byte 7)
       ) => BOOL(false)
     ) => BOOL(false)
   ) => BOOL(false)

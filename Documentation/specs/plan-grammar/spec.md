@@ -179,7 +179,7 @@ Nodes are written with a sigil, children in parentheses, one per line, indented 
 |---|---|---|
 | `container` | `:` | `:query-test`, `:"query parameters"` (quoted when it contains whitespace) |
 | `action` | `%` | `%expect:empty` |
-| `value` | none | `'a string'`, `42`, `true`, `NULL` |
+| `value` | none | `'a string'`, `42`, `true`, `NULL`, `BYTES(15, PGZvbz50ZXN0PC9mb28+)` |
 | `resolve` | `$` | `$.query` |
 | `resolve-current` | `~>` | `~>.name` |
 | `pipeline` | `->` | `->` |
@@ -201,6 +201,12 @@ Nodes are written with a sigil, children in parentheses, one per line, indented 
   )
 )
 ```
+
+A bytes value is written `BYTES(<length>, <base64>)`: its length in octets, then its base64 (protocol
+spec §2.5). The base64 is cut after 48 characters, which are the first 36 octets, and the cut is marked
+`...`, which no base64 alphabet holds: `BYTES(2048, iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA...)`.
+The length is always whole, so a cut value still says how big it is. The same form is used wherever a
+bytes value appears in a result or a mismatch message.
 
 This is a **specified surface**, not a debugging convenience. It is what `explain` prints, what a
 golden corpus records (§6), and what a user reads when a verification fails, so it is governed like a

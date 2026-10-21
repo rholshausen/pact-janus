@@ -26,6 +26,8 @@
 use super::interpret::{Executed, ExecutedKind, NodeResult};
 use super::model::{Literal, Node, NodeKind, Plan};
 use super::value::RuntimeValue;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::Number;
 
 /// The pretty form of a compiled plan (spec §3.1): the root node's rendering, wrapped in one more
@@ -102,7 +104,7 @@ fn render_value(value: &RuntimeValue) -> String {
     RuntimeValue::Bool(b) => b.to_string(),
     RuntimeValue::Number(n) => render_number(n),
     RuntimeValue::String(s) => quote_string(s),
-    RuntimeValue::Bytes(bytes) => format!("<{} byte(s)>", bytes.len()),
+    RuntimeValue::Bytes(bytes) => render_bytes(bytes),
     RuntimeValue::Array(items) => format!(
       "[{}]",
       items.iter().map(render_value).collect::<Vec<_>>().join(", ")
@@ -117,6 +119,22 @@ fn render_value(value: &RuntimeValue) -> String {
     ),
     RuntimeValue::Entry { key, value } => format!("{{{}: {}}}", quote_string(key), render_value(value)),
   }
+}
+
+/// How many base64 characters of a bytes value the text forms show: 36 octets, cut on a 4-character
+/// boundary so the part shown decodes on its own.
+const BYTES_SHOWN: usize = 48;
+
+/// A bytes value as the text forms print it (spec §3.1): `BYTES(<length>, <base64>)`, the base64 cut
+/// after [`BYTES_SHOWN`] characters and ended with `...`, which no base64 alphabet holds.
+pub(crate) fn render_bytes(bytes: &[u8]) -> String {
+  let encoded = BASE64.encode(bytes);
+  let shown = if encoded.len() > BYTES_SHOWN {
+    format!("{}...", &encoded[..BYTES_SHOWN])
+  } else {
+    encoded
+  };
+  format!("BYTES({}, {shown})", bytes.len())
 }
 
 fn render_number(n: &Number) -> String {

@@ -38,8 +38,8 @@
       ) => BOOL(true),
       :body (
         %match:equality (
-          $.response.body => <8 byte(s)>,
-          <8 byte(s)>
+          $.response.body => BYTES(8, iVBORw0KGgo=),
+          BYTES(8, iVBORw0KGgo=)
         ) => BOOL(true)
       ) => BOOL(true)
     ) => BOOL(true)

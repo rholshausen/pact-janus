@@ -636,7 +636,9 @@ fn a_binary_body_verifies_byte_for_byte() {
   assert_eq!(summary(&events)["status"], json!("failed"));
   assert_eq!(
     mismatch_messages(&events),
-    vec!["Expected <8 byte(s)> to equal <8 byte(s)>, differing from byte 7".to_string()]
+    vec![
+      "Expected BYTES(8, iVBORw0KGvU=) to equal BYTES(8, iVBORw0KGgo=), differing from byte 7".to_string()
+    ]
   );
 }
 
