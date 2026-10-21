@@ -20,7 +20,7 @@ export interface BrokerAuth {
 export interface BrokerDescriptor {
   auth?: BrokerAuth;
   /**
-   * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.
+   * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike.
    */
   client?: {
     [k: string]: unknown;
@@ -1003,6 +1003,9 @@ export interface VerificationTarget {
 }
 
 export interface TransportBinding {
+  /**
+   * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+   */
   options?: {
     [k: string]: unknown;
   };

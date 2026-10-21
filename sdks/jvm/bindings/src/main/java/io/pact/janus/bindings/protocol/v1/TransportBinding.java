@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -29,7 +30,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 })
 public class TransportBinding {
 
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
     @JsonProperty("options")
+    @JsonPropertyDescription("The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md \u00a75.6).")
     private Map<String, Object> options;
     /**
      * 
@@ -41,11 +47,19 @@ public class TransportBinding {
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
     @JsonProperty("options")
     public Map<String, Object> getOptions() {
         return options;
     }
 
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
     @JsonProperty("options")
     public void setOptions(Map<String, Object> options) {
         this.options = options;

@@ -41,11 +41,11 @@ public class BrokerDescriptor {
     @JsonPropertyDescription("Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.")
     private BrokerAuth auth;
     /**
-     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.
+     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike.
      * 
      */
     @JsonProperty("client")
-    @JsonPropertyDescription("HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.")
+    @JsonPropertyDescription("HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md \u00a75.6, ADR 0035), so one configuration reaches the provider and the broker alike.")
     private Map<String, Object> client;
     /**
      * The broker's base URL.
@@ -81,7 +81,7 @@ public class BrokerDescriptor {
     }
 
     /**
-     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.
+     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike.
      * 
      */
     @JsonProperty("client")
@@ -90,7 +90,7 @@ public class BrokerDescriptor {
     }
 
     /**
-     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP component's client half takes (staged plan S1.5), so one configuration reaches the provider and the broker alike.
+     * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike.
      * 
      */
     @JsonProperty("client")
