@@ -256,6 +256,43 @@ fn verify_trusts_a_provider_certificate_only_when_told_to() {
   assert_eq!(code(&accepted), 0, "{}\n{}", stdout(&accepted), stderr(&accepted));
 }
 
+/// A provider that speaks only HTTP/1.1, asked for HTTP/2: each request fails, and says why on
+/// one line, with the component's own code and no JSON, and nothing is logged at the default level
+/// that the result does not already say. (The sample provider never answers HTTP/2's preface, so
+/// the request times out; a provider that answers it with HTTP/1.1 fails on a bad frame instead.)
+#[test]
+fn a_request_the_provider_cannot_answer_is_reported_on_one_line() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let output = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--http-version",
+    "2",
+    "--request-timeout",
+    "500",
+  ]);
+  assert_eq!(code(&output), 1, "{}\n{}", stdout(&output), stderr(&output));
+  let text = stdout(&output);
+  let failures: Vec<&str> = text
+    .lines()
+    .filter(|line| line.contains("component-failed"))
+    .collect();
+  assert_eq!(failures.len(), 2, "{text}");
+  assert!(
+    failures
+      .iter()
+      .all(|line| line.contains("no answer within 500 ms") && line.ends_with("[transport-failed]")),
+    "{text}"
+  );
+  assert!(!text.contains(r#"{"component""#), "{text}");
+  assert!(!stderr(&output).contains("WARN"), "{}", stderr(&output));
+}
+
 /// Without `--proxy`, the environment's proxy is used, as today's verifier and curl use it.
 #[test]
 fn verify_reaches_the_provider_through_the_environments_proxy() {

@@ -1791,7 +1791,8 @@ fn drive(
   let reply = match sent {
     Ok(result) => result.reply,
     Err(error) => {
-      tracing::warn!(%variant, ?error, "the provider could not be driven for this variant");
+      // The result event reports it; a log line at the default level would say it twice.
+      tracing::debug!(%variant, ?error, "the provider could not be driven for this variant");
       // The protocol's `component-failed` (spec §10.2), whose message carries the component's own,
       // so a host can say why a request got no answer without reading the component's document.
       let error = EngineError::component_failed(&format!("transport/{}", target.kind), &error);
@@ -1830,7 +1831,7 @@ fn drive(
       json!({ "interaction": reference, "variant": variant, "status": "verified" })
     }
     Status::Mismatched => {
-      tracing::warn!(%variant, count = mismatches.len(), "variant failed");
+      tracing::debug!(%variant, count = mismatches.len(), "variant failed");
       json!({
         "interaction": reference, "variant": variant, "status": "failed",
         "mismatches": mismatches.iter().map(mismatch_json).collect::<Vec<_>>(),

@@ -50,7 +50,14 @@ pub fn render_error(error: &Value) -> String {
     Some(message) => format!("{code}: {message}"),
     None => code.to_string(),
   };
-  if let Some(problems) = error["details"]["problems"].as_array() {
+  // `component-failed` carries the component's own error (protocol spec §10.2), whose message the
+  // engine's already includes; its code is the one thing the message does not say.
+  let component_code = error["details"]["error"]["code"]
+    .as_str()
+    .filter(|_| code == "component-failed");
+  if let Some(component_code) = component_code {
+    text.push_str(&format!(" [{component_code}]"));
+  } else if let Some(problems) = error["details"]["problems"].as_array() {
     for problem in problems {
       let pointer = problem["pointer"].as_str().unwrap_or("");
       let message = problem["message"].as_str().unwrap_or("");
