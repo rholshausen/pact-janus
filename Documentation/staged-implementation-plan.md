@@ -69,7 +69,7 @@ first draft of something that will be rewritten against the final specification.
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the 158 known gaps closed rather than skipped (S1.6). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the 158 known gaps closed rather than skipped (S1.6, S1.22). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
 | **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); make the exchange loop single-threaded and async-ready (§4, gate W; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
@@ -565,7 +565,7 @@ item in 1a is done when S1.1 agrees.
   that is not JSON is `ok` (today's reading) where it was a hook failure; and `verification/warning`,
   emitted since the prototype, had no row in the protocol spec's event table, and now has one. Left
   out: generators for contracts, which `upgrade` still drops (S1.19), and for XML and form bodies,
-  which arrive with S1.6's content components and warn until then.
+  which arrive with S1.21's and S1.22's content components and warn until then.
 - **S1.5 The HTTP component's client half, rewritten** — **M**. Async and thread-free (the same
   executor seam S2.1 uses). TLS with custom CA bundles, client certificates and an insecure mode;
   HTTP and HTTPS proxies; request timeouts; HTTP/1.1 and HTTP/2; today's `--request-timeout`,
@@ -600,15 +600,25 @@ item in 1a is done when S1.1 agrees.
   `--hostname`/`--port`/`--transport` spellings (S1.13); the server half (S2.1). HTTP/2 is tested
   with prior knowledge in the clear and by what ALPN offers over TLS; no test provider answers in
   HTTP/2 over TLS.
-- **S1.6 Close the 158 skipped pact-specification cases, and the body kinds the cases do not cover**
-  — **L**. Plain-text, XML and form-urlencoded content components, and multipart and raw binary
-  bodies, which real pacts carry though the specification cases do not. S1.1's first run found
-  plain text missing too: a `text/plain` body is `component-unavailable` today. This pulls two things forward: **member order in
-  the document model** (finding 11, formerly stage 5), because XML children and form fields are
-  ordered; and **retyping the legacy body compiler off `serde_json::Value`** (kernel-boundary review
-  finding 5, closed on the premise that no v1–v4 pact body is non-JSON, which XML bodies disprove).
-  *Exit:* every pact-specification case the legacy harness runs passes, with no `janus:skip` left; a
-  v3 pact with XML, form, multipart and binary bodies agrees with today's verifier in S1.1.
+- **S1.6 Plain-text and binary bodies** — **S**. The first of the body kinds a JSON-only engine
+  lacks, and the two that need no document structure. S1.1's first run found both: a `text/plain`
+  body is `component-unavailable`, and a binary one (`image/jpeg` in a v1 pact) is refused as
+  `contract-invalid`. A plain-text content component decodes a `text/*` body the JSON component does
+  not claim into a string, compared as today's verifier compares text: by equality, or by the rules
+  on `$`. A body whose content type no component claims is compared as bytes, as today. This settles
+  how a body that is not JSON reaches the legacy compiler, which S1.21 to S1.23 reuse.
+  The body kinds were one item, S1.6, until 2026-10-21. It was split by what each kind needs:
+  - text and binary need nothing new in the document model, so they come first (this item);
+  - form and XML both need member order and the legacy compiler retyped (S1.20), then a component
+    each (S1.21, S1.22);
+  - multipart compares each part by its own content type, so it comes last (S1.23).
+
+  Measuring before the split found that the 158 skipped pact-specification cases are 156 XML ones
+  and two whose `janus:skip` blames unanchored regexes, which S1.18 anchored; both pass without it.
+  *Exit:* S1.1's ledger entries for `compatibility-suite/v1/15-response-with-plain-text-body-positive-case`
+  and `…/21-response-with-binary-body-positive-case` gone; corpus cases for a text body and a binary
+  body, matching and not; and the two `plain text regex matching that does not match` fixtures
+  without `janus:skip`.
 - **S1.7 Message pact verification** — **L**. Verifying v3 message pacts and v4 message and
   synchronous-message interactions, which pact-jvm users have in numbers. First the kernel's
   `request`/`response` part names and its HTTP 500 mismatch reply go (kernel-boundary review 8, 9):
@@ -721,6 +731,46 @@ item in 1a is done when S1.1 agrees.
   no `generator-dropped` left for the vocabulary `pact` provides; corpus cases for a generated
   request slot and a generated response slot; and a consumer conformance case for a served
   generated value.
+- **S1.20 Member order in the document model, and the legacy body compiler retyped** — **M**. The
+  shared prerequisite for form and XML bodies (S1.21, S1.22), split from S1.6. The document model
+  loses member order (finding 11, formerly stage 5), though XML children and form fields are ordered.
+  So order is kept through decode, the plan and encode; the third-party CSV component's mock serves
+  columns alphabetically today (third-party component report item 10). And the legacy compiler
+  walks a body as `serde_json::Value` (kernel-boundary review finding 5, closed on the premise that
+  no v1–v4 pact body is non-JSON, which XML bodies disprove), so a content component's decoded
+  document cannot reach it. It compiles over the document model instead. No verdict should move;
+  the corpus and S1.1's ledger staying as they are is the evidence. It rewrites the code S1.11 moves
+  behind a marked boundary, so S1.11 comes first.
+  *Exit:* the legacy compiler's body entry takes the document model, with no `serde_json::Value` in
+  its walk; `corpora/` and S1.1's ledger unchanged by it; and a corpus case in which order is
+  observable, the CSV component serving columns in the order its contract declares them.
+- **S1.21 Form-urlencoded bodies** — **S**, after S1.20. A content component for
+  `application/x-www-form-urlencoded`, decoding a body into an ordered document of names and
+  values, matched as today's verifier matches a form body; and S1.4's generators applied to it,
+  where they warn today.
+  *Exit:* S1.1's ledger entries for `compatibility-suite/v1/23-response-with-form-post-body-positive-case`
+  gone; corpus cases for a form body, matching and not; and a generator on a form body applied in
+  S1.1's harness, with no `generator-failed` warning.
+- **S1.22 XML bodies** — **L**, after S1.20. An XML content component: elements, attributes, text and
+  namespaces, with children in order; the v1–v4 matching-rule paths into XML, attributes and text
+  nodes included; and S1.4's generators on XML bodies. This is where the pact-specification cases
+  are closed: all 156 that are still skipped are XML.
+  *Exit:* every pact-specification case the legacy harness runs passes, with its XML exclusion rule
+  deleted and no `janus:skip` left; S1.1's ledger entries for
+  `compatibility-suite/v1/19-response-with-xml-body-positive-case` gone.
+- **S1.23 Multipart bodies** — **M**, last of the body kinds. `multipart/form-data` and
+  `multipart/mixed`, split at the boundary and each part compared by its own content type through
+  the components S1.6, S1.21 and S1.22 add, as today's verifier compares them.
+  *Exit:* S1.1's ledger entries for `compatibility-suite/v1/25-response-with-multipart-body-positive-case`
+  and its mutation gone; and a v3 pact with XML, form, multipart and binary bodies agrees with
+  today's verifier in S1.1, which was S1.6's combined exit.
+- **S1.24 The v3/v4 matching rules the legacy compiler refuses** — **S**. `Values`, `EachKey`,
+  `EachValue` and `ArrayContains` compile to a deliberate error node (`plan/legacy.rs`'s module
+  docs), so a pact that uses them fails where today's verifier passes it. No pact-specification case
+  covers them, which is why the 158 skipped cases never counted them. This was in S1.6's row of the
+  findings table, and has nothing to do with body kinds.
+  *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
+  verifier; corpus cases for each.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -873,7 +923,7 @@ The component model, opened to the ecosystem.
   spec §9). This closes S1.8's refusal.
 - **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
   decode errors and degradations reaching the user as their own finding kind, not as "expected a
-  value" (findings 13, 14). Member order moved to S1.6.
+  value" (findings 13, 14). Member order moved to S1.20.
 - **S5.4 Plan fragments versus operator-level substitution** — decision, gate F, before any third
   party depends on either; with it, a fragment's access to octets (finding 22) and where action
   configuration lives in the grammar (finding 24, ADR 0022 decision 6's provisional mapping).
@@ -980,7 +1030,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.3 | Per-pair verification counts in the run summary (`pairs`, option A); a publish verb; compression on the publish path | finding 10; broker notes §11 |
 | S1.4 | v3/v4 generators are dropped by `upgrade` and never applied in verification | new in this revision; `engine/kernel/src/upgrade.rs` |
 | S1.5 | No TLS, proxy or timeout options in the CLI or the HTTP component | new in this revision |
-| S1.6 | The 158 skipped pact-specification cases (XML, form bodies, four uncovered rules); plain-text, multipart and binary bodies; **member order in the document model** (moved from stage 5); the legacy body compiler typed to `serde_json::Value` | task 3.5; finding 11; kernel-boundary review 5 |
+| S1.6 | Plain-text and binary bodies; split from the rest of the body kinds on 2026-10-21 | task 3.5; S1.1's first run |
 | S1.7 | The `request`/`response` part names and the HTTP 500 mismatch reply in the kernel; the `produce-message`/`consume-message` hooks designed and not built | kernel-boundary review 8, 9; spike 1.5; design 2.7 |
 | S1.8 | Plugin-bearing v4 interactions have no path until S5.2 | new in this revision |
 | S1.10 | `match:content-type` runs with no detector in live exchanges and verification | third-party component report §4 |
@@ -990,6 +1040,11 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.17 | A filtered run that verified what it replayed — or replayed nothing, because no recorded variant has the id it named — has status `verified` and exits 0 | found rebuilding the CLI; variant-semantics spec §5.1 |
 | S1.18 | A regex matches anywhere in a value under Janus and the whole value under today's verifiers, so an unanchored pattern in a v1–v4 pact accepts more than it does today | S1.1's first run; shape-language spec §4.2 |
 | S1.19 | `upgrade` drops v1–v4 generators, so a contract replays a recorded value where its pact generated one; a shape's `generator` member is parsed and never applied | S1.4; ADR 0034 decision 6 |
+| S1.20 | **Member order in the document model** (moved from stage 5); the legacy body compiler typed to `serde_json::Value` | split from S1.6; finding 11; kernel-boundary review 5 |
+| S1.21 | Form-urlencoded bodies | split from S1.6 |
+| S1.22 | XML bodies, and the 156 pact-specification cases skipped for them | split from S1.6; task 3.5 |
+| S1.23 | Multipart bodies | split from S1.6 |
+| S1.24 | `Values`, `EachKey`, `EachValue` and `ArrayContains` compile to an error node | split from S1.6; task 3.5 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |
