@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792545010320,
+  "lastUpdate": 1792545012617,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -14832,6 +14832,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 29663,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "379f7ff5398a4899c9464109b13829ed677ccd36",
+          "message": "refactor: S1.11 the v1–v4 compatibility layer is the kernel's legacy module\n\nKernel-boundary review findings 3 and 6: nothing in the module tree marked the\nv1–v4 pact reader and matching-rule compiler as the permanent HTTP- and\nJSON-shaped exception to \"the kernel knows nothing about HTTP or JSON\".\n\nengine/kernel/src/legacy/ is that boundary, and its mod.rs says so: pact (was\nlegacy_pact.rs), compile (was plan/legacy.rs) and upgrade (was upgrade.rs,\nwhich needs the same knowledge). A module, not a crate: the compiler builds the\nkernel's plan nodes and verification calls the compiler, so each would need the\nother.\n\nengine/kernel/tests/boundary.rs holds the rest of the kernel to it, in cargo\ntest on every system: outside legacy/, any pact_models use fails unless its\nlist allows it, and it allows two, neither HTTP nor a pact document (the\nbuilt-in `pact` generator component's vocabulary, and the datetime operator's\nformat check). S1.4 had put a pact_models request in the verification path for\nits generators; it is now an opaque legacy::pact::RequestTemplate.\n\nAGENTS.md's architecture rule names the exception. No behaviour changes.\n\nNo-Changeset: a move inside the kernel; nothing an engine pin sees changes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-21T12:05:35+11:00",
+          "tree_id": "c66c1525b5116af4af30f88c5757ce6403cd3578",
+          "url": "https://github.com/rholshausen/pact-janus/commit/379f7ff5398a4899c9464109b13829ed677ccd36"
+        },
+        "date": 1792545011935,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28336,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20140,
             "unit": "requests per second",
             "extra": "engines 4"
           }
