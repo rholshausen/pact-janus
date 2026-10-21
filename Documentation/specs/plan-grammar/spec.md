@@ -279,7 +279,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | `expect` | structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:absent` | |
 | `check` | boolean checks | `check:exists`, `check:equals`, `check:null` | |
 | `match` | one per value operator of the shape language (§4.3) | `match:*` | |
-| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value` | |
+| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type` | |
 
 **Every core action takes at least a fixed number of children**, and a node with fewer is malformed:
 
@@ -287,7 +287,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 |---|---|
 | 0 | `flow:and`, `flow:or`, `flow:apply`, `flow:tee`, `value:join` |
 | 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries` |
-| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value` |
+| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type` |
 | 3 | `expect:size`; `legacy:min-type`, `legacy:max-type` |
 | 4 | `legacy:min-max-type` |
 
@@ -362,6 +362,7 @@ The actions only the v1–v4 compiler may emit are the `legacy` namespace, and n
 | `legacy:array-contains` | legacy only | the old `arrayContains`; shapes reach it through the opaque `contains` operator |
 | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a size bound, enforced only when the resolved value is an array — a string's characters and an object's members are not items — and never emitted bounded for a cascaded rule, which the legacy compiler reduces to `match:type` (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
 | `legacy:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
+| `legacy:body-type` | legacy only | v1–v4's check that a body is of the pact's content type before it is compared (ADR 0036): its children are the received `Content-Type` and the pact's type. An absent value agrees, as does an unknown type on either side (`*/*`), the same type and subtype, or a suffix type whose suffix is the pact's subtype (`application/hal+json` for `application/json`); when the pact's type has parameters, the received one must have the same. The legacy compiler emits it only when the pact names no `Content-Type` header, since `legacy:header-value` checks one it names. A shape's body type is its slot's declared content type (contract-file spec §5.5) instead. |
 | `match:any-of`, `expect:absent` | shapes only | v1–v4 has no enumeration or absence assertion |
 
 This is why the forked action set is worth keeping rather than replacing: it is the legacy half of the
@@ -409,6 +410,7 @@ mapping**, one name to one name:
 | `match:array-contains` | `legacy:array-contains` |
 | `match:min-type`, `match:max-type`, `match:min-max-type` | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` |
 | `match:header-value` | `legacy:header-value` |
+| — | `legacy:body-type`, which v0 did not have |
 | every other `expect:*`, `check:*` and `match:*` action | the same name |
 | `<component>:<name>` | the same name |
 
@@ -492,6 +494,11 @@ directory holding four files:
 The split is deliberate: the two halves that are text snapshots are *files a human diffs*, not strings
 inside a JSON document where every newline is an escape. A corpus nobody can read in a pull request is
 a corpus nobody reviews.
+
+`values` are JSON, and the document model also has bytes (engine-protocol spec §2.4). A value that is
+octets is written as its base64 and tagged in `encoded`, which maps a path in `values` to its
+representation: `base64`, as engine-protocol spec §2.5 defines it. A binary body is the case that needs
+it, since a body no content component claims is its octets (ADR 0036).
 
 **A case may say that its input is refused.** Some rules are about what never becomes a plan — an
 operator nobody can contribute, a shape that does not parse. Such a case has `status: invalid` and a

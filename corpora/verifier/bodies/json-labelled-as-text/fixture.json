@@ -1,0 +1,33 @@
+{
+  "description": "A pact with a JSON body and no Content-Type, answered with the same JSON labelled text/plain: the types disagree, so both fail it",
+  "source": "staged plan S1.6; ADR 0036; pact_matching::match_body, which picks the body matcher by the pact's content type when the reply's agrees with it or has none, and compare_bodies' match_text and match_octet_stream",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/thing"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "text/plain"
+            ]
+          },
+          "body": {
+            "json": {
+              "name": "a thing"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

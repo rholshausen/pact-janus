@@ -20,7 +20,7 @@ use pact_janus_kernel::error::Problem;
 use pact_janus_kernel::interaction_spec;
 use pact_janus_kernel::legacy::compile::compile_interaction;
 use pact_janus_kernel::legacy::pact as legacy_pact;
-use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, Status};
+use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, RuntimeValue, Status};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -33,6 +33,10 @@ struct CaseFile {
   description: String,
   input: Input,
   values: BTreeMap<String, Value>,
+  /// Representation tags for `values`, by path (plan-grammar spec §6, ADR 0036 decision 5):
+  /// `base64` means the value is the base64 of an octet sequence.
+  #[serde(default)]
+  encoded: BTreeMap<String, String>,
   result: ExpectedResult,
   #[serde(rename = "also-compiled-from")]
   also_compiled_from: Option<Input>,
@@ -179,7 +183,13 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     }
   };
 
-  let resolver = CapturedValues::from_json(&case.values);
+  let resolver = match captured_values(&case.values, &case.encoded) {
+    Ok(resolver) => resolver,
+    Err(err) => {
+      problems.push(format!("values: {err}"));
+      CapturedValues::new()
+    }
+  };
   let json_content = JsonContent::new();
   if let Some(plan) = &plan {
     let executed = plan::execute_with_content(plan, &resolver, Some(&json_content));
@@ -222,6 +232,36 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   }
 }
 
+/// A case's `values` as a resolver, each in the representation `encoded` names for its path: JSON by
+/// default, octets for `base64` (spec §6).
+fn captured_values(
+  values: &BTreeMap<String, Value>,
+  encoded: &BTreeMap<String, String>,
+) -> Result<CapturedValues, String> {
+  use base64::Engine as _;
+  if let Some(path) = encoded.keys().find(|path| !values.contains_key(*path)) {
+    return Err(format!("'encoded' names '{path}', which has no value"));
+  }
+  let mut resolver = CapturedValues::new();
+  for (path, value) in values {
+    let value = match encoded.get(path).map(String::as_str) {
+      None => RuntimeValue::from_json(value),
+      Some("base64") => value
+        .as_str()
+        .and_then(|text| base64::engine::general_purpose::STANDARD.decode(text).ok())
+        .map(RuntimeValue::Bytes)
+        .ok_or_else(|| format!("'{path}' is tagged base64 and is not a base64 string"))?,
+      Some(other) => {
+        return Err(format!(
+          "'{path}' has a representation this runner does not read: '{other}'"
+        ));
+      }
+    };
+    resolver = resolver.capture(path.clone(), value);
+  }
+  Ok(resolver)
+}
+
 /// A case whose input must be refused (spec §6.1): the engine's problems are the case's, in order,
 /// each at the pointer the case names and saying what the case says it must. Nothing here is a
 /// snapshot, so `accept` changes nothing — and a plan file beside such a case is a mistake.
@@ -248,8 +288,8 @@ fn check_refused(dir: &Path, case: &CaseFile, problems: &mut Vec<String>) {
   if case.also_compiled_from.is_some() {
     problems.push("'also-compiled-from' has no meaning for a case whose input is refused".to_string());
   }
-  if !case.values.is_empty() {
-    problems.push("a refused input is never executed: 'values' must be empty".to_string());
+  if !case.values.is_empty() || !case.encoded.is_empty() {
+    problems.push("a refused input is never executed: 'values' and 'encoded' must be empty".to_string());
   }
   for snapshot in ["plan.txt", "executed.txt"] {
     if dir.join(snapshot).exists() {

@@ -29,6 +29,10 @@
         ) => BOOL(true)
       ) => BOOL(true),
       :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/json'
+        ) => BOOL(true),
         :"$.items" (
           %legacy:min-type (
             $.response.body.items => [{'sku': '', 'tags': []}],

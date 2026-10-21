@@ -5,11 +5,11 @@
 //! the CLI and through no SDK.
 //!
 //! What a native embedding brings is what the kernel deliberately lacks (lifecycle-hooks spec §8.5,
-//! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport and JSON
-//! content components, the `exec` and `http` hook implementations, the built-in `oauth2` hook
-//! component, the WASM loader for out-of-tree components (plan task 8.1), and the Pact Broker
-//! client (ADR 0032, staged plan S1.3). An engine handed none of those refuses a configuration
-//! naming them — by name, before a run starts.
+//! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport, the
+//! JSON and text content components (ADR 0036), the `exec` and `http` hook implementations, the
+//! built-in `oauth2` hook component, the WASM loader for out-of-tree components (plan task 8.1),
+//! and the Pact Broker client (ADR 0032, staged plan S1.3). An engine handed none of those refuses
+//! a configuration naming them — by name, before a run starts.
 
 use pact_janus_hooks_host::{ExecHooks, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
@@ -32,6 +32,8 @@ pub fn native_engine() -> Engine {
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
   engine.declare_in_tree("content", "json", "1.0.0");
+  engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
+  engine.declare_in_tree("content", "text", "1.0.0");
   match pact_janus_component_host::WasmLoader::new() {
     Ok(loader) => engine.register_component_loader(Arc::new(loader)),
     Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),

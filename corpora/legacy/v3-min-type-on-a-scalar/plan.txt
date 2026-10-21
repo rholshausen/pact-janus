@@ -29,6 +29,10 @@
         )
       ),
       :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
         :"$.address" (
           :"$.address.city" (
             %match:type (

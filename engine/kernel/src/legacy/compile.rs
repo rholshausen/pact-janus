@@ -27,9 +27,9 @@
 //! reaches every descendant too. [`rule_list_node`] reduces a cascaded one to `Type`, so the bound
 //! is enforced once, on the array that declared it, and never re-applied several levels down.
 //!
-//! **Scope.** JSON bodies only (component-owned content types — XML, form, multipart — are out of
-//! scope until design 2.6's components exist, matching plan task 3.3's own JSON-first scope and
-//! the reuse-inventory's risk note). `Values`, `EachKey`, `EachValue`, `ArrayContains` and
+//! **Scope.** JSON bodies, walked member by member, and text and binary bodies, compiled as one value
+//! at `$` (ADR 0036 decision 3: today's `match_text` and `match_octet_stream`). XML, form and
+//! multipart bodies are S1.21 to S1.23. `Values`, `EachKey`, `EachValue`, `ArrayContains` and
 //! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
@@ -57,18 +57,34 @@ pub struct LegacyRequest {
   /// simpler scalar form and leaves multi-valued headers a documented gap.
   pub headers: BTreeMap<String, String>,
   /// `None` (the interaction never mentioned a body): the compiled plan asserts nothing about the
-  /// actual one (`body/no body`). `Some(Value::Null)` (a body was declared, explicitly empty):
-  /// the compiled plan asserts the actual body is absent too (`body/non empty body found when
-  /// empty expected` is a mismatch on exactly this) — these two are not the same thing.
-  pub body: Option<Value>,
+  /// actual one (`body/no body`). `Some(LegacyBody::Empty)` (a body was declared, explicitly
+  /// empty): the compiled plan asserts the actual body is absent too (`body/non empty body found
+  /// when empty expected` is a mismatch on exactly this) — these two are not the same thing.
+  pub body: Option<LegacyBody>,
+  /// The body's content type as the pact gives it — its own, else the `Content-Type` header, else
+  /// detected — which a received body's must agree with (`body_type_check`).
+  pub content_type: Option<String>,
   pub matching_rules: MatchingRules,
+}
+
+/// A declared v1–v4 body, as the legacy layer read it by its content type (ADR 0036 decision 3).
+#[derive(Debug, Clone, PartialEq)]
+pub enum LegacyBody {
+  /// Declared null or empty: the actual body must be absent too.
+  Empty,
+  /// A JSON document, or a text body as a string, which is the same thing to the compiler: a
+  /// string at `$`.
+  Document(Value),
+  /// A binary body, or a text body that is not UTF-8: compared as octets.
+  Bytes(Vec<u8>),
 }
 
 /// A v1–v4 response. See [`LegacyRequest`] for the header/body notes, which apply identically.
 pub struct LegacyResponse {
   pub status: u64,
   pub headers: BTreeMap<String, String>,
-  pub body: Option<Value>,
+  pub body: Option<LegacyBody>,
+  pub content_type: Option<String>,
   pub matching_rules: MatchingRules,
 }
 
@@ -101,7 +117,13 @@ pub fn compile_request(req: &LegacyRequest) -> model::Plan {
     ),
   ];
   slots.extend(compile_headers_slot(&req.headers, &req.matching_rules, "request"));
-  if let Some(node) = compile_body_slot(req.body.as_ref(), &req.matching_rules, "request") {
+  let check = body_type_check(
+    req.body.as_ref(),
+    &req.headers,
+    req.content_type.as_deref(),
+    "request",
+  );
+  if let Some(node) = compile_body_slot(req.body.as_ref(), &req.matching_rules, "request", check) {
     slots.push(node);
   }
   model::Plan {
@@ -129,7 +151,13 @@ pub fn compile_response(res: &LegacyResponse) -> model::Plan {
     &res.matching_rules,
     "response",
   ));
-  if let Some(node) = compile_body_slot(res.body.as_ref(), &res.matching_rules, "response") {
+  let check = body_type_check(
+    res.body.as_ref(),
+    &res.headers,
+    res.content_type.as_deref(),
+    "response",
+  );
+  if let Some(node) = compile_body_slot(res.body.as_ref(), &res.matching_rules, "response", check) {
     slots.push(node);
   }
   model::Plan {
@@ -265,25 +293,19 @@ pub fn anchored_pattern(pattern: &str) -> String {
 /// `Values`, `EachKey`, `EachValue`, `ArrayContains` and plugin-provided rules are a documented gap
 /// (module docs' "Scope"): none of the specification test cases in `tests/fixtures/spec_testcases`
 /// exercise them.
-fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
+fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal) -> Node {
   match rule {
-    MatchingRule::Equality => Node::action(
-      "match:equality",
-      vec![resolve, Node::value(Literal::from_json(example))],
-    ),
+    MatchingRule::Equality => Node::action("match:equality", vec![resolve, Node::value(example.clone())]),
     MatchingRule::Regex(pattern) => Node::action(
       "match:regex",
       vec![resolve, Node::value(Literal::string(anchored_pattern(pattern)))],
     ),
-    MatchingRule::Type => Node::action(
-      "match:type",
-      vec![resolve, Node::value(Literal::from_json(example))],
-    ),
+    MatchingRule::Type => Node::action("match:type", vec![resolve, Node::value(example.clone())]),
     MatchingRule::MinType(min) => Node::action(
       "legacy:min-type",
       vec![
         resolve,
-        Node::value(Literal::from_json(example)),
+        Node::value(example.clone()),
         Node::value(Literal::number(*min as u64)),
       ],
     ),
@@ -291,7 +313,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
       "legacy:max-type",
       vec![
         resolve,
-        Node::value(Literal::from_json(example)),
+        Node::value(example.clone()),
         Node::value(Literal::number(*max as u64)),
       ],
     ),
@@ -299,7 +321,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
       "legacy:min-max-type",
       vec![
         resolve,
-        Node::value(Literal::from_json(example)),
+        Node::value(example.clone()),
         Node::value(Literal::number(*min as u64)),
         Node::value(Literal::number(*max as u64)),
       ],
@@ -348,7 +370,7 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Value) -> Node {
 /// is the declaring array's own size, and v1–v4 never re-apply it below that array — not to a
 /// scalar, and not to a nested array either (`pact_matching`'s JSON matcher checks the bound only
 /// when `!cascaded`). Emitting the bounded action would both misread in `explain` and misbehave.
-fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Value) -> Node {
+fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Literal) -> Node {
   let mut nodes: Vec<Node> = list
     .rules
     .iter()
@@ -384,7 +406,7 @@ fn compile_scalar_slot(
   let fragments = vec!["$".to_string()];
   let resolve = Node::resolve(format!("$.{}", path::root(part, slot)));
   match best_rule(category.as_ref(), &fragments, false) {
-    Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, example),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(example)),
     // Method is the one scalar slot v1-v4 compares case-insensitively by default (spec test case
     // `method/method is different case`) — expressed with the existing `value:upper-case` core action
     // rather than a new one, since `match:equality`'s own children may be any value-producing node.
@@ -428,7 +450,7 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
       let resolve = Node::resolve(format!("$.{}.{lower_name}", path::root(part, "headers")));
       let example = Value::String(value.clone());
       let node = match best_rule(category.as_ref(), &fragments, true) {
-        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
+        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example)),
         // The v1-v4 default header comparison (module docs): not plain string equality — a
         // multi-valued (comma-separated) header tolerates whitespace around the commas, and a
         // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
@@ -469,7 +491,7 @@ fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, p
         let resolve = Node::resolve(format!("{base}[{index}]"));
         let example = Value::String(value.clone());
         let node = match best_rule(category.as_ref(), &fragments, false) {
-          Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
+          Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example)),
           None => Node::action(
             "match:equality",
             vec![resolve, Node::value(Literal::from_json(&example))],
@@ -489,23 +511,68 @@ fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, p
 
 // --- body: the recursive, cascading walk ---
 
-fn compile_body_slot(body: Option<&Value>, rules: &MatchingRules, part: &str) -> Option<Node> {
+/// The check today's verifier makes before it compares a body (`pact_matching::match_body`): the
+/// received body's content type agrees with the pact's (`legacy:body-type`, ADR 0036). Only when the
+/// pact names no `Content-Type` header, whose own check already covers it, and only for a body with
+/// content, of a type that is not unknown.
+fn body_type_check(
+  body: Option<&LegacyBody>,
+  headers: &BTreeMap<String, String>,
+  content_type: Option<&str>,
+  part: &str,
+) -> Option<Node> {
+  let has_content = matches!(body, Some(LegacyBody::Document(value)) if !value.is_null())
+    || matches!(body, Some(LegacyBody::Bytes(_)));
+  let named = headers
+    .keys()
+    .any(|name| name.eq_ignore_ascii_case("content-type"));
+  let content_type = content_type.filter(|content_type| !content_type.contains('*'))?;
+  (has_content && !named).then(|| {
+    Node::action(
+      "legacy:body-type",
+      vec![
+        Node::resolve(format!("$.{}.content-type", path::root(part, "headers"))),
+        Node::value(Literal::string(content_type)),
+      ],
+    )
+  })
+}
+
+fn compile_body_slot(
+  body: Option<&LegacyBody>,
+  rules: &MatchingRules,
+  part: &str,
+  check: Option<Node>,
+) -> Option<Node> {
   let root_path = format!("$.{}", path::root(part, "body"));
+  let container =
+    |nodes: Vec<Node>| Node::container(Some("body".to_string()), check.into_iter().chain(nodes).collect());
+  let category = rules_for(rules, "body");
   let body = match body {
     // No body was part of this interaction at all: nothing to assert (spec test case `body/no
     // body`).
     None => return None,
     // Explicitly null: v1-v4 requires the actual body be absent too (`body/non empty body found
     // when empty expected` is a mismatch on exactly this) — an assertion, not a skip.
-    Some(Value::Null) => {
-      return Some(Node::container(
-        Some("body".to_string()),
-        vec![Node::action("expect:absent", vec![Node::resolve(root_path)])],
-      ));
+    Some(LegacyBody::Empty) | Some(LegacyBody::Document(Value::Null)) => {
+      return Some(container(vec![Node::action(
+        "expect:absent",
+        vec![Node::resolve(root_path)],
+      )]));
     }
-    Some(body) => body,
+    // Octets: one value at `$`, compared by the rules there or byte for byte, as today's
+    // `match_octet_stream` compares them (ADR 0036 decision 3).
+    Some(LegacyBody::Bytes(bytes)) => {
+      let resolve = Node::resolve(root_path);
+      let example = Literal::bytes(bytes);
+      let node = match best_rule(category.as_ref(), &["$".to_string()], false) {
+        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
+        None => Node::action("match:equality", vec![resolve, Node::value(example)]),
+      };
+      return Some(container(vec![node]));
+    }
+    Some(LegacyBody::Document(body)) => body,
   };
-  let category = rules_for(rules, "body");
   let ctx = BodyCtx {
     fragments: vec!["$".to_string()],
     cursor: Cursor::Absolute(root_path.clone()),
@@ -513,10 +580,7 @@ fn compile_body_slot(body: Option<&Value>, rules: &MatchingRules, part: &str) ->
     category: category.as_ref(),
     closed_objects: part == "request",
   };
-  Some(Node::container(
-    Some("body".to_string()),
-    compile_body_value(body, &ctx),
-  ))
+  Some(container(compile_body_value(body, &ctx)))
 }
 
 /// Where a compiled node resolves its value from — [`crate::plan::compile`]'s own `Cursor`, duplicated
@@ -639,7 +703,7 @@ fn compile_body_value(value: &Value, ctx: &BodyCtx) -> Vec<Node> {
 
 fn compile_body_scalar(value: &Value, ctx: &BodyCtx) -> Node {
   match ctx.best() {
-    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), value),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), &Literal::from_json(value)),
     None => Node::action(
       "match:equality",
       vec![ctx.resolve(), Node::value(Literal::from_json(value))],
@@ -666,7 +730,7 @@ fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) 
       &list,
       false,
       ctx.resolve(),
-      &Value::Object(members.clone()),
+      &Literal::from_json(&Value::Object(members.clone())),
     )];
   }
   let mut nodes: Vec<Node> = members
@@ -706,7 +770,7 @@ fn compile_body_array(items: &[Value], ctx: &BodyCtx) -> Vec<Node> {
         &list,
         cascaded,
         ctx.resolve(),
-        &Value::Array(items.to_vec()),
+        &Literal::from_json(&Value::Array(items.to_vec())),
       )];
       if let Some(template) = items.first() {
         let item_ctx = ctx.template_item();

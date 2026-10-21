@@ -1,0 +1,31 @@
+{
+  "description": "A pact with a text body and no Content-Type (detected as text/plain), answered with the same text labelled text/html: the types disagree, so both fail it before comparing the text",
+  "source": "staged plan S1.6; ADR 0036; pact_matching::match_body, which picks the body matcher by the pact's content type when the reply's agrees with it or has none, and compare_bodies' match_text and match_octet_stream",
+  "expected": "fail",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/thing"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "text/html"
+            ]
+          },
+          "body": {
+            "text": "Hello World!"
+          }
+        }
+      }
+    ]
+  }
+}

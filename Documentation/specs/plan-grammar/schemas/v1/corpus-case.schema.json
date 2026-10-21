@@ -16,6 +16,14 @@
       "type": "object",
       "description": "The captured values the plan executes against, keyed by the paths a resolver would supply (spec.md §2.4). Offline: no transport runs."
     },
+    "encoded": {
+      "type": "object",
+      "description": "The representation of a value in 'values' that is not its natural JSON form, by the same path (spec.md §6.1, engine-protocol spec §2.5). 'base64' means the value is the base64 of an octet sequence: a body no content component claims (ADR 0036). A path with no entry is JSON.",
+      "additionalProperties": {
+        "type": "string",
+        "x-known-values": ["base64"]
+      }
+    },
     "result": { "$ref": "#/$defs/ExpectedResult" },
     "also-compiled-from": {
       "$ref": "#/$defs/Input",

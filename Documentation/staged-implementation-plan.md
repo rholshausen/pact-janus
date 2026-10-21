@@ -69,7 +69,7 @@ first draft of something that will be rewritten against the final specification.
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the 158 known gaps closed rather than skipped (S1.6, S1.22). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the known gaps closed rather than skipped: 156 remain, all XML (S1.22). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
 | **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); make the exchange loop single-threaded and async-ready (§4, gate W; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
@@ -619,6 +619,27 @@ item in 1a is done when S1.1 agrees.
   and `…/21-response-with-binary-body-positive-case` gone; corpus cases for a text body and a binary
   body, matching and not; and the two `plain text regex matching that does not match` fixtures
   without `janus:skip`.
+  *Done 2026-10-21* ([ADR 0036](decisions/0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)).
+  A built-in `text` content component, `engine/component-text`, decodes `text/*` as UTF-8 and encodes
+  a string back. Every embedding registers it after JSON, and `engine/hello` lists it. Octets no
+  component claims are now bytes rather than absent (component-interfaces spec §6.1). The legacy
+  layer reads a v1–v4 body by the pact's content type, as today's verifier picks its matcher: JSON is
+  a document, a binary type is bytes, any other text is a string. XML, form and multipart are still
+  refused, until S1.21 to S1.23. A text or bytes body compiles to one value at `$`: the rules there,
+  or equality. A reply's body is decoded as the pact's type. When the pact names no `Content-Type`
+  header, a new legacy action, `legacy:body-type`, fails a reply whose type does not agree, which is
+  today's check before a body is compared. The four ledger entries are gone. Six new `bodies/`
+  fixtures agree with today's verifier, mutations included: a reply with no `Content-Type`, one
+  relabelled, a text regex and an octet stream. The whole corpus is 326 verdicts: 312 agree and 14
+  are known. Five corpus cases cover text and binary bodies, matching and not, and a regex on text.
+  A binary case's values carry bytes through the corpus format's new `encoded` (plan-grammar spec
+  §6.1). The two regex cases run without `janus:skip`, so the legacy harness is 585 of 585, with
+  156 skipped, all XML. Not foreseen: the harness's mutations relabel each reply's content type, and
+  today's verifier fails every one on the type, so agreement had to be checked rather than
+  approximated. `explain` now shows that check in a JSON pact with no `Content-Type` header. A bytes
+  mismatch of equal length said nothing, so it now names the first byte that differs. Left out:
+  `janus upgrade` still asserts nothing about a body that is not JSON (S1.25); `match:content-type`
+  on a binary body still has no detector in verification (S1.10); charsets other than UTF-8 (S6.5).
 - **S1.7 Message pact verification** — **L**. Verifying v3 message pacts and v4 message and
   synchronous-message interactions, which pact-jvm users have in numbers. First the kernel's
   `request`/`response` part names and its HTTP 500 mismatch reply go (kernel-boundary review 8, 9):
@@ -751,7 +772,8 @@ item in 1a is done when S1.1 agrees.
   no v1–v4 pact body is non-JSON, which XML bodies disprove), so a content component's decoded
   document cannot reach it. It compiles over the document model instead. No verdict should move;
   the corpus and S1.1's ledger staying as they are is the evidence. It rewrites the code S1.11 moves
-  behind a marked boundary, so S1.11 comes first.
+  behind a marked boundary, so S1.11 comes first. Since S1.6 the compiler's body is a `LegacyBody`,
+  whose `Bytes` case becomes the document model's bytes here.
   *Exit:* the legacy compiler's body entry takes the document model, with no `serde_json::Value` in
   its walk; `corpora/` and S1.1's ledger unchanged by it; and a corpus case in which order is
   observable, the CSV component serving columns in the order its contract declares them.
@@ -782,6 +804,15 @@ item in 1a is done when S1.1 agrees.
   findings table, and has nothing to do with body kinds.
   *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
   verifier; corpus cases for each.
+- **S1.25 `janus upgrade` converts text and binary bodies** — **S**. Split from S1.6, which made
+  them verify. `janus upgrade` still carries a body that is not JSON across with a
+  `body-not-parsed` finding and asserts nothing about it, so the contract verifies less than the
+  pact it came from (plan-grammar spec §4.4's two-path agreement). The contract should declare the
+  body's type in `content-types` (contract-file spec §5.5) and shape it: a text body as a string
+  with its rules on `$`, a binary one as bytes with a base64 example. A reply of another content
+  type should fail the contract as `legacy:body-type` fails the pact (ADR 0036 decision 4).
+  *Exit:* corpus cases in which a text body and a binary body upgrade and reach the pact's verdict
+  (`also-compiled-from`), matching and not; and neither upgrade has a `body-not-parsed` finding.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -958,6 +989,15 @@ content component exists written by someone outside the core team.
 - **S6.3 gRPC and other transports** as components.
 - **S6.4 The RFC's fourth migration step:** today's FFI and pact-jvm cores go into maintenance mode as
   each language's MkII SDK passes conformance on both sides. The timeline is the community's (§7).
+- **S6.5 Text in charsets other than UTF-8**, in the built-in `text` component. It reads and writes
+  every body as UTF-8 whatever its `charset` says (ADR 0036 decision 1), which is today's verifier's
+  behaviour and so stage 1a's. A body in another charset fails to decode. Worse, a consumer mock
+  serving `text/plain; charset=utf-16` sends UTF-8 bytes under that label. The component decodes
+  and encodes by the `charset` parameter, using the WHATWG encoding labels (`encoding_rs`), and
+  refuses a charset it does not know rather than mislabel the body. A v1–v4 pact whose body names no
+  charset is still read as UTF-8, so S1.1's verdicts do not move. In practice this is Windows-1252
+  and Latin-1 from older stacks more than UTF-16. It supersedes ADR 0036's rejected alternative
+  "Decode `charset`s other than UTF-8".
 
 **Done when** it never is. Each SDK has its own exit: conformance passing, and the old SDK's example
 suites, consumer and provider, running on its compatibility facade.
@@ -1056,6 +1096,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.22 | XML bodies, and the 156 pact-specification cases skipped for them | split from S1.6; task 3.5 |
 | S1.23 | Multipart bodies | split from S1.6 |
 | S1.24 | `Values`, `EachKey`, `EachValue` and `ArrayContains` compile to an error node | split from S1.6; task 3.5 |
+| S1.25 | `upgrade` carries a body that is not JSON across with nothing asserted about it | split from S1.6; ADR 0036 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |

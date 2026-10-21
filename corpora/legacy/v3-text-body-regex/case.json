@@ -1,0 +1,66 @@
+{
+  "description": "a regex on a text body's $ applies to the whole text, anchored as every v1-v4 regex is (S1.18): 'alligator named .{4}' refuses 'alligator named brent' (pact-specification's 'plain text regex matching that does not match')",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /alligator",
+          "request": {
+            "method": "GET",
+            "path": "/alligator"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "text/plain"
+            },
+            "body": "alligator named mary",
+            "matchingRules": {
+              "body": {
+                "$": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "alligator named .{4}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/alligator",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "text/plain",
+    "$.response.body": "alligator named brent"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body",
+        "message": "Expected 'alligator named brent' to match '^(?:alligator named .{4})$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

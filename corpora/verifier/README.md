@@ -94,6 +94,12 @@ interaction of a pact it did not fetch is `absent` there too.
   endpoint and reports no pending status.
 - `state-callbacks/`: provider-state callbacks that misbehave in ways the compatibility suite does not
   cover, such as `fails-once`, an endpoint that fails while it warms up.
+- `generators/`: request generators applied before sending (S1.4), recognised by `patterns`.
+- `connection/`: the provider connection options, `--header`, `--base-path`, `--request-timeout` and
+  TLS (S1.5).
+- `bodies/`: bodies that are not JSON, and how a reply's content type is read (S1.6, ADR 0036): a
+  reply with no `Content-Type`, one labelled with a type the pact's does not agree with, a regex on
+  a text body and an `application/octet-stream` body.
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
   HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it,
   its broker scenarios as broker fixtures.

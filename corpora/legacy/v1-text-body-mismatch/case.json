@@ -1,0 +1,54 @@
+{
+  "description": "a v1 text/plain body that differs is a mismatch at $.response.body naming both texts (ADR 0036)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /plain",
+          "request": {
+            "method": "GET",
+            "path": "/plain"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "text/plain"
+            },
+            "body": "Hello World!"
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "1.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/plain",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "text/plain",
+    "$.response.body": "Hello Compatibility Suite!"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body",
+        "message": "Expected 'Hello Compatibility Suite!' to equal 'Hello World!'",
+        "action": "match:equality"
+      }
+    ]
+  }
+}

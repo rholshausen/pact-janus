@@ -1,0 +1,47 @@
+(
+  :"get /plain" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/plain',
+          '/plain'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'text/plain',
+            'text/plain'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %match:equality (
+          $.response.body => 'Hello Compatibility Suite!',
+          'Hello World!'
+        ) => ERROR(Expected 'Hello Compatibility Suite!' to equal 'Hello World!')
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

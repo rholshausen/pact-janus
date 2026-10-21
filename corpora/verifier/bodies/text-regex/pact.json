@@ -1,0 +1,41 @@
+{
+  "consumer": {
+    "name": "bodies-consumer"
+  },
+  "provider": {
+    "name": "bodies-provider"
+  },
+  "interactions": [
+    {
+      "description": "a thing",
+      "request": {
+        "method": "GET",
+        "path": "/thing"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "body": "Hello World!",
+        "matchingRules": {
+          "body": {
+            "$": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "Hello \\w+!"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

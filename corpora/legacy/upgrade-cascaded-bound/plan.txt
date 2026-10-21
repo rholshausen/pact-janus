@@ -29,6 +29,10 @@
         )
       ),
       :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
         :"$.items" (
           %legacy:min-type (
             $.response.body.items,

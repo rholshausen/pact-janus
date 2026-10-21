@@ -29,6 +29,10 @@
         ) => BOOL(true)
       ) => BOOL(true),
       :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/json'
+        ) => BOOL(true),
         :"$.date" (
           %match:regex (
             $.response.body.date => '2026-07-30 or later',

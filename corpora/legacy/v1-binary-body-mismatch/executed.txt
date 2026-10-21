@@ -1,0 +1,47 @@
+(
+  :"get /image" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/image',
+          '/image'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'image/png',
+            'image/png'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %match:equality (
+          $.response.body => <8 byte(s)>,
+          <8 byte(s)>
+        ) => ERROR(Expected <8 byte(s)> to equal <8 byte(s)>, differing from byte 7)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

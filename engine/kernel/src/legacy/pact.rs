@@ -20,7 +20,8 @@
 //! generators to apply is kept as a [`RequestTemplate`], so the verification path never holds a
 //! `pact_models` type (the module docs of [`crate::legacy`]).
 
-use super::compile::{LegacyRequest, LegacyResponse};
+use super::compile::{LegacyBody, LegacyRequest, LegacyResponse};
+use crate::common::ContentTypes;
 use crate::component::{
   ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
 };
@@ -29,6 +30,7 @@ use crate::plan::{CapturedValues, RuntimeValue};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
+use pact_models::content_types::ContentType;
 use pact_models::generators::{
   ContentTypeHandler, GenerateValue, Generator, GeneratorCategory, GeneratorTestMode, JsonHandler,
   NoopVariantMatcher, VariantMatcher,
@@ -106,7 +108,8 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
 /// to be JSON and was not is a problem with the *document*.
 #[derive(Debug, Clone)]
 pub enum Unsupported {
-  /// A body whose declared content type design 3.5 does not compile (it is JSON-only).
+  /// A body of a kind the legacy compiler does not compile yet: XML, form or multipart (S1.21 to
+  /// S1.23).
   ContentType(String),
   /// A body that claimed JSON and did not parse as it.
   Malformed(String),
@@ -117,23 +120,24 @@ impl std::fmt::Display for Unsupported {
     match self {
       Unsupported::ContentType(content_type) => write!(
         f,
-        "legacy_pact: unsupported body content type '{content_type}' (design 3.5 is JSON-only)"
+        "legacy_pact: a '{content_type}' body is not compiled yet (XML, form and multipart bodies \
+         are staged plan S1.21 to S1.23)"
       ),
       Unsupported::Malformed(message) => write!(f, "legacy_pact: body is not valid JSON: {message}"),
     }
   }
 }
 
-/// [`HttpRequest`] to design 3.5's own input type. The only fallible part is the body: JSON only
-/// (plan task 3.5's own scope), and `Err` names what content type defeated it rather than
-/// guessing.
+/// [`HttpRequest`] to design 3.5's own input type. The only fallible part is the body, read by its
+/// content type ([`legacy_body`]); `Err` names what content type defeated it rather than guessing.
 pub fn legacy_request(request: &HttpRequest) -> Result<LegacyRequest, Unsupported> {
   Ok(LegacyRequest {
     method: request.method.clone(),
     path: request.path.clone(),
     query: convert_query(request.query.as_ref()),
     headers: convert_headers(request.headers.as_ref()),
-    body: convert_body(&request.body)?,
+    body: legacy_body(request)?,
+    content_type: body_type(request),
     matching_rules: request.matching_rules.clone(),
   })
 }
@@ -143,9 +147,104 @@ pub fn legacy_response(response: &HttpResponse) -> Result<LegacyResponse, Unsupp
   Ok(LegacyResponse {
     status: response.status as u64,
     headers: convert_headers(response.headers.as_ref()),
-    body: convert_body(&response.body)?,
+    body: legacy_body(response)?,
+    content_type: body_type(response),
     matching_rules: response.matching_rules.clone(),
   })
+}
+
+/// How today's verifier compares a body of a content type (`pact_matching::compare_bodies`'
+/// `BODY_MATCHERS`, in its order), which is how the legacy layer reads one (ADR 0036 decision 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyKind {
+  Json,
+  /// XML, multipart or form: a matcher of its own today, and S1.21 to S1.23 here.
+  NotYet,
+  /// A binary type (`image`, `audio`, `video`, `font`, `application/octet-stream`, and anything
+  /// `pact_models` does not count as text): compared as octets.
+  Bytes,
+  /// Every other type: compared as text.
+  Text,
+}
+
+impl BodyKind {
+  fn of(content_type: &ContentType) -> BodyKind {
+    if content_type.is_json() {
+      BodyKind::Json
+    } else if content_type.is_xml()
+      || content_type.main_type == "multipart"
+      || content_type.base_type() == "application/x-www-form-urlencoded"
+    {
+      BodyKind::NotYet
+    } else if content_type.is_binary() || content_type.base_type() == "application/octet-stream" {
+      BodyKind::Bytes
+    } else {
+      BodyKind::Text
+    }
+  }
+}
+
+/// The part's content type as today's verifier takes it (`HttpPart::content_type`): the body's own,
+/// else the `Content-Type` header, else one detected from the body; unknown (`*/*`) when none is.
+fn part_content_type(part: &dyn HttpPart) -> ContentType {
+  part.content_type().unwrap_or_default()
+}
+
+/// [`OptionalBody`]'s three "nothing here" variants collapse to design 3.5's two-state model
+/// (`LegacyRequest::body`'s own doc comment): `Missing` (the interaction never mentioned a body)
+/// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
+/// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
+/// actual body is absent too". A present body is read by its content type ([`BodyKind`]): JSON is
+/// parsed, text is a string, a binary body is its octets.
+fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
+  let bytes = match part.body() {
+    OptionalBody::Missing => return Ok(None),
+    OptionalBody::Null | OptionalBody::Empty => return Ok(Some(LegacyBody::Empty)),
+    OptionalBody::Present(bytes, _, _) => bytes,
+  };
+  let content_type = part_content_type(part);
+  match BodyKind::of(&content_type) {
+    BodyKind::Json => serde_json::from_slice(bytes)
+      .map(|document| Some(LegacyBody::Document(document)))
+      .map_err(|err| Unsupported::Malformed(err.to_string())),
+    BodyKind::NotYet => Err(Unsupported::ContentType(content_type.to_string())),
+    BodyKind::Bytes => Ok(Some(LegacyBody::Bytes(bytes.to_vec()))),
+    BodyKind::Text => Ok(Some(match String::from_utf8(bytes.to_vec()) {
+      Ok(text) => LegacyBody::Document(Value::String(text)),
+      Err(err) => LegacyBody::Bytes(err.into_bytes()),
+    })),
+  }
+}
+
+/// The content type of a part's body, when it has one with content: the type a received body's
+/// must agree with, and the one it is decoded as.
+fn body_type(part: &dyn HttpPart) -> Option<String> {
+  part
+    .body()
+    .is_present()
+    .then(|| part_content_type(part).to_string())
+}
+
+/// The content types a provider's reply is decoded under (ADR 0036 decision 4): the pact's own for
+/// its response body, which a verification declares as a contract declares a slot's
+/// (contract-file spec §5.5), whatever the reply labels it. Whether the label agrees is the plan's
+/// to check (`legacy:body-type`). A text body that is not UTF-8 was read as octets, so its reply is
+/// declared as octets too, which no component claims. Empty when the response has no body.
+pub fn response_types(response: &LegacyResponse) -> ContentTypes {
+  let mut types = ContentTypes::new();
+  if let Some(content_type) = &response.content_type {
+    let is_text =
+      ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
+    let declared = match &response.body {
+      Some(LegacyBody::Bytes(_)) if is_text => "application/octet-stream".to_string(),
+      _ => content_type.clone(),
+    };
+    types.insert(
+      "response".to_string(),
+      BTreeMap::from([("body".to_string(), declared)]),
+    );
+  }
+  types
 }
 
 /// A query value is `Vec<Option<String>>` in `pact_models` — `None` is a bare `?flag` with no
@@ -179,30 +278,6 @@ fn convert_headers(headers: Option<&HashMap<String, Vec<String>>>) -> BTreeMap<S
         .collect()
     })
     .unwrap_or_default()
-}
-
-/// [`OptionalBody`]'s three "nothing here" variants collapse to design 3.5's two-state model
-/// (`LegacyRequest::body`'s own doc comment): `Missing` (the interaction never mentioned a body)
-/// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
-/// bytes) both become `Some(Value::Null)`, since either way there is no JSON content to check and
-/// design 3.5's compiler already treats an explicit `null` as "assert the actual body is absent
-/// too". A present, non-empty body must be JSON — anything else is `Err`, matching design 3.5's
-/// own JSON-only scope.
-fn convert_body(body: &OptionalBody) -> Result<Option<Value>, Unsupported> {
-  match body {
-    OptionalBody::Missing => Ok(None),
-    OptionalBody::Null | OptionalBody::Empty => Ok(Some(Value::Null)),
-    OptionalBody::Present(bytes, content_type, _) => {
-      if let Some(content_type) = content_type
-        && !content_type.is_json()
-      {
-        return Err(Unsupported::ContentType(content_type.to_string()));
-      }
-      serde_json::from_slice(bytes)
-        .map(Some)
-        .map_err(|err| Unsupported::Malformed(err.to_string()))
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------------------------

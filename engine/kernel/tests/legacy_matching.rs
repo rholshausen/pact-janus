@@ -8,8 +8,8 @@
 //!
 //! **Known gaps, excluded rather than silently miscounted.** [`skip_reason`] names every case this
 //! compiler cannot yet be expected to pass. Most are a scope decision recorded in
-//! `engine/kernel/src/legacy/compile.rs`'s module docs: non-JSON bodies (XML — content components are
-//! design 2.6/plan task 4.2, not built yet), and the handful of matching rules with zero coverage in
+//! `engine/kernel/src/legacy/compile.rs`'s module docs: XML bodies (staged plan S1.22; text bodies
+//! compile since S1.6), and the handful of matching rules with zero coverage in
 //! this corpus (`Values`, `EachKey`, `EachValue`, `ArrayContains`) that compile to a deliberate `error`
 //! node — these are excluded by a rule, since they cover every v2/v3/v4 duplicate of the same
 //! underlying case. The rest are a `janus:skip` attribute on the one fixture file it explains (not
@@ -17,7 +17,7 @@
 //! specific to that single case rather than a category of them. A case that isn't skipped is
 //! expected to pass; the assertion at the bottom enforces that.
 
-use pact_janus_kernel::legacy::compile::{self, LegacyRequest, LegacyResponse};
+use pact_janus_kernel::legacy::compile::{self, LegacyBody, LegacyRequest, LegacyResponse};
 use pact_janus_kernel::plan::{self, CapturedValues, RuntimeValue, Status};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -81,11 +81,11 @@ fn skip_reason(case: &Case) -> Option<String> {
   }
   let is_xml = |v: Option<Value>| matches!(v, Some(Value::String(s)) if s.trim_start().starts_with('<'));
   if is_xml(body_of(&case.expected)) || is_xml(body_of(&case.actual)) {
-    return Some("XML body: content components are plan task 4.2, not built yet".to_string());
+    return Some("XML body: staged plan S1.22".to_string());
   }
   let content_type = case.expected["headers"]["Content-Type"].as_str().unwrap_or("");
   if content_type.contains("xml") {
-    return Some("XML content type: content components are plan task 4.2, not built yet".to_string());
+    return Some("XML content type: staged plan S1.22".to_string());
   }
   None
 }
@@ -192,6 +192,15 @@ fn body_of(value: &Value) -> Option<Value> {
   }
 }
 
+/// [`body_of`] as the compiler takes it: a declared null is an empty body, anything else a
+/// document (a text case's body is a string, which is what the legacy layer makes of text).
+fn legacy_body_of(value: &Value) -> Option<LegacyBody> {
+  body_of(value).map(|body| match body {
+    Value::Null => LegacyBody::Empty,
+    body => LegacyBody::Document(body),
+  })
+}
+
 fn is_request(case_file: &str) -> bool {
   case_file.contains("/request/") || case_file.starts_with("request/")
 }
@@ -206,7 +215,9 @@ fn run_case(case: &Case) -> Result<(), String> {
       path: case.expected["path"].as_str().unwrap_or("/").to_string(),
       query: parse_query(&case.expected["query"]),
       headers: parse_headers(&case.expected["headers"]),
-      body: body_of(&case.expected),
+      body: legacy_body_of(&case.expected),
+      // The cases pin header and body matching, not the type agreement S1.6 added.
+      content_type: None,
       matching_rules: rules,
     };
     let plan = compile::compile_request(&req);
@@ -237,7 +248,9 @@ fn run_case(case: &Case) -> Result<(), String> {
     let res = LegacyResponse {
       status: case.expected["status"].as_u64().unwrap_or(200),
       headers: parse_headers(&case.expected["headers"]),
-      body: body_of(&case.expected),
+      body: legacy_body_of(&case.expected),
+      // The cases pin header and body matching, not the type agreement S1.6 added.
+      content_type: None,
       matching_rules: rules,
     };
     let plan = compile::compile_response(&res);

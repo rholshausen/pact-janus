@@ -1,0 +1,30 @@
+{
+  "description": "A pact with a JSON body and no Content-Type (its type is detected as JSON), answered with the same JSON and no Content-Type: both read the reply as JSON",
+  "source": "staged plan S1.6; ADR 0036; pact_matching::match_body, which picks the body matcher by the pact's content type when the reply's agrees with it or has none, and compare_bodies' match_text and match_octet_stream",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/thing"
+        },
+        "response": {
+          "status": 200,
+          "body": {
+            "json": {
+              "name": "a thing",
+              "count": 2
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

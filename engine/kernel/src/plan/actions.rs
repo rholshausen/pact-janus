@@ -17,56 +17,58 @@ const V0_FAMILIES: &[&str] = &["match", "expect", "check", "convert"];
 
 /// Every core action this engine implements (spec §4.2–§4.4), as (v1 name, v0 name, the least
 /// number of children it takes). The interpreter reads an action's children by position, so the
-/// count is what stands between a plan somebody else wrote and an index out of bounds.
-const CORE: &[(&str, &str, usize)] = &[
-  ("flow:and", "and", 0),
-  ("flow:or", "or", 0),
-  ("flow:if", "if", 2),
-  ("flow:error", "error", 1),
-  ("flow:apply", "apply", 0),
-  ("flow:for-each", "for-each", 2),
-  ("flow:tee", "tee", 0),
-  ("value:join", "join", 0),
-  ("value:join-with", "join-with", 1),
-  ("value:length", "length", 1),
-  ("value:lower-case", "lower-case", 1),
-  ("value:upper-case", "upper-case", 1),
-  ("value:to-string", "to-string", 1),
-  ("expect:object", "expect:object", 1),
-  ("expect:array", "expect:array", 1),
-  ("expect:empty", "expect:empty", 1),
-  ("expect:not-empty", "expect:not-empty", 1),
-  ("expect:count", "expect:count", 2),
-  ("expect:size", "expect:size", 3),
-  ("expect:entries", "expect:entries", 2),
-  ("expect:absent", "expect:absent", 1),
-  ("check:exists", "check:exists", 1),
-  ("check:equals", "check:equals", 2),
-  ("check:null", "check:null", 1),
-  ("match:any", "match:any", 1),
-  ("match:equality", "match:equality", 2),
-  ("match:type", "match:type", 2),
-  ("match:string", "match:string", 1),
-  ("match:number", "match:number", 1),
-  ("match:integer", "match:integer", 1),
-  ("match:decimal", "match:decimal", 1),
-  ("match:boolean", "match:boolean", 1),
-  ("match:null", "match:null", 1),
-  ("match:regex", "match:regex", 2),
-  ("match:datetime", "match:datetime", 1),
-  ("match:date", "match:date", 1),
-  ("match:time", "match:time", 1),
-  ("match:include", "match:include", 2),
-  ("match:content-type", "match:content-type", 2),
-  ("match:semver", "match:semver", 1),
-  ("match:any-of", "match:any-of", 1),
-  ("match:contains", "match:contains", 1),
-  ("legacy:only-entries", "expect:only-entries", 1),
-  ("legacy:array-contains", "match:array-contains", 2),
-  ("legacy:min-type", "match:min-type", 3),
-  ("legacy:max-type", "match:max-type", 3),
-  ("legacy:min-max-type", "match:min-max-type", 4),
-  ("legacy:header-value", "match:header-value", 2),
+/// count is what stands between a plan somebody else wrote and an index out of bounds. An action
+/// added after v0 has no v0 name: a v0 document cannot ask for it.
+const CORE: &[(&str, Option<&str>, usize)] = &[
+  ("flow:and", Some("and"), 0),
+  ("flow:or", Some("or"), 0),
+  ("flow:if", Some("if"), 2),
+  ("flow:error", Some("error"), 1),
+  ("flow:apply", Some("apply"), 0),
+  ("flow:for-each", Some("for-each"), 2),
+  ("flow:tee", Some("tee"), 0),
+  ("value:join", Some("join"), 0),
+  ("value:join-with", Some("join-with"), 1),
+  ("value:length", Some("length"), 1),
+  ("value:lower-case", Some("lower-case"), 1),
+  ("value:upper-case", Some("upper-case"), 1),
+  ("value:to-string", Some("to-string"), 1),
+  ("expect:object", Some("expect:object"), 1),
+  ("expect:array", Some("expect:array"), 1),
+  ("expect:empty", Some("expect:empty"), 1),
+  ("expect:not-empty", Some("expect:not-empty"), 1),
+  ("expect:count", Some("expect:count"), 2),
+  ("expect:size", Some("expect:size"), 3),
+  ("expect:entries", Some("expect:entries"), 2),
+  ("expect:absent", Some("expect:absent"), 1),
+  ("check:exists", Some("check:exists"), 1),
+  ("check:equals", Some("check:equals"), 2),
+  ("check:null", Some("check:null"), 1),
+  ("match:any", Some("match:any"), 1),
+  ("match:equality", Some("match:equality"), 2),
+  ("match:type", Some("match:type"), 2),
+  ("match:string", Some("match:string"), 1),
+  ("match:number", Some("match:number"), 1),
+  ("match:integer", Some("match:integer"), 1),
+  ("match:decimal", Some("match:decimal"), 1),
+  ("match:boolean", Some("match:boolean"), 1),
+  ("match:null", Some("match:null"), 1),
+  ("match:regex", Some("match:regex"), 2),
+  ("match:datetime", Some("match:datetime"), 1),
+  ("match:date", Some("match:date"), 1),
+  ("match:time", Some("match:time"), 1),
+  ("match:include", Some("match:include"), 2),
+  ("match:content-type", Some("match:content-type"), 2),
+  ("match:semver", Some("match:semver"), 1),
+  ("match:any-of", Some("match:any-of"), 1),
+  ("match:contains", Some("match:contains"), 1),
+  ("legacy:only-entries", Some("expect:only-entries"), 1),
+  ("legacy:array-contains", Some("match:array-contains"), 2),
+  ("legacy:min-type", Some("match:min-type"), 3),
+  ("legacy:max-type", Some("match:max-type"), 3),
+  ("legacy:min-max-type", Some("match:min-max-type"), 4),
+  ("legacy:header-value", Some("match:header-value"), 2),
+  ("legacy:body-type", None, 2),
 ];
 
 /// The grammar a document's action names are read under. The two differ only in names.
@@ -92,7 +94,7 @@ impl Grammar {
     CORE
       .iter()
       .find(|(v1, v0, _)| match self {
-        Grammar::V0 => *v0 == name,
+        Grammar::V0 => *v0 == Some(name),
         Grammar::V1 => *v1 == name,
       })
       .map(|(v1, _, _)| *v1)
@@ -175,9 +177,20 @@ mod tests {
   #[test]
   fn the_v0_mapping_is_one_to_one() {
     let v1: BTreeSet<&str> = CORE.iter().map(|(v1, _, _)| *v1).collect();
-    let v0: BTreeSet<&str> = CORE.iter().map(|(_, v0, _)| *v0).collect();
+    let v0: BTreeSet<&str> = CORE.iter().filter_map(|(_, v0, _)| *v0).collect();
     assert_eq!(v1.len(), CORE.len(), "a v1 name appears twice");
-    assert_eq!(v0.len(), CORE.len(), "a v0 name appears twice");
+    assert_eq!(
+      v0.len(),
+      CORE.iter().filter(|(_, v0, _)| v0.is_some()).count(),
+      "a v0 name appears twice"
+    );
+  }
+
+  #[test]
+  fn an_action_added_after_v0_is_core_in_v1_only() {
+    assert_eq!(Grammar::V1.core("legacy:body-type"), Some("legacy:body-type"));
+    assert_eq!(Grammar::V0.core("legacy:body-type"), None);
+    assert_eq!(least_children("legacy:body-type"), Some(2));
   }
 
   /// ADR 0026's table, and the two families that had no prefix.

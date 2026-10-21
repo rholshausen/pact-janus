@@ -587,8 +587,9 @@ impl Conversion {
             "lossy",
             at,
             format!(
-              "the body is '{content_type}', which this engine has no content component for: the \
-               example is carried across as bytes, but nothing is asserted about it"
+              "the body is '{content_type}', which `janus upgrade` converts only from JSON so far \
+               (staged plan S1.25): the example is carried across as bytes, but nothing is \
+               asserted about it"
             ),
           ));
           return None;

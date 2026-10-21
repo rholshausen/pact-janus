@@ -1,0 +1,19 @@
+[package]
+name = "pact_janus_component_text"
+description = "The built-in plain-text content component (component-interfaces spec §6, ADR 0036): decode/encode for text/*, native binding."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+base64 = "0.22"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints]
+workspace = true

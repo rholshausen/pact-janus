@@ -2,20 +2,6 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
-      "case": "compatibility-suite/v1/15-response-with-plain-text-body-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no content component for text/plain, so a plain-text body is component-unavailable; today compares it as text"
-    },
-    {
-      "case": "compatibility-suite/v1/15-response-with-plain-text-body-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no content component for text/plain, so a plain-text body is component-unavailable; today compares it as text"
-    },
-    {
       "case": "compatibility-suite/v1/19-response-with-xml-body-positive-case",
       "key": "0/0",
       "today": "pass",
@@ -28,20 +14,6 @@
       "today": "pass",
       "janus": "fail",
       "reason": "S1.6: Janus has no XML content component, so an XML body is component-unavailable"
-    },
-    {
-      "case": "compatibility-suite/v1/21-response-with-binary-body-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a binary (image/jpeg) body in a v1 pact is refused as contract-invalid; today compares the bytes"
-    },
-    {
-      "case": "compatibility-suite/v1/21-response-with-binary-body-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a binary (image/jpeg) body in a v1 pact is refused as contract-invalid; today compares the bytes"
     },
     {
       "case": "compatibility-suite/v1/23-response-with-form-post-body-positive-case",

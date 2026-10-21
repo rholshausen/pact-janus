@@ -1,0 +1,57 @@
+{
+  "description": "a v1 binary body that differs in its last byte is a mismatch naming the first byte that differs, since both are 8 bytes long (ADR 0036)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /image",
+          "request": {
+            "method": "GET",
+            "path": "/image"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "image/png"
+            },
+            "body": "iVBORw0KGgo="
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "1.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/image",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "image/png",
+    "$.response.body": "iVBORw0KGvU="
+  },
+  "encoded": {
+    "$.response.body": "base64"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body",
+        "message": "Expected <8 byte(s)> to equal <8 byte(s)>, differing from byte 7",
+        "action": "match:equality"
+      }
+    ]
+  }
+}

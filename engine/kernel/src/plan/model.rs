@@ -163,6 +163,18 @@ impl Literal {
     }
   }
 
+  /// Octets, carried as their base64 (spec §2.2, protocol spec §2.5): a v1–v4 binary body's
+  /// example (ADR 0036).
+  pub fn bytes(bytes: &[u8]) -> Literal {
+    use base64::Engine as _;
+    Literal {
+      of: DocumentKind::Bytes,
+      value: Value::String(base64::engine::general_purpose::STANDARD.encode(bytes)),
+      encoded: Some("base64".to_string()),
+      key: None,
+    }
+  }
+
   /// From a plain JSON literal (an `any-of` option, a `one-of` discriminator value, ...): `of` is
   /// inferred from the value's own kind. Never produces `Bytes` — only a shape's tagged `example`
   /// (spec §2.2) carries that distinction; see [`Literal::from_example`].

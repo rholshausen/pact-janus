@@ -50,6 +50,18 @@ impl ComponentError {
     }
   }
 
+  /// `encode-failed` (spec §11.1): the content component could not turn a document into octets of
+  /// this type, such as a document that is not a string for a text type.
+  pub fn encode_failed(content_type: &str, message: impl Into<String>) -> Self {
+    ComponentError {
+      code: "encode-failed".to_string(),
+      category: "document".to_string(),
+      message: message.into(),
+      source: None,
+      details: Some(serde_json::json!({ "content-type": content_type })),
+    }
+  }
+
   /// `unsupported-content-type` (spec §11.1): asked to decode/encode a type this component does
   /// not handle.
   pub fn unsupported_content_type(content_type: &str) -> Self {

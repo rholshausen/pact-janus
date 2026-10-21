@@ -1,0 +1,47 @@
+(
+  :"get /alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/alligator',
+          '/alligator'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'text/plain',
+            'text/plain'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %match:regex (
+          $.response.body => 'alligator named brent',
+          '^(?:alligator named .{4})$'
+        ) => ERROR(Expected 'alligator named brent' to match '^(?:alligator named .{4})$')
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

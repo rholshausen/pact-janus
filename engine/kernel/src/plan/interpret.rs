@@ -766,8 +766,18 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if runtime_eq(&actual, &expected) {
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
+        let mut message = format!("Expected {} to equal {}", display(&actual), display(&expected));
+        // Octets display as their length, which says nothing when the lengths are the same.
+        if let (RuntimeValue::Bytes(a), RuntimeValue::Bytes(e)) = (&actual, &expected) {
+          let at = a
+            .iter()
+            .zip(e)
+            .position(|(a, e)| a != e)
+            .unwrap_or(a.len().min(e.len()));
+          message.push_str(&format!(", differing from byte {at}"));
+        }
         NodeResult::Error {
-          message: format!("Expected {} to equal {}", display(&actual), display(&expected)),
+          message,
           path: locus(children),
         }
       }
@@ -933,10 +943,62 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       }
     }
 
+    "legacy:body-type" => {
+      let value = value_of(&children[0]);
+      let expected = plain_text(&value_of(&children[1]));
+      match as_text(&value) {
+        None if matches!(value, RuntimeValue::Absent | RuntimeValue::Null) => {
+          NodeResult::Value(RuntimeValue::Bool(true))
+        }
+        Some(actual) if body_types_agree(&expected, &actual) => NodeResult::Value(RuntimeValue::Bool(true)),
+        actual => NodeResult::Error {
+          message: format!(
+            "Expected a body of '{expected}' but the actual content type was '{}'",
+            actual.unwrap_or_else(|| display(&value))
+          ),
+          path: locus(children),
+        },
+      }
+    }
+
     _ => NodeResult::Error {
       message: format!("unknown or unavailable action '{name}'"),
       path: None,
     },
+  }
+}
+
+/// `legacy:body-type` (legacy only, ADR 0036): whether a reply labelled `actual` carries a body of the
+/// pact's type `expected`, as today's verifier decides before it compares a body
+/// (`pact_matching::match_body`). An unknown type on either side agrees (`*/*`, `text/*`, or a label
+/// that is not a type at all), as does the same type and subtype, or a suffix type whose suffix is
+/// the expected subtype (`application/hal+json` for `application/json`). When the pact's type has
+/// parameters, the label must have the same ones.
+fn body_types_agree(expected: &str, actual: &str) -> bool {
+  let parse = |value: &str| {
+    let (base, params) = mime_parts(value);
+    let base = base.to_ascii_lowercase();
+    let mut params: Vec<(String, String)> = params
+      .into_iter()
+      .map(|(k, v)| (k.to_ascii_lowercase(), v))
+      .collect();
+    params.sort();
+    base
+      .split_once('/')
+      .map(|(main, sub)| (main.to_string(), sub.to_string(), params))
+  };
+  let (Some((e_main, e_sub, e_params)), Some((a_main, a_sub, a_params))) = (parse(expected), parse(actual))
+  else {
+    return true;
+  };
+  if [&e_main, &e_sub, &a_main, &a_sub].iter().any(|part| *part == "*") {
+    return true;
+  }
+  let same = e_main == a_main && e_sub == a_sub;
+  if e_params.is_empty() {
+    same || (e_main == a_main && a_sub.rsplit_once('+').is_some_and(|(_, suffix)| suffix == e_sub))
+  } else {
+    same && e_params == a_params
   }
 }
 

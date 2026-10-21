@@ -1,0 +1,47 @@
+(
+  :"get /alligator" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/alligator'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'text/plain'
+          )
+        )
+      ),
+      :body (
+        %match:regex (
+          $.response.body,
+          '^(?:alligator named .{4})$'
+        )
+      )
+    )
+  )
+)

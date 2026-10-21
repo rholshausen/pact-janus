@@ -1,0 +1,32 @@
+{
+  "description": "An application/octet-stream body is compared byte for byte",
+  "source": "staged plan S1.6; ADR 0036; pact_matching::match_body, which picks the body matcher by the pact's content type when the reply's agrees with it or has none, and compare_bodies' match_text and match_octet_stream",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/thing"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/octet-stream"
+            ]
+          },
+          "body": {
+            "base64": "AAECAwQFBgcICQoLDA0ODw=="
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

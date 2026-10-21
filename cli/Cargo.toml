@@ -26,6 +26,7 @@ path = "src/bin/janus_engine.rs"
 pact_janus_kernel = { path = "../engine/kernel" }
 pact_janus_component_http = { path = "../engine/component-http" }
 pact_janus_component_json = { path = "../engine/component-json" }
+pact_janus_component_text = { path = "../engine/component-text" }
 # The capabilities the kernel deliberately lacks (lifecycle-hooks spec §8.5, ADR 0013): a
 # filesystem for `verifier.janus.yaml`, a process for `exec` hooks, a socket for `http` ones.
 pact_janus_hooks_host = { path = "../engine/hooks-host" }

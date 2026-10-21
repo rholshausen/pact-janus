@@ -54,6 +54,7 @@ fn engine_with_everything() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
@@ -172,14 +173,18 @@ fn read_json(path: &str) -> Value {
 struct Canned {
   status: u16,
   headers: Vec<(&'static str, String)>,
-  body: String,
+  body: Vec<u8>,
 }
 
 fn canned(status: u16, body: &str) -> Canned {
+  canned_as(status, "application/json", body.as_bytes())
+}
+
+fn canned_as(status: u16, content_type: &str, body: &[u8]) -> Canned {
   Canned {
     status,
-    headers: vec![("content-type", "application/json".to_string())],
-    body: body.to_string(),
+    headers: vec![("content-type", content_type.to_string())],
+    body: body.to_vec(),
   }
 }
 
@@ -238,7 +243,7 @@ fn stub_provider(replies: Vec<Canned>) -> (String, Receiver<String>) {
       head.push_str("connection: close\r\n\r\n");
       let stream = reader.get_mut();
       let _ = stream.write_all(head.as_bytes());
-      let _ = stream.write_all(canned.body.as_bytes());
+      let _ = stream.write_all(&canned.body);
       let _ = stream.flush();
       let _ = tx.send(request_line.trim_end().to_string());
     }
@@ -568,6 +573,90 @@ fn an_xml_body_is_a_named_component_gap_rather_than_a_crash() {
       .is_some_and(|component| component.starts_with("content/")),
     "the missing piece is named: {}",
     results[0]["error"]
+  );
+}
+
+/// A one-interaction v1 pact whose response is `body` of `content_type`, as the compatibility suite
+/// writes one.
+fn v1_pact_with_body(content_type: &str, body: &str) -> Value {
+  json!({
+    "consumer": { "name": "c" },
+    "provider": { "name": "p" },
+    "interactions": [{
+      "description": "a body",
+      "request": { "method": "GET", "path": "/body" },
+      "response": { "status": 200, "headers": { "content-type": content_type }, "body": body }
+    }],
+    "metadata": { "pactSpecification": { "version": "1.0.0" } }
+  })
+}
+
+fn mismatch_messages(events: &[Value]) -> Vec<String> {
+  results(events)
+    .iter()
+    .flat_map(|result| result["mismatches"].as_array().cloned().unwrap_or_default())
+    .map(|mismatch| mismatch["message"].as_str().unwrap_or_default().to_string())
+    .collect()
+}
+
+/// S1.6, ADR 0036: a text body is decoded by the text component and compared as text.
+#[test]
+fn a_plain_text_body_verifies_as_text() {
+  let pact = v1_pact_with_body("text/plain", "Hello World!");
+  let (base_url, _requests) = stub_provider(vec![
+    canned_as(200, "text/plain", b"Hello World!"),
+    canned_as(200, "text/plain", b"Hello Compatibility Suite!"),
+  ]);
+  let mut engine = engine_with_everything();
+
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  assert_eq!(
+    mismatch_messages(&events),
+    vec!["Expected 'Hello Compatibility Suite!' to equal 'Hello World!'".to_string()]
+  );
+}
+
+/// S1.6, ADR 0036: a binary body is its octets, which no component claims, compared byte for byte.
+#[test]
+fn a_binary_body_verifies_byte_for_byte() {
+  let png = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+  let mut changed = png;
+  changed[7] ^= 0xff;
+  let pact = v1_pact_with_body("image/png", "iVBORw0KGgo=");
+  let (base_url, _requests) = stub_provider(vec![
+    canned_as(200, "image/png", &png),
+    canned_as(200, "image/png", &changed),
+  ]);
+  let mut engine = engine_with_everything();
+
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  assert_eq!(
+    mismatch_messages(&events),
+    vec!["Expected <8 byte(s)> to equal <8 byte(s)>, differing from byte 7".to_string()]
+  );
+}
+
+/// S1.6, ADR 0036: a pact with no `Content-Type` header reads its body's type from the body, and a
+/// reply labelled with a type that does not agree fails before its body is compared, as today.
+#[test]
+fn a_reply_of_another_content_type_fails_on_its_type() {
+  let mut pact = v1_pact_with_body("text/plain", "Hello World!");
+  pact["interactions"][0]["response"]
+    .as_object_mut()
+    .expect("a response")
+    .remove("headers");
+  let (base_url, _requests) = stub_provider(vec![canned_as(200, "text/html", b"Hello World!")]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  assert_eq!(
+    mismatch_messages(&events),
+    vec!["Expected a body of 'text/plain' but the actual content type was 'text/html'".to_string()]
   );
 }
 

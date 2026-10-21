@@ -23,6 +23,9 @@ readability:
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
   agreement/` compiles the same interaction both ways — a v1–v4 pact directly, and the equivalent
   hand-authored shape — and asserts they reach the same verdict (plan-grammar spec §4.4).
+  `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
+  that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
+  value as base64 in `encoded` (plan-grammar spec §6.1).
 
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with

@@ -52,6 +52,7 @@ superseding ADR instead.
 | [0033](0033-count-a-runs-variants-per-source-document-in-its-summary.md) | Count a run's variants per source document in its summary | accepted |
 | [0034](0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md) | Apply a pact's request generators through a generator component, fed by provider-state values | accepted |
 | [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted |
+| [0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md) | Read text bodies through a text component, and bodies no component claims as bytes | accepted |
 
 ## Decision backlog
 

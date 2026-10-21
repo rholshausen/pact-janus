@@ -495,6 +495,12 @@ A component that cannot decode answers with an error (§11.1), and the engine fa
 never applies a shape to a guess: shape spec §2.2 makes that normative, and this is the operation where
 it is enforced.
 
+Octets whose media type no component claims are not decoded, and not guessed at either: the slot's
+document is the octets themselves, the document model's bytes ([ADR 0036](../../decisions/0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)).
+A requirement for a content type (§2.3) is still unsatisfied when nothing claims it. Bytes are what a
+body nobody can read is, not a component standing in for one. Every engine also has a built-in `text`
+component for `text/*`, after JSON, which decodes UTF-8 into a string.
+
 ### 6.2 Encoding is how variants become traffic
 
 `encode` is decode's inverse, and it exists because a consumer test must *produce* bodies: each selected

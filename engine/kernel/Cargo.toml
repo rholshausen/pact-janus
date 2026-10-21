@@ -43,6 +43,7 @@ pretty_assertions = "1"
 # `TransportComponent`/`ContentComponent` wiring against something that isn't a toy.
 pact_janus_component_http = { path = "../component-http" }
 pact_janus_component_json = { path = "../component-json" }
+pact_janus_component_text = { path = "../component-text" }
 # The sample provider (plan task 5.6), embedded rather than spawned: a verification run needs a
 # real provider on a real socket to be worth anything, and the one the plan calls for is in this
 # repo. No cycle — the sample depends on nothing of ours.

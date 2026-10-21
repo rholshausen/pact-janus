@@ -435,11 +435,11 @@ fn every_core_action_given_fewer_children_than_it_takes_is_an_error_on_the_node(
       short_nodes += 1;
     }
   }
-  // Plan-grammar spec §4.2's table, counted: 27 actions take at least one child, 12 at least two,
+  // Plan-grammar spec §4.2's table, counted: 27 actions take at least one child, 13 at least two,
   // 3 at least three and 1 four (and 5 take none), so an action added without its count shows here.
   assert_eq!(
     short_nodes,
-    27 + 12 * 2 + 3 * 3 + 4,
+    27 + 13 * 2 + 3 * 3 + 4,
     "every short form of every core action"
   );
 }
@@ -489,4 +489,64 @@ fn no_core_action_panics_whatever_its_children_are() {
       }
     }
   }
+}
+
+// --- legacy:body-type (ADR 0036) ---
+
+fn body_type_of(expected: &str, actual: Option<&str>) -> Result<(), String> {
+  let plan = Plan {
+    grammar: GRAMMAR_VERSION,
+    root: Node::action(
+      "legacy:body-type",
+      vec![
+        Node::resolve("$.response.headers.content-type"),
+        Node::value(Literal::string(expected)),
+      ],
+    ),
+    variant: None,
+  };
+  let mut resolver = CapturedValues::new();
+  if let Some(actual) = actual {
+    resolver = resolver.capture(
+      "$.response.headers.content-type",
+      RuntimeValue::String(actual.to_string()),
+    );
+  }
+  let (status, mismatches) = outcome(&execute(&plan, &resolver));
+  match status {
+    Status::Matched => Ok(()),
+    _ => Err(
+      mismatches
+        .into_iter()
+        .map(|m| m.message)
+        .collect::<Vec<_>>()
+        .join("; "),
+    ),
+  }
+}
+
+#[rstest::rstest]
+#[case::unlabelled("text/plain", None)]
+#[case::the_same_type("text/plain", Some("text/plain"))]
+#[case::with_parameters("text/plain", Some("Text/Plain; charset=utf-8"))]
+#[case::a_suffix_type("application/json", Some("application/hal+json"))]
+#[case::an_unknown_label("text/plain", Some("*/*"))]
+#[case::not_a_type_at_all("text/plain", Some("nonsense"))]
+#[case::the_same_parameters("text/plain; charset=utf-8", Some("text/plain;charset=utf-8"))]
+fn a_body_type_agrees(#[case] expected: &str, #[case] actual: Option<&str>) {
+  assert_eq!(body_type_of(expected, actual), Ok(()));
+}
+
+#[rstest::rstest]
+#[case::another_subtype("text/plain", "text/html")]
+#[case::another_type("application/json", "text/plain")]
+#[case::a_suffix_that_is_not_the_subtype("application/json", "application/hal+xml")]
+#[case::other_parameters("text/plain; charset=utf-8", "text/plain; charset=iso-8859-1")]
+fn a_body_type_disagrees(#[case] expected: &str, #[case] actual: &str) {
+  assert_eq!(
+    body_type_of(expected, Some(actual)),
+    Err(format!(
+      "Expected a body of '{expected}' but the actual content type was '{actual}'"
+    ))
+  );
 }

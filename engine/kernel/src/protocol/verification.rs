@@ -1382,7 +1382,9 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       assignment: json!([]),
       plan: compile_legacy_response(&response),
       resolve: legacy_resolver,
-      content_types: ContentTypes::new(),
+      // The reply's body is read as the pact's content type (ADR 0036 decision 4); the request
+      // replays the recorded octets, so it declares nothing.
+      content_types: legacy_pact::response_types(&response),
       states,
       request: legacy_pact::request_parts(&interaction.request),
       generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
@@ -1399,8 +1401,9 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
 /// The sole variant of a converted interaction (contract-file spec §8.3).
 const LEGACY_VARIANT: &str = "base";
 
-/// A reply read the way design 3.5's plans address it: the generic slot captures, plus one string
-/// per header name ([`legacy_pact::header_captures`] documents why the two forms differ).
+/// A reply read the way design 3.5's plans address it: the generic slot captures, the body decoded
+/// as the pact's content type ([`legacy_pact::response_types`]), plus one string per header name
+/// ([`legacy_pact::header_captures`] documents why the two forms differ).
 fn legacy_resolver(
   parts: &Parts,
   declared: &ContentTypes,

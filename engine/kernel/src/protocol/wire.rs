@@ -11,6 +11,8 @@
 use crate::common::{ContentTypes, declared_type};
 use crate::component::{ContentComponent, Decode, Encode, Parts, SlotValue};
 use crate::plan::{CapturedValues, Executed, ExecutedKind, Mismatch, RuntimeValue};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::Value;
 
 /// The plan-executed tree's named part subtree (`"request"`/`"response"`) — the root
@@ -48,16 +50,21 @@ pub(crate) fn parts_resolver(
 
 /// A wire-form slot's document value: a content component decodes anything with a content type —
 /// the one the interaction declared for the slot, else the one it arrived labelled with
-/// (component-interfaces spec §6, contract-file spec §5.5); everything else — method, path,
-/// headers, an untyped body — is already the document model's own value (contract-file spec §5.3's
-/// `json` default), so it is taken as-is.
+/// (component-interfaces spec §6, contract-file spec §5.5). Octets no component claims, with a type
+/// or without one, are the document model's bytes (ADR 0036 decision 2). Everything else — method,
+/// path, headers, a body carried as its JSON value — is already the document model's own value
+/// (contract-file spec §5.3's `json` default), so it is taken as-is.
 pub(crate) fn decode_slot(
   slot: &SlotValue,
   declared: Option<&str>,
   content: Option<&dyn ContentComponent>,
 ) -> RuntimeValue {
-  match (declared.or(slot.content_type.as_deref()), content) {
-    (Some(content_type), Some(content)) => match content.decode(Decode {
+  let content_type = declared.or(slot.content_type.as_deref());
+  let claimed = content_type
+    .zip(content)
+    .filter(|(content_type, content)| content.handles(content_type));
+  match claimed {
+    Some((content_type, content)) => match content.decode(Decode {
       content_type: content_type.to_string(),
       value: slot.clone(),
       options: None,
@@ -74,7 +81,13 @@ pub(crate) fn decode_slot(
         RuntimeValue::Absent
       }
     },
-    _ => RuntimeValue::from_json(&slot.content),
+    None => match (slot.encoded.as_deref(), slot.content.as_str()) {
+      (Some("base64"), Some(text)) => BASE64
+        .decode(text)
+        .map(RuntimeValue::Bytes)
+        .unwrap_or(RuntimeValue::Absent),
+      _ => RuntimeValue::from_json(&slot.content),
+    },
   }
 }
 
@@ -135,4 +148,83 @@ pub(crate) fn mismatch_json(mismatch: &Mismatch) -> Value {
     "message": mismatch.message,
     "action": mismatch.action,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::component::{
+    Compile, CompileResult, ComponentError, DecodeResult, Detect, DetectResult, EncodeResult,
+  };
+  use pretty_assertions::assert_eq;
+  use serde_json::json;
+
+  /// Claims `text/plain` and fails every decode.
+  struct Failing;
+
+  impl ContentComponent for Failing {
+    fn handles(&self, content_type: &str) -> bool {
+      content_type == "text/plain"
+    }
+    fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError> {
+      Err(ComponentError::decode_failed(&req.content_type, "never"))
+    }
+    fn encode(&self, _req: Encode) -> Result<EncodeResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/encode"))
+    }
+    fn compile(&self, _req: Compile) -> Result<CompileResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/compile"))
+    }
+    fn detect(&self, _req: Detect) -> Result<DetectResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/detect"))
+    }
+  }
+
+  fn octets(content_type: Option<&str>) -> SlotValue {
+    SlotValue {
+      content: json!("AAEC"),
+      encoded: Some("base64".to_string()),
+      content_type: content_type.map(str::to_string),
+    }
+  }
+
+  #[test]
+  fn octets_no_component_claims_are_bytes() {
+    for content_type in [Some("image/png"), None] {
+      assert_eq!(
+        decode_slot(&octets(content_type), None, Some(&Failing)),
+        RuntimeValue::Bytes(vec![0, 1, 2]),
+        "{content_type:?}"
+      );
+    }
+    assert_eq!(
+      decode_slot(&octets(Some("image/png")), None, None),
+      RuntimeValue::Bytes(vec![0, 1, 2]),
+      "with no content component at all"
+    );
+  }
+
+  #[test]
+  fn octets_a_component_claims_and_cannot_decode_are_absent() {
+    assert_eq!(
+      decode_slot(&octets(Some("text/plain")), None, Some(&Failing)),
+      RuntimeValue::Absent
+    );
+  }
+
+  #[test]
+  fn a_declared_type_decides_who_claims_the_octets() {
+    assert_eq!(
+      decode_slot(&octets(Some("image/png")), Some("text/plain"), Some(&Failing)),
+      RuntimeValue::Absent
+    );
+  }
+
+  #[test]
+  fn a_plain_value_is_taken_as_it_stands() {
+    assert_eq!(
+      decode_slot(&plain_slot(&json!(200)), None, Some(&Failing)),
+      RuntimeValue::from_json(&json!(200))
+    );
+  }
 }

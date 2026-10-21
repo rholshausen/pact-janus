@@ -177,6 +177,13 @@ impl Engine {
     self.loaders.push(loader);
   }
 
+  /// Add an in-tree content component after those already registered, which are asked first: the
+  /// built-in text component (ADR 0036) comes after JSON. Declare it with [`Self::declare_in_tree`]
+  /// too, so `engine/hello` lists it and a requirement can name it.
+  pub fn register_content(&mut self, component: Arc<dyn ContentComponent>) {
+    self.content = std::mem::take(&mut self.content).with(component);
+  }
+
   /// Name a component compiled into this embedding, so a requirement can be satisfied by it and a
   /// declaration cannot reuse its name (spec §2.3, §2.4). Transports passed to
   /// [`Engine::with_components`] are named already; a content component carries no name there.

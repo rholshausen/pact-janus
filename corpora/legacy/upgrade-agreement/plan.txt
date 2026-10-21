@@ -29,6 +29,10 @@
         )
       ),
       :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
         %match:type (
           $.response.body,
           42

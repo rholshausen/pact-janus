@@ -1,0 +1,50 @@
+{
+  "description": "a v1 binary body (image/png) is its octets, compared byte for byte as today's verifier compares a binary body (ADR 0036)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /image",
+          "request": {
+            "method": "GET",
+            "path": "/image"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "image/png"
+            },
+            "body": "iVBORw0KGgo="
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "1.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/image",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "image/png",
+    "$.response.body": "iVBORw0KGgo="
+  },
+  "encoded": {
+    "$.response.body": "base64"
+  },
+  "result": {
+    "status": "matched"
+  }
+}

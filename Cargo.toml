@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "engine/kernel",
   "engine/component-json",
+  "engine/component-text",
   "engine/component-http",
   "engine/component-oauth2",
   "engine/hooks-host",

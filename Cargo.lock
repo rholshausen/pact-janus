@@ -2372,6 +2372,7 @@ dependencies = [
  "pact_janus_component_http",
  "pact_janus_component_json",
  "pact_janus_component_oauth2",
+ "pact_janus_component_text",
  "pact_janus_hooks_host",
  "pact_janus_kernel",
  "pact_janus_sample_order_service",
@@ -2446,6 +2447,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_component_text"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "pact_janus_kernel",
+ "pretty_assertions",
+ "serde_json",
+]
+
+[[package]]
 name = "pact_janus_conformance"
 version = "0.2.0"
 dependencies = [
@@ -2458,6 +2469,7 @@ dependencies = [
 name = "pact_janus_corpus"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "pact_janus_component_json",
  "pact_janus_kernel",
  "serde",
@@ -2486,6 +2498,7 @@ name = "pact_janus_engine_wasm"
 version = "0.2.0"
 dependencies = [
  "pact_janus_component_json",
+ "pact_janus_component_text",
  "pact_janus_kernel",
  "serde_json",
  "wit-bindgen 0.60.0",
@@ -2530,6 +2543,7 @@ dependencies = [
  "pact_janus_component_http",
  "pact_janus_component_json",
  "pact_janus_component_oauth2",
+ "pact_janus_component_text",
  "pact_janus_hooks_host",
  "pact_janus_sample_order_service",
  "pact_models",
