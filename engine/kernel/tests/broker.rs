@@ -362,6 +362,109 @@ fn selectors_that_select_nothing_fail_the_run_unless_no_pacts_were_required() {
   assert_eq!(summary["contracts"], 0);
 }
 
+/// A Janus contract for provider `p` with two recorded variants of one interaction, `base` and
+/// `again`, both answered by [`provider`]: a filter on one of them narrows it.
+fn contract_with_two_variants(consumer: &str) -> Value {
+  let variant = |id: &str| {
+    json!({
+      "id": id, "origin": "base", "assignment": [],
+      "parts": {
+        "request": { "method": { "content": "GET" }, "path": { "content": "/widgets/1" } },
+        "response": { "status": { "content": 200 } }
+      }
+    })
+  };
+  json!({
+    "$format": "janus-contract/1",
+    "consumer": { "name": consumer },
+    "provider": { "name": "p" },
+    "interactions": [{
+      "description": "a request for widget 1",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": { "method": { "shape": "equality", "example": "GET" },
+                     "path": { "shape": "equality", "example": "/widgets/1" } },
+        "response": { "status": { "shape": "equality", "example": 200 } }
+      },
+      "selection": {
+        "variants": [variant("base"), variant("again")],
+        "report": { "space": { "size": 2, "dimensions": 1 } }
+      }
+    }]
+  })
+}
+
+/// ADR 0041 decision 4: a pact the filter narrowed is never published, and says why; one it did not
+/// narrow is published as usual. `base` is every variant a v1–v4 pact records, so `web`'s run is
+/// whole, while `mobile`'s contract also records `again`.
+#[test]
+fn a_pact_the_filter_narrowed_is_not_published_and_the_rest_are() {
+  let broker = Arc::new(FakeBroker {
+    pacts: vec![
+      fetched(pact("web", json!({ "id": 1 })), false),
+      fetched(contract_with_two_variants("mobile"), false),
+    ],
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let events = verify(
+    &mut engine,
+    json!({}),
+    json!({ "variants": ["base"], "publish": { "provider-version": "2.0.0" } }),
+  );
+
+  let summary = &events.last().unwrap()["payload"];
+  assert_eq!(summary["status"], "filtered", "{summary}");
+  assert_eq!(summary["pairs"][0]["status"], "verified");
+  assert_eq!(summary["pairs"][1]["status"], "filtered");
+  assert_eq!(
+    summary["publication"],
+    json!([
+      { "consumer": "web", "outcome": "published" },
+      { "consumer": "mobile", "outcome": "skipped", "reason": "filtered" }
+    ])
+  );
+  let published = of_kind(&events, "verification/published");
+  assert_eq!(published[1]["outcome"], "skipped");
+  assert_eq!(published[1]["provider-version"], "2.0.0");
+
+  let sent = broker.published.lock().unwrap();
+  assert_eq!(sent.len(), 1, "only web's result reached the broker: {sent:?}");
+  assert_eq!(sent[0]["handle"], json!({ "pact": "web" }));
+  assert_eq!(sent[0]["success"], true);
+}
+
+/// ADR 0041 decision 1, for a broker source: the documents are only known once fetched, so the run
+/// ends there, as one that fetched nothing does. Nothing runs and nothing is published — before,
+/// this published a success for every pact, since a pact with no results had none that failed.
+#[test]
+fn a_filter_naming_a_variant_no_fetched_pact_records_ends_the_run_before_anything_runs() {
+  let broker = Arc::new(FakeBroker {
+    pacts: vec![fetched(pact("web", json!({ "id": 1 })), false)],
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let events = verify(
+    &mut engine,
+    json!({}),
+    json!({ "variant": "nothing-is-called-this", "publish": { "provider-version": "2.0.0" } }),
+  );
+
+  assert_eq!(
+    events
+      .iter()
+      .map(|event| event["kind"].as_str().unwrap())
+      .collect::<Vec<_>>(),
+    vec!["verification/fetched", "verification/finished"]
+  );
+  let summary = &events.last().unwrap()["payload"];
+  assert_eq!(summary["status"], "failed");
+  assert_eq!(summary["error"]["code"], "variant-not-found");
+  assert_eq!(summary["error"]["details"]["variant"], "nothing-is-called-this");
+  assert_eq!(summary["error"]["details"]["recorded"], json!(["base"]));
+  assert!(broker.published.lock().unwrap().is_empty());
+}
+
 #[test]
 fn a_broker_event_names_the_broker_by_its_url_without_user_information() {
   let broker = Arc::new(FakeBroker {

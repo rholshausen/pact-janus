@@ -518,6 +518,10 @@ impl Engine {
         }
       },
     };
+    let filter = match verification::Filter::from_options(req.options.as_ref()) {
+      Ok(filter) => filter,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
     let client = self.broker.clone();
     if from_broker && client.is_none() {
       return ResponseFrame::err(id, EngineError::broker_unavailable("fetch pacts from a broker"));
@@ -549,6 +553,10 @@ impl Engine {
         Err(err) => return ResponseFrame::err(id, verify_error(err)),
       }
     };
+    // ADR 0041: a filter naming an id none of them records is a typo, refused before anything runs.
+    if let Err(err) = filter.check(&contracts) {
+      return ResponseFrame::err(id, err);
+    }
 
     // Component-interfaces spec §2.3: load what the project declared, then collect the union of
     // every interaction's requirements and fail the unsatisfiable ones — before any transport is
@@ -652,7 +660,16 @@ impl Engine {
       })),
       _ => verification::Sources::Read(contracts),
     };
-    let run = verification::start(sources, targets, components, hooks, req.options, publish, stream);
+    let run = verification::start(
+      sources,
+      targets,
+      components,
+      hooks,
+      req.options,
+      filter,
+      publish,
+      stream,
+    );
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))

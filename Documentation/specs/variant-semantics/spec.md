@@ -591,7 +591,17 @@ remove; and it would make a verification run's content depend on the verifier's 
 would not be reproducible from the pact. The consumer chooses the sample; the provider answers for it.
 
 A verifier MAY filter the recorded variants down (a `--variant` switch for debugging, design 5.5), and
-MUST report a filtered run as filtered — a partial run is not a pass.
+MUST report a filtered run as filtered — a partial run is not a pass ([ADR
+0041](../../decisions/0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md)):
+
+- A filter naming a variant that no document in the run records MUST be refused before anything runs,
+  as `variant-not-found` (§8). A filter that matches nothing is the author's typo, caught where they
+  can fix it, as §6.5 catches a reference to no dimension.
+- A run is **filtered** when its filter excluded at least one recorded variant. A filter that admits
+  every recorded variant leaves a whole run.
+- A filtered run that nothing failed MUST NOT be reported as verified: its status is `filtered`
+  (engine-protocol spec §9.6). It MUST NOT be published to a broker as a pass. A document the filter
+  narrowed is not published at all (engine-protocol spec §8.3).
 
 ### 5.2 Replaying a variant
 
@@ -814,7 +824,7 @@ details of two:
 |---|---|---|---|
 | `variant-budget-exceeded` | `document` | the selection would exceed `max-variants` (§3.6) | `space`, `selected`, `budget`, `dimensions` (the largest contributors, by id) |
 | `interaction-invalid` | `document` | a malformed policy, an unresolvable or ambiguous dimension reference, an unknown point, a missing `default` on a gated binding, a non-forest gate structure | `problems: [{ path, message }]`, with candidate ids where a reference was ambiguous |
-| `variant-not-found` | `session` | `serve-variant` with an id that is not in this interaction's selection | the id, and the selection's ids |
+| `variant-not-found` | `session` | `serve-variant` with an id that is not in this interaction's selection; `verification/verify` filtering on an id that no document in the run records (§5.1) | `variant`, the id, and `selection`, the selection's ids; for `verify`, `variant`, the first id no document records, and `recorded`, the ids they do |
 
 `variant-not-found` covers the case worth calling out: an id that names a *valid* variant of the space
 which was not selected. It is not found because the selection is what the contract will record, and

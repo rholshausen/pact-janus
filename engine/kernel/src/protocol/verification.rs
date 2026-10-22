@@ -71,9 +71,9 @@ use std::thread::{self, JoinHandle};
 
 /// Which recorded variants a run replays (variant-semantics spec §5.1). The default is all of
 /// them; a host may narrow it for debugging, and a narrowed run **must be reported as filtered** —
-/// a partial run is not a pass, and a summary that did not say so would read like one.
+/// a partial run is not a pass, and a summary that did not say so would read like one (ADR 0041).
 #[derive(Debug, Clone, Default)]
-struct Filter {
+pub(crate) struct Filter {
   variants: Option<Vec<String>>,
 }
 
@@ -119,10 +119,11 @@ impl ExecutedPlans {
 }
 
 impl Filter {
-  /// `options.variants` (a list) or `options.variant` (one), both naming recorded variant ids.
-  fn from_options(options: Option<&Value>) -> Filter {
+  /// `options.variants` (a list) or `options.variant` (one), both naming recorded variant ids. A
+  /// list naming none is refused: it could only ever replay nothing (spec §8.3).
+  pub(crate) fn from_options(options: Option<&Value>) -> Result<Filter, EngineError> {
     let Some(options) = options else {
-      return Filter::default();
+      return Ok(Filter::default());
     };
     let listed = options.get("variants").and_then(Value::as_array).map(|ids| {
       ids
@@ -131,13 +132,18 @@ impl Filter {
         .map(str::to_string)
         .collect::<Vec<_>>()
     });
+    if listed.as_ref().is_some_and(Vec::is_empty) {
+      return Err(EngineError::malformed_frame(
+        "options.variants names no variant: a run filtered to nothing would replay nothing",
+      ));
+    }
     let single = options
       .get("variant")
       .and_then(Value::as_str)
       .map(|id| vec![id.to_string()]);
-    Filter {
+    Ok(Filter {
       variants: listed.or(single),
-    }
+    })
   }
 
   fn admits(&self, id: &str) -> bool {
@@ -147,8 +153,33 @@ impl Filter {
     }
   }
 
-  fn is_filtered(&self) -> bool {
-    self.variants.is_some()
+  /// Refuse a filter that names an id no document records (variant-semantics spec §5.1, ADR 0041):
+  /// it is a typo, and a run of it would replay less than it was asked to, or nothing. A run with no
+  /// documents has nothing to narrow, so it is not refused.
+  pub(crate) fn check(&self, sources: &[Source]) -> Result<(), EngineError> {
+    let Some(wanted) = &self.variants else {
+      return Ok(());
+    };
+    if sources.is_empty() {
+      return Ok(());
+    }
+    let recorded: std::collections::BTreeSet<&str> = sources.iter().flat_map(Source::variant_ids).collect();
+    let unknown: Vec<String> = wanted
+      .iter()
+      .filter(|id| !recorded.contains(id.as_str()))
+      .cloned()
+      .collect();
+    if unknown.is_empty() {
+      return Ok(());
+    }
+    let recorded: Vec<String> = recorded.into_iter().map(str::to_string).collect();
+    Err(EngineError::variant_not_recorded(&unknown, &recorded))
+  }
+
+  /// Whether the filter excludes any variant `source` records: what makes a run, and a pair,
+  /// filtered (ADR 0041 decision 2). A filter that admits everything leaves a whole run.
+  fn narrows(&self, source: &Source) -> bool {
+    self.variants.is_some() && source.variant_ids().iter().any(|id| !self.admits(id))
   }
 }
 
@@ -352,6 +383,18 @@ impl Source {
     }
   }
 
+  /// The id of every variant this document records, one per result it will produce, in order.
+  fn variant_ids(&self) -> Vec<&str> {
+    match self {
+      Source::Janus(contract) => contract
+        .interactions
+        .iter()
+        .flat_map(|i| i.selection.variants.iter().map(|v| v.id.as_str()))
+        .collect(),
+      Source::Legacy(pact) => vec![LEGACY_VARIANT; pact.interactions.len()],
+    }
+  }
+
   /// Component-interfaces spec §2.3: everything this document's interactions cannot run without —
   /// their requirements and a component for each content type they declare — checked against the
   /// run's scope before the run starts. A v1–v4 pact declares neither.
@@ -512,11 +555,6 @@ pub(crate) struct Run {
   pub thread: JoinHandle<()>,
 }
 
-/// Start the run. Returns immediately (spec §8.3: "`verify` starts a verification session and
-/// returns immediately") — everything after this point is events on `stream`.
-///
-/// `options.variants`/`options.variant` narrow the run (variant-semantics spec §5.1); everything
-/// else in `options` is ignored for now and logged rather than silently dropped.
 /// What a run's scope lends it: the content components that decode and encode its slots, and what
 /// its declared components contribute to its plans (plan task 8.4).
 pub(crate) struct RunComponents {
@@ -549,16 +587,22 @@ struct BrokerRun {
   fetched: Vec<FetchedPact>,
 }
 
+/// Start the run. Returns immediately (spec §8.3: "`verify` starts a verification session and
+/// returns immediately") — everything after this point is events on `stream`.
+///
+/// `filter` narrows the run (variant-semantics spec §5.1). An inline source's documents were
+/// checked against it before `verify` answered; a broker source's are checked once fetched.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn start(
   sources: Sources,
   targets: Vec<Target>,
   components: RunComponents,
   hooks: Option<HookRunner>,
   options: Option<Value>,
+  filter: Filter,
   publish: Option<PublishOptions>,
   stream: Arc<Stream>,
 ) -> Run {
-  let filter = Filter::from_options(options.as_ref());
   let executed_plans = ExecutedPlans::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
   let crashed = match &sources {
@@ -643,6 +687,9 @@ fn fetch_sources(
       .map_err(|unavailable| failed(EngineError::component_unresolved(&unavailable)))?;
     sources.push(source);
   }
+  // ADR 0041: a filter naming an id none of them records ends the run here, before anything runs
+  // or is published, as one that fetched nothing does.
+  filter.check(&sources).map_err(failed)?;
   Ok((sources, fetched))
 }
 
@@ -683,7 +730,7 @@ fn crashed_summary(sources: &[Source], filter: &Filter) -> Value {
     "consumers": sources.iter().map(|s| s.consumer().to_string()).collect::<Vec<_>>(),
     "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
     "interactions": sources.iter().map(Source::interactions).sum::<usize>(),
-    "filtered": filter.is_filtered(),
+    "filtered": sources.iter().any(|source| filter.narrows(source)),
   })
 }
 
@@ -704,6 +751,9 @@ fn run(
   } = components;
   let interactions: usize = sources.iter().map(Source::interactions).sum();
   let variants: usize = sources.iter().map(Source::variants).sum();
+  // Per source, whether the filter excludes any of its variants (ADR 0041 decision 2): known before
+  // anything runs, so `started` can say it, and what each pair's status and publication follow.
+  let narrowed: Vec<bool> = sources.iter().map(|source| filter.narrows(source)).collect();
   stream.emit(
     "verification/started",
     json!({
@@ -716,7 +766,7 @@ fn run(
       // (plan task 5.4). A run over a mix of the two says so in its first event.
       "formats": sources.iter().map(Source::format).collect::<Vec<_>>(),
       "transports": targets.iter().map(|t| t.kind.clone()).collect::<Vec<_>>(),
-      "filtered": filter.is_filtered(),
+      "filtered": narrowed.contains(&true),
       "hooks": hooks.is_some(),
     }),
   );
@@ -783,14 +833,14 @@ fn run(
   }
 
   let publication = match &broker {
-    Some(broker) => publish(broker, &sources, &ran, &tally, &stream),
+    Some(broker) => publish(broker, &sources, &ran, &narrowed, &tally, &stream),
     None => vec![],
   };
   let report = Report {
     tally: &tally,
     sources: &sources,
     interactions,
-    filter: &filter,
+    narrowed: &narrowed,
     hooks: None,
     aborted: &aborted,
     pending: broker
@@ -857,6 +907,7 @@ fn publish(
   broker: &BrokerRun,
   sources: &[Source],
   ran: &[SourceRun],
+  narrowed: &[bool],
   tally: &Tally,
   stream: &Stream,
 ) -> Vec<Value> {
@@ -867,7 +918,18 @@ fn publish(
   // Only a source the run finished: a partial result published as the pact's would be a verdict
   // on interactions nobody verified.
   let finished = ran.iter().filter(|run| run.complete);
-  for ((source, fetched), run) in sources.iter().zip(&broker.fetched).zip(finished) {
+  for (((source, fetched), run), narrowed) in sources.iter().zip(&broker.fetched).zip(finished).zip(narrowed)
+  {
+    // Nor a source the filter narrowed (ADR 0041 decision 4): what it replayed is not the pact's
+    // result. Said, not silently left out, so a reader knows why the broker did not hear of it.
+    if *narrowed {
+      let entry = json!({ "consumer": source.consumer(), "outcome": "skipped", "reason": "filtered" });
+      let mut event = entry.clone();
+      event["provider-version"] = json!(options.provider_version);
+      stream.emit("verification/published", event);
+      publication.push(entry);
+      continue;
+    }
     let results: Vec<InteractionResult> = tally.results[run.results.clone()]
       .iter()
       .map(|payload| InteractionResult {
@@ -1000,8 +1062,10 @@ struct SourceRun {
 }
 
 /// One source's entry in the summary's `pairs` (ADR 0033): who it was between, how it went, and
-/// its own variant counts, which the run-level `variants` adds up.
-fn pair_entry(source: &Source, run: Option<&SourceRun>, results: &[Value]) -> Value {
+/// its own variant counts, which the run-level `variants` adds up. A source the filter narrowed is
+/// `filtered` unless something in it failed (ADR 0041 decision 3): what it replayed passing is not
+/// the pair verified.
+fn pair_entry(source: &Source, run: Option<&SourceRun>, narrowed: bool, results: &[Value]) -> Value {
   let results = run.map_or(&[][..], |run| &results[run.results.clone()]);
   let count = |status: &str| {
     results
@@ -1015,10 +1079,12 @@ fn pair_entry(source: &Source, run: Option<&SourceRun>, results: &[Value]) -> Va
   let skipped = run.map_or(0, |run| run.skipped);
   let status = if failed + state_unavailable > 0 {
     "failed"
-  } else if run.is_some_and(|run| run.complete) {
-    "verified"
-  } else {
+  } else if !run.is_some_and(|run| run.complete) {
     "incomplete"
+  } else if narrowed {
+    "filtered"
+  } else {
+    "verified"
   };
   json!({
     "consumer": source.consumer(),
@@ -1040,7 +1106,8 @@ struct Report<'a> {
   tally: &'a Tally,
   sources: &'a [Source],
   interactions: usize,
-  filter: &'a Filter,
+  /// Per source, whether the filter excluded any of its variants.
+  narrowed: &'a [bool],
   hooks: Option<&'a HookRunner>,
   aborted: &'a Option<Abort>,
   /// For a broker source: per source, whether it was pending.
@@ -1058,7 +1125,7 @@ fn summary(report: &Report<'_>) -> Value {
     tally,
     sources,
     interactions,
-    filter,
+    narrowed,
     hooks,
     aborted,
     ..
@@ -1069,8 +1136,18 @@ fn summary(report: &Report<'_>) -> Value {
   let failed = tally.failed + tally.state_unavailable;
   // A pending variant's failure is reported and does not fail the run (spec §8.3).
   let failing = failed - tally.pending_failed;
+  let filtered = narrowed.contains(&true);
+  // A narrowed run that nothing failed is not a pass (variant-semantics spec §5.1, ADR 0041): it
+  // says what it replayed passed, and that it did not replay everything.
+  let status = if failing > 0 || aborted.is_some() {
+    "failed"
+  } else if filtered {
+    "filtered"
+  } else {
+    "verified"
+  };
   let mut summary = json!({
-    "status": if failing == 0 && aborted.is_none() { "verified" } else { "failed" },
+    "status": status,
     "contracts": sources.len(),
     // Who this run was about, positionally parallel, one entry per source document — the same
     // pairing `started` announces. The summary is the document a report is written from (below),
@@ -1079,10 +1156,9 @@ fn summary(report: &Report<'_>) -> Value {
     "consumers": sources.iter().map(|s| s.consumer().to_string()).collect::<Vec<_>>(),
     "providers": sources.iter().map(|s| s.provider().to_string()).collect::<Vec<_>>(),
     "interactions": interactions,
-    // `filtered` rides in the summary as well as in `started`, because the summary is the
-    // document a report is written from and "verified" without "filtered" beside it would be a
-    // lie of omission.
-    "filtered": filter.is_filtered(),
+    // `filtered` rides in the summary as well as in `started` and `status`, for a reader that
+    // reads the run's counts without its status: unreplayed variants are not passing ones.
+    "filtered": filtered,
     "variants": {
       "total": tally.verified + failed + tally.skipped,
       "verified": tally.verified,
@@ -1109,7 +1185,14 @@ fn summary(report: &Report<'_>) -> Value {
       sources
         .iter()
         .enumerate()
-        .map(|(position, source)| pair_entry(source, report.ran.get(position), &tally.results))
+        .map(|(position, source)| {
+          pair_entry(
+            source,
+            report.ran.get(position),
+            narrowed.get(position).copied().unwrap_or(false),
+            &tally.results,
+          )
+        })
         .collect(),
     ),
   );

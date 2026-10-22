@@ -165,8 +165,8 @@ pub struct VerifyArgs {
   #[arg(long, value_name = "FILE")]
   pub config: Option<PathBuf>,
 
-  /// Replay only this variant; repeatable. The run is reported as filtered, because a partial run
-  /// is not a pass
+  /// Replay only this variant; repeatable. An id no document records is refused, and a run that
+  /// left a variant out is reported as filtered, never as verified, and is not published
   #[arg(long = "variant", value_name = "ID")]
   pub variants: Vec<String>,
 

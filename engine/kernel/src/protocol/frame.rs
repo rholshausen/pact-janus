@@ -231,6 +231,30 @@ impl EngineError {
     }
   }
 
+  /// `variant-not-found` for `verification/verify` (variant-semantics spec §5.1, §8; ADR 0041):
+  /// the run's filter names ids that no document in it records. `variant` is the first of them, as
+  /// `serve-variant`'s names its one, and `recorded` the ids the documents do record.
+  pub fn variant_not_recorded(unknown: &[String], recorded: &[String]) -> Self {
+    let names = unknown
+      .iter()
+      .map(|id| format!("'{id}'"))
+      .collect::<Vec<_>>()
+      .join(", ");
+    let message = match unknown {
+      [_] => format!("no document in this run records the variant {names}"),
+      _ => format!("no document in this run records the variants {names}"),
+    };
+    EngineError {
+      code: "variant-not-found".to_string(),
+      category: "session".to_string(),
+      message,
+      details: Some(Box::new(serde_json::json!({
+        "variant": unknown.first(),
+        "recorded": recorded,
+      }))),
+    }
+  }
+
   /// `variant-budget-exceeded` (variant-semantics spec §3.6, §8): the selection would exceed
   /// `max-variants`. Naming the space size, the selection size it would have been, the budget,
   /// and the dimensions contributing the most points is what turns this into a decision the

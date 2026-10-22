@@ -78,7 +78,9 @@ Three sources are the source of truth and take precedence over this file when th
 > today's verifier compares it, and the legacy harness runs every pact-specification case, skipping none),
 > and S1.23 (ADR 0040: multipart bodies decode through the built-in `multipart` component into a document
 > keyed by part name, each part's body through the built-in component for its type, and a v1–v4 multipart
-> body verifies as today's verifier compares it, so no body kind is refused).
+> body verifies as today's verifier compares it, so no body kind is refused), and S1.17 (ADR 0041: a
+> `--variant` naming an id no document records is refused, and a run that left a variant out reports
+> `filtered`, never `verified`, and is not published).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

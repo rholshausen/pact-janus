@@ -51,8 +51,9 @@ Options:
   -u, --provider-url <URL>  The base URL of the provider under test
       --config <FILE>       A verifier configuration (verifier.janus.yaml): the hooks that set up
                             provider states or authenticate, and the components the contracts need
-      --variant <ID>        Replay only this variant; repeatable. The run is reported as filtered,
-                            because a partial run is not a pass
+      --variant <ID>        Replay only this variant; repeatable. An id no document records is
+                            refused, and a run that left a variant out is reported as filtered,
+                            never as verified, and is not published
       --transport <KIND>    The transport to bind to the provider [default: http]
       --explain-failures    Print the executed plan for every variant that fails
   -o, --output <FORMAT>     text prints progress and a summary; json prints only the run summary

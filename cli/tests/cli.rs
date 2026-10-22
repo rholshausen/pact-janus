@@ -451,13 +451,11 @@ fn explain_failures_shows_only_the_response_a_contract_was_scored_on() {
   );
 }
 
-/// A narrowed run must be reported as narrowed (variant-semantics spec §5.1): an unreplayed
-/// variant is not a passing one, and a summary that did not say so would read like one.
-///
-/// The snapshot records today's gap: a filter that matches nothing still reports `VERIFIED` and
-/// exits 0. Staged plan S1.17 changes both, and this snapshot with them.
+/// A filter naming a variant no document records is a typo (ADR 0041 decision 1): refused before
+/// anything runs, as a request the engine cannot carry out, so exit 2. Before S1.17 it replayed
+/// nothing, reported `VERIFIED` and exited 0.
 #[test]
-fn a_filtered_run_says_so_in_its_summary() {
+fn a_variant_no_document_records_is_refused() {
   let provider = provider();
   let config = state_config(&provider);
   let output = janus(&[
@@ -470,17 +468,62 @@ fn a_filtered_run_says_so_in_its_summary() {
     "--variant",
     "nothing-is-called-this",
   ]);
+  assert_eq!(code(&output), 2, "stdout: {}", stdout(&output));
+  assert_eq!(stdout(&output), "");
   assert_data_eq!(
-    stdout(&output),
+    stderr(&output),
     str![[r#"
-Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
-  (filtered run: not every recorded variant will be replayed)
-
-
-VERIFIED: 0 verified, 0 failed, 0 state-unavailable, 2 skipped (of 2 variant(s) across 2 interaction(s))
-This was a filtered run: unreplayed variants are not passing ones.
+janus verify: variant-not-found: no document in this run records the variant 'nothing-is-called-this'
+  {"variant":"nothing-is-called-this","recorded":["base"]}
 
 "#]]
+  );
+}
+
+/// A narrowed run must be reported as narrowed (variant-semantics spec §5.1): an unreplayed
+/// variant is not a passing one. Its status says `FILTERED`, not `VERIFIED`, and it exits 0, since
+/// it did what it was asked (ADR 0041 decisions 3 and 5). The pact's interactions each record only
+/// `base`, so its upgraded contract gains a second variant of the first one for `--variant` to
+/// leave out.
+#[test]
+fn a_filtered_run_says_so_in_its_status_and_its_summary() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let contract = temp("filtered.janus.json");
+  let upgraded = janus(&["upgrade", &order_pact(), "--write", &contract, "--quiet"]);
+  assert_eq!(code(&upgraded), 0, "stderr: {}", stderr(&upgraded));
+  let mut document: Value =
+    serde_json::from_str(&std::fs::read_to_string(&contract).expect("the contract")).expect("json");
+  let variants = document["interactions"][0]["selection"]["variants"]
+    .as_array_mut()
+    .expect("recorded variants");
+  let mut again = variants[0].clone();
+  again["id"] = json!("again");
+  variants.push(again);
+  std::fs::write(&contract, document.to_string()).expect("writing the contract");
+
+  let output = janus(&[
+    "verify",
+    &contract,
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--variant",
+    "base",
+  ]);
+  assert_eq!(code(&output), 0, "{}", stdout(&output));
+  let text = stdout(&output);
+  assert!(
+    text.contains("(filtered run: not every recorded variant will be replayed)"),
+    "{text}"
+  );
+  assert!(
+    text.contains(
+      "FILTERED: 2 verified, 0 failed, 0 state-unavailable, 1 skipped (of 3 variant(s) across 2 interaction(s))\n\
+       This was a filtered run: unreplayed variants are not passing ones."
+    ),
+    "{text}"
   );
 }
 

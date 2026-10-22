@@ -612,6 +612,40 @@ fn a_run_with_pairs_reports_each_pairs_own_counts() {
   assert!(text.contains("5 of 5"), "{text}");
 }
 
+/// ADR 0041 decision 6: a summary with `pairs` says per pair whether the filter narrowed it, so
+/// `verification-filtered` warns about the pair it narrowed and not about one it verified whole.
+#[test]
+fn a_run_with_pairs_warns_only_about_the_pair_its_filter_narrowed() {
+  let mut engine = engine();
+  let pair = checked_pair(&mut engine);
+  let counts = |verified: u64, skipped: u64| json!({ "total": verified + skipped, "verified": verified, "failed": 0, "state-unavailable": 0, "skipped": skipped });
+  let summary = json!({ "status": "filtered", "contracts": 2,
+    "consumers": ["order-consumer", "billing-sync"],
+    "providers": ["order-service", "order-service"],
+    "interactions": 2, "filtered": true,
+    "variants": counts(3, 2),
+    "pairs": [
+      { "consumer": "order-consumer", "provider": "order-service", "status": "verified", "variants": counts(2, 0) },
+      { "consumer": "billing-sync", "provider": "order-service", "status": "filtered", "variants": counts(1, 2) }
+    ],
+    "failures": [] });
+
+  let (report, _) = decide(
+    &mut engine,
+    json!({ "pairs": [ pair,
+                       { "consumer": { "name": "billing-sync" }, "provider": { "name": "order-service" } } ],
+            "verification": [summary] }),
+  );
+  let whole = &report["pairs"][0];
+  assert_eq!(whole["verification"]["filtered"], json!(false));
+  assert!(!reason_codes(whole).contains(&"verification-filtered".to_string()));
+  let narrowed = &report["pairs"][1];
+  assert_eq!(narrowed["verification"]["status"], json!("verified"));
+  assert_eq!(narrowed["verification"]["filtered"], json!(true));
+  assert!(reason_codes(narrowed).contains(&"verification-filtered".to_string()));
+  assert_eq!(narrowed["decision"], json!("warn"));
+}
+
 /// The RFC's per-provider adoption path: a provider that publishes no shape gets replay-only
 /// semantics — today's behaviour, which is a pass, and a note rather than silence.
 #[test]

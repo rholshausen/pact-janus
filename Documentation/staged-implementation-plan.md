@@ -709,7 +709,10 @@ item in 1a is done when S1.1 agrees.
   "dropped, because". The table is the migration note for providers:
   [`verifier-migration.md`](verifier-migration.md), whose provider-connection rows S1.5 filled. Behaviour with no flag gets a
   row too, where a provider relies on it: today's verifier retries a failed state call eight times
-  and nothing on its command line changes that (S1.9).
+  and nothing on its command line changes that (S1.9). The `--filter-*` options are filtered runs as
+  [ADR 0041](decisions/0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md)
+  decides them (S1.17): a filter that matches nothing is refused, where today's verifiers pass it, and
+  a narrowed pact is not published, where `pact_verifier_cli` publishes it. Their rows carry the ADR.
   *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.
 - **S1.17 A filtered run never reads as a pass** — **S**. Found while rebuilding the CLI before stage
   1a, and in neither the findings list nor the earlier revisions. `janus verify --variant <id>` with an
@@ -732,6 +735,22 @@ item in 1a is done when S1.1 agrees.
   *Exit:* a corpus or conformance case for an unknown id and one for a filtered run; the snapshot in
   `cli/tests/cli.rs` (`a_filtered_run_says_so_in_its_summary`) changes with them; and a filtered run's
   verification result is never published as a success.
+  *Done 2026-10-23* ([ADR 0041](decisions/0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md)).
+  A filter naming an id no document records is `variant-not-found`, naming the id and the ids the
+  documents do record. For files `verify` refuses it, and `janus verify` exits 2. For a broker, the run
+  ends right after `verification/fetched`. A run is filtered when its filter left out a recorded
+  variant, as pact-jvm judges it, and then its status is `filtered`, as is each `pairs` entry it
+  narrowed. A narrowed pact is not published (`outcome: skipped`, `reason: filtered`), which is
+  pact-jvm's behaviour; `pact_verifier_cli` 1.3.5 publishes it as a success, and passes a filter
+  that matches nothing with exit 0. `subsumption/decide` now warns per pair. The snapshot became
+  `a_variant_no_document_records_is_refused` and `a_filtered_run_says_so_in_its_status_and_its_summary`.
+  Not foreseen: the exit asked for the CLI's exit code to read a filtered run as not a pass, and it
+  exits 0. It did what it was asked, both of today's verifiers exit 0, and the cases that matter are
+  covered by the refusal and by publishing (ADR 0041 decision 5). No corpus or conformance case could
+  hold either case: `corpora/` holds compiled plans, and `conformance/` has no provider side until
+  S1.14, which gains them. They are protocol-level tests in `engine/kernel/tests/verification.rs`
+  and `broker.rs`. S1.1 cannot compare a filtered run until `janus verify` takes the `--filter-*`
+  options (S1.13), whose rows carry ADR 0041.
 
 - **S1.18 A regex in a v1–v4 pact matches the whole value, as it does today** — **S**, decided.
   Found by S1.1's first run. The shape-language spec has `regex` match *anywhere* in a string, "exactly
@@ -748,6 +767,14 @@ item in 1a is done when S1.1 agrees.
   *Exit:* shape-language spec §4.2 and plan-grammar spec §4.4 say so; corpus cases for an unanchored
   pattern in a v3 pact and in the contract it upgrades into; and S1.1's ledger entry for
   `order-service/mutations/0/0/body/$.shippedAt/same-type` gone.
+  *Done 2026-10-18* (`178cb64`). The legacy compiler always emits a pact's pattern as `^(?:…)$`, even
+  one that looks anchored, since `^a|b$` matches `xb`; one function says so (`anchored_pattern`, in
+  `engine/kernel/src/legacy/compile.rs` since S1.11). `janus upgrade` writes the anchored form, and a
+  shape's own `regex` still matches anywhere. Shape-language §4.2, plan-grammar §4.4 and contract-file
+  §8.2 say so, and the corpus cases are `legacy/v3-regex-whole-value` and
+  `legacy/upgrade-regex-anchored`; no other verdict in the corpus moved. Not foreseen: the
+  repeated-header disagreement (S3.3) moved from the negative case to the positive one, since the
+  header's list is now judged as one whole value. The ledger says so.
 
 - **S1.19 Generators in contracts** — **M**. S1.4 applies a v1–v4 pact's request generators, and
   `janus upgrade` still drops them (`generator-dropped`), so a pact with a `ProviderState` path
@@ -948,7 +975,8 @@ SDK implements it, and the SDK specification covers only the consumer side.
 - **S1.14 The provider side of the SDK specification** — **M**. A provider section of
   `behavioural-spec.json` and conformance cases for it: verify-in-test, state handlers and request
   filters as loopback hooks, selecting pacts by selector, publishing results, and the per-variant
-  result surface. The thinness layers for it in each SDK's `thinness.json`.
+  result surface, including a filter naming no recorded variant and a filtered run (S1.17, whose
+  cases are protocol-level tests until then). The thinness layers for it in each SDK's `thinness.json`.
   *Exit:* the conformance lint passes with provider ids; both drivers run the provider cases.
 - **S1.15 JVM and JavaScript provider integrations** — **L**. A JUnit 5 provider runner and a
   `Verifier`-shaped API for Jest and Vitest, over the subprocess, from generated bindings, under the

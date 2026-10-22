@@ -1117,6 +1117,79 @@ fn a_filtered_run_replays_only_what_was_asked_and_says_it_was_filtered() {
     json!(true),
     "and the run says so from its first event, before any result"
   );
+  // ADR 0041 decision 3: what it replayed passed, and that is not the run verified.
+  assert_eq!(summary["status"], json!("filtered"), "{summary}");
+  assert_eq!(summary["pairs"][0]["status"], json!("filtered"));
+}
+
+/// ADR 0041 decision 1: a filter naming an id that no document records is a typo, refused before
+/// anything runs, naming the id and the ids the documents do record. Before, it replayed nothing
+/// and the run reported itself verified.
+#[test]
+fn a_filter_naming_a_variant_no_document_records_is_refused_before_anything_runs() {
+  let mut engine = engine_with_real_components();
+  let refused = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract_with_one_variant()] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } } ] },
+      "options": { "variants": ["base", "nothing-is-called-this"] },
+    }),
+  );
+  let error = &refused["error"];
+  assert_eq!(error["code"], json!("variant-not-found"), "{refused}");
+  assert_eq!(error["category"], json!("session"));
+  assert_eq!(error["details"]["variant"], json!("nothing-is-called-this"));
+  assert_eq!(error["details"]["recorded"], json!(["base"]));
+  assert!(
+    error["message"]
+      .as_str()
+      .is_some_and(|message| message.contains("'nothing-is-called-this'")),
+    "{error}"
+  );
+}
+
+#[test]
+fn a_filter_naming_no_variant_at_all_is_a_malformed_request() {
+  let mut engine = engine_with_real_components();
+  let refused = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract_with_one_variant()] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } } ] },
+      "options": { "variants": [] },
+    }),
+  );
+  assert_eq!(refused["error"]["code"], json!("malformed-frame"), "{refused}");
+}
+
+/// ADR 0041 decision 2: a run is filtered when its filter excluded something. One that admits every
+/// recorded variant, as `base` does a v1–v4 pact's, is a whole run, and verified.
+#[test]
+fn a_filter_that_admits_every_recorded_variant_leaves_a_whole_run() {
+  let mut engine = engine_with_real_components();
+  let (base_url, _requests) = stub_provider(vec![canned(200, r#"{"id":"o-1"}"#)]);
+  let started = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract_with_one_variant()] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ] },
+      "options": { "variant": "base" },
+    }),
+  );
+  let stream = started["ok"]["stream"].as_str().unwrap().to_string();
+  let events = drain_run(&mut engine, &stream);
+  let summary = summary(&events);
+  assert_eq!(summary["status"], json!("verified"), "{summary}");
+  assert_eq!(summary["filtered"], json!(false));
+  assert_eq!(summary["pairs"][0]["status"], json!("verified"));
+  assert_eq!(events[0]["payload"]["filtered"], json!(false));
 }
 
 // ---------------------------------------------------------------------------------------------

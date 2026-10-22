@@ -635,6 +635,16 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   Each publication is a `verification/published` event, and the summary's `publication` lists
   them. A publish that fails is reported and does not change the verdict. `publish` with an
   `inline` source is refused before the run starts: an inline document has no link to publish to.
+  A pact the run's filter narrowed is not published: its event and its `publication` entry have the
+  outcome `skipped`, with `reason: "filtered"` (below).
+- **`options.variants`** (a list of ids), or `options.variant` (one), narrows the run to those
+  recorded variants (variant-semantics spec §5.1, [ADR
+  0041](../../decisions/0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md)).
+  An id that no document in the run records is refused before anything runs, as
+  `variant-not-found` with the first such `variant` and the ids the documents `recorded`: by `verify`
+  itself for an inline source, and for a `broker` source by ending the run right after
+  `verification/fetched`, as `pacts-not-found` does. An empty list is `malformed-frame`. A run is
+  **filtered** when the filter excluded at least one recorded variant, and then reports as §9.6 says.
 - **`explain`** compiles one interaction (from a spec or a contract interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain
@@ -738,7 +748,7 @@ run's decision is the most severe of its pairs'.
 | `verification-failed` | `block` | a supplied summary's `failures` name this pair |
 | `verification-incomplete` | `block` | a covering run was aborted by a hook, so what it did not reach is unknown |
 | `verification-missing` | `warn` | no supplied summary covers this pair |
-| `verification-filtered` | `warn` | a covering run was filtered: unreplayed variants are not passing ones |
+| `verification-filtered` | `warn` | a covering run was filtered for this pair (its `pairs` entry says `filtered`; for a summary without `pairs`, the run says `filtered`): unreplayed variants are not passing ones |
 | `provider-shape-missing` | `note` | no report was attached — replay-only semantics, the RFC's per-provider adoption path |
 | `interactions-not-published` | `note` | the provider published a shape, but not for every interaction (design 2.8 §6.3) |
 | `subsumption-findings` | `on-finding` | at least one `finding`-severity result no exemption silenced |
@@ -902,7 +912,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034) | before the result it qualifies; a warning never changes a verdict |
 | `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
 | `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` source, before the first interaction (§8.3) |
-| `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, or `failed` with an `error` | one per pact, when `options.publish` asks (§8.3) |
+| `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it) | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 | `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
 | `broker/finished` | the outcome: `status` (`published` or `failed`), the broker (its URL, without credentials), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed | carries `last: true`; ends the broker session |
@@ -914,9 +924,16 @@ makes a run attributable per pair by `subsumption/decide` (§8.6) — a summary 
 without saying which consumer and which provider it verified could not be read back as an answer
 about either. Positionally parallel too, `pairs` gives each source document's own part of the run
 ([ADR 0033](../../decisions/0033-count-a-runs-variants-per-source-document-in-its-summary.md)):
-its `consumer` and `provider`, its `status` (`verified`, `failed`, or `incomplete` when the run
-stopped before finishing it) and its own `variants`, which the run-level `variants` adds up. A
-pending source that failed is `failed` there; whether that fails the run is the run's `status`. A
+its `consumer` and `provider`, its `status` (`failed`; `incomplete` when the run stopped before
+finishing it; `filtered` when the run's filter excluded any of its recorded variants; otherwise
+`verified`) and its own `variants`, which the run-level `variants` adds up. A
+pending source that failed is `failed` there; whether that fails the run is the run's `status`.
+
+The run's own `status` is `failed` when a variant that is not pending failed or a hook aborted the
+run, `filtered` when its filter excluded at least one recorded variant (§8.3), and `verified`
+otherwise. `filtered` is not a pass: it says what was replayed passed, and that not everything was
+(variant-semantics spec §5.1). The summary's `filtered` member says the same as a boolean, and so
+does `verification/started`'s. A
 run from a `broker` source also says, positionally beside `consumers`, which
 sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
 run, and, when it published, a `publication` entry per pact (§8.3).

@@ -125,8 +125,10 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   } else {
     outln!("{}", crate::output::pretty(&summary));
   }
+  // A filtered run did what it was asked: its summary says it is not a pass, and its result is not
+  // published (ADR 0041 decision 5).
   Ok(match summary["status"].as_str() {
-    Some("verified") => Outcome::Done,
+    Some("verified" | "filtered") => Outcome::Done,
     _ => Outcome::SubjectFailed,
   })
 }
@@ -333,6 +335,9 @@ fn report(event: &Value) {
       let version = payload["provider-version"].as_str().unwrap_or("?");
       match payload["outcome"].as_str() {
         Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
+        Some("skipped") => {
+          outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out")
+        }
         _ => {
           outln!("  PUBLISH FAILED for {consumer}'s result");
           print_error(&payload["error"]);

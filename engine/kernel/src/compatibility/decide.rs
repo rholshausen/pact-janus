@@ -675,13 +675,16 @@ fn verification_for(verifications: &[Value], consumer: &str, provider: &str) -> 
       continue;
     }
     runs += 1;
-    filtered = Some(filtered.unwrap_or(false) || summary["filtered"] == Value::Bool(true));
 
     if let Some(entries) = summary.get("pairs").and_then(Value::as_array) {
       let mine: Vec<&Value> = entries
         .iter()
         .filter(|entry| entry["consumer"] == json!(consumer) && entry["provider"] == json!(provider))
         .collect();
+      // Filtered for this pair, not merely in the same run (ADR 0041 decision 6): a run that
+      // narrowed another pair's document verified this one whole.
+      let narrowed = mine.iter().any(|entry| entry["status"] == json!("filtered"));
+      filtered = Some(filtered.unwrap_or(false) || narrowed);
       variants = (runs == 1).then(|| added_up(&mine));
       let this = mine.iter().filter_map(|entry| entry["status"].as_str()).fold(
         "verified",
@@ -695,6 +698,8 @@ fn verification_for(verifications: &[Value], consumer: &str, provider: &str) -> 
       continue;
     }
 
+    // A summary from before `pairs` says only whether the run was filtered.
+    filtered = Some(filtered.unwrap_or(false) || summary["filtered"] == Value::Bool(true));
     if pairs.len() == 1 && runs == 1 {
       variants = summary.get("variants").cloned();
     } else {
