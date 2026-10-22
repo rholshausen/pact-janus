@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792651422728,
+  "lastUpdate": 1792651424493,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -18372,6 +18372,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19605,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ba66863adea760556b544dbea6229fd262edb70e",
+          "message": "feat: S1.23 multipart bodies verify as today, through a built-in multipart component\n\nA v1–v4 pact with a multipart body was refused as component-unavailable, the\nlast body kind the legacy layer refused. ADR 0040 decides how multipart is\nread and compared.\n\nengine/component-multipart claims every multipart/* type and is registered\nafter form in every embedding. It splits a body with multer, as today's\nverifier does, at the boundary its content type names (read with mime, as\ntoday; multer's own parse_boundary reads only multipart/form-data). Its\ndocument is keyed by part name, unnamed parts under \"\", and a part is\nheaders, filename and body. Each part's body is decoded through the built-in\nJSON, XML, text and form components the multipart component holds itself;\nany other part is bytes. Reaching declared components is the new S5.6.\n\nThe legacy layer splits a pact's body the same way and reads each part by\nits own type, and a test holds that reader to the component's over every\nmultipart body in the repository. The legacy compiler compares the parts as\npact_matching's match_mime_multipart does: by name, or by position among the\nunnamed parts; a new legacy action, legacy:mime-part, fails a missing part\nor the wrong kind with today's messages; then each part's headers, and its\nbody, a text field as text and a file by its own type with the rules under\n$.<part> re-rooted. A reply is decoded under its own label, because its\nboundary is its own. Unsupported::ContentType is gone: no body kind is\nrefused.\n\nThe differential harness reads 399 verdicts over 183 cases: 389 agree and 10\nare known. The four ledger entries for compatibility-suite case 25 are gone.\nbodies/every-body-kind, one v3 pact with XML, form, multipart and binary\nbodies (S1.6's combined exit), and bodies/multipart-form-data agree with\ntoday's verifier, mutations included.\n\nThe multipart walk follows pact_matching::binary_utils (pact-reference,\nrust/pact_matching 2.0.11); no code was copied.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T17:39:22+11:00",
+          "tree_id": "17de75f266163bbf0117d8fe9da1636793d70f63",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ba66863adea760556b544dbea6229fd262edb70e"
+        },
+        "date": 1792651424000,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 64044,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 45175,
             "unit": "requests per second",
             "extra": "engines 4"
           }
