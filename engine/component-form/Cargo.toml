@@ -1,0 +1,23 @@
+[package]
+name = "pact_janus_component_form"
+description = "The built-in form-urlencoded content component (component-interfaces spec §6, ADR 0038): decode/encode for application/x-www-form-urlencoded, native binding."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+base64 = "0.22"
+# What today's verifier parses and writes a form body with, so both read the same pairs.
+serde_urlencoded = "0.7"
+indexmap = "2"
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.24"
+
+[lints]
+workspace = true

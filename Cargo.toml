@@ -4,6 +4,7 @@ members = [
   "engine/kernel",
   "engine/component-json",
   "engine/component-text",
+  "engine/component-form",
   "engine/component-http",
   "engine/component-oauth2",
   "engine/hooks-host",

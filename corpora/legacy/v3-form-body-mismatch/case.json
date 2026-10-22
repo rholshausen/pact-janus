@@ -1,0 +1,76 @@
+{
+  "description": "a v3 form body: a rule on a name reaches each of its values, a value that differs is a mismatch, and so is a name the pact lacks, in a response as in a request (ADR 0038)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /form",
+          "request": {
+            "method": "GET",
+            "path": "/form"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            "body": "user_id=1&tag=a&tag=b",
+            "matchingRules": {
+              "body": {
+                "$.user_id": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[0-9]+"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/form",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/x-www-form-urlencoded",
+    "$.response.body": { "user_id": ["42"], "tag": ["b", "a"], "extra": ["1"] }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.tag[0]",
+        "message": "Expected 'b' to equal 'a'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.response.body.tag[1]",
+        "message": "Expected 'a' to equal 'b'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.response.body",
+        "message": "Unexpected member(s): extra",
+        "action": "legacy:only-entries"
+      }
+    ]
+  }
+}

@@ -503,7 +503,10 @@ Octets whose media type no component claims are not decoded, and not guessed at 
 document is the octets themselves, the document model's bytes ([ADR 0036](../../decisions/0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)).
 A requirement for a content type (§2.3) is still unsatisfied when nothing claims it. Bytes are what a
 body nobody can read is, not a component standing in for one. Every engine also has a built-in `text`
-component for `text/*`, after JSON, which decodes UTF-8 into a string.
+component for `text/*`, after JSON, which decodes UTF-8 into a string, and a built-in `form` component
+for `application/x-www-form-urlencoded`, after text, which decodes a form into the query slot's model:
+an object whose members are arrays of strings, each name once, in the order it first appears
+([ADR 0038](../../decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)).
 
 ### 6.2 Encoding is how variants become traffic
 

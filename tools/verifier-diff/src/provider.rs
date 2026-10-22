@@ -255,8 +255,43 @@ fn recognises(route: &Route, incoming: &Incoming) -> bool {
       }
       actual == expected
     }
+    Some(body)
+      if example
+        .patterns
+        .keys()
+        .any(|position| position.starts_with("form.")) =>
+    {
+      form_matches(&body.bytes(), &incoming.body, &example.patterns)
+    }
     Some(body) => body.bytes() == incoming.body,
   }
+}
+
+/// A form body (`application/x-www-form-urlencoded`) recognised with `form.<name>` patterns: each
+/// name's values compared in order, and every value of a patterned name matching its pattern instead.
+fn form_matches(expected: &[u8], actual: &[u8], patterns: &BTreeMap<String, String>) -> bool {
+  let read = |body: &[u8]| -> Option<BTreeMap<String, Vec<String>>> {
+    let pairs: Vec<(String, String)> = serde_urlencoded::from_bytes(body).ok()?;
+    let mut names: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (name, value) in pairs {
+      names.entry(name).or_default().push(value);
+    }
+    Some(names)
+  };
+  let (Some(mut expected), Some(mut actual)) = (read(expected), read(actual)) else {
+    return false;
+  };
+  for (position, regex) in patterns {
+    let Some(name) = position.strip_prefix("form.") else {
+      continue;
+    };
+    let values = actual.remove(name).unwrap_or_default();
+    if values.is_empty() || !values.iter().all(|value| whole(regex).is_match(value)) {
+      return false;
+    }
+    expected.remove(name);
+  }
+  expected == actual
 }
 
 /// `pattern`, anchored so it must match the whole value. A fixture's pattern that does not parse is

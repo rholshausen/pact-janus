@@ -16,20 +16,6 @@
       "reason": "S1.6: Janus has no XML content component, so an XML body is component-unavailable"
     },
     {
-      "case": "compatibility-suite/v1/23-response-with-form-post-body-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no form-urlencoded content component, so a form body is component-unavailable"
-    },
-    {
-      "case": "compatibility-suite/v1/23-response-with-form-post-body-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no form-urlencoded content component, so a form body is component-unavailable"
-    },
-    {
       "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case",
       "key": "0/0",
       "today": "pass",
@@ -84,6 +70,20 @@
       "today": "pass",
       "janus": "fail",
       "reason": "S1.9: the state callback answers 503 once; today's verifier retries a state call that gets a 5xx, 408 or 429 (eight times, from 500 ms) and passes, and janus verify's http hook does not retry"
+    },
+    {
+      "case": "generators/form-body",
+      "key": "run",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body"
+    },
+    {
+      "case": "generators/form-body",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body"
     },
     {
       "case": "connection/header-case",

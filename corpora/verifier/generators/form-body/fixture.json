@@ -1,0 +1,35 @@
+{
+  "description": "Generators in a form body: the state-change call answers {\"customer\": 1234}, which reaches a ProviderState generator, and a random integer replaces the recorded quantity. The provider recognises both, so a verifier that sent the recorded body instead gets a 404. Today's verifier does, and Janus does not: a deliberate difference in the ledger (ADR 0038 decision 5)",
+  "source": "staged plan S1.21's exit; pact_models' FormUrlEncodedHandler, and pact-jvm's FormUrlEncodedContentTypeHandler; ADR 0038",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "customer": 1234
+      }
+    },
+    "routes": [
+      {
+        "states": [
+          "a customer exists"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/orders",
+          "body": {
+            "text": "customer=1234&qty=0&note=gift+wrap"
+          },
+          "patterns": {
+            "form.qty": "[1-9][0-9][0-9]"
+          }
+        },
+        "response": {
+          "status": 201
+        }
+      }
+    ]
+  }
+}

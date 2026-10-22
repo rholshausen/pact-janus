@@ -54,6 +54,7 @@ superseding ADR instead.
 | [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted |
 | [0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md) | Read text bodies through a text component, and bodies no component claims as bytes | accepted |
 | [0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md) | Carry member order through the engine, and decide nothing by it | accepted |
+| [0038](0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md) | Read form bodies as a query string, through a built-in form component | accepted |
 
 ## Decision backlog
 

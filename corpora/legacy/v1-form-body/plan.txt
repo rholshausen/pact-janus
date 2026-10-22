@@ -1,0 +1,90 @@
+(
+  :"get /form" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/form'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/x-www-form-urlencoded'
+          )
+        )
+      ),
+      :body (
+        :"$.a" (
+          %expect:count (
+            $.response.body.a,
+            1
+          ),
+          %match:equality (
+            $.response.body.a[0],
+            '1'
+          )
+        ),
+        :"$.b" (
+          %expect:count (
+            $.response.body.b,
+            1
+          ),
+          %match:equality (
+            $.response.body.b[0],
+            '2'
+          )
+        ),
+        :"$.c" (
+          %expect:count (
+            $.response.body.c,
+            1
+          ),
+          %match:equality (
+            $.response.body.c[0],
+            '3'
+          )
+        ),
+        :"$.d" (
+          %expect:count (
+            $.response.body.d,
+            1
+          ),
+          %match:equality (
+            $.response.body.d[0],
+            '4'
+          )
+        ),
+        %legacy:only-entries (
+          $.response.body,
+          'a',
+          'b',
+          'c',
+          'd'
+        )
+      )
+    )
+  )
+)

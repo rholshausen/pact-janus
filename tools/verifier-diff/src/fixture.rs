@@ -244,8 +244,9 @@ pub struct RequestExample {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: Option<Body>,
   /// Values a generator produces, recognised by a regular expression the whole value must match
-  /// rather than by example: `path`, `query.<name>`, `headers.<name>`, or `body<JSON pointer>`
-  /// (`body/one`). What the example has at that position is ignored.
+  /// rather than by example: `path`, `query.<name>`, `headers.<name>`, `body<JSON pointer>`
+  /// (`body/one`), or `form.<name>`, every value of a name in a form body. What the example has at
+  /// that position is ignored.
   #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
   pub patterns: BTreeMap<String, String>,
 }

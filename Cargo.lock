@@ -2368,6 +2368,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "pact_janus_broker_client",
+ "pact_janus_component_form",
  "pact_janus_component_host",
  "pact_janus_component_http",
  "pact_janus_component_json",
@@ -2388,6 +2389,19 @@ dependencies = [
  "tracing-subscriber",
  "trycmd",
  "ureq",
+]
+
+[[package]]
+name = "pact_janus_component_form"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "indexmap",
+ "pact_janus_kernel",
+ "pretty_assertions",
+ "rstest 0.24.0",
+ "serde_json",
+ "serde_urlencoded",
 ]
 
 [[package]]
@@ -2498,6 +2512,7 @@ dependencies = [
 name = "pact_janus_engine_wasm"
 version = "0.2.0"
 dependencies = [
+ "pact_janus_component_form",
  "pact_janus_component_json",
  "pact_janus_component_text",
  "pact_janus_kernel",
@@ -2542,6 +2557,7 @@ dependencies = [
  "base64 0.22.1",
  "indexmap",
  "jsonschema",
+ "pact_janus_component_form",
  "pact_janus_component_http",
  "pact_janus_component_json",
  "pact_janus_component_oauth2",
@@ -2557,6 +2573,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "serde_urlencoded",
  "test-log",
  "tracing",
  "ureq",
@@ -2621,6 +2638,7 @@ dependencies = [
  "rstest 0.26.1",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "tiny_http",
  "ureq",
 ]

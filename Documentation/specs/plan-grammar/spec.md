@@ -368,7 +368,10 @@ compilers differ is small and worth naming:
 
 The v1–v4 compiler compiles a body as a document in the protocol's model, not as JSON: a JSON body, a
 text body's string, a binary body's bytes, or whatever a content component decoded (staged plan S1.20).
-A v1–v4 JSON object's members are a set, so it compiles them by name.
+A v1–v4 JSON object's members are a set, so it compiles them by name. A form body is compiled as a query
+string is, with the body's rules: each name's values in order, and every name required whichever part it
+is in, as today's verifier compares a form
+([ADR 0038](../../decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)).
 
 The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
 "which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:

@@ -181,6 +181,9 @@ fn body_of(response: serde_json::Value) -> Result<Option<LegacyBody>, String> {
 #[case::an_unknown_application_type_is_binary(
   json!({ "status": 200, "headers": { "Content-Type": "application/vnd.acme" }, "body": "AAEC" }),
   Some(bytes(vec![0, 1, 2])))]
+#[case::form(
+  json!({ "status": 200, "headers": { "Content-Type": "application/x-www-form-urlencoded" }, "body": "b=2&a=1&b=x+y" }),
+  Some(LegacyBody::Form(RuntimeValue::from_json(&json!({ "b": ["2", "x y"], "a": ["1"] })))))]
 #[case::empty(json!({ "status": 200, "body": "" }), Some(LegacyBody::Empty))]
 #[case::missing(json!({ "status": 200 }), None)]
 fn a_body_is_read_as_todays_verifier_compares_its_content_type(
@@ -192,7 +195,6 @@ fn a_body_is_read_as_todays_verifier_compares_its_content_type(
 
 #[rstest]
 #[case::xml("application/xml", "<a/>")]
-#[case::form("application/x-www-form-urlencoded", "a=1")]
 #[case::multipart("multipart/form-data; boundary=x", "--x--")]
 fn a_body_kind_staged_for_later_is_refused_by_its_content_type(
   #[case] content_type: &str,

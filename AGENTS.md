@@ -71,7 +71,9 @@ Three sources are the source of truth and take precedence over this file when th
 > of the kernel to it), and S1.6 (ADR 0036: text bodies decode through the built-in `text` component,
 > a body no component claims is bytes, and a v1–v4 text or binary body verifies as today's verifier
 > compares it), and S1.20 (ADR 0037: an object's members keep the order they arrived in and nothing is
-> decided by it, so a mock serves them as declared; the legacy compiler compiles a body as a document).
+> decided by it, so a mock serves them as declared; the legacy compiler compiles a body as a document),
+> and S1.21 (ADR 0038: form bodies decode through the built-in `form` component, a v1–v4 form body verifies
+> as a query string, and its request generators are applied).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -88,7 +90,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  client send through (ADR 0035, S1.5): reqwest on a current-thread runtime, which
                  starts no thread, configured by the HTTP client options (component-interfaces §5.6);
                  component-text, the built-in content component for `text/*` (ADR 0036, S1.6),
-                 registered after component-json by every embedding;
+                 registered after component-json by every embedding; component-form, the built-in
+                 one for `application/x-www-form-urlencoded` (ADR 0038, S1.21), registered after it;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
 cli/             `janus` CLI (verify, explain, upgrade, check)

@@ -41,7 +41,8 @@ provider. When several routes recognise a request, the one whose `states` were j
 
 A value a generator produces cannot be recognised by example, since it changes on every run. A route's
 request may name `patterns` for those: a regular expression the whole value must match, keyed by its
-position, `path`, `query.<name>`, `headers.<name>`, or `body` followed by a JSON pointer (`body/one`).
+position, `path`, `query.<name>`, `headers.<name>`, `body` followed by a JSON pointer (`body/one`), or
+`form.<name>` for every value of a name in a form body.
 The example's value at that position is ignored, and everything else is still recognised strictly, so
 a verifier that sends the recorded value where a generated one belongs still gets a 404. The
 `generators/` fixtures (staged plan S1.4) use them.
@@ -94,7 +95,8 @@ interaction of a pact it did not fetch is `absent` there too.
   endpoint and reports no pending status.
 - `state-callbacks/`: provider-state callbacks that misbehave in ways the compatibility suite does not
   cover, such as `fails-once`, an endpoint that fails while it warms up.
-- `generators/`: request generators applied before sending (S1.4), recognised by `patterns`.
+- `generators/`: request generators applied before sending (S1.4), recognised by `patterns`. In a
+  form body they are a deliberate difference: today's verifier sends them unapplied (ADR 0038).
 - `connection/`: the provider connection options, `--header`, `--base-path`, `--request-timeout` and
   TLS (S1.5).
 - `bodies/`: bodies that are not JSON, and how a reply's content type is read (S1.6, ADR 0036): a

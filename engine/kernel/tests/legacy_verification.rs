@@ -55,6 +55,7 @@ fn engine_with_everything() -> Engine {
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
+  engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
@@ -638,6 +639,32 @@ fn a_binary_body_verifies_byte_for_byte() {
     mismatch_messages(&events),
     vec![
       "Expected BYTES(8, iVBORw0KGvU=) to equal BYTES(8, iVBORw0KGgo=), differing from byte 7".to_string()
+    ]
+  );
+}
+
+/// S1.21, ADR 0038: a form body is decoded by the form component and compared as today's verifier
+/// compares one, as a query string: the order of names is not compared, a name's values are, and a
+/// name the pact lacks is a mismatch in a response too.
+#[test]
+fn a_form_body_verifies_as_a_query_string() {
+  const FORM: &str = "application/x-www-form-urlencoded";
+  let pact = v1_pact_with_body(FORM, "a=1&b=2&b=3");
+  let (base_url, _requests) = stub_provider(vec![
+    canned_as(200, FORM, b"b=2&b=3&a=1"),
+    canned_as(200, FORM, b"a=1&b=3&b=2&c=4"),
+  ]);
+  let mut engine = engine_with_everything();
+
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  assert_eq!(
+    mismatch_messages(&events),
+    vec![
+      "Expected '3' to equal '2'".to_string(),
+      "Expected '2' to equal '3'".to_string(),
+      "Unexpected member(s): c".to_string(),
     ]
   );
 }

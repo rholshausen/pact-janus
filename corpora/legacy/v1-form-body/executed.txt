@@ -1,0 +1,90 @@
+(
+  :"get /form" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/form',
+          '/form'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/x-www-form-urlencoded',
+            'application/x-www-form-urlencoded'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.a" (
+          %expect:count (
+            $.response.body.a => ['1'],
+            1
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.a[0] => '1',
+            '1'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.b" (
+          %expect:count (
+            $.response.body.b => ['2'],
+            1
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.b[0] => '2',
+            '2'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.c" (
+          %expect:count (
+            $.response.body.c => ['3'],
+            1
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.c[0] => '3',
+            '3'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.d" (
+          %expect:count (
+            $.response.body.d => ['4'],
+            1
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.d[0] => '4',
+            '4'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        %legacy:only-entries (
+          $.response.body => {'d': ['4'], 'c': ['3'], 'b': ['2'], 'a': ['1']},
+          'a',
+          'b',
+          'c',
+          'd'
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

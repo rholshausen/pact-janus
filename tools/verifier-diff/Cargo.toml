@@ -33,6 +33,9 @@ pact_janus_test_servers = { path = "../test-servers" }
 # A route's patterns: the values a generator produces, recognised by form rather than by example.
 # Already in the tree.
 regex = "1"
+# A form body's patterns: the body read as name–value pairs, as both verifiers read one. Already in
+# the tree.
+serde_urlencoded = "0.7"
 
 [dev-dependencies]
 pretty_assertions = "1"

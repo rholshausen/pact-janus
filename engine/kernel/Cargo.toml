@@ -23,6 +23,9 @@ serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
 # The runtime value's objects, ordered as `serde_json`'s are (ADR 0037). Already in the tree
 # through `serde_json`'s `preserve_order`.
 indexmap = "2"
+# A v1–v4 form body, read and written as today's verifier reads and writes one (ADR 0038). Already
+# in the tree through `pact_models`' default `form_urlencoded` feature.
+serde_urlencoded = "0.7"
 serde_path_to_error = "0.1"
 # The interpreter's match:regex/match:semver/bytes-literal support. Pure Rust, no OS bindings -
 # pact-reference's own matching engine depends on the same three for the same reasons.
@@ -49,6 +52,7 @@ pretty_assertions = "1"
 pact_janus_component_http = { path = "../component-http" }
 pact_janus_component_json = { path = "../component-json" }
 pact_janus_component_text = { path = "../component-text" }
+pact_janus_component_form = { path = "../component-form" }
 # The sample provider (plan task 5.6), embedded rather than spawned: a verification run needs a
 # real provider on a real socket to be worth anything, and the one the plan calls for is in this
 # repo. No cycle — the sample depends on nothing of ours.

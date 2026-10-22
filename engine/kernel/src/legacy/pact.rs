@@ -31,6 +31,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentType;
+use pact_models::generators::form_urlencoded::FormUrlEncodedHandler;
 use pact_models::generators::{
   ContentTypeHandler, GenerateValue, Generator, GeneratorCategory, GeneratorTestMode, JsonHandler,
   NoopVariantMatcher, VariantMatcher,
@@ -105,13 +106,12 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
 /// Why a v1–v4 part could not be handed to design 3.5's compiler. Two genuinely different things,
 /// kept apart because their remedies are: a content type this engine has no compiler for is a
 /// missing *component* (the pact is fine, the engine is short a piece), while a body that claimed
-/// to be JSON and was not is a problem with the *document*.
+/// to be JSON, or a form, and was not is a problem with the *document*.
 #[derive(Debug, Clone)]
 pub enum Unsupported {
-  /// A body of a kind the legacy compiler does not compile yet: XML, form or multipart (S1.21 to
-  /// S1.23).
+  /// A body of a kind the legacy compiler does not compile yet: XML or multipart (S1.22, S1.23).
   ContentType(String),
-  /// A body that claimed JSON and did not parse as it.
+  /// A body that did not parse as the type it claimed: what went wrong, naming the type.
   Malformed(String),
 }
 
@@ -120,10 +120,10 @@ impl std::fmt::Display for Unsupported {
     match self {
       Unsupported::ContentType(content_type) => write!(
         f,
-        "legacy_pact: a '{content_type}' body is not compiled yet (XML, form and multipart bodies \
-         are staged plan S1.21 to S1.23)"
+        "legacy_pact: a '{content_type}' body is not compiled yet (XML and multipart bodies are \
+         staged plan S1.22 and S1.23)"
       ),
-      Unsupported::Malformed(message) => write!(f, "legacy_pact: body is not valid JSON: {message}"),
+      Unsupported::Malformed(message) => write!(f, "legacy_pact: {message}"),
     }
   }
 }
@@ -158,7 +158,9 @@ pub fn legacy_response(response: &HttpResponse) -> Result<LegacyResponse, Unsupp
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BodyKind {
   Json,
-  /// XML, multipart or form: a matcher of its own today, and S1.21 to S1.23 here.
+  /// `application/x-www-form-urlencoded`: compared as a query string (ADR 0038).
+  Form,
+  /// XML or multipart: a matcher of its own today, and S1.22 and S1.23 here.
   NotYet,
   /// A binary type (`image`, `audio`, `video`, `font`, `application/octet-stream`, and anything
   /// `pact_models` does not count as text): compared as octets.
@@ -171,10 +173,9 @@ impl BodyKind {
   fn of(content_type: &ContentType) -> BodyKind {
     if content_type.is_json() {
       BodyKind::Json
-    } else if content_type.is_xml()
-      || content_type.main_type == "multipart"
-      || content_type.base_type() == "application/x-www-form-urlencoded"
-    {
+    } else if content_type.base_type() == FORM {
+      BodyKind::Form
+    } else if content_type.is_xml() || content_type.main_type == "multipart" {
       BodyKind::NotYet
     } else if content_type.is_binary() || content_type.base_type() == "application/octet-stream" {
       BodyKind::Bytes
@@ -182,6 +183,26 @@ impl BodyKind {
       BodyKind::Text
     }
   }
+}
+
+/// The form media type, which today's verifier compares as a query string.
+const FORM: &str = "application/x-www-form-urlencoded";
+
+/// A form body's names and values, as the built-in form component decodes one (ADR 0038 decision 2):
+/// each name once, in the order it first appears, with its values in order. Parsed with
+/// `serde_urlencoded`, as today's verifier parses it.
+fn form_document(body: &[u8]) -> Result<RuntimeValue, serde_urlencoded::de::Error> {
+  let pairs: Vec<(String, String)> = serde_urlencoded::from_bytes(body)?;
+  let mut names: indexmap::IndexMap<String, Vec<RuntimeValue>> = indexmap::IndexMap::new();
+  for (name, value) in pairs {
+    names.entry(name).or_default().push(RuntimeValue::String(value));
+  }
+  Ok(RuntimeValue::Object(
+    names
+      .into_iter()
+      .map(|(name, values)| (name, RuntimeValue::Array(values)))
+      .collect(),
+  ))
 }
 
 /// The part's content type as today's verifier takes it (`HttpPart::content_type`): the body's own,
@@ -195,7 +216,8 @@ fn part_content_type(part: &dyn HttpPart) -> ContentType {
 /// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
 /// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
 /// actual body is absent too". A present body is read by its content type ([`BodyKind`]) into a
-/// document: JSON is parsed, text is a string, a binary body is its octets.
+/// document: JSON is parsed, a form is its names and values, text is a string, a binary body is its
+/// octets.
 fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   let bytes = match part.body() {
     OptionalBody::Missing => return Ok(None),
@@ -206,7 +228,10 @@ fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   match BodyKind::of(&content_type) {
     BodyKind::Json => serde_json::from_slice::<Value>(bytes)
       .map(|document| Some(LegacyBody::Document(RuntimeValue::from_json(&document))))
-      .map_err(|err| Unsupported::Malformed(err.to_string())),
+      .map_err(|err| Unsupported::Malformed(format!("body is not valid JSON: {err}"))),
+    BodyKind::Form => form_document(bytes)
+      .map(|form| Some(LegacyBody::Form(form)))
+      .map_err(|err| Unsupported::Malformed(format!("body is not a valid form: {err}"))),
     BodyKind::NotYet => Err(Unsupported::ContentType(content_type.to_string())),
     BodyKind::Bytes => Ok(Some(LegacyBody::Document(RuntimeValue::Bytes(bytes.to_vec())))),
     BodyKind::Text => Ok(Some(LegacyBody::Document(
@@ -461,36 +486,51 @@ fn generate_request(
   if !body_generators.is_empty()
     && let OptionalBody::Present(bytes, content_type, encoding) = &request.body
   {
-    let is_json = request.content_type().is_some_and(|ct| ct.is_json());
-    match serde_json::from_slice::<Value>(bytes) {
-      Ok(document) if is_json => {
-        let mut handler = JsonHandler { value: document };
-        let matcher: Box<dyn VariantMatcher + Send + Sync> = NoopVariantMatcher.boxed();
-        for (key, generator) in &body_generators {
-          let target = body_target(key);
-          let asking = Asking {
-            ask: &ask,
-            generator,
-            failures: RefCell::new(Vec::new()),
-          };
-          handler.apply_key(key, &asking, &HashMap::new(), &matcher);
-          failures.extend(
-            asking
-              .failures
-              .into_inner()
-              .into_iter()
-              .map(|err| failure(&target, generator, err)),
-          );
-        }
-        request.body = OptionalBody::Present(
-          handler.value.to_string().into_bytes().into(),
-          content_type.clone(),
-          *encoding,
+    let kind = request.content_type().map(|ct| BodyKind::of(&ct));
+    let matcher: Box<dyn VariantMatcher + Send + Sync> = NoopVariantMatcher.boxed();
+    // Each generator is asked through `pact_models`' own handler for the body's type, which resolves
+    // its path as today's verifier does, and the failures it would drop are kept.
+    let mut apply = |apply_key: &mut dyn FnMut(&DocPath, &Asking<'_, _>)| {
+      for (key, generator) in &body_generators {
+        let asking = Asking {
+          ask: &ask,
+          generator,
+          failures: RefCell::new(Vec::new()),
+        };
+        apply_key(key, &asking);
+        let target = body_target(key);
+        failures.extend(
+          asking
+            .failures
+            .into_inner()
+            .into_iter()
+            .map(|err| failure(&target, generator, err)),
         );
       }
-      _ => {
-        // XML and form bodies arrive with S1.6's content components; until then such a body is
-        // sent as recorded and every generator on it says so.
+    };
+    let generated: Option<Vec<u8>> = match kind {
+      Some(BodyKind::Json) => serde_json::from_slice::<Value>(bytes).ok().map(|document| {
+        let mut handler = JsonHandler { value: document };
+        apply(&mut |key, asking| handler.apply_key(key, asking, &HashMap::new(), &matcher));
+        handler.value.to_string().into_bytes()
+      }),
+      // A form body is its pairs, each generator applied to one occurrence of its name, and written
+      // back as today's verifier writes it (ADR 0038 decision 5).
+      Some(BodyKind::Form) => serde_urlencoded::from_bytes::<Vec<(String, String)>>(bytes)
+        .ok()
+        .and_then(|params| {
+          let mut handler = FormUrlEncodedHandler { params };
+          apply(&mut |key, asking| handler.apply_key(key, asking, &HashMap::new(), &matcher));
+          serde_urlencoded::to_string(&handler.params).ok()
+        })
+        .map(String::into_bytes),
+      _ => None,
+    };
+    match generated {
+      Some(body) => request.body = OptionalBody::Present(body.into(), content_type.clone(), *encoding),
+      None => {
+        // XML bodies arrive with S1.22's component; until then such a body is sent as recorded and
+        // every generator on it says so.
         let media_type = request
           .content_type()
           .map(|ct| ct.to_string())
@@ -500,7 +540,7 @@ fn generate_request(
             target: body_target(key),
             generator: PactGenerators::qualified(&generator.name()),
             message: format!(
-              "a body generator applies to a JSON body, and this body is {media_type}; the recorded value was sent"
+              "a body generator applies to a JSON or form body, and this body is {media_type}; the recorded value was sent"
             ),
           });
         }
@@ -551,6 +591,24 @@ struct Asking<'a, F: Fn(&Generator, Value) -> Result<Value, ComponentError>> {
   ask: &'a F,
   generator: &'a Generator,
   failures: RefCell<Vec<ComponentError>>,
+}
+
+/// A form value is text, so it is asked for as a string and the answer taken as text.
+impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<String> for Asking<'_, F> {
+  fn generate_value(
+    &self,
+    value: &String,
+    _context: &HashMap<&str, Value>,
+    _matcher: &Box<dyn VariantMatcher + Send + Sync>,
+  ) -> anyhow::Result<String> {
+    (self.ask)(self.generator, Value::String(value.clone()))
+      .map(|value| text_of(&value))
+      .map_err(|err| {
+        let message = err.message.clone();
+        self.failures.borrow_mut().push(err);
+        anyhow::anyhow!(message)
+      })
+  }
 }
 
 impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<Value> for Asking<'_, F> {

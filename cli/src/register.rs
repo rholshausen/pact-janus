@@ -34,6 +34,8 @@ pub fn native_engine() -> Engine {
   engine.declare_in_tree("content", "json", "1.0.0");
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.declare_in_tree("content", "text", "1.0.0");
+  engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
+  engine.declare_in_tree("content", "form", "1.0.0");
   match pact_janus_component_host::WasmLoader::new() {
     Ok(loader) => engine.register_component_loader(Arc::new(loader)),
     Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),

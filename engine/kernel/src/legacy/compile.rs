@@ -31,7 +31,8 @@
 //! §6.1), never JSON as such, so a content component's decoded document can reach this compiler as
 //! a JSON pact's body does (staged plan S1.20). Structure is walked member by member, by name; a
 //! string or bytes, which is what a text or binary body is, is one value at `$` (ADR 0036 decision
-//! 3: today's `match_text` and `match_octet_stream`). XML, form and multipart bodies are S1.21 to
+//! 3: today's `match_text` and `match_octet_stream`). A form body is compiled as a query string, the
+//! way today's `match_form_urlencoded` compares one (ADR 0038). XML and multipart bodies are S1.22 and
 //! S1.23. `Values`, `EachKey`, `EachValue`, `ArrayContains` and
 //! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
@@ -79,6 +80,9 @@ pub enum LegacyBody {
   /// The body as a document: a JSON document; a text body as a string; a binary body, or text that
   /// is not UTF-8, as bytes. A string and bytes are each one value at `$` to the compiler.
   Document(RuntimeValue),
+  /// A form body, as the form component decodes one: each name with its values, a list of strings.
+  /// Compiled as a query string is, since today's verifier compares it as one (ADR 0038).
+  Form(RuntimeValue),
 }
 
 /// A v1–v4 response. See [`LegacyRequest`] for the header/body notes, which apply identically.
@@ -115,7 +119,12 @@ pub fn compile_request(req: &LegacyRequest) -> model::Plan {
     ),
     Node::container(
       Some("query".to_string()),
-      compile_query(&req.query, &req.matching_rules, "request"),
+      compile_parameters(
+        &req.query,
+        &req.matching_rules,
+        "query",
+        &format!("$.{}", path::root("request", "query")),
+      ),
     ),
   ];
   slots.extend(compile_headers_slot(&req.headers, &req.matching_rules, "request"));
@@ -474,9 +483,18 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
 
 /// v1–v4's query default is closed, unlike headers' (spec test case `query/unexpected param`):
 /// every actual query parameter must be named in `expected`.
-fn compile_query(query: &BTreeMap<String, Vec<String>>, rules: &MatchingRules, part: &str) -> Vec<Node> {
-  let category = rules_for(rules, "query");
-  let base_path = format!("$.{}", path::root(part, "query"));
+///
+/// A form body is compared by the same rules (`pact_matching::match_form_urlencoded` hands both bodies
+/// to the query matcher), so this compiles one too, with the `body` category's rules at `base_path`
+/// (ADR 0038). Names are compiled by name.
+fn compile_parameters(
+  query: &BTreeMap<String, Vec<String>>,
+  rules: &MatchingRules,
+  category: &str,
+  base_path: &str,
+) -> Vec<Node> {
+  let category = rules_for(rules, category);
+  let base_path = base_path.to_string();
   let mut nodes: Vec<Node> = query
     .iter()
     .map(|(name, values)| {
@@ -526,7 +544,7 @@ fn body_type_check(
   let has_content = matches!(
     body,
     Some(LegacyBody::Document(value)) if !matches!(value, RuntimeValue::Null | RuntimeValue::Absent)
-  );
+  ) || matches!(body, Some(LegacyBody::Form(_)));
   let named = headers
     .keys()
     .any(|name| name.eq_ignore_ascii_case("content-type"));
@@ -564,6 +582,15 @@ fn compile_body_slot(
         vec![Node::resolve(root_path)],
       )]));
     }
+    // Names and their values, every name required whichever part this is, as a query string's.
+    Some(LegacyBody::Form(form)) => {
+      return Some(container(compile_parameters(
+        &form_parameters(form),
+        rules,
+        "body",
+        &root_path,
+      )));
+    }
     // Structure, or one value at `$`: a string, or octets compared by the rules there or byte for
     // byte, as today's `match_octet_stream` compares them (ADR 0036 decision 3).
     Some(LegacyBody::Document(body)) => body,
@@ -576,6 +603,28 @@ fn compile_body_slot(
     closed_objects: part == "request",
   };
   Some(container(compile_body_value(body, &ctx)))
+}
+
+/// A form document as the query compiler takes one: each name with its values as text. The form
+/// component writes only strings; anything else is taken as its JSON text rather than dropped.
+fn form_parameters(form: &RuntimeValue) -> BTreeMap<String, Vec<String>> {
+  let text = |value: &RuntimeValue| match value {
+    RuntimeValue::String(text) => text.clone(),
+    other => other.to_json().to_string(),
+  };
+  let RuntimeValue::Object(members) = form else {
+    return BTreeMap::new();
+  };
+  members
+    .iter()
+    .map(|(name, values)| {
+      let values = match values {
+        RuntimeValue::Array(values) => values.iter().map(text).collect(),
+        value => vec![text(value)],
+      };
+      (name.clone(), values)
+    })
+    .collect()
 }
 
 /// Where a compiled node resolves its value from — [`crate::plan::compile`]'s own `Cursor`, duplicated

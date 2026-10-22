@@ -1,0 +1,45 @@
+{
+  "description": "a v1 form body compiles as a query string, as today's verifier compares one: every name, and each name's values in order (ADR 0038; the compatibility suite's 'Response with form post body')",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /form",
+          "request": {
+            "method": "GET",
+            "path": "/form"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            "body": "a=1&b=2&c=3&d=4"
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "1.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/form",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/x-www-form-urlencoded",
+    "$.response.body": { "d": ["4"], "c": ["3"], "b": ["2"], "a": ["1"] }
+  },
+  "result": { "status": "matched" }
+}

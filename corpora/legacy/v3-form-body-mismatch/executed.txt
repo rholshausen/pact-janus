@@ -1,0 +1,72 @@
+(
+  :"get /form" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/form',
+          '/form'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/x-www-form-urlencoded',
+            'application/x-www-form-urlencoded'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.tag" (
+          %expect:count (
+            $.response.body.tag => ['b', 'a'],
+            2
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.tag[0] => 'b',
+            'a'
+          ) => ERROR(Expected 'b' to equal 'a'),
+          %match:equality (
+            $.response.body.tag[1] => 'a',
+            'b'
+          ) => ERROR(Expected 'a' to equal 'b')
+        ) => BOOL(false),
+        :"$.user_id" (
+          %expect:count (
+            $.response.body.user_id => ['42'],
+            1
+          ) => BOOL(true),
+          %match:regex (
+            $.response.body.user_id[0] => '42',
+            '^(?:[0-9]+)$'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        %legacy:only-entries (
+          $.response.body => {'user_id': ['42'], 'tag': ['b', 'a'], 'extra': ['1']},
+          'tag',
+          'user_id'
+        ) => ERROR(Unexpected member(s): extra)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

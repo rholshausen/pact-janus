@@ -803,6 +803,23 @@ item in 1a is done when S1.1 agrees.
   *Exit:* S1.1's ledger entries for `compatibility-suite/v1/23-response-with-form-post-body-positive-case`
   gone; corpus cases for a form body, matching and not; and a generator on a form body applied in
   S1.1's harness, with no `generator-failed` warning.
+  *Done 2026-10-22* ([ADR 0038](decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)).
+  A built-in `form` content component, `engine/component-form`, decodes a form into the query slot's
+  model, an object of string lists in the order names first appear, and encodes one back. Every
+  embedding registers it after text, and `engine/hello` lists it. The legacy layer reads a v1–v4
+  form body into the same document with `serde_urlencoded`, and the legacy compiler compiles it with
+  its query logic, now `compile_parameters`, as today's verifier hands a form to its query matcher.
+  So a name the pact lacks is a mismatch in a response too. A form body's request generators go
+  through `pact_models`' `FormUrlEncodedHandler`, asking the `pact` generator component. Both ledger
+  entries for the compatibility suite's case 23 are gone, and S1.1's harness reads 328 verdicts: 314
+  agree and 14 are known. Two corpus cases cover a form body, matching and not, with a rule on a
+  name. Not foreseen: today's Rust verifier does not apply generators to a form body.
+  `pact_verifier` builds `pact_matching` without its `form_urlencoded` feature, so the handler is
+  compiled out, while pact-jvm applies them. Janus applies them (ADR 0038 decision 5), so the new
+  `generators/form-body` fixture is a deliberate difference in the ledger, not an agreement. The
+  harness's scripted provider gained `form.<name>` patterns to recognise a generated form value.
+  Left out: `janus upgrade` still carries a form body across with `body-not-parsed`, which S1.25
+  now covers.
 - **S1.22 XML bodies** — **L**, after S1.20. An XML content component: elements, attributes, text and
   namespaces, with children in order; the v1–v4 matching-rule paths into XML, attributes and text
   nodes included; and S1.4's generators on XML bodies. This is where the pact-specification cases
@@ -823,15 +840,17 @@ item in 1a is done when S1.1 agrees.
   findings table, and has nothing to do with body kinds.
   *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
   verifier; corpus cases for each.
-- **S1.25 `janus upgrade` converts text and binary bodies** — **S**. Split from S1.6, which made
-  them verify. `janus upgrade` still carries a body that is not JSON across with a
+- **S1.25 `janus upgrade` converts text, binary and form bodies** — **S**. Split from S1.6, which made
+  text and binary bodies verify; S1.21 added form bodies, which upgrade the same way. `janus upgrade` still carries a body that is not JSON across with a
   `body-not-parsed` finding and asserts nothing about it, so the contract verifies less than the
   pact it came from (plan-grammar spec §4.4's two-path agreement). The contract should declare the
   body's type in `content-types` (contract-file spec §5.5) and shape it: a text body as a string
-  with its rules on `$`, a binary one as bytes with a base64 example. A reply of another content
+  with its rules on `$`, a binary one as bytes with a base64 example, a form as an object of string
+  lists with its rules on each name. A reply of another content
   type should fail the contract as `legacy:body-type` fails the pact (ADR 0036 decision 4).
-  *Exit:* corpus cases in which a text body and a binary body upgrade and reach the pact's verdict
-  (`also-compiled-from`), matching and not; and neither upgrade has a `body-not-parsed` finding.
+  *Exit:* corpus cases in which a text body, a binary body and a form body upgrade and reach the
+  pact's verdict (`also-compiled-from`), matching and not; and no upgrade has a `body-not-parsed`
+  finding.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current

@@ -23,6 +23,7 @@ bench = []
 pact_janus_kernel = { path = "../kernel" }
 pact_janus_component_json = { path = "../component-json" }
 pact_janus_component_text = { path = "../component-text" }
+pact_janus_component_form = { path = "../component-form" }
 serde_json = "1"
 wit-bindgen = "0.60"
 

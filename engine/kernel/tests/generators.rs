@@ -275,6 +275,70 @@ fn value_generators_reach_the_header_the_query_and_the_body() {
   assert_eq!(body, json!({ "one": 300, "two": "fixed" }));
 }
 
+/// A form body's generators, each applied to one occurrence of its name as today's verifier applies
+/// them (ADR 0038 decision 5): `$.b` the first `b`, `$.b[1]` the second, and a state's value through
+/// `ProviderState`. The rest of the body is written back as it was.
+#[test]
+fn generators_reach_a_form_body() {
+  let (base_url, received) = stub("{}", r#"{"id": 1234}"#);
+  let pact = pact(
+    json!([{ "name": "an order exists" }]),
+    json!({
+      "method": "POST",
+      "path": "/orders",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "body": "a=1&b=2&b=3&id=1&note=as+is",
+      "generators": {
+        "body": {
+          "$.b": { "type": "RandomInt", "min": 7, "max": 7 },
+          "$.b[1]": { "type": "RandomInt", "min": 8, "max": 8 },
+          "$.id": { "type": "ProviderState", "expression": "${id}" }
+        }
+      }
+    }),
+  );
+
+  let events = verify(
+    &mut engine(),
+    pact,
+    &base_url,
+    Some(&format!("{base_url}/states")),
+  );
+
+  assert_eq!(
+    of_kind(&events, "verification/interaction-result")[0]["status"],
+    json!("verified")
+  );
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  let requests = provider_requests(&received);
+  assert_eq!(requests[0].body, "a=1&b=7&b=8&id=1234&note=as+is");
+}
+
+/// A form body that does not parse is sent as recorded, and each generator on it says so.
+#[test]
+fn a_generator_on_a_body_it_cannot_read_warns() {
+  let (base_url, received) = stub("{}", "{}");
+  let pact = pact(
+    json!([]),
+    json!({
+      "method": "POST",
+      "path": "/things",
+      "headers": { "Content-Type": "application/xml" },
+      "body": "<a>1</a>",
+      "generators": { "body": { "$.a": { "type": "RandomInt", "min": 7, "max": 7 } } }
+    }),
+  );
+
+  let events = verify(&mut engine(), pact, &base_url, None);
+
+  let warnings = of_kind(&events, "verification/warning");
+  assert_eq!(warnings.len(), 1, "{events:?}");
+  assert_eq!(warnings[0]["code"], json!("generator-failed"));
+  assert_eq!(warnings[0]["target"], json!("$.request.body.a"));
+  let requests = provider_requests(&received);
+  assert_eq!(requests[0].body, "<a>1</a>");
+}
+
 /// A generator with nothing to generate from leaves the recorded value, as today, and says so.
 #[test]
 fn a_generator_that_produces_nothing_sends_the_recorded_value_and_warns() {
