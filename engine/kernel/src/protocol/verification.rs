@@ -1410,18 +1410,12 @@ fn legacy_resolver(
   legacy_pact::header_captures(parts_resolver(parts, declared, content), parts)
 }
 
-/// A v1–v4 body design 3.5 cannot compile, as the error a result carries. The two cases are
-/// genuinely different and get different codes: a content type the engine has no compiler for is
-/// a **missing component** (spec §10.2 — the identifier names what is missing, and a content
-/// component is exactly what would supply it), while a body that claimed to be JSON and was not is
-/// a **document** problem, carrying a pointer into the pact its author can act on.
+/// A v1–v4 body design 3.5 cannot compile, as the error a result carries: a body that claimed to be
+/// JSON, or another type, and was not is a **document** problem, carrying a pointer into the pact its
+/// author can act on. Every body kind is compiled since S1.23, so none is refused as a missing
+/// component.
 fn unsupported_body(err: &legacy_pact::Unsupported, index: usize, part: &str) -> Value {
   match err {
-    legacy_pact::Unsupported::ContentType(content_type) => json!({
-      "code": "component-unavailable",
-      "component": format!("content/{content_type}"),
-      "message": err.to_string(),
-    }),
     legacy_pact::Unsupported::Malformed(message) => json!({
       "code": "contract-invalid",
       "problems": [{ "pointer": format!("/interactions/{index}/{part}/body"), "message": message }],

@@ -18,6 +18,7 @@
 
 use pact_janus_component_form::FormContent;
 use pact_janus_component_json::JsonContent;
+use pact_janus_component_multipart::MultipartContent;
 use pact_janus_component_text::TextContent;
 use pact_janus_component_xml::XmlContent;
 use pact_janus_kernel::protocol::Engine;
@@ -44,6 +45,9 @@ fn engine() -> Engine {
   engine.declare_in_tree("content", "text", "1.0.0");
   engine.register_content(Arc::new(FormContent::new()));
   engine.declare_in_tree("content", "form", "1.0.0");
+  // A part's body goes to the built-in components it holds itself (ADR 0040 decision 3).
+  engine.register_content(Arc::new(MultipartContent::new()));
+  engine.declare_in_tree("content", "multipart", "1.0.0");
   engine
 }
 

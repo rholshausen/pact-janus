@@ -103,7 +103,9 @@ interaction of a pact it did not fetch is `absent` there too.
 - `bodies/`: bodies that are not JSON, and how a reply's content type is read (S1.6, ADR 0036): a
   reply with no `Content-Type`, one labelled with a type the pact's does not agree with, a regex on
   a text body and an `application/octet-stream` body; and XML (S1.22, ADR 0039): the rules pact-jvm's
-  XML builder writes, and a root element in a namespace the pact does not name, a deliberate difference.
+  XML builder writes, and a root element in a namespace the pact does not name, a deliberate difference;
+  and multipart (S1.23, ADR 0040): a `multipart/form-data` body with rules on a field and a JSON file
+  and a base64 PNG, and `every-body-kind`, one v3 pact with an XML, a form, a multipart and a binary body.
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
   HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it,
   its broker scenarios as broker fixtures.
@@ -123,6 +125,6 @@ so closing a gap means deleting its entries in the same change. `run --skeleton`
 for the unexpected disagreements, to fill in once each has a reason.
 
 The comparison is by verdict. Where both verifiers fail an interaction for different reasons, for
-example Janus because it does not compile a multipart body yet and today's verifier because the body differs, that
-counts as agreement. The ledger entry for the passing case of the same body kind is what records
-the gap.
+example Janus because it refuses a matching rule it does not compile yet (S1.24) and today's verifier
+because the body differs, that counts as agreement. The ledger entry for the passing case with the same
+rule is what records the gap.

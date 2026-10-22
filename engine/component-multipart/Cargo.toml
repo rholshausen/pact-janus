@@ -1,0 +1,32 @@
+[package]
+name = "pact_janus_component_multipart"
+description = "The built-in multipart content component (component-interfaces spec §6, ADR 0040): decode/encode for multipart/* bodies, each part through the built-in JSON, XML, text and form components, native binding."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+# A part's body is decoded and encoded by the built-in component for its type (ADR 0040 decision 3).
+pact_janus_component_json = { path = "../component-json" }
+pact_janus_component_xml = { path = "../component-xml" }
+pact_janus_component_text = { path = "../component-text" }
+pact_janus_component_form = { path = "../component-form" }
+serde_json = "1"
+base64 = "0.22"
+indexmap = "2"
+# What today's verifier splits a multipart body with (pact_matching's `multipart` feature), so both
+# accept the same bodies and read the same names. No default features: no tokio.
+multer = { version = "3.1", default-features = false }
+futures-util = { version = "0.3", default-features = false }
+# How today's verifier reads a multipart type's boundary. Already in the tree through `multer`.
+mime = "0.3"
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.24"
+
+[lints]
+workspace = true

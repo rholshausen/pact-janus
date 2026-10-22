@@ -33,14 +33,16 @@
 //! string or bytes, which is what a text or binary body is, is one value at `$` (ADR 0036 decision
 //! 3: today's `match_text` and `match_octet_stream`). A form body is compiled as a query string, the
 //! way today's `match_form_urlencoded` compares one (ADR 0038). An XML body is walked element by
-//! element, the way today's `match_xml` compares one (ADR 0039, [`compile_xml_body`]). Multipart
-//! bodies are S1.23. A rule on a value that is text — a path, a header, a query or form value, an XML
+//! element, the way today's `match_xml` compares one (ADR 0039, [`compile_xml_body`]). A multipart
+//! body is compared part by part, each by its own type, the way today's `match_mime_multipart`
+//! compares one (ADR 0040, [`compile_multipart_body`]). A rule on a value that is text — a path, a header, a query or form value, an XML
 //! attribute or text — reads the text as today's verifier does: `integer` is text that parses as an
 //! integer (`legacy:parses-as`). `Values`, `EachKey`, `EachValue`, `ArrayContains` and
 //! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
 
+use crate::legacy::multipart;
 use crate::legacy::xml::{self, rule_name};
 use crate::plan::{self as model, CapturedValues, Literal, Node, RuntimeValue, Status, member_path};
 use crate::shape::path;
@@ -90,6 +92,43 @@ pub enum LegacyBody {
   /// An XML body, as the XML component decodes one ([`crate::legacy::xml`]). Compiled element by
   /// element, as today's verifier compares one (ADR 0039).
   Xml(RuntimeValue),
+  /// A multipart body's parts, in body order ([`crate::legacy::multipart`]). Compiled part by part,
+  /// as today's verifier compares them (ADR 0040).
+  Multipart(Vec<LegacyPart>),
+}
+
+impl LegacyBody {
+  /// The body as the document its content component decodes it to; absent when it is empty.
+  pub fn document(&self) -> RuntimeValue {
+    match self {
+      LegacyBody::Empty => RuntimeValue::Absent,
+      LegacyBody::Document(document) | LegacyBody::Form(document) | LegacyBody::Xml(document) => {
+        document.clone()
+      }
+      LegacyBody::Multipart(parts) => crate::legacy::multipart::document(parts),
+    }
+  }
+}
+
+/// One part of a v1–v4 multipart body, read as today's verifier reads it (ADR 0040 decision 5).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LegacyPart {
+  /// Its name; empty when it has none.
+  pub name: String,
+  /// Its position among all the body's parts, which a rule path uses for a part with no name.
+  pub index: usize,
+  /// The file name its `Content-Disposition` gives.
+  pub filename: Option<String>,
+  /// A field (a `Content-Disposition` and no file name), which today compares as text; else a file,
+  /// compared as a body of its own type.
+  pub field: bool,
+  /// Its headers, lower-cased, as `multer` keeps them.
+  pub headers: Vec<(String, String)>,
+  /// Its own `Content-Type`, when it has one.
+  pub content_type: Option<String>,
+  /// Its content, read by its type as a body is: never [`LegacyBody::Empty`], and a part that is
+  /// itself multipart is bytes.
+  pub body: LegacyBody,
 }
 
 /// A v1–v4 response. See [`LegacyRequest`] for the header/body notes, which apply identically.
@@ -128,8 +167,7 @@ pub fn compile_request(req: &LegacyRequest) -> model::Plan {
       Some("query".to_string()),
       compile_parameters(
         &req.query,
-        &req.matching_rules,
-        "query",
+        rules_for(&req.matching_rules, "query").as_ref(),
         &format!("$.{}", path::root("request", "query")),
       ),
     ),
@@ -528,11 +566,9 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
 /// (ADR 0038). Names are compiled by name.
 fn compile_parameters(
   query: &BTreeMap<String, Vec<String>>,
-  rules: &MatchingRules,
-  category: &str,
+  category: Option<&MatchingRuleCategory>,
   base_path: &str,
 ) -> Vec<Node> {
-  let category = rules_for(rules, category);
   let base_path = base_path.to_string();
   let mut nodes: Vec<Node> = query
     .iter()
@@ -549,7 +585,7 @@ fn compile_parameters(
         let fragments = vec!["$".to_string(), name.clone(), index.to_string()];
         let resolve = Node::resolve(format!("{base}[{index}]"));
         let example = Value::String(value.clone());
-        let node = match best_rule(category.as_ref(), &fragments, false) {
+        let node = match best_rule(category, &fragments, false) {
           Some((list, cascaded)) => {
             rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example), Text::Yes)
           }
@@ -585,7 +621,10 @@ fn body_type_check(
   let has_content = matches!(
     body,
     Some(LegacyBody::Document(value)) if !matches!(value, RuntimeValue::Null | RuntimeValue::Absent)
-  ) || matches!(body, Some(LegacyBody::Form(_) | LegacyBody::Xml(_)));
+  ) || matches!(
+    body,
+    Some(LegacyBody::Form(_) | LegacyBody::Xml(_) | LegacyBody::Multipart(_))
+  );
   let named = headers
     .keys()
     .any(|name| name.eq_ignore_ascii_case("content-type"));
@@ -610,49 +649,57 @@ fn compile_body_slot(
   let root_path = format!("$.{}", path::root(part, "body"));
   let container =
     |nodes: Vec<Node>| Node::container(Some("body".to_string()), check.into_iter().chain(nodes).collect());
-  let category = rules_for(rules, "body");
-  let body = match body {
+  match body {
     // No body was part of this interaction at all: nothing to assert (spec test case `body/no
     // body`).
-    None => return None,
+    None => None,
     // Explicitly null: v1-v4 requires the actual body be absent too (`body/non empty body found
     // when empty expected` is a mismatch on exactly this) — an assertion, not a skip.
     Some(LegacyBody::Empty) | Some(LegacyBody::Document(RuntimeValue::Null | RuntimeValue::Absent)) => {
-      return Some(container(vec![Node::action(
+      Some(container(vec![Node::action(
         "expect:absent",
         vec![Node::resolve(root_path)],
-      )]));
+      )]))
     }
+    Some(body) => Some(container(compile_body_content(
+      body,
+      rules_for(rules, "body").as_ref(),
+      part == "request",
+      &root_path,
+    ))),
+  }
+}
+
+/// A body with content, at `root_path`, under `category`'s rules (rooted at the body's `$`), closed
+/// to unnamed members when `closed` (a request's): the whole body, or one multipart part's.
+fn compile_body_content(
+  body: &LegacyBody,
+  category: Option<&MatchingRuleCategory>,
+  closed: bool,
+  root_path: &str,
+) -> Vec<Node> {
+  match body {
+    // A part is never empty: an empty body is the slot's to assert (`compile_body_slot`).
+    LegacyBody::Empty => Vec::new(),
     // Names and their values, every name required whichever part this is, as a query string's.
-    Some(LegacyBody::Form(form)) => {
-      return Some(container(compile_parameters(
-        &form_parameters(form),
-        rules,
-        "body",
-        &root_path,
-      )));
-    }
+    LegacyBody::Form(form) => compile_parameters(&form_parameters(form), category, root_path),
     // Elements, attributes and text, as today's `match_xml` walks them.
-    Some(LegacyBody::Xml(document)) => {
-      return Some(container(compile_xml_body(
-        document,
-        category.as_ref(),
-        part == "request",
-        &root_path,
-      )));
-    }
+    LegacyBody::Xml(document) => compile_xml_body(document, category, closed, root_path),
+    // Parts by name, each by its own type, as today's `match_mime_multipart` compares them.
+    LegacyBody::Multipart(parts) => compile_multipart_body(parts, category, closed, root_path),
     // Structure, or one value at `$`: a string, or octets compared by the rules there or byte for
     // byte, as today's `match_octet_stream` compares them (ADR 0036 decision 3).
-    Some(LegacyBody::Document(body)) => body,
-  };
-  let ctx = BodyCtx {
-    fragments: vec!["$".to_string()],
-    cursor: Cursor::Absolute(root_path.clone()),
-    label_path: root_path,
-    category: category.as_ref(),
-    closed_objects: part == "request",
-  };
-  Some(container(compile_body_value(body, &ctx)))
+    LegacyBody::Document(body) => {
+      let ctx = BodyCtx {
+        fragments: vec!["$".to_string()],
+        cursor: Cursor::Absolute(root_path.to_string()),
+        label_path: root_path.to_string(),
+        category,
+        closed_objects: closed,
+      };
+      compile_body_value(body, &ctx)
+    }
+  }
 }
 
 /// A form document as the query compiler takes one: each name with its values as text. The form
@@ -1312,4 +1359,180 @@ fn accepts_empty_text(list: &RuleList, cascaded: bool, example: &Literal) -> boo
   };
   let executed = model::execute(&plan, &CapturedValues::new());
   model::outcome(&executed).0 == Status::Matched
+}
+
+// --- multipart: parts by name, each by its own type (ADR 0040) ---
+
+/// The part headers today's verifier does not require of the reply's part when the pact's has them.
+const OPTIONAL_PART_HEADERS: [&str; 3] = ["content-type", "content-disposition", "content-transfer-encoding"];
+
+/// A multipart body, as today's `match_mime_multipart` compares one: each of the pact's parts, in
+/// order, against the reply's first part of its name, or the unnamed part at its position among the
+/// unnamed parts. `legacy:mime-part` fails a missing part or one of the wrong kind; then its headers
+/// and its body are compared. A part the pact does not have is allowed, in a request too.
+fn compile_multipart_body(
+  parts: &[LegacyPart],
+  category: Option<&MatchingRuleCategory>,
+  closed: bool,
+  root_path: &str,
+) -> Vec<Node> {
+  let mut unnamed = 0;
+  parts
+    .iter()
+    .map(|part| {
+      let position = if part.name.is_empty() {
+        unnamed += 1;
+        unnamed - 1
+      } else {
+        0
+      };
+      let part_path = path::array_index(&member_path(root_path, &part.name), position);
+      // A rule path names a part by its name, or by its position among all the parts.
+      let key = if part.name.is_empty() {
+        part.index.to_string()
+      } else {
+        part.name.clone()
+      };
+      let mut checks = compile_part_headers(part, category, &key, &part_path);
+      checks.extend(compile_part_body(part, category, closed, &key, &part_path));
+      let kind = if part.field { "field" } else { "file" };
+      Node::container(
+        Some(part_path.clone()),
+        vec![Node::action(
+          "flow:if",
+          vec![
+            Node::action(
+              "legacy:mime-part",
+              vec![
+                Node::resolve(part_path.clone()),
+                Node::value(Literal::string(kind)),
+                Node::value(Literal::string(&part.name)),
+              ],
+            ),
+            Node::action("flow:and", checks),
+          ],
+        )],
+      )
+    })
+    .collect()
+}
+
+/// Each header the pact's part has, as today's `match_headers` compares it: by a rule at exactly
+/// `$.<part>.<header>`, or by equality. `Content-Disposition` is compared only by a rule, and the reply's
+/// part may lack it, `Content-Type` and `Content-Transfer-Encoding`.
+fn compile_part_headers(
+  part: &LegacyPart,
+  category: Option<&MatchingRuleCategory>,
+  key: &str,
+  part_path: &str,
+) -> Vec<Node> {
+  let mut headers = part.headers.clone();
+  headers.sort();
+  headers
+    .iter()
+    .filter_map(|(name, value)| {
+      let at = member_path(&member_path(part_path, multipart::HEADERS), name);
+      let fragments = vec!["$".to_string(), key.to_string(), name.clone()];
+      let example = Literal::string(value);
+      let node = match best_rule(category, &fragments, true) {
+        Some((list, false)) => rule_list_node(&list, false, Node::resolve(at.clone()), &example, Text::Yes),
+        _ if name == "content-disposition" => return None,
+        _ => Node::action(
+          "match:equality",
+          vec![Node::resolve(at.clone()), Node::value(example)],
+        ),
+      };
+      Some(if OPTIONAL_PART_HEADERS.contains(&name.as_str()) {
+        Node::action(
+          "flow:if",
+          vec![Node::action("check:exists", vec![Node::resolve(at)]), node],
+        )
+      } else {
+        node
+      })
+    })
+    .collect()
+}
+
+/// A part's body. A field of text is compared as text, by the rules at `$.<part>`, as today's
+/// `match_field` compares one. A file, or a field with a type of its own, is compared as a body of
+/// its type is, by the rules under `$.<part>` moved to its root, as today's `match_file_part`
+/// compares one; a file's type is checked first, with the part's `Content-Type`, and a file of another
+/// type is not compared further.
+fn compile_part_body(
+  part: &LegacyPart,
+  category: Option<&MatchingRuleCategory>,
+  closed: bool,
+  key: &str,
+  part_path: &str,
+) -> Vec<Node> {
+  let at = member_path(part_path, multipart::BODY);
+  let text = part
+    .content_type
+    .as_deref()
+    .is_none_or(|content_type| content_type.trim().to_ascii_lowercase().starts_with("text/"));
+  if part.field && text {
+    let fragments = vec!["$".to_string(), key.to_string()];
+    let example = Literal::from_document(&part.body.document());
+    return vec![match best_rule(category, &fragments, false) {
+      Some((list, cascaded)) => rule_list_node(&list, cascaded, Node::resolve(at), &example, Text::Yes),
+      None => Node::action("match:equality", vec![Node::resolve(at), Node::value(example)]),
+    }];
+  }
+  let rules = rerooted(category, key);
+  let nodes = compile_body_content(&part.body, rules.as_ref(), closed, &at);
+  // A file of another type is not compared, as today: the type mismatch is the finding.
+  match part
+    .content_type
+    .as_deref()
+    .filter(|ct| !part.field && !ct.contains('*'))
+  {
+    Some(content_type) => vec![Node::action(
+      "flow:if",
+      vec![
+        Node::action(
+          "legacy:body-type",
+          vec![
+            Node::resolve(member_path(
+              &member_path(part_path, multipart::HEADERS),
+              "content-type",
+            )),
+            Node::value(Literal::string(content_type)),
+          ],
+        ),
+        Node::action("flow:and", nodes),
+      ],
+    )],
+    None => nodes,
+  }
+}
+
+/// The rules under `$.<key>`, rooted at `$`: what today's `match_file_part` compares a part's body by.
+/// Only a rule naming the part itself counts; a wildcard in its place does not, as today.
+fn rerooted(category: Option<&MatchingRuleCategory>, key: &str) -> Option<MatchingRuleCategory> {
+  let category = category?;
+  let rules = category
+    .rules
+    .iter()
+    .filter_map(|(rule_path, list)| {
+      let tokens = rule_path.tokens();
+      let names_part = matches!(tokens.first(), Some(PathToken::Root))
+        && match tokens.get(1) {
+          Some(PathToken::Field(name)) => name == key,
+          Some(PathToken::Index(index)) => index.to_string() == key,
+          _ => false,
+        };
+      names_part.then(|| {
+        let mut path = DocPath::root();
+        for token in &tokens[2..] {
+          path.push(token.clone());
+        }
+        (path, list.clone())
+      })
+    })
+    .collect();
+  Some(MatchingRuleCategory {
+    name: category.name.clone(),
+    rules,
+  })
 }

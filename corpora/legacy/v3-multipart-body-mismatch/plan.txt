@@ -1,0 +1,164 @@
+(
+  :"post /upload" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'POST'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/upload'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.request.headers.content-type,
+            'multipart/form-data; boundary=b'
+          )
+        )
+      ),
+      :body (
+        :"$.name[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.request.body.name[0],
+              'field',
+              'name'
+            ),
+            %flow:and (
+              %match:equality (
+                $.request.body.name[0].body,
+                'Mary'
+              )
+            )
+          )
+        ),
+        :"$.order[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.request.body.order[0],
+              'file',
+              'order'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.request.body.order[0].headers.content-type
+                ),
+                %match:equality (
+                  $.request.body.order[0].headers.content-type,
+                  'application/json'
+                )
+              ),
+              %match:equality (
+                $.request.body.order[0].headers.x-version,
+                '2'
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.request.body.order[0].headers.content-type,
+                  'application/json'
+                ),
+                %flow:and (
+                  :"$.order[0].body.id" (
+                    %match:equality (
+                      $.request.body.order[0].body.id,
+                      1
+                    )
+                  ),
+                  %legacy:only-entries (
+                    $.request.body.order[0].body,
+                    'id'
+                  )
+                )
+              )
+            )
+          )
+        ),
+        :"$.note[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.request.body.note[0],
+              'file',
+              'note'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.request.body.note[0].headers.content-type
+                ),
+                %match:equality (
+                  $.request.body.note[0].headers.content-type,
+                  'text/plain'
+                )
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.request.body.note[0].headers.content-type,
+                  'text/plain'
+                ),
+                %flow:and (
+                  %match:equality (
+                    $.request.body.note[0].body,
+                    'hello'
+                  )
+                )
+              )
+            )
+          )
+        ),
+        :"$.logo[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.request.body.logo[0],
+              'file',
+              'logo'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.request.body.logo[0].headers.content-type
+                ),
+                %match:equality (
+                  $.request.body.logo[0].headers.content-type,
+                  'image/png'
+                )
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.request.body.logo[0].headers.content-type,
+                  'image/png'
+                ),
+                %flow:and (
+                  %match:equality (
+                    $.request.body.logo[0].body,
+                    BYTES(3, UE5H)
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          201
+        )
+      )
+    )
+  )
+)

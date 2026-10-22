@@ -30,6 +30,12 @@ serde_urlencoded = "0.7"
 # written back as it writes them (ADR 0039). Already in the tree through `pact_models`' default
 # `xml` feature.
 sxd-document = "0.3"
+# A v1–v4 multipart body, split as today's verifier splits one (ADR 0040): `multer`, without tokio,
+# polled once because it is handed the body whole, and its boundary read by `mime`, as today. Pure
+# Rust, wasm-safe.
+multer = { version = "3.1", default-features = false }
+futures-util = { version = "0.3", default-features = false }
+mime = "0.3"
 serde_path_to_error = "0.1"
 # The interpreter's match:regex/match:semver/bytes-literal support. Pure Rust, no OS bindings -
 # pact-reference's own matching engine depends on the same three for the same reasons.
@@ -58,6 +64,7 @@ pact_janus_component_json = { path = "../component-json" }
 pact_janus_component_text = { path = "../component-text" }
 pact_janus_component_form = { path = "../component-form" }
 pact_janus_component_xml = { path = "../component-xml" }
+pact_janus_component_multipart = { path = "../component-multipart" }
 # The sample provider (plan task 5.6), embedded rather than spawned: a verification run needs a
 # real provider on a real socket to be worth anything, and the one the plan calls for is in this
 # repo. No cycle — the sample depends on nothing of ours.

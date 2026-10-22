@@ -436,10 +436,10 @@ fn every_core_action_given_fewer_children_than_it_takes_is_an_error_on_the_node(
     }
   }
   // Plan-grammar spec §4.2's table, counted: 29 actions take at least one child, 14 at least two,
-  // 3 at least three and 1 four (and 5 take none), so an action added without its count shows here.
+  // 4 at least three and 1 four (and 5 take none), so an action added without its count shows here.
   assert_eq!(
     short_nodes,
-    29 + 14 * 2 + 3 * 3 + 4,
+    29 + 14 * 2 + 4 * 3 + 4,
     "every short form of every core action"
   );
 }

@@ -1,0 +1,112 @@
+{
+  "description": "a v3 multipart request body that fails as today's verifier fails it (ADR 0040): a field the reply sends as a file, a header its part lacks, a member a request's closed JSON does not allow, a part it lacks, and a file of another type, whose body is then not compared",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "post /upload",
+          "request": {
+            "method": "POST",
+            "path": "/upload",
+            "headers": {
+              "Content-Type": "multipart/form-data; boundary=b"
+            },
+            "body": "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"order.json\"\r\nContent-Type: application/json\r\nX-Version: 2\r\n\r\n{\"id\": 1}\r\n--b\r\nContent-Disposition: form-data; name=\"note\"; filename=\"note.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b\r\nContent-Disposition: form-data; name=\"logo\"; filename=\"logo.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n--b--\r\n"
+          },
+          "response": {
+            "status": 201
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/upload",
+    "$.request.query": {},
+    "$.request.headers.content-type": "multipart/form-data; boundary=b",
+    "$.request.body": {
+      "name": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"name\"; filename=\"n.txt\""
+          },
+          "filename": "n.txt",
+          "body": "Mary"
+        }
+      ],
+      "order": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"order\"; filename=\"o.json\"",
+            "content-type": "application/json"
+          },
+          "filename": "o.json",
+          "body": {
+            "id": 1,
+            "extra": 2
+          }
+        }
+      ],
+      "logo": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"logo\"; filename=\"logo.gif\"",
+            "content-type": "image/gif"
+          },
+          "filename": "logo.gif",
+          "body": "GIF"
+        }
+      ]
+    },
+    "$.response.status": 201
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.body.name[0]",
+        "message": "Expected a MIME field 'name' but was file",
+        "action": "legacy:mime-part"
+      },
+      {
+        "path": "$.request.body.order[0].headers.x-version",
+        "message": "Expected <absent> to equal '2'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.request.body.order[0].body",
+        "message": "Unexpected member(s): extra",
+        "action": "legacy:only-entries"
+      },
+      {
+        "path": "$.request.body.note[0]",
+        "message": "Expected a MIME part 'note' but was missing",
+        "action": "legacy:mime-part"
+      },
+      {
+        "path": "$.request.body.logo[0].headers.content-type",
+        "message": "Expected 'image/gif' to equal 'image/png'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.request.body.logo[0].headers.content-type",
+        "message": "Expected a body of 'image/png' but the actual content type was 'image/gif'",
+        "action": "legacy:body-type"
+      }
+    ]
+  }
+}

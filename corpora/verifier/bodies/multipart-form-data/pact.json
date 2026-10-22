@@ -1,0 +1,65 @@
+{
+  "consumer": {
+    "name": "bodies-consumer"
+  },
+  "provider": {
+    "name": "bodies-provider"
+  },
+  "interactions": [
+    {
+      "description": "an upload",
+      "request": {
+        "method": "GET",
+        "path": "/upload"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "multipart/form-data; boundary=b"
+        },
+        "body": "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"order.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 1, \"items\": [\"apple\"]}\r\n--b\r\nContent-Disposition: form-data; name=\"logo\"; filename=\"logo.png\"\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n--b--\r\n",
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "multipart/form-data;\\s*boundary=.+"
+                }
+              ]
+            }
+          },
+          "body": {
+            "$.name": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[A-Z][a-z]+"
+                }
+              ]
+            },
+            "$.order.id": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.order.items": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 //! Plan task 3.1: v1–v4 pact reading via `pact_models`, exercised against real-world fixtures
 //! (`tests/fixtures/legacy-pacts/README.md`) rather than only synthetic ones.
 
-use pact_janus_kernel::legacy::compile::LegacyBody;
+use pact_janus_kernel::legacy::compile::{LegacyBody, LegacyPart};
 use pact_janus_kernel::legacy::pact as legacy_pact;
 use pact_janus_kernel::plan::RuntimeValue;
 use pact_models::PactSpecification;
@@ -214,15 +214,104 @@ fn a_body_is_read_as_todays_verifier_compares_its_content_type(
   assert_eq!(body_of(response), Ok(expected));
 }
 
+/// A multipart body is its parts, each read by its own type (ADR 0040 decision 5): a field, a JSON file,
+/// a part with no type as text, and a part that is itself multipart as octets.
+#[test]
+fn a_multipart_body_is_read_into_its_parts_each_by_its_own_type() {
+  let body = "--x\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n\
+--x\r\nContent-Disposition: form-data; name=\"order\"; filename=\"o.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 1}\r\n\
+--x\r\nX-Note: n\r\n\r\nplain\r\n\
+--x\r\nContent-Type: multipart/mixed; boundary=y\r\n\r\n--y--\r\n--x--";
+  let read = body_of(json!({
+    "status": 200,
+    "headers": { "Content-Type": "multipart/form-data; boundary=x" },
+    "body": body
+  }));
+  let part = |name: &str,
+              index: usize,
+              filename: Option<&str>,
+              field: bool,
+              headers: &[(&str, &str)],
+              content_type: Option<&str>,
+              body: LegacyBody| LegacyPart {
+    name: name.to_string(),
+    index,
+    filename: filename.map(str::to_string),
+    field,
+    headers: headers
+      .iter()
+      .map(|(n, v)| (n.to_string(), v.to_string()))
+      .collect(),
+    content_type: content_type.map(str::to_string),
+    body,
+  };
+  assert_eq!(
+    read,
+    Ok(Some(LegacyBody::Multipart(vec![
+      part(
+        "name",
+        0,
+        None,
+        true,
+        &[("content-disposition", "form-data; name=\"name\"")],
+        None,
+        LegacyBody::Document(RuntimeValue::String("Mary".to_string()))
+      ),
+      part(
+        "order",
+        1,
+        Some("o.json"),
+        false,
+        &[
+          (
+            "content-disposition",
+            "form-data; name=\"order\"; filename=\"o.json\""
+          ),
+          ("content-type", "application/json"),
+        ],
+        Some("application/json"),
+        LegacyBody::Document(RuntimeValue::from_json(&json!({ "id": 1 })))
+      ),
+      part(
+        "",
+        2,
+        None,
+        false,
+        &[("x-note", "n")],
+        None,
+        LegacyBody::Document(RuntimeValue::String("plain".to_string()))
+      ),
+      part(
+        "",
+        3,
+        None,
+        false,
+        &[("content-type", "multipart/mixed; boundary=y")],
+        Some("multipart/mixed; boundary=y"),
+        bytes(b"--y--".to_vec())
+      ),
+    ])))
+  );
+}
+
 #[rstest]
-#[case::multipart("multipart/form-data; boundary=x", "--x--")]
-fn a_body_kind_staged_for_later_is_refused_by_its_content_type(
+#[case::no_boundary("multipart/form-data", "--x--", "names no boundary")]
+#[case::a_part_that_is_not_its_type(
+  "multipart/form-data; boundary=x",
+  "--x\r\nContent-Disposition: form-data; name=\"a\"\r\nContent-Type: application/json\r\n\r\n{\r\n--x--",
+  "part 'a' is not valid JSON"
+)]
+fn a_multipart_body_that_does_not_split_is_malformed(
   #[case] content_type: &str,
   #[case] body: &str,
+  #[case] message: &str,
 ) {
   let error = body_of(json!({ "status": 200, "headers": { "Content-Type": content_type }, "body": body }))
-    .expect_err("not compiled yet");
-  assert!(error.contains("not compiled yet"), "{error}");
+    .expect_err("malformed");
+  assert!(
+    error.contains("is not a valid multipart body") && error.contains(message),
+    "{error}"
+  );
 }
 
 fn response_types_of(response: serde_json::Value) -> Option<String> {
@@ -238,6 +327,10 @@ fn response_types_of(response: serde_json::Value) -> Option<String> {
 #[case::detected(json!({ "status": 200, "body": { "a": 1 } }), Some("application/json"))]
 #[case::binary(json!({ "status": 200, "headers": { "Content-Type": "image/png" }, "body": "iVBORw0KGgo=" }), Some("image/png"))]
 #[case::no_body(json!({ "status": 200 }), None)]
+#[case::multipart_under_its_own_label(
+  json!({ "status": 200, "headers": { "Content-Type": "multipart/mixed; boundary=x" }, "body": "--x--" }),
+  None
+)]
 fn the_reply_body_is_decoded_as_the_pacts_content_type(
   #[case] response: serde_json::Value,
   #[case] expected: Option<&str>,

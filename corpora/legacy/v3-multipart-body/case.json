@@ -1,0 +1,140 @@
+{
+  "description": "a v3 multipart response body compared part by part (ADR 0040): a regex reaches a field's text, an integer and a type rule under a JSON file's part name reach its document, and a regex an XML file's attribute; the reply's parts come in another order, under its own boundary and file names, with a member and a part the pact does not have, which a response may",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /upload",
+          "request": {
+            "method": "GET",
+            "path": "/upload"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "multipart/form-data; boundary=b"
+            },
+            "body": "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"order.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 1, \"items\": [\"apple\"]}\r\n--b\r\nContent-Disposition: form-data; name=\"note\"; filename=\"note.xml\"\r\nContent-Type: application/xml\r\n\r\n<note lang=\"en\">hi</note>\r\n--b--\r\n",
+            "matchingRules": {
+              "header": {
+                "Content-Type": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "multipart/form-data; boundary=.*"
+                    }
+                  ]
+                }
+              },
+              "body": {
+                "$.name": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[A-Z][a-z]+"
+                    }
+                  ]
+                },
+                "$.order.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                },
+                "$.order.items": {
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                },
+                "$.note.note['@lang']": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]{2}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/upload",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "multipart/form-data; boundary=other",
+    "$.response.body": {
+      "extra": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"extra\""
+          },
+          "body": "x"
+        }
+      ],
+      "note": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"note\"; filename=\"n.xml\"",
+            "content-type": "application/xml"
+          },
+          "filename": "n.xml",
+          "body": {
+            "note": {
+              "@lang": "fr",
+              "#text": "hi"
+            }
+          }
+        }
+      ],
+      "order": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"order\"; filename=\"o.json\"",
+            "content-type": "application/json"
+          },
+          "filename": "o.json",
+          "body": {
+            "id": 42,
+            "items": [
+              "pear",
+              "fig"
+            ],
+            "gift": true
+          }
+        }
+      ],
+      "name": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"name\""
+          },
+          "body": "Ada"
+        }
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

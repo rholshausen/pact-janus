@@ -1,0 +1,159 @@
+(
+  :"get /upload" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/upload',
+          '/upload'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %match:regex (
+            $.response.headers.content-type => 'multipart/form-data; boundary=other',
+            '^(?:multipart/form-data; boundary=.*)$'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.name[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.name[0] => {'headers': {'content-disposition': 'form-data; name="name"'}, 'body': 'Ada'},
+              'field',
+              'name'
+            ) => BOOL(true),
+            %flow:and (
+              %match:regex (
+                $.response.body.name[0].body => 'Ada',
+                '^(?:[A-Z][a-z]+)$'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.order[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.order[0] => {'headers': {'content-disposition': 'form-data; name="order"; filename="o.json"', 'content-type': 'application/json'}, 'filename': 'o.json', 'body': {'id': 42, 'items': ['pear', 'fig'], 'gift': true}},
+              'file',
+              'order'
+            ) => BOOL(true),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.order[0].headers.content-type => 'application/json'
+                ) => BOOL(true),
+                %match:equality (
+                  $.response.body.order[0].headers.content-type => 'application/json',
+                  'application/json'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.order[0].headers.content-type => 'application/json',
+                  'application/json'
+                ) => BOOL(true),
+                %flow:and (
+                  :"$.order[0].body.id" (
+                    %match:integer (
+                      $.response.body.order[0].body.id => 42
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  :"$.order[0].body.items" (
+                    %match:type (
+                      $.response.body.order[0].body.items => ['pear', 'fig'],
+                      ['apple']
+                    ) => BOOL(true),
+                    %flow:for-each (
+                      ** (
+                        $.response.body.order[0].body.items => ['pear', 'fig']
+                      ) => ['pear', 'fig'],
+                      :"$.order[0].body.items[*]" (
+                        %match:type (
+                          ~> => 'pear',
+                          'apple'
+                        ) => BOOL(true)
+                      ) => BOOL(true),
+                      :"$.order[0].body.items[*]" (
+                        %match:type (
+                          ~> => 'fig',
+                          'apple'
+                        ) => BOOL(true)
+                      ) => BOOL(true)
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.note[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.note[0] => {'headers': {'content-disposition': 'form-data; name="note"; filename="n.xml"', 'content-type': 'application/xml'}, 'filename': 'n.xml', 'body': {'note': {'@lang': 'fr', '#text': 'hi'}}},
+              'file',
+              'note'
+            ) => BOOL(true),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.note[0].headers.content-type => 'application/xml'
+                ) => BOOL(true),
+                %match:equality (
+                  $.response.body.note[0].headers.content-type => 'application/xml',
+                  'application/xml'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.note[0].headers.content-type => 'application/xml',
+                  'application/xml'
+                ) => BOOL(true),
+                %flow:and (
+                  %expect:object (
+                    $.response.body.note[0].body.note => {'@lang': 'fr', '#text': 'hi'}
+                  ) => BOOL(true),
+                  :"$.note[0].body.note" (
+                    :"$.note[0].body.note.@lang" (
+                      %match:regex (
+                        $.response.body.note[0].body.note.@lang => 'fr',
+                        '^(?:[a-z]{2})$'
+                      ) => BOOL(true)
+                    ) => BOOL(true),
+                    :"$.note[0].body.note.#text" (
+                      %match:equality (
+                        $.response.body.note[0].body.note.#text => 'hi',
+                        'hi'
+                      ) => BOOL(true)
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

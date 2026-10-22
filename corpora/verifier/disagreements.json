@@ -2,34 +2,6 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
-      "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a multipart body is refused as contract-invalid; today compares its parts"
-    },
-    {
-      "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a multipart body is refused as contract-invalid; today compares its parts"
-    },
-    {
-      "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case/mutations/0/0/body/text-changed",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a multipart body is refused as contract-invalid; today compares its parts"
-    },
-    {
-      "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case/mutations/0/0/body/text-changed",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: a multipart body is refused as contract-invalid; today compares its parts"
-    },
-    {
       "case": "compatibility-suite/v2/01-supports-matching-rules-for-the-response-headers-positive-case",
       "key": "0/0",
       "today": "pass",

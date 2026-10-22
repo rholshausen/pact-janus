@@ -866,6 +866,39 @@ item in 1a is done when S1.1 agrees.
   *Exit:* S1.1's ledger entries for `compatibility-suite/v1/25-response-with-multipart-body-positive-case`
   and its mutation gone; and a v3 pact with XML, form, multipart and binary bodies agrees with
   today's verifier in S1.1, which was S1.6's combined exit.
+  *Done 2026-10-22* ([ADR 0040](decisions/0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md)).
+  A built-in `multipart` content component, `engine/component-multipart`, claims every `multipart/*`
+  type. Every embedding registers it after form, and `engine/hello` lists it. It splits a body with
+  `multer`, as today's verifier does. Its document is keyed by part name, with unnamed parts under
+  `""`, and a part is `headers`, `filename` and `body`. Each part's body goes through the built-in JSON,
+  XML, text and form components the multipart component holds itself; any other part is bytes. The
+  legacy layer splits a pact's body the same way and reads each part by its own type, and a test holds
+  that reader to the component's over every multipart body in the repository. The legacy compiler
+  compares the parts as `match_mime_multipart` does, with one new legacy action, `legacy:mime-part`. A
+  reply is decoded under its own label, because its boundary is its own. No body kind is refused any
+  more. All four ledger entries for case 25 are gone, and S1.1's harness reads 399 verdicts over 183
+  cases: 389 agree and 10 are known. `bodies/multipart-form-data` and `bodies/every-body-kind`, the
+  combined exit's v3 pact with an XML, a form, a multipart and a binary body, agree with today's
+  verifier, mutations included. Corpus cases `v3-multipart-body` and `v3-multipart-body-mismatch` are
+  new. Not foreseen:
+  - nothing in the content interface lets one component ask another to decode. The multipart component
+    holds the built-in ones itself, which covers everything today's verifier compares a part with; a
+    part reaching a declared component is the new S5.6;
+  - `multer`'s own `parse_boundary` reads only `multipart/form-data`, so the boundary is read with
+    `mime`, as today's verifier reads it. `multer` keeps the last value of a repeated part header, and
+    misreads a part with no headers at all by swallowing the next one. Today's verifier shares both;
+  - today's verifier checks a rule on the pact's `Content-Type` header against the reply's type in a
+    normalised form (`multipart/form-data;boundary=x`, no space) before it compares a body. A regex
+    written with the space fails there, and passes in Janus. This holds for any type with parameters,
+    not only multipart, and no fixture covers it yet;
+  - a corpus case tags bytes only at the top of its values, so binary parts are covered by the kernel's
+    tests and the verifier fixtures rather than the golden corpus.
+
+  Left out: `janus upgrade` still carries a multipart body across with `body-not-parsed`, which S1.25
+  now covers, and request generators on a multipart body are not applied, as today. The differences
+  ADR 0040 makes deliberate are where today's behaviour is accidental: a field with a type of its own is
+  compared as that type, a part with no `Content-Type` is text, unnamed parts are matched among the
+  unnamed ones, and a part that is itself multipart is compared as octets.
 - **S1.24 The v3/v4 matching rules the legacy compiler refuses** — **S**. `Values`, `EachKey`,
   `EachValue` and `ArrayContains` compile to a deliberate error node (`legacy/compile.rs`'s module
   docs), so a pact that uses them fails where today's verifier passes it. No pact-specification case
@@ -873,18 +906,20 @@ item in 1a is done when S1.1 agrees.
   findings table, and has nothing to do with body kinds.
   *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
   verifier; corpus cases for each.
-- **S1.25 `janus upgrade` converts text, binary, form and XML bodies** — **S**. Split from S1.6, which made
-  text and binary bodies verify; S1.21 added form bodies and S1.22 XML ones, which upgrade the same way. `janus upgrade` still carries a body that is not JSON across with a
-  `body-not-parsed` finding and asserts nothing about it, so the contract verifies less than the
-  pact it came from (plan-grammar spec §4.4's two-path agreement). The contract should declare the
-  body's type in `content-types` (contract-file spec §5.5) and shape it: a text body as a string
+- **S1.25 `janus upgrade` converts text, binary, form, XML and multipart bodies** — **S**. Split from
+  S1.6, which made text and binary bodies verify; S1.21 added form bodies, S1.22 XML ones and S1.23
+  multipart ones, which upgrade the same way. `janus upgrade` still carries a body that is not JSON
+  across with a `body-not-parsed` finding and asserts nothing about it, so the contract verifies less
+  than the pact it came from (plan-grammar spec §4.4's two-path agreement). The contract should declare
+  the body's type in `content-types` (contract-file spec §5.5) and shape it: a text body as a string
   with its rules on `$`, a binary one as bytes with a base64 example, a form as an object of string
   lists with its rules on each name, an XML body in ADR 0039's document with its rules on each element,
-  attribute and text. A reply of another content
-  type should fail the contract as `legacy:body-type` fails the pact (ADR 0036 decision 4).
-  *Exit:* corpus cases in which a text body, a binary body, a form body and an XML body upgrade and
-  reach the pact's verdict (`also-compiled-from`), matching and not; and no upgrade has a `body-not-parsed`
-  finding.
+  attribute and text, and a multipart body in ADR 0040's document with each part's rules on its body.
+  A reply of another content type should fail the contract as `legacy:body-type` fails the pact (ADR
+  0036 decision 4).
+  *Exit:* corpus cases in which a text body, a binary body, a form body, an XML body and a multipart
+  body upgrade and reach the pact's verdict (`also-compiled-from`), matching and not; and no upgrade has
+  a `body-not-parsed` finding.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -1058,6 +1093,17 @@ The component model, opened to the ecosystem.
 - **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **M**: the
   containment rules of findings 18 and 20 (recreation in a shared process; what a `subprocess`
   source's command is).
+- **S5.6 A multipart part reaches the registry's components** — **M**. The built-in multipart component
+  decodes and encodes each part's body through the built-in JSON, XML, text and form components it holds
+  itself, and any other part is bytes (ADR 0040 decision 3). Stage 1a needs nothing more, because today's
+  verifier compares a part with its built-in matchers too. But a Janus contract cannot shape a part only
+  a declared component reads, such as a protobuf part, and a declared component for `text/csv` or JSON is
+  passed over for a part of that type. The content interface gains a way for a component to ask the
+  engine to decode and encode embedded content through the registry: a host callback in the native
+  binding, an import in the WASM world, and a request on the subprocess pipe (component-interfaces spec
+  §9). The multipart document does not change.
+  *Exit:* the worked CSV component (`third-party/janus-csv`) decodes a `text/csv` part of a multipart
+  body into rows a contract shapes, in each binding; and an ADR supersedes ADR 0040 decision 3.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -1199,6 +1245,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
+| S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
 | SA.3 | The security review an agent with provider access needs | AI-layer notes §4 |
 

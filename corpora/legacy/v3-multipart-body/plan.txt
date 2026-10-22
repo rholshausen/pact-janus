@@ -1,0 +1,153 @@
+(
+  :"get /upload" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/upload'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %match:regex (
+            $.response.headers.content-type,
+            '^(?:multipart/form-data; boundary=.*)$'
+          )
+        )
+      ),
+      :body (
+        :"$.name[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.name[0],
+              'field',
+              'name'
+            ),
+            %flow:and (
+              %match:regex (
+                $.response.body.name[0].body,
+                '^(?:[A-Z][a-z]+)$'
+              )
+            )
+          )
+        ),
+        :"$.order[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.order[0],
+              'file',
+              'order'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.order[0].headers.content-type
+                ),
+                %match:equality (
+                  $.response.body.order[0].headers.content-type,
+                  'application/json'
+                )
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.order[0].headers.content-type,
+                  'application/json'
+                ),
+                %flow:and (
+                  :"$.order[0].body.id" (
+                    %match:integer (
+                      $.response.body.order[0].body.id
+                    )
+                  ),
+                  :"$.order[0].body.items" (
+                    %match:type (
+                      $.response.body.order[0].body.items,
+                      ['apple']
+                    ),
+                    %flow:for-each (
+                      ** (
+                        $.response.body.order[0].body.items
+                      ),
+                      :"$.order[0].body.items[*]" (
+                        %match:type (
+                          ~>,
+                          'apple'
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        :"$.note[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.note[0],
+              'file',
+              'note'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.note[0].headers.content-type
+                ),
+                %match:equality (
+                  $.response.body.note[0].headers.content-type,
+                  'application/xml'
+                )
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.note[0].headers.content-type,
+                  'application/xml'
+                ),
+                %flow:and (
+                  %expect:object (
+                    $.response.body.note[0].body.note
+                  ),
+                  :"$.note[0].body.note" (
+                    :"$.note[0].body.note.@lang" (
+                      %match:regex (
+                        $.response.body.note[0].body.note.@lang,
+                        '^(?:[a-z]{2})$'
+                      )
+                    ),
+                    :"$.note[0].body.note.#text" (
+                      %match:equality (
+                        $.response.body.note[0].body.note.#text,
+                        'hi'
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

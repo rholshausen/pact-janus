@@ -998,6 +998,40 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       }
     }
 
+    // A multipart part found where the pact has one, and of its kind (ADR 0040): a *field* has a
+    // `Content-Disposition` and no file name, any other part is a *file*. Today's messages.
+    "legacy:mime-part" => {
+      let part = value_of(&children[0]);
+      let kind = plain_text(&value_of(&children[1]));
+      let name = plain_text(&value_of(&children[2]));
+      let RuntimeValue::Object(members) = &part else {
+        return NodeResult::Error {
+          message: format!("Expected a MIME part '{name}' but was missing"),
+          path: locus(children),
+        };
+      };
+      let disposition = matches!(
+        members.get("headers"),
+        Some(RuntimeValue::Object(headers)) if headers.contains_key("content-disposition")
+      );
+      let named_file = members
+        .get("filename")
+        .is_some_and(|filename| !matches!(filename, RuntimeValue::Absent));
+      let found = if disposition && !named_file {
+        "field"
+      } else {
+        "file"
+      };
+      if kind == found {
+        NodeResult::Ok
+      } else {
+        NodeResult::Error {
+          message: format!("Expected a MIME {kind} '{name}' but was {found}"),
+          path: locus(children),
+        }
+      }
+    }
+
     // A string read as today's verifier reads one against a type rule (ADR 0039): `number` and
     // `decimal` parse as a floating-point number, `integer` as an unsigned one, `boolean` is `true`
     // or `false`. Every v1–v4 value that is text — a path, a header, a query or form value, an XML

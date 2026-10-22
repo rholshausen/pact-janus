@@ -72,6 +72,7 @@ const CORE: &[(&str, Option<&str>, usize)] = &[
   ("legacy:xml-children", None, 1),
   ("legacy:xml-only-children", None, 1),
   ("legacy:parses-as", None, 2),
+  ("legacy:mime-part", None, 3),
 ];
 
 /// The grammar a document's action names are read under. The two differ only in names.

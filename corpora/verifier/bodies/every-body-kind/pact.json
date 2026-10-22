@@ -1,0 +1,105 @@
+{
+  "consumer": {
+    "name": "bodies-consumer"
+  },
+  "provider": {
+    "name": "bodies-provider"
+  },
+  "interactions": [
+    {
+      "description": "an XML body",
+      "request": {
+        "method": "GET",
+        "path": "/xml"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<order id=\"1\"><item>apple</item></order>",
+        "matchingRules": {
+          "body": {
+            "$.order['@id']": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a form body",
+      "request": {
+        "method": "GET",
+        "path": "/form"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "a=1&b=x",
+        "matchingRules": {
+          "body": {
+            "$.a": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d+"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a multipart body",
+      "request": {
+        "method": "GET",
+        "path": "/multipart"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "multipart/mixed; boundary=m"
+        },
+        "body": "--m\r\nContent-Type: text/plain\r\n\r\nthe summary\r\n--m\r\nContent-Type: application/json\r\n\r\n{\"id\": 1}\r\n--m--\r\n",
+        "matchingRules": {
+          "body": {
+            "$[1].id": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a binary body",
+      "request": {
+        "method": "GET",
+        "path": "/binary"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "image/png"
+        },
+        "body": "iVBORw0KGgo="
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

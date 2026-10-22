@@ -295,7 +295,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | `expect` | structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:absent` | |
 | `check` | boolean checks | `check:exists`, `check:equals`, `check:null` | |
 | `match` | one per value operator of the shape language (§4.3) | `match:*` | |
-| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as` | |
+| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as`, `legacy:mime-part` | |
 
 **Every core action takes at least a fixed number of children**, and a node with fewer is malformed:
 
@@ -304,7 +304,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | 0 | `flow:and`, `flow:or`, `flow:apply`, `flow:tee`, `value:join` |
 | 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries`, `legacy:xml-children`, `legacy:xml-only-children` |
 | 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type`, `legacy:parses-as` |
-| 3 | `expect:size`; `legacy:min-type`, `legacy:max-type` |
+| 3 | `expect:size`; `legacy:min-type`, `legacy:max-type`, `legacy:mime-part` |
 | 4 | `legacy:min-max-type` |
 
 The first child is the value under test wherever there is one. The engine's own compilers never emit a
@@ -379,6 +379,12 @@ An XML body is walked as today's verifier walks one, over the XML component's do
 spec §6.1): each element by the rule at its path or by its name, then its attributes, its text and its
 children, grouped by name, with rules found by pact's own paths (`$.a.b['@c']`, `['#text']`, no index)
 ([ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
+A multipart body is compared as today's verifier compares one, over the multipart component's document
+(component-interfaces spec §6.1): each of the pact's parts against the reply's first part of its name,
+or its unnamed part at the same position among the unnamed ones; then the part's headers, and its body,
+a field of text as text and anything else as a body of its own type, with the rules under `$.<part>`
+moved to the part's root
+([ADR 0040](../../decisions/0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md)).
 A type rule on a value that is text (a path, a header, a query or form value, an XML attribute or text)
 reads the text, as today's verifier does: `legacy:parses-as`.
 
@@ -396,6 +402,7 @@ one is the shape compiler's but for a single v1–v4 use:
 | `legacy:xml-children` | legacy only | an XML element's child elements, as their names, one per child (ADR 0039): what a size rule or `notEmpty` on an element counts. Absent for an absent element |
 | `legacy:xml-only-children` | legacy only | an XML element has no child element but those its children name (ADR 0039), failing with today's `Unexpected child <name/>`. A response's element is held to it where a type rule reaches its children; a request's is closed by `legacy:only-entries` |
 | `legacy:parses-as` | legacy only | a string read as today's verifier reads one against a type rule (ADR 0039): its second child is `number` or `decimal` (parses as a floating-point number), `integer` (as an unsigned one) or `boolean` (`true` or `false`). Shapes compare a value's kind with `match:number` and the rest instead |
+| `legacy:mime-part` | legacy only | a multipart part is there and of the pact's kind (ADR 0040): its children are the part, `field` or `file`, and the part's name. A field has a `Content-Disposition` header and no `filename`; any other part is a file. Fails with today's `Expected a MIME part '<name>' but was missing` or `Expected a MIME field '<name>' but was file` (or the reverse) |
 | `match:any-of` | shapes only | v1–v4 has no enumeration |
 | `expect:absent` | shapes; v1–v4 for an empty body only | v1–v4 asserts one absence: a body the pact declares empty or null fails when the actual one has content, as today's verifier fails it ("Expected empty body but received …") and passes it when the actual one is missing or empty. The v1–v4 compiler emits `expect:absent` on the body slot for that, and nowhere else |
 
@@ -445,7 +452,7 @@ mapping**, one name to one name:
 | `match:array-contains` | `legacy:array-contains` |
 | `match:min-type`, `match:max-type`, `match:min-max-type` | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` |
 | `match:header-value` | `legacy:header-value` |
-| — | `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children` and `legacy:parses-as`, which v0 did not have |
+| — | `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as` and `legacy:mime-part`, which v0 did not have |
 | every other `expect:*`, `check:*` and `match:*` action | the same name |
 | `<component>:<name>` | the same name |
 

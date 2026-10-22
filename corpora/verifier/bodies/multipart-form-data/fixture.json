@@ -1,0 +1,32 @@
+{
+  "description": "A multipart/form-data body: a field under a regex, a JSON file under an integer and a type rule, and a base64-encoded PNG compared byte for byte. The provider writes its own boundary, which a rule on the Content-Type header allows, its parts in another order, other file names, a part and a member the pact does not have",
+  "source": "staged plan S1.23; ADR 0040; pact_matching::binary_utils::match_mime_multipart",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/upload"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "multipart/form-data; boundary=provider-boundary"
+            ]
+          },
+          "body": {
+            "text": "--provider-boundary\r\nContent-Disposition: form-data; name=\"logo\"; filename=\"l.png\"\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n--provider-boundary\r\nContent-Disposition: form-data; name=\"extra\"\r\n\r\nnot in the pact\r\n--provider-boundary\r\nContent-Disposition: form-data; name=\"order\"; filename=\"o.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 42, \"items\": [\"pear\", \"fig\"], \"gift\": true}\r\n--provider-boundary\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nAda\r\n--provider-boundary--\r\n"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

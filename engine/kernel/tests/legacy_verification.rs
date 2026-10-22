@@ -58,6 +58,7 @@ fn engine_with_everything() -> Engine {
   engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
+  engine.register_content(Arc::new(pact_janus_component_multipart::MultipartContent::new()));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
@@ -781,4 +782,151 @@ fn state_recorder(count: usize) -> (String, Receiver<String>) {
     }
   });
   (url, rx)
+}
+
+/// The compatibility suite's multipart body: unnamed parts, the second base64-encoded.
+const MIXED_TYPE: &str = "multipart/mixed; boundary=gc0p4Jq0M2Yt08jU534c0p";
+
+fn mixed_body(octets: &str) -> String {
+  format!(
+    "--gc0p4Jq0M2Yt08jU534c0p\r\nContent-Type: text/plain\r\n\r\nThis is the body of the message.\r\n\
+     --gc0p4Jq0M2Yt08jU534c0p\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n\
+     {octets}\r\n--gc0p4Jq0M2Yt08jU534c0p--"
+  )
+}
+
+/// S1.23, ADR 0040: the compatibility suite's multipart case passes as today's verifier passes it, text
+/// after the closing boundary included, and its negative case fails on the part whose octets differ.
+#[test]
+fn a_multipart_body_verifies_part_by_part_as_todays_verifier_compares_one() {
+  let pact = v1_pact_with_body(MIXED_TYPE, &mixed_body("PGh0bWw+PC9odG1sPg=="));
+  let (base_url, _requests) = stub_provider(vec![
+    canned_as(200, MIXED_TYPE, mixed_body("PGh0bWw+PC9odG1sPg==").as_bytes()),
+    canned_as(
+      200,
+      MIXED_TYPE,
+      format!("{}!", mixed_body("PGh0bWw+PC9odG1sPg==")).as_bytes(),
+    ),
+    canned_as(200, MIXED_TYPE, mixed_body("eyJib2R5IjogMX0=").as_bytes()),
+  ]);
+  let mut engine = engine_with_everything();
+
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  let mismatches = serde_json::to_string(&results(&events)[0]["mismatches"]).unwrap();
+  assert!(mismatches.contains("$.response.body[''][1].body"), "{mismatches}");
+  assert_eq!(mismatch_messages(&events).len(), 1, "{mismatches}");
+}
+
+/// A v3 form-data pact: a field under a regex, a JSON file under a type rule, a header the part must
+/// carry, and a part the pact does not have, which the reply may (ADR 0040 decision 5).
+fn form_data_pact() -> Value {
+  let body = "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n\
+    --b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"order.json\"\r\nContent-Type: application/json\r\nX-Version: 2\r\n\r\n\
+    {\"id\": 1, \"items\": [\"apple\"]}\r\n--b--";
+  json!({
+    "consumer": { "name": "c" },
+    "provider": { "name": "p" },
+    "interactions": [{
+      "description": "an upload",
+      "request": { "method": "GET", "path": "/upload" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "multipart/form-data; boundary=b" },
+        "body": body,
+        "matchingRules": { "body": {
+          "$.name": { "matchers": [{ "match": "regex", "regex": "[A-Z][a-z]+" }] },
+          "$.order.id": { "matchers": [{ "match": "integer" }] },
+          "$.order.items": { "matchers": [{ "match": "type" }] }
+        } }
+      }
+    }],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  })
+}
+
+fn form_data_reply(name: &str, order_type: &str, order: &str, version: &str) -> Vec<u8> {
+  format!(
+    "--other\r\nContent-Disposition: form-data; name=\"extra\"\r\n\r\nx\r\n\
+     --other\r\nContent-Disposition: form-data; name=\"order\"; filename=\"o.json\"\r\nContent-Type: {order_type}\r\nX-Version: {version}\r\n\r\n\
+     {order}\r\n--other\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\n{name}\r\n--other--"
+  )
+  .into_bytes()
+}
+
+#[test]
+fn a_form_data_pacts_rules_reach_each_part() {
+  let reply_type = "multipart/form-data; boundary=other";
+  let (base_url, _requests) = stub_provider(vec![
+    canned_as(
+      200,
+      reply_type,
+      &form_data_reply(
+        "Ada",
+        "application/json",
+        r#"{"id": 7, "items": ["pear", "fig"], "more": true}"#,
+        "2",
+      ),
+    ),
+    canned_as(
+      200,
+      reply_type,
+      &form_data_reply("ada", "application/json", r#"{"id": "7", "items": []}"#, "3"),
+    ),
+    canned_as(200, reply_type, &form_data_reply("Ada", "text/plain", "{}", "2")),
+  ]);
+  let mut engine = engine_with_everything();
+
+  // The pact's Content-Type header names its own boundary, so a rule widens it, as a provider that
+  // writes its own boundary needs.
+  let mut pact = form_data_pact();
+  pact["interactions"][0]["response"]["matchingRules"]["header"] =
+    json!({ "Content-Type": { "matchers": [{ "match": "regex", "regex": "multipart/form-data;.*" }] } });
+
+  assert_all_verified(&verify(&mut engine, vec![pact.clone()], &base_url, None), 1);
+  let events = verify(&mut engine, vec![pact.clone()], &base_url, None);
+  let mut messages = mismatch_messages(&events);
+  messages.sort();
+  assert_eq!(
+    messages,
+    vec![
+      "Expected '3' to equal '2'".to_string(),
+      "Expected 'ada' to match '^(?:[A-Z][a-z]+)$'".to_string(),
+      "Expected a integer but got '7'".to_string(),
+    ]
+  );
+  // A file of another type: its header and its type fail, and its body is not compared, as today.
+  let events = verify(&mut engine, vec![pact], &base_url, None);
+  assert_eq!(
+    mismatch_messages(&events),
+    vec![
+      "Expected 'text/plain' to equal 'application/json'".to_string(),
+      "Expected a body of 'application/json' but the actual content type was 'text/plain'".to_string(),
+    ]
+  );
+}
+
+/// A part the reply lacks, and a file where the pact has a field, fail with today's messages.
+#[test]
+fn a_missing_part_or_one_of_the_wrong_kind_fails_as_today() {
+  let reply = "--b\r\nContent-Disposition: form-data; name=\"name\"; filename=\"n.txt\"\r\n\r\nMary\r\n--b--";
+  let (base_url, _requests) = stub_provider(vec![canned_as(
+    200,
+    "multipart/form-data; boundary=b",
+    reply.as_bytes(),
+  )]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(&mut engine, vec![form_data_pact()], &base_url, None);
+  let mut messages = mismatch_messages(&events);
+  messages.sort();
+  assert_eq!(
+    messages,
+    vec![
+      "Expected a MIME field 'name' but was file".to_string(),
+      "Expected a MIME part 'order' but was missing".to_string(),
+    ]
+  );
 }

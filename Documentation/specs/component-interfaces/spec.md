@@ -525,6 +525,25 @@ Its `encode` writes an element's text before its children, declares a namespace 
 and writes a number or a boolean as its text. Comments, processing instructions, namespace prefixes
 and the order between differently named children are not part of the document.
 
+Every engine also has a built-in `multipart` component for every `multipart/*` type, registered after
+form ([ADR 0040](../../decisions/0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md)).
+It splits a body at the boundary its content type names, and a type with no `boundary` does not decode.
+Its document is keyed by part name: an object with one member per name, in the order the names first
+appear, each an array of the parts with that name in body order, and the parts with no name under `""`.
+A part is an object of:
+
+- `headers`, each lower-cased header name with its value as a string;
+- `filename`, the file name its `Content-Disposition` gives, when it gives one;
+- `body`, its content after a `base64` `Content-Transfer-Encoding` is undone, decoded by the part's own
+  `Content-Type` through the built-in JSON, XML, text and form components. A part with no type is text,
+  or bytes when it is not UTF-8; a part of any other type is bytes. It is absent when the part's
+  component cannot decode it.
+
+A part never reaches a component a project declares: the multipart component holds the built-in ones
+itself (staged plan S5.6 lifts this). Its `encode` writes the boundary its content type names, or chooses
+one no part holds and labels the slot with it, and gives a named part with no `Content-Disposition` one
+of `form-data`. The order between differently named parts is not part of the document.
+
 ### 6.2 Encoding is how variants become traffic
 
 `encode` is decode's inverse, and it exists because a consumer test must *produce* bodies: each selected

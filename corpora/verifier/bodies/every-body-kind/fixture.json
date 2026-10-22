@@ -1,0 +1,83 @@
+{
+  "description": "One v3 pact with an XML, a form, a multipart and a binary body, each under a rule where it has one: the provider answers each with other values the rules allow, and the multipart body's unnamed JSON part, found by its position, with a member the pact does not have",
+  "source": "staged plan S1.23's exit, which was S1.6's combined exit; ADR 0036, ADR 0038, ADR 0039, ADR 0040",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/xml"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/xml"
+            ]
+          },
+          "body": {
+            "text": "<order id=\"7\"><item>apple</item></order>"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/form"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/x-www-form-urlencoded"
+            ]
+          },
+          "body": {
+            "text": "b=x&a=42"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/multipart"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "multipart/mixed; boundary=m"
+            ]
+          },
+          "body": {
+            "text": "--m\r\nContent-Type: text/plain\r\n\r\nthe summary\r\n--m\r\nContent-Type: application/json\r\n\r\n{\"id\": 99, \"more\": true}\r\n--m--\r\n"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/binary"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "image/png"
+            ]
+          },
+          "body": {
+            "base64": "iVBORw0KGgo="
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

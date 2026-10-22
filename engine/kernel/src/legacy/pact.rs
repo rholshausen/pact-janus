@@ -20,7 +20,7 @@
 //! generators to apply is kept as a [`RequestTemplate`], so the verification path never holds a
 //! `pact_models` type (the module docs of [`crate::legacy`]).
 
-use super::compile::{LegacyBody, LegacyRequest, LegacyResponse};
+use super::compile::{LegacyBody, LegacyPart, LegacyRequest, LegacyResponse};
 use crate::common::ContentTypes;
 use crate::component::{
   ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
@@ -104,26 +104,18 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
     .collect()
 }
 
-/// Why a v1–v4 part could not be handed to design 3.5's compiler. Two genuinely different things,
-/// kept apart because their remedies are: a content type this engine has no compiler for is a
-/// missing *component* (the pact is fine, the engine is short a piece), while a body that claimed
-/// to be JSON, or a form, and was not is a problem with the *document*.
+/// Why a v1–v4 part could not be handed to design 3.5's compiler: a body that did not parse as the
+/// type it claimed — JSON, a form, XML or multipart — which is a problem with the *document*. Every
+/// body kind today's verifier compares is read (ADR 0040), so none is refused for its type.
 #[derive(Debug, Clone)]
 pub enum Unsupported {
-  /// A body of a kind the legacy compiler does not compile yet: multipart (S1.23).
-  ContentType(String),
-  /// A body that did not parse as the type it claimed: what went wrong, naming the type.
+  /// What went wrong, naming the type.
   Malformed(String),
 }
 
 impl std::fmt::Display for Unsupported {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Unsupported::ContentType(content_type) => write!(
-        f,
-        "legacy_pact: a '{content_type}' body is not compiled yet (multipart bodies are staged \
-         plan S1.23)"
-      ),
       Unsupported::Malformed(message) => write!(f, "legacy_pact: {message}"),
     }
   }
@@ -163,8 +155,8 @@ enum BodyKind {
   Form,
   /// An XML type: compared element by element (ADR 0039).
   Xml,
-  /// Multipart: a matcher of its own today, and S1.23 here.
-  NotYet,
+  /// Multipart: split into parts, each compared by its own type (ADR 0040).
+  Multipart,
   /// A binary type (`image`, `audio`, `video`, `font`, `application/octet-stream`, and anything
   /// `pact_models` does not count as text): compared as octets.
   Bytes,
@@ -181,7 +173,7 @@ impl BodyKind {
     } else if content_type.is_xml() {
       BodyKind::Xml
     } else if content_type.main_type == "multipart" {
-      BodyKind::NotYet
+      BodyKind::Multipart
     } else if content_type.is_binary() || content_type.base_type() == "application/octet-stream" {
       BodyKind::Bytes
     } else {
@@ -220,35 +212,78 @@ fn part_content_type(part: &dyn HttpPart) -> ContentType {
 /// (`LegacyRequest::body`'s own doc comment): `Missing` (the interaction never mentioned a body)
 /// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
 /// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
-/// actual body is absent too". A present body is read by its content type ([`BodyKind`]) into a
-/// document: JSON is parsed, a form is its names and values, XML is its elements (ADR 0039), text is
-/// a string, a binary body is its octets.
+/// actual body is absent too". A present body is read by its content type ([`read_body`]).
 fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   let bytes = match part.body() {
     OptionalBody::Missing => return Ok(None),
     OptionalBody::Null | OptionalBody::Empty => return Ok(Some(LegacyBody::Empty)),
     OptionalBody::Present(bytes, _, _) => bytes,
   };
-  let content_type = part_content_type(part);
-  match BodyKind::of(&content_type) {
+  read_body(bytes, &part_content_type(part), "body").map(Some)
+}
+
+/// Octets read by their content type ([`BodyKind`]) into a document: JSON is parsed, a form is its
+/// names and values, XML is its elements (ADR 0039), multipart is its parts (ADR 0040), text is a
+/// string, a binary body is its octets. `what` names the body in an error: the body, or one part.
+fn read_body(bytes: &[u8], content_type: &ContentType, what: &str) -> Result<LegacyBody, Unsupported> {
+  match BodyKind::of(content_type) {
     BodyKind::Json => serde_json::from_slice::<Value>(bytes)
-      .map(|document| Some(LegacyBody::Document(RuntimeValue::from_json(&document))))
-      .map_err(|err| Unsupported::Malformed(format!("body is not valid JSON: {err}"))),
+      .map(|document| LegacyBody::Document(RuntimeValue::from_json(&document)))
+      .map_err(|err| Unsupported::Malformed(format!("{what} is not valid JSON: {err}"))),
     BodyKind::Form => form_document(bytes)
-      .map(|form| Some(LegacyBody::Form(form)))
-      .map_err(|err| Unsupported::Malformed(format!("body is not a valid form: {err}"))),
+      .map(LegacyBody::Form)
+      .map_err(|err| Unsupported::Malformed(format!("{what} is not a valid form: {err}"))),
     BodyKind::Xml => super::xml::document(bytes)
-      .map(|document| Some(LegacyBody::Xml(document)))
-      .map_err(|err| Unsupported::Malformed(format!("body is not valid XML: {err}"))),
-    BodyKind::NotYet => Err(Unsupported::ContentType(content_type.to_string())),
-    BodyKind::Bytes => Ok(Some(LegacyBody::Document(RuntimeValue::Bytes(bytes.to_vec())))),
-    BodyKind::Text => Ok(Some(LegacyBody::Document(
-      match String::from_utf8(bytes.to_vec()) {
-        Ok(text) => RuntimeValue::String(text),
-        Err(err) => RuntimeValue::Bytes(err.into_bytes()),
-      },
-    ))),
+      .map(LegacyBody::Xml)
+      .map_err(|err| Unsupported::Malformed(format!("{what} is not valid XML: {err}"))),
+    BodyKind::Multipart => read_multipart(bytes, &content_type.to_string())
+      .map(LegacyBody::Multipart)
+      .map_err(|err| Unsupported::Malformed(format!("{what} is not a valid multipart body: {err}"))),
+    BodyKind::Bytes => Ok(LegacyBody::Document(RuntimeValue::Bytes(bytes.to_vec()))),
+    BodyKind::Text => Ok(text_or_bytes(bytes)),
   }
+}
+
+fn text_or_bytes(bytes: &[u8]) -> LegacyBody {
+  LegacyBody::Document(match String::from_utf8(bytes.to_vec()) {
+    Ok(text) => RuntimeValue::String(text),
+    Err(err) => RuntimeValue::Bytes(err.into_bytes()),
+  })
+}
+
+/// A multipart body's parts (ADR 0040 decision 5), split at the boundary its content type names, each
+/// read by its own type as a body is. A part with no type is text, or bytes when it is not UTF-8; a
+/// part that is itself multipart is bytes, since no boundary reaches today's parser for one.
+pub fn read_multipart(bytes: &[u8], content_type: &str) -> Result<Vec<LegacyPart>, String> {
+  let boundary = super::multipart::boundary(content_type)?;
+  super::multipart::split(bytes, &boundary)?
+    .into_iter()
+    .enumerate()
+    .map(|(index, part)| {
+      let field = part.is_field();
+      let declared = part.headers.get("content-type").cloned();
+      let what = format!("part '{}'", part.name);
+      let body = match declared.as_deref().map(ContentType::parse) {
+        None => text_or_bytes(&part.data),
+        Some(Ok(content_type)) if BodyKind::of(&content_type) == BodyKind::Multipart => {
+          LegacyBody::Document(RuntimeValue::Bytes(part.data.clone()))
+        }
+        Some(Ok(content_type)) => {
+          read_body(&part.data, &content_type, &what).map_err(|err| err.to_string())?
+        }
+        Some(Err(_)) => LegacyBody::Document(RuntimeValue::Bytes(part.data.clone())),
+      };
+      Ok(LegacyPart {
+        name: part.name,
+        index,
+        filename: part.filename,
+        field,
+        headers: part.headers.into_iter().collect(),
+        content_type: declared,
+        body,
+      })
+    })
+    .collect()
 }
 
 /// The content type of a part's body, when it has one with content: the type a received body's
@@ -264,9 +299,14 @@ fn body_type(part: &dyn HttpPart) -> Option<String> {
 /// its response body, which a verification declares as a contract declares a slot's
 /// (contract-file spec §5.5), whatever the reply labels it. Whether the label agrees is the plan's
 /// to check (`legacy:body-type`). A text body that is not UTF-8 was read as octets, so its reply is
-/// declared as octets too, which no component claims. Empty when the response has no body.
+/// declared as octets too, which no component claims. Empty when the response has no body, or a
+/// multipart one.
 pub fn response_types(response: &LegacyResponse) -> ContentTypes {
   let mut types = ContentTypes::new();
+  // A multipart reply is read under its own label, which names its own boundary (ADR 0040 decision 5).
+  if matches!(response.body, Some(LegacyBody::Multipart(_))) {
+    return types;
+  }
   if let Some(content_type) = &response.content_type {
     let is_text =
       ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
