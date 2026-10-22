@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792633536870,
+  "lastUpdate": 1792633538858,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -17310,6 +17310,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27947,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "1dbc1d278e2ed5d00f929cdd3546194cf819594e",
+          "message": "chore: the benchmark chart draws a trend line, the median of the last runs\n\nThe runners are shared machines, so a single run's numbers move by tens of\npercent and a change in the code is hard to see on the chart. The chart page\nnow draws, at each run, the median of the last 7 runs over the runs\nthemselves, which are faded; ?window=N on the address changes how many.\n\nThe page was github-action-benchmark's default, which it writes to gh-pages\nonly when there is none. Its source now lives in benchmarks/chart/index.html,\nand the Benchmarks workflow publishes it as bench/index.html after each\nrecorded run, committing only when it differs.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T12:40:35+11:00",
+          "tree_id": "9956137246a351b5bf1dd3dacb31d6a210472a63",
+          "url": "https://github.com/rholshausen/pact-janus/commit/1dbc1d278e2ed5d00f929cdd3546194cf819594e"
+        },
+        "date": 1792633538313,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26901,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20148,
             "unit": "requests per second",
             "extra": "engines 4"
           }
