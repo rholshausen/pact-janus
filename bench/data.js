@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792627974763,
+  "lastUpdate": 1792627976947,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -16248,6 +16248,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 29781,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8a8449e082b0e74549f10c83899393fdd89d8773",
+          "message": "feat: S1.20 member order is carried through the engine, and decided by nothing\n\nADR 0037. The engine sorted every object's members, so a mock served a CSV\nbody's columns, or a JSON body's members, alphabetically whatever order the\nconsumer declared them in (phase-9 finding 11).\n\n- serde_json's preserve_order is on, the runtime value's objects and an\n  object shape's members are insertion-ordered, and a generated document\n  follows the declared order, so content/encode sees the author's order.\n- Order is never compared: objects with the same members are equal in any\n  order, and plans, the variant space, subsumption and the v1-v4 compiler\n  walk members by name. Two places had begun reading order once it was\n  kept and now go by name: subsumption's same-admits test, which zipped two\n  members maps, and janus upgrade's each-entry sample.\n- The canonical writer had relied on sorted maps. Records and a shape's own\n  members are written by name; an object shape's members, examples, options,\n  recorded content and state parameter values keep their order\n  (contract-file spec §2.4). Provider shapes follow the same rule. A contract\n  whose members were in name order writes the same bytes as before.\n- The legacy compiler compiles a body as a document (LegacyBody::Document of\n  a RuntimeValue), not serde_json::Value (kernel-boundary review finding 5),\n  so form and XML components can hand it what they decode.\n- ComponentError and EngineError box their details, since an ordered Value\n  is larger; the protocol is unchanged.\n\nNo plan or result in corpora/ moved; five executed.txt snapshots print a\ncaptured body in the order the case wrote it. A new case,\nshapes/member-order, compares an example and a body holding the same members\nin other orders. S1.1's harness: 326 verdicts, 312 agree, 14 known. The CSV\nhost test and the TypeScript SDK's CSV consumer check the column order.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T11:07:20+11:00",
+          "tree_id": "e0953a1a18802820d0a531e8f1af65fe4ae8e62a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8a8449e082b0e74549f10c83899393fdd89d8773"
+        },
+        "date": 1792627976223,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 39059,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27148,
             "unit": "requests per second",
             "extra": "engines 4"
           }
