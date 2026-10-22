@@ -2,20 +2,6 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
-      "case": "compatibility-suite/v1/19-response-with-xml-body-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no XML content component, so an XML body is component-unavailable"
-    },
-    {
-      "case": "compatibility-suite/v1/19-response-with-xml-body-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.6: Janus has no XML content component, so an XML body is component-unavailable"
-    },
-    {
       "case": "compatibility-suite/v1/25-response-with-multipart-body-positive-case",
       "key": "0/0",
       "today": "pass",
@@ -98,6 +84,20 @@
       "today": "fail",
       "janus": "pass",
       "reason": "ADR 0035: a --header replaces the pact's header of the same name in any case, as HTTP compares names; today's verifier keeps a pact header whose name differs in case from the option's, and sends the recorded token"
+    },
+    {
+      "case": "bodies/xml-unexpected-namespace",
+      "key": "run",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0039 decision 4: an element the pact puts in no namespace matches its local name in any, as pact-specification's v3 and v4 case `unexpected xml namespace` says and pact-reference's V2 engine does; today's verifier, like pact-jvm, compares the qualified name, and pact_matching's own spec tests ignore the case as incorrect behaviour"
+    },
+    {
+      "case": "bodies/xml-unexpected-namespace",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0039 decision 4: an element the pact puts in no namespace matches its local name in any, as pact-specification's v3 and v4 case `unexpected xml namespace` says and pact-reference's V2 engine does; today's verifier, like pact-jvm, compares the qualified name, and pact_matching's own spec tests ignore the case as incorrect behaviour"
     }
   ]
 }

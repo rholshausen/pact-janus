@@ -24,6 +24,7 @@ pact_janus_kernel = { path = "../kernel" }
 pact_janus_component_json = { path = "../component-json" }
 pact_janus_component_text = { path = "../component-text" }
 pact_janus_component_form = { path = "../component-form" }
+pact_janus_component_xml = { path = "../component-xml" }
 serde_json = "1"
 wit-bindgen = "0.60"
 

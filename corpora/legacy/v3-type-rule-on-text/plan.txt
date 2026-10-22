@@ -1,0 +1,63 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        :"$.page" (
+          %expect:count (
+            $.request.query.page,
+            1
+          ),
+          %legacy:parses-as (
+            $.request.query.page[0],
+            'integer'
+          )
+        ),
+        :"$.size" (
+          %expect:count (
+            $.request.query.size,
+            1
+          ),
+          %legacy:parses-as (
+            $.request.query.size[0],
+            'integer'
+          )
+        ),
+        %legacy:only-entries (
+          $.request.query,
+          'page',
+          'size'
+        )
+      ),
+      :headers (
+        :"$.X-Ratio" (
+          %legacy:parses-as (
+            $.request.headers.x-ratio,
+            'number'
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      )
+    )
+  )
+)

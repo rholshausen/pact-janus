@@ -2374,6 +2374,7 @@ dependencies = [
  "pact_janus_component_json",
  "pact_janus_component_oauth2",
  "pact_janus_component_text",
+ "pact_janus_component_xml",
  "pact_janus_hooks_host",
  "pact_janus_kernel",
  "pact_janus_sample_order_service",
@@ -2472,6 +2473,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_janus_component_xml"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "indexmap",
+ "pact_janus_kernel",
+ "pretty_assertions",
+ "rstest 0.24.0",
+ "serde_json",
+ "sxd-document",
+]
+
+[[package]]
 name = "pact_janus_conformance"
 version = "0.2.0"
 dependencies = [
@@ -2515,6 +2529,7 @@ dependencies = [
  "pact_janus_component_form",
  "pact_janus_component_json",
  "pact_janus_component_text",
+ "pact_janus_component_xml",
  "pact_janus_kernel",
  "serde_json",
  "wit-bindgen 0.60.0",
@@ -2562,6 +2577,7 @@ dependencies = [
  "pact_janus_component_json",
  "pact_janus_component_oauth2",
  "pact_janus_component_text",
+ "pact_janus_component_xml",
  "pact_janus_hooks_host",
  "pact_janus_sample_order_service",
  "pact_models",
@@ -2574,6 +2590,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+ "sxd-document",
  "test-log",
  "tracing",
  "ureq",

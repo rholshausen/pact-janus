@@ -1,0 +1,30 @@
+{
+  "description": "An XML body whose pact names no namespace, answered by a root element in one. pact-specification's v3 and v4 case `unexpected xml namespace` says it matches, and pact-reference's V2 engine agrees; today's verifier, and pact-jvm, compare the qualified name and fail it. Janus follows the specification: a deliberate difference in the ledger (ADR 0039 decision 4)",
+  "source": "staged plan S1.22; pact-specification's testcases/v3/response/body/unexpected xml namespace.json, which pact_matching's own spec tests ignore as \"Incorrect behaviour - fixed in V2 engine\"; ADR 0039",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/alligator"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/xml"
+            ]
+          },
+          "body": {
+            "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><alligator xmlns=\"urn:alligators\" name=\"Mary\"/>"
+          }
+        }
+      }
+    ]
+  }
+}

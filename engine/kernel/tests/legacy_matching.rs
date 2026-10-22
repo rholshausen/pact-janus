@@ -6,18 +6,17 @@
 //! This is a harness, not `corpora/`'s golden-corpus format (plan task 3.7, plan-grammar spec §6):
 //! these fixtures are pact-specification's own oracle, not Janus's — the two serve different jobs.
 //!
-//! **Known gaps, excluded rather than silently miscounted.** [`skip_reason`] names every case this
-//! compiler cannot yet be expected to pass. Most are a scope decision recorded in
-//! `engine/kernel/src/legacy/compile.rs`'s module docs: XML bodies (staged plan S1.22; text bodies
-//! compile since S1.6), and the handful of matching rules with zero coverage in
-//! this corpus (`Values`, `EachKey`, `EachValue`, `ArrayContains`) that compile to a deliberate `error`
-//! node — these are excluded by a rule, since they cover every v2/v3/v4 duplicate of the same
-//! underlying case. The rest are a `janus:skip` attribute on the one fixture file it explains (not
-//! part of pact-specification's own schema — see the fixtures' `README.md`), for a disagreement
-//! specific to that single case rather than a category of them. A case that isn't skipped is
-//! expected to pass; the assertion at the bottom enforces that.
+//! **Every case runs.** Text bodies compile since S1.6 and XML bodies since S1.22 (ADR 0039), the last
+//! category of case this harness excluded by a rule. A case this compiler is known to disagree with
+//! may still carry a `janus:skip` attribute on its fixture file (not part of pact-specification's own
+//! schema — see the fixtures' `README.md`), and none does. A case that isn't skipped is expected to
+//! pass; the assertion at the bottom enforces that.
+//!
+//! An XML case's expected body is read by the legacy layer and its actual one decoded by the XML
+//! component, as a verification reads a pact and decodes a reply.
 
 use pact_janus_kernel::legacy::compile::{self, LegacyBody, LegacyRequest, LegacyResponse};
+use pact_janus_kernel::legacy::xml;
 use pact_janus_kernel::plan::{self, CapturedValues, RuntimeValue, Status};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -28,7 +27,7 @@ struct Case {
   expected_match: bool,
   expected: Value,
   actual: Value,
-  /// `janus:skip`, when the fixture carries one (module docs' "Known gaps") — a Janus-added
+  /// `janus:skip`, when the fixture carries one (module docs) — a Janus-added
   /// annotation, not part of the file's own pact-specification schema, so it stays legible as
   /// "this one case, and here is why" instead of drifting from the case it was written against.
   skip: Option<String>,
@@ -70,24 +69,23 @@ fn read_cases(dir: &Path, out: &mut Vec<Case>) {
   }
 }
 
-/// Cases this compiler cannot yet be expected to pass (module docs). Two kinds: a `janus:skip`
-/// attribute on the fixture itself, for a single case that disagrees with this compiler for a
-/// reason specific to that one case (an annotation on the evidence, not a rule in the harness); and
-/// the content-type-driven exclusions below, applied by a rule because they cover every v2/v3/v4
-/// duplicate of the same underlying case rather than one file.
+/// A case this compiler cannot be expected to pass (module docs): a `janus:skip` attribute on the
+/// fixture itself, for a single case that disagrees with this compiler for a reason specific to that
+/// one case (an annotation on the evidence, not a rule in the harness).
 fn skip_reason(case: &Case) -> Option<String> {
-  if let Some(reason) = &case.skip {
-    return Some(reason.clone());
-  }
-  let is_xml = |v: Option<Value>| matches!(v, Some(Value::String(s)) if s.trim_start().starts_with('<'));
-  if is_xml(body_of(&case.expected)) || is_xml(body_of(&case.actual)) {
-    return Some("XML body: staged plan S1.22".to_string());
-  }
-  let content_type = case.expected["headers"]["Content-Type"].as_str().unwrap_or("");
-  if content_type.contains("xml") {
-    return Some("XML content type: staged plan S1.22".to_string());
-  }
-  None
+  case.skip.clone()
+}
+
+/// Whether the expected side's body is XML: by its content type, or by its text when it has none,
+/// as `pact_models` detects one.
+fn is_xml(case: &Case) -> bool {
+  let content_type = case.expected["headers"]["Content-Type"]
+    .as_str()
+    .or_else(|| case.expected["body"]["contentType"].as_str())
+    .unwrap_or("");
+  content_type.contains("xml")
+    || (content_type.is_empty()
+      && matches!(body_of(&case.expected), Some(Value::String(text)) if text.trim_start().starts_with("<?xml")))
 }
 
 // --- expected/actual JSON -> the compiler's input types ---
@@ -192,13 +190,27 @@ fn body_of(value: &Value) -> Option<Value> {
   }
 }
 
-/// [`body_of`] as the compiler takes it: a declared null is an empty body, anything else a
-/// document (a text case's body is a string, which is what the legacy layer makes of text).
-fn legacy_body_of(value: &Value) -> Option<LegacyBody> {
+/// [`body_of`] as the compiler takes it: a declared null is an empty body, an XML one its elements,
+/// anything else a document (a text case's body is a string, which is what the legacy layer makes of
+/// text).
+fn legacy_body_of(value: &Value, xml_body: bool) -> Option<LegacyBody> {
   body_of(value).map(|body| match body {
     Value::Null => LegacyBody::Empty,
+    Value::String(text) if xml_body => LegacyBody::Xml(
+      xml::document(text.as_bytes()).unwrap_or_else(|err| panic!("an expected XML body: {err}")),
+    ),
     body => LegacyBody::Document(RuntimeValue::from_json(&body)),
   })
+}
+
+/// The actual side's body as a verification captures it: decoded as the expected side's type, so an
+/// XML body by the XML component, and absent when it does not decode.
+fn actual_body_of(value: &Value, xml_body: bool) -> Option<RuntimeValue> {
+  match body_of(value).filter(|body| !body.is_null())? {
+    Value::String(text) if xml_body => pact_janus_component_xml::parse(text.as_bytes()).ok(),
+    _ if xml_body => None,
+    body => Some(RuntimeValue::from_json(&body)),
+  }
 }
 
 fn is_request(case_file: &str) -> bool {
@@ -209,13 +221,14 @@ fn is_request(case_file: &str) -> bool {
 
 fn run_case(case: &Case) -> Result<(), String> {
   let rules = matching_rules(&case.expected);
+  let xml_body = is_xml(case);
   let (plan, resolver) = if is_request(&case.file) {
     let req = LegacyRequest {
       method: case.expected["method"].as_str().unwrap_or("GET").to_string(),
       path: case.expected["path"].as_str().unwrap_or("/").to_string(),
       query: parse_query(&case.expected["query"]),
       headers: parse_headers(&case.expected["headers"]),
-      body: legacy_body_of(&case.expected),
+      body: legacy_body_of(&case.expected, xml_body),
       // The cases pin header and body matching, not the type agreement S1.6 added.
       content_type: None,
       matching_rules: rules,
@@ -240,15 +253,15 @@ fn run_case(case: &Case) -> Result<(), String> {
         RuntimeValue::String(value),
       );
     }
-    if let Some(body) = body_of(&case.actual).filter(|b| !b.is_null()) {
-      resolver = resolver.capture("$.request.body", RuntimeValue::from_json(&body));
+    if let Some(body) = actual_body_of(&case.actual, xml_body) {
+      resolver = resolver.capture("$.request.body", body);
     }
     (plan, resolver)
   } else {
     let res = LegacyResponse {
       status: case.expected["status"].as_u64().unwrap_or(200),
       headers: parse_headers(&case.expected["headers"]),
-      body: legacy_body_of(&case.expected),
+      body: legacy_body_of(&case.expected, xml_body),
       // The cases pin header and body matching, not the type agreement S1.6 added.
       content_type: None,
       matching_rules: rules,
@@ -267,8 +280,8 @@ fn run_case(case: &Case) -> Result<(), String> {
         RuntimeValue::String(value),
       );
     }
-    if let Some(body) = body_of(&case.actual).filter(|b| !b.is_null()) {
-      resolver = resolver.capture("$.response.body", RuntimeValue::from_json(&body));
+    if let Some(body) = actual_body_of(&case.actual, xml_body) {
+      resolver = resolver.capture("$.response.body", body);
     }
     (plan, resolver)
   };
@@ -313,6 +326,7 @@ fn legacy_compiler_matches_the_specification_test_cases() {
   }
 
   let run = cases.len() - skipped;
+  assert_eq!(skipped, 0, "no specification case is skipped (S1.22)");
   eprintln!(
     "legacy matching: {}/{run} passed ({skipped} skipped, known gaps) out of {} total",
     run - failures.len(),

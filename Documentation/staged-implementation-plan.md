@@ -69,7 +69,7 @@ first draft of something that will be rewritten against the final specification.
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them, with the known gaps closed rather than skipped: 156 remain, all XML (S1.22). The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
 | **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); make the exchange loop single-threaded and async-ready (§4, gate W; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
@@ -827,6 +827,37 @@ item in 1a is done when S1.1 agrees.
   *Exit:* every pact-specification case the legacy harness runs passes, with its XML exclusion rule
   deleted and no `janus:skip` left; S1.1's ledger entries for
   `compatibility-suite/v1/19-response-with-xml-body-positive-case` gone.
+  *Done 2026-10-22* ([ADR 0039](decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
+  A built-in `xml` content component, `engine/component-xml`, claims the types today's verifier counts
+  as XML. Every embedding registers it after JSON and before text, so `text/xml` reaches it, and
+  `engine/hello` lists it. It parses with `sxd-document`, as today's verifier does. Its document is
+  keyed by element name: the root's local name holds the root, and an element is `#namespace`,
+  `@<name>` per attribute, `#text`, and an array of children per local name. So pact's XML paths are
+  document paths. The legacy layer reads a pact's XML body into the same document, and a test holds
+  that reader to the component's over every XML body in the repository. The legacy compiler walks it
+  as `match_xml` does, with three new legacy actions: `legacy:xml-children`, `legacy:xml-only-children`
+  and `legacy:parses-as`. Plan paths gained a quoted segment, `['@{urn:names}name']`. Request
+  generators on an XML body go through `pact_models`' `XmlHandler`. The legacy harness runs all 741
+  cases, with no exclusion rule and no `janus:skip`. Both ledger entries for case 19 are gone, and
+  S1.1's harness reads 344 verdicts: 330 agree and 14 are known. Three fixtures are new.
+  `bodies/xml-rules`, with mutations, and `generators/xml-body` agree with today's verifier.
+  `bodies/xml-unexpected-namespace` is a deliberate difference. Corpus cases `v3-xml-body`,
+  `v3-xml-body-mismatch` and `v3-type-rule-on-text` are new. Not foreseen:
+  - two of the 156 cases, `unexpected xml namespace` in v3 and v4, fail under today's verifier and
+    pact-jvm. pact_matching's own tests ignore them as incorrect behaviour fixed in its V2 engine.
+    Janus follows the specification: an element the pact puts in no namespace matches its local name
+    in any namespace (ADR 0039 decision 4). Keying children by local name is what makes that free;
+  - today's verifier reads every text value against a type rule by parsing it, and Janus compared its
+    kind. So an `integer` rule on a query parameter, a header or a path failed where today passes. It
+    now reads the text (`legacy:parses-as`), for XML and for every other text slot;
+  - `sxd-document` keeps no attribute order, so attributes are in name order;
+  - the plan-grammar spec forbids the v1–v4 compiler `expect:absent` and `match:any-of`. The XML walk
+    uses neither, but the compiler has emitted `expect:absent` for an empty body since the prototype.
+
+  Left out: `janus upgrade` still carries an XML body across with `body-not-parsed`, which S1.25 now
+  covers. A size rule on an element counts its child elements, where today's verifier counts child
+  nodes, whitespace included. That difference is deliberate (ADR 0039). A Janus contract's XML text
+  is trimmed as a pact's is, CDATA sections included; keeping it as written is S2.10.
 - **S1.23 Multipart bodies** — **M**, last of the body kinds. `multipart/form-data` and
   `multipart/mixed`, split at the boundary and each part compared by its own content type through
   the components S1.6, S1.21 and S1.22 add, as today's verifier compares them.
@@ -840,16 +871,17 @@ item in 1a is done when S1.1 agrees.
   findings table, and has nothing to do with body kinds.
   *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
   verifier; corpus cases for each.
-- **S1.25 `janus upgrade` converts text, binary and form bodies** — **S**. Split from S1.6, which made
-  text and binary bodies verify; S1.21 added form bodies, which upgrade the same way. `janus upgrade` still carries a body that is not JSON across with a
+- **S1.25 `janus upgrade` converts text, binary, form and XML bodies** — **S**. Split from S1.6, which made
+  text and binary bodies verify; S1.21 added form bodies and S1.22 XML ones, which upgrade the same way. `janus upgrade` still carries a body that is not JSON across with a
   `body-not-parsed` finding and asserts nothing about it, so the contract verifies less than the
   pact it came from (plan-grammar spec §4.4's two-path agreement). The contract should declare the
   body's type in `content-types` (contract-file spec §5.5) and shape it: a text body as a string
   with its rules on `$`, a binary one as bytes with a base64 example, a form as an object of string
-  lists with its rules on each name. A reply of another content
+  lists with its rules on each name, an XML body in ADR 0039's document with its rules on each element,
+  attribute and text. A reply of another content
   type should fail the contract as `legacy:body-type` fails the pact (ADR 0036 decision 4).
-  *Exit:* corpus cases in which a text body, a binary body and a form body upgrade and reach the
-  pact's verdict (`also-compiled-from`), matching and not; and no upgrade has a `body-not-parsed`
+  *Exit:* corpus cases in which a text body, a binary body, a form body and an XML body upgrade and
+  reach the pact's verdict (`also-compiled-from`), matching and not; and no upgrade has a `body-not-parsed`
   finding.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
@@ -930,6 +962,20 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* both SDKs' CI is green in their new repositories against a released engine, the published
   packages pass the conformance suite, and `sdks/` here holds only `bindings.json` and the README that
   says where they went.
+- **S2.10 XML text as written, in Janus contracts** — **M**, Janus-only behaviour. The `xml` component
+  reads an element's text as today's verifier does: each text node trimmed, then joined (ADR 0039
+  decision 2). `sxd-document` reads a CDATA section as one more text node, so its contents are trimmed
+  too. That is right for a v1–v4 pact, whose verdict depends on it. In a Janus contract it loses
+  whitespace that XML counts, and the literal contents of a CDATA section, and a mock cannot serve
+  either. The component keeps text as written, with each text node and CDATA section apart. The legacy
+  compiler then trims each node and joins them itself, so no v1–v4 verdict moves. That needs a parser
+  that reports CDATA, or a scan for it, accepting exactly the documents `sxd-document` accepts. It
+  changes what `#text` means in a contract, so it lands before contracts with XML bodies are published,
+  and `janus upgrade` (S1.25) shapes a pact's XML text so that whitespace still does not count. An ADR
+  amends ADR 0039 decision 2, and decides whether `encode` writes a CDATA section back as one.
+  *Exit:* corpus cases in which a contract's XML text with surrounding whitespace, and a CDATA section
+  with it, matches only text written the same way; the legacy harness and S1.1's verdicts unchanged;
+  S1.25's XML cases still reach their pact's verdict.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
 of pact-js and pact-jvm run on the compatibility facade, both SDKs have graduated (S2.9), and early
@@ -1141,6 +1187,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
+| S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |

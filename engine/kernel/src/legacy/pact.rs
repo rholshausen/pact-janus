@@ -32,6 +32,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentType;
 use pact_models::generators::form_urlencoded::FormUrlEncodedHandler;
+use pact_models::generators::xml::XmlHandler;
 use pact_models::generators::{
   ContentTypeHandler, GenerateValue, Generator, GeneratorCategory, GeneratorTestMode, JsonHandler,
   NoopVariantMatcher, VariantMatcher,
@@ -109,7 +110,7 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
 /// to be JSON, or a form, and was not is a problem with the *document*.
 #[derive(Debug, Clone)]
 pub enum Unsupported {
-  /// A body of a kind the legacy compiler does not compile yet: XML or multipart (S1.22, S1.23).
+  /// A body of a kind the legacy compiler does not compile yet: multipart (S1.23).
   ContentType(String),
   /// A body that did not parse as the type it claimed: what went wrong, naming the type.
   Malformed(String),
@@ -120,8 +121,8 @@ impl std::fmt::Display for Unsupported {
     match self {
       Unsupported::ContentType(content_type) => write!(
         f,
-        "legacy_pact: a '{content_type}' body is not compiled yet (XML and multipart bodies are \
-         staged plan S1.22 and S1.23)"
+        "legacy_pact: a '{content_type}' body is not compiled yet (multipart bodies are staged \
+         plan S1.23)"
       ),
       Unsupported::Malformed(message) => write!(f, "legacy_pact: {message}"),
     }
@@ -160,7 +161,9 @@ enum BodyKind {
   Json,
   /// `application/x-www-form-urlencoded`: compared as a query string (ADR 0038).
   Form,
-  /// XML or multipart: a matcher of its own today, and S1.22 and S1.23 here.
+  /// An XML type: compared element by element (ADR 0039).
+  Xml,
+  /// Multipart: a matcher of its own today, and S1.23 here.
   NotYet,
   /// A binary type (`image`, `audio`, `video`, `font`, `application/octet-stream`, and anything
   /// `pact_models` does not count as text): compared as octets.
@@ -175,7 +178,9 @@ impl BodyKind {
       BodyKind::Json
     } else if content_type.base_type() == FORM {
       BodyKind::Form
-    } else if content_type.is_xml() || content_type.main_type == "multipart" {
+    } else if content_type.is_xml() {
+      BodyKind::Xml
+    } else if content_type.main_type == "multipart" {
       BodyKind::NotYet
     } else if content_type.is_binary() || content_type.base_type() == "application/octet-stream" {
       BodyKind::Bytes
@@ -216,8 +221,8 @@ fn part_content_type(part: &dyn HttpPart) -> ContentType {
 /// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
 /// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
 /// actual body is absent too". A present body is read by its content type ([`BodyKind`]) into a
-/// document: JSON is parsed, a form is its names and values, text is a string, a binary body is its
-/// octets.
+/// document: JSON is parsed, a form is its names and values, XML is its elements (ADR 0039), text is
+/// a string, a binary body is its octets.
 fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   let bytes = match part.body() {
     OptionalBody::Missing => return Ok(None),
@@ -232,6 +237,9 @@ fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
     BodyKind::Form => form_document(bytes)
       .map(|form| Some(LegacyBody::Form(form)))
       .map_err(|err| Unsupported::Malformed(format!("body is not a valid form: {err}"))),
+    BodyKind::Xml => super::xml::document(bytes)
+      .map(|document| Some(LegacyBody::Xml(document)))
+      .map_err(|err| Unsupported::Malformed(format!("body is not valid XML: {err}"))),
     BodyKind::NotYet => Err(Unsupported::ContentType(content_type.to_string())),
     BodyKind::Bytes => Ok(Some(LegacyBody::Document(RuntimeValue::Bytes(bytes.to_vec())))),
     BodyKind::Text => Ok(Some(LegacyBody::Document(
@@ -524,13 +532,27 @@ fn generate_request(
           serde_urlencoded::to_string(&handler.params).ok()
         })
         .map(String::into_bytes),
+      // An XML body's generators go to its attributes and text, by today's handler, and the document
+      // is written back as today's verifier writes it (ADR 0039 decision 6).
+      Some(BodyKind::Xml) => pact_models::xml_utils::parse_bytes(bytes)
+        .ok()
+        .and_then(|package| {
+          let mut handler = XmlHandler {
+            value: package.as_document(),
+          };
+          apply(&mut |key, asking| handler.apply_key(key, asking, &HashMap::new(), &matcher));
+          let mut written = Vec::new();
+          sxd_document::writer::format_document(&handler.value, &mut written)
+            .ok()
+            .map(|()| written)
+        }),
       _ => None,
     };
     match generated {
       Some(body) => request.body = OptionalBody::Present(body.into(), content_type.clone(), *encoding),
       None => {
-        // XML bodies arrive with S1.22's component; until then such a body is sent as recorded and
-        // every generator on it says so.
+        // A multipart body, or one that is not what it says it is, is sent as recorded and every
+        // generator on it says so.
         let media_type = request
           .content_type()
           .map(|ct| ct.to_string())
@@ -540,7 +562,7 @@ fn generate_request(
             target: body_target(key),
             generator: PactGenerators::qualified(&generator.name()),
             message: format!(
-              "a body generator applies to a JSON or form body, and this body is {media_type}; the recorded value was sent"
+              "a body generator applies to a JSON, form or XML body, and this body is {media_type}; the recorded value was sent"
             ),
           });
         }

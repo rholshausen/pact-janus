@@ -1,0 +1,106 @@
+(
+  :"post /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'POST'
+          ) => 'POST',
+          'POST'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders',
+          '/orders'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.request.headers.content-type => 'application/xml',
+            'application/xml'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %expect:object (
+          $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum'}], 'note': [{'#text': 'leave at the door'}]}
+        ) => BOOL(true),
+        :"$.order" (
+          %match:equality (
+            $.request.body.order.#namespace => 'urn:other',
+            'urn:orders'
+          ) => ERROR(Expected 'urn:other' to equal 'urn:orders'),
+          :"$.order.@id" (
+            %legacy:parses-as (
+              $.request.body.order.@id => 'one',
+              'integer'
+            ) => ERROR(Expected 'one' to match an integer number)
+          ) => BOOL(false),
+          :"$.order.#text" (
+            %flow:if (
+              %check:exists (
+                $.request.body.order.#text => NULL
+              ) => BOOL(false),
+              %match:equality (
+                $.request.body.order.#text,
+                ''
+              )
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:count (
+            $.request.body.order.item => [{'#text': 'plum'}],
+            2
+          ) => ERROR(Expected exactly 2 item(s) but got 1),
+          :"$.order.item[0]" (
+            :"$.order.item[0].#text" (
+              %match:equality (
+                $.request.body.order.item[0].#text => 'plum',
+                'apple'
+              ) => ERROR(Expected 'plum' to equal 'apple')
+            ) => BOOL(false),
+            %legacy:only-entries (
+              $.request.body.order.item[0] => {'#text': 'plum'},
+              '#text',
+              '#namespace'
+            ) => BOOL(true)
+          ) => BOOL(false),
+          :"$.order.item[1]" (
+            :"$.order.item[1].#text" (
+              %match:equality (
+                $.request.body.order.item[1].#text => NULL,
+                'pear'
+              ) => ERROR(Expected <absent> to equal 'pear')
+            ) => BOOL(false),
+            %legacy:only-entries (
+              $.request.body.order.item[1] => NULL,
+              '#text',
+              '#namespace'
+            ) => ERROR(Expected an object but got <absent>)
+          ) => BOOL(false),
+          %legacy:only-entries (
+            $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum'}], 'note': [{'#text': 'leave at the door'}]},
+            '@id',
+            'item',
+            '#text',
+            '#namespace'
+          ) => ERROR(Unexpected member(s): @gift, note)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 201,
+          201
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(false)
+)

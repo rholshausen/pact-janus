@@ -1,0 +1,189 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders',
+          '/orders'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/xml; charset=UTF-8',
+            'application/xml'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %expect:object (
+          $.response.body.orders => {'#namespace': 'urn:orders', 'order': [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]}
+        ) => BOOL(true),
+        :"$.orders" (
+          :"$.orders.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.orders.#text => NULL
+              ) => BOOL(false),
+              %match:equality (
+                $.response.body.orders.#text,
+                ''
+              )
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:not-empty (
+            $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]
+            ) => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}],
+            :"$.orders.order[*]" (
+              %expect:object (
+                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}
+              ) => BOOL(true),
+              :"$.orders.order[*].@id" (
+                %legacy:parses-as (
+                  ~>.@id => '17',
+                  'integer'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.orders.order[*].@status" (
+                %match:type (
+                  ~>.@status => 'packed',
+                  'shipped'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.orders.order[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => NULL
+                  ) => BOOL(false),
+                  %match:type (
+                    ~>.#text,
+                    ''
+                  )
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %expect:not-empty (
+                ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]
+              ) => BOOL(true),
+              %flow:for-each (
+                ** (
+                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]
+                ) => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}],
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'pear'}
+                  ) => BOOL(true),
+                  :"$.orders.order[*].item[*].#text" (
+                    %match:regex (
+                      ~>.#text => 'pear',
+                      '^(?:[a-z]+)$'
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  %legacy:xml-only-children (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'pear'}
+                  ) => BOOL(true)
+                ) => BOOL(true),
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'plum'}
+                  ) => BOOL(true),
+                  :"$.orders.order[*].item[*].#text" (
+                    %match:regex (
+                      ~>.#text => 'plum',
+                      '^(?:[a-z]+)$'
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  %legacy:xml-only-children (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'plum'}
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]},
+                'item'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.orders.order[*]" (
+              %expect:object (
+                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}
+              ) => BOOL(true),
+              :"$.orders.order[*].@id" (
+                %legacy:parses-as (
+                  ~>.@id => '18',
+                  'integer'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.orders.order[*].@status" (
+                %match:type (
+                  ~>.@status => 'shipped',
+                  'shipped'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.orders.order[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => NULL
+                  ) => BOOL(false),
+                  %match:type (
+                    ~>.#text,
+                    ''
+                  )
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %expect:not-empty (
+                ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig'}]
+              ) => BOOL(true),
+              %flow:for-each (
+                ** (
+                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig'}]
+                ) => [{'#namespace': 'urn:orders', '#text': 'fig'}],
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'fig'}
+                  ) => BOOL(true),
+                  :"$.orders.order[*].item[*].#text" (
+                    %match:regex (
+                      ~>.#text => 'fig',
+                      '^(?:[a-z]+)$'
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  %legacy:xml-only-children (
+                    ~> => {'#namespace': 'urn:orders', '#text': 'fig'}
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]},
+                'item'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

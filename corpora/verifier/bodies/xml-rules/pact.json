@@ -1,0 +1,63 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "description": "the orders, as XML",
+      "request": {
+        "method": "GET",
+        "path": "/orders"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><orders><order id=\"1\" status=\"shipped\"><item>apple</item></order></orders>",
+        "matchingRules": {
+          "body": {
+            "$.orders.order": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.orders.order['@id']": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.orders.order['@status']": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "packed|shipped"
+                }
+              ]
+            },
+            "$.orders.order.item['#text']": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[a-z]+"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

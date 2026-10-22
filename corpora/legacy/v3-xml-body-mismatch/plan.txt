@@ -1,0 +1,106 @@
+(
+  :"post /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'POST'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.request.headers.content-type,
+            'application/xml'
+          )
+        )
+      ),
+      :body (
+        %expect:object (
+          $.request.body.order
+        ),
+        :"$.order" (
+          %match:equality (
+            $.request.body.order.#namespace,
+            'urn:orders'
+          ),
+          :"$.order.@id" (
+            %legacy:parses-as (
+              $.request.body.order.@id,
+              'integer'
+            )
+          ),
+          :"$.order.#text" (
+            %flow:if (
+              %check:exists (
+                $.request.body.order.#text
+              ),
+              %match:equality (
+                $.request.body.order.#text,
+                ''
+              )
+            )
+          ),
+          %expect:count (
+            $.request.body.order.item,
+            2
+          ),
+          :"$.order.item[0]" (
+            :"$.order.item[0].#text" (
+              %match:equality (
+                $.request.body.order.item[0].#text,
+                'apple'
+              )
+            ),
+            %legacy:only-entries (
+              $.request.body.order.item[0],
+              '#text',
+              '#namespace'
+            )
+          ),
+          :"$.order.item[1]" (
+            :"$.order.item[1].#text" (
+              %match:equality (
+                $.request.body.order.item[1].#text,
+                'pear'
+              )
+            ),
+            %legacy:only-entries (
+              $.request.body.order.item[1],
+              '#text',
+              '#namespace'
+            )
+          ),
+          %legacy:only-entries (
+            $.request.body.order,
+            '@id',
+            'item',
+            '#text',
+            '#namespace'
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          201
+        )
+      )
+    )
+  )
+)

@@ -314,9 +314,10 @@ fn generators_reach_a_form_body() {
   assert_eq!(requests[0].body, "a=1&b=7&b=8&id=1234&note=as+is");
 }
 
-/// A form body that does not parse is sent as recorded, and each generator on it says so.
+/// An XML body's generators, applied to an attribute and an element's text by today's handler, and
+/// the document written back as today's verifier writes it (ADR 0039).
 #[test]
-fn a_generator_on_a_body_it_cannot_read_warns() {
+fn generators_reach_an_xml_body() {
   let (base_url, received) = stub("{}", "{}");
   let pact = pact(
     json!([]),
@@ -324,7 +325,36 @@ fn a_generator_on_a_body_it_cannot_read_warns() {
       "method": "POST",
       "path": "/things",
       "headers": { "Content-Type": "application/xml" },
-      "body": "<a>1</a>",
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a id=\"1\"><b>2</b><c>as is</c></a>",
+      "generators": { "body": {
+        "$.a['@id']": { "type": "RandomInt", "min": 7, "max": 7 },
+        "$.a.b['#text']": { "type": "RandomInt", "min": 8, "max": 8 }
+      } }
+    }),
+  );
+
+  let events = verify(&mut engine(), pact, &base_url, None);
+
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  let requests = provider_requests(&received);
+  assert_eq!(
+    requests[0].body,
+    "<?xml version='1.0'?><a id='7'><b>8</b><c>as is</c></a>"
+  );
+}
+
+/// A body generators cannot reach into is sent as recorded, and each generator on it says so.
+#[test]
+fn a_generator_on_a_body_it_cannot_read_warns() {
+  let (base_url, received) = stub("{}", "{}");
+  let body = "--x\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n1\r\n--x--\r\n";
+  let pact = pact(
+    json!([]),
+    json!({
+      "method": "POST",
+      "path": "/things",
+      "headers": { "Content-Type": "multipart/form-data; boundary=x" },
+      "body": body,
       "generators": { "body": { "$.a": { "type": "RandomInt", "min": 7, "max": 7 } } }
     }),
   );
@@ -336,7 +366,7 @@ fn a_generator_on_a_body_it_cannot_read_warns() {
   assert_eq!(warnings[0]["code"], json!("generator-failed"));
   assert_eq!(warnings[0]["target"], json!("$.request.body.a"));
   let requests = provider_requests(&received);
-  assert_eq!(requests[0].body, "<a>1</a>");
+  assert_eq!(requests[0].body, body);
 }
 
 /// A generator with nothing to generate from leaves the recorded value, as today, and says so.

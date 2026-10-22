@@ -28,7 +28,9 @@ readability:
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`
-  are form bodies, compiled as a query string (ADR 0038).
+  are form bodies, compiled as a query string (ADR 0038). `v3-xml-body/` and `v3-xml-body-mismatch/` are
+  XML bodies, walked element by element over the XML component's document, and `v3-type-rule-on-text/`
+  a type rule read against text, as today's verifier reads it (ADR 0039).
 
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with

@@ -69,6 +69,9 @@ const CORE: &[(&str, Option<&str>, usize)] = &[
   ("legacy:min-max-type", Some("match:min-max-type"), 4),
   ("legacy:header-value", Some("match:header-value"), 2),
   ("legacy:body-type", None, 2),
+  ("legacy:xml-children", None, 1),
+  ("legacy:xml-only-children", None, 1),
+  ("legacy:parses-as", None, 2),
 ];
 
 /// The grammar a document's action names are read under. The two differ only in names.

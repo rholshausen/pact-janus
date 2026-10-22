@@ -1,0 +1,83 @@
+{
+  "description": "a type rule on a value that is text reads the text, as today's verifier does (ADR 0039): an integer rule on a query parameter and a number rule on a header pass text that parses, and fail text that does not",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /orders",
+          "request": {
+            "method": "GET",
+            "path": "/orders",
+            "query": {
+              "page": ["1"],
+              "size": ["20"]
+            },
+            "headers": {
+              "X-Ratio": "0.5"
+            },
+            "matchingRules": {
+              "query": {
+                "page": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                },
+                "size": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              },
+              "header": {
+                "X-Ratio": {
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "response": {
+            "status": 200
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders",
+    "$.request.query": { "page": ["3"], "size": ["many"] },
+    "$.request.headers.x-ratio": "1e-3",
+    "$.response.status": 200
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.query.size[0]",
+        "message": "Expected 'many' to match an integer number",
+        "action": "legacy:parses-as"
+      }
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "description": "a v3 XML request body that differs (ADR 0039): its root is in another namespace than the pact's, an integer rule refuses an attribute that is not one, a request has exactly the children the pact names, a different text is a mismatch, and a request's element has no attribute or child the pact lacks",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "post /orders",
+          "request": {
+            "method": "POST",
+            "path": "/orders",
+            "headers": {
+              "Content-Type": "application/xml"
+            },
+            "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a:order xmlns:a=\"urn:orders\" id=\"1\"><item>apple</item><item>pear</item></a:order>",
+            "matchingRules": {
+              "body": {
+                "$['urn:orders:order']['@id']": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "response": {
+            "status": 201
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/orders",
+    "$.request.query": {},
+    "$.request.headers.content-type": "application/xml",
+    "$.request.body": {
+      "order": {
+        "#namespace": "urn:other",
+        "@gift": "yes",
+        "@id": "one",
+        "item": [{ "#text": "plum" }],
+        "note": [{ "#text": "leave at the door" }]
+      }
+    },
+    "$.response.status": 201
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.body.order.#namespace",
+        "message": "Expected 'urn:other' to equal 'urn:orders'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.request.body.order.@id",
+        "message": "Expected 'one' to match an integer number",
+        "action": "legacy:parses-as"
+      },
+      {
+        "path": "$.request.body.order.item",
+        "message": "Expected exactly 2 item(s) but got 1",
+        "action": "expect:count"
+      },
+      {
+        "path": "$.request.body.order.item[0].#text",
+        "message": "Expected 'plum' to equal 'apple'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.request.body.order.item[1].#text",
+        "message": "Expected <absent> to equal 'pear'",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.request.body.order.item[1]",
+        "message": "Expected an object but got <absent>",
+        "action": "legacy:only-entries"
+      },
+      {
+        "path": "$.request.body.order",
+        "message": "Unexpected member(s): @gift, note",
+        "action": "legacy:only-entries"
+      }
+    ]
+  }
+}

@@ -16,7 +16,7 @@ against.
 | `V3Consumer-ProviderStateService.json` | v3 | pact-jvm 4.7.6 | provider states, `type` and `regex` matching rules |
 | `eachkeylike__consumer-eachkeylike_provider.json` | v4 | pact-jvm 4.7.6 | `eachKeyLike` matching rule |
 | `test_consumer_v3-MessageProvider.json` | v3 | pact-jvm 4.7.6 | message pact (`messages`, not `interactions`) |
-| `XMLConsumer-XMLProvider.json` | v3 | pact-jvm 4.7.6 | XML body — design 3.5's documented content-type gap |
+| `XMLConsumer-XMLProvider.json` | v3 | pact-jvm 4.7.6 | XML bodies, with rules on attributes and `#text` (ADR 0039) |
 | `zoo_app-animal_service.json` | v1-era | pact_gem 1.0.9 | five interactions, a bare `provider_state` string, lower-case `get` |
 
 The pact_gem file is there for exactly the reason it looks out of place: it is a Ruby SDK's

@@ -54,6 +54,8 @@ fn engine_with_everything() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  // XML before text, so `text/xml` reaches it (ADR 0039), as every embedding registers them.
+  engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
@@ -545,12 +547,19 @@ fn a_v3_pacts_matching_rules_decide_the_verdict_not_the_recorded_example() {
   );
 }
 
-/// The one documented gap, reported as what it is. Design 3.5 compiles JSON bodies only, so an XML
-/// response is a **missing component** — the identifier names the content component that would
-/// supply it (spec §10.2) — and never a crash, a skip, or a pass.
+/// pact-jvm's XML pact verifies against a provider whose reply differs only where its rules allow:
+/// other text under the regexes, other whitespace, and an attribute and an element the pact does not
+/// name, which a response may have (ADR 0039).
 #[test]
-fn an_xml_body_is_a_named_component_gap_rather_than_a_crash() {
-  let (base_url, _requests) = stub_provider(vec![canned(200, "<alligator/>")]);
+fn an_xml_pact_verifies_as_todays_verifier_compares_xml() {
+  let reply = "<?xml version=\"1.0\"?><Message lang=\"en\"><Head><Server><Name>other</Name>\
+    <Version>4.1</Version><Timestamp>2026-10-22T10:00:00Z</Timestamp></Server></Head>\
+    <Body><Result state=\"SUCCESS\"/><Extra/></Body></Message>";
+  let (base_url, _requests) = stub_provider(vec![canned_as(
+    200,
+    "application/xml; charset=UTF-8",
+    reply.as_bytes(),
+  )]);
   let mut engine = engine_with_everything();
 
   let events = verify(
@@ -561,19 +570,35 @@ fn an_xml_body_is_a_named_component_gap_rather_than_a_crash() {
   );
 
   let results = results(&events);
-  assert_eq!(
-    results.len(),
-    1,
-    "the gap is reported against the variant, not swallowed"
+  assert_eq!(results.len(), 1);
+  assert_eq!(results[0]["status"], json!("verified"), "{}", results[0]);
+}
+
+/// The same pact against a reply whose attribute has another value fails, located at the attribute.
+#[test]
+fn an_xml_mismatch_is_located_at_the_attribute_it_broke() {
+  let reply = "<Message><Head><Server><Name>n</Name><Version>v</Version><Timestamp>t</Timestamp>\
+    </Server></Head><Body><Result state=\"FAILED\"/></Body></Message>";
+  let (base_url, _requests) = stub_provider(vec![canned_as(200, "application/xml", reply.as_bytes())]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![fixture("XMLConsumer-XMLProvider.json")],
+    &base_url,
+    None,
   );
+
+  let results = results(&events);
   assert_eq!(results[0]["status"], json!("failed"));
-  assert_eq!(results[0]["error"]["code"], json!("component-unavailable"));
+  let mismatches = serde_json::to_string(&results[0]["mismatches"]).unwrap();
   assert!(
-    results[0]["error"]["component"]
-      .as_str()
-      .is_some_and(|component| component.starts_with("content/")),
-    "the missing piece is named: {}",
-    results[0]["error"]
+    mismatches.contains("$.response.body.Message.Body[0].Result[0].@state"),
+    "{mismatches}"
+  );
+  assert!(
+    mismatches.contains("Expected 'FAILED' to equal 'SUCCESS'"),
+    "{mismatches}"
   );
 }
 

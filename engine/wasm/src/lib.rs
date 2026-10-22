@@ -19,6 +19,7 @@
 use pact_janus_component_form::FormContent;
 use pact_janus_component_json::JsonContent;
 use pact_janus_component_text::TextContent;
+use pact_janus_component_xml::XmlContent;
 use pact_janus_kernel::protocol::Engine;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -36,6 +37,9 @@ thread_local! {
 fn engine() -> Engine {
   let mut engine = Engine::with_components(HashMap::new(), Some(Arc::new(JsonContent::new())));
   engine.declare_in_tree("content", "json", "1.0.0");
+  // XML before text, which claims all of `text/*`, so `text/xml` reaches it (ADR 0039).
+  engine.register_content(Arc::new(XmlContent::new()));
+  engine.declare_in_tree("content", "xml", "1.0.0");
   engine.register_content(Arc::new(TextContent::new()));
   engine.declare_in_tree("content", "text", "1.0.0");
   engine.register_content(Arc::new(FormContent::new()));

@@ -1,0 +1,32 @@
+{
+  "description": "An XML body with the rules pact-jvm's XML builder writes: a type rule on a repeated element, which compares every one against the pact's first, an integer rule on an attribute, and regexes on text. The provider answers pretty-printed, with other values, more orders than the pact and an attribute it does not name",
+  "source": "staged plan S1.22; ADR 0039; pact_matching::xml::match_xml",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/xml; charset=UTF-8"
+            ]
+          },
+          "body": {
+            "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<orders>\n  <order id=\"17\" status=\"packed\">\n    <item>pear</item>\n    <item>plum</item>\n  </order>\n  <order id=\"18\" status=\"shipped\" priority=\"high\">\n    <item>fig</item>\n  </order>\n</orders>\n"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

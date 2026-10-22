@@ -26,6 +26,10 @@ indexmap = "2"
 # A v1–v4 form body, read and written as today's verifier reads and writes one (ADR 0038). Already
 # in the tree through `pact_models`' default `form_urlencoded` feature.
 serde_urlencoded = "0.7"
+# A v1–v4 XML body, read into a document as today's verifier reads one, and its request generators
+# written back as it writes them (ADR 0039). Already in the tree through `pact_models`' default
+# `xml` feature.
+sxd-document = "0.3"
 serde_path_to_error = "0.1"
 # The interpreter's match:regex/match:semver/bytes-literal support. Pure Rust, no OS bindings -
 # pact-reference's own matching engine depends on the same three for the same reasons.
@@ -53,6 +57,7 @@ pact_janus_component_http = { path = "../component-http" }
 pact_janus_component_json = { path = "../component-json" }
 pact_janus_component_text = { path = "../component-text" }
 pact_janus_component_form = { path = "../component-form" }
+pact_janus_component_xml = { path = "../component-xml" }
 # The sample provider (plan task 5.6), embedded rather than spawned: a verification run needs a
 # real provider on a real socket to be worth anything, and the one the plan calls for is in this
 # repo. No cycle — the sample depends on nothing of ours.

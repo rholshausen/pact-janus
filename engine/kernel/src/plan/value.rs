@@ -89,9 +89,44 @@ impl RuntimeValue {
   }
 }
 
-/// Navigate `value` by a relative path suffix built from `.member` and `[index]` segments (e.g.
-/// `.sku`, `[0]`, `.payment.dueDate`) — the syntax [`super::path`] and the compiler's `Cursor`
-/// both use. An empty suffix returns `value` itself.
+/// A member of `base`, as [`navigate`] reads one: `.<name>`, or `['<name>']` when the name has a
+/// character the plain form would end at, or none. In the quoted form `\` and `'` are escaped with
+/// a `\`. The v1–v4 compiler names XML members this way (`['@{urn:names}name']`, ADR 0039).
+pub fn member_path(base: &str, name: &str) -> String {
+  let plain = !name.is_empty()
+    && !name
+      .chars()
+      .any(|c| c.is_whitespace() || matches!(c, '.' | '[' | ']' | '\'' | '\\' | '{' | '}' | '~'));
+  if plain {
+    format!("{base}.{name}")
+  } else {
+    let escaped = name.replace('\\', "\\\\").replace('\'', "\\'");
+    format!("{base}['{escaped}']")
+  }
+}
+
+/// A quoted member's name, and what follows its closing `']`.
+fn unquote(quoted: &str) -> (String, &str) {
+  let mut name = String::new();
+  let mut chars = quoted.char_indices();
+  while let Some((at, c)) = chars.next() {
+    match c {
+      '\\' => {
+        if let Some((_, escaped)) = chars.next() {
+          name.push(escaped);
+        }
+      }
+      '\'' if quoted[at..].starts_with("']") => return (name, &quoted[at + 2..]),
+      c => name.push(c),
+    }
+  }
+  (name, "")
+}
+
+/// Navigate `value` by a relative path suffix built from `.member`, `['member']` and `[index]`
+/// segments (e.g. `.sku`, `[0]`, `.payment.dueDate`, `['@{urn:names}name']`) — the syntax
+/// [`super::path`], [`member_path`] and the compilers' `Cursor`s use. An empty suffix returns
+/// `value` itself.
 ///
 /// A member that does not exist, an index out of range, or descending into a value that is not
 /// the addressed shape (an object for `.member`, an array for `[index]`) yields
@@ -120,6 +155,14 @@ pub fn navigate(value: &RuntimeValue, suffix: &str) -> RuntimeValue {
           "value" => Some(&**value),
           _ => None,
         },
+        _ => None,
+      }
+    } else if let Some(quoted) = suffix.strip_prefix("['") {
+      // A member named in quotes, because its name has a character the other forms end at.
+      let (member, remaining) = unquote(quoted);
+      suffix = remaining;
+      match current {
+        RuntimeValue::Object(members) => members.get(&member),
         _ => None,
       }
     } else if let Some(after_bracket) = suffix.strip_prefix('[') {

@@ -1,4 +1,5 @@
-//! **The v1–v4 compatibility layer: the one part of the kernel that knows HTTP and JSON.**
+//! **The v1–v4 compatibility layer: the one part of the kernel that knows HTTP and JSON**, and the body
+//! kinds a v1–v4 pact compares by their own rules: form and XML.
 //!
 //! The kernel's rule is that it knows nothing about HTTP or JSON (AGENTS.md's architecture rules):
 //! transports, content and matchers are components, and the plan, the interpreter, shapes,
@@ -15,7 +16,9 @@
 //! - [`compile`] is the v1–v4 matching-rule compiler (plan-grammar spec §4.4): the single home of
 //!   v1–v4 cascading and precedence, and of the HTTP slot names `method`, `path`, `query`,
 //!   `headers`, `body` and `status`;
-//! - [`upgrade`] converts a v1–v4 pact into a Janus contract (contract-file spec §8).
+//! - [`upgrade`] converts a v1–v4 pact into a Janus contract (contract-file spec §8);
+//! - [`xml`] reads a v1–v4 XML body into the document the built-in XML component decodes one to
+//!   (ADR 0039), which [`compile`] walks as today's verifier walks XML.
 //!
 //! The rest of the kernel calls these, and holds what they return, without naming a `pact_models`
 //! type: a request kept for its generators is a [`pact::RequestTemplate`]. `tests/boundary.rs`
@@ -29,3 +32,4 @@
 pub mod compile;
 pub mod pact;
 pub mod upgrade;
+pub mod xml;

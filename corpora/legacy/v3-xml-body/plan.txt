@@ -1,0 +1,121 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/xml'
+          )
+        )
+      ),
+      :body (
+        %expect:object (
+          $.response.body.orders
+        ),
+        :"$.orders" (
+          :"$.orders.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.orders.#text
+              ),
+              %match:equality (
+                $.response.body.orders.#text,
+                ''
+              )
+            )
+          ),
+          %expect:not-empty (
+            $.response.body.orders.order
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.orders.order
+            ),
+            :"$.orders.order[*]" (
+              %expect:object (
+                ~>
+              ),
+              :"$.orders.order[*].@id" (
+                %legacy:parses-as (
+                  ~>.@id,
+                  'integer'
+                )
+              ),
+              :"$.orders.order[*].@status" (
+                %match:type (
+                  ~>.@status,
+                  'shipped'
+                )
+              ),
+              :"$.orders.order[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text
+                  ),
+                  %match:type (
+                    ~>.#text,
+                    ''
+                  )
+                )
+              ),
+              %expect:not-empty (
+                ~>.item
+              ),
+              %flow:for-each (
+                ** (
+                  ~>.item
+                ),
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~>
+                  ),
+                  :"$.orders.order[*].item[*].#text" (
+                    %match:regex (
+                      ~>.#text,
+                      '^(?:[a-z]+)$'
+                    )
+                  ),
+                  %legacy:xml-only-children (
+                    ~>
+                  )
+                )
+              ),
+              %legacy:xml-only-children (
+                ~>,
+                'item'
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,24 @@
+[package]
+name = "pact_janus_component_xml"
+description = "The built-in XML content component (component-interfaces spec §6, ADR 0039): decode/encode for application/xml, text/xml and +xml types, native binding."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+pact_janus_kernel = { path = "../kernel" }
+serde_json = "1"
+base64 = "0.22"
+# What today's verifier parses an XML body with (`pact_models::xml_utils::parse_bytes`), so both
+# accept the same documents and read the same names. Already in the tree through `pact_models`.
+sxd-document = "0.3"
+indexmap = "2"
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.24"
+
+[lints]
+workspace = true

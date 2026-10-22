@@ -943,6 +943,97 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       }
     }
 
+    // An XML element's child elements (ADR 0039): each child's name, once per child, from the
+    // members that are not an attribute (`@`) or the element's own (`#`). What today's verifier
+    // counts for a size rule on an element, and checks a response's unnamed children against.
+    "legacy:xml-children" => match value_of(&children[0]) {
+      RuntimeValue::Absent => NodeResult::Value(RuntimeValue::Absent),
+      RuntimeValue::Object(members) => NodeResult::Value(RuntimeValue::Array(
+        members
+          .iter()
+          .filter(|(name, _)| !name.starts_with('@') && !name.starts_with('#'))
+          .flat_map(|(name, value)| {
+            let count = match value {
+              RuntimeValue::Array(items) => items.len(),
+              _ => 1,
+            };
+            std::iter::repeat_n(RuntimeValue::String(name.clone()), count)
+          })
+          .collect(),
+      )),
+      other => NodeResult::Error {
+        message: format!("Expected an XML element but got {}", display(&other)),
+        path: locus(children),
+      },
+    },
+
+    // An XML element has no child elements but those named (ADR 0039): today's "Unexpected child".
+    // Its attributes (`@`) and its own members (`#`) are not children.
+    "legacy:xml-only-children" => {
+      let value = value_of(&children[0]);
+      let allowed: Vec<String> = children[1..].iter().map(|c| plain_text(&value_of(c))).collect();
+      match value {
+        RuntimeValue::Object(members) => {
+          let extra: Vec<String> = members
+            .keys()
+            .filter(|name| !name.starts_with('@') && !name.starts_with('#') && !allowed.contains(name))
+            .map(|name| format!("<{name}/>"))
+            .collect();
+          match extra.len() {
+            0 => NodeResult::Ok,
+            1 => NodeResult::Error {
+              message: format!("Unexpected child {}", extra[0]),
+              path: locus(children),
+            },
+            _ => NodeResult::Error {
+              message: format!("Unexpected children {}", extra.join(", ")),
+              path: locus(children),
+            },
+          }
+        }
+        other => NodeResult::Error {
+          message: format!("Expected an XML element but got {}", display(&other)),
+          path: locus(children),
+        },
+      }
+    }
+
+    // A string read as today's verifier reads one against a type rule (ADR 0039): `number` and
+    // `decimal` parse as a floating-point number, `integer` as an unsigned one, `boolean` is `true`
+    // or `false`. Every v1–v4 value that is text — a path, a header, a query or form value, an XML
+    // attribute or text — is compared this way.
+    "legacy:parses-as" => {
+      let value = value_of(&children[0]);
+      let kind = plain_text(&value_of(&children[1]));
+      match as_text(&value) {
+        None => NodeResult::Error {
+          message: format!("Expected a string but got {}", display(&value)),
+          path: locus(children),
+        },
+        Some(text) => {
+          let (parses, described) = match kind.as_str() {
+            "number" | "decimal" => (text.parse::<f64>().is_ok(), "a number"),
+            "integer" => (text.parse::<u64>().is_ok(), "an integer number"),
+            "boolean" => (text == "true" || text == "false", "a boolean"),
+            other => {
+              return NodeResult::Error {
+                message: format!("'{other}' is not a kind a string can be read as"),
+                path: locus(children),
+              };
+            }
+          };
+          if parses {
+            NodeResult::Value(RuntimeValue::Bool(true))
+          } else {
+            NodeResult::Error {
+              message: format!("Expected '{text}' to match {described}"),
+              path: locus(children),
+            }
+          }
+        }
+      }
+    }
+
     "legacy:body-type" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));

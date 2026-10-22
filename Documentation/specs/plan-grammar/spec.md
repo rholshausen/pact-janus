@@ -162,7 +162,10 @@ executed plan needs to know whether an unannotated node was skipped or never rea
 Values reach the plan through **resolvers**. A `resolve` node holds a path — `$.query`,
 `$.body.items`, `$.headers.content-type` — resolved against the interaction context by the transport
 and content components that own those parts. The kernel does not know what a header is; it knows how
-to ask.
+to ask. A path is segments: `.name` for a member, `[n]` for an element, and `['name']` for a member
+whose name has a character the plain form would end at (`.`, `[`, `]`, `'`, `\`, `{`, `}`, `~` or white
+space), with `\` and `'` escaped by a `\` (`$.body.order['@{urn:names}name']`,
+[ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
 
 ### 2.5 Determinism
 
@@ -292,15 +295,15 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | `expect` | structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:absent` | |
 | `check` | boolean checks | `check:exists`, `check:equals`, `check:null` | |
 | `match` | one per value operator of the shape language (§4.3) | `match:*` | |
-| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type` | |
+| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as` | |
 
 **Every core action takes at least a fixed number of children**, and a node with fewer is malformed:
 
 | Least children | Actions |
 |---|---|
 | 0 | `flow:and`, `flow:or`, `flow:apply`, `flow:tee`, `value:join` |
-| 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries` |
-| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type` |
+| 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries`, `legacy:xml-children`, `legacy:xml-only-children` |
+| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type`, `legacy:parses-as` |
 | 3 | `expect:size`; `legacy:min-type`, `legacy:max-type` |
 | 4 | `legacy:min-max-type` |
 
@@ -372,6 +375,12 @@ A v1–v4 JSON object's members are a set, so it compiles them by name. A form b
 string is, with the body's rules: each name's values in order, and every name required whichever part it
 is in, as today's verifier compares a form
 ([ADR 0038](../../decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)).
+An XML body is walked as today's verifier walks one, over the XML component's document (component-interfaces
+spec §6.1): each element by the rule at its path or by its name, then its attributes, its text and its
+children, grouped by name, with rules found by pact's own paths (`$.a.b['@c']`, `['#text']`, no index)
+([ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
+A type rule on a value that is text (a path, a header, a query or form value, an XML attribute or text)
+reads the text, as today's verifier does: `legacy:parses-as`.
 
 The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
 "which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:
@@ -383,6 +392,9 @@ The actions only the v1–v4 compiler may emit are the `legacy` namespace, and n
 | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a size bound, enforced only when the resolved value is an array — a string's characters and an object's members are not items — and never emitted bounded for a cascaded rule, which the legacy compiler reduces to `match:type` (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
 | `legacy:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
 | `legacy:body-type` | legacy only | v1–v4's check that a body is of the pact's content type before it is compared (ADR 0036): its children are the received `Content-Type` and the pact's type. An absent value agrees, as does an unknown type on either side (`*/*`), the same type and subtype, or a suffix type whose suffix is the pact's subtype (`application/hal+json` for `application/json`); when the pact's type has parameters, the received one must have the same. The legacy compiler emits it only when the pact names no `Content-Type` header, since `legacy:header-value` checks one it names. A shape's body type is its slot's declared content type (contract-file spec §5.5) instead. |
+| `legacy:xml-children` | legacy only | an XML element's child elements, as their names, one per child (ADR 0039): what a size rule or `notEmpty` on an element counts. Absent for an absent element |
+| `legacy:xml-only-children` | legacy only | an XML element has no child element but those its children name (ADR 0039), failing with today's `Unexpected child <name/>`. A response's element is held to it where a type rule reaches its children; a request's is closed by `legacy:only-entries` |
+| `legacy:parses-as` | legacy only | a string read as today's verifier reads one against a type rule (ADR 0039): its second child is `number` or `decimal` (parses as a floating-point number), `integer` (as an unsigned one) or `boolean` (`true` or `false`). Shapes compare a value's kind with `match:number` and the rest instead |
 | `match:any-of`, `expect:absent` | shapes only | v1–v4 has no enumeration or absence assertion |
 
 This is why the forked action set is worth keeping rather than replacing: it is the legacy half of the
@@ -430,7 +442,7 @@ mapping**, one name to one name:
 | `match:array-contains` | `legacy:array-contains` |
 | `match:min-type`, `match:max-type`, `match:min-max-type` | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` |
 | `match:header-value` | `legacy:header-value` |
-| — | `legacy:body-type`, which v0 did not have |
+| — | `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children` and `legacy:parses-as`, which v0 did not have |
 | every other `expect:*`, `check:*` and `match:*` action | the same name |
 | `<component>:<name>` | the same name |
 

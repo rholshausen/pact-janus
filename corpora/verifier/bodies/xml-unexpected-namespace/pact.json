@@ -1,0 +1,29 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "alligator-service"
+  },
+  "interactions": [
+    {
+      "description": "an alligator",
+      "request": {
+        "method": "GET",
+        "path": "/alligator"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/xml"
+        },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><alligator name=\"Mary\"/>"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

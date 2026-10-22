@@ -1,0 +1,32 @@
+{
+  "description": "Generators in an XML body: the state-change call answers {\"customer\": 1234}, which reaches a ProviderState generator on an attribute and one on an element's text. The provider recognises the generated body byte for byte, as both verifiers write it with the same XML writer, so a verifier that sent the recorded body instead gets a 404",
+  "source": "staged plan S1.22's exit; pact_models' XmlHandler, which pact_matching generates into an XML body with; ADR 0039",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "customer": 1234
+      }
+    },
+    "routes": [
+      {
+        "states": [
+          "a customer exists"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/orders",
+          "body": {
+            "text": "<?xml version='1.0'?><order customer='1234'><note>for 1234</note><qty>2</qty></order>"
+          }
+        },
+        "response": {
+          "status": 201
+        }
+      }
+    ]
+  }
+}

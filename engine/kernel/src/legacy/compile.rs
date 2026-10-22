@@ -32,13 +32,17 @@
 //! a JSON pact's body does (staged plan S1.20). Structure is walked member by member, by name; a
 //! string or bytes, which is what a text or binary body is, is one value at `$` (ADR 0036 decision
 //! 3: today's `match_text` and `match_octet_stream`). A form body is compiled as a query string, the
-//! way today's `match_form_urlencoded` compares one (ADR 0038). XML and multipart bodies are S1.22 and
-//! S1.23. `Values`, `EachKey`, `EachValue`, `ArrayContains` and
+//! way today's `match_form_urlencoded` compares one (ADR 0038). An XML body is walked element by
+//! element, the way today's `match_xml` compares one (ADR 0039, [`compile_xml_body`]). Multipart
+//! bodies are S1.23. A rule on a value that is text — a path, a header, a query or form value, an XML
+//! attribute or text — reads the text as today's verifier does: `integer` is text that parses as an
+//! integer (`legacy:parses-as`). `Values`, `EachKey`, `EachValue`, `ArrayContains` and
 //! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
 
-use crate::plan::{self as model, Literal, Node, RuntimeValue};
+use crate::legacy::xml::{self, rule_name};
+use crate::plan::{self as model, CapturedValues, Literal, Node, RuntimeValue, Status, member_path};
 use crate::shape::path;
 use indexmap::IndexMap;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
@@ -83,6 +87,9 @@ pub enum LegacyBody {
   /// A form body, as the form component decodes one: each name with its values, a list of strings.
   /// Compiled as a query string is, since today's verifier compares it as one (ADR 0038).
   Form(RuntimeValue),
+  /// An XML body, as the XML component decodes one ([`crate::legacy::xml`]). Compiled element by
+  /// element, as today's verifier compares one (ADR 0039).
+  Xml(RuntimeValue),
 }
 
 /// A v1–v4 response. See [`LegacyRequest`] for the header/body notes, which apply identically.
@@ -304,8 +311,23 @@ pub fn anchored_pattern(pattern: &str) -> String {
 /// `Values`, `EachKey`, `EachValue`, `ArrayContains` and plugin-provided rules are a documented gap
 /// (module docs' "Scope"): none of the specification test cases in `tests/fixtures/spec_testcases`
 /// exercise them.
-fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal) -> Node {
+fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text) -> Node {
   match rule {
+    // Text is read as today's verifier reads it against a type rule (module docs).
+    MatchingRule::Number | MatchingRule::Integer | MatchingRule::Decimal | MatchingRule::Boolean
+      if text == Text::Yes =>
+    {
+      let kind = match rule {
+        MatchingRule::Number => "number",
+        MatchingRule::Integer => "integer",
+        MatchingRule::Decimal => "decimal",
+        _ => "boolean",
+      };
+      Node::action(
+        "legacy:parses-as",
+        vec![resolve, Node::value(Literal::string(kind))],
+      )
+    }
     MatchingRule::Equality => Node::action("match:equality", vec![resolve, Node::value(example.clone())]),
     MatchingRule::Regex(pattern) => Node::action(
       "match:regex",
@@ -381,17 +403,31 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal) -> Node {
 /// is the declaring array's own size, and v1–v4 never re-apply it below that array — not to a
 /// scalar, and not to a nested array either (`pact_matching`'s JSON matcher checks the bound only
 /// when `!cascaded`). Emitting the bounded action would both misread in `explain` and misbehave.
-fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Literal) -> Node {
-  let mut nodes: Vec<Node> = list
+fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Literal, text: Text) -> Node {
+  let nodes: Vec<Node> = list
     .rules
     .iter()
     .map(|rule| match rule {
       MatchingRule::MinType(_) | MatchingRule::MaxType(_) | MatchingRule::MinMaxType(_, _) if cascaded => {
-        rule_node(&MatchingRule::Type, resolve.clone(), example)
+        rule_node(&MatchingRule::Type, resolve.clone(), example, text)
       }
-      _ => rule_node(rule, resolve.clone(), example),
+      _ => rule_node(rule, resolve.clone(), example, text),
     })
     .collect();
+  combine(list, nodes)
+}
+
+/// Whether a value is text, which a type rule reads by parsing it (module docs), or a document value,
+/// which it reads by its kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Text {
+  Yes,
+  No,
+}
+
+/// One node per rule, combined as the list says: the one node alone, or every one under `flow:and`
+/// or `flow:or`.
+fn combine(list: &RuleList, mut nodes: Vec<Node>) -> Node {
   match nodes.len() {
     1 => nodes.pop().expect("checked len == 1"),
     _ => {
@@ -416,8 +452,9 @@ fn compile_scalar_slot(
   let category = rules_for(rules, category_name);
   let fragments = vec!["$".to_string()];
   let resolve = Node::resolve(format!("$.{}", path::root(part, slot)));
+  let text = if example.is_string() { Text::Yes } else { Text::No };
   match best_rule(category.as_ref(), &fragments, false) {
-    Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(example)),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(example), text),
     // Method is the one scalar slot v1-v4 compares case-insensitively by default (spec test case
     // `method/method is different case`) — expressed with the existing `value:upper-case` core action
     // rather than a new one, since `match:equality`'s own children may be any value-producing node.
@@ -461,7 +498,9 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
       let resolve = Node::resolve(format!("$.{}.{lower_name}", path::root(part, "headers")));
       let example = Value::String(value.clone());
       let node = match best_rule(category.as_ref(), &fragments, true) {
-        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example)),
+        Some((list, cascaded)) => {
+          rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example), Text::Yes)
+        }
         // The v1-v4 default header comparison (module docs): not plain string equality — a
         // multi-valued (comma-separated) header tolerates whitespace around the commas, and a
         // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
@@ -511,7 +550,9 @@ fn compile_parameters(
         let resolve = Node::resolve(format!("{base}[{index}]"));
         let example = Value::String(value.clone());
         let node = match best_rule(category.as_ref(), &fragments, false) {
-          Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example)),
+          Some((list, cascaded)) => {
+            rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example), Text::Yes)
+          }
           None => Node::action(
             "match:equality",
             vec![resolve, Node::value(Literal::from_json(&example))],
@@ -544,7 +585,7 @@ fn body_type_check(
   let has_content = matches!(
     body,
     Some(LegacyBody::Document(value)) if !matches!(value, RuntimeValue::Null | RuntimeValue::Absent)
-  ) || matches!(body, Some(LegacyBody::Form(_)));
+  ) || matches!(body, Some(LegacyBody::Form(_) | LegacyBody::Xml(_)));
   let named = headers
     .keys()
     .any(|name| name.eq_ignore_ascii_case("content-type"));
@@ -588,6 +629,15 @@ fn compile_body_slot(
         &form_parameters(form),
         rules,
         "body",
+        &root_path,
+      )));
+    }
+    // Elements, attributes and text, as today's `match_xml` walks them.
+    Some(LegacyBody::Xml(document)) => {
+      return Some(container(compile_xml_body(
+        document,
+        category.as_ref(),
+        part == "request",
         &root_path,
       )));
     }
@@ -642,6 +692,14 @@ impl Cursor {
     match self {
       Cursor::Absolute(p) => Cursor::Absolute(path::member(p, name)),
       Cursor::Relative(p) => Cursor::Relative(path::member(p, name)),
+    }
+  }
+
+  /// A member by a name that may need quoting: an XML name's `@`, `#`, `{` (ADR 0039).
+  fn member_quoted(&self, name: &str) -> Cursor {
+    match self {
+      Cursor::Absolute(p) => Cursor::Absolute(member_path(p, name)),
+      Cursor::Relative(p) => Cursor::Relative(member_path(p, name)),
     }
   }
 
@@ -747,7 +805,13 @@ fn compile_body_value(value: &RuntimeValue, ctx: &BodyCtx) -> Vec<Node> {
 
 fn compile_body_scalar(value: &RuntimeValue, ctx: &BodyCtx) -> Node {
   match ctx.best() {
-    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), &Literal::from_document(value)),
+    Some((list, cascaded)) => rule_list_node(
+      &list,
+      cascaded,
+      ctx.resolve(),
+      &Literal::from_document(value),
+      Text::No,
+    ),
     None => Node::action(
       "match:equality",
       vec![ctx.resolve(), Node::value(Literal::from_document(value))],
@@ -779,6 +843,7 @@ fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) 
       false,
       ctx.resolve(),
       &Literal::from_document(&RuntimeValue::Object(members.clone())),
+      Text::No,
     )];
   }
   let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
@@ -824,6 +889,7 @@ fn compile_body_array(items: &[RuntimeValue], ctx: &BodyCtx) -> Vec<Node> {
         cascaded,
         ctx.resolve(),
         &Literal::from_document(&RuntimeValue::Array(items.to_vec())),
+        Text::No,
       )];
       if let Some(template) = items.first() {
         let item_ctx = ctx.template_item();
@@ -850,4 +916,400 @@ fn compile_body_array(items: &[RuntimeValue], ctx: &BodyCtx) -> Vec<Node> {
       nodes
     }
   }
+}
+
+// --- XML: elements, attributes and text (ADR 0039) ---
+
+/// What every element of one XML body is compiled under: the body's rules, and whether a request's
+/// closed comparison applies (`DiffConfig::NoUnexpectedKeys`) or a response's open one.
+struct XmlCtx<'a> {
+  category: Option<&'a MatchingRuleCategory>,
+  closed: bool,
+}
+
+/// An XML body, as today's `match_xml` compares one: the root element by its name, then each element
+/// by its rule or its name, its attributes, its text and its children, recursively. The document is
+/// the XML component's ([`crate::legacy::xml`]): an element's attributes are `@` members, its text
+/// `#text`, its namespace `#namespace`, and its children an array per local name.
+///
+/// Rules are looked up by today's paths, not the document's: a child is its name with no index
+/// (`$.animals.alligator`), a namespaced name is `<uri>:<local>`, an attribute `@<name>`, text
+/// `#text`. Where today's verifier answers from a parsed element rather than a value, the plan asks
+/// the same question of the document:
+///
+/// - a rule on an element compares its *name* (`Type`, `Equality`, `Regex`) or counts its *children*
+///   (`MinType`, `MaxType`, `NotEmpty`); any other rule cannot match an element;
+/// - children are grouped by name. A group a type rule reaches is compared item by item against the
+///   pact's first; any other is compared index by index, and a request must have exactly as many;
+/// - a request's element has only the attributes and children the pact names. A response's may have
+///   others, except a child a type rule reaches (today's `type_matcher_defined`);
+/// - text is compared even when the pact has none, and a rule on text sees an element with none as
+///   the empty string.
+///
+/// An element the pact puts in a namespace must be in it; one in no namespace matches its local name
+/// in any (ADR 0039 decision 4, pact-specification's `unexpected xml namespace`).
+fn compile_xml_body(
+  document: &RuntimeValue,
+  category: Option<&MatchingRuleCategory>,
+  closed: bool,
+  root_path: &str,
+) -> Vec<Node> {
+  let root = match document {
+    RuntimeValue::Object(members) if members.len() == 1 => members.first(),
+    _ => None,
+  };
+  let Some((name, element)) = root else {
+    return vec![Node::action(
+      "flow:error",
+      vec![Node::value(Literal::string(
+        "an XML body is an object holding its one root element",
+      ))],
+    )];
+  };
+  let element = only_element(element);
+  let ctx = XmlCtx { category, closed };
+  let at = Cursor::Absolute(member_path(root_path, name));
+  let fragments = vec!["$".to_string(), rule_name(name, namespace_of(element))];
+  vec![
+    Node::action("expect:object", vec![at.resolve()]),
+    compile_xml_element(
+      element,
+      name,
+      &fragments,
+      &at,
+      &member_path(root_path, name),
+      &ctx,
+    ),
+  ]
+}
+
+/// An element the document holds as a one-element array, as a child list is, or alone.
+fn only_element(value: &RuntimeValue) -> &RuntimeValue {
+  match value {
+    RuntimeValue::Array(items) if items.len() == 1 => &items[0],
+    other => other,
+  }
+}
+
+fn namespace_of(element: &RuntimeValue) -> Option<&str> {
+  match element {
+    RuntimeValue::Object(members) => match members.get(xml::NAMESPACE) {
+      Some(RuntimeValue::String(namespace)) => Some(namespace.as_str()),
+      _ => None,
+    },
+    _ => None,
+  }
+}
+
+/// One element (see [`compile_xml_body`]): `fragments` is its rule path, `at` where its actual
+/// counterpart resolves, and `label` its container's.
+fn compile_xml_element(
+  element: &RuntimeValue,
+  name: &str,
+  fragments: &[String],
+  at: &Cursor,
+  label: &str,
+  ctx: &XmlCtx,
+) -> Node {
+  let RuntimeValue::Object(members) = element else {
+    return Node::container(
+      Some(label.to_string()),
+      vec![Node::action(
+        "flow:error",
+        vec![Node::value(Literal::string(format!(
+          "the XML element '{name}' is not an object"
+        )))],
+      )],
+    );
+  };
+  let mut nodes = Vec::new();
+
+  if let Some((list, cascaded)) = best_rule(ctx.category, fragments, false) {
+    nodes.push(xml_element_rule(&list, cascaded, name, at));
+  }
+  if let Some(namespace) = namespace_of(element) {
+    nodes.push(Node::action(
+      "match:equality",
+      vec![
+        at.member_quoted(xml::NAMESPACE).resolve(),
+        Node::value(Literal::string(namespace)),
+      ],
+    ));
+  }
+
+  // Attributes, by name.
+  let mut attributes: Vec<(&String, &RuntimeValue)> =
+    members.iter().filter(|(key, _)| key.starts_with('@')).collect();
+  attributes.sort_by_key(|(key, _)| *key);
+  for (key, value) in &attributes {
+    let mut attribute_fragments = fragments.to_vec();
+    attribute_fragments.push(format!("@{}", rule_name(&key[1..], None)));
+    let attribute = at.member_quoted(key);
+    let example = Literal::from_document(value);
+    let node = match best_rule(ctx.category, &attribute_fragments, false) {
+      Some((list, cascaded)) => rule_list_node(&list, cascaded, attribute.resolve(), &example, Text::Yes),
+      None => Node::action("match:equality", vec![attribute.resolve(), Node::value(example)]),
+    };
+    nodes.push(Node::container(Some(member_path(label, key)), vec![node]));
+  }
+
+  // Text, compared whether or not the pact has any.
+  let expected_text = match members.get(xml::TEXT) {
+    Some(RuntimeValue::String(text)) => text.clone(),
+    _ => String::new(),
+  };
+  let mut text_fragments = fragments.to_vec();
+  text_fragments.push(xml::TEXT.to_string());
+  let text = at.member_quoted(xml::TEXT);
+  let text_node = match best_rule(ctx.category, &text_fragments, false) {
+    Some((list, cascaded)) => {
+      let example = Literal::string(&expected_text);
+      let rule = rule_list_node(&list, cascaded, text.resolve(), &example, Text::Yes);
+      // An element with no text is the empty string to a rule: where the rule accepts that, no text
+      // is a pass; where it does not, an absent value fails it as the empty string would.
+      if accepts_empty_text(&list, cascaded, &example) {
+        Node::action(
+          "flow:if",
+          vec![Node::action("check:exists", vec![text.resolve()]), rule],
+        )
+      } else {
+        rule
+      }
+    }
+    // The XML component leaves out a `#text` that would be empty, so text that is there is not
+    // empty, and is compared with the empty string the pact has.
+    None if expected_text.is_empty() => Node::action(
+      "flow:if",
+      vec![
+        Node::action("check:exists", vec![text.resolve()]),
+        Node::action(
+          "match:equality",
+          vec![text.resolve(), Node::value(Literal::string(""))],
+        ),
+      ],
+    ),
+    None => Node::action(
+      "match:equality",
+      vec![text.resolve(), Node::value(Literal::string(&expected_text))],
+    ),
+  };
+  nodes.push(Node::container(
+    Some(member_path(label, xml::TEXT)),
+    vec![text_node],
+  ));
+
+  // Children, a group per name, by name.
+  let mut children: Vec<(&String, Vec<&RuntimeValue>)> = members
+    .iter()
+    .filter(|(key, _)| !key.starts_with('@') && !key.starts_with('#'))
+    .map(|(key, value)| {
+      let items = match value {
+        RuntimeValue::Array(items) => items.iter().collect(),
+        other => vec![other],
+      };
+      (key, items)
+    })
+    .collect();
+  children.sort_by_key(|(key, _)| *key);
+  for (child, items) in &children {
+    let Some(first) = items.first() else { continue };
+    let mut child_fragments = fragments.to_vec();
+    child_fragments.push(rule_name(child, namespace_of(first)));
+    let group = at.member_quoted(child);
+    let group_label = member_path(label, child);
+    if type_rule_reaches(ctx.category, &child_fragments) {
+      nodes.push(Node::action("expect:not-empty", vec![group.resolve()]));
+      let item = compile_xml_element(
+        first,
+        child,
+        &child_fragments,
+        &Cursor::Relative("~>".to_string()),
+        &path::each_like_item(&group_label),
+        ctx,
+      );
+      nodes.push(Node::action(
+        "flow:for-each",
+        vec![Node::splat(vec![group.resolve()]), item],
+      ));
+    } else {
+      let count = Node::value(Literal::number(items.len() as u64));
+      nodes.push(if ctx.closed {
+        Node::action("expect:count", vec![group.resolve(), count])
+      } else {
+        Node::action(
+          "expect:size",
+          vec![group.resolve(), count, Node::value(Literal::null())],
+        )
+      });
+      for (index, item) in items.iter().enumerate() {
+        nodes.push(compile_xml_element(
+          item,
+          child,
+          &child_fragments,
+          &group.array_index(index),
+          &path::array_index(&group_label, index),
+          ctx,
+        ));
+      }
+    }
+  }
+
+  // What the element may have that the pact does not name.
+  let names: Vec<&String> = children.iter().map(|(name, _)| *name).collect();
+  if ctx.closed {
+    let mut only = vec![at.resolve()];
+    only.extend(
+      members
+        .keys()
+        .filter(|key| !key.starts_with('#'))
+        .chain([&xml::TEXT.to_string(), &xml::NAMESPACE.to_string()])
+        .map(|key| Node::value(Literal::string(key))),
+    );
+    nodes.push(Node::action("legacy:only-entries", only));
+  } else {
+    // A child no rule names and a type rule reaches: any name, when the rule reaches every child.
+    let mut unnamed = fragments.to_vec();
+    unnamed.push(String::new());
+    if type_rule_reaches(ctx.category, &unnamed) {
+      let mut only = vec![at.resolve()];
+      only.extend(names.iter().map(|name| Node::value(Literal::string(*name))));
+      nodes.push(Node::action("legacy:xml-only-children", only));
+    } else {
+      for forbidden in type_rule_names(ctx.category, fragments) {
+        if !names.iter().any(|name| **name == forbidden) {
+          nodes.push(Node::action(
+            "expect:empty",
+            vec![at.member_quoted(&forbidden).resolve()],
+          ));
+        }
+      }
+    }
+  }
+
+  Node::container(Some(label.to_string()), nodes)
+}
+
+/// A rule on an element (`pact_matching`'s `DoMatch<&Element>`). A name rule compares the element's
+/// name, which is the pact's: the plan found the element by it. A size rule counts the element's
+/// child elements, and `NotEmpty` wants a child or text. Anything else cannot match an element.
+fn xml_element_rule(list: &RuleList, cascaded: bool, name: &str, at: &Cursor) -> Node {
+  let children = || Node::action("legacy:xml-children", vec![at.resolve()]);
+  let size = |min: Option<usize>, max: Option<usize>| {
+    let bound = |n: Option<usize>| match n {
+      Some(n) => Literal::number(n as u64),
+      None => Literal::null(),
+    };
+    Node::action(
+      "expect:size",
+      vec![
+        children(),
+        Node::value(bound(Some(min.unwrap_or(0)))),
+        Node::value(bound(max)),
+      ],
+    )
+  };
+  let nodes = list
+    .rules
+    .iter()
+    .map(|rule| match rule {
+      MatchingRule::Regex(pattern) => Node::action(
+        "match:regex",
+        vec![
+          Node::value(Literal::string(name)),
+          Node::value(Literal::string(anchored_pattern(pattern))),
+        ],
+      ),
+      MatchingRule::MinType(min) if !cascaded => size(Some(*min), None),
+      MatchingRule::MaxType(max) if !cascaded => size(None, Some(*max)),
+      MatchingRule::MinMaxType(min, max) if !cascaded => size(Some(*min), Some(*max)),
+      MatchingRule::Type
+      | MatchingRule::Equality
+      | MatchingRule::MinType(_)
+      | MatchingRule::MaxType(_)
+      | MatchingRule::MinMaxType(_, _) => Node::action("expect:object", vec![at.resolve()]),
+      MatchingRule::NotEmpty => Node::action(
+        "flow:or",
+        vec![
+          Node::action("expect:not-empty", vec![children()]),
+          Node::action("expect:not-empty", vec![at.member_quoted(xml::TEXT).resolve()]),
+        ],
+      ),
+      other => Node::action(
+        "flow:error",
+        vec![Node::value(Literal::string(format!(
+          "Unable to match the element '{name}' using {}",
+          other.name()
+        )))],
+      ),
+    })
+    .collect();
+  combine(list, nodes)
+}
+
+/// Whether a type rule reaches `fragments`: today's `type_matcher_defined`, which asks every rule whose
+/// path matches, the shallower ones included, not only the winner. An empty last fragment stands for a
+/// name the pact does not have, which only a wildcard or a shallower rule reaches.
+fn type_rule_reaches(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> bool {
+  let Some(category) = category else {
+    return false;
+  };
+  category.rules.iter().any(|(rule_path, list)| {
+    let tokens = rule_path.tokens();
+    tokens.len() <= fragments.len()
+      && tokens
+        .iter()
+        .zip(fragments)
+        .all(|(token, fragment)| token_weight(token, fragment, false) > 0)
+      && list.type_matcher_defined()
+  })
+}
+
+/// The names of children a type rule names directly below `fragments`, as document keys (their local
+/// names): a response may not have one the pact lacks.
+fn type_rule_names(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> Vec<String> {
+  let Some(category) = category else {
+    return Vec::new();
+  };
+  let mut names: Vec<String> = category
+    .rules
+    .iter()
+    .filter(|(_, list)| list.type_matcher_defined())
+    .filter_map(|(rule_path, _)| {
+      let tokens = rule_path.tokens();
+      let (last, prefix) = tokens.split_last()?;
+      let PathToken::Field(name) = last else {
+        return None;
+      };
+      (prefix.len() == fragments.len()
+        && !name.starts_with('@')
+        && !name.starts_with('#')
+        && prefix
+          .iter()
+          .zip(fragments)
+          .all(|(token, fragment)| token_weight(token, fragment, false) > 0))
+      .then(|| name.rsplit(':').next().unwrap_or(name).to_string())
+    })
+    .collect();
+  names.sort();
+  names.dedup();
+  names
+}
+
+/// Whether `list` accepts the empty string, which is what today's verifier compares a rule on text
+/// against when an element has none. Answered by running the rule on it.
+fn accepts_empty_text(list: &RuleList, cascaded: bool, example: &Literal) -> bool {
+  let node = rule_list_node(
+    list,
+    cascaded,
+    Node::value(Literal::string("")),
+    example,
+    Text::Yes,
+  );
+  let plan = model::Plan {
+    grammar: model::GRAMMAR_VERSION,
+    root: Node::container(None, vec![node]),
+    variant: None,
+  };
+  let executed = model::execute(&plan, &CapturedValues::new());
+  model::outcome(&executed).0 == Status::Matched
 }

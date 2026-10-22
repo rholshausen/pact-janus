@@ -1,0 +1,82 @@
+{
+  "description": "a v3 XML response body compared element by element (ADR 0039): a type rule on a repeated child compares every order against the pact's first, an integer rule reads an attribute's text, a regex reaches each item's text, the reply's extra attribute is allowed in a response, and its root, in a namespace the pact does not name, matches by its local name",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /orders",
+          "request": {
+            "method": "GET",
+            "path": "/orders"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/xml"
+            },
+            "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><orders><order id=\"1\" status=\"shipped\"><item>apple</item></order></orders>",
+            "matchingRules": {
+              "body": {
+                "$.orders.order": {
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                },
+                "$.orders.order['@id']": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                },
+                "$.orders.order.item['#text']": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]+"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/xml; charset=UTF-8",
+    "$.response.body": {
+      "orders": {
+        "#namespace": "urn:orders",
+        "order": [
+          { "#namespace": "urn:orders", "@id": "17", "@status": "packed", "item": [{ "#namespace": "urn:orders", "#text": "pear" }, { "#namespace": "urn:orders", "#text": "plum" }] },
+          { "#namespace": "urn:orders", "@id": "18", "@priority": "high", "@status": "shipped", "item": [{ "#namespace": "urn:orders", "#text": "fig" }] }
+        ]
+      }
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

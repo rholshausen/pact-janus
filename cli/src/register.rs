@@ -32,6 +32,9 @@ pub fn native_engine() -> Engine {
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
   engine.declare_in_tree("content", "json", "1.0.0");
+  // XML before text, which claims all of `text/*`, so `text/xml` reaches it (ADR 0039).
+  engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
+  engine.declare_in_tree("content", "xml", "1.0.0");
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.declare_in_tree("content", "text", "1.0.0");
   engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));

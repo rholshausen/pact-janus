@@ -121,20 +121,33 @@ fn a_v4_bodys_content_contenttype_encoded_envelope_is_already_unwrapped() {
   );
 }
 
+/// pact-jvm's XML pact reads on both sides, its bodies as their elements (ADR 0039).
 #[test]
-fn a_non_json_body_is_a_named_error_not_a_panic() {
+fn an_xml_body_is_read_into_its_elements() {
   let json = fixture("XMLConsumer-XMLProvider.json");
   let pact = legacy_pact::read("XMLConsumer-XMLProvider.json", &json).expect("reads clean");
   let interactions = legacy_pact::http_interactions(pact.as_ref());
   assert_eq!(interactions.len(), 1);
   let interaction = &interactions[0];
-  // Whichever side actually carries the XML body, converting it must fail with a message naming
-  // why — XML is S1.22's — rather than panicking on the bytes.
-  let request_err = legacy_pact::legacy_request(&interaction.request);
-  let response_err = legacy_pact::legacy_response(&interaction.response);
+  let request = legacy_pact::legacy_request(&interaction.request).expect("the request reads");
   assert!(
-    request_err.is_err() || response_err.is_err(),
-    "expected the XML body to be rejected on at least one side"
+    matches!(request.body, Some(LegacyBody::Xml(_))),
+    "{:?}",
+    request.body
+  );
+  let response = legacy_pact::legacy_response(&interaction.response).expect("the response reads");
+  assert_eq!(
+    response.body,
+    Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({
+      "Message": {
+        "Head": [{ "Server": [{
+          "Name": [{ "#text": "server_name" }],
+          "Version": [{ "#text": "server_version" }],
+          "Timestamp": [{ "#text": "server_timestamp" }]
+        }] }],
+        "Body": [{ "Result": [{ "@state": "SUCCESS" }] }]
+      }
+    }))))
   );
 }
 
@@ -184,6 +197,14 @@ fn body_of(response: serde_json::Value) -> Result<Option<LegacyBody>, String> {
 #[case::form(
   json!({ "status": 200, "headers": { "Content-Type": "application/x-www-form-urlencoded" }, "body": "b=2&a=1&b=x+y" }),
   Some(LegacyBody::Form(RuntimeValue::from_json(&json!({ "b": ["2", "x y"], "a": ["1"] })))))]
+#[case::xml(
+  json!({ "status": 200, "headers": { "Content-Type": "application/xml" }, "body": "<a x=\"1\"><b>t</b><b/></a>" }),
+  Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "a": { "@x": "1", "b": [{ "#text": "t" }, {}] } })))))]
+#[case::xml_suffix(
+  json!({ "status": 200, "headers": { "Content-Type": "application/atom+xml" }, "body": "<feed/>" }),
+  Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "feed": {} })))))]
+#[case::xml_detected(json!({ "status": 200, "body": "<?xml version=\"1.0\"?><a/>" }),
+  Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "a": {} })))))]
 #[case::empty(json!({ "status": 200, "body": "" }), Some(LegacyBody::Empty))]
 #[case::missing(json!({ "status": 200 }), None)]
 fn a_body_is_read_as_todays_verifier_compares_its_content_type(
@@ -194,7 +215,6 @@ fn a_body_is_read_as_todays_verifier_compares_its_content_type(
 }
 
 #[rstest]
-#[case::xml("application/xml", "<a/>")]
 #[case::multipart("multipart/form-data; boundary=x", "--x--")]
 fn a_body_kind_staged_for_later_is_refused_by_its_content_type(
   #[case] content_type: &str,
@@ -223,4 +243,13 @@ fn the_reply_body_is_decoded_as_the_pacts_content_type(
   #[case] expected: Option<&str>,
 ) {
   assert_eq!(response_types_of(response), expected.map(str::to_string));
+}
+
+/// A body that claims to be XML and is not is a problem with the document, named as one.
+#[test]
+fn an_xml_body_that_is_not_xml_is_malformed() {
+  let error =
+    body_of(json!({ "status": 200, "headers": { "Content-Type": "application/xml" }, "body": "<a>" }))
+      .expect_err("not XML");
+  assert!(error.contains("body is not valid XML"), "{error}");
 }

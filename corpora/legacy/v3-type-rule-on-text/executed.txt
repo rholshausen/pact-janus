@@ -1,0 +1,63 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders',
+          '/orders'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        :"$.page" (
+          %expect:count (
+            $.request.query.page => ['3'],
+            1
+          ) => BOOL(true),
+          %legacy:parses-as (
+            $.request.query.page[0] => '3',
+            'integer'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.size" (
+          %expect:count (
+            $.request.query.size => ['many'],
+            1
+          ) => BOOL(true),
+          %legacy:parses-as (
+            $.request.query.size[0] => 'many',
+            'integer'
+          ) => ERROR(Expected 'many' to match an integer number)
+        ) => BOOL(false),
+        %legacy:only-entries (
+          $.request.query => {'page': ['3'], 'size': ['many']},
+          'page',
+          'size'
+        ) => BOOL(true)
+      ) => BOOL(false),
+      :headers (
+        :"$.X-Ratio" (
+          %legacy:parses-as (
+            $.request.headers.x-ratio => '1e-3',
+            'number'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(false),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(false)
+)

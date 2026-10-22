@@ -508,6 +508,23 @@ for `application/x-www-form-urlencoded`, after text, which decodes a form into t
 an object whose members are arrays of strings, each name once, in the order it first appears
 ([ADR 0038](../../decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)).
 
+Every engine also has a built-in `xml` component, registered after JSON and before text so `text/xml`
+reaches it, for the `application` and `text` types whose subtype is `xml` or ends in `+xml`
+([ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
+Its document is keyed by element name. The body is an object with one member, the root element's local
+name, holding the root element. An element is an object of:
+
+- `#namespace`, its namespace URI, when it is in one;
+- `@<name>`, each attribute's value as a string, in name order. A namespaced attribute is written
+  `@{<uri>}<local>`. Namespace declarations are not attributes;
+- `#text`, its text nodes, each trimmed, then joined. It is absent when that is empty;
+- `<local name>`, an array of its child elements with that local name, in document order. There is
+  one member per name, in the order the names first appear.
+
+Its `encode` writes an element's text before its children, declares a namespace where it changes,
+and writes a number or a boolean as its text. Comments, processing instructions, namespace prefixes
+and the order between differently named children are not part of the document.
+
 ### 6.2 Encoding is how variants become traffic
 
 `encode` is decode's inverse, and it exists because a consumer test must *produce* bodies: each selected
