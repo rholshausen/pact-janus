@@ -853,6 +853,8 @@ item in 1a is done when S1.1 agrees.
   - `sxd-document` keeps no attribute order, so attributes are in name order;
   - the plan-grammar spec forbids the v1–v4 compiler `expect:absent` and `match:any-of`. The XML walk
     uses neither, but the compiler has emitted `expect:absent` for an empty body since the prototype.
+    That reproduces today's verdict on a body the pact declares empty, so the spec now allows it there
+    (plan-grammar §4.4, §4.5).
 
   Left out: `janus upgrade` still carries an XML body across with `body-not-parsed`, which S1.25 now
   covers. A size rule on an element counts its child elements, where today's verifier counts child

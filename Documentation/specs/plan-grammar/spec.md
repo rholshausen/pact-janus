@@ -383,7 +383,8 @@ A type rule on a value that is text (a path, a header, a query or form value, an
 reads the text, as today's verifier does: `legacy:parses-as`.
 
 The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
-"which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:
+"which compiler may emit this" (§4.5) is read off a node's name. One action goes the other way, and
+one is the shape compiler's but for a single v1–v4 use:
 
 | Action | Emitted by | Note |
 |---|---|---|
@@ -395,7 +396,8 @@ The actions only the v1–v4 compiler may emit are the `legacy` namespace, and n
 | `legacy:xml-children` | legacy only | an XML element's child elements, as their names, one per child (ADR 0039): what a size rule or `notEmpty` on an element counts. Absent for an absent element |
 | `legacy:xml-only-children` | legacy only | an XML element has no child element but those its children name (ADR 0039), failing with today's `Unexpected child <name/>`. A response's element is held to it where a type rule reaches its children; a request's is closed by `legacy:only-entries` |
 | `legacy:parses-as` | legacy only | a string read as today's verifier reads one against a type rule (ADR 0039): its second child is `number` or `decimal` (parses as a floating-point number), `integer` (as an unsigned one) or `boolean` (`true` or `false`). Shapes compare a value's kind with `match:number` and the rest instead |
-| `match:any-of`, `expect:absent` | shapes only | v1–v4 has no enumeration or absence assertion |
+| `match:any-of` | shapes only | v1–v4 has no enumeration |
+| `expect:absent` | shapes; v1–v4 for an empty body only | v1–v4 asserts one absence: a body the pact declares empty or null fails when the actual one has content, as today's verifier fails it ("Expected empty body but received …") and passes it when the actual one is missing or empty. The v1–v4 compiler emits `expect:absent` on the body slot for that, and nowhere else |
 
 This is why the forked action set is worth keeping rather than replacing: it is the legacy half of the
 answer, already validated against pact-reference's 803 specification test cases. What this grammar adds
@@ -410,8 +412,9 @@ unchecked claim about migration is how migrations break.
 ### 4.5 Which compiler may emit what
 
 An action carries a set of compilers permitted to emit it, and the name says which: the shape compiler
-MUST NOT emit an action in the `legacy` namespace, and the v1–v4 compiler MUST NOT emit `match:any-of`
-or `expect:absent`. An engine MUST reject a plan in which the shape compiler emitted a `legacy:` action,
+MUST NOT emit an action in the `legacy` namespace, and the v1–v4 compiler MUST NOT emit `match:any-of`,
+nor `expect:absent` anywhere but on the body slot of a body the pact declares empty or null (§4.4). An
+engine MUST reject a plan in which the shape compiler emitted a `legacy:` action,
 as an internal error — this is the mechanism that keeps 2.2's must-ignore guarantee true rather than
 merely intended. A guarantee that depends on nobody writing the wrong line is not a guarantee.
 
