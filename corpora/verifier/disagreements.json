@@ -70,6 +70,20 @@
       "today": "fail",
       "janus": "pass",
       "reason": "ADR 0039 decision 4: an element the pact puts in no namespace matches its local name in any, as pact-specification's v3 and v4 case `unexpected xml namespace` says and pact-reference's V2 engine does; today's verifier, like pact-jvm, compares the qualified name, and pact_matching's own spec tests ignore the case as incorrect behaviour"
+    },
+    {
+      "case": "bodies/content-type-rule-with-a-space",
+      "key": "run",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "S1.26: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the rule once, there; today's verifier checks it again before comparing the body, against the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
+    },
+    {
+      "case": "bodies/content-type-rule-with-a-space",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "S1.26: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the rule once, there; today's verifier checks it again before comparing the body, against the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
     }
   ]
 }

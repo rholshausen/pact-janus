@@ -1,0 +1,32 @@
+{
+  "description": "A regex on the pact's Content-Type header that expects a space before the charset, and a reply in another charset that the regex allows. Today's verifier passes the header, then checks the same rule against the reply's type written without the space (application/json;charset=iso-8859-1) before it compares the body, and fails it there; janus verify checks the rule once, on the header as sent",
+  "source": "staged plan S1.26; pact_matching::match_body's content-type gate, which calls match_header_value on ContentType's Display",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/order"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=iso-8859-1"
+            ]
+          },
+          "body": {
+            "text": "{\"id\": 1}"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": false
+}

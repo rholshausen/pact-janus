@@ -890,7 +890,7 @@ item in 1a is done when S1.1 agrees.
   - today's verifier checks a rule on the pact's `Content-Type` header against the reply's type in a
     normalised form (`multipart/form-data;boundary=x`, no space) before it compares a body. A regex
     written with the space fails there, and passes in Janus. This holds for any type with parameters,
-    not only multipart, and no fixture covers it yet;
+    not only multipart. It is the new S1.26, and `bodies/content-type-rule-with-a-space` records it;
   - a corpus case tags bytes only at the top of its values, so binary parts are covered by the kernel's
     tests and the verifier fixtures rather than the golden corpus.
 
@@ -920,6 +920,18 @@ item in 1a is done when S1.1 agrees.
   *Exit:* corpus cases in which a text body, a binary body, a form body, an XML body and a multipart
   body upgrade and reach the pact's verdict (`also-compiled-from`), matching and not; and no upgrade has
   a `body-not-parsed` finding.
+
+- **S1.26 A rule on the pact's `Content-Type` header, read as today's body check reads it** — **S**,
+  a decision first. Found landing S1.23. Today's verifier checks a rule on the pact's `Content-Type`
+  header twice: on the header as sent, and again before it compares a body, against the reply's type
+  as `pact_models` writes it, with no space before a parameter and the charset in lower case
+  (`application/json;charset=utf-8`). A regex written with the space, as most are, passes the first
+  check and fails the second, so today fails a reply whose header the rule allows. Janus checks the
+  rule once, on the header (ADR 0036 decision 4), and passes it. This applies to any type with
+  parameters: a charset, or a multipart boundary. Either the legacy compiler copies the second check,
+  or an ADR makes the difference deliberate, since today's own header check passes the same reply.
+  *Exit:* the decision recorded, and S1.1's ledger entries for `bodies/content-type-rule-with-a-space`
+  gone, or carrying that ADR as their reason.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -1229,6 +1241,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.23 | Multipart bodies | split from S1.6 |
 | S1.24 | `Values`, `EachKey`, `EachValue` and `ArrayContains` compile to an error node | split from S1.6; task 3.5 |
 | S1.25 | `upgrade` carries a body that is not JSON across with nothing asserted about it | split from S1.6; ADR 0036 |
+| S1.26 | A rule on the pact's `Content-Type` header passes a reply that today's body check fails, when its regex expects a space before a parameter | found landing S1.23; ADR 0036 decision 4 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |

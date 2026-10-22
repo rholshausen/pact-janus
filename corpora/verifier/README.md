@@ -105,7 +105,9 @@ interaction of a pact it did not fetch is `absent` there too.
   a text body and an `application/octet-stream` body; and XML (S1.22, ADR 0039): the rules pact-jvm's
   XML builder writes, and a root element in a namespace the pact does not name, a deliberate difference;
   and multipart (S1.23, ADR 0040): a `multipart/form-data` body with rules on a field and a JSON file
-  and a base64 PNG, and `every-body-kind`, one v3 pact with an XML, a form, a multipart and a binary body.
+  and a base64 PNG, and `every-body-kind`, one v3 pact with an XML, a form, a multipart and a binary body;
+  and `content-type-rule-with-a-space`, a rule on the `Content-Type` header that today checks a second
+  time against the reply's type written without the space (S1.26).
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
   HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it,
   its broker scenarios as broker fixtures.
