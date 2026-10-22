@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792654464592,
+  "lastUpdate": 1792654467534,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -19080,6 +19080,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27519,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "4057e1433a8668942599a644f6ff9971c9633e9d",
+          "message": "fix: generated bindings keep the schema's member order however the generator is built\n\nThe release builds janus-sdk-gates alongside the CLI, so Cargo unified the\nkernel's serde_json `preserve_order` (ADR 0037, S1.20) into the bindings\ngenerator: the release's gates wrote members in schema order while\n`cargo run -p pact_janus_bindings` sorted them, and the release's bindings\ngate failed on both SDKs. The bindings crate now asks for `preserve_order`\nitself, and the checked-in bindings are regenerated in schema order.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T18:20:05+11:00",
+          "tree_id": "0ead9bb71c37035b34eee234b3e2c6e86df4fbeb",
+          "url": "https://github.com/rholshausen/pact-janus/commit/4057e1433a8668942599a644f6ff9971c9633e9d"
+        },
+        "date": 1792654465998,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 30311,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21509,
             "unit": "requests per second",
             "extra": "engines 4"
           }
