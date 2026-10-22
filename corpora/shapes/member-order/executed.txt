@@ -1,0 +1,27 @@
+(
+  :"an order with its shipping address" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'id': 66, 'shipping': {'city': 'London', 'postcode': 'N1 9GU', 'street': '1 High St'}, 'status': 'SHIPPED'}
+        ) => BOOL(true),
+        :"$.id" (
+          %match:integer (
+            $.response.body.id => 66
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.shipping" (
+          %match:equality (
+            $.response.body.shipping => {'city': 'London', 'postcode': 'N1 9GU', 'street': '1 High St'},
+            {'street': '1 High St', 'city': 'London', 'postcode': 'N1 9GU'}
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.status" (
+          %match:string (
+            $.response.body.status => 'SHIPPED'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

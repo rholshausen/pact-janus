@@ -3,29 +3,17 @@
     :response (
       :body (
         %expect:object (
-          $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'}
+          $.response.body => {'content-type': 'application/json', 'cache-control': 'no-store'}
         ) => BOOL(true),
         %expect:size (
-          $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'},
+          $.response.body => {'content-type': 'application/json', 'cache-control': 'no-store'},
           1,
           NULL
         ) => BOOL(true),
         %flow:for-each (
           ** (
-            $.response.body => {'cache-control': 'no-store', 'content-type': 'application/json'}
-          ) => [{'cache-control': 'no-store'}, {'content-type': 'application/json'}],
-          :"$.response.body" (
-            :"$.response.body{key}" (
-              %match:string (
-                ~>.key => 'cache-control'
-              ) => BOOL(true)
-            ) => BOOL(true),
-            :"$.response.body{*}" (
-              %match:string (
-                ~>.value => 'no-store'
-              ) => BOOL(true)
-            ) => BOOL(true)
-          ) => BOOL(true),
+            $.response.body => {'content-type': 'application/json', 'cache-control': 'no-store'}
+          ) => [{'content-type': 'application/json'}, {'cache-control': 'no-store'}],
           :"$.response.body" (
             :"$.response.body{key}" (
               %match:string (
@@ -35,6 +23,18 @@
             :"$.response.body{*}" (
               %match:string (
                 ~>.value => 'application/json'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.response.body" (
+            :"$.response.body{key}" (
+              %match:string (
+                ~>.key => 'cache-control'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.response.body{*}" (
+              %match:string (
+                ~>.value => 'no-store'
               ) => BOOL(true)
             ) => BOOL(true)
           ) => BOOL(true)

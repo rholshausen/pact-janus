@@ -195,6 +195,25 @@ impl Literal {
     }
   }
 
+  /// From a document-model value, a decoded body's say: the inverse of
+  /// [`RuntimeValue::from_literal`](super::RuntimeValue::from_literal). Bytes are tagged, an
+  /// entry keeps its key, and members keep their order (ADR 0037). Absence is not a value, so it
+  /// becomes `null`; a document never holds it. A plan literal tags only its own top level, so
+  /// bytes inside an array or object become their base64 text, as in a mismatch message.
+  pub fn from_document(value: &super::RuntimeValue) -> Literal {
+    use super::RuntimeValue;
+    match value {
+      RuntimeValue::Bytes(bytes) => Literal::bytes(bytes),
+      RuntimeValue::Entry { key, value } => Literal {
+        of: DocumentKind::Entry,
+        value: value.to_json(),
+        encoded: None,
+        key: Some(key.clone()),
+      },
+      other => Literal::from_json(&other.to_json()),
+    }
+  }
+
   /// From a shape's `example` (spec §3.3), honouring its bytes tag (protocol spec §2.5).
   pub fn from_example(example: &crate::shape::Example) -> Literal {
     match example.encoded.as_deref() {

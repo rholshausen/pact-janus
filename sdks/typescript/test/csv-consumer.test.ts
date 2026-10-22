@@ -23,8 +23,8 @@ class OrderReport {
     this.baseUrl = baseUrl;
   }
 
-  /** How many items the orders in the export hold between them. */
-  async totalItems(): Promise<number> {
+  /** How many items the orders in the export hold between them, and the export's columns. */
+  async totalItems(): Promise<{ total: number; columns: string[] }> {
     const response = await fetch(`${this.baseUrl}/orders.csv`, { headers: { Accept: "text/csv" } });
     if (!response.ok) {
       throw new Error(`GET /orders.csv: ${response.status} ${await response.text()}`);
@@ -37,7 +37,7 @@ class OrderReport {
     if (items < 0) {
       throw new Error(`no 'items' column in ${header.join(",")}`);
     }
-    return rows.reduce((total, row) => total + Number.parseInt(row[items] ?? "", 10), 0);
+    return { total: rows.reduce((total, row) => total + Number.parseInt(row[items] ?? "", 10), 0), columns: header };
   }
 }
 
@@ -74,7 +74,10 @@ describe("a CSV consumer, through a third-party content component", () => {
     const janus = new Janus({ consumer: "reporting", provider: "order-service", contractDir, components: [csv] });
 
     await janus.execute(exportInteraction(janus), async (mock) => {
-      expect(await new OrderReport(mock.url).totalItems()).toBeGreaterThan(0);
+      const { total, columns } = await new OrderReport(mock.url).totalItems();
+      expect(total).toBeGreaterThan(0);
+      // In the order the interaction declares them (ADR 0037), as a consumer reading by position needs.
+      expect(columns).toEqual(["id", "status", "items"]);
     });
     const { contractFile } = await janus.finalise();
 

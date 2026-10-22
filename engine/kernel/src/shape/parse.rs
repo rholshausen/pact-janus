@@ -9,6 +9,7 @@
 use super::model::{CORE_OPERATORS, CoreShape, Example, ShapeKind, ShapeNode, TemporalKind, ValueKind};
 use crate::error::{Problem, push_pointer_segment};
 use crate::plan::RESERVED_NAMESPACES;
+use indexmap::IndexMap;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
@@ -289,7 +290,7 @@ fn parse_core(
         });
         return None;
       };
-      let mut members = BTreeMap::new();
+      let mut members = IndexMap::new();
       for (name, member_value) in members_obj {
         let mut member_path = path.to_string();
         member_path.push_str("/members");
@@ -713,7 +714,7 @@ fn discriminator_options(
 
 /// The members of an `object` node, or of the `object` a `nullable` wraps — the shapes spec
 /// §5.4 accepts as a `one-of` alternative — or `None` for anything else.
-fn unwrap_object_members(node: &ShapeNode) -> Option<&BTreeMap<String, ShapeNode>> {
+fn unwrap_object_members(node: &ShapeNode) -> Option<&IndexMap<String, ShapeNode>> {
   match &node.kind {
     ShapeKind::Core(CoreShape::Object { members }) => Some(members),
     ShapeKind::Core(CoreShape::Nullable { of }) => match &of.kind {

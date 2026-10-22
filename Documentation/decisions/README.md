@@ -53,6 +53,7 @@ superseding ADR instead.
 | [0034](0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md) | Apply a pact's request generators through a generator component, fed by provider-state values | accepted |
 | [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted |
 | [0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md) | Read text bodies through a text component, and bodies no component claims as bytes | accepted |
+| [0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md) | Carry member order through the engine, and decide nothing by it | accepted |
 
 ## Decision backlog
 

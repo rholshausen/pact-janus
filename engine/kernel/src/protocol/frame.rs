@@ -68,8 +68,10 @@ pub struct EngineError {
   pub code: String,
   pub category: String,
   pub message: String,
+  /// Boxed: an object `Value` keeps its members in order (ADR 0037), which makes it large, and an
+  /// error is carried by every `Result` that can fail.
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub details: Option<Value>,
+  pub details: Option<Box<Value>>,
 }
 
 impl EngineError {
@@ -99,7 +101,7 @@ impl EngineError {
       code: "operation-unsupported".to_string(),
       category: "protocol".to_string(),
       message: format!("unknown operation '{op}'"),
-      details: Some(serde_json::json!({ "op": op })),
+      details: Some(Box::new(serde_json::json!({ "op": op }))),
     }
   }
 
@@ -109,7 +111,7 @@ impl EngineError {
       code: "protocol-version-unsupported".to_string(),
       category: "protocol".to_string(),
       message: format!("this engine speaks protocol versions {supported:?}"),
-      details: Some(serde_json::json!({ "supported": supported })),
+      details: Some(Box::new(serde_json::json!({ "supported": supported }))),
     }
   }
 
@@ -130,7 +132,7 @@ impl EngineError {
       code: "session-not-found".to_string(),
       category: "session".to_string(),
       message: format!("session '{session}' does not exist or has ended"),
-      details: Some(serde_json::json!({ "session": session })),
+      details: Some(Box::new(serde_json::json!({ "session": session }))),
     }
   }
 
@@ -141,7 +143,7 @@ impl EngineError {
       code: "interaction-invalid".to_string(),
       category: "document".to_string(),
       message: "interaction specification is not valid".to_string(),
-      details: Some(serde_json::json!({ "problems": problems })),
+      details: Some(Box::new(serde_json::json!({ "problems": problems }))),
     }
   }
 
@@ -154,7 +156,7 @@ impl EngineError {
       code: "stream-not-found".to_string(),
       category: "session".to_string(),
       message: format!("event stream '{stream}' does not exist or has ended"),
-      details: Some(serde_json::json!({ "stream": stream })),
+      details: Some(Box::new(serde_json::json!({ "stream": stream }))),
     }
   }
 
@@ -171,9 +173,9 @@ impl EngineError {
         Some(found) => format!("contract {index} is not a Janus contract (found {found})"),
         None => format!("contract {index} is not a Janus contract"),
       },
-      details: Some(
+      details: Some(Box::new(
         serde_json::json!({ "index": index, "found": found, "expected": crate::contract::FORMAT }),
-      ),
+      )),
     }
   }
 
@@ -186,7 +188,7 @@ impl EngineError {
       code: "hook-config-invalid".to_string(),
       category: "document".to_string(),
       message: "hook configuration is not valid".to_string(),
-      details: Some(serde_json::json!({ "problems": problems })),
+      details: Some(Box::new(serde_json::json!({ "problems": problems }))),
     }
   }
 
@@ -200,9 +202,9 @@ impl EngineError {
       code: "hook-unavailable".to_string(),
       category: "component".to_string(),
       message: format!("hook '{hook}' needs implementation kind '{kind}', which this engine cannot run"),
-      details: Some(serde_json::json!({
+      details: Some(Box::new(serde_json::json!({
         "kind": kind, "hook": hook, "implementations": available,
-      })),
+      }))),
     }
   }
 
@@ -212,7 +214,7 @@ impl EngineError {
       code: "handle-not-found".to_string(),
       category: "session".to_string(),
       message: format!("interaction handle '{handle}' does not exist in this session"),
-      details: Some(serde_json::json!({ "handle": handle })),
+      details: Some(Box::new(serde_json::json!({ "handle": handle }))),
     }
   }
 
@@ -223,7 +225,9 @@ impl EngineError {
       code: "variant-not-found".to_string(),
       category: "session".to_string(),
       message: format!("'{variant}' is not in this interaction's selection"),
-      details: Some(serde_json::json!({ "variant": variant, "selection": selection })),
+      details: Some(Box::new(
+        serde_json::json!({ "variant": variant, "selection": selection }),
+      )),
     }
   }
 
@@ -236,9 +240,9 @@ impl EngineError {
       code: "variant-budget-exceeded".to_string(),
       category: "document".to_string(),
       message: format!("the selection would need {selected} variants, above the budget of {budget}"),
-      details: Some(serde_json::json!({
+      details: Some(Box::new(serde_json::json!({
         "space": space, "selected": selected, "budget": budget, "dimensions": dimensions,
-      })),
+      }))),
     }
   }
 
@@ -250,7 +254,7 @@ impl EngineError {
       code: "interaction-invalid".to_string(),
       category: "document".to_string(),
       message: "sampling policy is not valid".to_string(),
-      details: Some(serde_json::json!({ "problems": problems })),
+      details: Some(Box::new(serde_json::json!({ "problems": problems }))),
     }
   }
 
@@ -262,7 +266,7 @@ impl EngineError {
       code: "component-unavailable".to_string(),
       category: "component".to_string(),
       message: format!("no '{component}' component is loaded"),
-      details: Some(serde_json::json!({ "component": component })),
+      details: Some(Box::new(serde_json::json!({ "component": component }))),
     }
   }
 
@@ -273,7 +277,7 @@ impl EngineError {
       code: "component-unavailable".to_string(),
       category: "component".to_string(),
       message: format!("this engine has no Pact Broker client, so it cannot {what}"),
-      details: Some(serde_json::json!({ "component": "broker" })),
+      details: Some(Box::new(serde_json::json!({ "component": "broker" }))),
     }
   }
 
@@ -284,7 +288,7 @@ impl EngineError {
       code: "pacts-not-found".to_string(),
       category: "document".to_string(),
       message: format!("the broker has no pacts for '{provider}' that the consumer version selectors select"),
-      details: Some(serde_json::json!({ "provider": provider })),
+      details: Some(Box::new(serde_json::json!({ "provider": provider }))),
     }
   }
 
@@ -295,7 +299,7 @@ impl EngineError {
       code: "component-unavailable".to_string(),
       category: "component".to_string(),
       message: unavailable.message.clone(),
-      details: Some(unavailable.details.clone()),
+      details: Some(Box::new(unavailable.details.clone())),
     }
   }
 
@@ -307,7 +311,9 @@ impl EngineError {
       code: "component-failed".to_string(),
       category: "component".to_string(),
       message: format!("the '{component}' component failed: {}", error.message),
-      details: Some(serde_json::json!({ "component": component, "error": error })),
+      details: Some(Box::new(
+        serde_json::json!({ "component": component, "error": error }),
+      )),
     }
   }
 
@@ -320,7 +326,7 @@ impl EngineError {
       code: "contract-invalid".to_string(),
       category: "document".to_string(),
       message: "the session's interactions cannot produce a valid contract".to_string(),
-      details: Some(serde_json::json!({ "problems": problems })),
+      details: Some(Box::new(serde_json::json!({ "problems": problems }))),
     }
   }
 
@@ -346,7 +352,7 @@ impl EngineError {
       code: code.to_string(),
       category: "document".to_string(),
       message: format!("'{member}': {error}"),
-      details: Some(details),
+      details: Some(Box::new(details)),
     }
   }
 
@@ -359,9 +365,9 @@ impl EngineError {
       code: "document-mismatched".to_string(),
       category: "document".to_string(),
       message: format!("the contract is for provider '{contract}' and the provider shape is for '{shape}'"),
-      details: Some(
+      details: Some(Box::new(
         serde_json::json!({ "member": "provider", "contract": contract, "provider-shape": shape }),
-      ),
+      )),
     }
   }
 

@@ -6,6 +6,7 @@
 //! operator-specific members as raw JSON for a later stage (a loaded component, design 2.6) to
 //! interpret.
 
+use indexmap::IndexMap;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -132,9 +133,11 @@ pub enum CoreShape {
     content_type: String,
   },
   Semver,
-  /// Members not named here are admitted and ignored (spec §4.3's must-ignore default).
+  /// Members not named here are admitted and ignored (spec §4.3's must-ignore default). In the
+  /// order the author declared them, which is the order a generated document has (ADR 0037).
+  /// Anything that decides by them walks them by name instead: [`members_by_name`].
   Object {
-    members: BTreeMap<String, ShapeNode>,
+    members: IndexMap<String, ShapeNode>,
   },
   /// Exactly `entries.len()` elements, positionally matched (spec §4.3).
   Array {
@@ -178,6 +181,15 @@ pub enum CoreShape {
     /// Absent means the lexicographically first alternative name (spec §5.4).
     default: Option<String>,
   },
+}
+
+/// An `object` shape's members by name, the order a plan and a variant space visit them in (shape
+/// spec §6.2): what they decide must not change when a document is written in another order
+/// (ADR 0037). Only a generated document follows the declared order.
+pub fn members_by_name(members: &IndexMap<String, ShapeNode>) -> Vec<(&String, &ShapeNode)> {
+  let mut sorted: Vec<_> = members.iter().collect();
+  sorted.sort_by_key(|(name, _)| *name);
+  sorted
 }
 
 impl CoreShape {

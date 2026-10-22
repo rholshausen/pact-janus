@@ -26,7 +26,11 @@ pub struct State {
   pub name: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub params: Option<BTreeMap<String, Value>>,
-  #[serde(rename = "variant-params", skip_serializing_if = "Option::is_none")]
+  #[serde(
+    rename = "variant-params",
+    skip_serializing_if = "Option::is_none",
+    serialize_with = "crate::contract::canonical::bindings"
+  )]
   pub variant_params: Option<Vec<Value>>,
 }
 

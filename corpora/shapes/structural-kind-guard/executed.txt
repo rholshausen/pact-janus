@@ -3,7 +3,7 @@
     :response (
       :body (
         %expect:object (
-          $.response.body => {'items': 'SKU-1', 'totals': 7}
+          $.response.body => {'totals': 7, 'items': 'SKU-1'}
         ) => BOOL(true),
         :"$.items" (
           %expect:array (

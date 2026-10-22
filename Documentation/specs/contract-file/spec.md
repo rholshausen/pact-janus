@@ -135,6 +135,18 @@ trailing whitespace. Members are emitted in the order this specification lists t
 Arrays are emitted in their specified order — `interactions` as submitted, `variants` in recorded order,
 which is run order (variant semantics §4.3, §5.1).
 
+The members this specification leaves open are emitted by what they are
+([ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+A **record** another specification defines — the selection `report`, a variant's `assignment`, a
+`variant-params` binding and its cases — is emitted with every object's members sorted by name, at every
+depth. A **shape** node's own members are sorted by name, its `alternatives` too, and its child shapes
+are written by the same rule; an `object` shape's `members` keep the order the author declared them in,
+which is the order a mock serves them in (shape spec §4.3). A **document** is emitted as it was
+submitted or produced: an `example`, an `any-of`'s `options`, a slot value's `content`, and a state's
+parameter values, including a binding's `value` and `default`. A component operator's node is the
+component's, and is emitted as submitted. So the same content is the same bytes whichever SDK wrote it,
+and an author's order is kept where it means something.
+
 Compact, not pretty-printed: [ADR 0018](../../decisions/0018-canonical-contract-bytes-are-compact-not-pretty-printed.md)
 found that a pretty form and §2.3's literal `{"$format":` byte prefix cannot both hold without a special
 case for exactly one member, and that the special case buys nothing a machine reader needs — a

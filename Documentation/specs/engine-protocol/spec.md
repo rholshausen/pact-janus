@@ -157,6 +157,13 @@ hold text costs a little width and nothing else, while a member declared text ca
 the one stray non-UTF-8 payload that a contract test exists to catch. When a member's content
 is not certainly text for all time, declare it bytes.
 
+**Member order is carried, never compared** ([ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+An object's members have an order, the order they were written in, and an engine MUST keep it
+from where a document enters to where it leaves: a decoded body, a shape's members, an example.
+Two objects with the same members are nonetheless the same value in any order, and nothing an
+engine decides may depend on the order. That is what lets a mock serve a CSV body's columns as
+the consumer declared them, while a JSON provider that reorders its members still passes.
+
 ### 2.5 Tagged content: choosing the representation per call
 
 The static declaration above fixes a member's type in the schema. Some members instead carry

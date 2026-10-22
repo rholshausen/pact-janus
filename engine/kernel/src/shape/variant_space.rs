@@ -307,8 +307,8 @@ fn walk(shape: &ShapeNode, at: &str, gates: &[Gate], out: &mut Vec<Dimension>) {
       walk(values, &path::each_entry_value(at), gates, out);
     }
     CoreShape::Object { members } => {
-      // A `BTreeMap`'s iteration order is already the lexicographic order spec §6.2 requires.
-      for (name, member) in members {
+      // By name, the lexicographic order spec §6.2 requires, not the declared order (ADR 0037).
+      for (name, member) in super::members_by_name(members) {
         walk(member, &path::member(at, name), gates, out);
       }
     }

@@ -666,11 +666,14 @@ impl Conversion {
     if let Some((list, false)) = &list
       && let Some(rule) = list.rules.iter().find(|rule| is_map_entry_rule(rule))
     {
-      let sample = members.values().next().cloned().unwrap_or(Value::Null);
+      // The member first by name, not first as written: the sample decides every value's shape,
+      // and nothing is decided by member order (ADR 0037).
+      let first = members.iter().min_by(|(a, _), (b, _)| a.cmp(b));
+      let sample = first.map(|(_, value)| value.clone()).unwrap_or(Value::Null);
       let values = self.body_shape(rules, &sample, &ctx.entry_value());
       let mut shape = json!({ "shape": "each-entry", "values": values, "min": 0 });
       if let MatchingRule::EachKey(_) = rule {
-        shape["keys"] = json!({ "shape": "string", "example": members.keys().next() });
+        shape["keys"] = json!({ "shape": "string", "example": first.map(|(name, _)| name) });
       }
       return shape;
     }

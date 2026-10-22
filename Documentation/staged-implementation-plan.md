@@ -777,6 +777,25 @@ item in 1a is done when S1.1 agrees.
   *Exit:* the legacy compiler's body entry takes the document model, with no `serde_json::Value` in
   its walk; `corpora/` and S1.1's ledger unchanged by it; and a corpus case in which order is
   observable, the CSV component serving columns in the order its contract declares them.
+  *Done 2026-10-22* ([ADR 0037](decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+  Order is carried, never compared. An object's members keep the order they arrived in, through
+  decode, plans, generation and encode: `serde_json`'s `preserve_order` is on, and the runtime value's
+  objects and an `object` shape's `members` are insertion-ordered. Two objects with the same members
+  are equal in any order, and whatever decides by members walks them by name: plans, the variant
+  space, subsumption, and the v1–v4 compiler. A mock serves members as the shape declares them, so
+  the CSV component's columns come out as the consumer wrote them. Its host test and the TypeScript
+  SDK's CSV consumer now check the order. The legacy compiler's body is `LegacyBody::Document`, a
+  runtime value, and its `Bytes` case is the model's bytes. S1.1's harness is unchanged: 326
+  verdicts, 312 agree and 14 are known. No plan and no result in `corpora/` moved. The exit's
+  "unchanged" held for verdicts but not for snapshots: five `executed.txt` files print a captured body
+  in the order the case wrote it, not sorted. A new case, `shapes/member-order`, compares an example
+  and a body that hold the same members in other orders. Not foreseen: a contract's canonical bytes
+  had relied on sorted maps, so with order kept, every contract would have changed and then varied
+  with the SDK that wrote it. The writer now sorts the records and a shape's own members, and keeps
+  order only in an `object` shape's `members` and in documents (contract-file spec §2.4). A contract
+  whose members were in name order writes the same bytes as before. Two decisions had silently read
+  order once it was kept, and now go by name: subsumption's test for two shapes admitting the same
+  values, and `janus upgrade`'s sample of an `each-entry` map.
 - **S1.21 Form-urlencoded bodies** — **S**, after S1.20. A content component for
   `application/x-www-form-urlencoded`, decoding a body into an ordered document of names and
   values, matched as today's verifier matches a form body; and S1.4's generators applied to it,

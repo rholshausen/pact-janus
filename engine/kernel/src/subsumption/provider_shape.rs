@@ -47,14 +47,21 @@ pub struct ProviderInteraction {
   /// slots — for HTTP, `method` and `path`. Only ever matched against a contract's recorded
   /// examples, never compared for subsumption, so it carries no claim about what the provider
   /// accepts.
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(
+    skip_serializing_if = "Option::is_none",
+    serialize_with = "crate::contract::canonical::optional_shape_parts"
+  )]
   pub selector: Option<BTreeMap<String, ShapePart>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub provenance: Option<String>,
   /// Open provenance detail (spec §2.4), not interpreted by the walk.
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(
+    skip_serializing_if = "Option::is_none",
+    serialize_with = "crate::contract::canonical::optional_record_map"
+  )]
   pub source: Option<BTreeMap<String, Value>>,
   /// Part name -> slot name -> shape.
+  #[serde(serialize_with = "crate::contract::canonical::shape_parts")]
   pub parts: BTreeMap<String, ShapePart>,
 }
 

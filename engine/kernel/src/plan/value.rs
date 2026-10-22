@@ -7,8 +7,8 @@
 
 use super::model::{DocumentKind, Literal};
 use base64::Engine;
+use indexmap::IndexMap;
 use serde_json::{Number, Value};
-use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RuntimeValue {
@@ -18,7 +18,9 @@ pub enum RuntimeValue {
   Number(Number),
   String(String),
   Array(Vec<RuntimeValue>),
-  Object(BTreeMap<String, RuntimeValue>),
+  /// Members in the order they arrived: decoded, read from a plan, or captured (ADR 0037). The
+  /// order is carried, never compared: two objects with the same members are equal in any order.
+  Object(IndexMap<String, RuntimeValue>),
   Bytes(Vec<u8>),
   /// A key paired with a value (spec §2.2) — what `resolve-current`'s `.key`/`.value` suffixes
   /// address while iterating an `each-entry` (plan task 3.3's compiled form).

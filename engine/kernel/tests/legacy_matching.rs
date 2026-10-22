@@ -197,7 +197,7 @@ fn body_of(value: &Value) -> Option<Value> {
 fn legacy_body_of(value: &Value) -> Option<LegacyBody> {
   body_of(value).map(|body| match body {
     Value::Null => LegacyBody::Empty,
-    body => LegacyBody::Document(body),
+    body => LegacyBody::Document(RuntimeValue::from_json(&body)),
   })
 }
 

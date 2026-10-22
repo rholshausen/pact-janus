@@ -114,6 +114,12 @@ fn consumer_run(engine: &mut Engine) -> Value {
 }
 
 fn consumer_run_with(engine: &mut Engine, interaction: Value) -> Value {
+  // The columns as the interaction declares them, in its order (ADR 0037).
+  let declared: Vec<String> = interaction
+    .pointer("/parts/response/body/items/members")
+    .and_then(Value::as_object)
+    .map(|members| members.keys().cloned().collect())
+    .unwrap_or_default();
   let created = send(
     engine,
     "consumer-session/create",
@@ -167,6 +173,13 @@ fn consumer_run_with(engine: &mut Engine, interaction: Value) -> Value {
     for column in ["id", "status", "items"] {
       assert!(header.contains(&column), "column '{column}' in {header:?}");
     }
+    // In the order the interaction declares them, not by name: a consumer may read by position.
+    let in_declared_order: Vec<&str> = declared
+      .iter()
+      .map(String::as_str)
+      .filter(|column| header.contains(column))
+      .collect();
+    assert_eq!(header, in_declared_order, "the columns as declared, in {body:?}");
     assert!(lines.count() >= 1, "at least one row: {body:?}");
   }
 
@@ -205,7 +218,23 @@ fn a_consumer_test_serves_csv_and_records_a_contract_that_says_so() {
       body["content"].is_array(),
       "and is recorded as a readable document: {body}"
     );
+    let row: Vec<&String> = body["content"][0].as_object().unwrap().keys().collect();
+    assert_eq!(
+      row,
+      ["id", "status", "items"],
+      "each row in the order declared: {body}"
+    );
   }
+  let declared: Vec<&String> = interaction["parts"]["response"]["body"]["items"]["members"]
+    .as_object()
+    .unwrap()
+    .keys()
+    .collect();
+  assert_eq!(
+    declared,
+    ["id", "status", "items"],
+    "the contract records the columns in the order the consumer declared them"
+  );
 }
 
 #[test]

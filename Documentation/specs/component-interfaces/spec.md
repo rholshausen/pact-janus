@@ -495,6 +495,10 @@ A component that cannot decode answers with an error (§11.1), and the engine fa
 never applies a shape to a guess: shape spec §2.2 makes that normative, and this is the operation where
 it is enforced.
 
+A decoded document's objects keep their members in the order the component wrote them, and the engine
+keeps that order wherever the document goes; it never compares by it (engine-protocol spec §2.4,
+[ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+
 Octets whose media type no component claims are not decoded, and not guessed at either: the slot's
 document is the octets themselves, the document model's bytes ([ADR 0036](../../decisions/0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)).
 A requirement for a content type (§2.3) is still unsatisfied when nothing claims it. Bytes are what a
@@ -504,7 +508,9 @@ component for `text/*`, after JSON, which decodes UTF-8 into a string.
 ### 6.2 Encoding is how variants become traffic
 
 `encode` is decode's inverse, and it exists because a consumer test must *produce* bodies: each selected
-variant's document becomes the octets a mock serves (plan 4.3/4.4). `decode(encode(d))` MUST equal `d`
+variant's document becomes the octets a mock serves (plan 4.3/4.4). That document's members are in the
+order its shape declares them (shape spec §4.3), so a component that writes members in the order it is
+handed them serves what the author wrote. `decode(encode(d))` MUST equal `d`
 for every document the component's own `decode` can produce. Round-tripping is not a nicety here —
 a contract records both the shape and a produced example, and a component whose two halves disagree
 records an example its own matcher would reject.

@@ -126,6 +126,13 @@ members are arrays of strings. Neither needs a kind of its own.
 Bytes in a plan document use the protocol's bytes forms (protocol spec §2.4–2.5), so a plan carrying
 a malformed payload round-trips through a frame like anything else.
 
+An object value keeps its members in the order they were written, and the text forms (§3) print them
+in that order, a captured value's included. Order is never compared: `match:equality` finds two objects
+with the same members equal in any order (protocol spec §2.4,
+[ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+And a compiler visits an object's members by name, so a plan does not change when its source is written
+in another order.
+
 ### 2.3 Results
 
 Executing a node produces one of three results:
@@ -359,6 +366,10 @@ compiler emits a pact's pattern anchored, `^(?:…)$`, because today's verifiers
 whole value (staged plan S1.18). The pattern a plan prints is the one it matches. Where the two
 compilers differ is small and worth naming:
 
+The v1–v4 compiler compiles a body as a document in the protocol's model, not as JSON: a JSON body, a
+text body's string, a binary body's bytes, or whatever a content component decoded (staged plan S1.20).
+A v1–v4 JSON object's members are a set, so it compiles them by name.
+
 The actions only the v1–v4 compiler may emit are the `legacy` namespace, and nothing else is in it, so
 "which compiler may emit this" (§4.5) is read off a node's name. Two actions go the other way:
 
@@ -448,7 +459,7 @@ are two plans.
 | Operator | Compiles to |
 |---|---|
 | value operators | the matching action of §4.3, applied to the resolved value |
-| `object` | `expect:object`, then a `container` per named member, each holding the member's compiled shape; no assertion about unnamed members |
+| `object` | `expect:object`, then a `container` per named member, in order of name, each holding the member's compiled shape; no assertion about unnamed members |
 | `array` | `expect:array`, `expect:count`, then a `container` per index |
 | `each-like` | `expect:array`, `expect:size` for the cardinality, plus `flow:for-each` over a `splat` of the elements, with the item shape compiled once and applied to `resolve-current` |
 | `each-entry` | `expect:object`, then the same over entries, with `entry` values (§2.2) feeding key and value shapes |

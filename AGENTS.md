@@ -70,7 +70,8 @@ Three sources are the source of truth and take precedence over this file when th
 > `engine/kernel/src/legacy/`, the kernel's one HTTP- and JSON-shaped module, and a test holds the rest
 > of the kernel to it), and S1.6 (ADR 0036: text bodies decode through the built-in `text` component,
 > a body no component claims is bytes, and a v1–v4 text or binary body verifies as today's verifier
-> compares it).
+> compares it), and S1.20 (ADR 0037: an object's members keep the order they arrived in and nothing is
+> decided by it, so a mock serves them as declared; the legacy compiler compiles a body as a document).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

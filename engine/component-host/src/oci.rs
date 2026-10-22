@@ -773,7 +773,7 @@ fn failure(code: &str, message: String, details: Value) -> ComponentError {
     category: "component".to_string(),
     message,
     source: Some("engine".into()),
-    details: Some(details),
+    details: Some(Box::new(details)),
   }
 }
 

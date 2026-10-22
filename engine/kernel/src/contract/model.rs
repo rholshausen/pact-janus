@@ -8,10 +8,10 @@
 //! Anything the schema calls opaque — shape nodes, the selection report, a variant's assignment,
 //! state parameters and variant-param bindings — stays a `BTreeMap`/`Value` here. Shapes are
 //! design 2.2's business, the selection report and variant bindings are design 2.3's; re-typing
-//! them in the contract model would mean re-deriving their semantics in a second place.
-//! `BTreeMap` rather than `serde_json::Map` for these: it sorts keys, which makes the canonical
-//! writer's determinism (§2.4) independent of whatever order the code that built the value
-//! happened to insert members in, rather than a property that depends on construction order.
+//! them in the contract model would mean re-deriving their semantics in a second place. A `Value`
+//! keeps its members in the order they arrived (ADR 0037), so each opaque member is written by
+//! [`super::canonical`]'s rule for what it is: a record by name, a shape canonically, a document
+//! as it arrived.
 
 use crate::common::{ContentTypes, Requirement, State, Transport};
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,7 @@ pub struct Interaction {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub states: Option<Vec<State>>,
   /// Part name -> slot name -> shape (opaque; design 2.2 owns the shape's own interior).
+  #[serde(serialize_with = "super::canonical::shape_parts")]
   pub parts: BTreeMap<String, ShapePart>,
   /// Declared content types (contract-file spec §5.5, ADR 0020), recorded as the author wrote them.
   #[serde(rename = "content-types", skip_serializing_if = "Option::is_none")]
@@ -76,6 +77,7 @@ pub struct Interaction {
 pub struct RecordedSelection {
   pub variants: Vec<RecordedVariant>,
   /// Design 2.3's selection report, opaque here.
+  #[serde(serialize_with = "super::canonical::record_map")]
   pub report: BTreeMap<String, Value>,
 }
 
@@ -88,6 +90,7 @@ pub struct RecordedVariant {
   /// it (contract-file spec examples §3).
   pub origin: crate::variant::Origin,
   /// The assignment is the truth and `id` is its name (variant-semantics spec §2.2); opaque here.
+  #[serde(serialize_with = "super::canonical::record_list")]
   pub assignment: Vec<Value>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub states: Option<Vec<ResolvedState>>,

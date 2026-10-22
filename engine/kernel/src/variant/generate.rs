@@ -93,6 +93,8 @@ pub fn value(shape: &ShapeNode, at: &str, assignment: &Assignment) -> Option<Val
       Some(Value::Object(map))
     }
     CoreShape::Object { members } => {
+      // In the order the author declared them, so the octets `content/encode` writes follow it: a
+      // CSV's columns, say (ADR 0037).
       let mut map = serde_json::Map::new();
       for (name, member) in members {
         if let Some(v) = value(member, &path::member(at, name), assignment) {

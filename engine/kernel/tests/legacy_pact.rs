@@ -3,6 +3,7 @@
 
 use pact_janus_kernel::legacy::compile::LegacyBody;
 use pact_janus_kernel::legacy::pact as legacy_pact;
+use pact_janus_kernel::plan::RuntimeValue;
 use pact_models::PactSpecification;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
@@ -113,7 +114,7 @@ fn a_v4_bodys_content_contenttype_encoded_envelope_is_already_unwrapped() {
     .expect("pact_models decodes the content/contentType/encoded envelope itself");
   assert_eq!(
     legacy_request.body,
-    Some(LegacyBody::Document(
+    Some(document(
       serde_json::json!({ "a": { "prop1": { "value": "x" } } })
     )),
     "the body must be the decoded content, not the {{content, contentType, encoded}} envelope itself"
@@ -149,6 +150,15 @@ fn response_of(response: serde_json::Value) -> pact_models::v4::http_parts::Http
   legacy_pact::http_interactions(pact.as_ref()).remove(0).response
 }
 
+/// A body as the legacy layer holds it: a document in the engine's model (staged plan S1.20).
+fn document(value: serde_json::Value) -> LegacyBody {
+  LegacyBody::Document(RuntimeValue::from_json(&value))
+}
+
+fn bytes(octets: Vec<u8>) -> LegacyBody {
+  LegacyBody::Document(RuntimeValue::Bytes(octets))
+}
+
 fn body_of(response: serde_json::Value) -> Result<Option<LegacyBody>, String> {
   legacy_pact::legacy_response(&response_of(response))
     .map(|response| response.body)
@@ -157,20 +167,20 @@ fn body_of(response: serde_json::Value) -> Result<Option<LegacyBody>, String> {
 
 #[rstest]
 #[case::json(json!({ "status": 200, "headers": { "Content-Type": "application/json" }, "body": { "a": 1 } }),
-  Some(LegacyBody::Document(json!({ "a": 1 }))))]
-#[case::json_detected(json!({ "status": 200, "body": [1, 2] }), Some(LegacyBody::Document(json!([1, 2]))))]
+  Some(document(json!({ "a": 1 }))))]
+#[case::json_detected(json!({ "status": 200, "body": [1, 2] }), Some(document(json!([1, 2]))))]
 #[case::text(json!({ "status": 200, "headers": { "Content-Type": "text/plain" }, "body": "Hello World!" }),
-  Some(LegacyBody::Document(json!("Hello World!"))))]
-#[case::text_detected(json!({ "status": 200, "body": "Hello World!" }), Some(LegacyBody::Document(json!("Hello World!"))))]
+  Some(document(json!("Hello World!"))))]
+#[case::text_detected(json!({ "status": 200, "body": "Hello World!" }), Some(document(json!("Hello World!"))))]
 #[case::html(json!({ "status": 200, "headers": { "Content-Type": "text/html; charset=utf-8" }, "body": "<p>hi</p>" }),
-  Some(LegacyBody::Document(json!("<p>hi</p>"))))]
+  Some(document(json!("<p>hi</p>"))))]
 #[case::binary(json!({ "status": 200, "headers": { "Content-Type": "image/png" }, "body": "iVBORw0KGgo=" }),
-  Some(LegacyBody::Bytes(vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a])))]
+  Some(bytes(vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a])))]
 #[case::octet_stream(json!({ "status": 200, "headers": { "Content-Type": "application/octet-stream" }, "body": "AAEC" }),
-  Some(LegacyBody::Bytes(vec![0, 1, 2])))]
+  Some(bytes(vec![0, 1, 2])))]
 #[case::an_unknown_application_type_is_binary(
   json!({ "status": 200, "headers": { "Content-Type": "application/vnd.acme" }, "body": "AAEC" }),
-  Some(LegacyBody::Bytes(vec![0, 1, 2])))]
+  Some(bytes(vec![0, 1, 2])))]
 #[case::empty(json!({ "status": 200, "body": "" }), Some(LegacyBody::Empty))]
 #[case::missing(json!({ "status": 200 }), None)]
 fn a_body_is_read_as_todays_verifier_compares_its_content_type(

@@ -17,7 +17,9 @@ readability:
   `cardinality-pinned-region/`, a request list pinned to `min+1` admitting any length above the
   minimum (ADR 0024, phase-9 finding 25) — the corpus's one case compiled under a variant; and
   `reserved-namespace-operator/`, a shape that asks for core plan actions by name and is refused
-  (staged plan S0.13) — the corpus's one case with no plan.
+  (staged plan S0.13) — the corpus's one case with no plan; and `member-order/`, members declared out
+  of name order and compiled by name, with an example and a body that hold the same members in other
+  orders compared as equal (ADR 0037).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-

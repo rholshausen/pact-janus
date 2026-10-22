@@ -3,7 +3,7 @@
     :response (
       :body (
         %expect:object (
-          $.response.body => {'id': 42, 'items': [], 'payment': {'dueDate': '2026-08-30T00:00:00Z', 'type': 'invoice'}, 'status': 'REFUNDED'}
+          $.response.body => {'id': 42, 'status': 'REFUNDED', 'payment': {'type': 'invoice', 'dueDate': '2026-08-30T00:00:00Z'}, 'items': []}
         ) => BOOL(true),
         :"$.id" (
           %match:integer (
@@ -55,7 +55,7 @@
               ) => BOOL(true),
               :invoice (
                 %expect:object (
-                  $.response.body.payment => {'dueDate': '2026-08-30T00:00:00Z', 'type': 'invoice'}
+                  $.response.body.payment => {'type': 'invoice', 'dueDate': '2026-08-30T00:00:00Z'}
                 ) => BOOL(true),
                 :"$.response.body.payment@invoice.dueDate" (
                   %match:date (

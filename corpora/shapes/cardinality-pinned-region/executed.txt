@@ -3,20 +3,20 @@
     :request (
       :body (
         %expect:array (
-          $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}]
+          $.request.body => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}]
         ) => BOOL(true),
         %expect:size (
-          $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}],
+          $.request.body => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}],
           2,
           NULL
         ) => BOOL(true),
         %flow:for-each (
           ** (
-            $.request.body => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}]
-          ) => [{'qty': 1, 'sku': 'SKU-1'}, {'qty': 4, 'sku': 'SKU-2'}, {'qty': 2, 'sku': 'SKU-3'}],
+            $.request.body => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}]
+          ) => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}],
           :"$.request.body[*]" (
             %expect:object (
-              ~> => {'qty': 1, 'sku': 'SKU-1'}
+              ~> => {'sku': 'SKU-1', 'qty': 1}
             ) => BOOL(true),
             :"$.request.body[*].qty" (
               %match:integer (
@@ -31,7 +31,7 @@
           ) => BOOL(true),
           :"$.request.body[*]" (
             %expect:object (
-              ~> => {'qty': 4, 'sku': 'SKU-2'}
+              ~> => {'sku': 'SKU-2', 'qty': 4}
             ) => BOOL(true),
             :"$.request.body[*].qty" (
               %match:integer (
@@ -46,7 +46,7 @@
           ) => BOOL(true),
           :"$.request.body[*]" (
             %expect:object (
-              ~> => {'qty': 2, 'sku': 'SKU-3'}
+              ~> => {'sku': 'SKU-3', 'qty': 2}
             ) => BOOL(true),
             :"$.request.body[*].qty" (
               %match:integer (

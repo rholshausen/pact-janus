@@ -166,7 +166,7 @@ impl WasmLoader {
           category: "component".to_string(),
           message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
           source: Some("engine".into()),
-          details: Some(json!({ "expected": expected, "actual": actual })),
+          details: Some(Box::new(json!({ "expected": expected, "actual": actual }))),
         });
       }
     }
@@ -248,10 +248,10 @@ fn check_artifact_config(pulled: &oci::Pulled, hello: &Value) -> Result<(), Comp
           says[member]
         ),
         source: Some("engine".into()),
-        details: Some(
+        details: Some(Box::new(
           json!({ "reference": pulled.reference.to_string(), "digest": pulled.digest,
                               "config": pulled.config, "handshake": says }),
-        ),
+        )),
       });
     }
   }
@@ -345,7 +345,7 @@ fn check_imports(engine: &Engine, component: &Component, grants: &Grants) -> Res
         category: "component".to_string(),
         message: format!("the component imports {name}, and its declaration does not grant network"),
         source: Some("engine".into()),
-        details: Some(json!({ "import": name, "grant": "network" })),
+        details: Some(Box::new(json!({ "import": name, "grant": "network" }))),
       });
     }
     return Err(ComponentError {
@@ -353,7 +353,7 @@ fn check_imports(engine: &Engine, component: &Component, grants: &Grants) -> Res
       category: "component".to_string(),
       message: format!("the component imports {name}, which no grant provides"),
       source: Some("engine".into()),
-      details: Some(json!({ "import": name })),
+      details: Some(Box::new(json!({ "import": name }))),
     });
   }
   Ok(())
@@ -473,7 +473,7 @@ impl WasmComponent {
       code,
       format!("component '{}' {what} during {doing}: {err:#}", self.name),
     );
-    error.details = Some(json!({ "component": self.name, "op": doing }));
+    error.details = Some(Box::new(json!({ "component": self.name, "op": doing })));
     error
   }
 }

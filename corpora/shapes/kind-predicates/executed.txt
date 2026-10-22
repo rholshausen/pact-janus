@@ -3,7 +3,7 @@
     :response (
       :body (
         %expect:object (
-          $.response.body => {'active': true, 'age': 42, 'count': 3, 'name': 'Mary', 'note': NULL, 'price': 19.99}
+          $.response.body => {'name': 'Mary', 'count': 3, 'age': 42, 'price': 19.99, 'active': true, 'note': NULL}
         ) => BOOL(true),
         :"$.active" (
           %match:boolean (

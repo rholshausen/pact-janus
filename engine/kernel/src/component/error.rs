@@ -18,8 +18,10 @@ pub struct ComponentError {
   /// no" and "the component died" send a reader to different places.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub source: Option<Box<str>>,
+  /// Boxed: an object `Value` keeps its members in order (ADR 0037), which makes it large, and an
+  /// error is carried by every `Result` that can fail.
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub details: Option<Value>,
+  pub details: Option<Box<Value>>,
 }
 
 fn internal_category() -> String {
@@ -35,7 +37,7 @@ impl ComponentError {
       category: "protocol".to_string(),
       message: format!("unsupported operation '{op}'"),
       source: None,
-      details: Some(serde_json::json!({ "op": op })),
+      details: Some(Box::new(serde_json::json!({ "op": op }))),
     }
   }
 
@@ -46,7 +48,7 @@ impl ComponentError {
       category: "component".to_string(),
       message: message.into(),
       source: None,
-      details: Some(serde_json::json!({ "content-type": content_type })),
+      details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
     }
   }
 
@@ -58,7 +60,7 @@ impl ComponentError {
       category: "document".to_string(),
       message: message.into(),
       source: None,
-      details: Some(serde_json::json!({ "content-type": content_type })),
+      details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
     }
   }
 
@@ -70,7 +72,7 @@ impl ComponentError {
       category: "component".to_string(),
       message: format!("unsupported content type '{content_type}'"),
       source: None,
-      details: Some(serde_json::json!({ "content-type": content_type })),
+      details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
     }
   }
 
@@ -93,7 +95,7 @@ impl ComponentError {
       category: "document".to_string(),
       message: format!("no generator '{name}'"),
       source: None,
-      details: Some(serde_json::json!({ "generator": name })),
+      details: Some(Box::new(serde_json::json!({ "generator": name }))),
     }
   }
 
@@ -105,7 +107,7 @@ impl ComponentError {
       category: "document".to_string(),
       message: message.into(),
       source: None,
-      details: Some(serde_json::json!({ "name": name })),
+      details: Some(Box::new(serde_json::json!({ "name": name }))),
     }
   }
 
@@ -116,7 +118,7 @@ impl ComponentError {
       category: "document".to_string(),
       message: message.into(),
       source: None,
-      details: Some(serde_json::json!({ "generator": generator })),
+      details: Some(Box::new(serde_json::json!({ "generator": generator }))),
     }
   }
 

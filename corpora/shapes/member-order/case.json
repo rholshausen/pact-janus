@@ -1,0 +1,32 @@
+{
+  "description": "member order is carried, never compared (ADR 0037): an object shape declared out of name order compiles by name, and an example and a provider's body with the same members in other orders are equal, each shown in the order it was written",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order with its shipping address",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "status": { "shape": "string", "example": "PENDING" },
+              "id": { "shape": "integer", "example": 66 },
+              "shipping": {
+                "shape": "equality",
+                "example": { "street": "1 High St", "city": "London", "postcode": "N1 9GU" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "id": 66,
+      "shipping": { "city": "London", "postcode": "N1 9GU", "street": "1 High St" },
+      "status": "SHIPPED"
+    }
+  },
+  "result": { "status": "matched" }
+}

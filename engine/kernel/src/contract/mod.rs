@@ -1,6 +1,7 @@
 //! The Janus contract model: read and write per design 2.5, including ADR 0011's canonical
 //! writing rules and its strict/tolerant identification modes (plan task 3.1).
 
+pub mod canonical;
 mod error;
 mod identify;
 mod model;

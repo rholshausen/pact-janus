@@ -27,15 +27,19 @@
 //! reaches every descendant too. [`rule_list_node`] reduces a cascaded one to `Type`, so the bound
 //! is enforced once, on the array that declared it, and never re-applied several levels down.
 //!
-//! **Scope.** JSON bodies, walked member by member, and text and binary bodies, compiled as one value
-//! at `$` (ADR 0036 decision 3: today's `match_text` and `match_octet_stream`). XML, form and
-//! multipart bodies are S1.21 to S1.23. `Values`, `EachKey`, `EachValue`, `ArrayContains` and
+//! **Scope.** A body is a document in the engine's model ([`RuntimeValue`], component-interfaces spec
+//! §6.1), never JSON as such, so a content component's decoded document can reach this compiler as
+//! a JSON pact's body does (staged plan S1.20). Structure is walked member by member, by name; a
+//! string or bytes, which is what a text or binary body is, is one value at `$` (ADR 0036 decision
+//! 3: today's `match_text` and `match_octet_stream`). XML, form and multipart bodies are S1.21 to
+//! S1.23. `Values`, `EachKey`, `EachValue`, `ArrayContains` and
 //! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
 //! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
 //! none of them, so this is a documented gap, not a silent one.
 
-use crate::plan::{self as model, Literal, Node};
+use crate::plan::{self as model, Literal, Node, RuntimeValue};
 use crate::shape::path;
+use indexmap::IndexMap;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
 use pact_models::path_exp::{DocPath, PathToken};
 use serde_json::Value;
@@ -72,11 +76,9 @@ pub struct LegacyRequest {
 pub enum LegacyBody {
   /// Declared null or empty: the actual body must be absent too.
   Empty,
-  /// A JSON document, or a text body as a string, which is the same thing to the compiler: a
-  /// string at `$`.
-  Document(Value),
-  /// A binary body, or a text body that is not UTF-8: compared as octets.
-  Bytes(Vec<u8>),
+  /// The body as a document: a JSON document; a text body as a string; a binary body, or text that
+  /// is not UTF-8, as bytes. A string and bytes are each one value at `$` to the compiler.
+  Document(RuntimeValue),
 }
 
 /// A v1–v4 response. See [`LegacyRequest`] for the header/body notes, which apply identically.
@@ -521,8 +523,10 @@ fn body_type_check(
   content_type: Option<&str>,
   part: &str,
 ) -> Option<Node> {
-  let has_content = matches!(body, Some(LegacyBody::Document(value)) if !value.is_null())
-    || matches!(body, Some(LegacyBody::Bytes(_)));
+  let has_content = matches!(
+    body,
+    Some(LegacyBody::Document(value)) if !matches!(value, RuntimeValue::Null | RuntimeValue::Absent)
+  );
   let named = headers
     .keys()
     .any(|name| name.eq_ignore_ascii_case("content-type"));
@@ -554,23 +558,14 @@ fn compile_body_slot(
     None => return None,
     // Explicitly null: v1-v4 requires the actual body be absent too (`body/non empty body found
     // when empty expected` is a mismatch on exactly this) — an assertion, not a skip.
-    Some(LegacyBody::Empty) | Some(LegacyBody::Document(Value::Null)) => {
+    Some(LegacyBody::Empty) | Some(LegacyBody::Document(RuntimeValue::Null | RuntimeValue::Absent)) => {
       return Some(container(vec![Node::action(
         "expect:absent",
         vec![Node::resolve(root_path)],
       )]));
     }
-    // Octets: one value at `$`, compared by the rules there or byte for byte, as today's
-    // `match_octet_stream` compares them (ADR 0036 decision 3).
-    Some(LegacyBody::Bytes(bytes)) => {
-      let resolve = Node::resolve(root_path);
-      let example = Literal::bytes(bytes);
-      let node = match best_rule(category.as_ref(), &["$".to_string()], false) {
-        Some((list, cascaded)) => rule_list_node(&list, cascaded, resolve, &example),
-        None => Node::action("match:equality", vec![resolve, Node::value(example)]),
-      };
-      return Some(container(vec![node]));
-    }
+    // Structure, or one value at `$`: a string, or octets compared by the rules there or byte for
+    // byte, as today's `match_octet_stream` compares them (ADR 0036 decision 3).
     Some(LegacyBody::Document(body)) => body,
   };
   let ctx = BodyCtx {
@@ -693,20 +688,20 @@ impl<'a> BodyCtx<'a> {
   }
 }
 
-fn compile_body_value(value: &Value, ctx: &BodyCtx) -> Vec<Node> {
+fn compile_body_value(value: &RuntimeValue, ctx: &BodyCtx) -> Vec<Node> {
   match value {
-    Value::Object(members) => compile_body_object(members, ctx),
-    Value::Array(items) => compile_body_array(items, ctx),
+    RuntimeValue::Object(members) => compile_body_object(members, ctx),
+    RuntimeValue::Array(items) => compile_body_array(items, ctx),
     _ => vec![compile_body_scalar(value, ctx)],
   }
 }
 
-fn compile_body_scalar(value: &Value, ctx: &BodyCtx) -> Node {
+fn compile_body_scalar(value: &RuntimeValue, ctx: &BodyCtx) -> Node {
   match ctx.best() {
-    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), &Literal::from_json(value)),
+    Some((list, cascaded)) => rule_list_node(&list, cascaded, ctx.resolve(), &Literal::from_document(value)),
     None => Node::action(
       "match:equality",
-      vec![ctx.resolve(), Node::value(Literal::from_json(value))],
+      vec![ctx.resolve(), Node::value(Literal::from_document(value))],
     ),
   }
 }
@@ -722,7 +717,11 @@ fn compile_body_scalar(value: &Value, ctx: &BodyCtx) -> Node {
 /// oracle's own behaviour (a bare `Type`/`Regex`/`Equality` declared on an object path does not
 /// replace the structural walk), confirmed against `tests/fixtures/spec_testcases` rather than
 /// assumed.
-fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) -> Vec<Node> {
+///
+/// Members are compiled by name, not in the order the pact wrote them (ADR 0037): a v1–v4 JSON
+/// object's members are a set, and a pact's plan must not change when a broker or a formatter
+/// writes it out again.
+fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) -> Vec<Node> {
   if let Some((list, false)) = ctx.best()
     && list.rules.iter().any(is_map_entry_rule)
   {
@@ -730,10 +729,12 @@ fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) 
       &list,
       false,
       ctx.resolve(),
-      &Literal::from_json(&Value::Object(members.clone())),
+      &Literal::from_document(&RuntimeValue::Object(members.clone())),
     )];
   }
-  let mut nodes: Vec<Node> = members
+  let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
+  by_name.sort_by_key(|(name, _)| *name);
+  let mut nodes: Vec<Node> = by_name
     .iter()
     .map(|(name, value)| {
       let member_ctx = ctx.member(name);
@@ -741,7 +742,10 @@ fn compile_body_object(members: &serde_json::Map<String, Value>, ctx: &BodyCtx) 
     })
     .collect();
   if ctx.closed_objects {
-    let names: Vec<Node> = members.keys().map(|k| Node::value(Literal::string(k))).collect();
+    let names: Vec<Node> = by_name
+      .iter()
+      .map(|(k, _)| Node::value(Literal::string(*k)))
+      .collect();
     let mut only_entries = vec![ctx.resolve()];
     only_entries.extend(names);
     nodes.push(Node::action("legacy:only-entries", only_entries));
@@ -763,14 +767,14 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 /// that one element once as a template and applying it to every actual element at run time —
 /// exactly [`compile.rs`](crate::plan::compile)'s `each-like`, with the item shape replaced by whatever
 /// rule cascades into the template's own path.
-fn compile_body_array(items: &[Value], ctx: &BodyCtx) -> Vec<Node> {
+fn compile_body_array(items: &[RuntimeValue], ctx: &BodyCtx) -> Vec<Node> {
   match ctx.best() {
     Some((list, cascaded)) => {
       let mut nodes = vec![rule_list_node(
         &list,
         cascaded,
         ctx.resolve(),
-        &Literal::from_json(&Value::Array(items.to_vec())),
+        &Literal::from_document(&RuntimeValue::Array(items.to_vec())),
       )];
       if let Some(template) = items.first() {
         let item_ctx = ctx.template_item();

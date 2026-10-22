@@ -17,7 +17,12 @@ anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 # `raw_value`: a response's `ok` document is carried pre-serialised, so a contract inside it keeps
 # its schema member order (contract-file spec §2.4) rather than a `Value` map's sorted one.
-serde_json = { version = "1", features = ["raw_value"] }
+# `preserve_order`: an object's members keep the order they arrived in (ADR 0037). Every crate
+# that holds a document depends on this one, so Cargo turns it on for all of them.
+serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
+# The runtime value's objects, ordered as `serde_json`'s are (ADR 0037). Already in the tree
+# through `serde_json`'s `preserve_order`.
+indexmap = "2"
 serde_path_to_error = "0.1"
 # The interpreter's match:regex/match:semver/bytes-literal support. Pure Rust, no OS bindings -
 # pact-reference's own matching engine depends on the same three for the same reasons.

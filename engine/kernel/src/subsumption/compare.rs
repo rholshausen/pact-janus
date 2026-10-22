@@ -420,7 +420,8 @@ impl<'a> Walk<'a> {
       // --- objects (spec §3.2, Rule 2) ---
       (CoreShape::Object { members: p_members }, CoreShape::Object { members: c_members }) => {
         let mut out = Out::yes();
-        for (name, c_member) in c_members {
+        // By name, so findings come out in the same order however either shape was written.
+        for (name, c_member) in crate::shape::members_by_name(c_members) {
           let member_path = path::member(at, name);
           match p_members.get(name) {
             Some(p_member) => out = out.and(self.node(p_member, c_member, &member_path)),
@@ -1375,13 +1376,13 @@ fn same_admits(p: &ShapeNode, c: &ShapeNode) -> bool {
         _ => false,
       },
       (CoreShape::Object { members: p_members }, CoreShape::Object { members: c_members }) => {
+        // By name: the same members declared in another order admit the same values (ADR 0037).
         p_members.len() == c_members.len()
-          && p_members
-            .iter()
-            .zip(c_members)
-            .all(|((p_name, p_member), (c_name, c_member))| {
-              p_name == c_name && same_admits(p_member, c_member)
-            })
+          && p_members.iter().all(|(name, p_member)| {
+            c_members
+              .get(name)
+              .is_some_and(|c_member| same_admits(p_member, c_member))
+          })
       }
       (CoreShape::Array { entries: p_entries }, CoreShape::Array { entries: c_entries })
       | (CoreShape::Contains { entries: p_entries }, CoreShape::Contains { entries: c_entries }) => {

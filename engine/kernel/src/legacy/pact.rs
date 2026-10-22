@@ -194,8 +194,8 @@ fn part_content_type(part: &dyn HttpPart) -> ContentType {
 /// (`LegacyRequest::body`'s own doc comment): `Missing` (the interaction never mentioned a body)
 /// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
 /// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
-/// actual body is absent too". A present body is read by its content type ([`BodyKind`]): JSON is
-/// parsed, text is a string, a binary body is its octets.
+/// actual body is absent too". A present body is read by its content type ([`BodyKind`]) into a
+/// document: JSON is parsed, text is a string, a binary body is its octets.
 fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   let bytes = match part.body() {
     OptionalBody::Missing => return Ok(None),
@@ -204,15 +204,17 @@ fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   };
   let content_type = part_content_type(part);
   match BodyKind::of(&content_type) {
-    BodyKind::Json => serde_json::from_slice(bytes)
-      .map(|document| Some(LegacyBody::Document(document)))
+    BodyKind::Json => serde_json::from_slice::<Value>(bytes)
+      .map(|document| Some(LegacyBody::Document(RuntimeValue::from_json(&document))))
       .map_err(|err| Unsupported::Malformed(err.to_string())),
     BodyKind::NotYet => Err(Unsupported::ContentType(content_type.to_string())),
-    BodyKind::Bytes => Ok(Some(LegacyBody::Bytes(bytes.to_vec()))),
-    BodyKind::Text => Ok(Some(match String::from_utf8(bytes.to_vec()) {
-      Ok(text) => LegacyBody::Document(Value::String(text)),
-      Err(err) => LegacyBody::Bytes(err.into_bytes()),
-    })),
+    BodyKind::Bytes => Ok(Some(LegacyBody::Document(RuntimeValue::Bytes(bytes.to_vec())))),
+    BodyKind::Text => Ok(Some(LegacyBody::Document(
+      match String::from_utf8(bytes.to_vec()) {
+        Ok(text) => RuntimeValue::String(text),
+        Err(err) => RuntimeValue::Bytes(err.into_bytes()),
+      },
+    ))),
   }
 }
 
@@ -236,7 +238,7 @@ pub fn response_types(response: &LegacyResponse) -> ContentTypes {
     let is_text =
       ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
     let declared = match &response.body {
-      Some(LegacyBody::Bytes(_)) if is_text => "application/octet-stream".to_string(),
+      Some(LegacyBody::Document(RuntimeValue::Bytes(_))) if is_text => "application/octet-stream".to_string(),
       _ => content_type.clone(),
     };
     types.insert(

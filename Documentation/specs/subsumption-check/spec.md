@@ -165,7 +165,9 @@ is rolled out).
 
 Schema: [`schemas/v1/provider-shape.schema.json`](schemas/v1/provider-shape.schema.json). Members not
 named there — `shape`, and everything under it — are design 2.2's document, opaque to this schema, the
-same treatment contract spec §5.1 gives the same nesting.
+same treatment contract spec §5.1 gives the same nesting. A writer emits them by the rule contract spec
+§2.4 gives a contract's open members: a shape's own members by name, an `object` shape's `members` in
+their declared order, and `source` as a record, by name.
 
 ## 3. The subsumption walk
 

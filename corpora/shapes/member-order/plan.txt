@@ -1,0 +1,27 @@
+(
+  :"an order with its shipping address" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$.id" (
+          %match:integer (
+            $.response.body.id
+          )
+        ),
+        :"$.shipping" (
+          %match:equality (
+            $.response.body.shipping,
+            {'street': '1 High St', 'city': 'London', 'postcode': 'N1 9GU'}
+          )
+        ),
+        :"$.status" (
+          %match:string (
+            $.response.body.status
+          )
+        )
+      )
+    )
+  )
+)

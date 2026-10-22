@@ -625,7 +625,7 @@ fn error(broker: &BrokerDescriptor, code: &str, message: String, details: Value)
     category: "component".to_string(),
     message,
     source: None,
-    details: Some(details),
+    details: Some(Box::new(details)),
   }
 }
 

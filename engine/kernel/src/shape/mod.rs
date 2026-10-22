@@ -6,12 +6,17 @@
 //! module's own job stops at "is this shape tree well-formed, and if not, where and why" — the
 //! `interaction-invalid` quality plan task 3.2 exists to deliver — plus, in [`variant_space`],
 //! answering "which dimensions does this tree contribute" (spec §6), which the plan compiler
-//! needs computed by the same walk it uses.
+//! needs computed by the same walk it uses. And [`canonical`]: how a shape is written into a
+//! recorded document (ADR 0037).
 
+mod canonical;
 mod model;
 mod parse;
 pub(crate) mod path;
 pub mod variant_space;
 
-pub use model::{CORE_OPERATORS, CoreShape, Example, ShapeKind, ShapeNode, TemporalKind, ValueKind};
+pub use canonical::canonical;
+pub use model::{
+  CORE_OPERATORS, CoreShape, Example, ShapeKind, ShapeNode, TemporalKind, ValueKind, members_by_name,
+};
 pub use parse::parse;

@@ -16,7 +16,8 @@
 use super::model::{Literal, Node};
 use crate::interaction_spec::InteractionSpec;
 use crate::shape::variant_space::{VariantSpace, canonical_point_name, cardinality_region, compute_many};
-use crate::shape::{CoreShape, Example, ShapeKind, ShapeNode, path};
+use crate::shape::{CoreShape, Example, ShapeKind, ShapeNode, members_by_name, path};
+use indexmap::IndexMap;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -233,10 +234,11 @@ fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<N
 /// `object` (spec §5.2): `expect:object` for the kind it admits, then a container per named
 /// member; nothing about unnamed ones (the must-ignore default, spec §4.3, is this absence — no
 /// assertion is emitted for a member nobody named, and the kind assertion says nothing about them
-/// either).
-fn compile_object(members: &BTreeMap<String, ShapeNode>, ctx: &Ctx) -> Vec<Node> {
+/// either). Members by name, as the variant space visits them (ADR 0037): a plan does not change
+/// when a shape is written in another order.
+fn compile_object(members: &IndexMap<String, ShapeNode>, ctx: &Ctx) -> Vec<Node> {
   let mut nodes = vec![Node::action("expect:object", vec![ctx.resolve()])];
-  nodes.extend(members.iter().map(|(name, member)| {
+  nodes.extend(members_by_name(members).into_iter().map(|(name, member)| {
     let member_ctx = ctx.member(name);
     let children = compile_shape(member, &member_ctx);
     Node::container(Some(member_ctx.label()), children)

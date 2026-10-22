@@ -370,6 +370,12 @@ rather than a decoded document by design.
 — the member's value if present, `⊥` if not — must be admitted by that member's shape. A member whose
 shape does not admit `⊥` is therefore **required** by construction, with no separate "required" flag.
 
+The order of `members` is the author's, and it is not part of what the shape admits: an object with
+the named members in any order is admitted alike (protocol spec §2.4). It is the order a produced
+document has (§3.3), so a mock serves the members, or a CSV's columns, as the author wrote them.
+Everything that decides by the members — a plan, the variant space (§6.2), the subsumption check —
+visits them by name ([ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
+
 **Members not named in `members` are admitted and ignored.** This is the must-ignore default, and it
 is normative: an object shape says nothing whatever about members it does not name, and a value
 carrying extra members is admitted unchanged. There is no operator to close an object, and none will
