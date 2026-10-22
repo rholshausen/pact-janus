@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792632068320,
+  "lastUpdate": 1792632070270,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -16956,6 +16956,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20445,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8aaf6091a572b0a41bc17a7d49e8ca733377f414",
+          "message": "docs: cite pact-reference#588 for today's unapplied form body generators\n\nThe ledger's two generators/form-body entries name the upstream issue:\npact_verifier builds pact_matching without its form_urlencoded feature, so\ntoday's verifier sends a form body's generators unapplied. ADR 0038 said\ntoday's verifier generates into a form body; it now says pact_matching does\nwhen built to, pact_verifier is not, and pact-jvm does, citing the issue.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T12:15:33+11:00",
+          "tree_id": "a3a786f54eb917e612cdceb90f07f528e2d22b31",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8aaf6091a572b0a41bc17a7d49e8ca733377f414"
+        },
+        "date": 1792632069716,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 37746,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27947,
             "unit": "requests per second",
             "extra": "engines 4"
           }
