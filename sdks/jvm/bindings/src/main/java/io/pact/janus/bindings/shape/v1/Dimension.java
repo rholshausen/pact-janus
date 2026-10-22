@@ -26,39 +26,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "default",
-    "facet",
-    "gated-by",
     "id",
-    "operator",
     "path",
-    "points"
+    "facet",
+    "operator",
+    "points",
+    "default",
+    "gated-by"
 })
 public class Dimension {
 
-    /**
-     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
-     * (Required)
-     * 
-     */
-    @JsonProperty("default")
-    @JsonPropertyDescription("Name of the point the shape's own examples exercise \u2014 the base variant's assignment for this dimension.")
-    private String _default;
-    /**
-     * Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.
-     * (Required)
-     * 
-     */
-    @JsonProperty("facet")
-    @JsonPropertyDescription("Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.")
-    private String facet;
-    /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
-     * 
-     */
-    @JsonProperty("gated-by")
-    @JsonPropertyDescription("Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md \u00a76.3).")
-    private List<Gate> gatedBy;
     /**
      * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
      * (Required)
@@ -68,19 +45,27 @@ public class Dimension {
     @JsonPropertyDescription("'<path>#<facet>', stable across engine versions and pact-file round trips (spec.md \u00a76.2).")
     private String id;
     /**
-     * The shape operator that contributed the dimension.
-     * 
-     */
-    @JsonProperty("operator")
-    @JsonPropertyDescription("The shape operator that contributed the dimension.")
-    private String operator;
-    /**
      * The location of the operator that contributes the dimension, without the facet suffix.
      * 
      */
     @JsonProperty("path")
     @JsonPropertyDescription("The location of the operator that contributes the dimension, without the facet suffix.")
     private String path;
+    /**
+     * Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.
+     * (Required)
+     * 
+     */
+    @JsonProperty("facet")
+    @JsonPropertyDescription("Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.")
+    private String facet;
+    /**
+     * The shape operator that contributed the dimension.
+     * 
+     */
+    @JsonProperty("operator")
+    @JsonPropertyDescription("The shape operator that contributed the dimension.")
+    private String operator;
     /**
      * The values this dimension can take. A dimension with fewer than two points is not a dimension (spec.md §6.1).
      * (Required)
@@ -89,27 +74,60 @@ public class Dimension {
     @JsonProperty("points")
     @JsonPropertyDescription("The values this dimension can take. A dimension with fewer than two points is not a dimension (spec.md \u00a76.1).")
     private List<Point> points;
+    /**
+     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+     * (Required)
+     * 
+     */
+    @JsonProperty("default")
+    @JsonPropertyDescription("Name of the point the shape's own examples exercise \u2014 the base variant's assignment for this dimension.")
+    private String _default;
+    /**
+     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * 
+     */
+    @JsonProperty("gated-by")
+    @JsonPropertyDescription("Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md \u00a76.3).")
+    private List<Gate> gatedBy;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
-     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+     * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
      * (Required)
      * 
      */
-    @JsonProperty("default")
-    public String getDefault() {
-        return _default;
+    @JsonProperty("id")
+    public String getId() {
+        return id;
     }
 
     /**
-     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+     * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
      * (Required)
      * 
      */
-    @JsonProperty("default")
-    public void setDefault(String _default) {
-        this._default = _default;
+    @JsonProperty("id")
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    /**
+     * The location of the operator that contributes the dimension, without the facet suffix.
+     * 
+     */
+    @JsonProperty("path")
+    public String getPath() {
+        return path;
+    }
+
+    /**
+     * The location of the operator that contributes the dimension, without the facet suffix.
+     * 
+     */
+    @JsonProperty("path")
+    public void setPath(String path) {
+        this.path = path;
     }
 
     /**
@@ -133,44 +151,6 @@ public class Dimension {
     }
 
     /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
-     * 
-     */
-    @JsonProperty("gated-by")
-    public List<Gate> getGatedBy() {
-        return gatedBy;
-    }
-
-    /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
-     * 
-     */
-    @JsonProperty("gated-by")
-    public void setGatedBy(List<Gate> gatedBy) {
-        this.gatedBy = gatedBy;
-    }
-
-    /**
-     * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
-     * (Required)
-     * 
-     */
-    @JsonProperty("id")
-    public String getId() {
-        return id;
-    }
-
-    /**
-     * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
-     * (Required)
-     * 
-     */
-    @JsonProperty("id")
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    /**
      * The shape operator that contributed the dimension.
      * 
      */
@@ -186,24 +166,6 @@ public class Dimension {
     @JsonProperty("operator")
     public void setOperator(String operator) {
         this.operator = operator;
-    }
-
-    /**
-     * The location of the operator that contributes the dimension, without the facet suffix.
-     * 
-     */
-    @JsonProperty("path")
-    public String getPath() {
-        return path;
-    }
-
-    /**
-     * The location of the operator that contributes the dimension, without the facet suffix.
-     * 
-     */
-    @JsonProperty("path")
-    public void setPath(String path) {
-        this.path = path;
     }
 
     /**
@@ -226,6 +188,44 @@ public class Dimension {
         this.points = points;
     }
 
+    /**
+     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+     * (Required)
+     * 
+     */
+    @JsonProperty("default")
+    public String getDefault() {
+        return _default;
+    }
+
+    /**
+     * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+     * (Required)
+     * 
+     */
+    @JsonProperty("default")
+    public void setDefault(String _default) {
+        this._default = _default;
+    }
+
+    /**
+     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * 
+     */
+    @JsonProperty("gated-by")
+    public List<Gate> getGatedBy() {
+        return gatedBy;
+    }
+
+    /**
+     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * 
+     */
+    @JsonProperty("gated-by")
+    public void setGatedBy(List<Gate> gatedBy) {
+        this.gatedBy = gatedBy;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -240,33 +240,33 @@ public class Dimension {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Dimension.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("_default");
-        sb.append('=');
-        sb.append(((this._default == null)?"<null>":this._default));
-        sb.append(',');
-        sb.append("facet");
-        sb.append('=');
-        sb.append(((this.facet == null)?"<null>":this.facet));
-        sb.append(',');
-        sb.append("gatedBy");
-        sb.append('=');
-        sb.append(((this.gatedBy == null)?"<null>":this.gatedBy));
-        sb.append(',');
         sb.append("id");
         sb.append('=');
         sb.append(((this.id == null)?"<null>":this.id));
-        sb.append(',');
-        sb.append("operator");
-        sb.append('=');
-        sb.append(((this.operator == null)?"<null>":this.operator));
         sb.append(',');
         sb.append("path");
         sb.append('=');
         sb.append(((this.path == null)?"<null>":this.path));
         sb.append(',');
+        sb.append("facet");
+        sb.append('=');
+        sb.append(((this.facet == null)?"<null>":this.facet));
+        sb.append(',');
+        sb.append("operator");
+        sb.append('=');
+        sb.append(((this.operator == null)?"<null>":this.operator));
+        sb.append(',');
         sb.append("points");
         sb.append('=');
         sb.append(((this.points == null)?"<null>":this.points));
+        sb.append(',');
+        sb.append("_default");
+        sb.append('=');
+        sb.append(((this._default == null)?"<null>":this._default));
+        sb.append(',');
+        sb.append("gatedBy");
+        sb.append('=');
+        sb.append(((this.gatedBy == null)?"<null>":this.gatedBy));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -283,8 +283,8 @@ public class Dimension {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this._default == null)? 0 :this._default.hashCode()));
         result = ((result* 31)+((this.path == null)? 0 :this.path.hashCode()));
+        result = ((result* 31)+((this._default == null)? 0 :this._default.hashCode()));
         result = ((result* 31)+((this.gatedBy == null)? 0 :this.gatedBy.hashCode()));
         result = ((result* 31)+((this.id == null)? 0 :this.id.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
@@ -303,7 +303,7 @@ public class Dimension {
             return false;
         }
         Dimension rhs = ((Dimension) other);
-        return (((((((((this._default == rhs._default)||((this._default!= null)&&this._default.equals(rhs._default)))&&((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path))))&&((this.gatedBy == rhs.gatedBy)||((this.gatedBy!= null)&&this.gatedBy.equals(rhs.gatedBy))))&&((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.facet == rhs.facet)||((this.facet!= null)&&this.facet.equals(rhs.facet))))&&((this.operator == rhs.operator)||((this.operator!= null)&&this.operator.equals(rhs.operator))))&&((this.points == rhs.points)||((this.points!= null)&&this.points.equals(rhs.points))));
+        return (((((((((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path)))&&((this._default == rhs._default)||((this._default!= null)&&this._default.equals(rhs._default))))&&((this.gatedBy == rhs.gatedBy)||((this.gatedBy!= null)&&this.gatedBy.equals(rhs.gatedBy))))&&((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.facet == rhs.facet)||((this.facet!= null)&&this.facet.equals(rhs.facet))))&&((this.operator == rhs.operator)||((this.operator!= null)&&this.operator.equals(rhs.operator))))&&((this.points == rhs.points)||((this.points!= null)&&this.points.equals(rhs.points))));
     }
 
 }

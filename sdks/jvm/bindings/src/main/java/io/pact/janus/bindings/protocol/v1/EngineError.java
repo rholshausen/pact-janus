@@ -25,20 +25,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "category",
     "code",
-    "details",
-    "message"
+    "category",
+    "message",
+    "details"
 })
 public class EngineError {
 
-    /**
-     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
-     * 
-     */
-    @JsonProperty("category")
-    @JsonPropertyDescription("Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.")
-    private java.lang.String category;
     /**
      * Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md §10.2).
      * (Required)
@@ -48,12 +41,12 @@ public class EngineError {
     @JsonPropertyDescription("Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md \u00a710.2).")
     private java.lang.String code;
     /**
-     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
      * 
      */
-    @JsonProperty("details")
-    @JsonPropertyDescription("Code-specific structure per spec.md \u00a710.2 \u2014 e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).")
-    private Map<String, Object> details;
+    @JsonProperty("category")
+    @JsonPropertyDescription("Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.")
+    private java.lang.String category;
     /**
      * Human-readable description, not intended for programmatic dispatch.
      * (Required)
@@ -62,26 +55,15 @@ public class EngineError {
     @JsonProperty("message")
     @JsonPropertyDescription("Human-readable description, not intended for programmatic dispatch.")
     private java.lang.String message;
+    /**
+     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * 
+     */
+    @JsonProperty("details")
+    @JsonPropertyDescription("Code-specific structure per spec.md \u00a710.2 \u2014 e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).")
+    private Map<String, Object> details;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
-     * 
-     */
-    @JsonProperty("category")
-    public java.lang.String getCategory() {
-        return category;
-    }
-
-    /**
-     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
-     * 
-     */
-    @JsonProperty("category")
-    public void setCategory(java.lang.String category) {
-        this.category = category;
-    }
 
     /**
      * Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md §10.2).
@@ -104,21 +86,21 @@ public class EngineError {
     }
 
     /**
-     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
      * 
      */
-    @JsonProperty("details")
-    public Map<String, Object> getDetails() {
-        return details;
+    @JsonProperty("category")
+    public java.lang.String getCategory() {
+        return category;
     }
 
     /**
-     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
      * 
      */
-    @JsonProperty("details")
-    public void setDetails(Map<String, Object> details) {
-        this.details = details;
+    @JsonProperty("category")
+    public void setCategory(java.lang.String category) {
+        this.category = category;
     }
 
     /**
@@ -141,6 +123,24 @@ public class EngineError {
         this.message = message;
     }
 
+    /**
+     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * 
+     */
+    @JsonProperty("details")
+    public Map<String, Object> getDetails() {
+        return details;
+    }
+
+    /**
+     * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
+     * 
+     */
+    @JsonProperty("details")
+    public void setDetails(Map<String, Object> details) {
+        this.details = details;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -155,21 +155,21 @@ public class EngineError {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(EngineError.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("category");
-        sb.append('=');
-        sb.append(((this.category == null)?"<null>":this.category));
-        sb.append(',');
         sb.append("code");
         sb.append('=');
         sb.append(((this.code == null)?"<null>":this.code));
         sb.append(',');
-        sb.append("details");
+        sb.append("category");
         sb.append('=');
-        sb.append(((this.details == null)?"<null>":this.details));
+        sb.append(((this.category == null)?"<null>":this.category));
         sb.append(',');
         sb.append("message");
         sb.append('=');
         sb.append(((this.message == null)?"<null>":this.message));
+        sb.append(',');
+        sb.append("details");
+        sb.append('=');
+        sb.append(((this.details == null)?"<null>":this.details));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

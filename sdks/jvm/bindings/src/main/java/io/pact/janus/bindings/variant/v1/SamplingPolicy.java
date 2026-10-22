@@ -26,38 +26,31 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "algorithm",
-    "boundaries",
-    "exclude",
+    "strategy",
+    "strength",
     "exhaustive-threshold",
     "max-variants",
+    "boundaries",
+    "algorithm",
     "pin",
-    "strategy",
-    "strength"
+    "exclude"
 })
 public class SamplingPolicy {
 
     /**
-     * The named selection algorithm (spec.md §3.7).
+     * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
      * 
      */
-    @JsonProperty("algorithm")
-    @JsonPropertyDescription("The named selection algorithm (spec.md \u00a73.7).")
-    private String algorithm;
+    @JsonProperty("strategy")
+    @JsonPropertyDescription("Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md \u00a73.2).")
+    private String strategy;
     /**
-     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+     * Covering strength for 't-wise'. 2 is pairwise, the default.
      * 
      */
-    @JsonProperty("boundaries")
-    @JsonPropertyDescription("Seed the minimal and maximal variants \u2014 each dimension at the point producing the least, respectively the most, structure (spec.md \u00a73.1). They cost between zero and two variants, because the covering step works around a seed.")
-    private Boolean boundaries;
-    /**
-     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclude")
-    @JsonPropertyDescription("Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md \u00a73.5).")
-    private List<Exclusion> exclude;
+    @JsonProperty("strength")
+    @JsonPropertyDescription("Covering strength for 't-wise'. 2 is pairwise, the default.")
+    private Long strength;
     /**
      * Space size at or below which 'auto' selects every variant.
      * 
@@ -73,6 +66,20 @@ public class SamplingPolicy {
     @JsonPropertyDescription("Largest selection the engine will return for one interaction. Exceeding it is 'variant-budget-exceeded', never a truncated selection (spec.md \u00a73.6).")
     private Long maxVariants;
     /**
+     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+     * 
+     */
+    @JsonProperty("boundaries")
+    @JsonPropertyDescription("Seed the minimal and maximal variants \u2014 each dimension at the point producing the least, respectively the most, structure (spec.md \u00a73.1). They cost between zero and two variants, because the covering step works around a seed.")
+    private Boolean boundaries;
+    /**
+     * The named selection algorithm (spec.md §3.7).
+     * 
+     */
+    @JsonProperty("algorithm")
+    @JsonPropertyDescription("The named selection algorithm (spec.md \u00a73.7).")
+    private String algorithm;
+    /**
      * Partial assignments the selection must extend, in order, after the base variant.
      * 
      */
@@ -80,74 +87,49 @@ public class SamplingPolicy {
     @JsonPropertyDescription("Partial assignments the selection must extend, in order, after the base variant.")
     private List<Pin> pin;
     /**
+     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
+     * 
+     */
+    @JsonProperty("exclude")
+    @JsonPropertyDescription("Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md \u00a73.5).")
+    private List<Exclusion> exclude;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
+    /**
      * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
      * 
      */
     @JsonProperty("strategy")
-    @JsonPropertyDescription("Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md \u00a73.2).")
-    private String strategy;
+    public String getStrategy() {
+        return strategy;
+    }
+
+    /**
+     * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
+     * 
+     */
+    @JsonProperty("strategy")
+    public void setStrategy(String strategy) {
+        this.strategy = strategy;
+    }
+
     /**
      * Covering strength for 't-wise'. 2 is pairwise, the default.
      * 
      */
     @JsonProperty("strength")
-    @JsonPropertyDescription("Covering strength for 't-wise'. 2 is pairwise, the default.")
-    private Long strength;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * The named selection algorithm (spec.md §3.7).
-     * 
-     */
-    @JsonProperty("algorithm")
-    public String getAlgorithm() {
-        return algorithm;
+    public Long getStrength() {
+        return strength;
     }
 
     /**
-     * The named selection algorithm (spec.md §3.7).
+     * Covering strength for 't-wise'. 2 is pairwise, the default.
      * 
      */
-    @JsonProperty("algorithm")
-    public void setAlgorithm(String algorithm) {
-        this.algorithm = algorithm;
-    }
-
-    /**
-     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
-     * 
-     */
-    @JsonProperty("boundaries")
-    public Boolean getBoundaries() {
-        return boundaries;
-    }
-
-    /**
-     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
-     * 
-     */
-    @JsonProperty("boundaries")
-    public void setBoundaries(Boolean boundaries) {
-        this.boundaries = boundaries;
-    }
-
-    /**
-     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclude")
-    public List<Exclusion> getExclude() {
-        return exclude;
-    }
-
-    /**
-     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclude")
-    public void setExclude(List<Exclusion> exclude) {
-        this.exclude = exclude;
+    @JsonProperty("strength")
+    public void setStrength(Long strength) {
+        this.strength = strength;
     }
 
     /**
@@ -187,6 +169,42 @@ public class SamplingPolicy {
     }
 
     /**
+     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+     * 
+     */
+    @JsonProperty("boundaries")
+    public Boolean getBoundaries() {
+        return boundaries;
+    }
+
+    /**
+     * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+     * 
+     */
+    @JsonProperty("boundaries")
+    public void setBoundaries(Boolean boundaries) {
+        this.boundaries = boundaries;
+    }
+
+    /**
+     * The named selection algorithm (spec.md §3.7).
+     * 
+     */
+    @JsonProperty("algorithm")
+    public String getAlgorithm() {
+        return algorithm;
+    }
+
+    /**
+     * The named selection algorithm (spec.md §3.7).
+     * 
+     */
+    @JsonProperty("algorithm")
+    public void setAlgorithm(String algorithm) {
+        this.algorithm = algorithm;
+    }
+
+    /**
      * Partial assignments the selection must extend, in order, after the base variant.
      * 
      */
@@ -205,39 +223,21 @@ public class SamplingPolicy {
     }
 
     /**
-     * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
+     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
      * 
      */
-    @JsonProperty("strategy")
-    public String getStrategy() {
-        return strategy;
+    @JsonProperty("exclude")
+    public List<Exclusion> getExclude() {
+        return exclude;
     }
 
     /**
-     * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
+     * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
      * 
      */
-    @JsonProperty("strategy")
-    public void setStrategy(String strategy) {
-        this.strategy = strategy;
-    }
-
-    /**
-     * Covering strength for 't-wise'. 2 is pairwise, the default.
-     * 
-     */
-    @JsonProperty("strength")
-    public Long getStrength() {
-        return strength;
-    }
-
-    /**
-     * Covering strength for 't-wise'. 2 is pairwise, the default.
-     * 
-     */
-    @JsonProperty("strength")
-    public void setStrength(Long strength) {
-        this.strength = strength;
+    @JsonProperty("exclude")
+    public void setExclude(List<Exclusion> exclude) {
+        this.exclude = exclude;
     }
 
     @JsonAnyGetter
@@ -254,17 +254,13 @@ public class SamplingPolicy {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(SamplingPolicy.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("algorithm");
+        sb.append("strategy");
         sb.append('=');
-        sb.append(((this.algorithm == null)?"<null>":this.algorithm));
+        sb.append(((this.strategy == null)?"<null>":this.strategy));
         sb.append(',');
-        sb.append("boundaries");
+        sb.append("strength");
         sb.append('=');
-        sb.append(((this.boundaries == null)?"<null>":this.boundaries));
-        sb.append(',');
-        sb.append("exclude");
-        sb.append('=');
-        sb.append(((this.exclude == null)?"<null>":this.exclude));
+        sb.append(((this.strength == null)?"<null>":this.strength));
         sb.append(',');
         sb.append("exhaustiveThreshold");
         sb.append('=');
@@ -274,17 +270,21 @@ public class SamplingPolicy {
         sb.append('=');
         sb.append(((this.maxVariants == null)?"<null>":this.maxVariants));
         sb.append(',');
+        sb.append("boundaries");
+        sb.append('=');
+        sb.append(((this.boundaries == null)?"<null>":this.boundaries));
+        sb.append(',');
+        sb.append("algorithm");
+        sb.append('=');
+        sb.append(((this.algorithm == null)?"<null>":this.algorithm));
+        sb.append(',');
         sb.append("pin");
         sb.append('=');
         sb.append(((this.pin == null)?"<null>":this.pin));
         sb.append(',');
-        sb.append("strategy");
+        sb.append("exclude");
         sb.append('=');
-        sb.append(((this.strategy == null)?"<null>":this.strategy));
-        sb.append(',');
-        sb.append("strength");
-        sb.append('=');
-        sb.append(((this.strength == null)?"<null>":this.strength));
+        sb.append(((this.exclude == null)?"<null>":this.exclude));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -302,8 +302,8 @@ public class SamplingPolicy {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.exhaustiveThreshold == null)? 0 :this.exhaustiveThreshold.hashCode()));
-        result = ((result* 31)+((this.pin == null)? 0 :this.pin.hashCode()));
         result = ((result* 31)+((this.strength == null)? 0 :this.strength.hashCode()));
+        result = ((result* 31)+((this.pin == null)? 0 :this.pin.hashCode()));
         result = ((result* 31)+((this.maxVariants == null)? 0 :this.maxVariants.hashCode()));
         result = ((result* 31)+((this.boundaries == null)? 0 :this.boundaries.hashCode()));
         result = ((result* 31)+((this.exclude == null)? 0 :this.exclude.hashCode()));
@@ -322,7 +322,7 @@ public class SamplingPolicy {
             return false;
         }
         SamplingPolicy rhs = ((SamplingPolicy) other);
-        return ((((((((((this.exhaustiveThreshold == rhs.exhaustiveThreshold)||((this.exhaustiveThreshold!= null)&&this.exhaustiveThreshold.equals(rhs.exhaustiveThreshold)))&&((this.pin == rhs.pin)||((this.pin!= null)&&this.pin.equals(rhs.pin))))&&((this.strength == rhs.strength)||((this.strength!= null)&&this.strength.equals(rhs.strength))))&&((this.maxVariants == rhs.maxVariants)||((this.maxVariants!= null)&&this.maxVariants.equals(rhs.maxVariants))))&&((this.boundaries == rhs.boundaries)||((this.boundaries!= null)&&this.boundaries.equals(rhs.boundaries))))&&((this.exclude == rhs.exclude)||((this.exclude!= null)&&this.exclude.equals(rhs.exclude))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.strategy == rhs.strategy)||((this.strategy!= null)&&this.strategy.equals(rhs.strategy))))&&((this.algorithm == rhs.algorithm)||((this.algorithm!= null)&&this.algorithm.equals(rhs.algorithm))));
+        return ((((((((((this.exhaustiveThreshold == rhs.exhaustiveThreshold)||((this.exhaustiveThreshold!= null)&&this.exhaustiveThreshold.equals(rhs.exhaustiveThreshold)))&&((this.strength == rhs.strength)||((this.strength!= null)&&this.strength.equals(rhs.strength))))&&((this.pin == rhs.pin)||((this.pin!= null)&&this.pin.equals(rhs.pin))))&&((this.maxVariants == rhs.maxVariants)||((this.maxVariants!= null)&&this.maxVariants.equals(rhs.maxVariants))))&&((this.boundaries == rhs.boundaries)||((this.boundaries!= null)&&this.boundaries.equals(rhs.boundaries))))&&((this.exclude == rhs.exclude)||((this.exclude!= null)&&this.exclude.equals(rhs.exclude))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.strategy == rhs.strategy)||((this.strategy!= null)&&this.strategy.equals(rhs.strategy))))&&((this.algorithm == rhs.algorithm)||((this.algorithm!= null)&&this.algorithm.equals(rhs.algorithm))));
     }
 
 }

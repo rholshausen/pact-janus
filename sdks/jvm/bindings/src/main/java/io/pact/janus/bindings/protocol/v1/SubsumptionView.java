@@ -25,41 +25,25 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "advisories",
-    "exempt",
-    "findings",
+    "verdict",
     "interactions",
     "matched",
     "not-published",
+    "findings",
     "reviews",
-    "verdict"
+    "exempt",
+    "advisories"
 })
 public class SubsumptionView {
 
     /**
-     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+     * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
      * (Required)
      * 
      */
-    @JsonProperty("advisories")
-    @JsonPropertyDescription("'advisory' entries (design 2.8 \u00a75), which no policy governs and no exemption silences.")
-    private Long advisories;
-    /**
-     * Results of either severity an exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exempt")
-    @JsonPropertyDescription("Results of either severity an exemption silenced.")
-    private Long exempt;
-    /**
-     * 'finding'-severity results no exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    @JsonPropertyDescription("'finding'-severity results no exemption silenced.")
-    private Long findings;
+    @JsonProperty("verdict")
+    @JsonPropertyDescription("The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.")
+    private String verdict;
     /**
      * 
      * (Required)
@@ -84,6 +68,14 @@ public class SubsumptionView {
     @JsonPropertyDescription("Interactions the provider published nothing for, which were therefore not checked (design 2.8 \u00a76.3).")
     private Long notPublished;
     /**
+     * 'finding'-severity results no exemption silenced.
+     * (Required)
+     * 
+     */
+    @JsonProperty("findings")
+    @JsonPropertyDescription("'finding'-severity results no exemption silenced.")
+    private Long findings;
+    /**
      * 'review'-severity results no exemption silenced.
      * (Required)
      * 
@@ -92,74 +84,42 @@ public class SubsumptionView {
     @JsonPropertyDescription("'review'-severity results no exemption silenced.")
     private Long reviews;
     /**
+     * Results of either severity an exemption silenced.
+     * (Required)
+     * 
+     */
+    @JsonProperty("exempt")
+    @JsonPropertyDescription("Results of either severity an exemption silenced.")
+    private Long exempt;
+    /**
+     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+     * (Required)
+     * 
+     */
+    @JsonProperty("advisories")
+    @JsonPropertyDescription("'advisory' entries (design 2.8 \u00a75), which no policy governs and no exemption silences.")
+    private Long advisories;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
+    /**
      * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
      * (Required)
      * 
      */
     @JsonProperty("verdict")
-    @JsonPropertyDescription("The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.")
-    private String verdict;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
-     * (Required)
-     * 
-     */
-    @JsonProperty("advisories")
-    public Long getAdvisories() {
-        return advisories;
+    public String getVerdict() {
+        return verdict;
     }
 
     /**
-     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+     * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
      * (Required)
      * 
      */
-    @JsonProperty("advisories")
-    public void setAdvisories(Long advisories) {
-        this.advisories = advisories;
-    }
-
-    /**
-     * Results of either severity an exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exempt")
-    public Long getExempt() {
-        return exempt;
-    }
-
-    /**
-     * Results of either severity an exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exempt")
-    public void setExempt(Long exempt) {
-        this.exempt = exempt;
-    }
-
-    /**
-     * 'finding'-severity results no exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    public Long getFindings() {
-        return findings;
-    }
-
-    /**
-     * 'finding'-severity results no exemption silenced.
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    public void setFindings(Long findings) {
-        this.findings = findings;
+    @JsonProperty("verdict")
+    public void setVerdict(String verdict) {
+        this.verdict = verdict;
     }
 
     /**
@@ -223,6 +183,26 @@ public class SubsumptionView {
     }
 
     /**
+     * 'finding'-severity results no exemption silenced.
+     * (Required)
+     * 
+     */
+    @JsonProperty("findings")
+    public Long getFindings() {
+        return findings;
+    }
+
+    /**
+     * 'finding'-severity results no exemption silenced.
+     * (Required)
+     * 
+     */
+    @JsonProperty("findings")
+    public void setFindings(Long findings) {
+        this.findings = findings;
+    }
+
+    /**
      * 'review'-severity results no exemption silenced.
      * (Required)
      * 
@@ -243,23 +223,43 @@ public class SubsumptionView {
     }
 
     /**
-     * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
+     * Results of either severity an exemption silenced.
      * (Required)
      * 
      */
-    @JsonProperty("verdict")
-    public String getVerdict() {
-        return verdict;
+    @JsonProperty("exempt")
+    public Long getExempt() {
+        return exempt;
     }
 
     /**
-     * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
+     * Results of either severity an exemption silenced.
      * (Required)
      * 
      */
-    @JsonProperty("verdict")
-    public void setVerdict(String verdict) {
-        this.verdict = verdict;
+    @JsonProperty("exempt")
+    public void setExempt(Long exempt) {
+        this.exempt = exempt;
+    }
+
+    /**
+     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+     * (Required)
+     * 
+     */
+    @JsonProperty("advisories")
+    public Long getAdvisories() {
+        return advisories;
+    }
+
+    /**
+     * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+     * (Required)
+     * 
+     */
+    @JsonProperty("advisories")
+    public void setAdvisories(Long advisories) {
+        this.advisories = advisories;
     }
 
     @JsonAnyGetter
@@ -276,17 +276,9 @@ public class SubsumptionView {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(SubsumptionView.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("advisories");
+        sb.append("verdict");
         sb.append('=');
-        sb.append(((this.advisories == null)?"<null>":this.advisories));
-        sb.append(',');
-        sb.append("exempt");
-        sb.append('=');
-        sb.append(((this.exempt == null)?"<null>":this.exempt));
-        sb.append(',');
-        sb.append("findings");
-        sb.append('=');
-        sb.append(((this.findings == null)?"<null>":this.findings));
+        sb.append(((this.verdict == null)?"<null>":this.verdict));
         sb.append(',');
         sb.append("interactions");
         sb.append('=');
@@ -300,13 +292,21 @@ public class SubsumptionView {
         sb.append('=');
         sb.append(((this.notPublished == null)?"<null>":this.notPublished));
         sb.append(',');
+        sb.append("findings");
+        sb.append('=');
+        sb.append(((this.findings == null)?"<null>":this.findings));
+        sb.append(',');
         sb.append("reviews");
         sb.append('=');
         sb.append(((this.reviews == null)?"<null>":this.reviews));
         sb.append(',');
-        sb.append("verdict");
+        sb.append("exempt");
         sb.append('=');
-        sb.append(((this.verdict == null)?"<null>":this.verdict));
+        sb.append(((this.exempt == null)?"<null>":this.exempt));
+        sb.append(',');
+        sb.append("advisories");
+        sb.append('=');
+        sb.append(((this.advisories == null)?"<null>":this.advisories));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -326,8 +326,8 @@ public class SubsumptionView {
         result = ((result* 31)+((this.advisories == null)? 0 :this.advisories.hashCode()));
         result = ((result* 31)+((this.reviews == null)? 0 :this.reviews.hashCode()));
         result = ((result* 31)+((this.notPublished == null)? 0 :this.notPublished.hashCode()));
-        result = ((result* 31)+((this.findings == null)? 0 :this.findings.hashCode()));
         result = ((result* 31)+((this.verdict == null)? 0 :this.verdict.hashCode()));
+        result = ((result* 31)+((this.findings == null)? 0 :this.findings.hashCode()));
         result = ((result* 31)+((this.matched == null)? 0 :this.matched.hashCode()));
         result = ((result* 31)+((this.exempt == null)? 0 :this.exempt.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
@@ -344,7 +344,7 @@ public class SubsumptionView {
             return false;
         }
         SubsumptionView rhs = ((SubsumptionView) other);
-        return ((((((((((this.advisories == rhs.advisories)||((this.advisories!= null)&&this.advisories.equals(rhs.advisories)))&&((this.reviews == rhs.reviews)||((this.reviews!= null)&&this.reviews.equals(rhs.reviews))))&&((this.notPublished == rhs.notPublished)||((this.notPublished!= null)&&this.notPublished.equals(rhs.notPublished))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))))&&((this.verdict == rhs.verdict)||((this.verdict!= null)&&this.verdict.equals(rhs.verdict))))&&((this.matched == rhs.matched)||((this.matched!= null)&&this.matched.equals(rhs.matched))))&&((this.exempt == rhs.exempt)||((this.exempt!= null)&&this.exempt.equals(rhs.exempt))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))));
+        return ((((((((((this.advisories == rhs.advisories)||((this.advisories!= null)&&this.advisories.equals(rhs.advisories)))&&((this.reviews == rhs.reviews)||((this.reviews!= null)&&this.reviews.equals(rhs.reviews))))&&((this.notPublished == rhs.notPublished)||((this.notPublished!= null)&&this.notPublished.equals(rhs.notPublished))))&&((this.verdict == rhs.verdict)||((this.verdict!= null)&&this.verdict.equals(rhs.verdict))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))))&&((this.matched == rhs.matched)||((this.matched!= null)&&this.matched.equals(rhs.matched))))&&((this.exempt == rhs.exempt)||((this.exempt!= null)&&this.exempt.equals(rhs.exempt))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))));
     }
 
 }

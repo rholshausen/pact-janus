@@ -24,19 +24,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "handle",
     "session",
+    "handle",
     "variant"
 })
 public class ServeVariant {
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("handle")
-    private String handle;
     /**
      * 
      * (Required)
@@ -49,30 +42,17 @@ public class ServeVariant {
      * (Required)
      * 
      */
+    @JsonProperty("handle")
+    private String handle;
+    /**
+     * 
+     * (Required)
+     * 
+     */
     @JsonProperty("variant")
     private String variant;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("handle")
-    public String getHandle() {
-        return handle;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("handle")
-    public void setHandle(String handle) {
-        this.handle = handle;
-    }
 
     /**
      * 
@@ -92,6 +72,26 @@ public class ServeVariant {
     @JsonProperty("session")
     public void setSession(String session) {
         this.session = session;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("handle")
+    public String getHandle() {
+        return handle;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("handle")
+    public void setHandle(String handle) {
+        this.handle = handle;
     }
 
     /**
@@ -128,13 +128,13 @@ public class ServeVariant {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ServeVariant.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("handle");
-        sb.append('=');
-        sb.append(((this.handle == null)?"<null>":this.handle));
-        sb.append(',');
         sb.append("session");
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
+        sb.append(',');
+        sb.append("handle");
+        sb.append('=');
+        sb.append(((this.handle == null)?"<null>":this.handle));
         sb.append(',');
         sb.append("variant");
         sb.append('=');

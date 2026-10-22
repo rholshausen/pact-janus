@@ -25,19 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "format",
-    "report"
+    "report",
+    "format"
 })
 public class CheckResult {
 
-    /**
-     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
-     * (Required)
-     * 
-     */
-    @JsonProperty("format")
-    @JsonPropertyDescription("How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.")
-    private java.lang.String format;
     /**
      * The subsumption report (design 2.8 §6, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for.
      * (Required)
@@ -46,28 +38,16 @@ public class CheckResult {
     @JsonProperty("report")
     @JsonPropertyDescription("The subsumption report (design 2.8 \u00a76, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for.")
     private Map<String, Object> report;
+    /**
+     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
+     * (Required)
+     * 
+     */
+    @JsonProperty("format")
+    @JsonPropertyDescription("How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.")
+    private java.lang.String format;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
-     * (Required)
-     * 
-     */
-    @JsonProperty("format")
-    public java.lang.String getFormat() {
-        return format;
-    }
-
-    /**
-     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
-     * (Required)
-     * 
-     */
-    @JsonProperty("format")
-    public void setFormat(java.lang.String format) {
-        this.format = format;
-    }
 
     /**
      * The subsumption report (design 2.8 §6, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for.
@@ -89,6 +69,26 @@ public class CheckResult {
         this.report = report;
     }
 
+    /**
+     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
+     * (Required)
+     * 
+     */
+    @JsonProperty("format")
+    public java.lang.String getFormat() {
+        return format;
+    }
+
+    /**
+     * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
+     * (Required)
+     * 
+     */
+    @JsonProperty("format")
+    public void setFormat(java.lang.String format) {
+        this.format = format;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -103,13 +103,13 @@ public class CheckResult {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(CheckResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("format");
-        sb.append('=');
-        sb.append(((this.format == null)?"<null>":this.format));
-        sb.append(',');
         sb.append("report");
         sb.append('=');
         sb.append(((this.report == null)?"<null>":this.report));
+        sb.append(',');
+        sb.append("format");
+        sb.append('=');
+        sb.append(((this.format == null)?"<null>":this.format));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -126,8 +126,8 @@ public class CheckResult {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.format == null)? 0 :this.format.hashCode()));
         result = ((result* 31)+((this.report == null)? 0 :this.report.hashCode()));
+        result = ((result* 31)+((this.format == null)? 0 :this.format.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
     }
@@ -141,7 +141,7 @@ public class CheckResult {
             return false;
         }
         CheckResult rhs = ((CheckResult) other);
-        return ((((this.format == rhs.format)||((this.format!= null)&&this.format.equals(rhs.format)))&&((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report)))&&((this.format == rhs.format)||((this.format!= null)&&this.format.equals(rhs.format))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

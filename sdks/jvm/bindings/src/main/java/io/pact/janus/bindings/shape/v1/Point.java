@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "name",
-    "size",
-    "value"
+    "value",
+    "size"
 })
 public class Point {
 
@@ -40,19 +40,19 @@ public class Point {
     @JsonPropertyDescription("Stable within the dimension: 'present'/'absent', 'null'/'non-null', an alternative name, a canonical literal rendering, or 'min'/'min+1'/'max'.")
     private String name;
     /**
-     * The cardinality this point selects, for 'cardinality' facets.
-     * 
-     */
-    @JsonProperty("size")
-    @JsonPropertyDescription("The cardinality this point selects, for 'cardinality' facets.")
-    private Long size;
-    /**
      * The literal this point selects, for 'value' facets.
      * 
      */
     @JsonProperty("value")
     @JsonPropertyDescription("The literal this point selects, for 'value' facets.")
     private Object value;
+    /**
+     * The cardinality this point selects, for 'cardinality' facets.
+     * 
+     */
+    @JsonProperty("size")
+    @JsonPropertyDescription("The cardinality this point selects, for 'cardinality' facets.")
+    private Long size;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -77,24 +77,6 @@ public class Point {
     }
 
     /**
-     * The cardinality this point selects, for 'cardinality' facets.
-     * 
-     */
-    @JsonProperty("size")
-    public Long getSize() {
-        return size;
-    }
-
-    /**
-     * The cardinality this point selects, for 'cardinality' facets.
-     * 
-     */
-    @JsonProperty("size")
-    public void setSize(Long size) {
-        this.size = size;
-    }
-
-    /**
      * The literal this point selects, for 'value' facets.
      * 
      */
@@ -110,6 +92,24 @@ public class Point {
     @JsonProperty("value")
     public void setValue(Object value) {
         this.value = value;
+    }
+
+    /**
+     * The cardinality this point selects, for 'cardinality' facets.
+     * 
+     */
+    @JsonProperty("size")
+    public Long getSize() {
+        return size;
+    }
+
+    /**
+     * The cardinality this point selects, for 'cardinality' facets.
+     * 
+     */
+    @JsonProperty("size")
+    public void setSize(Long size) {
+        this.size = size;
     }
 
     @JsonAnyGetter
@@ -130,13 +130,13 @@ public class Point {
         sb.append('=');
         sb.append(((this.name == null)?"<null>":this.name));
         sb.append(',');
-        sb.append("size");
-        sb.append('=');
-        sb.append(((this.size == null)?"<null>":this.size));
-        sb.append(',');
         sb.append("value");
         sb.append('=');
         sb.append(((this.value == null)?"<null>":this.value));
+        sb.append(',');
+        sb.append("size");
+        sb.append('=');
+        sb.append(((this.size == null)?"<null>":this.size));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

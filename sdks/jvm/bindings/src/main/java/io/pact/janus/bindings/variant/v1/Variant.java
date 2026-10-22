@@ -26,22 +26,14 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "assignment",
     "id",
+    "assignment",
     "label",
     "origin",
     "states"
 })
 public class Variant {
 
-    /**
-     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    @JsonPropertyDescription("One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.")
-    private List<Point> assignment;
     /**
      * 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default, in variant-space order.
      * (Required)
@@ -50,6 +42,14 @@ public class Variant {
     @JsonProperty("id")
     @JsonPropertyDescription("'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default, in variant-space order.")
     private java.lang.String id;
+    /**
+     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
+     * (Required)
+     * 
+     */
+    @JsonProperty("assignment")
+    @JsonPropertyDescription("One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.")
+    private List<Point> assignment;
     /**
      * Display only: the id with dimension ids shortened to the shortest unique trailing path segments. Never recorded in a pact file, never accepted where an id is expected (spec.md §2.2).
      * 
@@ -75,26 +75,6 @@ public class Variant {
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
-     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    public List<Point> getAssignment() {
-        return assignment;
-    }
-
-    /**
-     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    public void setAssignment(List<Point> assignment) {
-        this.assignment = assignment;
-    }
-
-    /**
      * 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default, in variant-space order.
      * (Required)
      * 
@@ -112,6 +92,26 @@ public class Variant {
     @JsonProperty("id")
     public void setId(java.lang.String id) {
         this.id = id;
+    }
+
+    /**
+     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
+     * (Required)
+     * 
+     */
+    @JsonProperty("assignment")
+    public List<Point> getAssignment() {
+        return assignment;
+    }
+
+    /**
+     * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
+     * (Required)
+     * 
+     */
+    @JsonProperty("assignment")
+    public void setAssignment(List<Point> assignment) {
+        this.assignment = assignment;
     }
 
     /**
@@ -182,13 +182,13 @@ public class Variant {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Variant.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("assignment");
-        sb.append('=');
-        sb.append(((this.assignment == null)?"<null>":this.assignment));
-        sb.append(',');
         sb.append("id");
         sb.append('=');
         sb.append(((this.id == null)?"<null>":this.id));
+        sb.append(',');
+        sb.append("assignment");
+        sb.append('=');
+        sb.append(((this.assignment == null)?"<null>":this.assignment));
         sb.append(',');
         sb.append("label");
         sb.append('=');

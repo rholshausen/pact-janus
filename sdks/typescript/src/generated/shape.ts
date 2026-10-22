@@ -8,45 +8,31 @@
  */
 export type Shape = unknown & {
   /**
-   * Alternative name -> shape ('one-of'). Each alternative is an 'object' shape binding the discriminator to a distinct literal (spec.md §5.4).
+   * The operator. Open vocabulary; an unknown operator is a named failure, never an ignored constraint (spec.md §3.7).
    */
-  alternatives?: {
-    [k: string]: Shape;
-  };
-  /**
-   * Content type the value's octets must be detected as ('content-type').
-   */
-  "content-type"?: string;
-  /**
-   * Names the default variant point of this node: an alternative name ('one-of'). Absent, the default is the lexicographically first alternative — never JSON member order (spec.md §6.1).
-   */
-  default?: string;
-  /**
-   * Member name whose value selects the alternative ('one-of').
-   */
-  discriminator?: string;
-  /**
-   * Representation tag for 'example'. Absent means the example is its natural JSON value; 'base64' means it is the base64 of an octet sequence (Engine Protocol spec §2.4).
-   */
-  encoded?: string;
-  /**
-   * Positional element shapes ('array'), or the shapes that must each be satisfied by some element ('contains').
-   */
-  entries?: Shape[];
+  shape: string;
   /**
    * A value this shape admits, and the value produced for this node unless a variant point or generator selects another. For 'equality' it is also the operator's parameter: the shape admits exactly this value. Carries bytes when tagged (see 'encoded'); untagged it is the natural JSON value (Engine Protocol spec §2.5).
    */
   example?: unknown;
   /**
-   * Date/time format pattern ('datetime', 'date', 'time'), in the pattern language fixed by spec.md §4.2. Optional: absent means the operator admits any string parsing as ISO-8601 for its kind.
+   * Representation tag for 'example'. Absent means the example is its natural JSON value; 'base64' means it is the base64 of an octet sequence (Engine Protocol spec §2.4).
    */
-  format?: string;
+  encoded?: string;
   /**
-   * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+   * The wrapped shape ('optional', 'nullable').
    */
-  generator?: {
-    [k: string]: unknown;
+  of?: Shape;
+  /**
+   * Member name -> shape ('object'). Members not named here are admitted and ignored unless a member is declared 'forbidden' (spec.md §4.3).
+   */
+  members?: {
+    [k: string]: Shape;
   };
+  /**
+   * Positional element shapes ('array'), or the shapes that must each be satisfied by some element ('contains').
+   */
+  entries?: Shape[];
   /**
    * The shape every element must satisfy ('each-like').
    */
@@ -56,23 +42,17 @@ export type Shape = unknown & {
    */
   keys?: Shape;
   /**
-   * Maximum cardinality ('each-like', 'each-entry'); absent means unbounded.
+   * The shape every entry value must satisfy ('each-entry').
    */
-  max?: number;
-  /**
-   * Member name -> shape ('object'). Members not named here are admitted and ignored unless a member is declared 'forbidden' (spec.md §4.3).
-   */
-  members?: {
-    [k: string]: Shape;
-  };
+  values?: Shape;
   /**
    * Minimum cardinality ('each-like', 'each-entry'); default 1.
    */
   min?: number;
   /**
-   * The wrapped shape ('optional', 'nullable').
+   * Maximum cardinality ('each-like', 'each-entry'); absent means unbounded.
    */
-  of?: Shape;
+  max?: number;
   /**
    * The literal values admitted ('any-of'). Values, not shapes — a union of shapes is expressed with 'one-of' (spec.md §4.4).
    *
@@ -80,21 +60,41 @@ export type Shape = unknown & {
    */
   options?: [unknown, ...unknown[]];
   /**
+   * Member name whose value selects the alternative ('one-of').
+   */
+  discriminator?: string;
+  /**
+   * Names the default variant point of this node: an alternative name ('one-of'). Absent, the default is the lexicographically first alternative — never JSON member order (spec.md §6.1).
+   */
+  default?: string;
+  /**
+   * Alternative name -> shape ('one-of'). Each alternative is an 'object' shape binding the discriminator to a distinct literal (spec.md §5.4).
+   */
+  alternatives?: {
+    [k: string]: Shape;
+  };
+  /**
    * Regular expression ('regex'), in the dialect fixed by spec.md §4.2.
    */
   pattern?: string;
   /**
-   * The operator. Open vocabulary; an unknown operator is a named failure, never an ignored constraint (spec.md §3.7).
+   * Date/time format pattern ('datetime', 'date', 'time'), in the pattern language fixed by spec.md §4.2. Optional: absent means the operator admits any string parsing as ISO-8601 for its kind.
    */
-  shape: string;
+  format?: string;
   /**
    * Substring that must occur in the value ('include').
    */
   substring?: string;
   /**
-   * The shape every entry value must satisfy ('each-entry').
+   * Content type the value's octets must be detected as ('content-type').
    */
-  values?: Shape;
+  "content-type"?: string;
+  /**
+   * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+   */
+  generator?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 };
 
@@ -111,41 +111,35 @@ export interface VariantSpace {
 
 export interface Dimension {
   /**
-   * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+   * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
    */
-  default: string;
+  id: string;
+  /**
+   * The location of the operator that contributes the dimension, without the facet suffix.
+   */
+  path?: string;
   /**
    * Which axis of the located value varies. Open vocabulary: a component operator may contribute its own.
    */
   facet: string;
   /**
-   * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
-   */
-  "gated-by"?: Gate[];
-  /**
-   * '<path>#<facet>', stable across engine versions and pact-file round trips (spec.md §6.2).
-   */
-  id: string;
-  /**
    * The shape operator that contributed the dimension.
    */
   operator?: string;
-  /**
-   * The location of the operator that contributes the dimension, without the facet suffix.
-   */
-  path?: string;
   /**
    * The values this dimension can take. A dimension with fewer than two points is not a dimension (spec.md §6.1).
    *
    * @minItems 2
    */
   points: [Point, Point, ...Point[]];
-  [k: string]: unknown;
-}
-
-export interface Gate {
-  dimension: string;
-  point: string;
+  /**
+   * Name of the point the shape's own examples exercise — the base variant's assignment for this dimension.
+   */
+  default: string;
+  /**
+   * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+   */
+  "gated-by"?: Gate[];
   [k: string]: unknown;
 }
 
@@ -155,12 +149,18 @@ export interface Point {
    */
   name: string;
   /**
-   * The cardinality this point selects, for 'cardinality' facets.
-   */
-  size?: number;
-  /**
    * The literal this point selects, for 'value' facets.
    */
   value?: unknown;
+  /**
+   * The cardinality this point selects, for 'cardinality' facets.
+   */
+  size?: number;
+  [k: string]: unknown;
+}
+
+export interface Gate {
+  dimension: string;
+  point: string;
   [k: string]: unknown;
 }

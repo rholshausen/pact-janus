@@ -25,20 +25,33 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "consumer",
-    "expires",
-    "interaction",
+    "status",
     "matched",
+    "consumer",
+    "interaction",
     "path",
     "reason",
-    "status"
+    "expires"
 })
 public class ExemptionResult {
 
+    /**
+     * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
+     * (Required)
+     * 
+     */
+    @JsonProperty("status")
+    @JsonPropertyDescription("'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.")
+    private String status;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("matched")
+    private Long matched;
     @JsonProperty("consumer")
     private String consumer;
-    @JsonProperty("expires")
-    private String expires;
     /**
      * InteractionId
      * <p>
@@ -48,13 +61,6 @@ public class ExemptionResult {
     @JsonProperty("interaction")
     @JsonPropertyDescription("An interaction by contract spec \u00a74.2's identity: description plus state names.")
     private InteractionId interaction;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("matched")
-    private Long matched;
     @JsonProperty("path")
     private String path;
     /**
@@ -64,16 +70,50 @@ public class ExemptionResult {
      */
     @JsonProperty("reason")
     private String reason;
+    @JsonProperty("expires")
+    private String expires;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
     /**
      * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
      * (Required)
      * 
      */
     @JsonProperty("status")
-    @JsonPropertyDescription("'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.")
-    private String status;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    public String getStatus() {
+        return status;
+    }
+
+    /**
+     * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
+     * (Required)
+     * 
+     */
+    @JsonProperty("status")
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("matched")
+    public Long getMatched() {
+        return matched;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("matched")
+    public void setMatched(Long matched) {
+        this.matched = matched;
+    }
 
     @JsonProperty("consumer")
     public String getConsumer() {
@@ -83,16 +123,6 @@ public class ExemptionResult {
     @JsonProperty("consumer")
     public void setConsumer(String consumer) {
         this.consumer = consumer;
-    }
-
-    @JsonProperty("expires")
-    public String getExpires() {
-        return expires;
-    }
-
-    @JsonProperty("expires")
-    public void setExpires(String expires) {
-        this.expires = expires;
     }
 
     /**
@@ -115,26 +145,6 @@ public class ExemptionResult {
     @JsonProperty("interaction")
     public void setInteraction(InteractionId interaction) {
         this.interaction = interaction;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("matched")
-    public Long getMatched() {
-        return matched;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("matched")
-    public void setMatched(Long matched) {
-        this.matched = matched;
     }
 
     @JsonProperty("path")
@@ -167,24 +177,14 @@ public class ExemptionResult {
         this.reason = reason;
     }
 
-    /**
-     * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
-     * (Required)
-     * 
-     */
-    @JsonProperty("status")
-    public String getStatus() {
-        return status;
+    @JsonProperty("expires")
+    public String getExpires() {
+        return expires;
     }
 
-    /**
-     * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
-     * (Required)
-     * 
-     */
-    @JsonProperty("status")
-    public void setStatus(String status) {
-        this.status = status;
+    @JsonProperty("expires")
+    public void setExpires(String expires) {
+        this.expires = expires;
     }
 
     @JsonAnyGetter
@@ -201,21 +201,21 @@ public class ExemptionResult {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ExemptionResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("consumer");
+        sb.append("status");
         sb.append('=');
-        sb.append(((this.consumer == null)?"<null>":this.consumer));
-        sb.append(',');
-        sb.append("expires");
-        sb.append('=');
-        sb.append(((this.expires == null)?"<null>":this.expires));
-        sb.append(',');
-        sb.append("interaction");
-        sb.append('=');
-        sb.append(((this.interaction == null)?"<null>":this.interaction));
+        sb.append(((this.status == null)?"<null>":this.status));
         sb.append(',');
         sb.append("matched");
         sb.append('=');
         sb.append(((this.matched == null)?"<null>":this.matched));
+        sb.append(',');
+        sb.append("consumer");
+        sb.append('=');
+        sb.append(((this.consumer == null)?"<null>":this.consumer));
+        sb.append(',');
+        sb.append("interaction");
+        sb.append('=');
+        sb.append(((this.interaction == null)?"<null>":this.interaction));
         sb.append(',');
         sb.append("path");
         sb.append('=');
@@ -225,9 +225,9 @@ public class ExemptionResult {
         sb.append('=');
         sb.append(((this.reason == null)?"<null>":this.reason));
         sb.append(',');
-        sb.append("status");
+        sb.append("expires");
         sb.append('=');
-        sb.append(((this.status == null)?"<null>":this.status));
+        sb.append(((this.expires == null)?"<null>":this.expires));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "contract",
-    "options",
-    "provider-shape"
+    "provider-shape",
+    "options"
 })
 public class Check {
 
@@ -39,8 +39,6 @@ public class Check {
     @JsonProperty("contract")
     @JsonPropertyDescription("The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.")
     private Map<String, Object> contract;
-    @JsonProperty("options")
-    private Map<String, Object> options;
     /**
      * A provider shape (design 2.8 §2), for the same provider the contract names.
      * (Required)
@@ -49,6 +47,8 @@ public class Check {
     @JsonProperty("provider-shape")
     @JsonPropertyDescription("A provider shape (design 2.8 \u00a72), for the same provider the contract names.")
     private Map<String, Object> providerShape;
+    @JsonProperty("options")
+    private Map<String, Object> options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -72,16 +72,6 @@ public class Check {
         this.contract = contract;
     }
 
-    @JsonProperty("options")
-    public Map<String, Object> getOptions() {
-        return options;
-    }
-
-    @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
-        this.options = options;
-    }
-
     /**
      * A provider shape (design 2.8 §2), for the same provider the contract names.
      * (Required)
@@ -102,6 +92,16 @@ public class Check {
         this.providerShape = providerShape;
     }
 
+    @JsonProperty("options")
+    public Map<String, Object> getOptions() {
+        return options;
+    }
+
+    @JsonProperty("options")
+    public void setOptions(Map<String, Object> options) {
+        this.options = options;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -120,13 +120,13 @@ public class Check {
         sb.append('=');
         sb.append(((this.contract == null)?"<null>":this.contract));
         sb.append(',');
-        sb.append("options");
-        sb.append('=');
-        sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
         sb.append("providerShape");
         sb.append('=');
         sb.append(((this.providerShape == null)?"<null>":this.providerShape));
+        sb.append(',');
+        sb.append("options");
+        sb.append('=');
+        sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

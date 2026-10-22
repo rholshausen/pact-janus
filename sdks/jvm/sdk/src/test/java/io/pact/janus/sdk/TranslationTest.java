@@ -317,7 +317,7 @@ class TranslationTest {
       assertShape("{ 'shape': 'number', 'example': 2.5 }", number(2.5));
       assertShape("{ 'shape': 'decimal', 'example': 12.5 }", decimal(12.5));
       // a BigDecimal example keeps its written scale on the wire
-      assertEquals("{\"example\":12.50,\"shape\":\"decimal\"}", decimal(new BigDecimal("12.50")).toString());
+      assertEquals("{\"shape\":\"decimal\",\"example\":12.50}", decimal(new BigDecimal("12.50")).toString());
       assertShape("{ 'shape': 'string', 'example': 'x' }", string("x"));
       assertShape("{ 'shape': 'boolean', 'example': true }", bool(true));
     }

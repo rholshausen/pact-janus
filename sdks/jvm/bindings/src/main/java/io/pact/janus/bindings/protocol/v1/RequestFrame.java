@@ -25,21 +25,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "body",
+    "type",
     "id",
     "op",
-    "type"
+    "body"
 })
 public class RequestFrame {
 
     /**
-     * The operation's request document, governed by the operation's schema.
+     * 
      * (Required)
      * 
      */
-    @JsonProperty("body")
-    @JsonPropertyDescription("The operation's request document, governed by the operation's schema.")
-    private Map<String, Object> body;
+    @JsonProperty("type")
+    private java.lang.String type;
     /**
      * Host-chosen correlation id, unique among the host's in-flight requests on this pipe. Opaque to the engine.
      * (Required)
@@ -57,33 +56,34 @@ public class RequestFrame {
     @JsonPropertyDescription("Operation name, namespaced '<area>/<verb>'. Open vocabulary; unknown ops are answered with error 'operation-unsupported'.")
     private java.lang.String op;
     /**
+     * The operation's request document, governed by the operation's schema.
+     * (Required)
+     * 
+     */
+    @JsonProperty("body")
+    @JsonPropertyDescription("The operation's request document, governed by the operation's schema.")
+    private Map<String, Object> body;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("type")
-    private java.lang.String type;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The operation's request document, governed by the operation's schema.
-     * (Required)
-     * 
-     */
-    @JsonProperty("body")
-    public Map<String, Object> getBody() {
-        return body;
+    public java.lang.String getType() {
+        return type;
     }
 
     /**
-     * The operation's request document, governed by the operation's schema.
+     * 
      * (Required)
      * 
      */
-    @JsonProperty("body")
-    public void setBody(Map<String, Object> body) {
-        this.body = body;
+    @JsonProperty("type")
+    public void setType(java.lang.String type) {
+        this.type = type;
     }
 
     /**
@@ -127,23 +127,23 @@ public class RequestFrame {
     }
 
     /**
-     * 
+     * The operation's request document, governed by the operation's schema.
      * (Required)
      * 
      */
-    @JsonProperty("type")
-    public java.lang.String getType() {
-        return type;
+    @JsonProperty("body")
+    public Map<String, Object> getBody() {
+        return body;
     }
 
     /**
-     * 
+     * The operation's request document, governed by the operation's schema.
      * (Required)
      * 
      */
-    @JsonProperty("type")
-    public void setType(java.lang.String type) {
-        this.type = type;
+    @JsonProperty("body")
+    public void setBody(Map<String, Object> body) {
+        this.body = body;
     }
 
     @JsonAnyGetter
@@ -160,9 +160,9 @@ public class RequestFrame {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(RequestFrame.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("body");
+        sb.append("type");
         sb.append('=');
-        sb.append(((this.body == null)?"<null>":this.body));
+        sb.append(((this.type == null)?"<null>":this.type));
         sb.append(',');
         sb.append("id");
         sb.append('=');
@@ -172,9 +172,9 @@ public class RequestFrame {
         sb.append('=');
         sb.append(((this.op == null)?"<null>":this.op));
         sb.append(',');
-        sb.append("type");
+        sb.append("body");
         sb.append('=');
-        sb.append(((this.type == null)?"<null>":this.type));
+        sb.append(((this.body == null)?"<null>":this.body));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -194,8 +194,8 @@ public class RequestFrame {
         result = ((result* 31)+((this.op == null)? 0 :this.op.hashCode()));
         result = ((result* 31)+((this.id == null)? 0 :this.id.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.body == null)? 0 :this.body.hashCode()));
         result = ((result* 31)+((this.type == null)? 0 :this.type.hashCode()));
+        result = ((result* 31)+((this.body == null)? 0 :this.body.hashCode()));
         return result;
     }
 
@@ -208,7 +208,7 @@ public class RequestFrame {
             return false;
         }
         RequestFrame rhs = ((RequestFrame) other);
-        return ((((((this.op == rhs.op)||((this.op!= null)&&this.op.equals(rhs.op)))&&((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.body == rhs.body)||((this.body!= null)&&this.body.equals(rhs.body))))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))));
+        return ((((((this.op == rhs.op)||((this.op!= null)&&this.op.equals(rhs.op)))&&((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))))&&((this.body == rhs.body)||((this.body!= null)&&this.body.equals(rhs.body))));
     }
 
 }

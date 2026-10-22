@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "consumer",
-    "format",
     "provider",
+    "format",
     "subsumption"
 })
 public class DecidePair {
@@ -42,13 +42,6 @@ public class DecidePair {
     @JsonProperty("consumer")
     private Party consumer;
     /**
-     * How the consumer document identified itself, as CheckResult reported it.
-     * 
-     */
-    @JsonProperty("format")
-    @JsonPropertyDescription("How the consumer document identified itself, as CheckResult reported it.")
-    private java.lang.String format;
-    /**
      * Party
      * <p>
      * 
@@ -57,6 +50,13 @@ public class DecidePair {
      */
     @JsonProperty("provider")
     private Party provider;
+    /**
+     * How the consumer document identified itself, as CheckResult reported it.
+     * 
+     */
+    @JsonProperty("format")
+    @JsonPropertyDescription("How the consumer document identified itself, as CheckResult reported it.")
+    private java.lang.String format;
     /**
      * This pair's subsumption report, when the host has one. Its absence is not an error: a provider that has published no shape gets replay-only semantics (design 2.8 §6.3), which is what makes the check adoptable per provider.
      * 
@@ -92,24 +92,6 @@ public class DecidePair {
     }
 
     /**
-     * How the consumer document identified itself, as CheckResult reported it.
-     * 
-     */
-    @JsonProperty("format")
-    public java.lang.String getFormat() {
-        return format;
-    }
-
-    /**
-     * How the consumer document identified itself, as CheckResult reported it.
-     * 
-     */
-    @JsonProperty("format")
-    public void setFormat(java.lang.String format) {
-        this.format = format;
-    }
-
-    /**
      * Party
      * <p>
      * 
@@ -131,6 +113,24 @@ public class DecidePair {
     @JsonProperty("provider")
     public void setProvider(Party provider) {
         this.provider = provider;
+    }
+
+    /**
+     * How the consumer document identified itself, as CheckResult reported it.
+     * 
+     */
+    @JsonProperty("format")
+    public java.lang.String getFormat() {
+        return format;
+    }
+
+    /**
+     * How the consumer document identified itself, as CheckResult reported it.
+     * 
+     */
+    @JsonProperty("format")
+    public void setFormat(java.lang.String format) {
+        this.format = format;
     }
 
     /**
@@ -169,13 +169,13 @@ public class DecidePair {
         sb.append('=');
         sb.append(((this.consumer == null)?"<null>":this.consumer));
         sb.append(',');
-        sb.append("format");
-        sb.append('=');
-        sb.append(((this.format == null)?"<null>":this.format));
-        sb.append(',');
         sb.append("provider");
         sb.append('=');
         sb.append(((this.provider == null)?"<null>":this.provider));
+        sb.append(',');
+        sb.append("format");
+        sb.append('=');
+        sb.append(((this.format == null)?"<null>":this.format));
         sb.append(',');
         sb.append("subsumption");
         sb.append('=');

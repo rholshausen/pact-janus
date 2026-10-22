@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "content",
-    "content-type",
-    "encoded"
+    "encoded",
+    "content-type"
 })
 public class ObservedSlotValue {
 
@@ -40,19 +40,19 @@ public class ObservedSlotValue {
     @JsonPropertyDescription("The decoded value, any JSON value including null.")
     private Object content;
     /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
-     * 
-     */
-    @JsonProperty("content-type")
-    @JsonPropertyDescription("Advisory: what the host believes the slot carried. Not interpreted.")
-    private String contentType;
-    /**
      * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
      * 
      */
     @JsonProperty("encoded")
     @JsonPropertyDescription("Representation tag for 'content' (spec.md \u00a72.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.")
     private String encoded;
+    /**
+     * Advisory: what the host believes the slot carried. Not interpreted.
+     * 
+     */
+    @JsonProperty("content-type")
+    @JsonPropertyDescription("Advisory: what the host believes the slot carried. Not interpreted.")
+    private String contentType;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -77,24 +77,6 @@ public class ObservedSlotValue {
     }
 
     /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
-     * 
-     */
-    @JsonProperty("content-type")
-    public String getContentType() {
-        return contentType;
-    }
-
-    /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
-     * 
-     */
-    @JsonProperty("content-type")
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    /**
      * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
      * 
      */
@@ -110,6 +92,24 @@ public class ObservedSlotValue {
     @JsonProperty("encoded")
     public void setEncoded(String encoded) {
         this.encoded = encoded;
+    }
+
+    /**
+     * Advisory: what the host believes the slot carried. Not interpreted.
+     * 
+     */
+    @JsonProperty("content-type")
+    public String getContentType() {
+        return contentType;
+    }
+
+    /**
+     * Advisory: what the host believes the slot carried. Not interpreted.
+     * 
+     */
+    @JsonProperty("content-type")
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
     }
 
     @JsonAnyGetter
@@ -130,13 +130,13 @@ public class ObservedSlotValue {
         sb.append('=');
         sb.append(((this.content == null)?"<null>":this.content));
         sb.append(',');
-        sb.append("contentType");
-        sb.append('=');
-        sb.append(((this.contentType == null)?"<null>":this.contentType));
-        sb.append(',');
         sb.append("encoded");
         sb.append('=');
         sb.append(((this.encoded == null)?"<null>":this.encoded));
+        sb.append(',');
+        sb.append("contentType");
+        sb.append('=');
+        sb.append(((this.contentType == null)?"<null>":this.contentType));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

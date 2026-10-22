@@ -25,13 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "options",
-    "pact"
+    "pact",
+    "options"
 })
 public class Pact {
 
-    @JsonProperty("options")
-    private Map<String, Object> options;
     /**
      * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
      * (Required)
@@ -40,18 +38,10 @@ public class Pact {
     @JsonProperty("pact")
     @JsonPropertyDescription("A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).")
     private Map<String, Object> pact;
+    @JsonProperty("options")
+    private Map<String, Object> options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    @JsonProperty("options")
-    public Map<String, Object> getOptions() {
-        return options;
-    }
-
-    @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
-        this.options = options;
-    }
 
     /**
      * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
@@ -73,6 +63,16 @@ public class Pact {
         this.pact = pact;
     }
 
+    @JsonProperty("options")
+    public Map<String, Object> getOptions() {
+        return options;
+    }
+
+    @JsonProperty("options")
+    public void setOptions(Map<String, Object> options) {
+        this.options = options;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -87,13 +87,13 @@ public class Pact {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Pact.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("options");
-        sb.append('=');
-        sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
         sb.append("pact");
         sb.append('=');
         sb.append(((this.pact == null)?"<null>":this.pact));
+        sb.append(',');
+        sb.append("options");
+        sb.append('=');
+        sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

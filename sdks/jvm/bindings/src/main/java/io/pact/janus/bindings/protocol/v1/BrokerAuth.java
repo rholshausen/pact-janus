@@ -25,9 +25,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "kind",
-    "password",
     "token",
-    "username"
+    "username",
+    "password"
 })
 public class BrokerAuth {
 
@@ -38,12 +38,12 @@ public class BrokerAuth {
      */
     @JsonProperty("kind")
     private String kind;
-    @JsonProperty("password")
-    private String password;
     @JsonProperty("token")
     private String token;
     @JsonProperty("username")
     private String username;
+    @JsonProperty("password")
+    private String password;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -67,16 +67,6 @@ public class BrokerAuth {
         this.kind = kind;
     }
 
-    @JsonProperty("password")
-    public String getPassword() {
-        return password;
-    }
-
-    @JsonProperty("password")
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     @JsonProperty("token")
     public String getToken() {
         return token;
@@ -97,6 +87,16 @@ public class BrokerAuth {
         this.username = username;
     }
 
+    @JsonProperty("password")
+    public String getPassword() {
+        return password;
+    }
+
+    @JsonProperty("password")
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -115,10 +115,6 @@ public class BrokerAuth {
         sb.append('=');
         sb.append(((this.kind == null)?"<null>":this.kind));
         sb.append(',');
-        sb.append("password");
-        sb.append('=');
-        sb.append(((this.password == null)?"<null>":this.password));
-        sb.append(',');
         sb.append("token");
         sb.append('=');
         sb.append(((this.token == null)?"<null>":this.token));
@@ -126,6 +122,10 @@ public class BrokerAuth {
         sb.append("username");
         sb.append('=');
         sb.append(((this.username == null)?"<null>":this.username));
+        sb.append(',');
+        sb.append("password");
+        sb.append('=');
+        sb.append(((this.password == null)?"<null>":this.password));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

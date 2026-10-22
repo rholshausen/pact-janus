@@ -16,94 +16,12 @@ export interface Contract {
    */
   $schema?: string;
   consumer: Party;
+  provider: Party;
   /**
    * In the order the consumer submitted them. Every interaction here was exercised successfully on every variant its selection required (spec.md §2.2) — a contract is never written otherwise.
    */
   interactions: Interaction[];
   metadata?: Metadata;
-  provider: Party;
-  [k: string]: unknown;
-}
-
-/**
- * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
- */
-export interface ContentTypes {
-  [k: string]: {
-    [k: string]: string;
-  };
-}
-
-/**
- * One interaction: its shape recorded once, and the evidence of every variant that was exercised (spec.md §4). Identity is 'description' plus 'states' (spec.md §4.2).
- */
-export interface Interaction {
-  "content-types"?: ContentTypes;
-  /**
-   * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
-   */
-  description: string;
-  /**
-   * Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.
-   */
-  parts: {
-    [k: string]: ShapePart;
-  };
-  /**
-   * Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.
-   */
-  requires?: Requirement[];
-  selection: RecordedSelection;
-  /**
-   * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
-   */
-  states?: State[];
-  transport?: Transport;
-  [k: string]: unknown;
-}
-
-/**
- * The interaction specification an author writes and a host submits to 'consumer-session/add-interaction': this document's interaction record minus the evidence — the same members as 'Interaction', with no 'selection' (spec.md §1). Not a member of a contract; it is defined here so the author's input and the engine's output stay one document with one optional half.
- */
-export interface InteractionSpec {
-  "content-types"?: ContentTypes;
-  /**
-   * What the interaction is, in the author's words (spec.md §4.2).
-   */
-  description: string;
-  /**
-   * Part name -> slot name -> shape (shape spec §3.6).
-   */
-  parts: {
-    [k: string]: ShapePart;
-  };
-  /**
-   * Components this interaction cannot be matched without (spec.md §7).
-   */
-  requires?: Requirement[];
-  /**
-   * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
-   */
-  states?: State[];
-  transport?: Transport;
-  [k: string]: unknown;
-}
-
-/**
- * How the file came to exist, and nothing that changes what a verifier does (spec.md §3.2). Deliberately outside the content-addressed identity, so an unchanged rebuild is not a new contract. MUST NOT carry 'pactSpecification' — a Janus contract conforms to no pact specification version (ADR 0011).
- */
-export interface Metadata {
-  "build-url"?: string;
-  /**
-   * RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2).
-   */
-  created?: string;
-  /**
-   * What wrote the file: an open map of component name to version string.
-   */
-  writer?: {
-    [k: string]: string;
-  };
   [k: string]: unknown;
 }
 
@@ -116,102 +34,72 @@ export interface Party {
 }
 
 /**
- * Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).
+ * One interaction: its shape recorded once, and the evidence of every variant that was exercised (spec.md §4). Identity is 'description' plus 'states' (spec.md §4.2).
  */
-export interface RecordedSelection {
+export interface Interaction {
   /**
-   * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
+   * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
    */
-  report: {
-    [k: string]: unknown;
-  };
+  description: string;
+  transport?: Transport;
   /**
-   * In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics §5.1). Only exercised variants appear — the honesty rule.
-   *
-   * @minItems 1
+   * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
    */
-  variants: [RecordedVariant, ...RecordedVariant[]];
-  [k: string]: unknown;
-}
-
-/**
- * One exercised variant: its identity from design 2.3, and the concrete values it produced. 'parts' is this design's addition to design 2.3's variant document (variant semantics §4.4).
- */
-export interface RecordedVariant {
+  states?: State[];
   /**
-   * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
-   */
-  assignment: {
-    [k: string]: unknown;
-  }[];
-  /**
-   * The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics §2.2).
-   */
-  id: string;
-  /**
-   * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+   * Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.
    */
   parts: {
-    [k: string]: ValuePart;
+    [k: string]: ShapePart;
   };
+  "content-types"?: ContentTypes;
   /**
-   * The interaction's states with this variant's parameters resolved (variant semantics §6.4). Resolved values only — bindings live on the interaction, never here.
+   * Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.
    */
-  states?: ResolvedState[];
+  requires?: Requirement[];
+  selection: RecordedSelection;
   [k: string]: unknown;
 }
 
 /**
- * A component the interaction needs, at a major version or above (spec.md §7). Structured rather than an expression string, because a document that must be evaluated to be understood cannot be reviewed (ADR 0007's reasoning).
+ * The interaction specification an author writes and a host submits to 'consumer-session/add-interaction': this document's interaction record minus the evidence — the same members as 'Interaction', with no 'selection' (spec.md §1). Not a member of a contract; it is defined here so the author's input and the engine's output stay one document with one optional half.
  */
-export interface Requirement {
+export interface InteractionSpec {
   /**
-   * '<interface>/<name>', e.g. 'content/protobuf'. The interface half is an open vocabulary owned by design 2.6.
+   * What the interaction is, in the author's words (spec.md §4.2).
    */
-  component: string;
+  description: string;
+  transport?: Transport;
   /**
-   * Lowest acceptable major version. Majors only: the protocol is coarse-grained by ADR 0002, and a contract that pins a patch is a contract that breaks on a bug fix.
+   * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
    */
-  "min-version"?: number;
+  states?: State[];
+  /**
+   * Part name -> slot name -> shape (shape spec §3.6).
+   */
+  parts: {
+    [k: string]: ShapePart;
+  };
+  "content-types"?: ContentTypes;
+  /**
+   * Components this interaction cannot be matched without (spec.md §7).
+   */
+  requires?: Requirement[];
   [k: string]: unknown;
 }
 
 /**
- * A state as this variant needs it. A parameter with no case and no default is absent — not null, not empty (variant semantics §6.4).
+ * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
  */
-export interface ResolvedState {
-  name: string;
-  params?: {
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-
-/**
- * One part's shapes: slot name -> shape node. Each value is design 2.2's shape document, opaque here.
- */
-export interface ShapePart {
-  [k: string]: {
-    [k: string]: unknown;
-  };
-}
-
-/**
- * The value a slot carried, always wrapped. The wrapper is unconditional and never in-band: a bare value with a sibling tag would be ambiguous against user data that happens to have that member, which is the trap ADR 0007 and variant semantics §6.2 both refuse (spec.md §5.3).
- */
-export interface SlotValue {
+export interface Transport {
   /**
-   * The value, represented as 'encoded' says. Absent means the slot was empty; null means the slot carried a null.
+   * Open vocabulary; an unknown kind is 'component-unavailable' naming it, never a silent skip.
    */
-  content: unknown;
+  kind: string;
   /**
-   * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
+   * Whether the consumer answers a request ('passive') or emits a message ('emissive') — protocol spec §8.2.
    */
-  "content-type"?: string;
-  /**
-   * How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 §4 octets (ADR 0006).
-   */
-  encoded?: string;
+  mode?: string;
   [k: string]: unknown;
 }
 
@@ -236,17 +124,92 @@ export interface State {
 }
 
 /**
- * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
+ * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
  */
-export interface Transport {
+export interface ContentTypes {
+  [k: string]: {
+    [k: string]: string;
+  };
+}
+
+/**
+ * One part's shapes: slot name -> shape node. Each value is design 2.2's shape document, opaque here.
+ */
+export interface ShapePart {
+  [k: string]: {
+    [k: string]: unknown;
+  };
+}
+
+/**
+ * A component the interaction needs, at a major version or above (spec.md §7). Structured rather than an expression string, because a document that must be evaluated to be understood cannot be reviewed (ADR 0007's reasoning).
+ */
+export interface Requirement {
   /**
-   * Open vocabulary; an unknown kind is 'component-unavailable' naming it, never a silent skip.
+   * '<interface>/<name>', e.g. 'content/protobuf'. The interface half is an open vocabulary owned by design 2.6.
    */
-  kind: string;
+  component: string;
   /**
-   * Whether the consumer answers a request ('passive') or emits a message ('emissive') — protocol spec §8.2.
+   * Lowest acceptable major version. Majors only: the protocol is coarse-grained by ADR 0002, and a contract that pins a patch is a contract that breaks on a bug fix.
    */
-  mode?: string;
+  "min-version"?: number;
+  [k: string]: unknown;
+}
+
+/**
+ * Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).
+ */
+export interface RecordedSelection {
+  /**
+   * In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics §5.1). Only exercised variants appear — the honesty rule.
+   *
+   * @minItems 1
+   */
+  variants: [RecordedVariant, ...RecordedVariant[]];
+  /**
+   * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
+   */
+  report: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * One exercised variant: its identity from design 2.3, and the concrete values it produced. 'parts' is this design's addition to design 2.3's variant document (variant semantics §4.4).
+ */
+export interface RecordedVariant {
+  /**
+   * The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics §2.2).
+   */
+  id: string;
+  /**
+   * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
+   */
+  assignment: {
+    [k: string]: unknown;
+  }[];
+  /**
+   * The interaction's states with this variant's parameters resolved (variant semantics §6.4). Resolved values only — bindings live on the interaction, never here.
+   */
+  states?: ResolvedState[];
+  /**
+   * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+   */
+  parts: {
+    [k: string]: ValuePart;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * A state as this variant needs it. A parameter with no case and no default is absent — not null, not empty (variant semantics §6.4).
+ */
+export interface ResolvedState {
+  name: string;
+  params?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 
@@ -255,6 +218,43 @@ export interface Transport {
  */
 export interface ValuePart {
   [k: string]: SlotValue;
+}
+
+/**
+ * The value a slot carried, always wrapped. The wrapper is unconditional and never in-band: a bare value with a sibling tag would be ambiguous against user data that happens to have that member, which is the trap ADR 0007 and variant semantics §6.2 both refuse (spec.md §5.3).
+ */
+export interface SlotValue {
+  /**
+   * The value, represented as 'encoded' says. Absent means the slot was empty; null means the slot carried a null.
+   */
+  content: unknown;
+  /**
+   * How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 §4 octets (ADR 0006).
+   */
+  encoded?: string;
+  /**
+   * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
+   */
+  "content-type"?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * How the file came to exist, and nothing that changes what a verifier does (spec.md §3.2). Deliberately outside the content-addressed identity, so an unchanged rebuild is not a new contract. MUST NOT carry 'pactSpecification' — a Janus contract conforms to no pact specification version (ADR 0011).
+ */
+export interface Metadata {
+  /**
+   * What wrote the file: an open map of component name to version string.
+   */
+  writer?: {
+    [k: string]: string;
+  };
+  /**
+   * RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2).
+   */
+  created?: string;
+  "build-url"?: string;
+  [k: string]: unknown;
 }
 
 /**
@@ -278,13 +278,13 @@ export interface Finding {
    */
   kind: string;
   /**
-   * Prose, addressed to the author of the pact. Says what was decided and what to check, not what the converter's internals did.
-   */
-  message: string;
-  /**
    * RFC 6901 JSON pointer into the *source pact*, not the converted contract — the author is looking at the file they wrote.
    */
   path: string;
+  /**
+   * Prose, addressed to the author of the pact. Says what was decided and what to check, not what the converter's internals did.
+   */
+  message: string;
   /**
    * RFC 6901 JSON pointer into the converted contract, where the source construct ended up, when there is such a place.
    */

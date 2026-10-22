@@ -26,19 +26,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "mismatches",
+    "variant",
     "status",
-    "variant"
+    "mismatches"
 })
 public class VariantResult {
 
     /**
-     * Mismatch documents in the plan grammar's result form (design 2.4).
+     * 
+     * (Required)
      * 
      */
-    @JsonProperty("mismatches")
-    @JsonPropertyDescription("Mismatch documents in the plan grammar's result form (design 2.4).")
-    private List<Map<String, Object>> mismatches;
+    @JsonProperty("variant")
+    private java.lang.String variant;
     /**
      * 
      * (Required)
@@ -47,31 +47,33 @@ public class VariantResult {
     @JsonProperty("status")
     private java.lang.String status;
     /**
+     * Mismatch documents in the plan grammar's result form (design 2.4).
+     * 
+     */
+    @JsonProperty("mismatches")
+    @JsonPropertyDescription("Mismatch documents in the plan grammar's result form (design 2.4).")
+    private List<Map<String, Object>> mismatches;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("variant")
-    private java.lang.String variant;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * Mismatch documents in the plan grammar's result form (design 2.4).
-     * 
-     */
-    @JsonProperty("mismatches")
-    public List<Map<String, Object>> getMismatches() {
-        return mismatches;
+    public java.lang.String getVariant() {
+        return variant;
     }
 
     /**
-     * Mismatch documents in the plan grammar's result form (design 2.4).
+     * 
+     * (Required)
      * 
      */
-    @JsonProperty("mismatches")
-    public void setMismatches(List<Map<String, Object>> mismatches) {
-        this.mismatches = mismatches;
+    @JsonProperty("variant")
+    public void setVariant(java.lang.String variant) {
+        this.variant = variant;
     }
 
     /**
@@ -95,23 +97,21 @@ public class VariantResult {
     }
 
     /**
-     * 
-     * (Required)
+     * Mismatch documents in the plan grammar's result form (design 2.4).
      * 
      */
-    @JsonProperty("variant")
-    public java.lang.String getVariant() {
-        return variant;
+    @JsonProperty("mismatches")
+    public List<Map<String, Object>> getMismatches() {
+        return mismatches;
     }
 
     /**
-     * 
-     * (Required)
+     * Mismatch documents in the plan grammar's result form (design 2.4).
      * 
      */
-    @JsonProperty("variant")
-    public void setVariant(java.lang.String variant) {
-        this.variant = variant;
+    @JsonProperty("mismatches")
+    public void setMismatches(List<Map<String, Object>> mismatches) {
+        this.mismatches = mismatches;
     }
 
     @JsonAnyGetter
@@ -128,17 +128,17 @@ public class VariantResult {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VariantResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("mismatches");
+        sb.append("variant");
         sb.append('=');
-        sb.append(((this.mismatches == null)?"<null>":this.mismatches));
+        sb.append(((this.variant == null)?"<null>":this.variant));
         sb.append(',');
         sb.append("status");
         sb.append('=');
         sb.append(((this.status == null)?"<null>":this.status));
         sb.append(',');
-        sb.append("variant");
+        sb.append("mismatches");
         sb.append('=');
-        sb.append(((this.variant == null)?"<null>":this.variant));
+        sb.append(((this.mismatches == null)?"<null>":this.mismatches));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -155,8 +155,8 @@ public class VariantResult {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.mismatches == null)? 0 :this.mismatches.hashCode()));
         result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
+        result = ((result* 31)+((this.mismatches == null)? 0 :this.mismatches.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.status == null)? 0 :this.status.hashCode()));
         return result;
@@ -171,7 +171,7 @@ public class VariantResult {
             return false;
         }
         VariantResult rhs = ((VariantResult) other);
-        return (((((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches)))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
+        return (((((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant)))&&((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
     }
 
 }

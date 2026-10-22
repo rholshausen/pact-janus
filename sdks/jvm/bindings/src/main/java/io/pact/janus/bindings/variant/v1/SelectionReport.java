@@ -26,73 +26,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "algorithm",
-    "boundaries",
-    "budgets",
-    "coverage",
-    "exclusions",
-    "notes",
-    "selected",
     "space",
     "strategy",
-    "strength"
+    "strength",
+    "algorithm",
+    "selected",
+    "coverage",
+    "budgets",
+    "boundaries",
+    "exclusions",
+    "notes"
 })
 public class SelectionReport {
 
-    /**
-     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
-     * (Required)
-     * 
-     */
-    @JsonProperty("algorithm")
-    @JsonPropertyDescription("The named selection algorithm (spec.md \u00a73.7). A different algorithm is a different name, never a redefinition.")
-    private String algorithm;
-    /**
-     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
-     * 
-     */
-    @JsonProperty("boundaries")
-    @JsonPropertyDescription("Whether the minimal and maximal variants were seeded (spec.md \u00a73.1).")
-    private Boolean boundaries;
-    /**
-     * Budgets
-     * <p>
-     * 
-     * 
-     */
-    @JsonProperty("budgets")
-    private Budgets budgets;
-    /**
-     * Coverage
-     * <p>
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("coverage")
-    private Coverage coverage;
-    /**
-     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclusions")
-    @JsonPropertyDescription("The exclusions in force, each with the reason it carries and what it removed (spec.md \u00a73.5).")
-    private List<AppliedExclusion> exclusions;
-    /**
-     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
-     * 
-     */
-    @JsonProperty("notes")
-    @JsonPropertyDescription("Anything the selection needs to say for itself \u2014 a dropped target, a saturated count, a waiver.")
-    private List<Note> notes;
-    /**
-     * Number of variants in the selection; at least 1, because the base variant is unconditional.
-     * (Required)
-     * 
-     */
-    @JsonProperty("selected")
-    @JsonPropertyDescription("Number of variants in the selection; at least 1, because the base variant is unconditional.")
-    private Long selected;
     /**
      * SpaceSummary
      * <p>
@@ -117,148 +63,62 @@ public class SelectionReport {
     @JsonProperty("strength")
     @JsonPropertyDescription("Covering strength, for strategy 't-wise'.")
     private Long strength;
+    /**
+     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
+     * (Required)
+     * 
+     */
+    @JsonProperty("algorithm")
+    @JsonPropertyDescription("The named selection algorithm (spec.md \u00a73.7). A different algorithm is a different name, never a redefinition.")
+    private String algorithm;
+    /**
+     * Number of variants in the selection; at least 1, because the base variant is unconditional.
+     * (Required)
+     * 
+     */
+    @JsonProperty("selected")
+    @JsonPropertyDescription("Number of variants in the selection; at least 1, because the base variant is unconditional.")
+    private Long selected;
+    /**
+     * Coverage
+     * <p>
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("coverage")
+    private Coverage coverage;
+    /**
+     * Budgets
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("budgets")
+    private Budgets budgets;
+    /**
+     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
+     * 
+     */
+    @JsonProperty("boundaries")
+    @JsonPropertyDescription("Whether the minimal and maximal variants were seeded (spec.md \u00a73.1).")
+    private Boolean boundaries;
+    /**
+     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
+     * 
+     */
+    @JsonProperty("exclusions")
+    @JsonPropertyDescription("The exclusions in force, each with the reason it carries and what it removed (spec.md \u00a73.5).")
+    private List<AppliedExclusion> exclusions;
+    /**
+     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
+     * 
+     */
+    @JsonProperty("notes")
+    @JsonPropertyDescription("Anything the selection needs to say for itself \u2014 a dropped target, a saturated count, a waiver.")
+    private List<Note> notes;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
-     * (Required)
-     * 
-     */
-    @JsonProperty("algorithm")
-    public String getAlgorithm() {
-        return algorithm;
-    }
-
-    /**
-     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
-     * (Required)
-     * 
-     */
-    @JsonProperty("algorithm")
-    public void setAlgorithm(String algorithm) {
-        this.algorithm = algorithm;
-    }
-
-    /**
-     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
-     * 
-     */
-    @JsonProperty("boundaries")
-    public Boolean getBoundaries() {
-        return boundaries;
-    }
-
-    /**
-     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
-     * 
-     */
-    @JsonProperty("boundaries")
-    public void setBoundaries(Boolean boundaries) {
-        this.boundaries = boundaries;
-    }
-
-    /**
-     * Budgets
-     * <p>
-     * 
-     * 
-     */
-    @JsonProperty("budgets")
-    public Budgets getBudgets() {
-        return budgets;
-    }
-
-    /**
-     * Budgets
-     * <p>
-     * 
-     * 
-     */
-    @JsonProperty("budgets")
-    public void setBudgets(Budgets budgets) {
-        this.budgets = budgets;
-    }
-
-    /**
-     * Coverage
-     * <p>
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("coverage")
-    public Coverage getCoverage() {
-        return coverage;
-    }
-
-    /**
-     * Coverage
-     * <p>
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("coverage")
-    public void setCoverage(Coverage coverage) {
-        this.coverage = coverage;
-    }
-
-    /**
-     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclusions")
-    public List<AppliedExclusion> getExclusions() {
-        return exclusions;
-    }
-
-    /**
-     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("exclusions")
-    public void setExclusions(List<AppliedExclusion> exclusions) {
-        this.exclusions = exclusions;
-    }
-
-    /**
-     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
-     * 
-     */
-    @JsonProperty("notes")
-    public List<Note> getNotes() {
-        return notes;
-    }
-
-    /**
-     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
-     * 
-     */
-    @JsonProperty("notes")
-    public void setNotes(List<Note> notes) {
-        this.notes = notes;
-    }
-
-    /**
-     * Number of variants in the selection; at least 1, because the base variant is unconditional.
-     * (Required)
-     * 
-     */
-    @JsonProperty("selected")
-    public Long getSelected() {
-        return selected;
-    }
-
-    /**
-     * Number of variants in the selection; at least 1, because the base variant is unconditional.
-     * (Required)
-     * 
-     */
-    @JsonProperty("selected")
-    public void setSelected(Long selected) {
-        this.selected = selected;
-    }
 
     /**
      * SpaceSummary
@@ -322,6 +182,146 @@ public class SelectionReport {
         this.strength = strength;
     }
 
+    /**
+     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
+     * (Required)
+     * 
+     */
+    @JsonProperty("algorithm")
+    public String getAlgorithm() {
+        return algorithm;
+    }
+
+    /**
+     * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
+     * (Required)
+     * 
+     */
+    @JsonProperty("algorithm")
+    public void setAlgorithm(String algorithm) {
+        this.algorithm = algorithm;
+    }
+
+    /**
+     * Number of variants in the selection; at least 1, because the base variant is unconditional.
+     * (Required)
+     * 
+     */
+    @JsonProperty("selected")
+    public Long getSelected() {
+        return selected;
+    }
+
+    /**
+     * Number of variants in the selection; at least 1, because the base variant is unconditional.
+     * (Required)
+     * 
+     */
+    @JsonProperty("selected")
+    public void setSelected(Long selected) {
+        this.selected = selected;
+    }
+
+    /**
+     * Coverage
+     * <p>
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("coverage")
+    public Coverage getCoverage() {
+        return coverage;
+    }
+
+    /**
+     * Coverage
+     * <p>
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("coverage")
+    public void setCoverage(Coverage coverage) {
+        this.coverage = coverage;
+    }
+
+    /**
+     * Budgets
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("budgets")
+    public Budgets getBudgets() {
+        return budgets;
+    }
+
+    /**
+     * Budgets
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("budgets")
+    public void setBudgets(Budgets budgets) {
+        this.budgets = budgets;
+    }
+
+    /**
+     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
+     * 
+     */
+    @JsonProperty("boundaries")
+    public Boolean getBoundaries() {
+        return boundaries;
+    }
+
+    /**
+     * Whether the minimal and maximal variants were seeded (spec.md §3.1).
+     * 
+     */
+    @JsonProperty("boundaries")
+    public void setBoundaries(Boolean boundaries) {
+        this.boundaries = boundaries;
+    }
+
+    /**
+     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
+     * 
+     */
+    @JsonProperty("exclusions")
+    public List<AppliedExclusion> getExclusions() {
+        return exclusions;
+    }
+
+    /**
+     * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
+     * 
+     */
+    @JsonProperty("exclusions")
+    public void setExclusions(List<AppliedExclusion> exclusions) {
+        this.exclusions = exclusions;
+    }
+
+    /**
+     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
+     * 
+     */
+    @JsonProperty("notes")
+    public List<Note> getNotes() {
+        return notes;
+    }
+
+    /**
+     * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
+     * 
+     */
+    @JsonProperty("notes")
+    public void setNotes(List<Note> notes) {
+        this.notes = notes;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -336,34 +336,6 @@ public class SelectionReport {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(SelectionReport.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("algorithm");
-        sb.append('=');
-        sb.append(((this.algorithm == null)?"<null>":this.algorithm));
-        sb.append(',');
-        sb.append("boundaries");
-        sb.append('=');
-        sb.append(((this.boundaries == null)?"<null>":this.boundaries));
-        sb.append(',');
-        sb.append("budgets");
-        sb.append('=');
-        sb.append(((this.budgets == null)?"<null>":this.budgets));
-        sb.append(',');
-        sb.append("coverage");
-        sb.append('=');
-        sb.append(((this.coverage == null)?"<null>":this.coverage));
-        sb.append(',');
-        sb.append("exclusions");
-        sb.append('=');
-        sb.append(((this.exclusions == null)?"<null>":this.exclusions));
-        sb.append(',');
-        sb.append("notes");
-        sb.append('=');
-        sb.append(((this.notes == null)?"<null>":this.notes));
-        sb.append(',');
-        sb.append("selected");
-        sb.append('=');
-        sb.append(((this.selected == null)?"<null>":this.selected));
-        sb.append(',');
         sb.append("space");
         sb.append('=');
         sb.append(((this.space == null)?"<null>":this.space));
@@ -375,6 +347,34 @@ public class SelectionReport {
         sb.append("strength");
         sb.append('=');
         sb.append(((this.strength == null)?"<null>":this.strength));
+        sb.append(',');
+        sb.append("algorithm");
+        sb.append('=');
+        sb.append(((this.algorithm == null)?"<null>":this.algorithm));
+        sb.append(',');
+        sb.append("selected");
+        sb.append('=');
+        sb.append(((this.selected == null)?"<null>":this.selected));
+        sb.append(',');
+        sb.append("coverage");
+        sb.append('=');
+        sb.append(((this.coverage == null)?"<null>":this.coverage));
+        sb.append(',');
+        sb.append("budgets");
+        sb.append('=');
+        sb.append(((this.budgets == null)?"<null>":this.budgets));
+        sb.append(',');
+        sb.append("boundaries");
+        sb.append('=');
+        sb.append(((this.boundaries == null)?"<null>":this.boundaries));
+        sb.append(',');
+        sb.append("exclusions");
+        sb.append('=');
+        sb.append(((this.exclusions == null)?"<null>":this.exclusions));
+        sb.append(',');
+        sb.append("notes");
+        sb.append('=');
+        sb.append(((this.notes == null)?"<null>":this.notes));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -399,8 +399,8 @@ public class SelectionReport {
         result = ((result* 31)+((this.exclusions == null)? 0 :this.exclusions.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.strategy == null)? 0 :this.strategy.hashCode()));
-        result = ((result* 31)+((this.selected == null)? 0 :this.selected.hashCode()));
         result = ((result* 31)+((this.space == null)? 0 :this.space.hashCode()));
+        result = ((result* 31)+((this.selected == null)? 0 :this.selected.hashCode()));
         result = ((result* 31)+((this.algorithm == null)? 0 :this.algorithm.hashCode()));
         return result;
     }
@@ -414,7 +414,7 @@ public class SelectionReport {
             return false;
         }
         SelectionReport rhs = ((SelectionReport) other);
-        return ((((((((((((this.coverage == rhs.coverage)||((this.coverage!= null)&&this.coverage.equals(rhs.coverage)))&&((this.notes == rhs.notes)||((this.notes!= null)&&this.notes.equals(rhs.notes))))&&((this.strength == rhs.strength)||((this.strength!= null)&&this.strength.equals(rhs.strength))))&&((this.budgets == rhs.budgets)||((this.budgets!= null)&&this.budgets.equals(rhs.budgets))))&&((this.boundaries == rhs.boundaries)||((this.boundaries!= null)&&this.boundaries.equals(rhs.boundaries))))&&((this.exclusions == rhs.exclusions)||((this.exclusions!= null)&&this.exclusions.equals(rhs.exclusions))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.strategy == rhs.strategy)||((this.strategy!= null)&&this.strategy.equals(rhs.strategy))))&&((this.selected == rhs.selected)||((this.selected!= null)&&this.selected.equals(rhs.selected))))&&((this.space == rhs.space)||((this.space!= null)&&this.space.equals(rhs.space))))&&((this.algorithm == rhs.algorithm)||((this.algorithm!= null)&&this.algorithm.equals(rhs.algorithm))));
+        return ((((((((((((this.coverage == rhs.coverage)||((this.coverage!= null)&&this.coverage.equals(rhs.coverage)))&&((this.notes == rhs.notes)||((this.notes!= null)&&this.notes.equals(rhs.notes))))&&((this.strength == rhs.strength)||((this.strength!= null)&&this.strength.equals(rhs.strength))))&&((this.budgets == rhs.budgets)||((this.budgets!= null)&&this.budgets.equals(rhs.budgets))))&&((this.boundaries == rhs.boundaries)||((this.boundaries!= null)&&this.boundaries.equals(rhs.boundaries))))&&((this.exclusions == rhs.exclusions)||((this.exclusions!= null)&&this.exclusions.equals(rhs.exclusions))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.strategy == rhs.strategy)||((this.strategy!= null)&&this.strategy.equals(rhs.strategy))))&&((this.space == rhs.space)||((this.space!= null)&&this.space.equals(rhs.space))))&&((this.selected == rhs.selected)||((this.selected!= null)&&this.selected.equals(rhs.selected))))&&((this.algorithm == rhs.algorithm)||((this.algorithm!= null)&&this.algorithm.equals(rhs.algorithm))));
     }
 
 }

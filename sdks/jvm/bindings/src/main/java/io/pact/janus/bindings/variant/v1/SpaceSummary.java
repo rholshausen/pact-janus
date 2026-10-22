@@ -25,26 +25,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "dimensions",
+    "size",
     "exact",
-    "size"
+    "dimensions"
 })
 public class SpaceSummary {
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimensions")
-    private Long dimensions;
-    /**
-     * False when counting saturated against the largest budget in force.
-     * 
-     */
-    @JsonProperty("exact")
-    @JsonPropertyDescription("False when counting saturated against the largest budget in force.")
-    private Boolean exact;
     /**
      * Variants in the space, counted per spec.md §2.3. When 'exact' is false this is the saturation bound, meaning 'at least this many'.
      * (Required)
@@ -53,46 +39,22 @@ public class SpaceSummary {
     @JsonProperty("size")
     @JsonPropertyDescription("Variants in the space, counted per spec.md \u00a72.3. When 'exact' is false this is the saturation bound, meaning 'at least this many'.")
     private Long size;
+    /**
+     * False when counting saturated against the largest budget in force.
+     * 
+     */
+    @JsonProperty("exact")
+    @JsonPropertyDescription("False when counting saturated against the largest budget in force.")
+    private Boolean exact;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimensions")
+    private Long dimensions;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimensions")
-    public Long getDimensions() {
-        return dimensions;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimensions")
-    public void setDimensions(Long dimensions) {
-        this.dimensions = dimensions;
-    }
-
-    /**
-     * False when counting saturated against the largest budget in force.
-     * 
-     */
-    @JsonProperty("exact")
-    public Boolean getExact() {
-        return exact;
-    }
-
-    /**
-     * False when counting saturated against the largest budget in force.
-     * 
-     */
-    @JsonProperty("exact")
-    public void setExact(Boolean exact) {
-        this.exact = exact;
-    }
 
     /**
      * Variants in the space, counted per spec.md §2.3. When 'exact' is false this is the saturation bound, meaning 'at least this many'.
@@ -114,6 +76,44 @@ public class SpaceSummary {
         this.size = size;
     }
 
+    /**
+     * False when counting saturated against the largest budget in force.
+     * 
+     */
+    @JsonProperty("exact")
+    public Boolean getExact() {
+        return exact;
+    }
+
+    /**
+     * False when counting saturated against the largest budget in force.
+     * 
+     */
+    @JsonProperty("exact")
+    public void setExact(Boolean exact) {
+        this.exact = exact;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimensions")
+    public Long getDimensions() {
+        return dimensions;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimensions")
+    public void setDimensions(Long dimensions) {
+        this.dimensions = dimensions;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -128,17 +128,17 @@ public class SpaceSummary {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(SpaceSummary.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("dimensions");
+        sb.append("size");
         sb.append('=');
-        sb.append(((this.dimensions == null)?"<null>":this.dimensions));
+        sb.append(((this.size == null)?"<null>":this.size));
         sb.append(',');
         sb.append("exact");
         sb.append('=');
         sb.append(((this.exact == null)?"<null>":this.exact));
         sb.append(',');
-        sb.append("size");
+        sb.append("dimensions");
         sb.append('=');
-        sb.append(((this.size == null)?"<null>":this.size));
+        sb.append(((this.dimensions == null)?"<null>":this.dimensions));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

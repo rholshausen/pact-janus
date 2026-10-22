@@ -25,36 +25,21 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "kind",
-    "last",
-    "payload",
+    "stream",
     "seq",
-    "stream"
+    "kind",
+    "payload",
+    "last"
 })
 public class Event {
 
     /**
-     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
-     * (Required)
-     * 
-     */
-    @JsonProperty("kind")
-    @JsonPropertyDescription("Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.")
-    private java.lang.String kind;
-    /**
-     * Structural termination: true on the final event of a stream, whatever its kind.
-     * 
-     */
-    @JsonProperty("last")
-    @JsonPropertyDescription("Structural termination: true on the final event of a stream, whatever its kind.")
-    private Boolean last;
-    /**
      * 
      * (Required)
      * 
      */
-    @JsonProperty("payload")
-    private Map<String, Object> payload;
+    @JsonProperty("stream")
+    private java.lang.String stream;
     /**
      * Per-stream, starts at 1, increments by 1, no gaps.
      * (Required)
@@ -64,51 +49,38 @@ public class Event {
     @JsonPropertyDescription("Per-stream, starts at 1, increments by 1, no gaps.")
     private Long seq;
     /**
+     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
+     * (Required)
+     * 
+     */
+    @JsonProperty("kind")
+    @JsonPropertyDescription("Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.")
+    private java.lang.String kind;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("payload")
+    private Map<String, Object> payload;
+    /**
+     * Structural termination: true on the final event of a stream, whatever its kind.
+     * 
+     */
+    @JsonProperty("last")
+    @JsonPropertyDescription("Structural termination: true on the final event of a stream, whatever its kind.")
+    private Boolean last;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("stream")
-    private java.lang.String stream;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
-     * (Required)
-     * 
-     */
-    @JsonProperty("kind")
-    public java.lang.String getKind() {
-        return kind;
-    }
-
-    /**
-     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
-     * (Required)
-     * 
-     */
-    @JsonProperty("kind")
-    public void setKind(java.lang.String kind) {
-        this.kind = kind;
-    }
-
-    /**
-     * Structural termination: true on the final event of a stream, whatever its kind.
-     * 
-     */
-    @JsonProperty("last")
-    public Boolean getLast() {
-        return last;
-    }
-
-    /**
-     * Structural termination: true on the final event of a stream, whatever its kind.
-     * 
-     */
-    @JsonProperty("last")
-    public void setLast(Boolean last) {
-        this.last = last;
+    public java.lang.String getStream() {
+        return stream;
     }
 
     /**
@@ -116,19 +88,9 @@ public class Event {
      * (Required)
      * 
      */
-    @JsonProperty("payload")
-    public Map<String, Object> getPayload() {
-        return payload;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("payload")
-    public void setPayload(Map<String, Object> payload) {
-        this.payload = payload;
+    @JsonProperty("stream")
+    public void setStream(java.lang.String stream) {
+        this.stream = stream;
     }
 
     /**
@@ -152,13 +114,23 @@ public class Event {
     }
 
     /**
-     * 
+     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
      * (Required)
      * 
      */
-    @JsonProperty("stream")
-    public java.lang.String getStream() {
-        return stream;
+    @JsonProperty("kind")
+    public java.lang.String getKind() {
+        return kind;
+    }
+
+    /**
+     * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
+     * (Required)
+     * 
+     */
+    @JsonProperty("kind")
+    public void setKind(java.lang.String kind) {
+        this.kind = kind;
     }
 
     /**
@@ -166,9 +138,37 @@ public class Event {
      * (Required)
      * 
      */
-    @JsonProperty("stream")
-    public void setStream(java.lang.String stream) {
-        this.stream = stream;
+    @JsonProperty("payload")
+    public Map<String, Object> getPayload() {
+        return payload;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("payload")
+    public void setPayload(Map<String, Object> payload) {
+        this.payload = payload;
+    }
+
+    /**
+     * Structural termination: true on the final event of a stream, whatever its kind.
+     * 
+     */
+    @JsonProperty("last")
+    public Boolean getLast() {
+        return last;
+    }
+
+    /**
+     * Structural termination: true on the final event of a stream, whatever its kind.
+     * 
+     */
+    @JsonProperty("last")
+    public void setLast(Boolean last) {
+        this.last = last;
     }
 
     @JsonAnyGetter
@@ -185,25 +185,25 @@ public class Event {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Event.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("kind");
+        sb.append("stream");
         sb.append('=');
-        sb.append(((this.kind == null)?"<null>":this.kind));
-        sb.append(',');
-        sb.append("last");
-        sb.append('=');
-        sb.append(((this.last == null)?"<null>":this.last));
-        sb.append(',');
-        sb.append("payload");
-        sb.append('=');
-        sb.append(((this.payload == null)?"<null>":this.payload));
+        sb.append(((this.stream == null)?"<null>":this.stream));
         sb.append(',');
         sb.append("seq");
         sb.append('=');
         sb.append(((this.seq == null)?"<null>":this.seq));
         sb.append(',');
-        sb.append("stream");
+        sb.append("kind");
         sb.append('=');
-        sb.append(((this.stream == null)?"<null>":this.stream));
+        sb.append(((this.kind == null)?"<null>":this.kind));
+        sb.append(',');
+        sb.append("payload");
+        sb.append('=');
+        sb.append(((this.payload == null)?"<null>":this.payload));
+        sb.append(',');
+        sb.append("last");
+        sb.append('=');
+        sb.append(((this.last == null)?"<null>":this.last));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -221,8 +221,8 @@ public class Event {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.last == null)? 0 :this.last.hashCode()));
-        result = ((result* 31)+((this.payload == null)? 0 :this.payload.hashCode()));
         result = ((result* 31)+((this.stream == null)? 0 :this.stream.hashCode()));
+        result = ((result* 31)+((this.payload == null)? 0 :this.payload.hashCode()));
         result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.seq == null)? 0 :this.seq.hashCode()));
@@ -238,7 +238,7 @@ public class Event {
             return false;
         }
         Event rhs = ((Event) other);
-        return (((((((this.last == rhs.last)||((this.last!= null)&&this.last.equals(rhs.last)))&&((this.payload == rhs.payload)||((this.payload!= null)&&this.payload.equals(rhs.payload))))&&((this.stream == rhs.stream)||((this.stream!= null)&&this.stream.equals(rhs.stream))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.seq == rhs.seq)||((this.seq!= null)&&this.seq.equals(rhs.seq))));
+        return (((((((this.last == rhs.last)||((this.last!= null)&&this.last.equals(rhs.last)))&&((this.stream == rhs.stream)||((this.stream!= null)&&this.stream.equals(rhs.stream))))&&((this.payload == rhs.payload)||((this.payload!= null)&&this.payload.equals(rhs.payload))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.seq == rhs.seq)||((this.seq!= null)&&this.seq.equals(rhs.seq))));
     }
 
 }

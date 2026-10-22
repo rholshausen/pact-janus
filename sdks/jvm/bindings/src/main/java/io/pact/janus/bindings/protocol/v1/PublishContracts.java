@@ -26,22 +26,15 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "branch",
     "broker",
-    "build-url",
     "consumer-version",
-    "contracts",
-    "tags"
+    "branch",
+    "tags",
+    "build-url",
+    "contracts"
 })
 public class PublishContracts {
 
-    /**
-     * The consumer version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    @JsonPropertyDescription("The consumer version's branch.")
-    private java.lang.String branch;
     /**
      * BrokerDescriptor
      * <p>
@@ -53,13 +46,6 @@ public class PublishContracts {
     @JsonPropertyDescription("Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them \u2014 not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.")
     private BrokerDescriptor broker;
     /**
-     * The build that produced the contracts.
-     * 
-     */
-    @JsonProperty("build-url")
-    @JsonPropertyDescription("The build that produced the contracts.")
-    private java.lang.String buildUrl;
-    /**
      * The consumer's application version these contracts belong to.
      * (Required)
      * 
@@ -68,34 +54,30 @@ public class PublishContracts {
     @JsonPropertyDescription("The consumer's application version these contracts belong to.")
     private java.lang.String consumerVersion;
     /**
+     * The consumer version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    @JsonPropertyDescription("The consumer version's branch.")
+    private java.lang.String branch;
+    @JsonProperty("tags")
+    private List<java.lang.String> tags;
+    /**
+     * The build that produced the contracts.
+     * 
+     */
+    @JsonProperty("build-url")
+    @JsonPropertyDescription("The build that produced the contracts.")
+    private java.lang.String buildUrl;
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("contracts")
     private List<Map<String, Object>> contracts;
-    @JsonProperty("tags")
-    private List<java.lang.String> tags;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The consumer version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    public java.lang.String getBranch() {
-        return branch;
-    }
-
-    /**
-     * The consumer version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    public void setBranch(java.lang.String branch) {
-        this.branch = branch;
-    }
 
     /**
      * BrokerDescriptor
@@ -122,24 +104,6 @@ public class PublishContracts {
     }
 
     /**
-     * The build that produced the contracts.
-     * 
-     */
-    @JsonProperty("build-url")
-    public java.lang.String getBuildUrl() {
-        return buildUrl;
-    }
-
-    /**
-     * The build that produced the contracts.
-     * 
-     */
-    @JsonProperty("build-url")
-    public void setBuildUrl(java.lang.String buildUrl) {
-        this.buildUrl = buildUrl;
-    }
-
-    /**
      * The consumer's application version these contracts belong to.
      * (Required)
      * 
@@ -157,6 +121,52 @@ public class PublishContracts {
     @JsonProperty("consumer-version")
     public void setConsumerVersion(java.lang.String consumerVersion) {
         this.consumerVersion = consumerVersion;
+    }
+
+    /**
+     * The consumer version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    public java.lang.String getBranch() {
+        return branch;
+    }
+
+    /**
+     * The consumer version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    public void setBranch(java.lang.String branch) {
+        this.branch = branch;
+    }
+
+    @JsonProperty("tags")
+    public List<java.lang.String> getTags() {
+        return tags;
+    }
+
+    @JsonProperty("tags")
+    public void setTags(List<java.lang.String> tags) {
+        this.tags = tags;
+    }
+
+    /**
+     * The build that produced the contracts.
+     * 
+     */
+    @JsonProperty("build-url")
+    public java.lang.String getBuildUrl() {
+        return buildUrl;
+    }
+
+    /**
+     * The build that produced the contracts.
+     * 
+     */
+    @JsonProperty("build-url")
+    public void setBuildUrl(java.lang.String buildUrl) {
+        this.buildUrl = buildUrl;
     }
 
     /**
@@ -179,16 +189,6 @@ public class PublishContracts {
         this.contracts = contracts;
     }
 
-    @JsonProperty("tags")
-    public List<java.lang.String> getTags() {
-        return tags;
-    }
-
-    @JsonProperty("tags")
-    public void setTags(List<java.lang.String> tags) {
-        this.tags = tags;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -203,29 +203,29 @@ public class PublishContracts {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(PublishContracts.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("branch");
-        sb.append('=');
-        sb.append(((this.branch == null)?"<null>":this.branch));
-        sb.append(',');
         sb.append("broker");
         sb.append('=');
         sb.append(((this.broker == null)?"<null>":this.broker));
-        sb.append(',');
-        sb.append("buildUrl");
-        sb.append('=');
-        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
         sb.append(',');
         sb.append("consumerVersion");
         sb.append('=');
         sb.append(((this.consumerVersion == null)?"<null>":this.consumerVersion));
         sb.append(',');
-        sb.append("contracts");
+        sb.append("branch");
         sb.append('=');
-        sb.append(((this.contracts == null)?"<null>":this.contracts));
+        sb.append(((this.branch == null)?"<null>":this.branch));
         sb.append(',');
         sb.append("tags");
         sb.append('=');
         sb.append(((this.tags == null)?"<null>":this.tags));
+        sb.append(',');
+        sb.append("buildUrl");
+        sb.append('=');
+        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
+        sb.append(',');
+        sb.append("contracts");
+        sb.append('=');
+        sb.append(((this.contracts == null)?"<null>":this.contracts));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

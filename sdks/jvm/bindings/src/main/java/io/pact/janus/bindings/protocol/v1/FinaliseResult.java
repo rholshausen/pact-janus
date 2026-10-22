@@ -26,18 +26,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "contract",
-    "results"
+    "results",
+    "contract"
 })
 public class FinaliseResult {
 
-    /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
-     * 
-     */
-    @JsonProperty("contract")
-    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.")
-    private Map<String, Object> contract;
     /**
      * 
      * (Required)
@@ -45,26 +38,15 @@ public class FinaliseResult {
      */
     @JsonProperty("results")
     private List<InteractionResult> results;
+    /**
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * 
+     */
+    @JsonProperty("contract")
+    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.")
+    private Map<String, Object> contract;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
-     * 
-     */
-    @JsonProperty("contract")
-    public Map<String, Object> getContract() {
-        return contract;
-    }
-
-    /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
-     * 
-     */
-    @JsonProperty("contract")
-    public void setContract(Map<String, Object> contract) {
-        this.contract = contract;
-    }
 
     /**
      * 
@@ -86,6 +68,24 @@ public class FinaliseResult {
         this.results = results;
     }
 
+    /**
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * 
+     */
+    @JsonProperty("contract")
+    public Map<String, Object> getContract() {
+        return contract;
+    }
+
+    /**
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * 
+     */
+    @JsonProperty("contract")
+    public void setContract(Map<String, Object> contract) {
+        this.contract = contract;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -100,13 +100,13 @@ public class FinaliseResult {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(FinaliseResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("contract");
-        sb.append('=');
-        sb.append(((this.contract == null)?"<null>":this.contract));
-        sb.append(',');
         sb.append("results");
         sb.append('=');
         sb.append(((this.results == null)?"<null>":this.results));
+        sb.append(',');
+        sb.append("contract");
+        sb.append('=');
+        sb.append(((this.contract == null)?"<null>":this.contract));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

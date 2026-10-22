@@ -25,20 +25,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "action",
     "code",
+    "action",
     "message"
 })
 public class Reason {
 
-    /**
-     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
-     * (Required)
-     * 
-     */
-    @JsonProperty("action")
-    @JsonPropertyDescription("What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.")
-    private String action;
     /**
      * Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.
      * (Required)
@@ -48,6 +40,14 @@ public class Reason {
     @JsonPropertyDescription("Open vocabulary, listed in spec.md \u00a78.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.")
     private String code;
     /**
+     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
+     * (Required)
+     * 
+     */
+    @JsonProperty("action")
+    @JsonPropertyDescription("What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.")
+    private String action;
+    /**
      * 
      * (Required)
      * 
@@ -56,26 +56,6 @@ public class Reason {
     private String message;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
-     * (Required)
-     * 
-     */
-    @JsonProperty("action")
-    public String getAction() {
-        return action;
-    }
-
-    /**
-     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
-     * (Required)
-     * 
-     */
-    @JsonProperty("action")
-    public void setAction(String action) {
-        this.action = action;
-    }
 
     /**
      * Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.
@@ -95,6 +75,26 @@ public class Reason {
     @JsonProperty("code")
     public void setCode(String code) {
         this.code = code;
+    }
+
+    /**
+     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
+     * (Required)
+     * 
+     */
+    @JsonProperty("action")
+    public String getAction() {
+        return action;
+    }
+
+    /**
+     * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
+     * (Required)
+     * 
+     */
+    @JsonProperty("action")
+    public void setAction(String action) {
+        this.action = action;
     }
 
     /**
@@ -131,13 +131,13 @@ public class Reason {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Reason.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("action");
-        sb.append('=');
-        sb.append(((this.action == null)?"<null>":this.action));
-        sb.append(',');
         sb.append("code");
         sb.append('=');
         sb.append(((this.code == null)?"<null>":this.code));
+        sb.append(',');
+        sb.append("action");
+        sb.append('=');
+        sb.append(((this.action == null)?"<null>":this.action));
         sb.append(',');
         sb.append("message");
         sb.append('=');

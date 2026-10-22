@@ -25,27 +25,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "contract",
-    "index",
     "kind",
-    "spec"
+    "spec",
+    "contract",
+    "index"
 })
 public class ExplainSubject {
 
-    /**
-     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
-     * 
-     */
-    @JsonProperty("contract")
-    @JsonPropertyDescription("For kind 'contract-interaction': the contract document (a Janus contract or a v1\u2013v4 pact).")
-    private Map<String, Object> contract;
-    /**
-     * For kind 'contract-interaction': which interaction.
-     * 
-     */
-    @JsonProperty("index")
-    @JsonPropertyDescription("For kind 'contract-interaction': which interaction.")
-    private Long index;
     /**
      * 
      * (Required)
@@ -60,44 +46,22 @@ public class ExplainSubject {
     @JsonProperty("spec")
     @JsonPropertyDescription("For kind 'spec': the interaction specification.")
     private Map<String, Object> spec;
+    /**
+     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
+     * 
+     */
+    @JsonProperty("contract")
+    @JsonPropertyDescription("For kind 'contract-interaction': the contract document (a Janus contract or a v1\u2013v4 pact).")
+    private Map<String, Object> contract;
+    /**
+     * For kind 'contract-interaction': which interaction.
+     * 
+     */
+    @JsonProperty("index")
+    @JsonPropertyDescription("For kind 'contract-interaction': which interaction.")
+    private Long index;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
-     * 
-     */
-    @JsonProperty("contract")
-    public Map<String, Object> getContract() {
-        return contract;
-    }
-
-    /**
-     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
-     * 
-     */
-    @JsonProperty("contract")
-    public void setContract(Map<String, Object> contract) {
-        this.contract = contract;
-    }
-
-    /**
-     * For kind 'contract-interaction': which interaction.
-     * 
-     */
-    @JsonProperty("index")
-    public Long getIndex() {
-        return index;
-    }
-
-    /**
-     * For kind 'contract-interaction': which interaction.
-     * 
-     */
-    @JsonProperty("index")
-    public void setIndex(Long index) {
-        this.index = index;
-    }
 
     /**
      * 
@@ -137,6 +101,42 @@ public class ExplainSubject {
         this.spec = spec;
     }
 
+    /**
+     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
+     * 
+     */
+    @JsonProperty("contract")
+    public Map<String, Object> getContract() {
+        return contract;
+    }
+
+    /**
+     * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
+     * 
+     */
+    @JsonProperty("contract")
+    public void setContract(Map<String, Object> contract) {
+        this.contract = contract;
+    }
+
+    /**
+     * For kind 'contract-interaction': which interaction.
+     * 
+     */
+    @JsonProperty("index")
+    public Long getIndex() {
+        return index;
+    }
+
+    /**
+     * For kind 'contract-interaction': which interaction.
+     * 
+     */
+    @JsonProperty("index")
+    public void setIndex(Long index) {
+        this.index = index;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -151,14 +151,6 @@ public class ExplainSubject {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ExplainSubject.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("contract");
-        sb.append('=');
-        sb.append(((this.contract == null)?"<null>":this.contract));
-        sb.append(',');
-        sb.append("index");
-        sb.append('=');
-        sb.append(((this.index == null)?"<null>":this.index));
-        sb.append(',');
         sb.append("kind");
         sb.append('=');
         sb.append(((this.kind == null)?"<null>":this.kind));
@@ -166,6 +158,14 @@ public class ExplainSubject {
         sb.append("spec");
         sb.append('=');
         sb.append(((this.spec == null)?"<null>":this.spec));
+        sb.append(',');
+        sb.append("contract");
+        sb.append('=');
+        sb.append(((this.contract == null)?"<null>":this.contract));
+        sb.append(',');
+        sb.append("index");
+        sb.append('=');
+        sb.append(((this.index == null)?"<null>":this.index));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -25,18 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "options",
-    "transport"
+    "transport",
+    "options"
 })
 public class TransportBinding {
 
-    /**
-     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
-     * 
-     */
-    @JsonProperty("options")
-    @JsonPropertyDescription("The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md \u00a75.6).")
-    private Map<String, Object> options;
     /**
      * 
      * (Required)
@@ -44,26 +37,15 @@ public class TransportBinding {
      */
     @JsonProperty("transport")
     private java.lang.String transport;
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
+    @JsonProperty("options")
+    @JsonPropertyDescription("The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md \u00a75.6).")
+    private Map<String, Object> options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
-     * 
-     */
-    @JsonProperty("options")
-    public Map<String, Object> getOptions() {
-        return options;
-    }
-
-    /**
-     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
-     * 
-     */
-    @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
-        this.options = options;
-    }
 
     /**
      * 
@@ -85,6 +67,24 @@ public class TransportBinding {
         this.transport = transport;
     }
 
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
+    @JsonProperty("options")
+    public Map<String, Object> getOptions() {
+        return options;
+    }
+
+    /**
+     * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+     * 
+     */
+    @JsonProperty("options")
+    public void setOptions(Map<String, Object> options) {
+        this.options = options;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -99,13 +99,13 @@ public class TransportBinding {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(TransportBinding.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("options");
-        sb.append('=');
-        sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
         sb.append("transport");
         sb.append('=');
         sb.append(((this.transport == null)?"<null>":this.transport));
+        sb.append(',');
+        sb.append("options");
+        sb.append('=');
+        sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

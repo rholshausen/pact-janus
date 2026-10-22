@@ -25,21 +25,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "options",
     "source",
-    "target"
+    "target",
+    "options"
 })
 public class Verify {
 
-    /**
-     * VerifyOptions
-     * <p>
-     * Open, additive verification options (filtering, executed plans, publishing).
-     * 
-     */
-    @JsonProperty("options")
-    @JsonPropertyDescription("Open, additive verification options (filtering, executed plans, publishing).")
-    private VerifyOptions options;
     /**
      * ContractSource
      * <p>
@@ -60,30 +51,17 @@ public class Verify {
     @JsonProperty("target")
     @JsonPropertyDescription("The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).")
     private VerificationTarget target;
+    /**
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
+     * 
+     */
+    @JsonProperty("options")
+    @JsonPropertyDescription("Open, additive verification options (filtering, executed plans, publishing).")
+    private VerifyOptions options;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * VerifyOptions
-     * <p>
-     * Open, additive verification options (filtering, executed plans, publishing).
-     * 
-     */
-    @JsonProperty("options")
-    public VerifyOptions getOptions() {
-        return options;
-    }
-
-    /**
-     * VerifyOptions
-     * <p>
-     * Open, additive verification options (filtering, executed plans, publishing).
-     * 
-     */
-    @JsonProperty("options")
-    public void setOptions(VerifyOptions options) {
-        this.options = options;
-    }
 
     /**
      * ContractSource
@@ -133,6 +111,28 @@ public class Verify {
         this.target = target;
     }
 
+    /**
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
+     * 
+     */
+    @JsonProperty("options")
+    public VerifyOptions getOptions() {
+        return options;
+    }
+
+    /**
+     * VerifyOptions
+     * <p>
+     * Open, additive verification options (filtering, executed plans, publishing).
+     * 
+     */
+    @JsonProperty("options")
+    public void setOptions(VerifyOptions options) {
+        this.options = options;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -147,10 +147,6 @@ public class Verify {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Verify.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("options");
-        sb.append('=');
-        sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
         sb.append("source");
         sb.append('=');
         sb.append(((this.source == null)?"<null>":this.source));
@@ -158,6 +154,10 @@ public class Verify {
         sb.append("target");
         sb.append('=');
         sb.append(((this.target == null)?"<null>":this.target));
+        sb.append(',');
+        sb.append("options");
+        sb.append('=');
+        sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -25,12 +25,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "url",
     "auth",
-    "client",
-    "url"
+    "client"
 })
 public class BrokerDescriptor {
 
+    /**
+     * The broker's base URL.
+     * (Required)
+     * 
+     */
+    @JsonProperty("url")
+    @JsonPropertyDescription("The broker's base URL.")
+    private java.lang.String url;
     /**
      * BrokerAuth
      * <p>
@@ -47,16 +55,28 @@ public class BrokerDescriptor {
     @JsonProperty("client")
     @JsonPropertyDescription("HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md \u00a75.6, ADR 0035), so one configuration reaches the provider and the broker alike.")
     private Map<String, Object> client;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
     /**
      * The broker's base URL.
      * (Required)
      * 
      */
     @JsonProperty("url")
-    @JsonPropertyDescription("The broker's base URL.")
-    private java.lang.String url;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    public java.lang.String getUrl() {
+        return url;
+    }
+
+    /**
+     * The broker's base URL.
+     * (Required)
+     * 
+     */
+    @JsonProperty("url")
+    public void setUrl(java.lang.String url) {
+        this.url = url;
+    }
 
     /**
      * BrokerAuth
@@ -98,26 +118,6 @@ public class BrokerDescriptor {
         this.client = client;
     }
 
-    /**
-     * The broker's base URL.
-     * (Required)
-     * 
-     */
-    @JsonProperty("url")
-    public java.lang.String getUrl() {
-        return url;
-    }
-
-    /**
-     * The broker's base URL.
-     * (Required)
-     * 
-     */
-    @JsonProperty("url")
-    public void setUrl(java.lang.String url) {
-        this.url = url;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -132,6 +132,10 @@ public class BrokerDescriptor {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(BrokerDescriptor.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("url");
+        sb.append('=');
+        sb.append(((this.url == null)?"<null>":this.url));
+        sb.append(',');
         sb.append("auth");
         sb.append('=');
         sb.append(((this.auth == null)?"<null>":this.auth));
@@ -139,10 +143,6 @@ public class BrokerDescriptor {
         sb.append("client");
         sb.append('=');
         sb.append(((this.client == null)?"<null>":this.client));
-        sb.append(',');
-        sb.append("url");
-        sb.append('=');
-        sb.append(((this.url == null)?"<null>":this.url));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

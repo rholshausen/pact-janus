@@ -27,8 +27,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "code",
     "kind",
-    "message",
     "path",
+    "message",
     "target"
 })
 public class UpgradeFinding {
@@ -50,14 +50,6 @@ public class UpgradeFinding {
     @JsonPropertyDescription("'lossy' means the contract now says less than the pact did; 'judgement' means the converter chose between readings the pact did not distinguish; 'note' means neither, and is worth reading anyway.")
     private String kind;
     /**
-     * Prose, addressed to the author of the pact.
-     * (Required)
-     * 
-     */
-    @JsonProperty("message")
-    @JsonPropertyDescription("Prose, addressed to the author of the pact.")
-    private String message;
-    /**
      * RFC 6901 JSON pointer into the *source pact* — the file the author is looking at.
      * (Required)
      * 
@@ -65,6 +57,14 @@ public class UpgradeFinding {
     @JsonProperty("path")
     @JsonPropertyDescription("RFC 6901 JSON pointer into the *source pact* \u2014 the file the author is looking at.")
     private String path;
+    /**
+     * Prose, addressed to the author of the pact.
+     * (Required)
+     * 
+     */
+    @JsonProperty("message")
+    @JsonPropertyDescription("Prose, addressed to the author of the pact.")
+    private String message;
     /**
      * RFC 6901 JSON pointer into the converted contract, where the source construct ended up, when there is such a place.
      * 
@@ -116,26 +116,6 @@ public class UpgradeFinding {
     }
 
     /**
-     * Prose, addressed to the author of the pact.
-     * (Required)
-     * 
-     */
-    @JsonProperty("message")
-    public String getMessage() {
-        return message;
-    }
-
-    /**
-     * Prose, addressed to the author of the pact.
-     * (Required)
-     * 
-     */
-    @JsonProperty("message")
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    /**
      * RFC 6901 JSON pointer into the *source pact* — the file the author is looking at.
      * (Required)
      * 
@@ -153,6 +133,26 @@ public class UpgradeFinding {
     @JsonProperty("path")
     public void setPath(String path) {
         this.path = path;
+    }
+
+    /**
+     * Prose, addressed to the author of the pact.
+     * (Required)
+     * 
+     */
+    @JsonProperty("message")
+    public String getMessage() {
+        return message;
+    }
+
+    /**
+     * Prose, addressed to the author of the pact.
+     * (Required)
+     * 
+     */
+    @JsonProperty("message")
+    public void setMessage(String message) {
+        this.message = message;
     }
 
     /**
@@ -195,13 +195,13 @@ public class UpgradeFinding {
         sb.append('=');
         sb.append(((this.kind == null)?"<null>":this.kind));
         sb.append(',');
-        sb.append("message");
-        sb.append('=');
-        sb.append(((this.message == null)?"<null>":this.message));
-        sb.append(',');
         sb.append("path");
         sb.append('=');
         sb.append(((this.path == null)?"<null>":this.path));
+        sb.append(',');
+        sb.append("message");
+        sb.append('=');
+        sb.append(((this.message == null)?"<null>":this.message));
         sb.append(',');
         sb.append("target");
         sb.append('=');

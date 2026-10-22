@@ -26,23 +26,14 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "as-of",
-    "options",
     "pairs",
+    "verification",
     "policy",
-    "verification"
+    "as-of",
+    "options"
 })
 public class Decide {
 
-    /**
-     * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
-     * 
-     */
-    @JsonProperty("as-of")
-    @JsonPropertyDescription("The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.")
-    private java.lang.String asOf;
-    @JsonProperty("options")
-    private Map<String, Object> options;
     /**
      * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
      * (Required)
@@ -52,6 +43,13 @@ public class Decide {
     @JsonPropertyDescription("The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.")
     private List<DecidePair> pairs;
     /**
+     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
+     * 
+     */
+    @JsonProperty("verification")
+    @JsonPropertyDescription("Verification run summaries, exactly as the terminal event of a run carries them (spec.md \u00a79.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.")
+    private List<Map<String, Object>> verification;
+    /**
      * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
      * 
      */
@@ -59,14 +57,72 @@ public class Decide {
     @JsonPropertyDescription("Subsumption policy layers (design 2.8 \u00a77.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.")
     private List<Map<String, Object>> policy;
     /**
+     * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
+     * 
+     */
+    @JsonProperty("as-of")
+    @JsonPropertyDescription("The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.")
+    private java.lang.String asOf;
+    @JsonProperty("options")
+    private Map<String, Object> options;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
+     * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public List<DecidePair> getPairs() {
+        return pairs;
+    }
+
+    /**
+     * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public void setPairs(List<DecidePair> pairs) {
+        this.pairs = pairs;
+    }
+
+    /**
      * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
      * 
      */
     @JsonProperty("verification")
-    @JsonPropertyDescription("Verification run summaries, exactly as the terminal event of a run carries them (spec.md \u00a79.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.")
-    private List<Map<String, Object>> verification;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    public List<Map<String, Object>> getVerification() {
+        return verification;
+    }
+
+    /**
+     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
+     * 
+     */
+    @JsonProperty("verification")
+    public void setVerification(List<Map<String, Object>> verification) {
+        this.verification = verification;
+    }
+
+    /**
+     * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
+     * 
+     */
+    @JsonProperty("policy")
+    public List<Map<String, Object>> getPolicy() {
+        return policy;
+    }
+
+    /**
+     * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
+     * 
+     */
+    @JsonProperty("policy")
+    public void setPolicy(List<Map<String, Object>> policy) {
+        this.policy = policy;
+    }
 
     /**
      * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
@@ -96,62 +152,6 @@ public class Decide {
         this.options = options;
     }
 
-    /**
-     * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public List<DecidePair> getPairs() {
-        return pairs;
-    }
-
-    /**
-     * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public void setPairs(List<DecidePair> pairs) {
-        this.pairs = pairs;
-    }
-
-    /**
-     * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
-     * 
-     */
-    @JsonProperty("policy")
-    public List<Map<String, Object>> getPolicy() {
-        return policy;
-    }
-
-    /**
-     * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
-     * 
-     */
-    @JsonProperty("policy")
-    public void setPolicy(List<Map<String, Object>> policy) {
-        this.policy = policy;
-    }
-
-    /**
-     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
-     * 
-     */
-    @JsonProperty("verification")
-    public List<Map<String, Object>> getVerification() {
-        return verification;
-    }
-
-    /**
-     * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
-     * 
-     */
-    @JsonProperty("verification")
-    public void setVerification(List<Map<String, Object>> verification) {
-        this.verification = verification;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -166,6 +166,18 @@ public class Decide {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Decide.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("pairs");
+        sb.append('=');
+        sb.append(((this.pairs == null)?"<null>":this.pairs));
+        sb.append(',');
+        sb.append("verification");
+        sb.append('=');
+        sb.append(((this.verification == null)?"<null>":this.verification));
+        sb.append(',');
+        sb.append("policy");
+        sb.append('=');
+        sb.append(((this.policy == null)?"<null>":this.policy));
+        sb.append(',');
         sb.append("asOf");
         sb.append('=');
         sb.append(((this.asOf == null)?"<null>":this.asOf));
@@ -173,18 +185,6 @@ public class Decide {
         sb.append("options");
         sb.append('=');
         sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
-        sb.append("pairs");
-        sb.append('=');
-        sb.append(((this.pairs == null)?"<null>":this.pairs));
-        sb.append(',');
-        sb.append("policy");
-        sb.append('=');
-        sb.append(((this.policy == null)?"<null>":this.policy));
-        sb.append(',');
-        sb.append("verification");
-        sb.append('=');
-        sb.append(((this.verification == null)?"<null>":this.verification));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

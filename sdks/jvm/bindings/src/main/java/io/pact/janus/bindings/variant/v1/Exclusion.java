@@ -26,11 +26,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "reason",
-    "when"
+    "when",
+    "reason"
 })
 public class Exclusion {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("when")
+    private List<PointRef> when;
     /**
      * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
      * (Required)
@@ -39,35 +46,8 @@ public class Exclusion {
     @JsonProperty("reason")
     @JsonPropertyDescription("Required: an excluded region is declared width that will never be demonstrated, and the contract records why.")
     private String reason;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("when")
-    private List<PointRef> when;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
-     * (Required)
-     * 
-     */
-    @JsonProperty("reason")
-    public String getReason() {
-        return reason;
-    }
-
-    /**
-     * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
-     * (Required)
-     * 
-     */
-    @JsonProperty("reason")
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
 
     /**
      * 
@@ -89,6 +69,26 @@ public class Exclusion {
         this.when = when;
     }
 
+    /**
+     * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
+     * (Required)
+     * 
+     */
+    @JsonProperty("reason")
+    public String getReason() {
+        return reason;
+    }
+
+    /**
+     * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
+     * (Required)
+     * 
+     */
+    @JsonProperty("reason")
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -103,13 +103,13 @@ public class Exclusion {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Exclusion.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("reason");
-        sb.append('=');
-        sb.append(((this.reason == null)?"<null>":this.reason));
-        sb.append(',');
         sb.append("when");
         sb.append('=');
         sb.append(((this.when == null)?"<null>":this.when));
+        sb.append(',');
+        sb.append("reason");
+        sb.append('=');
+        sb.append(((this.reason == null)?"<null>":this.reason));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

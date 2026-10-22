@@ -26,15 +26,47 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "content-types",
     "description",
-    "parts",
-    "requires",
+    "transport",
     "states",
-    "transport"
+    "parts",
+    "content-types",
+    "requires"
 })
 public class InteractionSpec {
 
+    /**
+     * What the interaction is, in the author's words (spec.md §4.2).
+     * (Required)
+     * 
+     */
+    @JsonProperty("description")
+    @JsonPropertyDescription("What the interaction is, in the author's words (spec.md \u00a74.2).")
+    private java.lang.String description;
+    /**
+     * Transport
+     * <p>
+     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
+     * 
+     */
+    @JsonProperty("transport")
+    @JsonPropertyDescription("How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).")
+    private Transport transport;
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
+     * 
+     */
+    @JsonProperty("states")
+    @JsonPropertyDescription("Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md \u00a76).")
+    private List<State> states;
+    /**
+     * Part name -> slot name -> shape (shape spec §3.6).
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    @JsonPropertyDescription("Part name -> slot name -> shape (shape spec \u00a73.6).")
+    private Map<String, ShapePart> parts;
     /**
      * ContentTypes
      * <p>
@@ -45,68 +77,14 @@ public class InteractionSpec {
     @JsonPropertyDescription("Part name -> slot name -> the media type of that slot's content (spec.md \u00a75.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.")
     private ContentTypes contentTypes;
     /**
-     * What the interaction is, in the author's words (spec.md §4.2).
-     * (Required)
-     * 
-     */
-    @JsonProperty("description")
-    @JsonPropertyDescription("What the interaction is, in the author's words (spec.md \u00a74.2).")
-    private java.lang.String description;
-    /**
-     * Part name -> slot name -> shape (shape spec §3.6).
-     * (Required)
-     * 
-     */
-    @JsonProperty("parts")
-    @JsonPropertyDescription("Part name -> slot name -> shape (shape spec \u00a73.6).")
-    private Map<String, ShapePart> parts;
-    /**
      * Components this interaction cannot be matched without (spec.md §7).
      * 
      */
     @JsonProperty("requires")
     @JsonPropertyDescription("Components this interaction cannot be matched without (spec.md \u00a77).")
     private List<Requirement> requires;
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
-     * 
-     */
-    @JsonProperty("states")
-    @JsonPropertyDescription("Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md \u00a76).")
-    private List<State> states;
-    /**
-     * Transport
-     * <p>
-     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
-     * 
-     */
-    @JsonProperty("transport")
-    @JsonPropertyDescription("How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).")
-    private Transport transport;
     @JsonIgnore
     private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
-
-    /**
-     * ContentTypes
-     * <p>
-     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
-     * 
-     */
-    @JsonProperty("content-types")
-    public ContentTypes getContentTypes() {
-        return contentTypes;
-    }
-
-    /**
-     * ContentTypes
-     * <p>
-     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
-     * 
-     */
-    @JsonProperty("content-types")
-    public void setContentTypes(ContentTypes contentTypes) {
-        this.contentTypes = contentTypes;
-    }
 
     /**
      * What the interaction is, in the author's words (spec.md §4.2).
@@ -126,62 +104,6 @@ public class InteractionSpec {
     @JsonProperty("description")
     public void setDescription(java.lang.String description) {
         this.description = description;
-    }
-
-    /**
-     * Part name -> slot name -> shape (shape spec §3.6).
-     * (Required)
-     * 
-     */
-    @JsonProperty("parts")
-    public Map<String, ShapePart> getParts() {
-        return parts;
-    }
-
-    /**
-     * Part name -> slot name -> shape (shape spec §3.6).
-     * (Required)
-     * 
-     */
-    @JsonProperty("parts")
-    public void setParts(Map<String, ShapePart> parts) {
-        this.parts = parts;
-    }
-
-    /**
-     * Components this interaction cannot be matched without (spec.md §7).
-     * 
-     */
-    @JsonProperty("requires")
-    public List<Requirement> getRequires() {
-        return requires;
-    }
-
-    /**
-     * Components this interaction cannot be matched without (spec.md §7).
-     * 
-     */
-    @JsonProperty("requires")
-    public void setRequires(List<Requirement> requires) {
-        this.requires = requires;
-    }
-
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
-     * 
-     */
-    @JsonProperty("states")
-    public List<State> getStates() {
-        return states;
-    }
-
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
-     * 
-     */
-    @JsonProperty("states")
-    public void setStates(List<State> states) {
-        this.states = states;
     }
 
     /**
@@ -206,6 +128,84 @@ public class InteractionSpec {
         this.transport = transport;
     }
 
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
+     * 
+     */
+    @JsonProperty("states")
+    public List<State> getStates() {
+        return states;
+    }
+
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6).
+     * 
+     */
+    @JsonProperty("states")
+    public void setStates(List<State> states) {
+        this.states = states;
+    }
+
+    /**
+     * Part name -> slot name -> shape (shape spec §3.6).
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public Map<String, ShapePart> getParts() {
+        return parts;
+    }
+
+    /**
+     * Part name -> slot name -> shape (shape spec §3.6).
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public void setParts(Map<String, ShapePart> parts) {
+        this.parts = parts;
+    }
+
+    /**
+     * ContentTypes
+     * <p>
+     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+     * 
+     */
+    @JsonProperty("content-types")
+    public ContentTypes getContentTypes() {
+        return contentTypes;
+    }
+
+    /**
+     * ContentTypes
+     * <p>
+     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+     * 
+     */
+    @JsonProperty("content-types")
+    public void setContentTypes(ContentTypes contentTypes) {
+        this.contentTypes = contentTypes;
+    }
+
+    /**
+     * Components this interaction cannot be matched without (spec.md §7).
+     * 
+     */
+    @JsonProperty("requires")
+    public List<Requirement> getRequires() {
+        return requires;
+    }
+
+    /**
+     * Components this interaction cannot be matched without (spec.md §7).
+     * 
+     */
+    @JsonProperty("requires")
+    public void setRequires(List<Requirement> requires) {
+        this.requires = requires;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -220,29 +220,29 @@ public class InteractionSpec {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(InteractionSpec.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("contentTypes");
-        sb.append('=');
-        sb.append(((this.contentTypes == null)?"<null>":this.contentTypes));
-        sb.append(',');
         sb.append("description");
         sb.append('=');
         sb.append(((this.description == null)?"<null>":this.description));
         sb.append(',');
-        sb.append("parts");
+        sb.append("transport");
         sb.append('=');
-        sb.append(((this.parts == null)?"<null>":this.parts));
-        sb.append(',');
-        sb.append("requires");
-        sb.append('=');
-        sb.append(((this.requires == null)?"<null>":this.requires));
+        sb.append(((this.transport == null)?"<null>":this.transport));
         sb.append(',');
         sb.append("states");
         sb.append('=');
         sb.append(((this.states == null)?"<null>":this.states));
         sb.append(',');
-        sb.append("transport");
+        sb.append("parts");
         sb.append('=');
-        sb.append(((this.transport == null)?"<null>":this.transport));
+        sb.append(((this.parts == null)?"<null>":this.parts));
+        sb.append(',');
+        sb.append("contentTypes");
+        sb.append('=');
+        sb.append(((this.contentTypes == null)?"<null>":this.contentTypes));
+        sb.append(',');
+        sb.append("requires");
+        sb.append('=');
+        sb.append(((this.requires == null)?"<null>":this.requires));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -264,8 +264,8 @@ public class InteractionSpec {
         result = ((result* 31)+((this.transport == null)? 0 :this.transport.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.contentTypes == null)? 0 :this.contentTypes.hashCode()));
-        result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
         result = ((result* 31)+((this.states == null)? 0 :this.states.hashCode()));
+        result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
         return result;
     }
 
@@ -278,7 +278,7 @@ public class InteractionSpec {
             return false;
         }
         InteractionSpec rhs = ((InteractionSpec) other);
-        return ((((((((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
+        return ((((((((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
     }
 
 }

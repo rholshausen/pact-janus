@@ -24,37 +24,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "blocked",
-    "exempt",
-    "findings",
     "pairs",
+    "blocked",
+    "warned",
     "passed",
+    "findings",
     "reviews",
-    "warned"
+    "exempt"
 })
 public class CompatibilitySummary {
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("blocked")
-    private Long blocked;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("exempt")
-    private Long exempt;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    private Long findings;
     /**
      * 
      * (Required)
@@ -67,8 +46,29 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
+    @JsonProperty("blocked")
+    private Long blocked;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("warned")
+    private Long warned;
+    /**
+     * 
+     * (Required)
+     * 
+     */
     @JsonProperty("passed")
     private Long passed;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("findings")
+    private Long findings;
     /**
      * 
      * (Required)
@@ -81,10 +81,30 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
-    @JsonProperty("warned")
-    private Long warned;
+    @JsonProperty("exempt")
+    private Long exempt;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public Long getPairs() {
+        return pairs;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public void setPairs(Long pairs) {
+        this.pairs = pairs;
+    }
 
     /**
      * 
@@ -111,9 +131,9 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
-    @JsonProperty("exempt")
-    public Long getExempt() {
-        return exempt;
+    @JsonProperty("warned")
+    public Long getWarned() {
+        return warned;
     }
 
     /**
@@ -121,49 +141,9 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
-    @JsonProperty("exempt")
-    public void setExempt(Long exempt) {
-        this.exempt = exempt;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    public Long getFindings() {
-        return findings;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("findings")
-    public void setFindings(Long findings) {
-        this.findings = findings;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public Long getPairs() {
-        return pairs;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public void setPairs(Long pairs) {
-        this.pairs = pairs;
+    @JsonProperty("warned")
+    public void setWarned(Long warned) {
+        this.warned = warned;
     }
 
     /**
@@ -191,6 +171,26 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
+    @JsonProperty("findings")
+    public Long getFindings() {
+        return findings;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("findings")
+    public void setFindings(Long findings) {
+        this.findings = findings;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
     @JsonProperty("reviews")
     public Long getReviews() {
         return reviews;
@@ -211,9 +211,9 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
-    @JsonProperty("warned")
-    public Long getWarned() {
-        return warned;
+    @JsonProperty("exempt")
+    public Long getExempt() {
+        return exempt;
     }
 
     /**
@@ -221,9 +221,9 @@ public class CompatibilitySummary {
      * (Required)
      * 
      */
-    @JsonProperty("warned")
-    public void setWarned(Long warned) {
-        this.warned = warned;
+    @JsonProperty("exempt")
+    public void setExempt(Long exempt) {
+        this.exempt = exempt;
     }
 
     @JsonAnyGetter
@@ -240,33 +240,33 @@ public class CompatibilitySummary {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(CompatibilitySummary.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("pairs");
+        sb.append('=');
+        sb.append(((this.pairs == null)?"<null>":this.pairs));
+        sb.append(',');
         sb.append("blocked");
         sb.append('=');
         sb.append(((this.blocked == null)?"<null>":this.blocked));
         sb.append(',');
-        sb.append("exempt");
+        sb.append("warned");
         sb.append('=');
-        sb.append(((this.exempt == null)?"<null>":this.exempt));
-        sb.append(',');
-        sb.append("findings");
-        sb.append('=');
-        sb.append(((this.findings == null)?"<null>":this.findings));
-        sb.append(',');
-        sb.append("pairs");
-        sb.append('=');
-        sb.append(((this.pairs == null)?"<null>":this.pairs));
+        sb.append(((this.warned == null)?"<null>":this.warned));
         sb.append(',');
         sb.append("passed");
         sb.append('=');
         sb.append(((this.passed == null)?"<null>":this.passed));
         sb.append(',');
+        sb.append("findings");
+        sb.append('=');
+        sb.append(((this.findings == null)?"<null>":this.findings));
+        sb.append(',');
         sb.append("reviews");
         sb.append('=');
         sb.append(((this.reviews == null)?"<null>":this.reviews));
         sb.append(',');
-        sb.append("warned");
+        sb.append("exempt");
         sb.append('=');
-        sb.append(((this.warned == null)?"<null>":this.warned));
+        sb.append(((this.exempt == null)?"<null>":this.exempt));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -287,8 +287,8 @@ public class CompatibilitySummary {
         result = ((result* 31)+((this.reviews == null)? 0 :this.reviews.hashCode()));
         result = ((result* 31)+((this.findings == null)? 0 :this.findings.hashCode()));
         result = ((result* 31)+((this.warned == null)? 0 :this.warned.hashCode()));
-        result = ((result* 31)+((this.exempt == null)? 0 :this.exempt.hashCode()));
         result = ((result* 31)+((this.passed == null)? 0 :this.passed.hashCode()));
+        result = ((result* 31)+((this.exempt == null)? 0 :this.exempt.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.pairs == null)? 0 :this.pairs.hashCode()));
         return result;
@@ -303,7 +303,7 @@ public class CompatibilitySummary {
             return false;
         }
         CompatibilitySummary rhs = ((CompatibilitySummary) other);
-        return (((((((((this.blocked == rhs.blocked)||((this.blocked!= null)&&this.blocked.equals(rhs.blocked)))&&((this.reviews == rhs.reviews)||((this.reviews!= null)&&this.reviews.equals(rhs.reviews))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))))&&((this.warned == rhs.warned)||((this.warned!= null)&&this.warned.equals(rhs.warned))))&&((this.exempt == rhs.exempt)||((this.exempt!= null)&&this.exempt.equals(rhs.exempt))))&&((this.passed == rhs.passed)||((this.passed!= null)&&this.passed.equals(rhs.passed))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.pairs == rhs.pairs)||((this.pairs!= null)&&this.pairs.equals(rhs.pairs))));
+        return (((((((((this.blocked == rhs.blocked)||((this.blocked!= null)&&this.blocked.equals(rhs.blocked)))&&((this.reviews == rhs.reviews)||((this.reviews!= null)&&this.reviews.equals(rhs.reviews))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))))&&((this.warned == rhs.warned)||((this.warned!= null)&&this.warned.equals(rhs.warned))))&&((this.passed == rhs.passed)||((this.passed!= null)&&this.passed.equals(rhs.passed))))&&((this.exempt == rhs.exempt)||((this.exempt!= null)&&this.exempt.equals(rhs.exempt))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.pairs == rhs.pairs)||((this.pairs!= null)&&this.pairs.equals(rhs.pairs))));
     }
 
 }

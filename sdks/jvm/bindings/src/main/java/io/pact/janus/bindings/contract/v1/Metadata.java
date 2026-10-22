@@ -26,21 +26,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "build-url",
+    "writer",
     "created",
-    "writer"
+    "build-url"
 })
 public class Metadata {
 
-    @JsonProperty("build-url")
-    private java.lang.String buildUrl;
-    /**
-     * RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2).
-     * 
-     */
-    @JsonProperty("created")
-    @JsonPropertyDescription("RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md \u00a73.2).")
-    private Date created;
     /**
      * What wrote the file: an open map of component name to version string.
      * 
@@ -48,17 +39,34 @@ public class Metadata {
     @JsonProperty("writer")
     @JsonPropertyDescription("What wrote the file: an open map of component name to version string.")
     private Map<String, String> writer;
+    /**
+     * RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2).
+     * 
+     */
+    @JsonProperty("created")
+    @JsonPropertyDescription("RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md \u00a73.2).")
+    private Date created;
+    @JsonProperty("build-url")
+    private java.lang.String buildUrl;
     @JsonIgnore
     private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
 
-    @JsonProperty("build-url")
-    public java.lang.String getBuildUrl() {
-        return buildUrl;
+    /**
+     * What wrote the file: an open map of component name to version string.
+     * 
+     */
+    @JsonProperty("writer")
+    public Map<String, String> getWriter() {
+        return writer;
     }
 
-    @JsonProperty("build-url")
-    public void setBuildUrl(java.lang.String buildUrl) {
-        this.buildUrl = buildUrl;
+    /**
+     * What wrote the file: an open map of component name to version string.
+     * 
+     */
+    @JsonProperty("writer")
+    public void setWriter(Map<String, String> writer) {
+        this.writer = writer;
     }
 
     /**
@@ -79,22 +87,14 @@ public class Metadata {
         this.created = created;
     }
 
-    /**
-     * What wrote the file: an open map of component name to version string.
-     * 
-     */
-    @JsonProperty("writer")
-    public Map<String, String> getWriter() {
-        return writer;
+    @JsonProperty("build-url")
+    public java.lang.String getBuildUrl() {
+        return buildUrl;
     }
 
-    /**
-     * What wrote the file: an open map of component name to version string.
-     * 
-     */
-    @JsonProperty("writer")
-    public void setWriter(Map<String, String> writer) {
-        this.writer = writer;
+    @JsonProperty("build-url")
+    public void setBuildUrl(java.lang.String buildUrl) {
+        this.buildUrl = buildUrl;
     }
 
     @JsonAnyGetter
@@ -111,17 +111,17 @@ public class Metadata {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Metadata.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("buildUrl");
+        sb.append("writer");
         sb.append('=');
-        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
+        sb.append(((this.writer == null)?"<null>":this.writer));
         sb.append(',');
         sb.append("created");
         sb.append('=');
         sb.append(((this.created == null)?"<null>":this.created));
         sb.append(',');
-        sb.append("writer");
+        sb.append("buildUrl");
         sb.append('=');
-        sb.append(((this.writer == null)?"<null>":this.writer));
+        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

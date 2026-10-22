@@ -24,13 +24,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "expires",
-    "reason"
+    "reason",
+    "expires"
 })
 public class ExemptionRef {
 
-    @JsonProperty("expires")
-    private String expires;
     /**
      * 
      * (Required)
@@ -38,18 +36,10 @@ public class ExemptionRef {
      */
     @JsonProperty("reason")
     private String reason;
+    @JsonProperty("expires")
+    private String expires;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    @JsonProperty("expires")
-    public String getExpires() {
-        return expires;
-    }
-
-    @JsonProperty("expires")
-    public void setExpires(String expires) {
-        this.expires = expires;
-    }
 
     /**
      * 
@@ -71,6 +61,16 @@ public class ExemptionRef {
         this.reason = reason;
     }
 
+    @JsonProperty("expires")
+    public String getExpires() {
+        return expires;
+    }
+
+    @JsonProperty("expires")
+    public void setExpires(String expires) {
+        this.expires = expires;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -85,13 +85,13 @@ public class ExemptionRef {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ExemptionRef.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("expires");
-        sb.append('=');
-        sb.append(((this.expires == null)?"<null>":this.expires));
-        sb.append(',');
         sb.append("reason");
         sb.append('=');
         sb.append(((this.reason == null)?"<null>":this.reason));
+        sb.append(',');
+        sb.append("expires");
+        sb.append('=');
+        sb.append(((this.expires == null)?"<null>":this.expires));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

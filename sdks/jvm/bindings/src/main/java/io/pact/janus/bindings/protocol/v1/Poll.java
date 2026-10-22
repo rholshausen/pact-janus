@@ -26,19 +26,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "max",
     "streams",
+    "max",
     "wait-ms"
 })
 public class Poll {
 
-    /**
-     * Maximum events to return; default is the engine's choice.
-     * 
-     */
-    @JsonProperty("max")
-    @JsonPropertyDescription("Maximum events to return; default is the engine's choice.")
-    private Long max;
     /**
      * 
      * (Required)
@@ -46,6 +39,13 @@ public class Poll {
      */
     @JsonProperty("streams")
     private List<String> streams;
+    /**
+     * Maximum events to return; default is the engine's choice.
+     * 
+     */
+    @JsonProperty("max")
+    @JsonPropertyDescription("Maximum events to return; default is the engine's choice.")
+    private Long max;
     /**
      * Long-poll: the engine may hold the response up to this long when no events are pending.
      * 
@@ -55,24 +55,6 @@ public class Poll {
     private Long waitMs;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * Maximum events to return; default is the engine's choice.
-     * 
-     */
-    @JsonProperty("max")
-    public Long getMax() {
-        return max;
-    }
-
-    /**
-     * Maximum events to return; default is the engine's choice.
-     * 
-     */
-    @JsonProperty("max")
-    public void setMax(Long max) {
-        this.max = max;
-    }
 
     /**
      * 
@@ -92,6 +74,24 @@ public class Poll {
     @JsonProperty("streams")
     public void setStreams(List<String> streams) {
         this.streams = streams;
+    }
+
+    /**
+     * Maximum events to return; default is the engine's choice.
+     * 
+     */
+    @JsonProperty("max")
+    public Long getMax() {
+        return max;
+    }
+
+    /**
+     * Maximum events to return; default is the engine's choice.
+     * 
+     */
+    @JsonProperty("max")
+    public void setMax(Long max) {
+        this.max = max;
     }
 
     /**
@@ -126,13 +126,13 @@ public class Poll {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Poll.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("max");
-        sb.append('=');
-        sb.append(((this.max == null)?"<null>":this.max));
-        sb.append(',');
         sb.append("streams");
         sb.append('=');
         sb.append(((this.streams == null)?"<null>":this.streams));
+        sb.append(',');
+        sb.append("max");
+        sb.append('=');
+        sb.append(((this.max == null)?"<null>":this.max));
         sb.append(',');
         sb.append("waitMs");
         sb.append('=');

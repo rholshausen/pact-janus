@@ -26,21 +26,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "capabilities",
+    "protocol-versions",
     "host",
-    "protocol-versions"
+    "capabilities"
 })
 public class Hello {
 
     /**
-     * Capabilities
-     * <p>
-     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
+     * Protocol major versions the host can speak, in preference order.
+     * (Required)
      * 
      */
-    @JsonProperty("capabilities")
-    @JsonPropertyDescription("Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.")
-    private Capabilities capabilities;
+    @JsonProperty("protocol-versions")
+    @JsonPropertyDescription("Protocol major versions the host can speak, in preference order.")
+    private List<Long> protocolVersions;
     /**
      * PartyInfo
      * <p>
@@ -51,36 +50,35 @@ public class Hello {
     @JsonPropertyDescription("Identification for diagnostics only; protocol semantics never depend on it.")
     private PartyInfo host;
     /**
+     * Capabilities
+     * <p>
+     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
+     * 
+     */
+    @JsonProperty("capabilities")
+    @JsonPropertyDescription("Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.")
+    private Capabilities capabilities;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
+    /**
      * Protocol major versions the host can speak, in preference order.
      * (Required)
      * 
      */
     @JsonProperty("protocol-versions")
-    @JsonPropertyDescription("Protocol major versions the host can speak, in preference order.")
-    private List<Long> protocolVersions;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * Capabilities
-     * <p>
-     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
-     * 
-     */
-    @JsonProperty("capabilities")
-    public Capabilities getCapabilities() {
-        return capabilities;
+    public List<Long> getProtocolVersions() {
+        return protocolVersions;
     }
 
     /**
-     * Capabilities
-     * <p>
-     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
+     * Protocol major versions the host can speak, in preference order.
+     * (Required)
      * 
      */
-    @JsonProperty("capabilities")
-    public void setCapabilities(Capabilities capabilities) {
-        this.capabilities = capabilities;
+    @JsonProperty("protocol-versions")
+    public void setProtocolVersions(List<Long> protocolVersions) {
+        this.protocolVersions = protocolVersions;
     }
 
     /**
@@ -106,23 +104,25 @@ public class Hello {
     }
 
     /**
-     * Protocol major versions the host can speak, in preference order.
-     * (Required)
+     * Capabilities
+     * <p>
+     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
      * 
      */
-    @JsonProperty("protocol-versions")
-    public List<Long> getProtocolVersions() {
-        return protocolVersions;
+    @JsonProperty("capabilities")
+    public Capabilities getCapabilities() {
+        return capabilities;
     }
 
     /**
-     * Protocol major versions the host can speak, in preference order.
-     * (Required)
+     * Capabilities
+     * <p>
+     * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
      * 
      */
-    @JsonProperty("protocol-versions")
-    public void setProtocolVersions(List<Long> protocolVersions) {
-        this.protocolVersions = protocolVersions;
+    @JsonProperty("capabilities")
+    public void setCapabilities(Capabilities capabilities) {
+        this.capabilities = capabilities;
     }
 
     @JsonAnyGetter
@@ -139,17 +139,17 @@ public class Hello {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Hello.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("capabilities");
+        sb.append("protocolVersions");
         sb.append('=');
-        sb.append(((this.capabilities == null)?"<null>":this.capabilities));
+        sb.append(((this.protocolVersions == null)?"<null>":this.protocolVersions));
         sb.append(',');
         sb.append("host");
         sb.append('=');
         sb.append(((this.host == null)?"<null>":this.host));
         sb.append(',');
-        sb.append("protocolVersions");
+        sb.append("capabilities");
         sb.append('=');
-        sb.append(((this.protocolVersions == null)?"<null>":this.protocolVersions));
+        sb.append(((this.capabilities == null)?"<null>":this.capabilities));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

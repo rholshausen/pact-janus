@@ -4,20 +4,13 @@
  */
 
 /**
- * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
- */
-export interface BrokerAuth {
-  kind: string;
-  password?: string;
-  token?: string;
-  username?: string;
-  [k: string]: unknown;
-}
-
-/**
  * Which Pact Broker, and how to reach it. The engine never reads credentials from its environment: a host passes them here, and the engine never repeats them — not in an event, a summary, an error or a log, where the broker is named by its URL with any user information removed.
  */
 export interface BrokerDescriptor {
+  /**
+   * The broker's base URL.
+   */
+  url: string;
   auth?: BrokerAuth;
   /**
    * HTTP client options: TLS, proxies, timeouts, retries. The same open document the HTTP transport's drive role takes, specified by the component interfaces' http-transport.schema.json ($defs/ClientOptions; component-interfaces spec.md §5.6, ADR 0035), so one configuration reaches the provider and the broker alike.
@@ -25,10 +18,17 @@ export interface BrokerDescriptor {
   client?: {
     [k: string]: unknown;
   };
-  /**
-   * The broker's base URL.
-   */
-  url: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
+ */
+export interface BrokerAuth {
+  kind: string;
+  token?: string;
+  username?: string;
+  password?: string;
   [k: string]: unknown;
 }
 
@@ -43,19 +43,20 @@ export interface ConsumerVersionSelector {
  * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, published as the broker's 'pact' specification (ADR 0011 decision 6), all for the same consumer.
  */
 export interface PublishContracts {
-  /**
-   * The consumer version's branch.
-   */
-  branch?: string;
   broker: BrokerDescriptor;
-  /**
-   * The build that produced the contracts.
-   */
-  "build-url"?: string;
   /**
    * The consumer's application version these contracts belong to.
    */
   "consumer-version": string;
+  /**
+   * The consumer version's branch.
+   */
+  branch?: string;
+  tags?: string[];
+  /**
+   * The build that produced the contracts.
+   */
+  "build-url"?: string;
   /**
    * @minItems 1
    */
@@ -67,7 +68,6 @@ export interface PublishContracts {
       [k: string]: unknown;
     }[]
   ];
-  tags?: string[];
   [k: string]: unknown;
 }
 
@@ -80,14 +80,36 @@ export interface PublishContractsResult {
   [k: string]: unknown;
 }
 
+export interface Create {
+  config: SessionConfig;
+  [k: string]: unknown;
+}
+
+export interface SessionConfig {
+  consumer: Party;
+  provider: Party;
+  /**
+   * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
+  [k: string]: unknown;
+}
+
+export interface CreateResult {
+  session: string;
+  [k: string]: unknown;
+}
+
 export interface AddInteraction {
+  session: string;
   /**
    * One complete interaction specification (designs 2.2/3.2).
    */
   interaction: {
     [k: string]: unknown;
   };
-  session: string;
   [k: string]: unknown;
 }
 
@@ -99,25 +121,73 @@ export interface AddInteractionResult {
   [k: string]: unknown;
 }
 
-export interface Create {
-  config: SessionConfig;
-  [k: string]: unknown;
-}
-
-export interface SessionConfig {
-  /**
-   * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
-   */
-  components?: {
-    [k: string]: unknown;
-  }[];
-  consumer: Party;
-  provider: Party;
-  [k: string]: unknown;
-}
-
-export interface CreateResult {
+export interface Variants {
   session: string;
+  handle: string;
+  /**
+   * Per-call sampling policy override (design 2.3), for a host offering an '--exhaustive'-style switch. The resolution order is spec-defaults, session config, interaction spec, then this.
+   */
+  policy?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface VariantsResult {
+  /**
+   * The selection, in run order — the variants the engine chose, not the whole space (design 2.3).
+   */
+  variants: VariantDescriptor[];
+  /**
+   * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
+   */
+  report?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * The protocol requires only 'id'; the rest belongs to design 2.3, which defines the id, the assignment it derives from, the display label and the origin.
+ */
+export interface VariantDescriptor {
+  id: string;
+  [k: string]: unknown;
+}
+
+export interface StartTransport {
+  session: string;
+  /**
+   * Transport component name.
+   */
+  transport: string;
+  /**
+   * Transport-specific options (design 2.6).
+   */
+  options?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface StartTransportResult {
+  /**
+   * Open endpoint descriptor document — host/port for HTTP, broker/topic details for messaging (spike 1.5).
+   */
+  endpoint: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface ServeVariant {
+  session: string;
+  handle: string;
+  variant: string;
+  [k: string]: unknown;
+}
+
+export interface ServeVariantResult {
   [k: string]: unknown;
 }
 
@@ -127,13 +197,13 @@ export interface Finalise {
 }
 
 export interface FinaliseResult {
+  results: InteractionResult[];
   /**
    * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
    */
   contract?: {
     [k: string]: unknown;
   };
-  results: InteractionResult[];
   [k: string]: unknown;
 }
 
@@ -148,14 +218,14 @@ export interface InteractionResult {
 }
 
 export interface VariantResult {
+  variant: string;
+  status: string;
   /**
    * Mismatch documents in the plan grammar's result form (design 2.4).
    */
   mismatches?: {
     [k: string]: unknown;
   }[];
-  status: string;
-  variant: string;
   [k: string]: unknown;
 }
 
@@ -164,130 +234,60 @@ export interface Party {
   [k: string]: unknown;
 }
 
-export interface ServeVariant {
-  handle: string;
-  session: string;
-  variant: string;
-  [k: string]: unknown;
-}
-
-export interface ServeVariantResult {
-  [k: string]: unknown;
-}
-
-export interface StartTransport {
-  /**
-   * Transport-specific options (design 2.6).
-   */
-  options?: {
-    [k: string]: unknown;
-  };
-  session: string;
-  /**
-   * Transport component name.
-   */
-  transport: string;
-  [k: string]: unknown;
-}
-
-export interface StartTransportResult {
-  /**
-   * Open endpoint descriptor document — host/port for HTTP, broker/topic details for messaging (spike 1.5).
-   */
-  endpoint: {
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-
-/**
- * The protocol requires only 'id'; the rest belongs to design 2.3, which defines the id, the assignment it derives from, the display label and the origin.
- */
-export interface VariantDescriptor {
-  id: string;
-  [k: string]: unknown;
-}
-
-export interface Variants {
-  handle: string;
-  /**
-   * Per-call sampling policy override (design 2.3), for a host offering an '--exhaustive'-style switch. The resolution order is spec-defaults, session config, interaction spec, then this.
-   */
-  policy?: {
-    [k: string]: unknown;
-  };
-  session: string;
-  [k: string]: unknown;
-}
-
-export interface VariantsResult {
-  /**
-   * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
-   */
-  report?: {
-    [k: string]: unknown;
-  };
-  /**
-   * The selection, in run order — the variants the engine chose, not the whole space (design 2.3).
-   */
-  variants: VariantDescriptor[];
-  [k: string]: unknown;
-}
-
 /**
  * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
  */
 export interface EngineError {
   /**
+   * Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md §10.2).
+   */
+  code: string;
+  /**
    * Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.
    */
   category?: string;
   /**
-   * Machine-readable error code. Open vocabulary; unknown codes are handled by the category fallback (spec.md §10.2).
+   * Human-readable description, not intended for programmatic dispatch.
    */
-  code: string;
+  message: string;
   /**
    * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
    */
   details?: {
     [k: string]: unknown;
   };
-  /**
-   * Human-readable description, not intended for programmatic dispatch.
-   */
-  message: string;
   [k: string]: unknown;
 }
 
 export interface Event {
-  /**
-   * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
-   */
-  kind: string;
-  /**
-   * Structural termination: true on the final event of a stream, whatever its kind.
-   */
-  last?: boolean;
-  payload: {
-    [k: string]: unknown;
-  };
+  stream: string;
   /**
    * Per-stream, starts at 1, increments by 1, no gaps.
    */
   seq: number;
-  stream: string;
+  /**
+   * Open vocabulary, namespaced like operations. Unknown kinds are handled by policy, never by failure; seq and last are honoured regardless.
+   */
+  kind: string;
+  payload: {
+    [k: string]: unknown;
+  };
+  /**
+   * Structural termination: true on the final event of a stream, whatever its kind.
+   */
+  last?: boolean;
   [k: string]: unknown;
 }
 
 export interface Poll {
   /**
-   * Maximum events to return; default is the engine's choice.
-   */
-  max?: number;
-  /**
    * @minItems 1
    */
   streams: [string, ...string[]];
+  /**
+   * Maximum events to return; default is the engine's choice.
+   */
+  max?: number;
   /**
    * Long-poll: the engine may hold the response up to this long when no events are pending.
    */
@@ -308,19 +308,8 @@ export type Frame = unknown & {
   [k: string]: unknown;
 };
 
-export interface EventFrame {
-  event: Event;
-  type: "event";
-  [k: string]: unknown;
-}
-
 export interface RequestFrame {
-  /**
-   * The operation's request document, governed by the operation's schema.
-   */
-  body: {
-    [k: string]: unknown;
-  };
+  type: "request";
   /**
    * Host-chosen correlation id, unique among the host's in-flight requests on this pipe. Opaque to the engine.
    */
@@ -329,12 +318,17 @@ export interface RequestFrame {
    * Operation name, namespaced '<area>/<verb>'. Open vocabulary; unknown ops are answered with error 'operation-unsupported'.
    */
   op: string;
-  type: "request";
+  /**
+   * The operation's request document, governed by the operation's schema.
+   */
+  body: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 
 export type ResponseFrame = {
-  error?: EngineError;
+  type: "response";
   /**
    * Echo of the request id. Empty string means pipe-level (uncorrelatable), see spec.md §4.4.
    */
@@ -345,24 +339,39 @@ export type ResponseFrame = {
   ok?: {
     [k: string]: unknown;
   };
-  type: "response";
+  error?: EngineError;
   [k: string]: unknown;
 } & {
   [k: string]: unknown;
 };
 
+export interface EventFrame {
+  type: "event";
+  event: Event;
+  [k: string]: unknown;
+}
+
 /**
  * Request body of 'engine/hello', the mandatory first operation on every pipe. Result is HelloResult. See spec.md §5.
  */
 export interface Hello {
-  capabilities?: Capabilities;
-  host?: PartyInfo;
   /**
    * Protocol major versions the host can speak, in preference order.
    *
    * @minItems 1
    */
   "protocol-versions": [number, ...number[]];
+  host?: PartyInfo;
+  capabilities?: Capabilities;
+  [k: string]: unknown;
+}
+
+/**
+ * Identification for diagnostics only; protocol semantics never depend on it.
+ */
+export interface PartyInfo {
+  name: string;
+  version: string;
   [k: string]: unknown;
 }
 
@@ -409,21 +418,96 @@ export type EncodingName = string;
  * Result document of 'engine/hello'.
  */
 export interface HelloResult {
-  capabilities?: Capabilities;
-  engine?: PartyInfo;
   /**
    * The version the engine selected; all subsequent frames on this pipe are governed by it.
    */
   "protocol-version": number;
+  engine?: PartyInfo;
+  capabilities?: Capabilities;
+  [k: string]: unknown;
+}
+
+export interface StartRecording {
+  provider: RecordedProvider;
+  policy?: RecordingPolicy;
+  [k: string]: unknown;
+}
+
+export interface StartRecordingResult {
+  /**
+   * Engine-assigned session id (spec.md §7.1).
+   */
+  session: string;
   [k: string]: unknown;
 }
 
 /**
- * Identification for diagnostics only; protocol semantics never depend on it.
+ * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
  */
-export interface PartyInfo {
-  name: string;
-  version: string;
+export interface RecordingPolicy {
+  /**
+   * Beyond this many distinct values, the position is an open domain whatever the repetition says.
+   */
+  "max-options"?: number;
+  /**
+   * Below this many observations, 'every value was new' is not evidence of an open domain.
+   */
+  "min-evidence"?: number;
+  [k: string]: unknown;
+}
+
+/**
+ * One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.
+ */
+export interface ObserveResponse {
+  session: string;
+  /**
+   * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+   */
+  description: string;
+  /**
+   * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
+   */
+  states?: string[];
+  /**
+   * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+   */
+  parts: {
+    [k: string]: {
+      [k: string]: ObservedSlotValue;
+    };
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.
+ */
+export interface ObservedSlotValue {
+  /**
+   * The decoded value, any JSON value including null.
+   */
+  content: unknown;
+  /**
+   * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+   */
+  encoded?: string;
+  /**
+   * Advisory: what the host believes the slot carried. Not interpreted.
+   */
+  "content-type"?: string;
+  [k: string]: unknown;
+}
+
+export interface ObserveResponseResult {
+  /**
+   * How many responses this session has recorded in total, so a host can report progress without holding its own counters.
+   */
+  observations: number;
+  /**
+   * How many distinct interactions those responses covered.
+   */
+  interactions: number;
   [k: string]: unknown;
 }
 
@@ -445,92 +529,8 @@ export interface FinaliseRecordingResult {
   [k: string]: unknown;
 }
 
-/**
- * One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.
- */
-export interface ObserveResponse {
-  /**
-   * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
-   */
-  description: string;
-  /**
-   * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
-   */
-  parts: {
-    [k: string]: {
-      [k: string]: ObservedSlotValue;
-    };
-  };
-  session: string;
-  /**
-   * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
-   */
-  states?: string[];
-  [k: string]: unknown;
-}
-
-export interface ObserveResponseResult {
-  /**
-   * How many distinct interactions those responses covered.
-   */
-  interactions: number;
-  /**
-   * How many responses this session has recorded in total, so a host can report progress without holding its own counters.
-   */
-  observations: number;
-  [k: string]: unknown;
-}
-
-/**
- * One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.
- */
-export interface ObservedSlotValue {
-  /**
-   * The decoded value, any JSON value including null.
-   */
-  content: unknown;
-  /**
-   * Advisory: what the host believes the slot carried. Not interpreted.
-   */
-  "content-type"?: string;
-  /**
-   * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
-   */
-  encoded?: string;
-  [k: string]: unknown;
-}
-
 export interface RecordedProvider {
   name: string;
-  [k: string]: unknown;
-}
-
-/**
- * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
- */
-export interface RecordingPolicy {
-  /**
-   * Beyond this many distinct values, the position is an open domain whatever the repetition says.
-   */
-  "max-options"?: number;
-  /**
-   * Below this many observations, 'every value was new' is not evidence of an open domain.
-   */
-  "min-evidence"?: number;
-  [k: string]: unknown;
-}
-
-export interface StartRecording {
-  policy?: RecordingPolicy;
-  provider: RecordedProvider;
-  [k: string]: unknown;
-}
-
-export interface StartRecordingResult {
-  /**
-   * Engine-assigned session id (spec.md §7.1).
-   */
-  session: string;
   [k: string]: unknown;
 }
 
@@ -541,13 +541,13 @@ export interface Check {
   contract: {
     [k: string]: unknown;
   };
-  options?: {
-    [k: string]: unknown;
-  };
   /**
    * A provider shape (design 2.8 §2), for the same provider the contract names.
    */
   "provider-shape": {
+    [k: string]: unknown;
+  };
+  options?: {
     [k: string]: unknown;
   };
   [k: string]: unknown;
@@ -555,60 +555,29 @@ export interface Check {
 
 export interface CheckResult {
   /**
-   * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
-   */
-  format: string;
-  /**
    * The subsumption report (design 2.8 §6, 'janus-subsumption-report/1'). Every interaction of the contract appears in it, including the ones the provider published nothing for.
    */
   report: {
     [k: string]: unknown;
   };
-  [k: string]: unknown;
-}
-
-/**
- * The can-i-deploy answer for one run (spec.md §8.6): every pair asked about, why each decided the way it did, and what policy decided it. Owned by plan task 7.4 — design 2.8 §1 lists combining its report with verification results as out of its own scope.
- */
-export interface CompatibilityReport {
   /**
-   * 'janus-compatibility-report/1'.
+   * How the consumer document identified itself: 'janus-contract/1', or 'pact/<version>' for a v1-v4 pact converted on the way in.
    */
-  $format: string;
-  /**
-   * The date exemption expiry was judged against, when the host supplied one.
-   */
-  "as-of"?: string;
-  decision: Decision;
-  pairs: PairResult[];
-  policy: PolicyView;
-  summary: CompatibilitySummary;
-  [k: string]: unknown;
-}
-
-export interface CompatibilitySummary {
-  blocked: number;
-  exempt: number;
-  findings: number;
-  pairs: number;
-  passed: number;
-  reviews: number;
-  warned: number;
+  format: string;
   [k: string]: unknown;
 }
 
 export interface Decide {
   /**
-   * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
-   */
-  "as-of"?: string;
-  options?: {
-    [k: string]: unknown;
-  };
-  /**
    * The (consumer, provider) pairs the host is asking about. The engine never infers a pair from the verification results it was handed: a question nobody asked is not answered, and a pair asked about with nothing attached is answered honestly rather than dropped.
    */
   pairs: DecidePair[];
+  /**
+   * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
+   */
+  verification?: {
+    [k: string]: unknown;
+  }[];
   /**
    * Subsumption policy layers (design 2.8 §7.1), least specific first: project configuration, then a per-run override. Scalars override; 'exemptions' accumulate across layers (ADR 0016). A merged document is not accepted in their place, because the merge rule is the part hosts would disagree about.
    */
@@ -616,21 +585,22 @@ export interface Decide {
     [k: string]: unknown;
   }[];
   /**
-   * Verification run summaries, exactly as the terminal event of a run carries them (spec.md §9.6). Attributed per pair by the summary's own 'pairs' (ADR 0033), or, in a summary from before them, by its 'consumers'/'providers' members and its 'failures'.
+   * The date exemption expiry is judged against (RFC 3339 full-date). The engine has no clock, deliberately: it must produce the same answer on every pipe, including wasm32-wasip2. Omitted means expiry is not evaluated, and every applied exemption's date is reported as unevaluated.
    */
-  verification?: {
+  "as-of"?: string;
+  options?: {
     [k: string]: unknown;
-  }[];
+  };
   [k: string]: unknown;
 }
 
 export interface DecidePair {
   consumer: Party;
+  provider: Party;
   /**
    * How the consumer document identified itself, as CheckResult reported it.
    */
   format?: string;
-  provider: Party;
   /**
    * This pair's subsumption report, when the host has one. Its absence is not an error: a provider that has published no shape gets replay-only semantics (design 2.8 §6.3), which is what makes the check adoptable per provider.
    */
@@ -650,37 +620,148 @@ export interface DecideResult {
 }
 
 /**
+ * The can-i-deploy answer for one run (spec.md §8.6): every pair asked about, why each decided the way it did, and what policy decided it. Owned by plan task 7.4 — design 2.8 §1 lists combining its report with verification results as out of its own scope.
+ */
+export interface CompatibilityReport {
+  /**
+   * 'janus-compatibility-report/1'.
+   */
+  $format: string;
+  decision: Decision;
+  policy: PolicyView;
+  /**
+   * The date exemption expiry was judged against, when the host supplied one.
+   */
+  "as-of"?: string;
+  pairs: PairResult[];
+  summary: CompatibilitySummary;
+  [k: string]: unknown;
+}
+
+/**
  * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
  */
 export type Decision = string;
 
 /**
- * The silencing exemption, quoted where the finding is — the reason a reader is looking for.
+ * The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.
  */
-export interface ExemptionRef {
-  expires?: string;
-  reason: string;
+export interface PolicyView {
+  "on-finding": PolicyAction;
+  "on-review": PolicyAction;
+  /**
+   * How many exemptions were in force across every layer.
+   */
+  exemptions: number;
   [k: string]: unknown;
 }
 
 /**
- * One exemption's outcome, echoing the exemption itself (design 2.8 §7.2's selectors) so a reader of the report does not need the policy file open beside it.
+ * What a subsumption severity does to the run (design 2.8 §7.1). Both default to 'warn' (ADR 0016).
  */
-export interface ExemptionResult {
-  consumer?: string;
-  expires?: string;
-  interaction?: InteractionId;
-  matched: number;
-  path?: string;
-  reason: string;
+export type PolicyAction = string;
+
+export interface PairResult {
+  consumer: Party;
+  provider: Party;
   /**
-   * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
+   * How the consumer document identified itself.
+   */
+  format?: string;
+  decision: Decision;
+  verification: VerificationView;
+  subsumption: SubsumptionView;
+  /**
+   * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
+   */
+  reasons: Reason[];
+  /**
+   * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
+   */
+  findings?: FindingEntry[];
+  /**
+   * What became of each exemption the policy carried.
+   */
+  exemptions?: ExemptionResult[];
+  [k: string]: unknown;
+}
+
+export interface Reason {
+  /**
+   * Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.
+   */
+  code: string;
+  /**
+   * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
+   */
+  action: string;
+  message: string;
+  [k: string]: unknown;
+}
+
+/**
+ * What the supplied verification results say about this pair. A missing result is never a pass.
+ */
+export interface VerificationView {
+  /**
+   * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
    */
   status: string;
+  /**
+   * How many supplied results covered this pair.
+   */
+  runs: number;
+  /**
+   * Whether any covering run was filtered: unreplayed variants are not passing ones.
+   */
+  filtered?: boolean;
+  /**
+   * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
+   */
+  variants?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * What the subsumption report says about this pair, after policy.
+ */
+export interface SubsumptionView {
+  /**
+   * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
+   */
+  verdict: string;
+  interactions: number;
+  /**
+   * Interactions with a published provider-shape entry (design 2.8 §2.2).
+   */
+  matched: number;
+  /**
+   * Interactions the provider published nothing for, which were therefore not checked (design 2.8 §6.3).
+   */
+  "not-published": number;
+  /**
+   * 'finding'-severity results no exemption silenced.
+   */
+  findings: number;
+  /**
+   * 'review'-severity results no exemption silenced.
+   */
+  reviews: number;
+  /**
+   * Results of either severity an exemption silenced.
+   */
+  exempt: number;
+  /**
+   * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
+   */
+  advisories: number;
   [k: string]: unknown;
 }
 
 export interface FindingEntry {
+  interaction: InteractionId;
   /**
    * Whether policy left this finding live or an exemption silenced it.
    */
@@ -692,7 +773,6 @@ export interface FindingEntry {
   finding: {
     [k: string]: unknown;
   };
-  interaction: InteractionId;
   [k: string]: unknown;
 }
 
@@ -705,131 +785,51 @@ export interface InteractionId {
   [k: string]: unknown;
 }
 
-export interface PairResult {
-  consumer: Party;
-  decision: Decision;
-  /**
-   * What became of each exemption the policy carried.
-   */
-  exemptions?: ExemptionResult[];
-  /**
-   * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
-   */
-  findings?: FindingEntry[];
-  /**
-   * How the consumer document identified itself.
-   */
-  format?: string;
-  provider: Party;
-  /**
-   * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
-   */
-  reasons: Reason[];
-  subsumption: SubsumptionView;
-  verification: VerificationView;
+/**
+ * The silencing exemption, quoted where the finding is — the reason a reader is looking for.
+ */
+export interface ExemptionRef {
+  reason: string;
+  expires?: string;
   [k: string]: unknown;
 }
 
 /**
- * What a subsumption severity does to the run (design 2.8 §7.1). Both default to 'warn' (ADR 0016).
+ * One exemption's outcome, echoing the exemption itself (design 2.8 §7.2's selectors) so a reader of the report does not need the policy file open beside it.
  */
-export type PolicyAction = string;
-
-/**
- * The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.
- */
-export interface PolicyView {
+export interface ExemptionResult {
   /**
-   * How many exemptions were in force across every layer.
-   */
-  exemptions: number;
-  "on-finding": PolicyAction;
-  "on-review": PolicyAction;
-  [k: string]: unknown;
-}
-
-export interface Reason {
-  /**
-   * What this reason does to the decision. 'note' is the third value a Decision does not have: something worth printing that changes nothing.
-   */
-  action: string;
-  /**
-   * Open vocabulary, listed in spec.md §8.6. An unknown code is displayed, never dispatched on: 'action' is what a script reads.
-   */
-  code: string;
-  message: string;
-  [k: string]: unknown;
-}
-
-/**
- * What the subsumption report says about this pair, after policy.
- */
-export interface SubsumptionView {
-  /**
-   * 'advisory' entries (design 2.8 §5), which no policy governs and no exemption silences.
-   */
-  advisories: number;
-  /**
-   * Results of either severity an exemption silenced.
-   */
-  exempt: number;
-  /**
-   * 'finding'-severity results no exemption silenced.
-   */
-  findings: number;
-  interactions: number;
-  /**
-   * Interactions with a published provider-shape entry (design 2.8 §2.2).
-   */
-  matched: number;
-  /**
-   * Interactions the provider published nothing for, which were therefore not checked (design 2.8 §6.3).
-   */
-  "not-published": number;
-  /**
-   * 'review'-severity results no exemption silenced.
-   */
-  reviews: number;
-  /**
-   * The walk's own aggregate verdict, unchanged by policy: an exempted finding is still a 'no'. 'not-checked' means no report was attached.
-   */
-  verdict: string;
-  [k: string]: unknown;
-}
-
-/**
- * What the supplied verification results say about this pair. A missing result is never a pass.
- */
-export interface VerificationView {
-  /**
-   * Whether any covering run was filtered: unreplayed variants are not passing ones.
-   */
-  filtered?: boolean;
-  /**
-   * How many supplied results covered this pair.
-   */
-  runs: number;
-  /**
-   * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
+   * 'applied' silenced at least one finding, 'unused' matched nothing, 'lapsed' is past its own 'expires' date and silenced nothing.
    */
   status: string;
-  /**
-   * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
-   */
-  variants?: {
-    [k: string]: unknown;
-  };
+  matched: number;
+  consumer?: string;
+  interaction?: InteractionId;
+  path?: string;
+  reason: string;
+  expires?: string;
+  [k: string]: unknown;
+}
+
+export interface CompatibilitySummary {
+  pairs: number;
+  blocked: number;
+  warned: number;
+  passed: number;
+  findings: number;
+  reviews: number;
+  exempt: number;
   [k: string]: unknown;
 }
 
 export interface Pact {
-  options?: {
-    [k: string]: unknown;
-  };
   /**
    * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
    */
   pact: {
+    [k: string]: unknown;
+  };
+  options?: {
     [k: string]: unknown;
   };
   [k: string]: unknown;
@@ -862,13 +862,13 @@ export interface UpgradeFinding {
    */
   kind: string;
   /**
-   * Prose, addressed to the author of the pact.
-   */
-  message: string;
-  /**
    * RFC 6901 JSON pointer into the *source pact* — the file the author is looking at.
    */
   path: string;
+  /**
+   * Prose, addressed to the author of the pact.
+   */
+  message: string;
   /**
    * RFC 6901 JSON pointer into the converted contract, where the source construct ended up, when there is such a place.
    */
@@ -876,147 +876,10 @@ export interface UpgradeFinding {
   [k: string]: unknown;
 }
 
-/**
- * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
- */
-export interface ContractSource {
-  broker?: BrokerDescriptor;
-  /**
-   * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
-   */
-  "consumer-version-selectors"?: ConsumerVersionSelector[];
-  /**
-   * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
-   */
-  contracts?: {
-    [k: string]: unknown;
-  }[];
-  /**
-   * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
-   */
-  "include-pending"?: boolean;
-  /**
-   * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
-   */
-  "include-wip-since"?: string;
-  kind: string;
-  /**
-   * For kind 'broker': the provider whose pacts to fetch.
-   */
-  provider?: string;
-  /**
-   * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
-   */
-  "provider-branch"?: string;
-  /**
-   * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
-   */
-  "provider-tags"?: string[];
-  /**
-   * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
-   */
-  "require-pacts"?: boolean;
-  [k: string]: unknown;
-}
-
-export interface Explain {
-  interaction: ExplainSubject;
-  options?: {
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-
-/**
- * What to compile: an interaction specification or one interaction from a contract document.
- */
-export interface ExplainSubject {
-  /**
-   * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
-   */
-  contract?: {
-    [k: string]: unknown;
-  };
-  /**
-   * For kind 'contract-interaction': which interaction.
-   */
-  index?: number;
-  kind: string;
-  /**
-   * For kind 'spec': the interaction specification.
-   */
-  spec?: {
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-
-export interface ExplainResult {
-  /**
-   * The structured plan document, when requested via options.
-   */
-  plan?: {
-    [k: string]: unknown;
-  };
-  /**
-   * The plan's pretty text form (design 2.4).
-   */
-  text: string;
-  [k: string]: unknown;
-}
-
-/**
- * Publish each fetched pact's result to that pact's own link when the run ends (spec.md §8.3). Only for a source of kind 'broker': an inline document has no link to publish to. A publish that fails is reported per pact and does not change the verdict.
- */
-export interface PublishResults {
-  /**
-   * The provider version's branch.
-   */
-  branch?: string;
-  /**
-   * The build that ran the verification.
-   */
-  "build-url"?: string;
-  /**
-   * The provider application version the results are for.
-   */
-  "provider-version": string;
-  tags?: string[];
-  [k: string]: unknown;
-}
-
-/**
- * The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).
- */
-export interface VerificationTarget {
-  /**
-   * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
-   */
-  components?: {
-    [k: string]: unknown;
-  }[];
-  /**
-   * @minItems 1
-   */
-  transports: [TransportBinding, ...TransportBinding[]];
-  [k: string]: unknown;
-}
-
-export interface TransportBinding {
-  /**
-   * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
-   */
-  options?: {
-    [k: string]: unknown;
-  };
-  transport: string;
-  [k: string]: unknown;
-}
-
 export interface Verify {
-  options?: VerifyOptions;
   source: ContractSource;
   target: VerificationTarget;
+  options?: VerifyOptions;
   [k: string]: unknown;
 }
 
@@ -1034,5 +897,142 @@ export interface VerifyOptions {
 export interface VerifyResult {
   session: string;
   stream: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+ */
+export interface ContractSource {
+  kind: string;
+  /**
+   * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
+   */
+  contracts?: {
+    [k: string]: unknown;
+  }[];
+  broker?: BrokerDescriptor;
+  /**
+   * For kind 'broker': the provider whose pacts to fetch.
+   */
+  provider?: string;
+  /**
+   * For kind 'broker': which consumer versions' pacts. Absent means the broker's default.
+   */
+  "consumer-version-selectors"?: ConsumerVersionSelector[];
+  /**
+   * For kind 'broker': the branch of the provider version being verified, which the broker uses to decide which pacts are pending.
+   */
+  "provider-branch"?: string;
+  /**
+   * For kind 'broker': the provider version's tags, for brokers that decide pending status by tag.
+   */
+  "provider-tags"?: string[];
+  /**
+   * For kind 'broker': ask the broker which pacts are pending. A pending pact's failures are reported and do not fail the run.
+   */
+  "include-pending"?: boolean;
+  /**
+   * For kind 'broker': also verify work-in-progress pacts published since this date (YYYY-MM-DD). They are pending.
+   */
+  "include-wip-since"?: string;
+  /**
+   * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
+   */
+  "require-pacts"?: boolean;
+  [k: string]: unknown;
+}
+
+/**
+ * Publish each fetched pact's result to that pact's own link when the run ends (spec.md §8.3). Only for a source of kind 'broker': an inline document has no link to publish to. A publish that fails is reported per pact and does not change the verdict.
+ */
+export interface PublishResults {
+  /**
+   * The provider application version the results are for.
+   */
+  "provider-version": string;
+  /**
+   * The provider version's branch.
+   */
+  branch?: string;
+  tags?: string[];
+  /**
+   * The build that ran the verification.
+   */
+  "build-url"?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * The provider under test: transport bindings as open descriptor documents, plus open options (state-change/hook config is design 2.7's).
+ */
+export interface VerificationTarget {
+  /**
+   * @minItems 1
+   */
+  transports: [TransportBinding, ...TransportBinding[]];
+  /**
+   * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
+  [k: string]: unknown;
+}
+
+export interface TransportBinding {
+  transport: string;
+  /**
+   * The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md §5.6).
+   */
+  options?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+export interface Explain {
+  interaction: ExplainSubject;
+  options?: {
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * What to compile: an interaction specification or one interaction from a contract document.
+ */
+export interface ExplainSubject {
+  kind: string;
+  /**
+   * For kind 'spec': the interaction specification.
+   */
+  spec?: {
+    [k: string]: unknown;
+  };
+  /**
+   * For kind 'contract-interaction': the contract document (a Janus contract or a v1–v4 pact).
+   */
+  contract?: {
+    [k: string]: unknown;
+  };
+  /**
+   * For kind 'contract-interaction': which interaction.
+   */
+  index?: number;
+  [k: string]: unknown;
+}
+
+export interface ExplainResult {
+  /**
+   * The plan's pretty text form (design 2.4).
+   */
+  text: string;
+  /**
+   * The structured plan document, when requested via options.
+   */
+  plan?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }

@@ -8,17 +8,13 @@
  */
 export interface SamplingPolicy {
   /**
-   * The named selection algorithm (spec.md §3.7).
+   * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
    */
-  algorithm?: string;
+  strategy?: string;
   /**
-   * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+   * Covering strength for 't-wise'. 2 is pairwise, the default.
    */
-  boundaries?: boolean;
-  /**
-   * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
-   */
-  exclude?: Exclusion[];
+  strength?: number;
   /**
    * Space size at or below which 'auto' selects every variant.
    */
@@ -28,32 +24,21 @@ export interface SamplingPolicy {
    */
   "max-variants"?: number;
   /**
+   * Seed the minimal and maximal variants — each dimension at the point producing the least, respectively the most, structure (spec.md §3.1). They cost between zero and two variants, because the covering step works around a seed.
+   */
+  boundaries?: boolean;
+  /**
+   * The named selection algorithm (spec.md §3.7).
+   */
+  algorithm?: string;
+  /**
    * Partial assignments the selection must extend, in order, after the base variant.
    */
   pin?: Pin[];
   /**
-   * Default 'auto': exhaustive at or below 'exhaustive-threshold', t-wise above it (spec.md §3.2).
+   * Regions removed from the space: never selected, never a coverage target, always reported with their reason (spec.md §3.5).
    */
-  strategy?: string;
-  /**
-   * Covering strength for 't-wise'. 2 is pairwise, the default.
-   */
-  strength?: number;
-  [k: string]: unknown;
-}
-
-/**
- * A conjunction of points that cannot occur together. A list of pairs, never an expression (spec.md §3.5).
- */
-export interface Exclusion {
-  /**
-   * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
-   */
-  reason: string;
-  /**
-   * @minItems 1
-   */
-  when: [PointRef, ...PointRef[]];
+  exclude?: Exclusion[];
   [k: string]: unknown;
 }
 
@@ -66,6 +51,21 @@ export interface Pin {
    */
   assignment: [PointRef, ...PointRef[]];
   reason?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * A conjunction of points that cannot occur together. A list of pairs, never an expression (spec.md §3.5).
+ */
+export interface Exclusion {
+  /**
+   * @minItems 1
+   */
+  when: [PointRef, ...PointRef[]];
+  /**
+   * Required: an excluded region is declared width that will never be demonstrated, and the contract records why.
+   */
+  reason: string;
   [k: string]: unknown;
 }
 
@@ -91,6 +91,14 @@ export interface VariantParams {
  */
 export interface Binding {
   /**
+   * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
+   */
+  name: string;
+  /**
+   * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
+   */
+  dimension: string;
+  /**
    * @minItems 1
    */
   cases: [Case, ...Case[]];
@@ -98,14 +106,6 @@ export interface Binding {
    * The value when the dimension is inactive, or takes a point no case names. Required when the dimension is gated (spec.md §6.5). Absent with no matching case means the parameter is absent for that variant — not null.
    */
   default?: unknown;
-  /**
-   * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
-   */
-  dimension: string;
-  /**
-   * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
-   */
-  name: string;
   [k: string]: unknown;
 }
 
@@ -125,60 +125,40 @@ export interface Case {
  * The variants an engine has selected for one interaction, with the report of how they were chosen (spec.md §3.9). This is the document 'consumer-session/variants' returns: the sample, not the whole space. The space itself is the shape language's variant-space document (design 2.2).
  */
 export interface VariantSelection {
-  report: SelectionReport;
   /**
    * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
    */
   variants: Variant[];
+  report: SelectionReport;
   [k: string]: unknown;
 }
 
-export interface AppliedExclusion {
-  reason: string;
+/**
+ * One variant. The assignment is the identity; the id is derived from it (spec.md §2.2).
+ */
+export interface Variant {
   /**
-   * Coverage targets this exclusion made unreachable.
+   * 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default, in variant-space order.
    */
-  removed?: number;
+  id: string;
   /**
-   * @minItems 1
+   * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
    */
-  when: [Point, ...Point[]];
-  [k: string]: unknown;
-}
-
-export interface Budgets {
-  "exhaustive-threshold"?: number;
-  "max-variants"?: number;
-  [k: string]: unknown;
-}
-
-export interface Coverage {
-  covered: number;
+  assignment: Point[];
   /**
-   * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
+   * Display only: the id with dimension ids shortened to the shortest unique trailing path segments. Never recorded in a pact file, never accepted where an id is expected (spec.md §2.2).
    */
-  dropped?: number;
+  label?: string;
   /**
-   * Targets removed because an exclusion makes them unreachable.
+   * Why this variant is in the selection.
    */
-  removed?: number;
+  origin?: string;
   /**
-   * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
+   * The interaction's provider states with this variant's parameters resolved (spec.md §6.4). The state document is design 2.5's.
    */
-  targets: number;
-  [k: string]: unknown;
-}
-
-export interface Note {
-  /**
-   * Open vocabulary; unknown codes are displayed, never dispatched on.
-   */
-  code: string;
-  message: string;
-  /**
-   * For 'target-dropped': the target that was not covered.
-   */
-  target?: Point[];
+  states?: {
+    [k: string]: unknown;
+  }[];
   [k: string]: unknown;
 }
 
@@ -195,28 +175,6 @@ export interface Point {
  * How the selection was chosen. Coverage figures are computed, never asserted (spec.md §3.3).
  */
 export interface SelectionReport {
-  /**
-   * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
-   */
-  algorithm: string;
-  /**
-   * Whether the minimal and maximal variants were seeded (spec.md §3.1).
-   */
-  boundaries?: boolean;
-  budgets?: Budgets;
-  coverage: Coverage;
-  /**
-   * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
-   */
-  exclusions?: AppliedExclusion[];
-  /**
-   * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
-   */
-  notes?: Note[];
-  /**
-   * Number of variants in the selection; at least 1, because the base variant is unconditional.
-   */
-  selected: number;
   space: SpaceSummary;
   /**
    * The strategy actually applied, after 'auto' resolved (spec.md §3.2).
@@ -226,47 +184,89 @@ export interface SelectionReport {
    * Covering strength, for strategy 't-wise'.
    */
   strength?: number;
+  /**
+   * The named selection algorithm (spec.md §3.7). A different algorithm is a different name, never a redefinition.
+   */
+  algorithm: string;
+  /**
+   * Number of variants in the selection; at least 1, because the base variant is unconditional.
+   */
+  selected: number;
+  coverage: Coverage;
+  budgets?: Budgets;
+  /**
+   * Whether the minimal and maximal variants were seeded (spec.md §3.1).
+   */
+  boundaries?: boolean;
+  /**
+   * The exclusions in force, each with the reason it carries and what it removed (spec.md §3.5).
+   */
+  exclusions?: AppliedExclusion[];
+  /**
+   * Anything the selection needs to say for itself — a dropped target, a saturated count, a waiver.
+   */
+  notes?: Note[];
   [k: string]: unknown;
 }
 
 export interface SpaceSummary {
-  dimensions: number;
-  /**
-   * False when counting saturated against the largest budget in force.
-   */
-  exact?: boolean;
   /**
    * Variants in the space, counted per spec.md §2.3. When 'exact' is false this is the saturation bound, meaning 'at least this many'.
    */
   size: number;
+  /**
+   * False when counting saturated against the largest budget in force.
+   */
+  exact?: boolean;
+  dimensions: number;
   [k: string]: unknown;
 }
 
-/**
- * One variant. The assignment is the identity; the id is derived from it (spec.md §2.2).
- */
-export interface Variant {
+export interface Coverage {
   /**
-   * One point per active dimension, in variant-space order. Inactive dimensions are absent, never null.
+   * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
    */
-  assignment: Point[];
+  targets: number;
+  covered: number;
   /**
-   * 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default, in variant-space order.
+   * Targets removed because an exclusion makes them unreachable.
    */
-  id: string;
+  removed?: number;
   /**
-   * Display only: the id with dimension ids shortened to the shortest unique trailing path segments. Never recorded in a pact file, never accepted where an id is expected (spec.md §2.2).
+   * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
    */
-  label?: string;
+  dropped?: number;
+  [k: string]: unknown;
+}
+
+export interface Budgets {
+  "exhaustive-threshold"?: number;
+  "max-variants"?: number;
+  [k: string]: unknown;
+}
+
+export interface AppliedExclusion {
   /**
-   * Why this variant is in the selection.
+   * @minItems 1
    */
-  origin?: string;
+  when: [Point, ...Point[]];
+  reason: string;
   /**
-   * The interaction's provider states with this variant's parameters resolved (spec.md §6.4). The state document is design 2.5's.
+   * Coverage targets this exclusion made unreachable.
    */
-  states?: {
-    [k: string]: unknown;
-  }[];
+  removed?: number;
+  [k: string]: unknown;
+}
+
+export interface Note {
+  /**
+   * Open vocabulary; unknown codes are displayed, never dispatched on.
+   */
+  code: string;
+  message: string;
+  /**
+   * For 'target-dropped': the target that was not covered.
+   */
+  target?: Point[];
   [k: string]: unknown;
 }

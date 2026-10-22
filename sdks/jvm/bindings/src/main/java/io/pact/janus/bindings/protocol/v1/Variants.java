@@ -25,12 +25,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "session",
     "handle",
-    "policy",
-    "session"
+    "policy"
 })
 public class Variants {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("session")
+    private java.lang.String session;
     /**
      * 
      * (Required)
@@ -45,15 +52,28 @@ public class Variants {
     @JsonProperty("policy")
     @JsonPropertyDescription("Per-call sampling policy override (design 2.3), for a host offering an '--exhaustive'-style switch. The resolution order is spec-defaults, session config, interaction spec, then this.")
     private Map<String, Object> policy;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
     /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("session")
-    private java.lang.String session;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    public java.lang.String getSession() {
+        return session;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("session")
+    public void setSession(java.lang.String session) {
+        this.session = session;
+    }
 
     /**
      * 
@@ -93,26 +113,6 @@ public class Variants {
         this.policy = policy;
     }
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("session")
-    public java.lang.String getSession() {
-        return session;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("session")
-    public void setSession(java.lang.String session) {
-        this.session = session;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -127,6 +127,10 @@ public class Variants {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Variants.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("session");
+        sb.append('=');
+        sb.append(((this.session == null)?"<null>":this.session));
+        sb.append(',');
         sb.append("handle");
         sb.append('=');
         sb.append(((this.handle == null)?"<null>":this.handle));
@@ -134,10 +138,6 @@ public class Variants {
         sb.append("policy");
         sb.append('=');
         sb.append(((this.policy == null)?"<null>":this.policy));
-        sb.append(',');
-        sb.append("session");
-        sb.append('=');
-        sb.append(((this.session == null)?"<null>":this.session));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -26,13 +26,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "description",
-    "parts",
     "session",
-    "states"
+    "description",
+    "states",
+    "parts"
 })
 public class ObserveResponse {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("session")
+    private java.lang.String session;
     /**
      * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
      * (Required)
@@ -42,6 +49,13 @@ public class ObserveResponse {
     @JsonPropertyDescription("The interaction this response belongs to. With 'states', it is the identity design 2.8 \u00a72.2 matches a consumer contract's interaction by.")
     private java.lang.String description;
     /**
+     * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
+     * 
+     */
+    @JsonProperty("states")
+    @JsonPropertyDescription("Provider state names only \u2014 a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 \u00a72.2).")
+    private List<java.lang.String> states;
+    /**
      * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
@@ -49,62 +63,8 @@ public class ObserveResponse {
     @JsonProperty("parts")
     @JsonPropertyDescription("Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.")
     private Map<String, Map<String, ObservedSlotValue>> parts;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("session")
-    private java.lang.String session;
-    /**
-     * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
-     * 
-     */
-    @JsonProperty("states")
-    @JsonPropertyDescription("Provider state names only \u2014 a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 \u00a72.2).")
-    private List<java.lang.String> states;
     @JsonIgnore
     private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
-
-    /**
-     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
-     * (Required)
-     * 
-     */
-    @JsonProperty("description")
-    public java.lang.String getDescription() {
-        return description;
-    }
-
-    /**
-     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
-     * (Required)
-     * 
-     */
-    @JsonProperty("description")
-    public void setDescription(java.lang.String description) {
-        this.description = description;
-    }
-
-    /**
-     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
-     * (Required)
-     * 
-     */
-    @JsonProperty("parts")
-    public Map<String, Map<String, ObservedSlotValue>> getParts() {
-        return parts;
-    }
-
-    /**
-     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
-     * (Required)
-     * 
-     */
-    @JsonProperty("parts")
-    public void setParts(Map<String, Map<String, ObservedSlotValue>> parts) {
-        this.parts = parts;
-    }
 
     /**
      * 
@@ -127,6 +87,26 @@ public class ObserveResponse {
     }
 
     /**
+     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+     * (Required)
+     * 
+     */
+    @JsonProperty("description")
+    public java.lang.String getDescription() {
+        return description;
+    }
+
+    /**
+     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+     * (Required)
+     * 
+     */
+    @JsonProperty("description")
+    public void setDescription(java.lang.String description) {
+        this.description = description;
+    }
+
+    /**
      * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
      * 
      */
@@ -144,6 +124,26 @@ public class ObserveResponse {
         this.states = states;
     }
 
+    /**
+     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public Map<String, Map<String, ObservedSlotValue>> getParts() {
+        return parts;
+    }
+
+    /**
+     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public void setParts(Map<String, Map<String, ObservedSlotValue>> parts) {
+        this.parts = parts;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -158,21 +158,21 @@ public class ObserveResponse {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ObserveResponse.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("description");
-        sb.append('=');
-        sb.append(((this.description == null)?"<null>":this.description));
-        sb.append(',');
-        sb.append("parts");
-        sb.append('=');
-        sb.append(((this.parts == null)?"<null>":this.parts));
-        sb.append(',');
         sb.append("session");
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
         sb.append(',');
+        sb.append("description");
+        sb.append('=');
+        sb.append(((this.description == null)?"<null>":this.description));
+        sb.append(',');
         sb.append("states");
         sb.append('=');
         sb.append(((this.states == null)?"<null>":this.states));
+        sb.append(',');
+        sb.append("parts");
+        sb.append('=');
+        sb.append(((this.parts == null)?"<null>":this.parts));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

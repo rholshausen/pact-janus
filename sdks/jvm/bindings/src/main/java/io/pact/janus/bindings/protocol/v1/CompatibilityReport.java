@@ -27,10 +27,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "$format",
-    "as-of",
     "decision",
-    "pairs",
     "policy",
+    "as-of",
+    "pairs",
     "summary"
 })
 public class CompatibilityReport {
@@ -44,13 +44,6 @@ public class CompatibilityReport {
     @JsonPropertyDescription("'janus-compatibility-report/1'.")
     private String $format;
     /**
-     * The date exemption expiry was judged against, when the host supplied one.
-     * 
-     */
-    @JsonProperty("as-of")
-    @JsonPropertyDescription("The date exemption expiry was judged against, when the host supplied one.")
-    private String asOf;
-    /**
      * Decision
      * <p>
      * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
@@ -61,13 +54,6 @@ public class CompatibilityReport {
     @JsonPropertyDescription("'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.")
     private String decision;
     /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    private List<PairResult> pairs;
-    /**
      * PolicyView
      * <p>
      * The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.
@@ -77,6 +63,20 @@ public class CompatibilityReport {
     @JsonProperty("policy")
     @JsonPropertyDescription("The policy this run resolved to, recorded because design 2.8 \u00a77.1's layering means the answer is in no single file.")
     private PolicyView policy;
+    /**
+     * The date exemption expiry was judged against, when the host supplied one.
+     * 
+     */
+    @JsonProperty("as-of")
+    @JsonPropertyDescription("The date exemption expiry was judged against, when the host supplied one.")
+    private String asOf;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    private List<PairResult> pairs;
     /**
      * CompatibilitySummary
      * <p>
@@ -110,24 +110,6 @@ public class CompatibilityReport {
     }
 
     /**
-     * The date exemption expiry was judged against, when the host supplied one.
-     * 
-     */
-    @JsonProperty("as-of")
-    public String getAsOf() {
-        return asOf;
-    }
-
-    /**
-     * The date exemption expiry was judged against, when the host supplied one.
-     * 
-     */
-    @JsonProperty("as-of")
-    public void setAsOf(String asOf) {
-        this.asOf = asOf;
-    }
-
-    /**
      * Decision
      * <p>
      * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
@@ -152,26 +134,6 @@ public class CompatibilityReport {
     }
 
     /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public List<PairResult> getPairs() {
-        return pairs;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("pairs")
-    public void setPairs(List<PairResult> pairs) {
-        this.pairs = pairs;
-    }
-
-    /**
      * PolicyView
      * <p>
      * The policy this run resolved to, recorded because design 2.8 §7.1's layering means the answer is in no single file.
@@ -193,6 +155,44 @@ public class CompatibilityReport {
     @JsonProperty("policy")
     public void setPolicy(PolicyView policy) {
         this.policy = policy;
+    }
+
+    /**
+     * The date exemption expiry was judged against, when the host supplied one.
+     * 
+     */
+    @JsonProperty("as-of")
+    public String getAsOf() {
+        return asOf;
+    }
+
+    /**
+     * The date exemption expiry was judged against, when the host supplied one.
+     * 
+     */
+    @JsonProperty("as-of")
+    public void setAsOf(String asOf) {
+        this.asOf = asOf;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public List<PairResult> getPairs() {
+        return pairs;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("pairs")
+    public void setPairs(List<PairResult> pairs) {
+        this.pairs = pairs;
     }
 
     /**
@@ -237,21 +237,21 @@ public class CompatibilityReport {
         sb.append('=');
         sb.append(((this.$format == null)?"<null>":this.$format));
         sb.append(',');
-        sb.append("asOf");
-        sb.append('=');
-        sb.append(((this.asOf == null)?"<null>":this.asOf));
-        sb.append(',');
         sb.append("decision");
         sb.append('=');
         sb.append(((this.decision == null)?"<null>":this.decision));
         sb.append(',');
-        sb.append("pairs");
-        sb.append('=');
-        sb.append(((this.pairs == null)?"<null>":this.pairs));
-        sb.append(',');
         sb.append("policy");
         sb.append('=');
         sb.append(((this.policy == null)?"<null>":this.policy));
+        sb.append(',');
+        sb.append("asOf");
+        sb.append('=');
+        sb.append(((this.asOf == null)?"<null>":this.asOf));
+        sb.append(',');
+        sb.append("pairs");
+        sb.append('=');
+        sb.append(((this.pairs == null)?"<null>":this.pairs));
         sb.append(',');
         sb.append("summary");
         sb.append('=');
@@ -273,8 +273,8 @@ public class CompatibilityReport {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.summary == null)? 0 :this.summary.hashCode()));
-        result = ((result* 31)+((this.asOf == null)? 0 :this.asOf.hashCode()));
         result = ((result* 31)+((this.decision == null)? 0 :this.decision.hashCode()));
+        result = ((result* 31)+((this.asOf == null)? 0 :this.asOf.hashCode()));
         result = ((result* 31)+((this.$format == null)? 0 :this.$format.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.pairs == null)? 0 :this.pairs.hashCode()));
@@ -291,7 +291,7 @@ public class CompatibilityReport {
             return false;
         }
         CompatibilityReport rhs = ((CompatibilityReport) other);
-        return ((((((((this.summary == rhs.summary)||((this.summary!= null)&&this.summary.equals(rhs.summary)))&&((this.asOf == rhs.asOf)||((this.asOf!= null)&&this.asOf.equals(rhs.asOf))))&&((this.decision == rhs.decision)||((this.decision!= null)&&this.decision.equals(rhs.decision))))&&((this.$format == rhs.$format)||((this.$format!= null)&&this.$format.equals(rhs.$format))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.pairs == rhs.pairs)||((this.pairs!= null)&&this.pairs.equals(rhs.pairs))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
+        return ((((((((this.summary == rhs.summary)||((this.summary!= null)&&this.summary.equals(rhs.summary)))&&((this.decision == rhs.decision)||((this.decision!= null)&&this.decision.equals(rhs.decision))))&&((this.asOf == rhs.asOf)||((this.asOf!= null)&&this.asOf.equals(rhs.asOf))))&&((this.$format == rhs.$format)||((this.$format!= null)&&this.$format.equals(rhs.$format))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.pairs == rhs.pairs)||((this.pairs!= null)&&this.pairs.equals(rhs.pairs))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
     }
 
 }

@@ -26,13 +26,29 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "cases",
-    "default",
+    "name",
     "dimension",
-    "name"
+    "cases",
+    "default"
 })
 public class Binding {
 
+    /**
+     * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
+     * (Required)
+     * 
+     */
+    @JsonProperty("name")
+    @JsonPropertyDescription("The state parameter this binds. MUST NOT also appear among the state's literal parameters.")
+    private String name;
+    /**
+     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimension")
+    @JsonPropertyDescription("A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md \u00a76.3).")
+    private String dimension;
     /**
      * 
      * (Required)
@@ -47,24 +63,48 @@ public class Binding {
     @JsonProperty("default")
     @JsonPropertyDescription("The value when the dimension is inactive, or takes a point no case names. Required when the dimension is gated (spec.md \u00a76.5). Absent with no matching case means the parameter is absent for that variant \u2014 not null.")
     private Object _default;
-    /**
-     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimension")
-    @JsonPropertyDescription("A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md \u00a76.3).")
-    private String dimension;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
     /**
      * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
      * (Required)
      * 
      */
     @JsonProperty("name")
-    @JsonPropertyDescription("The state parameter this binds. MUST NOT also appear among the state's literal parameters.")
-    private String name;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
+     * (Required)
+     * 
+     */
+    @JsonProperty("name")
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimension")
+    public String getDimension() {
+        return dimension;
+    }
+
+    /**
+     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("dimension")
+    public void setDimension(String dimension) {
+        this.dimension = dimension;
+    }
 
     /**
      * 
@@ -104,46 +144,6 @@ public class Binding {
         this._default = _default;
     }
 
-    /**
-     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimension")
-    public String getDimension() {
-        return dimension;
-    }
-
-    /**
-     * A dimension reference: full id, full path, or a trailing run of whole path segments. Resolved by the engine at add-interaction and recorded resolved (spec.md §6.3).
-     * (Required)
-     * 
-     */
-    @JsonProperty("dimension")
-    public void setDimension(String dimension) {
-        this.dimension = dimension;
-    }
-
-    /**
-     * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
-     * (Required)
-     * 
-     */
-    @JsonProperty("name")
-    public String getName() {
-        return name;
-    }
-
-    /**
-     * The state parameter this binds. MUST NOT also appear among the state's literal parameters.
-     * (Required)
-     * 
-     */
-    @JsonProperty("name")
-    public void setName(String name) {
-        this.name = name;
-    }
-
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -158,6 +158,14 @@ public class Binding {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Binding.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("name");
+        sb.append('=');
+        sb.append(((this.name == null)?"<null>":this.name));
+        sb.append(',');
+        sb.append("dimension");
+        sb.append('=');
+        sb.append(((this.dimension == null)?"<null>":this.dimension));
+        sb.append(',');
         sb.append("cases");
         sb.append('=');
         sb.append(((this.cases == null)?"<null>":this.cases));
@@ -165,14 +173,6 @@ public class Binding {
         sb.append("_default");
         sb.append('=');
         sb.append(((this._default == null)?"<null>":this._default));
-        sb.append(',');
-        sb.append("dimension");
-        sb.append('=');
-        sb.append(((this.dimension == null)?"<null>":this.dimension));
-        sb.append(',');
-        sb.append("name");
-        sb.append('=');
-        sb.append(((this.name == null)?"<null>":this.name));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

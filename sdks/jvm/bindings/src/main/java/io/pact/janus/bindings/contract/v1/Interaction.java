@@ -26,25 +26,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "content-types",
     "description",
-    "parts",
-    "requires",
-    "selection",
+    "transport",
     "states",
-    "transport"
+    "parts",
+    "content-types",
+    "requires",
+    "selection"
 })
 public class Interaction {
 
-    /**
-     * ContentTypes
-     * <p>
-     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
-     * 
-     */
-    @JsonProperty("content-types")
-    @JsonPropertyDescription("Part name -> slot name -> the media type of that slot's content (spec.md \u00a75.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.")
-    private ContentTypes contentTypes;
     /**
      * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
      * (Required)
@@ -54,6 +45,22 @@ public class Interaction {
     @JsonPropertyDescription("What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md \u00a74.2).")
     private java.lang.String description;
     /**
+     * Transport
+     * <p>
+     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
+     * 
+     */
+    @JsonProperty("transport")
+    @JsonPropertyDescription("How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).")
+    private Transport transport;
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
+     * 
+     */
+    @JsonProperty("states")
+    @JsonPropertyDescription("Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md \u00a76). Bindings appear here once; their resolved values appear per variant.")
+    private List<State> states;
+    /**
      * Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.
      * (Required)
      * 
@@ -61,6 +68,15 @@ public class Interaction {
     @JsonProperty("parts")
     @JsonPropertyDescription("Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec \u00a73.6); this schema fixes only the nesting.")
     private Map<String, ShapePart> parts;
+    /**
+     * ContentTypes
+     * <p>
+     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+     * 
+     */
+    @JsonProperty("content-types")
+    @JsonPropertyDescription("Part name -> slot name -> the media type of that slot's content (spec.md \u00a75.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.")
+    private ContentTypes contentTypes;
     /**
      * Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.
      * 
@@ -78,46 +94,8 @@ public class Interaction {
     @JsonProperty("selection")
     @JsonPropertyDescription("Design 2.3's variant-selection document \u2014 the exercised variants and the report of how they were chosen \u2014 with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md \u00a75.1).")
     private RecordedSelection selection;
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
-     * 
-     */
-    @JsonProperty("states")
-    @JsonPropertyDescription("Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md \u00a76). Bindings appear here once; their resolved values appear per variant.")
-    private List<State> states;
-    /**
-     * Transport
-     * <p>
-     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
-     * 
-     */
-    @JsonProperty("transport")
-    @JsonPropertyDescription("How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).")
-    private Transport transport;
     @JsonIgnore
     private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
-
-    /**
-     * ContentTypes
-     * <p>
-     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
-     * 
-     */
-    @JsonProperty("content-types")
-    public ContentTypes getContentTypes() {
-        return contentTypes;
-    }
-
-    /**
-     * ContentTypes
-     * <p>
-     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
-     * 
-     */
-    @JsonProperty("content-types")
-    public void setContentTypes(ContentTypes contentTypes) {
-        this.contentTypes = contentTypes;
-    }
 
     /**
      * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
@@ -140,6 +118,46 @@ public class Interaction {
     }
 
     /**
+     * Transport
+     * <p>
+     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
+     * 
+     */
+    @JsonProperty("transport")
+    public Transport getTransport() {
+        return transport;
+    }
+
+    /**
+     * Transport
+     * <p>
+     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
+     * 
+     */
+    @JsonProperty("transport")
+    public void setTransport(Transport transport) {
+        this.transport = transport;
+    }
+
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
+     * 
+     */
+    @JsonProperty("states")
+    public List<State> getStates() {
+        return states;
+    }
+
+    /**
+     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
+     * 
+     */
+    @JsonProperty("states")
+    public void setStates(List<State> states) {
+        this.states = states;
+    }
+
+    /**
      * Part name -> slot name -> shape. Part and slot names are the transport and content components' business, never the kernel's (shape spec §3.6); this schema fixes only the nesting.
      * (Required)
      * 
@@ -157,6 +175,28 @@ public class Interaction {
     @JsonProperty("parts")
     public void setParts(Map<String, ShapePart> parts) {
         this.parts = parts;
+    }
+
+    /**
+     * ContentTypes
+     * <p>
+     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+     * 
+     */
+    @JsonProperty("content-types")
+    public ContentTypes getContentTypes() {
+        return contentTypes;
+    }
+
+    /**
+     * ContentTypes
+     * <p>
+     * Part name -> slot name -> the media type of that slot's content (spec.md §5.5, ADR 0020). A decode instruction, not a constraint: it names the content component that turns the slot's octets into the document its shape applies to, and back. Absent for a slot means an undeclared one: produced as JSON when structured, decoded as the arriving slot is labelled. Every entry must name a slot 'parts' gives a shape.
+     * 
+     */
+    @JsonProperty("content-types")
+    public void setContentTypes(ContentTypes contentTypes) {
+        this.contentTypes = contentTypes;
     }
 
     /**
@@ -201,46 +241,6 @@ public class Interaction {
         this.selection = selection;
     }
 
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
-     * 
-     */
-    @JsonProperty("states")
-    public List<State> getStates() {
-        return states;
-    }
-
-    /**
-     * Provider states this interaction requires, with their literal parameters and their variant bindings (spec.md §6). Bindings appear here once; their resolved values appear per variant.
-     * 
-     */
-    @JsonProperty("states")
-    public void setStates(List<State> states) {
-        this.states = states;
-    }
-
-    /**
-     * Transport
-     * <p>
-     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
-     * 
-     */
-    @JsonProperty("transport")
-    public Transport getTransport() {
-        return transport;
-    }
-
-    /**
-     * Transport
-     * <p>
-     * How the parts crossed the wire. An open descriptor: 'kind' and 'mode' are fixed here, everything else belongs to the transport component (design 2.6).
-     * 
-     */
-    @JsonProperty("transport")
-    public void setTransport(Transport transport) {
-        this.transport = transport;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -255,17 +255,25 @@ public class Interaction {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Interaction.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("contentTypes");
-        sb.append('=');
-        sb.append(((this.contentTypes == null)?"<null>":this.contentTypes));
-        sb.append(',');
         sb.append("description");
         sb.append('=');
         sb.append(((this.description == null)?"<null>":this.description));
         sb.append(',');
+        sb.append("transport");
+        sb.append('=');
+        sb.append(((this.transport == null)?"<null>":this.transport));
+        sb.append(',');
+        sb.append("states");
+        sb.append('=');
+        sb.append(((this.states == null)?"<null>":this.states));
+        sb.append(',');
         sb.append("parts");
         sb.append('=');
         sb.append(((this.parts == null)?"<null>":this.parts));
+        sb.append(',');
+        sb.append("contentTypes");
+        sb.append('=');
+        sb.append(((this.contentTypes == null)?"<null>":this.contentTypes));
         sb.append(',');
         sb.append("requires");
         sb.append('=');
@@ -274,14 +282,6 @@ public class Interaction {
         sb.append("selection");
         sb.append('=');
         sb.append(((this.selection == null)?"<null>":this.selection));
-        sb.append(',');
-        sb.append("states");
-        sb.append('=');
-        sb.append(((this.states == null)?"<null>":this.states));
-        sb.append(',');
-        sb.append("transport");
-        sb.append('=');
-        sb.append(((this.transport == null)?"<null>":this.transport));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -304,8 +304,8 @@ public class Interaction {
         result = ((result* 31)+((this.transport == null)? 0 :this.transport.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.contentTypes == null)? 0 :this.contentTypes.hashCode()));
-        result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
         result = ((result* 31)+((this.states == null)? 0 :this.states.hashCode()));
+        result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
         return result;
     }
 
@@ -318,7 +318,7 @@ public class Interaction {
             return false;
         }
         Interaction rhs = ((Interaction) other);
-        return (((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
+        return (((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
     }
 
 }

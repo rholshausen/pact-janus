@@ -27,14 +27,14 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "consumer",
-    "decision",
-    "exemptions",
-    "findings",
-    "format",
     "provider",
-    "reasons",
+    "format",
+    "decision",
+    "verification",
     "subsumption",
-    "verification"
+    "reasons",
+    "findings",
+    "exemptions"
 })
 public class PairResult {
 
@@ -48,6 +48,22 @@ public class PairResult {
     @JsonProperty("consumer")
     private Party consumer;
     /**
+     * Party
+     * <p>
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("provider")
+    private Party provider;
+    /**
+     * How the consumer document identified itself.
+     * 
+     */
+    @JsonProperty("format")
+    @JsonPropertyDescription("How the consumer document identified itself.")
+    private String format;
+    /**
      * Decision
      * <p>
      * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
@@ -58,43 +74,15 @@ public class PairResult {
     @JsonPropertyDescription("'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.")
     private String decision;
     /**
-     * What became of each exemption the policy carried.
-     * 
-     */
-    @JsonProperty("exemptions")
-    @JsonPropertyDescription("What became of each exemption the policy carried.")
-    private List<ExemptionResult> exemptions;
-    /**
-     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
-     * 
-     */
-    @JsonProperty("findings")
-    @JsonPropertyDescription("Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.")
-    private List<FindingEntry> findings;
-    /**
-     * How the consumer document identified itself.
-     * 
-     */
-    @JsonProperty("format")
-    @JsonPropertyDescription("How the consumer document identified itself.")
-    private String format;
-    /**
-     * Party
+     * VerificationView
      * <p>
-     * 
+     * What the supplied verification results say about this pair. A missing result is never a pass.
      * (Required)
      * 
      */
-    @JsonProperty("provider")
-    private Party provider;
-    /**
-     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
-     * (Required)
-     * 
-     */
-    @JsonProperty("reasons")
-    @JsonPropertyDescription("One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.")
-    private List<Reason> reasons;
+    @JsonProperty("verification")
+    @JsonPropertyDescription("What the supplied verification results say about this pair. A missing result is never a pass.")
+    private VerificationView verification;
     /**
      * SubsumptionView
      * <p>
@@ -106,15 +94,27 @@ public class PairResult {
     @JsonPropertyDescription("What the subsumption report says about this pair, after policy.")
     private SubsumptionView subsumption;
     /**
-     * VerificationView
-     * <p>
-     * What the supplied verification results say about this pair. A missing result is never a pass.
+     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
      * (Required)
      * 
      */
-    @JsonProperty("verification")
-    @JsonPropertyDescription("What the supplied verification results say about this pair. A missing result is never a pass.")
-    private VerificationView verification;
+    @JsonProperty("reasons")
+    @JsonPropertyDescription("One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.")
+    private List<Reason> reasons;
+    /**
+     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
+     * 
+     */
+    @JsonProperty("findings")
+    @JsonPropertyDescription("Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.")
+    private List<FindingEntry> findings;
+    /**
+     * What became of each exemption the policy carried.
+     * 
+     */
+    @JsonProperty("exemptions")
+    @JsonPropertyDescription("What became of each exemption the policy carried.")
+    private List<ExemptionResult> exemptions;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -143,84 +143,6 @@ public class PairResult {
     }
 
     /**
-     * Decision
-     * <p>
-     * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
-     * (Required)
-     * 
-     */
-    @JsonProperty("decision")
-    public String getDecision() {
-        return decision;
-    }
-
-    /**
-     * Decision
-     * <p>
-     * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
-     * (Required)
-     * 
-     */
-    @JsonProperty("decision")
-    public void setDecision(String decision) {
-        this.decision = decision;
-    }
-
-    /**
-     * What became of each exemption the policy carried.
-     * 
-     */
-    @JsonProperty("exemptions")
-    public List<ExemptionResult> getExemptions() {
-        return exemptions;
-    }
-
-    /**
-     * What became of each exemption the policy carried.
-     * 
-     */
-    @JsonProperty("exemptions")
-    public void setExemptions(List<ExemptionResult> exemptions) {
-        this.exemptions = exemptions;
-    }
-
-    /**
-     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
-     * 
-     */
-    @JsonProperty("findings")
-    public List<FindingEntry> getFindings() {
-        return findings;
-    }
-
-    /**
-     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
-     * 
-     */
-    @JsonProperty("findings")
-    public void setFindings(List<FindingEntry> findings) {
-        this.findings = findings;
-    }
-
-    /**
-     * How the consumer document identified itself.
-     * 
-     */
-    @JsonProperty("format")
-    public String getFormat() {
-        return format;
-    }
-
-    /**
-     * How the consumer document identified itself.
-     * 
-     */
-    @JsonProperty("format")
-    public void setFormat(String format) {
-        this.format = format;
-    }
-
-    /**
      * Party
      * <p>
      * 
@@ -245,23 +167,69 @@ public class PairResult {
     }
 
     /**
-     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
-     * (Required)
+     * How the consumer document identified itself.
      * 
      */
-    @JsonProperty("reasons")
-    public List<Reason> getReasons() {
-        return reasons;
+    @JsonProperty("format")
+    public String getFormat() {
+        return format;
     }
 
     /**
-     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
+     * How the consumer document identified itself.
+     * 
+     */
+    @JsonProperty("format")
+    public void setFormat(String format) {
+        this.format = format;
+    }
+
+    /**
+     * Decision
+     * <p>
+     * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
      * (Required)
      * 
      */
-    @JsonProperty("reasons")
-    public void setReasons(List<Reason> reasons) {
-        this.reasons = reasons;
+    @JsonProperty("decision")
+    public String getDecision() {
+        return decision;
+    }
+
+    /**
+     * Decision
+     * <p>
+     * 'pass' nothing to say, 'warn' something to read that does not stop the deploy, 'block' stop. Open vocabulary, ordered as written: a host that does not know a value treats it as at least as severe as 'warn'.
+     * (Required)
+     * 
+     */
+    @JsonProperty("decision")
+    public void setDecision(String decision) {
+        this.decision = decision;
+    }
+
+    /**
+     * VerificationView
+     * <p>
+     * What the supplied verification results say about this pair. A missing result is never a pass.
+     * (Required)
+     * 
+     */
+    @JsonProperty("verification")
+    public VerificationView getVerification() {
+        return verification;
+    }
+
+    /**
+     * VerificationView
+     * <p>
+     * What the supplied verification results say about this pair. A missing result is never a pass.
+     * (Required)
+     * 
+     */
+    @JsonProperty("verification")
+    public void setVerification(VerificationView verification) {
+        this.verification = verification;
     }
 
     /**
@@ -289,27 +257,59 @@ public class PairResult {
     }
 
     /**
-     * VerificationView
-     * <p>
-     * What the supplied verification results say about this pair. A missing result is never a pass.
+     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
      * (Required)
      * 
      */
-    @JsonProperty("verification")
-    public VerificationView getVerification() {
-        return verification;
+    @JsonProperty("reasons")
+    public List<Reason> getReasons() {
+        return reasons;
     }
 
     /**
-     * VerificationView
-     * <p>
-     * What the supplied verification results say about this pair. A missing result is never a pass.
+     * One entry per fact, never a summary of several: a pair that said 'block' without saying which of four possible facts blocked it would send its reader back to the raw documents.
      * (Required)
      * 
      */
-    @JsonProperty("verification")
-    public void setVerification(VerificationView verification) {
-        this.verification = verification;
+    @JsonProperty("reasons")
+    public void setReasons(List<Reason> reasons) {
+        this.reasons = reasons;
+    }
+
+    /**
+     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
+     * 
+     */
+    @JsonProperty("findings")
+    public List<FindingEntry> getFindings() {
+        return findings;
+    }
+
+    /**
+     * Every finding this pair's report carried, with what policy did to it. Exempted findings are listed, not dropped: a report that hid them would hide the gap a team accepted.
+     * 
+     */
+    @JsonProperty("findings")
+    public void setFindings(List<FindingEntry> findings) {
+        this.findings = findings;
+    }
+
+    /**
+     * What became of each exemption the policy carried.
+     * 
+     */
+    @JsonProperty("exemptions")
+    public List<ExemptionResult> getExemptions() {
+        return exemptions;
+    }
+
+    /**
+     * What became of each exemption the policy carried.
+     * 
+     */
+    @JsonProperty("exemptions")
+    public void setExemptions(List<ExemptionResult> exemptions) {
+        this.exemptions = exemptions;
     }
 
     @JsonAnyGetter
@@ -330,37 +330,37 @@ public class PairResult {
         sb.append('=');
         sb.append(((this.consumer == null)?"<null>":this.consumer));
         sb.append(',');
-        sb.append("decision");
+        sb.append("provider");
         sb.append('=');
-        sb.append(((this.decision == null)?"<null>":this.decision));
-        sb.append(',');
-        sb.append("exemptions");
-        sb.append('=');
-        sb.append(((this.exemptions == null)?"<null>":this.exemptions));
-        sb.append(',');
-        sb.append("findings");
-        sb.append('=');
-        sb.append(((this.findings == null)?"<null>":this.findings));
+        sb.append(((this.provider == null)?"<null>":this.provider));
         sb.append(',');
         sb.append("format");
         sb.append('=');
         sb.append(((this.format == null)?"<null>":this.format));
         sb.append(',');
-        sb.append("provider");
+        sb.append("decision");
         sb.append('=');
-        sb.append(((this.provider == null)?"<null>":this.provider));
+        sb.append(((this.decision == null)?"<null>":this.decision));
         sb.append(',');
-        sb.append("reasons");
+        sb.append("verification");
         sb.append('=');
-        sb.append(((this.reasons == null)?"<null>":this.reasons));
+        sb.append(((this.verification == null)?"<null>":this.verification));
         sb.append(',');
         sb.append("subsumption");
         sb.append('=');
         sb.append(((this.subsumption == null)?"<null>":this.subsumption));
         sb.append(',');
-        sb.append("verification");
+        sb.append("reasons");
         sb.append('=');
-        sb.append(((this.verification == null)?"<null>":this.verification));
+        sb.append(((this.reasons == null)?"<null>":this.reasons));
+        sb.append(',');
+        sb.append("findings");
+        sb.append('=');
+        sb.append(((this.findings == null)?"<null>":this.findings));
+        sb.append(',');
+        sb.append("exemptions");
+        sb.append('=');
+        sb.append(((this.exemptions == null)?"<null>":this.exemptions));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

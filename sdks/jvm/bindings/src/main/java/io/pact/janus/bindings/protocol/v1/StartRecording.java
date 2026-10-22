@@ -25,20 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "policy",
-    "provider"
+    "provider",
+    "policy"
 })
 public class StartRecording {
 
-    /**
-     * RecordingPolicy
-     * <p>
-     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
-     * 
-     */
-    @JsonProperty("policy")
-    @JsonPropertyDescription("How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.")
-    private RecordingPolicy policy;
     /**
      * RecordedProvider
      * <p>
@@ -48,30 +39,17 @@ public class StartRecording {
      */
     @JsonProperty("provider")
     private RecordedProvider provider;
+    /**
+     * RecordingPolicy
+     * <p>
+     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
+     * 
+     */
+    @JsonProperty("policy")
+    @JsonPropertyDescription("How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.")
+    private RecordingPolicy policy;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * RecordingPolicy
-     * <p>
-     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
-     * 
-     */
-    @JsonProperty("policy")
-    public RecordingPolicy getPolicy() {
-        return policy;
-    }
-
-    /**
-     * RecordingPolicy
-     * <p>
-     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
-     * 
-     */
-    @JsonProperty("policy")
-    public void setPolicy(RecordingPolicy policy) {
-        this.policy = policy;
-    }
 
     /**
      * RecordedProvider
@@ -97,6 +75,28 @@ public class StartRecording {
         this.provider = provider;
     }
 
+    /**
+     * RecordingPolicy
+     * <p>
+     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
+     * 
+     */
+    @JsonProperty("policy")
+    public RecordingPolicy getPolicy() {
+        return policy;
+    }
+
+    /**
+     * RecordingPolicy
+     * <p>
+     * How the recorder decides whether a scalar position is a closed set of values or samples of an open domain. Both members are judgements a recorder cannot avoid, so they are named rather than buried; an engine that omits them uses its own documented defaults.
+     * 
+     */
+    @JsonProperty("policy")
+    public void setPolicy(RecordingPolicy policy) {
+        this.policy = policy;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -111,13 +111,13 @@ public class StartRecording {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(StartRecording.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("policy");
-        sb.append('=');
-        sb.append(((this.policy == null)?"<null>":this.policy));
-        sb.append(',');
         sb.append("provider");
         sb.append('=');
         sb.append(((this.provider == null)?"<null>":this.provider));
+        sb.append(',');
+        sb.append("policy");
+        sb.append('=');
+        sb.append(((this.policy == null)?"<null>":this.policy));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -25,19 +25,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "options",
     "session",
-    "transport"
+    "transport",
+    "options"
 })
 public class StartTransport {
 
-    /**
-     * Transport-specific options (design 2.6).
-     * 
-     */
-    @JsonProperty("options")
-    @JsonPropertyDescription("Transport-specific options (design 2.6).")
-    private Map<String, Object> options;
     /**
      * 
      * (Required)
@@ -53,26 +46,15 @@ public class StartTransport {
     @JsonProperty("transport")
     @JsonPropertyDescription("Transport component name.")
     private java.lang.String transport;
+    /**
+     * Transport-specific options (design 2.6).
+     * 
+     */
+    @JsonProperty("options")
+    @JsonPropertyDescription("Transport-specific options (design 2.6).")
+    private Map<String, Object> options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * Transport-specific options (design 2.6).
-     * 
-     */
-    @JsonProperty("options")
-    public Map<String, Object> getOptions() {
-        return options;
-    }
-
-    /**
-     * Transport-specific options (design 2.6).
-     * 
-     */
-    @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
-        this.options = options;
-    }
 
     /**
      * 
@@ -114,6 +96,24 @@ public class StartTransport {
         this.transport = transport;
     }
 
+    /**
+     * Transport-specific options (design 2.6).
+     * 
+     */
+    @JsonProperty("options")
+    public Map<String, Object> getOptions() {
+        return options;
+    }
+
+    /**
+     * Transport-specific options (design 2.6).
+     * 
+     */
+    @JsonProperty("options")
+    public void setOptions(Map<String, Object> options) {
+        this.options = options;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -128,10 +128,6 @@ public class StartTransport {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(StartTransport.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("options");
-        sb.append('=');
-        sb.append(((this.options == null)?"<null>":this.options));
-        sb.append(',');
         sb.append("session");
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
@@ -139,6 +135,10 @@ public class StartTransport {
         sb.append("transport");
         sb.append('=');
         sb.append(((this.transport == null)?"<null>":this.transport));
+        sb.append(',');
+        sb.append("options");
+        sb.append('=');
+        sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -26,11 +26,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "report",
-    "variants"
+    "variants",
+    "report"
 })
 public class VariantSelection {
 
+    /**
+     * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("variants")
+    @JsonPropertyDescription("In run order: the base variant first, then pins, then covering variants (spec.md \u00a74.3).")
+    private List<Variant> variants;
     /**
      * SelectionReport
      * <p>
@@ -41,16 +49,28 @@ public class VariantSelection {
     @JsonProperty("report")
     @JsonPropertyDescription("How the selection was chosen. Coverage figures are computed, never asserted (spec.md \u00a73.3).")
     private SelectionReport report;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
     /**
      * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
      * (Required)
      * 
      */
     @JsonProperty("variants")
-    @JsonPropertyDescription("In run order: the base variant first, then pins, then covering variants (spec.md \u00a74.3).")
-    private List<Variant> variants;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    public List<Variant> getVariants() {
+        return variants;
+    }
+
+    /**
+     * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("variants")
+    public void setVariants(List<Variant> variants) {
+        this.variants = variants;
+    }
 
     /**
      * SelectionReport
@@ -76,26 +96,6 @@ public class VariantSelection {
         this.report = report;
     }
 
-    /**
-     * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
-     * (Required)
-     * 
-     */
-    @JsonProperty("variants")
-    public List<Variant> getVariants() {
-        return variants;
-    }
-
-    /**
-     * In run order: the base variant first, then pins, then covering variants (spec.md §4.3).
-     * (Required)
-     * 
-     */
-    @JsonProperty("variants")
-    public void setVariants(List<Variant> variants) {
-        this.variants = variants;
-    }
-
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -110,13 +110,13 @@ public class VariantSelection {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VariantSelection.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("report");
-        sb.append('=');
-        sb.append(((this.report == null)?"<null>":this.report));
-        sb.append(',');
         sb.append("variants");
         sb.append('=');
         sb.append(((this.variants == null)?"<null>":this.variants));
+        sb.append(',');
+        sb.append("report");
+        sb.append('=');
+        sb.append(((this.report == null)?"<null>":this.report));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

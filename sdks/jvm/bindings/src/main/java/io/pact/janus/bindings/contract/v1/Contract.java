@@ -29,9 +29,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "$format",
     "$schema",
     "consumer",
+    "provider",
     "interactions",
-    "metadata",
-    "provider"
+    "metadata"
 })
 public class Contract {
 
@@ -61,6 +61,16 @@ public class Contract {
     @JsonPropertyDescription("A named party. The member name and the path to 'name' are fixed by spec.md \u00a73.1 so brokers already deployed read them correctly.")
     private Party consumer;
     /**
+     * Party
+     * <p>
+     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
+     * (Required)
+     * 
+     */
+    @JsonProperty("provider")
+    @JsonPropertyDescription("A named party. The member name and the path to 'name' are fixed by spec.md \u00a73.1 so brokers already deployed read them correctly.")
+    private Party provider;
+    /**
      * In the order the consumer submitted them. Every interaction here was exercised successfully on every variant its selection required (spec.md §2.2) — a contract is never written otherwise.
      * (Required)
      * 
@@ -77,16 +87,6 @@ public class Contract {
     @JsonProperty("metadata")
     @JsonPropertyDescription("How the file came to exist, and nothing that changes what a verifier does (spec.md \u00a73.2). Deliberately outside the content-addressed identity, so an unchanged rebuild is not a new contract. MUST NOT carry 'pactSpecification' \u2014 a Janus contract conforms to no pact specification version (ADR 0011).")
     private Metadata metadata;
-    /**
-     * Party
-     * <p>
-     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
-     * (Required)
-     * 
-     */
-    @JsonProperty("provider")
-    @JsonPropertyDescription("A named party. The member name and the path to 'name' are fixed by spec.md \u00a73.1 so brokers already deployed read them correctly.")
-    private Party provider;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -153,6 +153,30 @@ public class Contract {
     }
 
     /**
+     * Party
+     * <p>
+     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
+     * (Required)
+     * 
+     */
+    @JsonProperty("provider")
+    public Party getProvider() {
+        return provider;
+    }
+
+    /**
+     * Party
+     * <p>
+     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
+     * (Required)
+     * 
+     */
+    @JsonProperty("provider")
+    public void setProvider(Party provider) {
+        this.provider = provider;
+    }
+
+    /**
      * In the order the consumer submitted them. Every interaction here was exercised successfully on every variant its selection required (spec.md §2.2) — a contract is never written otherwise.
      * (Required)
      * 
@@ -194,30 +218,6 @@ public class Contract {
         this.metadata = metadata;
     }
 
-    /**
-     * Party
-     * <p>
-     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
-     * (Required)
-     * 
-     */
-    @JsonProperty("provider")
-    public Party getProvider() {
-        return provider;
-    }
-
-    /**
-     * Party
-     * <p>
-     * A named party. The member name and the path to 'name' are fixed by spec.md §3.1 so brokers already deployed read them correctly.
-     * (Required)
-     * 
-     */
-    @JsonProperty("provider")
-    public void setProvider(Party provider) {
-        this.provider = provider;
-    }
-
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -244,6 +244,10 @@ public class Contract {
         sb.append('=');
         sb.append(((this.consumer == null)?"<null>":this.consumer));
         sb.append(',');
+        sb.append("provider");
+        sb.append('=');
+        sb.append(((this.provider == null)?"<null>":this.provider));
+        sb.append(',');
         sb.append("interactions");
         sb.append('=');
         sb.append(((this.interactions == null)?"<null>":this.interactions));
@@ -251,10 +255,6 @@ public class Contract {
         sb.append("metadata");
         sb.append('=');
         sb.append(((this.metadata == null)?"<null>":this.metadata));
-        sb.append(',');
-        sb.append("provider");
-        sb.append('=');
-        sb.append(((this.provider == null)?"<null>":this.provider));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

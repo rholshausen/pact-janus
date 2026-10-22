@@ -25,34 +25,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "targets",
     "covered",
-    "dropped",
     "removed",
-    "targets"
+    "dropped"
 })
 public class Coverage {
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("covered")
-    private Long covered;
-    /**
-     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("dropped")
-    @JsonPropertyDescription("Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md \u00a73.5).")
-    private Long dropped;
-    /**
-     * Targets removed because an exclusion makes them unreachable.
-     * 
-     */
-    @JsonProperty("removed")
-    @JsonPropertyDescription("Targets removed because an exclusion makes them unreachable.")
-    private Long removed;
     /**
      * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
      * (Required)
@@ -61,8 +40,49 @@ public class Coverage {
     @JsonProperty("targets")
     @JsonPropertyDescription("Reachable coverage targets at this strength, after exclusions (spec.md \u00a73.3).")
     private Long targets;
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("covered")
+    private Long covered;
+    /**
+     * Targets removed because an exclusion makes them unreachable.
+     * 
+     */
+    @JsonProperty("removed")
+    @JsonPropertyDescription("Targets removed because an exclusion makes them unreachable.")
+    private Long removed;
+    /**
+     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
+     * 
+     */
+    @JsonProperty("dropped")
+    @JsonPropertyDescription("Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md \u00a73.5).")
+    private Long dropped;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
+    /**
+     * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("targets")
+    public Long getTargets() {
+        return targets;
+    }
+
+    /**
+     * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
+     * (Required)
+     * 
+     */
+    @JsonProperty("targets")
+    public void setTargets(Long targets) {
+        this.targets = targets;
+    }
 
     /**
      * 
@@ -85,24 +105,6 @@ public class Coverage {
     }
 
     /**
-     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("dropped")
-    public Long getDropped() {
-        return dropped;
-    }
-
-    /**
-     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
-     * 
-     */
-    @JsonProperty("dropped")
-    public void setDropped(Long dropped) {
-        this.dropped = dropped;
-    }
-
-    /**
      * Targets removed because an exclusion makes them unreachable.
      * 
      */
@@ -121,23 +123,21 @@ public class Coverage {
     }
 
     /**
-     * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
-     * (Required)
+     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
      * 
      */
-    @JsonProperty("targets")
-    public Long getTargets() {
-        return targets;
+    @JsonProperty("dropped")
+    public Long getDropped() {
+        return dropped;
     }
 
     /**
-     * Reachable coverage targets at this strength, after exclusions (spec.md §3.3).
-     * (Required)
+     * Reachable targets the sampler could not complete without matching an exclusion; reported rather than searched for (spec.md §3.5).
      * 
      */
-    @JsonProperty("targets")
-    public void setTargets(Long targets) {
-        this.targets = targets;
+    @JsonProperty("dropped")
+    public void setDropped(Long dropped) {
+        this.dropped = dropped;
     }
 
     @JsonAnyGetter
@@ -154,21 +154,21 @@ public class Coverage {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Coverage.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("targets");
+        sb.append('=');
+        sb.append(((this.targets == null)?"<null>":this.targets));
+        sb.append(',');
         sb.append("covered");
         sb.append('=');
         sb.append(((this.covered == null)?"<null>":this.covered));
-        sb.append(',');
-        sb.append("dropped");
-        sb.append('=');
-        sb.append(((this.dropped == null)?"<null>":this.dropped));
         sb.append(',');
         sb.append("removed");
         sb.append('=');
         sb.append(((this.removed == null)?"<null>":this.removed));
         sb.append(',');
-        sb.append("targets");
+        sb.append("dropped");
         sb.append('=');
-        sb.append(((this.targets == null)?"<null>":this.targets));
+        sb.append(((this.dropped == null)?"<null>":this.dropped));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

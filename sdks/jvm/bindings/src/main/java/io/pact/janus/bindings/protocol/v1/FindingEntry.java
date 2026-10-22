@@ -25,13 +25,23 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "interaction",
     "disposition",
     "exemption",
-    "finding",
-    "interaction"
+    "finding"
 })
 public class FindingEntry {
 
+    /**
+     * InteractionId
+     * <p>
+     * An interaction by contract spec §4.2's identity: description plus state names.
+     * (Required)
+     * 
+     */
+    @JsonProperty("interaction")
+    @JsonPropertyDescription("An interaction by contract spec \u00a74.2's identity: description plus state names.")
+    private InteractionId interaction;
     /**
      * Whether policy left this finding live or an exemption silenced it.
      * (Required)
@@ -57,6 +67,9 @@ public class FindingEntry {
     @JsonProperty("finding")
     @JsonPropertyDescription("Design 2.8 \u00a74's finding (its schemas/v1/finding.schema.json), carried through untouched.")
     private Map<String, Object> finding;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
     /**
      * InteractionId
      * <p>
@@ -65,10 +78,21 @@ public class FindingEntry {
      * 
      */
     @JsonProperty("interaction")
-    @JsonPropertyDescription("An interaction by contract spec \u00a74.2's identity: description plus state names.")
-    private InteractionId interaction;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    public InteractionId getInteraction() {
+        return interaction;
+    }
+
+    /**
+     * InteractionId
+     * <p>
+     * An interaction by contract spec §4.2's identity: description plus state names.
+     * (Required)
+     * 
+     */
+    @JsonProperty("interaction")
+    public void setInteraction(InteractionId interaction) {
+        this.interaction = interaction;
+    }
 
     /**
      * Whether policy left this finding live or an exemption silenced it.
@@ -132,30 +156,6 @@ public class FindingEntry {
         this.finding = finding;
     }
 
-    /**
-     * InteractionId
-     * <p>
-     * An interaction by contract spec §4.2's identity: description plus state names.
-     * (Required)
-     * 
-     */
-    @JsonProperty("interaction")
-    public InteractionId getInteraction() {
-        return interaction;
-    }
-
-    /**
-     * InteractionId
-     * <p>
-     * An interaction by contract spec §4.2's identity: description plus state names.
-     * (Required)
-     * 
-     */
-    @JsonProperty("interaction")
-    public void setInteraction(InteractionId interaction) {
-        this.interaction = interaction;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -170,6 +170,10 @@ public class FindingEntry {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(FindingEntry.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("interaction");
+        sb.append('=');
+        sb.append(((this.interaction == null)?"<null>":this.interaction));
+        sb.append(',');
         sb.append("disposition");
         sb.append('=');
         sb.append(((this.disposition == null)?"<null>":this.disposition));
@@ -181,10 +185,6 @@ public class FindingEntry {
         sb.append("finding");
         sb.append('=');
         sb.append(((this.finding == null)?"<null>":this.finding));
-        sb.append(',');
-        sb.append("interaction");
-        sb.append('=');
-        sb.append(((this.interaction == null)?"<null>":this.interaction));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

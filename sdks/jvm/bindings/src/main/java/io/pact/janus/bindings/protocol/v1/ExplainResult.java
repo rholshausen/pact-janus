@@ -25,18 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "plan",
-    "text"
+    "text",
+    "plan"
 })
 public class ExplainResult {
 
-    /**
-     * The structured plan document, when requested via options.
-     * 
-     */
-    @JsonProperty("plan")
-    @JsonPropertyDescription("The structured plan document, when requested via options.")
-    private Map<String, Object> plan;
     /**
      * The plan's pretty text form (design 2.4).
      * (Required)
@@ -45,26 +38,15 @@ public class ExplainResult {
     @JsonProperty("text")
     @JsonPropertyDescription("The plan's pretty text form (design 2.4).")
     private java.lang.String text;
+    /**
+     * The structured plan document, when requested via options.
+     * 
+     */
+    @JsonProperty("plan")
+    @JsonPropertyDescription("The structured plan document, when requested via options.")
+    private Map<String, Object> plan;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The structured plan document, when requested via options.
-     * 
-     */
-    @JsonProperty("plan")
-    public Map<String, Object> getPlan() {
-        return plan;
-    }
-
-    /**
-     * The structured plan document, when requested via options.
-     * 
-     */
-    @JsonProperty("plan")
-    public void setPlan(Map<String, Object> plan) {
-        this.plan = plan;
-    }
 
     /**
      * The plan's pretty text form (design 2.4).
@@ -86,6 +68,24 @@ public class ExplainResult {
         this.text = text;
     }
 
+    /**
+     * The structured plan document, when requested via options.
+     * 
+     */
+    @JsonProperty("plan")
+    public Map<String, Object> getPlan() {
+        return plan;
+    }
+
+    /**
+     * The structured plan document, when requested via options.
+     * 
+     */
+    @JsonProperty("plan")
+    public void setPlan(Map<String, Object> plan) {
+        this.plan = plan;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -100,13 +100,13 @@ public class ExplainResult {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ExplainResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("plan");
-        sb.append('=');
-        sb.append(((this.plan == null)?"<null>":this.plan));
-        sb.append(',');
         sb.append("text");
         sb.append('=');
         sb.append(((this.text == null)?"<null>":this.text));
+        sb.append(',');
+        sb.append("plan");
+        sb.append('=');
+        sb.append(((this.plan == null)?"<null>":this.plan));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

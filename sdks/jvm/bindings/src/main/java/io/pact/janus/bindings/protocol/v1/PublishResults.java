@@ -26,27 +26,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "branch",
-    "build-url",
     "provider-version",
-    "tags"
+    "branch",
+    "tags",
+    "build-url"
 })
 public class PublishResults {
 
-    /**
-     * The provider version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    @JsonPropertyDescription("The provider version's branch.")
-    private String branch;
-    /**
-     * The build that ran the verification.
-     * 
-     */
-    @JsonProperty("build-url")
-    @JsonPropertyDescription("The build that ran the verification.")
-    private String buildUrl;
     /**
      * The provider application version the results are for.
      * (Required)
@@ -55,46 +41,24 @@ public class PublishResults {
     @JsonProperty("provider-version")
     @JsonPropertyDescription("The provider application version the results are for.")
     private String providerVersion;
+    /**
+     * The provider version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    @JsonPropertyDescription("The provider version's branch.")
+    private String branch;
     @JsonProperty("tags")
     private List<String> tags;
+    /**
+     * The build that ran the verification.
+     * 
+     */
+    @JsonProperty("build-url")
+    @JsonPropertyDescription("The build that ran the verification.")
+    private String buildUrl;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * The provider version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    public String getBranch() {
-        return branch;
-    }
-
-    /**
-     * The provider version's branch.
-     * 
-     */
-    @JsonProperty("branch")
-    public void setBranch(String branch) {
-        this.branch = branch;
-    }
-
-    /**
-     * The build that ran the verification.
-     * 
-     */
-    @JsonProperty("build-url")
-    public String getBuildUrl() {
-        return buildUrl;
-    }
-
-    /**
-     * The build that ran the verification.
-     * 
-     */
-    @JsonProperty("build-url")
-    public void setBuildUrl(String buildUrl) {
-        this.buildUrl = buildUrl;
-    }
 
     /**
      * The provider application version the results are for.
@@ -116,6 +80,24 @@ public class PublishResults {
         this.providerVersion = providerVersion;
     }
 
+    /**
+     * The provider version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    public String getBranch() {
+        return branch;
+    }
+
+    /**
+     * The provider version's branch.
+     * 
+     */
+    @JsonProperty("branch")
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
+
     @JsonProperty("tags")
     public List<String> getTags() {
         return tags;
@@ -124,6 +106,24 @@ public class PublishResults {
     @JsonProperty("tags")
     public void setTags(List<String> tags) {
         this.tags = tags;
+    }
+
+    /**
+     * The build that ran the verification.
+     * 
+     */
+    @JsonProperty("build-url")
+    public String getBuildUrl() {
+        return buildUrl;
+    }
+
+    /**
+     * The build that ran the verification.
+     * 
+     */
+    @JsonProperty("build-url")
+    public void setBuildUrl(String buildUrl) {
+        this.buildUrl = buildUrl;
     }
 
     @JsonAnyGetter
@@ -140,21 +140,21 @@ public class PublishResults {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(PublishResults.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("branch");
-        sb.append('=');
-        sb.append(((this.branch == null)?"<null>":this.branch));
-        sb.append(',');
-        sb.append("buildUrl");
-        sb.append('=');
-        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
-        sb.append(',');
         sb.append("providerVersion");
         sb.append('=');
         sb.append(((this.providerVersion == null)?"<null>":this.providerVersion));
         sb.append(',');
+        sb.append("branch");
+        sb.append('=');
+        sb.append(((this.branch == null)?"<null>":this.branch));
+        sb.append(',');
         sb.append("tags");
         sb.append('=');
         sb.append(((this.tags == null)?"<null>":this.tags));
+        sb.append(',');
+        sb.append("buildUrl");
+        sb.append('=');
+        sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

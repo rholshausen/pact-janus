@@ -25,19 +25,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "interactions",
-    "observations"
+    "observations",
+    "interactions"
 })
 public class ObserveResponseResult {
 
-    /**
-     * How many distinct interactions those responses covered.
-     * (Required)
-     * 
-     */
-    @JsonProperty("interactions")
-    @JsonPropertyDescription("How many distinct interactions those responses covered.")
-    private Long interactions;
     /**
      * How many responses this session has recorded in total, so a host can report progress without holding its own counters.
      * (Required)
@@ -46,28 +38,16 @@ public class ObserveResponseResult {
     @JsonProperty("observations")
     @JsonPropertyDescription("How many responses this session has recorded in total, so a host can report progress without holding its own counters.")
     private Long observations;
+    /**
+     * How many distinct interactions those responses covered.
+     * (Required)
+     * 
+     */
+    @JsonProperty("interactions")
+    @JsonPropertyDescription("How many distinct interactions those responses covered.")
+    private Long interactions;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * How many distinct interactions those responses covered.
-     * (Required)
-     * 
-     */
-    @JsonProperty("interactions")
-    public Long getInteractions() {
-        return interactions;
-    }
-
-    /**
-     * How many distinct interactions those responses covered.
-     * (Required)
-     * 
-     */
-    @JsonProperty("interactions")
-    public void setInteractions(Long interactions) {
-        this.interactions = interactions;
-    }
 
     /**
      * How many responses this session has recorded in total, so a host can report progress without holding its own counters.
@@ -89,6 +69,26 @@ public class ObserveResponseResult {
         this.observations = observations;
     }
 
+    /**
+     * How many distinct interactions those responses covered.
+     * (Required)
+     * 
+     */
+    @JsonProperty("interactions")
+    public Long getInteractions() {
+        return interactions;
+    }
+
+    /**
+     * How many distinct interactions those responses covered.
+     * (Required)
+     * 
+     */
+    @JsonProperty("interactions")
+    public void setInteractions(Long interactions) {
+        this.interactions = interactions;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -103,13 +103,13 @@ public class ObserveResponseResult {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ObserveResponseResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("interactions");
-        sb.append('=');
-        sb.append(((this.interactions == null)?"<null>":this.interactions));
-        sb.append(',');
         sb.append("observations");
         sb.append('=');
         sb.append(((this.observations == null)?"<null>":this.observations));
+        sb.append(',');
+        sb.append("interactions");
+        sb.append('=');
+        sb.append(((this.interactions == null)?"<null>":this.interactions));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -127,8 +127,8 @@ public class ObserveResponseResult {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.interactions == null)? 0 :this.interactions.hashCode()));
         result = ((result* 31)+((this.observations == null)? 0 :this.observations.hashCode()));
+        result = ((result* 31)+((this.interactions == null)? 0 :this.interactions.hashCode()));
         return result;
     }
 
@@ -141,7 +141,7 @@ public class ObserveResponseResult {
             return false;
         }
         ObserveResponseResult rhs = ((ObserveResponseResult) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))))&&((this.observations == rhs.observations)||((this.observations!= null)&&this.observations.equals(rhs.observations))));
+        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.observations == rhs.observations)||((this.observations!= null)&&this.observations.equals(rhs.observations))))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))));
     }
 
 }

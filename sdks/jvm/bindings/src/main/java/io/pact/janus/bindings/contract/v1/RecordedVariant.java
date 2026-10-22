@@ -26,21 +26,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "assignment",
     "id",
-    "parts",
-    "states"
+    "assignment",
+    "states",
+    "parts"
 })
 public class RecordedVariant {
 
-    /**
-     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    @JsonPropertyDescription("The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.")
-    private List<Map<String, Object>> assignment;
     /**
      * The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics §2.2).
      * (Required)
@@ -50,13 +42,13 @@ public class RecordedVariant {
     @JsonPropertyDescription("The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics \u00a72.2).")
     private java.lang.String id;
     /**
-     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
      * (Required)
      * 
      */
-    @JsonProperty("parts")
-    @JsonPropertyDescription("Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.")
-    private Map<String, ValuePart> parts;
+    @JsonProperty("assignment")
+    @JsonPropertyDescription("The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.")
+    private List<Map<String, Object>> assignment;
     /**
      * The interaction's states with this variant's parameters resolved (variant semantics §6.4). Resolved values only — bindings live on the interaction, never here.
      * 
@@ -64,28 +56,16 @@ public class RecordedVariant {
     @JsonProperty("states")
     @JsonPropertyDescription("The interaction's states with this variant's parameters resolved (variant semantics \u00a76.4). Resolved values only \u2014 bindings live on the interaction, never here.")
     private List<ResolvedState> states;
+    /**
+     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    @JsonPropertyDescription("Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.")
+    private Map<String, ValuePart> parts;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    public List<Map<String, Object>> getAssignment() {
-        return assignment;
-    }
-
-    /**
-     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
-     * (Required)
-     * 
-     */
-    @JsonProperty("assignment")
-    public void setAssignment(List<Map<String, Object>> assignment) {
-        this.assignment = assignment;
-    }
 
     /**
      * The variant id. 'base', or the ';'-joined '<dimension-id>=<point>' renderings of the dimensions that differ from their default. Never a label (variant semantics §2.2).
@@ -108,23 +88,23 @@ public class RecordedVariant {
     }
 
     /**
-     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
      * (Required)
      * 
      */
-    @JsonProperty("parts")
-    public Map<String, ValuePart> getParts() {
-        return parts;
+    @JsonProperty("assignment")
+    public List<Map<String, Object>> getAssignment() {
+        return assignment;
     }
 
     /**
-     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * The assignment is the truth and the id is its name; both are recorded so a variant stays interpretable against a shape that has since grown a dimension.
      * (Required)
      * 
      */
-    @JsonProperty("parts")
-    public void setParts(Map<String, ValuePart> parts) {
-        this.parts = parts;
+    @JsonProperty("assignment")
+    public void setAssignment(List<Map<String, Object>> assignment) {
+        this.assignment = assignment;
     }
 
     /**
@@ -145,6 +125,26 @@ public class RecordedVariant {
         this.states = states;
     }
 
+    /**
+     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public Map<String, ValuePart> getParts() {
+        return parts;
+    }
+
+    /**
+     * Part name -> slot name -> the concrete value produced. Keyed identically to the interaction's 'parts', so shape and evidence line up slot for slot.
+     * (Required)
+     * 
+     */
+    @JsonProperty("parts")
+    public void setParts(Map<String, ValuePart> parts) {
+        this.parts = parts;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -159,21 +159,21 @@ public class RecordedVariant {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(RecordedVariant.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("assignment");
-        sb.append('=');
-        sb.append(((this.assignment == null)?"<null>":this.assignment));
-        sb.append(',');
         sb.append("id");
         sb.append('=');
         sb.append(((this.id == null)?"<null>":this.id));
         sb.append(',');
-        sb.append("parts");
+        sb.append("assignment");
         sb.append('=');
-        sb.append(((this.parts == null)?"<null>":this.parts));
+        sb.append(((this.assignment == null)?"<null>":this.assignment));
         sb.append(',');
         sb.append("states");
         sb.append('=');
         sb.append(((this.states == null)?"<null>":this.states));
+        sb.append(',');
+        sb.append("parts");
+        sb.append('=');
+        sb.append(((this.parts == null)?"<null>":this.parts));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

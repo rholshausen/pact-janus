@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "content",
-    "content-type",
-    "encoded"
+    "encoded",
+    "content-type"
 })
 public class SlotValue {
 
@@ -40,19 +40,19 @@ public class SlotValue {
     @JsonPropertyDescription("The value, represented as 'encoded' says. Absent means the slot was empty; null means the slot carried a null.")
     private Object content;
     /**
-     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
-     * 
-     */
-    @JsonProperty("content-type")
-    @JsonPropertyDescription("The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.")
-    private String contentType;
-    /**
      * How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 §4 octets (ADR 0006).
      * 
      */
     @JsonProperty("encoded")
     @JsonPropertyDescription("How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 \u00a74 octets (ADR 0006).")
     private String encoded;
+    /**
+     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
+     * 
+     */
+    @JsonProperty("content-type")
+    @JsonPropertyDescription("The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.")
+    private String contentType;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -77,24 +77,6 @@ public class SlotValue {
     }
 
     /**
-     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
-     * 
-     */
-    @JsonProperty("content-type")
-    public String getContentType() {
-        return contentType;
-    }
-
-    /**
-     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
-     * 
-     */
-    @JsonProperty("content-type")
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    /**
      * How to read 'content': 'json' is the value as it stands, so a JSON body stays readable and addressable; 'text' is a string whose octets are its UTF-8 encoding; 'base64' is RFC 4648 §4 octets (ADR 0006).
      * 
      */
@@ -110,6 +92,24 @@ public class SlotValue {
     @JsonProperty("encoded")
     public void setEncoded(String encoded) {
         this.encoded = encoded;
+    }
+
+    /**
+     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
+     * 
+     */
+    @JsonProperty("content-type")
+    public String getContentType() {
+        return contentType;
+    }
+
+    /**
+     * The media type the part declared for this slot, when it had one. Recorded because a verifier hands it to the content component and must not re-derive it.
+     * 
+     */
+    @JsonProperty("content-type")
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
     }
 
     @JsonAnyGetter
@@ -130,13 +130,13 @@ public class SlotValue {
         sb.append('=');
         sb.append(((this.content == null)?"<null>":this.content));
         sb.append(',');
-        sb.append("contentType");
-        sb.append('=');
-        sb.append(((this.contentType == null)?"<null>":this.contentType));
-        sb.append(',');
         sb.append("encoded");
         sb.append('=');
         sb.append(((this.encoded == null)?"<null>":this.encoded));
+        sb.append(',');
+        sb.append("contentType");
+        sb.append('=');
+        sb.append(((this.contentType == null)?"<null>":this.contentType));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -13,7 +13,11 @@ path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `preserve_order`: a schema's members are generated in the order its author wrote them (ADR 0037).
+# Spelled here, not inherited: this crate does not depend on the kernel, so whether Cargo turned it
+# on would depend on what else was built alongside it, and the release builds janus-sdk-gates with
+# the CLI — its bindings would differ from the ones `cargo run -p pact_janus_bindings` checked in.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 [dev-dependencies]
 expectest = "0.12"

@@ -25,20 +25,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "exemptions",
     "on-finding",
-    "on-review"
+    "on-review",
+    "exemptions"
 })
 public class PolicyView {
 
-    /**
-     * How many exemptions were in force across every layer.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exemptions")
-    @JsonPropertyDescription("How many exemptions were in force across every layer.")
-    private Long exemptions;
     /**
      * PolicyAction
      * <p>
@@ -59,28 +51,16 @@ public class PolicyView {
     @JsonProperty("on-review")
     @JsonPropertyDescription("What a subsumption severity does to the run (design 2.8 \u00a77.1). Both default to 'warn' (ADR 0016).")
     private String onReview;
+    /**
+     * How many exemptions were in force across every layer.
+     * (Required)
+     * 
+     */
+    @JsonProperty("exemptions")
+    @JsonPropertyDescription("How many exemptions were in force across every layer.")
+    private Long exemptions;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
-
-    /**
-     * How many exemptions were in force across every layer.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exemptions")
-    public Long getExemptions() {
-        return exemptions;
-    }
-
-    /**
-     * How many exemptions were in force across every layer.
-     * (Required)
-     * 
-     */
-    @JsonProperty("exemptions")
-    public void setExemptions(Long exemptions) {
-        this.exemptions = exemptions;
-    }
 
     /**
      * PolicyAction
@@ -130,6 +110,26 @@ public class PolicyView {
         this.onReview = onReview;
     }
 
+    /**
+     * How many exemptions were in force across every layer.
+     * (Required)
+     * 
+     */
+    @JsonProperty("exemptions")
+    public Long getExemptions() {
+        return exemptions;
+    }
+
+    /**
+     * How many exemptions were in force across every layer.
+     * (Required)
+     * 
+     */
+    @JsonProperty("exemptions")
+    public void setExemptions(Long exemptions) {
+        this.exemptions = exemptions;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -144,10 +144,6 @@ public class PolicyView {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(PolicyView.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("exemptions");
-        sb.append('=');
-        sb.append(((this.exemptions == null)?"<null>":this.exemptions));
-        sb.append(',');
         sb.append("onFinding");
         sb.append('=');
         sb.append(((this.onFinding == null)?"<null>":this.onFinding));
@@ -155,6 +151,10 @@ public class PolicyView {
         sb.append("onReview");
         sb.append('=');
         sb.append(((this.onReview == null)?"<null>":this.onReview));
+        sb.append(',');
+        sb.append("exemptions");
+        sb.append('=');
+        sb.append(((this.exemptions == null)?"<null>":this.exemptions));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -173,8 +173,8 @@ public class PolicyView {
         int result = 1;
         result = ((result* 31)+((this.onFinding == null)? 0 :this.onFinding.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.exemptions == null)? 0 :this.exemptions.hashCode()));
         result = ((result* 31)+((this.onReview == null)? 0 :this.onReview.hashCode()));
+        result = ((result* 31)+((this.exemptions == null)? 0 :this.exemptions.hashCode()));
         return result;
     }
 
@@ -187,7 +187,7 @@ public class PolicyView {
             return false;
         }
         PolicyView rhs = ((PolicyView) other);
-        return (((((this.onFinding == rhs.onFinding)||((this.onFinding!= null)&&this.onFinding.equals(rhs.onFinding)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.exemptions == rhs.exemptions)||((this.exemptions!= null)&&this.exemptions.equals(rhs.exemptions))))&&((this.onReview == rhs.onReview)||((this.onReview!= null)&&this.onReview.equals(rhs.onReview))));
+        return (((((this.onFinding == rhs.onFinding)||((this.onFinding!= null)&&this.onFinding.equals(rhs.onFinding)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.onReview == rhs.onReview)||((this.onReview!= null)&&this.onReview.equals(rhs.onReview))))&&((this.exemptions == rhs.exemptions)||((this.exemptions!= null)&&this.exemptions.equals(rhs.exemptions))));
     }
 
 }

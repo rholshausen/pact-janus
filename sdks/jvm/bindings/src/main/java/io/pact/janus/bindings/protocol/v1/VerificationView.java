@@ -25,20 +25,21 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "filtered",
-    "runs",
     "status",
+    "runs",
+    "filtered",
     "variants"
 })
 public class VerificationView {
 
     /**
-     * Whether any covering run was filtered: unreplayed variants are not passing ones.
+     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
+     * (Required)
      * 
      */
-    @JsonProperty("filtered")
-    @JsonPropertyDescription("Whether any covering run was filtered: unreplayed variants are not passing ones.")
-    private Boolean filtered;
+    @JsonProperty("status")
+    @JsonPropertyDescription("'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' \u2014 no supplied result covers this pair.")
+    private java.lang.String status;
     /**
      * How many supplied results covered this pair.
      * (Required)
@@ -48,13 +49,12 @@ public class VerificationView {
     @JsonPropertyDescription("How many supplied results covered this pair.")
     private Long runs;
     /**
-     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
-     * (Required)
+     * Whether any covering run was filtered: unreplayed variants are not passing ones.
      * 
      */
-    @JsonProperty("status")
-    @JsonPropertyDescription("'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' \u2014 no supplied result covers this pair.")
-    private java.lang.String status;
+    @JsonProperty("filtered")
+    @JsonPropertyDescription("Whether any covering run was filtered: unreplayed variants are not passing ones.")
+    private Boolean filtered;
     /**
      * The variants the covering run replayed for this pair: its 'pairs' entries' counts, added up when it verified more than one document between these two (ADR 0033). Present only when one run covered the pair, and, for a summary from before 'pairs', only when that run covered this pair alone.
      * 
@@ -66,21 +66,23 @@ public class VerificationView {
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
-     * Whether any covering run was filtered: unreplayed variants are not passing ones.
+     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
+     * (Required)
      * 
      */
-    @JsonProperty("filtered")
-    public Boolean getFiltered() {
-        return filtered;
+    @JsonProperty("status")
+    public java.lang.String getStatus() {
+        return status;
     }
 
     /**
-     * Whether any covering run was filtered: unreplayed variants are not passing ones.
+     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
+     * (Required)
      * 
      */
-    @JsonProperty("filtered")
-    public void setFiltered(Boolean filtered) {
-        this.filtered = filtered;
+    @JsonProperty("status")
+    public void setStatus(java.lang.String status) {
+        this.status = status;
     }
 
     /**
@@ -104,23 +106,21 @@ public class VerificationView {
     }
 
     /**
-     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
-     * (Required)
+     * Whether any covering run was filtered: unreplayed variants are not passing ones.
      * 
      */
-    @JsonProperty("status")
-    public java.lang.String getStatus() {
-        return status;
+    @JsonProperty("filtered")
+    public Boolean getFiltered() {
+        return filtered;
     }
 
     /**
-     * 'verified', 'failed', 'incomplete' (a run a hook aborted), or 'unknown' — no supplied result covers this pair.
-     * (Required)
+     * Whether any covering run was filtered: unreplayed variants are not passing ones.
      * 
      */
-    @JsonProperty("status")
-    public void setStatus(java.lang.String status) {
-        this.status = status;
+    @JsonProperty("filtered")
+    public void setFiltered(Boolean filtered) {
+        this.filtered = filtered;
     }
 
     /**
@@ -155,17 +155,17 @@ public class VerificationView {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VerificationView.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("filtered");
+        sb.append("status");
         sb.append('=');
-        sb.append(((this.filtered == null)?"<null>":this.filtered));
+        sb.append(((this.status == null)?"<null>":this.status));
         sb.append(',');
         sb.append("runs");
         sb.append('=');
         sb.append(((this.runs == null)?"<null>":this.runs));
         sb.append(',');
-        sb.append("status");
+        sb.append("filtered");
         sb.append('=');
-        sb.append(((this.status == null)?"<null>":this.status));
+        sb.append(((this.filtered == null)?"<null>":this.filtered));
         sb.append(',');
         sb.append("variants");
         sb.append('=');

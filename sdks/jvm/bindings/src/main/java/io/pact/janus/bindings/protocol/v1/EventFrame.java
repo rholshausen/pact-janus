@@ -24,11 +24,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "event",
-    "type"
+    "type",
+    "event"
 })
 public class EventFrame {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("type")
+    private String type;
     /**
      * Event
      * <p>
@@ -38,15 +45,28 @@ public class EventFrame {
      */
     @JsonProperty("event")
     private Event event;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
     /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("type")
-    private String type;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    public String getType() {
+        return type;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("type")
+    public void setType(String type) {
+        this.type = type;
+    }
 
     /**
      * Event
@@ -72,26 +92,6 @@ public class EventFrame {
         this.event = event;
     }
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("type")
-    public String getType() {
-        return type;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("type")
-    public void setType(String type) {
-        this.type = type;
-    }
-
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -106,13 +106,13 @@ public class EventFrame {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(EventFrame.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("event");
-        sb.append('=');
-        sb.append(((this.event == null)?"<null>":this.event));
-        sb.append(',');
         sb.append("type");
         sb.append('=');
         sb.append(((this.type == null)?"<null>":this.type));
+        sb.append(',');
+        sb.append("event");
+        sb.append('=');
+        sb.append(((this.event == null)?"<null>":this.event));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -130,8 +130,8 @@ public class EventFrame {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.event == null)? 0 :this.event.hashCode()));
         result = ((result* 31)+((this.type == null)? 0 :this.type.hashCode()));
+        result = ((result* 31)+((this.event == null)? 0 :this.event.hashCode()));
         return result;
     }
 
@@ -144,7 +144,7 @@ public class EventFrame {
             return false;
         }
         EventFrame rhs = ((EventFrame) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.event == rhs.event)||((this.event!= null)&&this.event.equals(rhs.event))))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))));
+        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))))&&((this.event == rhs.event)||((this.event!= null)&&this.event.equals(rhs.event))));
     }
 
 }

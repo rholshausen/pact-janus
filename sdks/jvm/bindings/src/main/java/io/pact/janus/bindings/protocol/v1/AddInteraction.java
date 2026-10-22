@@ -25,11 +25,18 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "interaction",
-    "session"
+    "session",
+    "interaction"
 })
 public class AddInteraction {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("session")
+    private java.lang.String session;
     /**
      * One complete interaction specification (designs 2.2/3.2).
      * (Required)
@@ -38,35 +45,8 @@ public class AddInteraction {
     @JsonProperty("interaction")
     @JsonPropertyDescription("One complete interaction specification (designs 2.2/3.2).")
     private Map<String, Object> interaction;
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("session")
-    private java.lang.String session;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * One complete interaction specification (designs 2.2/3.2).
-     * (Required)
-     * 
-     */
-    @JsonProperty("interaction")
-    public Map<String, Object> getInteraction() {
-        return interaction;
-    }
-
-    /**
-     * One complete interaction specification (designs 2.2/3.2).
-     * (Required)
-     * 
-     */
-    @JsonProperty("interaction")
-    public void setInteraction(Map<String, Object> interaction) {
-        this.interaction = interaction;
-    }
 
     /**
      * 
@@ -88,6 +68,26 @@ public class AddInteraction {
         this.session = session;
     }
 
+    /**
+     * One complete interaction specification (designs 2.2/3.2).
+     * (Required)
+     * 
+     */
+    @JsonProperty("interaction")
+    public Map<String, Object> getInteraction() {
+        return interaction;
+    }
+
+    /**
+     * One complete interaction specification (designs 2.2/3.2).
+     * (Required)
+     * 
+     */
+    @JsonProperty("interaction")
+    public void setInteraction(Map<String, Object> interaction) {
+        this.interaction = interaction;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -102,13 +102,13 @@ public class AddInteraction {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(AddInteraction.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("interaction");
-        sb.append('=');
-        sb.append(((this.interaction == null)?"<null>":this.interaction));
-        sb.append(',');
         sb.append("session");
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
+        sb.append(',');
+        sb.append("interaction");
+        sb.append('=');
+        sb.append(((this.interaction == null)?"<null>":this.interaction));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

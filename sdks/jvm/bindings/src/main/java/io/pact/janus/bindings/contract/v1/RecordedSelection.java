@@ -26,19 +26,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "report",
-    "variants"
+    "variants",
+    "report"
 })
 public class RecordedSelection {
 
-    /**
-     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
-     * (Required)
-     * 
-     */
-    @JsonProperty("report")
-    @JsonPropertyDescription("Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.")
-    private Map<String, Object> report;
     /**
      * In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics §5.1). Only exercised variants appear — the honesty rule.
      * (Required)
@@ -47,28 +39,16 @@ public class RecordedSelection {
     @JsonProperty("variants")
     @JsonPropertyDescription("In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics \u00a75.1). Only exercised variants appear \u2014 the honesty rule.")
     private List<RecordedVariant> variants;
+    /**
+     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
+     * (Required)
+     * 
+     */
+    @JsonProperty("report")
+    @JsonPropertyDescription("Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.")
+    private Map<String, Object> report;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
-     * (Required)
-     * 
-     */
-    @JsonProperty("report")
-    public Map<String, Object> getReport() {
-        return report;
-    }
-
-    /**
-     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
-     * (Required)
-     * 
-     */
-    @JsonProperty("report")
-    public void setReport(Map<String, Object> report) {
-        this.report = report;
-    }
 
     /**
      * In recorded order, which is run order: a verifier replays exactly these, in this order, and never re-samples (variant semantics §5.1). Only exercised variants appear — the honesty rule.
@@ -90,6 +70,26 @@ public class RecordedSelection {
         this.variants = variants;
     }
 
+    /**
+     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
+     * (Required)
+     * 
+     */
+    @JsonProperty("report")
+    public Map<String, Object> getReport() {
+        return report;
+    }
+
+    /**
+     * Design 2.3's selection report. Recording it is what makes a contract self-describing about its own coverage.
+     * (Required)
+     * 
+     */
+    @JsonProperty("report")
+    public void setReport(Map<String, Object> report) {
+        this.report = report;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -104,13 +104,13 @@ public class RecordedSelection {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(RecordedSelection.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("report");
-        sb.append('=');
-        sb.append(((this.report == null)?"<null>":this.report));
-        sb.append(',');
         sb.append("variants");
         sb.append('=');
         sb.append(((this.variants == null)?"<null>":this.variants));
+        sb.append(',');
+        sb.append("report");
+        sb.append('=');
+        sb.append(((this.report == null)?"<null>":this.report));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

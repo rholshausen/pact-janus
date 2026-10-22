@@ -26,18 +26,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "components",
-    "transports"
+    "transports",
+    "components"
 })
 public class VerificationTarget {
 
-    /**
-     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
-     * 
-     */
-    @JsonProperty("components")
-    @JsonPropertyDescription("The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md \u00a78.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.")
-    private List<Map<String, Object>> components;
     /**
      * 
      * (Required)
@@ -45,26 +38,15 @@ public class VerificationTarget {
      */
     @JsonProperty("transports")
     private List<TransportBinding> transports;
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md \u00a78.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.")
+    private List<Map<String, Object>> components;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
-     * 
-     */
-    @JsonProperty("components")
-    public List<Map<String, Object>> getComponents() {
-        return components;
-    }
-
-    /**
-     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
-     * 
-     */
-    @JsonProperty("components")
-    public void setComponents(List<Map<String, Object>> components) {
-        this.components = components;
-    }
 
     /**
      * 
@@ -86,6 +68,24 @@ public class VerificationTarget {
         this.transports = transports;
     }
 
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as for consumer-session/create (spec.md §8.3). Loaded, and every contract's 'requires' checked against them, before the run starts: an unsatisfiable requirement fails the call, never interaction 40 of 50.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -100,13 +100,13 @@ public class VerificationTarget {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VerificationTarget.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("components");
-        sb.append('=');
-        sb.append(((this.components == null)?"<null>":this.components));
-        sb.append(',');
         sb.append("transports");
         sb.append('=');
         sb.append(((this.transports == null)?"<null>":this.transports));
+        sb.append(',');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

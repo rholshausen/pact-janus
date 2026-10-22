@@ -26,18 +26,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "report",
-    "variants"
+    "variants",
+    "report"
 })
 public class VariantsResult {
 
-    /**
-     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
-     * 
-     */
-    @JsonProperty("report")
-    @JsonPropertyDescription("How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).")
-    private Map<String, Object> report;
     /**
      * The selection, in run order — the variants the engine chose, not the whole space (design 2.3).
      * (Required)
@@ -46,26 +39,15 @@ public class VariantsResult {
     @JsonProperty("variants")
     @JsonPropertyDescription("The selection, in run order \u2014 the variants the engine chose, not the whole space (design 2.3).")
     private List<VariantDescriptor> variants;
+    /**
+     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
+     * 
+     */
+    @JsonProperty("report")
+    @JsonPropertyDescription("How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).")
+    private Map<String, Object> report;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
-     * 
-     */
-    @JsonProperty("report")
-    public Map<String, Object> getReport() {
-        return report;
-    }
-
-    /**
-     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
-     * 
-     */
-    @JsonProperty("report")
-    public void setReport(Map<String, Object> report) {
-        this.report = report;
-    }
 
     /**
      * The selection, in run order — the variants the engine chose, not the whole space (design 2.3).
@@ -87,6 +69,24 @@ public class VariantsResult {
         this.variants = variants;
     }
 
+    /**
+     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
+     * 
+     */
+    @JsonProperty("report")
+    public Map<String, Object> getReport() {
+        return report;
+    }
+
+    /**
+     * How the selection was chosen: space size, strategy, coverage, exclusions (design 2.3).
+     * 
+     */
+    @JsonProperty("report")
+    public void setReport(Map<String, Object> report) {
+        this.report = report;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -101,13 +101,13 @@ public class VariantsResult {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(VariantsResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("report");
-        sb.append('=');
-        sb.append(((this.report == null)?"<null>":this.report));
-        sb.append(',');
         sb.append("variants");
         sb.append('=');
         sb.append(((this.variants == null)?"<null>":this.variants));
+        sb.append(',');
+        sb.append("report");
+        sb.append('=');
+        sb.append(((this.report == null)?"<null>":this.report));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');

@@ -25,22 +25,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "error",
+    "type",
     "id",
     "ok",
-    "type"
+    "error"
 })
 public class ResponseFrame {
 
     /**
-     * EngineError
-     * <p>
-     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
+     * 
+     * (Required)
      * 
      */
-    @JsonProperty("error")
-    @JsonPropertyDescription("The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md \u00a710.")
-    private EngineError error;
+    @JsonProperty("type")
+    private java.lang.String type;
     /**
      * Echo of the request id. Empty string means pipe-level (uncorrelatable), see spec.md §4.4.
      * (Required)
@@ -57,35 +55,35 @@ public class ResponseFrame {
     @JsonPropertyDescription("The operation's result document, governed by the operation's schema.")
     private Map<String, Object> ok;
     /**
+     * EngineError
+     * <p>
+     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
+     * 
+     */
+    @JsonProperty("error")
+    @JsonPropertyDescription("The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md \u00a710.")
+    private EngineError error;
+    @JsonIgnore
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+
+    /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("type")
-    private java.lang.String type;
-    @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
-
-    /**
-     * EngineError
-     * <p>
-     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
-     * 
-     */
-    @JsonProperty("error")
-    public EngineError getError() {
-        return error;
+    public java.lang.String getType() {
+        return type;
     }
 
     /**
-     * EngineError
-     * <p>
-     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
+     * 
+     * (Required)
      * 
      */
-    @JsonProperty("error")
-    public void setError(EngineError error) {
-        this.error = error;
+    @JsonProperty("type")
+    public void setType(java.lang.String type) {
+        this.type = type;
     }
 
     /**
@@ -127,23 +125,25 @@ public class ResponseFrame {
     }
 
     /**
-     * 
-     * (Required)
+     * EngineError
+     * <p>
+     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
      * 
      */
-    @JsonProperty("type")
-    public java.lang.String getType() {
-        return type;
+    @JsonProperty("error")
+    public EngineError getError() {
+        return error;
     }
 
     /**
-     * 
-     * (Required)
+     * EngineError
+     * <p>
+     * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
      * 
      */
-    @JsonProperty("type")
-    public void setType(java.lang.String type) {
-        this.type = type;
+    @JsonProperty("error")
+    public void setError(EngineError error) {
+        this.error = error;
     }
 
     @JsonAnyGetter
@@ -160,9 +160,9 @@ public class ResponseFrame {
     public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ResponseFrame.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
-        sb.append("error");
+        sb.append("type");
         sb.append('=');
-        sb.append(((this.error == null)?"<null>":this.error));
+        sb.append(((this.type == null)?"<null>":this.type));
         sb.append(',');
         sb.append("id");
         sb.append('=');
@@ -172,9 +172,9 @@ public class ResponseFrame {
         sb.append('=');
         sb.append(((this.ok == null)?"<null>":this.ok));
         sb.append(',');
-        sb.append("type");
+        sb.append("error");
         sb.append('=');
-        sb.append(((this.type == null)?"<null>":this.type));
+        sb.append(((this.error == null)?"<null>":this.error));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -193,9 +193,9 @@ public class ResponseFrame {
         int result = 1;
         result = ((result* 31)+((this.id == null)? 0 :this.id.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.error == null)? 0 :this.error.hashCode()));
-        result = ((result* 31)+((this.ok == null)? 0 :this.ok.hashCode()));
         result = ((result* 31)+((this.type == null)? 0 :this.type.hashCode()));
+        result = ((result* 31)+((this.ok == null)? 0 :this.ok.hashCode()));
+        result = ((result* 31)+((this.error == null)? 0 :this.error.hashCode()));
         return result;
     }
 
@@ -208,7 +208,7 @@ public class ResponseFrame {
             return false;
         }
         ResponseFrame rhs = ((ResponseFrame) other);
-        return ((((((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.error == rhs.error)||((this.error!= null)&&this.error.equals(rhs.error))))&&((this.ok == rhs.ok)||((this.ok!= null)&&this.ok.equals(rhs.ok))))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))));
+        return ((((((this.id == rhs.id)||((this.id!= null)&&this.id.equals(rhs.id)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.type == rhs.type)||((this.type!= null)&&this.type.equals(rhs.type))))&&((this.ok == rhs.ok)||((this.ok!= null)&&this.ok.equals(rhs.ok))))&&((this.error == rhs.error)||((this.error!= null)&&this.error.equals(rhs.error))));
     }
 
 }

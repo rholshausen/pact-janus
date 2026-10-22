@@ -26,12 +26,19 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
+    "when",
     "reason",
-    "removed",
-    "when"
+    "removed"
 })
 public class AppliedExclusion {
 
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("when")
+    private List<Point> when;
     /**
      * 
      * (Required)
@@ -46,15 +53,28 @@ public class AppliedExclusion {
     @JsonProperty("removed")
     @JsonPropertyDescription("Coverage targets this exclusion made unreachable.")
     private Long removed;
+    @JsonIgnore
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+
     /**
      * 
      * (Required)
      * 
      */
     @JsonProperty("when")
-    private List<Point> when;
-    @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    public List<Point> getWhen() {
+        return when;
+    }
+
+    /**
+     * 
+     * (Required)
+     * 
+     */
+    @JsonProperty("when")
+    public void setWhen(List<Point> when) {
+        this.when = when;
+    }
 
     /**
      * 
@@ -94,26 +114,6 @@ public class AppliedExclusion {
         this.removed = removed;
     }
 
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("when")
-    public List<Point> getWhen() {
-        return when;
-    }
-
-    /**
-     * 
-     * (Required)
-     * 
-     */
-    @JsonProperty("when")
-    public void setWhen(List<Point> when) {
-        this.when = when;
-    }
-
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -128,6 +128,10 @@ public class AppliedExclusion {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(AppliedExclusion.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("when");
+        sb.append('=');
+        sb.append(((this.when == null)?"<null>":this.when));
+        sb.append(',');
         sb.append("reason");
         sb.append('=');
         sb.append(((this.reason == null)?"<null>":this.reason));
@@ -135,10 +139,6 @@ public class AppliedExclusion {
         sb.append("removed");
         sb.append('=');
         sb.append(((this.removed == null)?"<null>":this.removed));
-        sb.append(',');
-        sb.append("when");
-        sb.append('=');
-        sb.append(((this.when == null)?"<null>":this.when));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
