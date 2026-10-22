@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792651762171,
+  "lastUpdate": 1792651763819,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -18726,6 +18726,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 45175,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "37282376c5d1521d5a6a11b62220eceb12c8dca7",
+          "message": "test: record today's second Content-Type rule check as S1.26\n\nFound landing S1.23. Today's verifier checks a rule on the pact's\nContent-Type header on the header as sent, and again before it compares a\nbody, against the reply's type as pact_models writes it: no space before a\nparameter, charset in lower case. A regex written with the space passes the\nfirst check and fails the second. janus verify checks the rule once, on the\nheader (ADR 0036 decision 4), and passes.\n\nThe fixture bodies/content-type-rule-with-a-space shows it on a JSON body,\nso it is not multipart's alone, and its two ledger entries name S1.26, a new\nplan item that decides whether the legacy compiler copies the second check\nor an ADR makes the difference deliberate. Nothing the engine ships changes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T17:44:22+11:00",
+          "tree_id": "789ac731a096dd03b98419ef52cbcf8dd49db9aa",
+          "url": "https://github.com/rholshausen/pact-janus/commit/37282376c5d1521d5a6a11b62220eceb12c8dca7"
+        },
+        "date": 1792651763472,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 37381,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27519,
             "unit": "requests per second",
             "extra": "engines 4"
           }
