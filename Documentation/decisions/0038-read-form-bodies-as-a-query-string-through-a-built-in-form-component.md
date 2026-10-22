@@ -5,7 +5,9 @@
 - **Plan tasks**: S1.21 (the build); S1.25 (`janus upgrade`, which this leaves as it was)
 - **Evidence**: pact-reference's matcher (`pact_matching::form_urlencoded::match_form_urlencoded`,
   which hands both bodies to `query::match_query_maps`); `pact_models`' `FormUrlEncodedHandler`, which
-  today's verifier generates into a form body with; S1.1's first run
+  `pact_matching` generates into a form body with, and which `pact_verifier` is built without
+  ([pact-reference#588](https://github.com/pact-foundation/pact-reference/issues/588)); pact-jvm's
+  `FormUrlEncodedContentTypeHandler`; S1.1's first run
   (`compatibility-suite/v1/23-…`); [ADR 0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)
   decision 3 and its tripwire; [ADR 0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)
 
@@ -13,15 +15,20 @@
 
 A v1–v4 pact with an `application/x-www-form-urlencoded` body is refused as `component-unavailable`,
 and a body generator on a form body is sent as recorded with a `generator-failed` warning. Today's
-verifier passes the first and applies the second.
+verifier passes the first. What it does with the second depends on which verifier: see below.
 
 Today's verifier compares a form body exactly as it compares a query string. It parses both bodies
 into name–value pairs, groups the values by name, and calls the query matcher on the two maps, with
 the body's matching rules. So a name the pact lacks is a mismatch, in a request and in a response
 alike, which is unlike a JSON response body. A name's values are compared in order, by the rule at
-`$.<name>` or `$.<name>[<index>]` or by equality. And to generate, it parses the body into pairs,
-applies each generator to one occurrence of its name, and writes the pairs back out with
-`serde_urlencoded`.
+`$.<name>` or `$.<name>[<index>]` or by equality.
+
+Generating is where today's verifiers differ. `pact_matching` parses the body into pairs, applies each
+generator to one occurrence of its name, and writes the pairs back out with `serde_urlencoded`, but
+only with its `form_urlencoded` feature, which `pact_verifier` does not turn on. So
+`pact_verifier_cli` sends a form body's generators unapplied, and has for a long time
+([pact-reference#588](https://github.com/pact-foundation/pact-reference/issues/588)). pact-jvm applies
+them.
 
 The query slot already has a model: an object whose members are arrays of strings (the HTTP
 transport's, which a Janus contract's query shape addresses). Since ADR 0037 the object keeps the order
@@ -53,9 +60,11 @@ A form body needs one: it is compiled as a query string, not walked as a documen
    `serde_json`. Compiling v1–v4 rules is the legacy compiler's alone (plan-grammar spec §1), and no
    component could do it without importing those semantics. XML (S1.22) asks the tripwire's question
    again, more sharply.
-5. **A form body's generators are applied as today's**, with `pact_models`' `FormUrlEncodedHandler`.
-   Each value comes from the built-in `pact` generator component (ADR 0034), and a generator that
-   produces nothing keeps the recorded value and is reported, as in a JSON body.
+5. **A form body's generators are applied**, with `pact_models`' `FormUrlEncodedHandler`, as
+   `pact_matching` applies them when it is built to, and as pact-jvm does. Each value comes from the
+   built-in `pact` generator component (ADR 0034), and a generator that produces nothing keeps the
+   recorded value and is reported, as in a JSON body. Against `pact_verifier_cli` this is a
+   deliberate difference, which S1.1's ledger records with pact-reference#588.
 
 ## Alternatives considered
 
@@ -74,7 +83,8 @@ A form body needs one: it is compiled as a query string, not walked as a documen
 
 ## Consequences
 
-- A v1–v4 pact with a form body verifies as it does today, and its request generators are applied.
+- A v1–v4 pact with a form body verifies as it does today, and its request generators are applied,
+  which today's Rust verifier does not do.
 - A Janus contract can declare a form body. Its shape is an object of string arrays, written as the
   query slot's is.
 - `janus upgrade` still carries a form body across with `body-not-parsed`. S1.25 now converts form

@@ -76,14 +76,14 @@
       "key": "run",
       "today": "fail",
       "janus": "pass",
-      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body"
+      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body (pact-foundation/pact-reference#588)"
     },
     {
       "case": "generators/form-body",
       "key": "0/0",
       "today": "fail",
       "janus": "pass",
-      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body"
+      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body (pact-foundation/pact-reference#588)"
     },
     {
       "case": "connection/header-case",
