@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792646614542,
+  "lastUpdate": 1792646616748,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -17664,6 +17664,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20148,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "bc39a46924ad38f93319780dbc31296e1b10da52",
+          "message": "feat: S1.22 XML bodies verify as today, through a built-in XML component\n\nA v1–v4 pact with an XML body was refused, and the legacy harness skipped\nthe 156 pact-specification cases that have one. ADR 0039 decides how XML\nis read and compared.\n\nengine/component-xml is a built-in content component for the types today's\nverifier counts as XML (application or text, subtype xml or +xml). Every\nembedding registers it after JSON and before text, so text/xml reaches it.\nIt parses with sxd-document, as today's verifier does. Its document is\nkeyed by element name: an element holds #namespace, @<name> per attribute,\n#text (each text node trimmed, then joined) and an array of children per\nlocal name, so pact's XML paths are document paths.\n\nThe legacy layer reads a pact's XML body into the same document, and a test\nholds that reader to the component's. The legacy compiler walks it as\npact_matching's match_xml does, with three new legacy actions:\nlegacy:xml-children, legacy:xml-only-children and legacy:parses-as. Plan\npaths gain a quoted segment, ['@{urn:names}name']. Request generators on an\nXML body go through pact_models' XmlHandler.\n\nA type rule on any v1–v4 text value (attribute, element text, path, header,\nquery or form value) now parses the text, as today's verifier does, where\nit compared the value's kind.\n\nThe legacy harness runs all 741 cases, with no exclusion rule and no\njanus:skip. The differential harness reads 344 verdicts: 330 agree and 14\nare known. Its ledger entries for compatibility-suite case 19 are gone. One\nnew entry is deliberate: an element the pact puts in no namespace matches\nits local name in any namespace, as the specification's `unexpected xml\nnamespace` case says and pact-reference's V2 engine does, where today's\nverifier and pact-jvm fail it.\n\nThe staged plan adds S2.10: keeping XML text as written, CDATA included,\nin Janus contracts only.\n\nThe XML walk follows pact_matching::xml (pact-reference, rust/pact_matching\n2.0.11); no code was copied.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T16:18:29+11:00",
+          "tree_id": "d6d6727384e3368ffa58a5d037dd75287f00123d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/bc39a46924ad38f93319780dbc31296e1b10da52"
+        },
+        "date": 1792646616028,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25564,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20318,
             "unit": "requests per second",
             "extra": "engines 4"
           }
