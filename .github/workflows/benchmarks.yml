@@ -111,3 +111,22 @@ jobs:
           summary-always: true
           comment-on-alert: false
           fail-on-alert: false
+      # The page that draws the chart lives in this repository, benchmarks/chart/index.html, so a
+      # change to it is reviewed. The action writes its own default page only when there is none, so
+      # this replaces whatever is published when it differs. The action has switched back from
+      # gh-pages by now, and pushed it, so this starts from what it pushed.
+      - name: Publish the chart page
+        if: env.RECORD == 'true'
+        run: |
+          git fetch --no-tags origin +gh-pages:refs/remotes/origin/gh-pages
+          git worktree add --detach "$RUNNER_TEMP/gh-pages" origin/gh-pages
+          cp benchmarks/chart/index.html "$RUNNER_TEMP/gh-pages/bench/index.html"
+          cd "$RUNNER_TEMP/gh-pages"
+          if git diff --quiet; then
+            echo "The published chart page is this one"
+          else
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -am "Publish the chart page from ${GITHUB_SHA}"
+            git push origin HEAD:gh-pages
+          fi

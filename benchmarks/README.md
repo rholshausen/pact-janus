@@ -39,6 +39,12 @@ arming share of a mock exchange, the per-interaction and per-variant costs, thro
 component's compile time and size). The points live in `bench/data.js` on the `gh-pages` branch, which
 only that workflow writes. The whole result documents, every metric, are an artifact of each run.
 
+The page that draws them is [`chart/index.html`](chart/index.html), which the workflow publishes as
+`bench/index.html` after each recorded run. It is the action's own default page plus a trend line: at
+each run, the median of the last 7 runs, drawn over the runs themselves, which are faded. One noisy
+runner moves a point but not the line, so a change in the code shows as a step in the line that stays.
+`?window=N` on the page's address changes how many runs the median spans.
+
 It is a **trend, not a gate**. The runners are shared machines, so one run's numbers can move by
 tens of percent with no change in the code; nothing fails a build for being slower, and a single
 point means little. Read the shape over many merges. The runs in `results/` are the other kind of
