@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792631509342,
+  "lastUpdate": 1792631510937,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -16602,6 +16602,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27148,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "648b4dc90df51ab7cfa44e8c19f0290507d98c59",
+          "message": "fix: the broker client's recording keeps the order the broker sends\n\nCI's verifier-diff job records the broker scenario again and fails on any\ndifference. Since S1.20 (ADR 0037) a Value keeps its members in the order\nthey arrived, so the recorder writes the broker's replies and our requests\nin their own order rather than sorted. The content is unchanged, the 409 the\nscenario provokes included; only member order moved. Recorded again against\nthe pinned broker, and the result is byte-identical across two fresh\nbrokers.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T12:06:08+11:00",
+          "tree_id": "2d7e6b70ea0f8e75ea828f14660cfb394445ea07",
+          "url": "https://github.com/rholshausen/pact-janus/commit/648b4dc90df51ab7cfa44e8c19f0290507d98c59"
+        },
+        "date": 1792631510609,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26976,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20445,
             "unit": "requests per second",
             "extra": "engines 4"
           }
