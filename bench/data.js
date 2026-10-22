@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792646942788,
+  "lastUpdate": 1792646946068,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -18018,6 +18018,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20318,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f2da18e712b02bdcf2cc6df6623284295781fb5f",
+          "message": "docs: the v1–v4 compiler may emit expect:absent for a body declared empty\n\nPlan-grammar §4.4 and §4.5 said the v1–v4 compiler never emits\nexpect:absent, since v1–v4 has no absence assertion. It has one: a body\nthe pact declares empty or null fails when the actual body has content\n(\"Expected empty body but received …\", pact_matching 2.0.11\nmatch_body_content) and passes when it is missing or empty. The legacy\ncompiler has emitted expect:absent on the body slot for exactly that since\nthe prototype, and the specification case `body/non empty body found when\nempty expected` holds it to today's verdict.\n\nThe spec now allows expect:absent there and nowhere else in a v1–v4 plan;\nmatch:any-of stays shapes only. No behaviour or corpus changes. Found while\nlanding S1.22.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-22T16:22:57+11:00",
+          "tree_id": "25a0f07018c6aa287d7a56a7cdf90f2d94948293",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f2da18e712b02bdcf2cc6df6623284295781fb5f"
+        },
+        "date": 1792646944621,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27164,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19605,
             "unit": "requests per second",
             "extra": "engines 4"
           }
