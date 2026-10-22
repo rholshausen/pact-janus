@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792712403349,
+  "lastUpdate": 1792712405648,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -19788,6 +19788,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20486,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "7de3724e7af2d45f501bfd9884afc48338adeb67",
+          "message": "feat: S1.17 a filtered run is reported as filtered, never verified, and is not published\n\nA --variant naming an id no document recorded replayed nothing and reported\nVERIFIED with exit 0; from a broker with --publish it published a success\nfor every pact, since a pact with no results had none that failed. ADR 0041\ndecides what a filtered run is and how it reads:\n\n- A filter naming an id no document records is variant-not-found, with the\n  first such id and the ids the documents record. verify refuses it for an\n  inline source (janus verify exits 2); a broker run ends right after\n  verification/fetched, before anything runs or is published. An empty\n  variants list is malformed-frame.\n- A run is filtered when its filter left out a recorded variant, as pact-jvm\n  judges it; one that admits everything (base, over v1-v4 pacts) is whole.\n- A filtered run that nothing failed has status filtered, and so does each\n  pairs entry it narrowed. janus verify prints FILTERED and exits 0: it did\n  what it was asked, as today's verifiers do.\n- A narrowed pact is not published: outcome skipped, reason filtered, as\n  pact-jvm skips it. pact_verifier_cli 1.3.5 publishes it, and passes a\n  filter that matches nothing with exit 0.\n- subsumption/decide raises verification-filtered per pair.\n\nThe variant-semantics and engine-protocol specs say so. The cases are\nprotocol-level tests in the kernel's verification and broker tests, and two\nCLI tests replace the snapshot that recorded the gap; corpora/ holds plans\nand conformance/ has no provider side until S1.14, which gains them. S1.13's\n--filter-* rows carry ADR 0041.\n\nAlso: S1.18's Done line in the staged plan (178cb64), and start()'s doc\ncomment, which had drifted onto RunComponents.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T10:24:25+11:00",
+          "tree_id": "4cf962543227f55092ed4346084d123eae52adfc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/7de3724e7af2d45f501bfd9884afc48338adeb67"
+        },
+        "date": 1792712404940,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 39011,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27812,
             "unit": "requests per second",
             "extra": "engines 4"
           }
