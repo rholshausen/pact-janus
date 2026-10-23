@@ -83,7 +83,9 @@ Three sources are the source of truth and take precedence over this file when th
 > `filtered`, never `verified`, and is not published), and S1.24 (ADR 0042: a v1–v4 body's `values`,
 > `eachKey`, `eachValue` and `arrayContains` rules compile as today's verifier applies them), and S1.26
 > (ADR 0043: a pact's `Content-Type` is checked once, on the header; today's second check before the
-> body is a deliberate difference).
+> body is a deliberate difference), and S1.9 (ADR 0044: an `http` hook sends through `engine/http-client`
+> with a `client` member and tries a state call three times; hook secrets never reach a log; `exec`
+> deadlines end the process group and scripts' memory and stack are bounded).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

@@ -454,7 +454,8 @@ does not know is ignored, as in every open document.
   by ALPN over TLS and with prior knowledge in the clear; `"negotiate"`, offering both by ALPN over
   TLS and HTTP/1.1 in the clear.
 - `retries`: how many times a client that retries tries a request again. The broker client does
-  (default 2). A provider request is never retried, because a verification observes the provider's
+  (default 2), and so does an `http` hook (lifecycle-hooks spec §8.4: default 2 at the state points, 0
+  elsewhere). A provider request is never retried, because a verification observes the provider's
   first answer.
 
 ```json http-client-options

@@ -628,6 +628,86 @@ fn a_teardown_failure_warns_and_leaves_the_result_alone() {
   assert_eq!(summary(&events)["status"], json!("verified"));
 }
 
+/// Lifecycle-hooks spec §7.3, one member at a time (staged plan S1.9): a hook's `config`, its
+/// `run.env` and `run.headers`, the user information in an `http` hook's URL, and the `data` a hook
+/// returns are where a project's secrets land. None reaches an event, the hook report or the
+/// summary, whether the hook succeeds or fails; `data` does only when its entry sets
+/// `report-data: true`.
+#[test]
+fn no_hook_secret_reaches_anything_a_run_reports() {
+  let provider = provider_without_auth();
+  let mut engine = engine_with_hooks();
+  let contract = contract_with_two_variants(&mut engine);
+  let with_userinfo = provider
+    .base_url()
+    .replace("http://", "http://bob:s3cret-userinfo@");
+  let hooks = |report_data: bool| {
+    json!({ "hooks": {
+      "before-verification": [
+        { "name": "token",
+          "run": { "kind": "script",
+                   "source": "function hook(ctx) { return { outcome: 'ok', data: { token: 's3cret-data:' + ctx.config.secret.length } }; }" },
+          "config": { "secret": "s3cret-config" },
+          "report-data": report_data } ],
+      "state-setup": [
+        { "name": "fixtures",
+          "run": { "kind": "http", "url": format!("{with_userinfo}/_pact/provider-states"),
+                   "format": "pact-state-change",
+                   "headers": { "Authorization": "Bearer s3cret-header" } } } ],
+      "after-verification": [
+        { "name": "notify",
+          "run": { "kind": "exec", "command": sh(), "args": [fixture("ok.sh")],
+                   "env": { "PATH": "/usr/bin:/bin", "NOTIFY_TOKEN": "s3cret-env" } } },
+        { "name": "report",
+          "run": { "kind": "http", "url": format!("{with_userinfo}/nowhere"),
+                   "headers": { "Authorization": "Bearer s3cret-header" } } } ]
+    } })
+  };
+
+  let events = verify(
+    &mut engine,
+    contract.clone(),
+    provider.base_url(),
+    Some(hooks(false)),
+  );
+  for result in results(&events) {
+    assert_eq!(result["status"], json!("verified"), "{result}");
+  }
+  let report = &summary(&events)["hooks"]["invocations"];
+  assert!(
+    report
+      .as_array()
+      .unwrap()
+      .iter()
+      .any(|i| i["hook"] == json!("report") && i["outcome"] == json!("failed")),
+    "the failing hook is reported: {report}"
+  );
+  let everything = serde_json::to_string(&events).unwrap();
+  for secret in [
+    "s3cret-config",
+    "s3cret-env",
+    "s3cret-header",
+    "s3cret-userinfo",
+    "s3cret-data",
+    "bob:",
+  ] {
+    assert!(
+      !everything.contains(secret),
+      "{secret} reached what the run reported: {everything}"
+    );
+  }
+
+  let events = verify(&mut engine, contract, provider.base_url(), Some(hooks(true)));
+  let everything = serde_json::to_string(&events).unwrap();
+  assert!(
+    everything.contains("s3cret-data:13"),
+    "report-data: true reports it: {everything}"
+  );
+  for secret in ["s3cret-config", "s3cret-env", "s3cret-header", "s3cret-userinfo"] {
+    assert!(!everything.contains(secret), "{secret}: {everything}");
+  }
+}
+
 #[test]
 fn a_selector_runs_a_state_handler_only_for_its_own_state() {
   let provider = provider_without_auth();

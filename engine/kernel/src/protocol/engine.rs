@@ -952,12 +952,26 @@ impl Engine {
 /// `kind` and nothing else, and a `url` loses any user information. The HTTP client options carry
 /// a client certificate's private key, whose `key` is hidden, and a transport binding's options
 /// carry headers for every request to the provider, today's `--header`, which is how a token is
-/// usually passed, so their values are hidden (ADR 0035). Bytes that are not JSON are shown by
-/// their length, since nothing says what they hold.
+/// usually passed, so their values are hidden (ADR 0035). A hook entry's `config`, and its `run`'s
+/// `headers` and `env`, are where interpolated secrets land (lifecycle-hooks spec §7.3), so they are
+/// hidden too, by the shape of an entry: an object with a `run` object. Bytes that are not JSON are
+/// shown by their length, since nothing says what they hold.
 fn loggable(bytes: &[u8]) -> String {
   fn redact(value: &mut Value) {
     match value {
       Value::Object(members) => {
+        if members.get("run").is_some_and(Value::is_object) {
+          if let Some(config) = members.get_mut("config") {
+            *config = json!("***");
+          }
+          if let Some(Value::Object(run)) = members.get_mut("run") {
+            for secrets in ["headers", "env"] {
+              if let Some(Value::Object(values)) = run.get_mut(secrets) {
+                values.values_mut().for_each(|value| *value = json!("***"));
+              }
+            }
+          }
+        }
         for (name, member) in members.iter_mut() {
           match (name.as_str(), member) {
             ("auth", Value::Object(auth)) => {
@@ -1161,6 +1175,52 @@ mod tests {
       logged.contains(r#""Authorization":"***""#) && logged.contains("BEGIN CERTIFICATE-----mine"),
       "{logged}"
     );
+  }
+
+  /// Lifecycle-hooks spec §7.3: a hook entry's `config`, `run.headers` and `run.env` are where the
+  /// loader puts a project's secrets, and none is logged, nor the key in an `http` hook's client
+  /// options or the user information in its URL (staged plan S1.9). What is not secret still is.
+  #[test]
+  fn a_logged_frame_carries_no_hook_secret() {
+    let frame = json!({
+      "type": "request", "id": "r-1", "op": "verification/verify",
+      "body": { "target": { "transports": [], "hooks": { "version": 1, "hooks": {
+        "before-request": [{
+          "name": "sign",
+          "run": { "kind": "exec", "command": "./sign", "env": { "SIGNING_KEY": "s3cret-env" } },
+          "config": { "secret": "s3cret-config", "nested": { "token": "s3cret-nested" } },
+          "changes": ["parts.request.headers"]
+        }],
+        "state-setup": [{
+          "name": "states",
+          "run": { "kind": "http", "url": "https://bob:s3cret-userinfo@provider.example/_pact/states",
+                   "headers": { "Authorization": "Bearer s3cret-header" },
+                   "client": { "tls": { "client-certificate": {
+                     "certificate": "-----BEGIN CERTIFICATE-----mine", "key": "s3cret-key" } } } }
+        }]
+      } } } }
+    });
+    let logged = loggable(&serde_json::to_vec(&frame).unwrap());
+    for secret in [
+      "s3cret-env",
+      "s3cret-config",
+      "s3cret-nested",
+      "s3cret-userinfo",
+      "s3cret-header",
+      "s3cret-key",
+      "bob",
+    ] {
+      assert!(!logged.contains(secret), "{secret} in {logged}");
+    }
+    for shown in [
+      r#""name":"sign""#,
+      r#""command":"./sign""#,
+      "SIGNING_KEY",
+      "provider.example/_pact/states",
+      "BEGIN CERTIFICATE-----mine",
+    ] {
+      assert!(logged.contains(shown), "{shown} not in {logged}");
+    }
   }
 
   /// `events/poll` at the dispatch boundary. The stream's own guarantees (ordering, `seq`,

@@ -62,7 +62,7 @@
         "retries": {
           "type": "integer",
           "minimum": 0,
-          "description": "How many times a client that retries tries a request again. The broker client does (default 2: a request with no answer, a 5xx, or a 429 that says when). A provider request is never retried: a verification observes the provider's first answer."
+          "description": "How many times a client that retries tries a request again. The broker client does (default 2: a request with no answer, a 5xx, or a 429 that says when), and so does an http hook (default 2 at the state points, 0 elsewhere: a 5xx, a 408 or a 429). A provider request is never retried: a verification observes the provider's first answer."
         }
       }
     },

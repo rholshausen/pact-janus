@@ -16,20 +16,6 @@
       "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 1000) reaches the plan as one list, and one match:regex judges it, as a whole value since S1.18, so it fails \\d{1,4}; today applies the rule to each value, and both pass"
     },
     {
-      "case": "state-callbacks/fails-once",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.9: the state callback answers 503 once; today's verifier retries a state call that gets a 5xx, 408 or 429 (eight times, from 500 ms) and passes, and janus verify's http hook does not retry"
-    },
-    {
-      "case": "state-callbacks/fails-once",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S1.9: the state callback answers 503 once; today's verifier retries a state call that gets a 5xx, 408 or 429 (eight times, from 500 ms) and passes, and janus verify's http hook does not retry"
-    },
-    {
       "case": "generators/form-body",
       "key": "run",
       "today": "fail",

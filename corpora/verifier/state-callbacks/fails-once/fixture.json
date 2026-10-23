@@ -1,5 +1,5 @@
 {
-  "description": "A provider-state callback that fails once with a 503, as an endpoint still warming up would, and then succeeds. Today's verifier retries a failed state call (eight times, backing off from 500 ms) and passes; janus verify's http hook does not retry, and fails",
+  "description": "A provider-state callback that fails once with a 503, as an endpoint still warming up would, and then succeeds. Today's verifier tries a failed state call again (up to eight times) and passes; janus verify's http hook tries a state call three times (ADR 0044) and passes too",
   "source": "staged plan S1.9; pact_verifier's HttpRequestProviderStateExecutor (retries: 8)",
   "pacts": ["pact.json"],
   "provider": {

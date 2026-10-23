@@ -17,7 +17,8 @@ PACT_VERIFIER_CLI=target/pact-verifier/pact-verifier-linux-x86_64 \
 The broker is needed only by the broker cases (below): without `--broker`, a run that includes
 them stops and says so, and `--filter` can leave them out. CI runs this as the `verifier-diff` job, and `cargo test` checks that every fixture and ledger entry
 reads without running anything. One case takes about two minutes on its own: when a provider-state
-call fails, today's verifier retries it before giving up (staged plan S1.9 records the difference).
+call fails, today's verifier tries it eight times before giving up, where `janus verify` tries it three
+(ADR 0044).
 
 ## What a fixture is
 

@@ -678,6 +678,26 @@ item in 1a is done when S1.1 agrees.
   dispatcher) must cover them as it covers a broker's `auth`.
   *Exit:* every state-change and request-filter option in S1.13's table maps to a hook, and the
   redaction rules (lifecycle-hooks spec §7.3) have a test per secret-bearing context member.
+  *Done 2026-10-23* ([ADR 0044](decisions/0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md)).
+  The `http` hook sends through `engine/http-client` and takes a `client` member, so a state endpoint
+  behind mutual TLS is reached as the provider is. The default is not today's eight: that count came
+  with the broker's retries in May 2026 (`c98502f6`), not from a decision about state calls. A state
+  call is tried three times, after a 5xx, 408 or 429, waiting 100 ms and then 1 s, which is the 2022
+  design (#197). `timeout-ms` bounds each attempt. `state-callbacks/fails-once` now agrees, and its two
+  ledger entries are gone: the harness reads 782 verdicts, 770 agreeing and 12 known.
+  `format: pact-state-change-query` is today's `--state-change-as-query`. The migration table has a
+  row for each state-change option of both CLIs, `--custom-middleware`, and the in-test request
+  filters and state handlers, which S1.15 serves as loopback hooks. Redaction, reviewed surface by
+  surface: renderings and reports already left out `config`, `env` and `headers`. Two leaks are fixed:
+  the `trace` frame log repeated all three, and a failing `http` hook's message repeated its URL's user
+  information. Tests cover each secret-bearing member across events, the hook report, the summary,
+  frames and the binary's own `trace` output. An `exec` deadline now ends the process group (Unix,
+  through `rustix`, with no `unsafe`) or tree (`taskkill /T` on Windows), and so does a command that
+  exits while a child it started holds its output. A script's memory (64 MiB) and stack (256 KiB) are
+  bounded, with a test each, which closes X.2. Not foreseen: rquickjs already capped the stack at
+  256 KiB, unstated, and its memory limit is silently ignored under its custom-allocator features,
+  which the kernel does not enable. Left out: registry credentials, X.3's other half, are now S1.27,
+  and the built-in OAuth2 hook component still has its own client.
 - **S1.10 `match:content-type` in live runs** — **S**. The exchange and verification paths execute
   with no content detector (third-party component report §4); the single `ContentDetector` slot
   becomes a lookup over the session's `ContentRegistry`.
@@ -989,6 +1009,18 @@ item in 1a is done when S1.1 agrees.
   with the same charset, and a rule written to allow no space all agree. Nothing the engine does
   changed.
 
+- **S1.27 Registry credentials from the resolved configuration** — **S**. Split from S1.9 on
+  2026-10-23, for X.3. The WASM loader reads `JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` itself
+  (Phase 9 finding 16), so two runs of the same configuration on two machines can differ in whether
+  they start, and nothing in the configuration says why: the one place a run still depends on the
+  environment of the process that hosts the engine, which lifecycle-hooks spec §7.1 exists to rule
+  out. Finding 16's option B: a component declaration's `source` takes an `auth` member,
+  `${VAR}`-interpolated by the loader like a hook's `run.headers`, and the redaction rules of §7.3,
+  and the frame log's, extended from hooks to component entries. Whether the two variables stay as a
+  fallback for `janus component pull`, which has no configuration, is the decision.
+  *Exit:* finding 16 closed; a component declaration's registry credential reaches the registry and
+  nothing a run reports or logs, with a test, as S1.9's hook secrets have.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.
@@ -1229,7 +1261,7 @@ model, written down as it is built.
 |---|---|---|
 | **X.1 The subprocess binary's provenance** | S0.4 | How an SDK resolves `janus-engine`: pinned version, verified checksum, the `JANUS_ENGINE` override logged, never a bare `PATH` lookup |
 | **X.2 The scripted-hook sandbox** | S1.9 | QuickJS runs scripts a repository's `verifier.janus.yaml` names (ADR 0015). The hook context is the script's whole capability surface; memory, time and recursion limits are enforced, and that claim has a test |
-| **X.3 Credentials** | S1.3, S1.9 | Broker, OAuth2 and registry credentials come from the loader's resolved configuration, never the run's environment (finding 16's exception closed), and the redaction rules cover every report they could reach |
+| **X.3 Credentials** | S1.3, S1.9, S1.27 | Broker, OAuth2 and registry credentials come from the loader's resolved configuration, never the run's environment (finding 16's exception closed, S1.27), and the redaction rules cover every report they could reach |
 | **X.4 Secrets in recorded artifacts** | S2.8 | Contracts, executed plans and hook reports |
 | **X.5 Component sandboxing** | S5.1, S5.5 | The WASM grants (`fs`, `network`, `env`) enforced in process; out of process, `fs` and `network` are unenforceable (finding 19) and the specification says so to the user |
 | **X.6 Component supply chain** | S5.1 | Signed artifacts, verified at pull and at load; the digest recorded in the run (finding 15) |

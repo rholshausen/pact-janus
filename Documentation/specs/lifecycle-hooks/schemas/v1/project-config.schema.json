@@ -84,7 +84,8 @@
         "url": { "type": "string" },
         "method": { "type": "string", "x-known-values": ["POST", "PUT", "GET"] },
         "headers": { "type": "object", "additionalProperties": { "type": "string" } },
-        "format": { "type": "string", "x-known-values": ["janus", "pact-state-change"] }
+        "format": { "type": "string", "x-known-values": ["janus", "pact-state-change", "pact-state-change-query"] },
+        "client": { "type": "object" }
       }
     }
   }

@@ -116,8 +116,12 @@
         },
         "format": {
           "type": "string",
-          "description": "kind 'http': the body shape. 'janus' is this specification's context document. 'pact-state-change' is the v3/v4 provider-state body ({ state, params, action }) so an existing state-change endpoint keeps working unchanged — the migration case B5 exists for (spec.md §8.4).",
-          "x-known-values": ["janus", "pact-state-change"]
+          "description": "kind 'http': the body shape. 'janus' is this specification's context document. 'pact-state-change' is the v3/v4 provider-state body ({ state, params, action }) so an existing state-change endpoint keeps working unchanged — the migration case B5 exists for; 'pact-state-change-query' sends the same as query parameters and no body, as today's --state-change-as-query does (spec.md §8.4).",
+          "x-known-values": ["janus", "pact-state-change", "pact-state-change-query"]
+        },
+        "client": {
+          "type": "object",
+          "description": "kind 'http': the HTTP client options the endpoint is reached with, the document a provider's transport takes as 'client' (component-interfaces spec §5.6). Its 'retries' defaults to 2 at state-setup and state-teardown and 0 elsewhere, and 'timeout-ms' bounds each attempt (spec.md §8.4, ADR 0044)."
         }
       }
     },

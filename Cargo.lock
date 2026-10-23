@@ -2577,12 +2577,16 @@ dependencies = [
 name = "pact_janus_hooks_host"
 version = "0.3.0"
 dependencies = [
+ "http",
+ "pact_janus_http_client",
  "pact_janus_kernel",
+ "pact_janus_test_servers",
  "pretty_assertions",
+ "rustix 1.1.5",
  "serde_json",
  "serde_yaml_ng",
  "tracing",
- "ureq",
+ "url",
 ]
 
 [[package]]

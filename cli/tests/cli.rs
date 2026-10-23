@@ -527,6 +527,49 @@ fn a_filtered_run_says_so_in_its_status_and_its_summary() {
   );
 }
 
+/// Lifecycle-hooks spec §7.3 through the binary (staged plan S1.9): a secret the loader interpolates
+/// into a hook's `config` or `run.headers` reaches the hook and nothing `janus verify` prints, every
+/// frame and log line at `trace` included.
+#[test]
+fn a_hook_secret_appears_nowhere_janus_verify_prints() {
+  let provider = provider();
+  let config = temp("secret-hooks.janus.yaml");
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\nhooks:\n  before-verification:\n    - name: token\n      run: {{ kind: script, source: \"function hook(ctx) {{ return {{ outcome: 'ok' }}; }}\" }}\n      config: {{ secret: \"${{HOOK_SECRET}}\" }}\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n        headers: {{ Authorization: \"Bearer ${{STATE_TOKEN}}\" }}\n",
+      provider.base_url()
+    ),
+  )
+  .expect("writing the config");
+  let output = janus_command()
+    .args([
+      "verify",
+      &order_pact(),
+      "--provider-url",
+      provider.base_url(),
+      "--config",
+      &config,
+    ])
+    .args(["--log-level", "trace"])
+    .env("HOOK_SECRET", "s3cret-config")
+    .env("STATE_TOKEN", "s3cret-header")
+    .output()
+    .expect("the janus binary runs");
+  let everything = format!("{}{}", stdout(&output), stderr(&output));
+  assert_eq!(code(&output), 0, "{everything}");
+  for secret in ["s3cret-config", "s3cret-header"] {
+    assert!(
+      !everything.contains(secret),
+      "{secret} was printed:\n{everything}"
+    );
+  }
+  assert!(
+    everything.contains("frame in"),
+    "the frames were logged: {everything}"
+  );
+}
+
 #[test]
 fn verify_reads_a_directory_and_skips_what_is_not_a_contract_or_a_pact() {
   let provider = provider();

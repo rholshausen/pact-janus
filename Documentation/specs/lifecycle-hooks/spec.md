@@ -440,7 +440,8 @@ than being killed mid-call.
 
 Expiry is a failure and takes the point's `on-failure` policy. For scripts the bound is enforced by an
 interrupt handler around every invocation (§9.5); for `exec` by killing the process group; for `http` by
-abandoning the request; for components by the binding's deadline.
+abandoning the request, each attempt bounded on its own when the request is tried again (§8.4); for
+components by the binding's deadline.
 
 ### 5.5 `state-unavailable`, and its waiver
 
@@ -629,13 +630,26 @@ this one: a long-lived process that speaks the same frames is a **subprocess com
 
 ### 8.4 `http`
 
-`run: { kind: http, url, method?, headers?, format? }`. The engine POSTs the context document to the
-endpoint; a 2xx response with a JSON result body is the result, a 2xx with an empty body is
+`run: { kind: http, url, method?, headers?, format?, client? }`. The engine POSTs the context document to
+the endpoint; a 2xx response with a JSON result body is the result, a 2xx with an empty body is
 `{ "outcome": "ok" }`, and a non-2xx is `failed` carrying the status and a bounded excerpt of the body.
+
+`client` is the HTTP client options (component-interfaces spec
+[§5.6](../component-interfaces/spec.md#56-the-built-in-http-transports-options), [ADR
+0035](../../decisions/0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md)):
+the endpoint is reached through the same client a provider is, so a state endpoint behind the
+provider's mutual TLS or private CA is reached with the same options. Its `retries` is how many times a
+request is tried again after an answer of 5xx, 408 or 429, waiting 100 ms, then 1 s, ten times longer
+each time after; a request that gets no answer is not tried again. It defaults to **2 at `state-setup`
+and `state-teardown`**, so a state endpoint that is still warming up is not a failed interaction, and to
+0 at every other point ([ADR 0044](../../decisions/0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md)).
+`timeout-ms` (§5.4) bounds each attempt.
 
 `format: pact-state-change` sends the v3/v4 provider-state body instead — `{ "state", "params", "action" }`
 with `action` `"setup"` or `"teardown"` from the point — so **an existing state-change endpoint keeps
-working unchanged**. That is B5's actual migration test: a provider that has a state endpoint today
+working unchanged**. `format: pact-state-change-query` sends the same as query parameters and no body
+(`state`, `action`, and each parameter, a string as it is and anything else as its JSON text), as today's
+`--state-change-as-query` does. That is B5's actual migration test: a provider that has a state endpoint today
 should be verifiable by Janus by naming it in a config file, not by rewriting it. The response is read
 the way today's verifiers read it: a 2xx whose body is a JSON object with no `outcome` member is
 `{ "outcome": "ok", "values": <the object> }`, the provider-state values a `ProviderState` generator reads
@@ -728,6 +742,12 @@ the invocation ends as `timed-out` and the point's policy applies. This is not o
 the bake-off interrupts a runaway script by default, and a hook that spins would otherwise hang a
 verification. Verified in the WASM build, where the host's epoch deadline bounds it from outside as well
 (spike 1.4).
+
+Time is not the only thing a script could exhaust. Each invocation's runtime may allocate at most
+**64 MiB** and use at most **256 KiB of stack**, so a script that allocates or recurses without end
+fails as `errored`, with the interpreter's own message, rather than taking the engine's process with it.
+The stack limit is QuickJS's default, made a commitment: it has to sit well inside the stack of the
+thread the engine runs hooks on, since the interpreter checks it only as it goes.
 
 ### 9.6 TypeScript
 

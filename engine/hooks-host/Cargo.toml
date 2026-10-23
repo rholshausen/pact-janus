@@ -14,13 +14,25 @@ serde_json = "1"
 # the archived serde_yaml; the parsed document is a serde_json::Value either way, so nothing below
 # the loader knows which form the file was in.
 serde_yaml_ng = "0.10"
-# The `http` implementation's client — already in the tree for the HTTP transport's drive role, and
-# blocking for the same reason: an invocation is one request and its reply.
-ureq = "3"
+# The `http` implementation's client: the one the HTTP transport and the broker client send through
+# (ADR 0035), so a state endpoint is reached as the provider is (ADR 0044).
+pact_janus_http_client = { path = "../http-client" }
+http = "1"
+# A query-form state call's parameters, encoded (today's `--state-change-as-query`). Already in the
+# tree through reqwest.
+url = "2"
 tracing = "0.1"
+
+# Ends an exec hook's process group at its deadline, safely (spec §5.4). Already in the tree through
+# wasmtime.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["process"] }
 
 [dev-dependencies]
 pretty_assertions = "1"
+# A provider over TLS that can demand a client certificate, for a state endpoint reached as the
+# provider is (ADR 0044).
+pact_janus_test_servers = { path = "../../tools/test-servers" }
 
 [lints]
 workspace = true

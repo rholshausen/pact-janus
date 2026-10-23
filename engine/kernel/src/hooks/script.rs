@@ -17,7 +17,9 @@
 //!
 //! **Every invocation is bounded** (§9.5). An interrupt handler tripped by the deadline ends a
 //! runaway script as `timed-out`; no interpreter in the bake-off interrupts one by default, and a
-//! hook that spins would otherwise hang a verification.
+//! hook that spins would otherwise hang a verification. Its memory and its stack are bounded too
+//! ([`MEMORY_LIMIT`], [`STACK_LIMIT`]), so a script that allocates without end or recurses without
+//! end fails as `errored` rather than taking the engine's process with it (staged plan S1.9, X.2).
 //!
 //! **A runtime per invocation.** Caching one per source would save the 0.17 ms cold start the spike
 //! measured, and would mean one hook's leftover globals reaching the next invocation — state no
@@ -29,6 +31,15 @@ use super::invoke::{HookFailure, HookInvoker, InvokeResult, Outcome};
 use rquickjs::{Context, Function, Runtime};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
+
+/// The most memory one invocation's runtime may allocate (spec §9.5): enough for a context carrying
+/// several megabytes of bodies, and a bound on a script that would take the engine's memory.
+pub const MEMORY_LIMIT: usize = 64 * 1024 * 1024;
+
+/// The most stack one invocation may use (spec §9.5), QuickJS's own default made explicit. It has
+/// to sit well inside the stack of the thread a verification runs on, 2 MiB, since QuickJS checks
+/// it only as it goes: a limit past the real stack would let a deep recursion crash the process.
+pub const STACK_LIMIT: usize = 256 * 1024;
 
 /// The JavaScript half of the `janus` standard library (spec §9.3, `hook-api.d.ts`). Evaluated
 /// before the hook's own source, so a script sees it as an ordinary global.
@@ -109,6 +120,8 @@ impl HookInvoker for ScriptHooks {
     // §9.5: tripped by the deadline, checked by the interpreter between operations — the only
     // thing that stops `while (true) {}`.
     runtime.set_interrupt_handler(Some(Box::new(move || Instant::now() >= deadline)));
+    runtime.set_memory_limit(MEMORY_LIMIT);
+    runtime.set_max_stack_size(STACK_LIMIT);
 
     let ctx = Context::full(&runtime).map_err(|err| HookFailure::errored(format!("quickjs: {err}")))?;
     let answered: Result<String, ScriptError> = ctx.with(|ctx| {
@@ -410,6 +423,49 @@ mod tests {
       "the interrupt handler stopped it, not a test timeout: {:?}",
       started.elapsed()
     );
+  }
+
+  /// X.2: memory and recursion are bounded as time is. A script that allocates or recurses without
+  /// end fails as `errored`, well before its deadline, and the engine carries on.
+  #[rstest::rstest]
+  #[case::memory(
+    "function hook(ctx) { const hoard = []; while (true) { hoard.push(new Array(1000000).fill(1)); } }",
+    "memory"
+  )]
+  #[case::recursion(
+    "function hook(ctx) { function deeper(n) { return deeper(n + 1) + 1; } return deeper(0); }",
+    "stack"
+  )]
+  fn a_script_that_would_exhaust_the_engine_is_stopped_by_its_limits(
+    #[case] source: &str,
+    #[case] limit: &str,
+  ) {
+    let started = Instant::now();
+    let failure = ScriptHooks::new()
+      .invoke(
+        &json!({ "kind": "script", "source": source }),
+        &request_context(),
+        30_000,
+      )
+      .expect_err("it cannot finish");
+    assert_eq!(failure.outcome, Outcome::Errored, "{:?}", failure.error);
+    let message = failure.error["message"].as_str().unwrap_or_default();
+    assert!(message.contains(limit), "{message}");
+    assert!(
+      started.elapsed() < Duration::from_secs(20),
+      "{:?}",
+      started.elapsed()
+    );
+
+    // And the next invocation runs as if nothing happened.
+    let next = ScriptHooks::new()
+      .invoke(
+        &json!({ "kind": "script", "source": "function hook(ctx) { return { outcome: 'ok' }; }" }),
+        &request_context(),
+        1_000,
+      )
+      .expect("a fresh runtime");
+    assert_eq!(next.outcome(), Outcome::Ok);
   }
 
   #[test]
