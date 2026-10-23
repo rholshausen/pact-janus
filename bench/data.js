@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792717293277,
+  "lastUpdate": 1792717295590,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -20496,6 +20496,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 46004,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ea1f4368e80ec5f43e3cdbd6fb5ed2725324ddfb",
+          "message": "docs: S1.26 a pact's Content-Type is checked once, on the header (ADR 0043)\n\nToday's verifier checks a named Content-Type a second time before the body:\nwhen the pact's type has parameters, the reply must have exactly those, or\nthe header's rule must match both types as pact_models writes them (no\nspace, charset in lower case). It fails replies its own header check has\njust accepted: a rule written with a space and another charset, and,\nfound here, a reply that adds a parameter with no rule at all. pact-jvm\ncompares base types only and passes both, as janus verify does.\n\nADR 0043 makes the difference deliberate. bodies/content-type-extra-\nparameter is the new fixture, and the four ledger entries for it and\nbodies/content-type-rule-with-a-space carry the ADR. A probe of the\nneighbouring cases (charset case, a pact type with no parameters, a rule\nwith the same charset or written to allow no space) found them agreeing.\nThe harness reads 782 verdicts: 768 agree, 14 known. Nothing the engine\nships changes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T11:42:39+11:00",
+          "tree_id": "1b036ce771d696d21e8905552a1c3f417df416f7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ea1f4368e80ec5f43e3cdbd6fb5ed2725324ddfb"
+        },
+        "date": 1792717294885,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 57546,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 48198,
             "unit": "requests per second",
             "extra": "engines 4"
           }
