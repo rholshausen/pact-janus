@@ -1,5 +1,8 @@
 //! The `exec` implementation's deadline (lifecycle-hooks spec §5.4, staged plan S1.9): it kills the
 //! process group, so a child the command started does not outlive the invocation.
+//! The tests are Unix-only: they observe the group through `/bin/sh` and `kill -0`.
+
+#![cfg(unix)]
 
 use pact_janus_hooks_host::exec::ExecHooks;
 use pact_janus_kernel::hooks::{HookInvoker, Outcome};
@@ -7,7 +10,6 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 /// Whether a process is still running, asked of the system's own `kill -0`.
-#[cfg(unix)]
 fn running(pid: &str) -> bool {
   std::process::Command::new("/bin/sh")
     .args(["-c", &format!("kill -0 {pid} 2>/dev/null")])
@@ -15,7 +17,6 @@ fn running(pid: &str) -> bool {
     .is_ok_and(|status| status.success())
 }
 
-#[cfg(unix)]
 #[test]
 fn a_deadline_ends_the_command_and_every_process_it_started() {
   let dir = std::env::temp_dir().join(format!("janus-exec-group-{}", std::process::id()));
@@ -49,7 +50,6 @@ fn a_deadline_ends_the_command_and_every_process_it_started() {
   let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[cfg(unix)]
 #[test]
 fn a_command_that_exits_but_leaves_a_child_holding_its_output_is_ended_at_the_deadline() {
   let run = json!({ "kind": "exec", "command": "/bin/sh", "args": ["-c", "sleep 60 &"],
