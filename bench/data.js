@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792735225975,
+  "lastUpdate": 1792739581363,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -19078,6 +19078,324 @@ window.BENCHMARK_DATA = {
           {
             "name": "verify-corpus-small-upgraded (subprocess)",
             "value": 0.55,
+            "unit": "ms per interaction",
+            "extra": "runs 5, interactions 50"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9f90fb4d8ab1651739adbede9e5c37aaf0e849b9",
+          "message": "feat: S1.7 message pacts are verified, asked of the provider through produce-message (ADR 0046)\n\nA transport names its own parts (exchange-parts: initiating, answering;\nHTTP's are request and response), and the kernel spells none. A served\nrequest that does not match is disposed of as `reject` with its\nmismatches, which the HTTP transport answers with the 500 the kernel used\nto write. Closes kernel-boundary review findings 8 and 9; the line\ntransport in declared_transport.rs now uses parts of its own.\n\nA v3 message and a v4 asynchronous or synchronous message is one replay\nthat drives no transport: its produce-message hooks produce a `message`\npart (metadata, body), compared as today's verifier compares a message,\nwith legacy:message-type for its content-type check. When no hook\nproduces it, it fails as component-unavailable naming\nhook/produce-message.\n\n- The http hook gains `format: pact-message` (today's POST and reply)\n  and `transports`, which routes a message as today's --transports does.\n- janus verify takes --transports NAME:PORT[/PATH], and adds a\n  pact-message producer when the configuration names none.\n- A reply that is not a 2xx fails for every message: a deliberate\n  difference, fixture messages/error-status, in the ledger.\n- explain and the golden corpus show a message's plan; four corpus cases.\n- S1.1: messages/ fixtures from pact-js's and pact-jvm's message\n  examples, a mixed HTTP and message pact, all mutated; the importer reads\n  the compatibility suite's V3 and V4 message provider scenarios (19); a\n  `routes` command prints a pact's routes. The whole corpus is 1124\n  verdicts: 1110 agree, 14 known.\n- The request-filter scenario's skip reason now says why: today's CLI\n  takes no request filter.\n\nFixtures from pact-js examples/messages (MIT, 8a8f27a) and pact-jvm\nprovider/junit5 amqp_pacts (Apache-2.0, e419148).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T17:57:37+11:00",
+          "tree_id": "72966284584948419e34321fc6f8dc8563db4738",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9f90fb4d8ab1651739adbede9e5c37aaf0e849b9"
+        },
+        "date": 1792739580308,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "cold-start (native)",
+            "value": 10.7,
+            "unit": "µs",
+            "extra": "min 10.3 µs, p95 42.1 µs, iterations 20"
+          },
+          {
+            "name": "cold-start (subprocess)",
+            "value": 2289.2,
+            "unit": "µs",
+            "extra": "min 2222.3 µs, p95 2475.3 µs, iterations 20"
+          },
+          {
+            "name": "cold-start (wasm)",
+            "value": 160.7,
+            "unit": "µs",
+            "extra": "min 138.7 µs, p95 186.8 µs, iterations 20"
+          },
+          {
+            "name": "cold-start · compile (wasm)",
+            "value": 2759.3,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "cold-start · component size (wasm)",
+            "value": 8313937,
+            "unit": "bytes",
+            "extra": ""
+          },
+          {
+            "name": "explain-pact-100k (native)",
+            "value": 46389,
+            "unit": "µs",
+            "extra": "min 44446.2 µs, p95 48061.1 µs, iterations 200"
+          },
+          {
+            "name": "explain-pact-100k (subprocess)",
+            "value": 47597.7,
+            "unit": "µs",
+            "extra": "min 45496.6 µs, p95 49378.6 µs, iterations 200"
+          },
+          {
+            "name": "explain-pact-100k (wasm)",
+            "value": 53265.4,
+            "unit": "µs",
+            "extra": "min 52163.1 µs, p95 54190.5 µs, iterations 200"
+          },
+          {
+            "name": "explain-pact-small (native)",
+            "value": 515.7,
+            "unit": "µs",
+            "extra": "min 491.2 µs, p95 546.1 µs, iterations 2000"
+          },
+          {
+            "name": "explain-pact-small (subprocess)",
+            "value": 563.3,
+            "unit": "µs",
+            "extra": "min 532.3 µs, p95 592.9 µs, iterations 2000"
+          },
+          {
+            "name": "explain-pact-small (wasm)",
+            "value": 603,
+            "unit": "µs",
+            "extra": "min 578.2 µs, p95 626.4 µs, iterations 2000"
+          },
+          {
+            "name": "match-100k (native)",
+            "value": 22646.1,
+            "unit": "µs",
+            "extra": "min 19756.7 µs, p95 24304.9 µs, iterations 500"
+          },
+          {
+            "name": "match-100k (wasm)",
+            "value": 22981.8,
+            "unit": "µs",
+            "extra": "min 21731.7 µs, p95 23480.6 µs, iterations 500"
+          },
+          {
+            "name": "match-small (native)",
+            "value": 23.2,
+            "unit": "µs",
+            "extra": "min 22 µs, p95 24.2 µs, iterations 5000"
+          },
+          {
+            "name": "match-small (wasm)",
+            "value": 29,
+            "unit": "µs",
+            "extra": "min 28.6 µs, p95 30 µs, iterations 5000"
+          },
+          {
+            "name": "mock-server-latency-100k (native)",
+            "value": 34369.4,
+            "unit": "µs",
+            "extra": "min 30532.5 µs, p95 37421.2 µs, iterations 500"
+          },
+          {
+            "name": "mock-server-latency-100k (subprocess)",
+            "value": 34881.3,
+            "unit": "µs",
+            "extra": "min 31058.6 µs, p95 39189.5 µs, iterations 500"
+          },
+          {
+            "name": "mock-server-latency-100k · arming (native)",
+            "value": 20985.3,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-latency-100k · arming (subprocess)",
+            "value": 21726.6,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-latency-mismatch (native)",
+            "value": 151.6,
+            "unit": "µs",
+            "extra": "min 139.2 µs, p95 165.4 µs, iterations 500"
+          },
+          {
+            "name": "mock-server-latency-mismatch (subprocess)",
+            "value": 181.4,
+            "unit": "µs",
+            "extra": "min 156.7 µs, p95 194.6 µs, iterations 500"
+          },
+          {
+            "name": "mock-server-latency-mismatch · arming (native)",
+            "value": 31,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-latency-mismatch · arming (subprocess)",
+            "value": 70.4,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-latency-small (native)",
+            "value": 137.7,
+            "unit": "µs",
+            "extra": "min 121.9 µs, p95 166.2 µs, iterations 5000"
+          },
+          {
+            "name": "mock-server-latency-small (subprocess)",
+            "value": 176.2,
+            "unit": "µs",
+            "extra": "min 146.4 µs, p95 195.1 µs, iterations 5000"
+          },
+          {
+            "name": "mock-server-latency-small · arming (native)",
+            "value": 24.4,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-latency-small · arming (subprocess)",
+            "value": 64,
+            "unit": "µs",
+            "extra": ""
+          },
+          {
+            "name": "mock-server-startup-cycle (native)",
+            "value": 451.8,
+            "unit": "µs",
+            "extra": "min 309.6 µs, p95 569.1 µs, iterations 20"
+          },
+          {
+            "name": "mock-server-startup-cycle (subprocess)",
+            "value": 484.9,
+            "unit": "µs",
+            "extra": "min 423.9 µs, p95 616.5 µs, iterations 20"
+          },
+          {
+            "name": "upgrade-pact-100k (native)",
+            "value": 43585.4,
+            "unit": "µs",
+            "extra": "min 41762.7 µs, p95 44464.5 µs, iterations 200"
+          },
+          {
+            "name": "upgrade-pact-100k (subprocess)",
+            "value": 45930.8,
+            "unit": "µs",
+            "extra": "min 44329.4 µs, p95 48164.2 µs, iterations 200"
+          },
+          {
+            "name": "upgrade-pact-100k (wasm)",
+            "value": 53261.7,
+            "unit": "µs",
+            "extra": "min 52214.5 µs, p95 54214.7 µs, iterations 200"
+          },
+          {
+            "name": "variant-space-rfc-order (native)",
+            "value": 317,
+            "unit": "µs",
+            "extra": "min 304.1 µs, p95 358.8 µs, iterations 200, variants 8"
+          },
+          {
+            "name": "variant-space-rfc-order (subprocess)",
+            "value": 405,
+            "unit": "µs",
+            "extra": "min 394 µs, p95 434.1 µs, iterations 200, variants 8"
+          },
+          {
+            "name": "variant-space-rfc-order (wasm)",
+            "value": 462.3,
+            "unit": "µs",
+            "extra": "min 438.2 µs, p95 504.4 µs, iterations 200, variants 8"
+          },
+          {
+            "name": "variants-consumer-rfc-order (native)",
+            "value": 2.42,
+            "unit": "ms",
+            "extra": "runs 20, variants 8"
+          },
+          {
+            "name": "variants-consumer-rfc-order (subprocess)",
+            "value": 2.87,
+            "unit": "ms",
+            "extra": "runs 20, variants 8"
+          },
+          {
+            "name": "variants-consumer-rfc-order · finalise (native)",
+            "value": 0.37,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "variants-consumer-rfc-order · finalise (subprocess)",
+            "value": 0.42,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "variants-consumer-rfc-order · per extra variant (native)",
+            "value": 0.205,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "variants-consumer-rfc-order · per extra variant (subprocess)",
+            "value": 0.234,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "variants-provider-order-service (native)",
+            "value": 10.32,
+            "unit": "ms",
+            "extra": "runs 10, variants 6"
+          },
+          {
+            "name": "variants-provider-order-service · per extra variant (native)",
+            "value": 0.66,
+            "unit": "ms",
+            "extra": ""
+          },
+          {
+            "name": "verify-corpus-100k (native)",
+            "value": 36.72,
+            "unit": "ms per interaction",
+            "extra": "runs 3, interactions 5"
+          },
+          {
+            "name": "verify-corpus-100k (subprocess)",
+            "value": 39.66,
+            "unit": "ms per interaction",
+            "extra": "runs 3, interactions 5"
+          },
+          {
+            "name": "verify-corpus-small (native)",
+            "value": 0.39,
+            "unit": "ms per interaction",
+            "extra": "runs 5, interactions 50"
+          },
+          {
+            "name": "verify-corpus-small (subprocess)",
+            "value": 0.44,
+            "unit": "ms per interaction",
+            "extra": "runs 5, interactions 50"
+          },
+          {
+            "name": "verify-corpus-small-upgraded (native)",
+            "value": 0.54,
+            "unit": "ms per interaction",
+            "extra": "runs 5, interactions 50"
+          },
+          {
+            "name": "verify-corpus-small-upgraded (subprocess)",
+            "value": 0.59,
             "unit": "ms per interaction",
             "extra": "runs 5, interactions 50"
           }
