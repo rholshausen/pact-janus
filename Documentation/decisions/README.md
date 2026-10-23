@@ -61,6 +61,7 @@ superseding ADR instead.
 | [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
 | [0043](0043-check-a-pacts-content-type-once-on-the-header.md) | Check a pact's Content-Type once, on the header | accepted |
 | [0044](0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md) | Reach a hook endpoint as a provider is, and try a state call three times | accepted |
+| [0045](0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md) | Refuse an interaction that needs a pact plugin by name, and verify the rest | accepted |
 
 ## Decision backlog
 

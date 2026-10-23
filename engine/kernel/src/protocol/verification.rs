@@ -60,7 +60,7 @@ use crate::error::Problem;
 use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
 use crate::legacy::compile::compile_response as compile_legacy_response;
-use crate::legacy::pact::{self as legacy_pact, LegacyInteraction, RequestTemplate};
+use crate::legacy::pact::{self as legacy_pact, PactInteraction, PluginInteraction, RequestTemplate};
 use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
 use crate::variant::params;
 use serde::Deserialize;
@@ -322,7 +322,7 @@ pub(crate) struct LegacyPact {
   consumer: String,
   provider: String,
   specification: String,
-  interactions: Vec<LegacyInteraction>,
+  interactions: Vec<PactInteraction>,
 }
 
 impl Source {
@@ -364,7 +364,10 @@ impl Source {
       Source::Legacy(pact) => pact
         .interactions
         .get(index)
-        .is_some_and(|interaction| interaction.pending),
+        .is_some_and(|interaction| match interaction {
+          PactInteraction::Http(http) => http.pending,
+          PactInteraction::NeedsPlugins(needs) => needs.pending,
+        }),
     }
   }
 
@@ -505,7 +508,7 @@ fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
     consumer: pact.consumer().name,
     provider: pact.provider().name,
     specification: pact.specification_version().version_str(),
-    interactions: legacy_pact::http_interactions(pact.as_ref()),
+    interactions: legacy_pact::interactions(pact.as_ref()),
   })
 }
 
@@ -1410,7 +1413,10 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
 /// pleasant consequence: a request body in a content type design 3.5 cannot compile still replays,
 /// byte for byte, instead of failing an interaction whose response is perfectly checkable.
 fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
-  let interaction = &pact.interactions[index];
+  let interaction = match &pact.interactions[index] {
+    PactInteraction::Http(http) => http,
+    PactInteraction::NeedsPlugins(needs) => return refuse_plugin_interaction(pact, needs, index, format),
+  };
   let states: Vec<contract::ResolvedState> = interaction
     .provider_states
     .iter()
@@ -1476,6 +1482,38 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
         "transport": { "kind": DEFAULT_TRANSPORT_KIND },
       }),
     }))],
+  }
+}
+
+/// An interaction that needs a pact-plugins plugin (staged plan S1.8): refused before anything runs,
+/// with no state set up and nothing sent, as `component-unavailable` naming each plugin it needs. It
+/// is a result like any other, so the summary counts it as failed, and a pact that mixes it with
+/// interactions the engine can verify is never reported as verified.
+fn refuse_plugin_interaction(
+  pact: &LegacyPact,
+  needs: &PluginInteraction,
+  index: usize,
+  format: &str,
+) -> Prepared {
+  let mut reference = json!({
+    "contract": { "consumer": pact.consumer, "provider": pact.provider },
+    "index": index,
+    "description": needs.description,
+    "states": needs.provider_states.iter().map(|state| state.name.clone()).collect::<Vec<_>>(),
+    "format": format,
+  });
+  if let Some(id) = &needs.id {
+    reference["id"] = json!(id);
+  }
+  let error =
+    serde_json::to_value(EngineError::pact_plugins_unavailable(&needs.plugins)).unwrap_or(Value::Null);
+  Prepared {
+    reference,
+    transport: DEFAULT_TRANSPORT_KIND.to_string(),
+    replays: vec![Replay::Broken {
+      variant: LEGACY_VARIANT.to_string(),
+      error,
+    }],
   }
 }
 

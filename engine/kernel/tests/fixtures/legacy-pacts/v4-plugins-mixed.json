@@ -1,0 +1,158 @@
+{
+  "consumer": {
+    "name": "plugin-consumer"
+  },
+  "provider": {
+    "name": "plugin-provider"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a plain JSON request",
+      "key": "plain",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/plain"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "ok": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "request for a report",
+      "key": "8af9887b",
+      "pending": false,
+      "pluginConfiguration": {
+        "csv": {
+          "response": {
+            "csvHeaders": false
+          }
+        }
+      },
+      "interactionMarkup": {
+        "markup": "# Data\n\n|Name|100|2000-01-01|\n",
+        "markupType": "COMMON_MARK"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/reports/report001.csv"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": [
+            "text/csv; charset=UTF-8"
+          ]
+        },
+        "body": {
+          "content": "Name,100,2000-01-01\n",
+          "contentType": "text/csv; charset=UTF-8",
+          "contentTypeHint": "DEFAULT",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "column:1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "column:2": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "transport": "http"
+    },
+    {
+      "type": "Synchronous/Messages",
+      "description": "calculate rectangle area request",
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "descriptorKey": "50089d38cd498bf470a1e6afc269ae96",
+          "service": ".area_calculator.Calculator/calculateMulti"
+        }
+      },
+      "request": {
+        "contents": {
+          "content": "CgwSCg0AAEBAFQAAgEAKBwoFDQAAQEA=",
+          "contentType": "application/protobuf;message=.area_calculator.AreaRequest",
+          "contentTypeHint": "BINARY",
+          "encoded": "base64"
+        }
+      },
+      "response": [
+        {
+          "contents": {
+            "content": "CggAAEBBAAAQQQ==",
+            "contentType": "application/protobuf;message=.area_calculator.AreaResponse",
+            "contentTypeHint": "BINARY",
+            "encoded": "base64"
+          }
+        }
+      ],
+      "transport": "grpc"
+    },
+    {
+      "type": "Asynchronous/Messages",
+      "description": "an area response for a circle",
+      "key": "62879dcc",
+      "pending": false,
+      "contents": {
+        "content": "DGNpcmNsZQAAnUI=",
+        "contentType": "avro/binary; record=AreaResponse",
+        "contentTypeHint": "BINARY",
+        "encoded": "base64"
+      },
+      "pluginConfiguration": {
+        "avro": {
+          "record": "AreaResponse",
+          "schemaKey": "c040a317135f09e98c34a836c175c564"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "name": "csv",
+        "version": "0.1.0"
+      },
+      {
+        "name": "protobuf",
+        "version": "0.8.0"
+      },
+      {
+        "name": "avro",
+        "version": "0.1.0-dev"
+      }
+    ]
+  }
+}

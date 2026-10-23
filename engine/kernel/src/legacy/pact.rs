@@ -38,6 +38,7 @@ use pact_models::generators::{
   NoopVariantMatcher, VariantMatcher,
 };
 use pact_models::http_parts::HttpPart;
+use pact_models::matchingrules::{MatchingRule, MatchingRules};
 use pact_models::pact::Pact;
 use pact_models::path_exp::DocPath;
 use pact_models::provider_states::ProviderState;
@@ -82,26 +83,111 @@ pub struct LegacyInteraction {
   pub response: HttpResponse,
 }
 
-/// Every HTTP interaction in `pact`. `Interaction::as_v4_http` is `pact_models`' one downcast that
-/// is uniform across every pact spec version (v1–v3's `RequestResponseInteraction` converts itself
-/// on the call; a genuine v4 `SynchronousHttp` is a passthrough) and cleanly excludes message
-/// interactions (`None`) without this module having to branch on which pact version it read — so
-/// this is the only extraction a caller needs regardless of what `read` handed back.
-pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
+/// A v4 interaction that needs a pact-plugins plugin (protobuf, gRPC, Avro, CSV…), which this engine
+/// cannot load until a bridge to them exists (staged plan S1.8, S5.2). It is refused by name rather
+/// than verified with the built-in components, which would compare a body the plugin owns as text or
+/// bytes and so verify half of it.
+pub struct PluginInteraction {
+  pub description: String,
+  pub id: Option<String>,
+  pub pending: bool,
+  pub provider_states: Vec<ProviderState>,
+  /// The plugins it needs, by the names the pact gives them, sorted.
+  pub plugins: Vec<String>,
+}
+
+/// One interaction of a v1–v4 pact that the engine takes on: one it verifies, or one it refuses by
+/// name.
+pub enum PactInteraction {
+  Http(Box<LegacyInteraction>),
+  NeedsPlugins(PluginInteraction),
+}
+
+/// Every interaction in `pact` the engine takes on, in the pact's order. An interaction that needs a
+/// plugin ([`plugins_needed`]) is [`PactInteraction::NeedsPlugins`], whatever its kind. Of the rest,
+/// HTTP ones are [`PactInteraction::Http`]: `Interaction::as_v4_http` is `pact_models`' one downcast
+/// that is uniform across every pact spec version (v1–v3's `RequestResponseInteraction` converts
+/// itself on the call; a genuine v4 `SynchronousHttp` is a passthrough), and it excludes message
+/// interactions (`None`), which are not taken on yet (staged plan S1.7).
+pub fn interactions(pact: &dyn Pact) -> Vec<PactInteraction> {
+  let named: Vec<String> = pact.plugin_data().into_iter().map(|plugin| plugin.name).collect();
   pact
     .interactions()
     .into_iter()
     .filter_map(|interaction| {
-      interaction.as_v4_http().map(|http| LegacyInteraction {
-        description: http.description,
-        id: http.id,
-        pending: http.pending,
-        provider_states: http.provider_states,
-        request: http.request,
-        response: http.response,
+      let plugins = plugins_needed(interaction.as_ref(), &named);
+      if !plugins.is_empty() {
+        return Some(PactInteraction::NeedsPlugins(PluginInteraction {
+          description: interaction.description(),
+          id: interaction.id(),
+          pending: interaction.pending(),
+          provider_states: interaction.provider_states(),
+          plugins,
+        }));
+      }
+      interaction.as_v4_http().map(|http| {
+        PactInteraction::Http(Box::new(LegacyInteraction {
+          description: http.description,
+          id: http.id,
+          pending: http.pending,
+          provider_states: http.provider_states,
+          request: http.request,
+          response: http.response,
+        }))
       })
     })
     .collect()
+}
+
+/// Every HTTP interaction in `pact` that needs no plugin: [`interactions`]' `Http` entries.
+pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
+  interactions(pact)
+    .into_iter()
+    .filter_map(|interaction| match interaction {
+      PactInteraction::Http(http) => Some(*http),
+      PactInteraction::NeedsPlugins(_) => None,
+    })
+    .collect()
+}
+
+/// The plugins an interaction needs, sorted. A v4 interaction a plugin built names it in its
+/// `pluginConfiguration`, which is how a gRPC, protobuf, Avro or CSV interaction says so. A plugin
+/// that contributes only a matcher or a generator (the `creditcard` example) leaves no configuration
+/// there: the pact names it in its metadata's `plugins`, and the interaction carries a rule
+/// `pact_models` does not know, which it reads as `MatchingRule::Plugin`. Which of the pact's
+/// plugins provides that rule the pact does not say, so such an interaction needs every one it
+/// names, as today's verifier loads every one before it verifies anything. A rule nobody names a
+/// plugin for is not a plugin's: it compiles to an error node, as an unknown rule always has.
+fn plugins_needed(
+  interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + RefUnwindSafe),
+  named: &[String],
+) -> Vec<String> {
+  let mut plugins: Vec<String> = interaction
+    .as_v4()
+    .map(|v4| v4.plugin_config().into_keys().collect())
+    .unwrap_or_default();
+  if plugins.is_empty()
+    && !named.is_empty()
+    && interaction.as_v4_http().is_some_and(|http| {
+      has_plugin_rule(&http.request.matching_rules) || has_plugin_rule(&http.response.matching_rules)
+    })
+  {
+    plugins = named.to_vec();
+  }
+  plugins.sort();
+  plugins.dedup();
+  plugins
+}
+
+fn has_plugin_rule(rules: &MatchingRules) -> bool {
+  rules.rules.values().any(|category| {
+    category.rules.values().any(|list| {
+      list
+        .rules
+        .iter()
+        .any(|rule| matches!(rule, MatchingRule::Plugin { .. }))
+    })
+  })
 }
 
 /// Why a v1–v4 part could not be handed to design 3.5's compiler: a body that did not parse as the

@@ -294,6 +294,30 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` for a v1–v4 interaction that needs pact-plugins plugins (staged plan
+  /// S1.8), which this engine cannot load: `component` names the first as a requirement
+  /// (component-interfaces spec §11.3), `plugins` lists every one, and `reason` is `pact-plugin`.
+  /// `plugins` is never empty.
+  pub fn pact_plugins_unavailable(plugins: &[String]) -> Self {
+    let named = plugins
+      .iter()
+      .map(|plugin| format!("'{plugin}'"))
+      .collect::<Vec<_>>()
+      .join(", ");
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!(
+        "this interaction needs the pact plugin(s) {named}, and this engine cannot load pact plugins"
+      ),
+      details: Some(Box::new(serde_json::json!({
+        "component": format!("pact-plugin/{}", plugins.first().map_or("", String::as_str)),
+        "plugins": plugins,
+        "reason": "pact-plugin",
+      }))),
+    }
+  }
+
   /// `component-unavailable` naming `broker` (spec §8.7, ADR 0032): the broker client is a native
   /// host capability, and this engine has none — the offline WASM artifact never does.
   pub fn broker_unavailable(what: &str) -> Self {

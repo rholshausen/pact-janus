@@ -655,6 +655,23 @@ item in 1a is done when S1.1 agrees.
   `component-unavailable` naming the plugin, and the run summary counts it, so a mixed pact is not
   silently half-verified.
   *Exit:* a conformance and corpus case per plugin-bearing interaction kind.
+  *Done 2026-10-23* ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)).
+  An interaction needs a plugin when its `pluginConfiguration` names one, which every CSV, JWT,
+  protobuf, gRPC, JSON-RPC and Avro example does. Not foreseen: a plugin that contributes only a
+  matcher (pact-plugins' `creditcard`) is named in the pact's metadata alone, so an interaction using
+  a rule `pact_models` reads as a plugin's needs every plugin the pact names. Before this, a CSV
+  interaction verified with its body compared as text, and a gRPC or Avro one was skipped without a
+  word. Now each is `failed` with `component-unavailable` naming `pact-plugin/<name>`, before any
+  state or request, and the rest of the pact verifies. Today's verifier refuses the whole run when it
+  cannot load a plugin, and the migration note says so. `janus upgrade` drops such an interaction
+  with an `interaction-dropped` finding naming the plugin, and `janus explain` refuses it. The exit
+  changed in two ways. There is no conformance case, because the conformance suite has no provider
+  side until S1.14. There is no S1.1 fixture either: today's verifier installs a missing plugin from
+  the plugin index (it did, into an empty `PACT_PLUGIN_DIR`), so a fixture would download plugin
+  binaries on every CI run. The refusal is tested offline instead, per kind (HTTP, gRPC, an async
+  message, a matcher-only plugin), in `engine/kernel/tests/legacy_verification.rs`, `legacy_pact.rs`
+  and `upgrade.rs`, and in two `cli/tests/cmd/` cases. The corpus format has no refusal of this kind:
+  its one refusal is an invalid document.
 - **S1.9 Hooks in place of request filters and state-change callbacks** — **M**. The prototype's
   hooks, hardened: the hooks host's credential redaction reviewed for production, script and `exec`
   hook timeouts and resource limits enforced, and a migration note for each verifier option they

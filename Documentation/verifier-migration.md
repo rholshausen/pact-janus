@@ -7,7 +7,8 @@ migration note for providers. Behaviour with no option gets a row too, where a p
 
 It is filled in by area as each area is built. The provider connection is complete
 ([S1.5](staged-implementation-plan.md), [ADR 0035](decisions/0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md)),
-and so are provider states and request filters, which become hooks (S1.9). S1.13 adds the rest:
+and so are provider states and request filters, which become hooks (S1.9), and pact plugins, which
+are refused by name until S5.2 (S1.8). S1.13 adds the rest:
 pact sources, the Pact Broker, filtering, publishing and reporting.
 
 Where a row says the two differ, [`corpora/verifier/`](../corpora/verifier/README.md) has a fixture
@@ -55,6 +56,21 @@ which an SDK passes directly.
 | `--proxy <URL>`, `--no-proxy <HOSTS>` | `proxy` |
 | `--connect-timeout <MS>` | `timeouts.connect-ms` |
 | `--http-version 1.1\|2\|negotiate` | `http-version` |
+
+## Pact plugins
+
+Today's verifiers load the pact-plugins plugins a pact names (protobuf and gRPC, Avro, CSV and the
+others). Janus has no bridge to them yet: that is [S5.2](staged-implementation-plan.md). Until then
+`janus verify` refuses each interaction that needs one, by name, and verifies the rest
+([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)).
+
+| Today | `janus verify` | Notes |
+|---|---|---|
+| `PACT_PLUGIN_DIR`, default `~/.pact/plugins`: where plugins are found and installed | none yet | S5.2 |
+| A plugin the pact names is loaded before anything is verified; a missing one is installed from the plugin index, and one that cannot be ends the run with no results | Each interaction that needs a plugin fails as `component-unavailable` naming `pact-plugin/<name>`, before anything runs for it, and the pact is not verified. Interactions that need none are verified | **Differs** until S5.2. An interaction needs a plugin when its `pluginConfiguration` names one, or when it uses a matcher only a plugin provides, which needs every plugin the pact names |
+
+`janus upgrade` drops such an interaction from the contract it writes, with an `interaction-dropped`
+finding naming the plugin, and `janus explain` refuses it as `verify` does.
 
 ## Provider states and request filters
 

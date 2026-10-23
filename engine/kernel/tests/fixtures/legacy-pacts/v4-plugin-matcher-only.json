@@ -1,0 +1,113 @@
+{
+  "consumer": {
+    "name": "CreditCardClient"
+  },
+  "provider": {
+    "name": "CreditCardServer"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a request for a Visa card",
+      "key": "20fd2715",
+      "pending": false,
+      "transport": "http",
+      "request": {
+        "method": "GET",
+        "path": "/cards/visa"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "content": {
+            "card": {
+              "brand": "visa",
+              "expiry": "04/28",
+              "number": "4111111111111111"
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "generators": {
+          "body": {
+            "$.card.number": {
+              "brand": "visa",
+              "type": "creditcard"
+            }
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.card.expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{2}/\\d{2}$"
+                }
+              ]
+            },
+            "$.card.number": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "brand": "visa",
+                  "match": "creditcard"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a request for the card brands",
+      "key": "brands",
+      "pending": false,
+      "transport": "http",
+      "request": {
+        "method": "GET",
+        "path": "/brands"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "content": [
+            "visa"
+          ],
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.4"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "name": "creditcard",
+        "version": "0.0.0"
+      }
+    ]
+  }
+}

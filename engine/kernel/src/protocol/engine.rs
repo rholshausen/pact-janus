@@ -1071,6 +1071,7 @@ fn explain_error(err: ExplainError) -> EngineError {
     )),
     ExplainError::Invalid(problems) => EngineError::interaction_invalid(&problems),
     ExplainError::NotReadable(message) => EngineError::malformed_frame(message),
+    ExplainError::NeedsPlugins(plugins) => EngineError::pact_plugins_unavailable(&plugins),
   }
 }
 

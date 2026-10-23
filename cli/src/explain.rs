@@ -49,8 +49,9 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   )
   .map_err(|err| {
     // A document with no `$format` that is also not a pact reaches the engine as a
-    // contract-interaction and is refused there. Saying so beats a bare parse error.
-    if args.spec {
+    // contract-interaction and is refused there. Saying so beats a bare parse error. A missing
+    // component is not a parse error: the document was read.
+    if args.spec || err.starts_with("component-unavailable") {
       err
     } else {
       format!(

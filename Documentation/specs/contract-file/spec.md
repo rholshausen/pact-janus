@@ -550,7 +550,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `body-not-parsed` | `judgement` | a body could not be parsed as its declared content type and was carried as bytes |
 | `state-params-untyped` | `note` | v3 state parameters carried across as-is; the format types them, the pact did not |
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
-| `interaction-dropped` | `lossy` | an interaction could not be converted at all |
+| `interaction-dropped` | `lossy` | an interaction could not be converted at all: a message interaction, or one that needs a pact plugin, named in the message (ADR 0045) |
 
 An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an
 HTTP request can make it, because `request-query-opened` is raised for every one — the loss is real

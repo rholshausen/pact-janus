@@ -460,6 +460,120 @@ fn a_v4_pact_another_sdk_wrote_verifies_through_the_same_path() {
   assert_eq!(started(&events)["formats"], json!(["pact/4.0"]));
 }
 
+// ---------------------------------------------------------------------------------------------
+// Interactions that need a pact plugin (staged plan S1.8)
+// ---------------------------------------------------------------------------------------------
+
+/// Each result's description, status and the component its error names, in order.
+fn verdicts(events: &[Value]) -> Vec<(String, String, Option<String>)> {
+  results(events)
+    .iter()
+    .map(|result| {
+      (
+        result["interaction"]["description"]
+          .as_str()
+          .unwrap_or("?")
+          .to_string(),
+        result["status"].as_str().unwrap_or("?").to_string(),
+        result["error"]["details"]["component"]
+          .as_str()
+          .map(str::to_string),
+      )
+    })
+    .collect()
+}
+
+/// A pact mixing an interaction the engine verifies with CSV, gRPC and Avro ones: each of those is
+/// refused by the plugin it names, before anything runs, and the pact is not reported verified. The
+/// provider sees only the plain request, and only the plain interaction is started, so no state is
+/// set up for a refused one.
+#[test]
+fn an_interaction_that_needs_a_pact_plugin_is_refused_by_name_and_counted() {
+  let (base_url, requests) = stub_provider(vec![canned(200, r#"{"ok":true}"#)]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![fixture("v4-plugins-mixed.json")],
+    &base_url,
+    None,
+  );
+
+  let component = |name: &str| Some(format!("pact-plugin/{name}"));
+  assert_eq!(
+    verdicts(&events),
+    vec![
+      ("a plain JSON request".to_string(), "verified".to_string(), None),
+      (
+        "request for a report".to_string(),
+        "failed".to_string(),
+        component("csv")
+      ),
+      (
+        "calculate rectangle area request".to_string(),
+        "failed".to_string(),
+        component("protobuf")
+      ),
+      (
+        "an area response for a circle".to_string(),
+        "failed".to_string(),
+        component("avro")
+      ),
+    ]
+  );
+  let refused = &results(&events)[1]["error"];
+  assert_eq!(refused["code"], json!("component-unavailable"));
+  assert_eq!(refused["details"]["reason"], json!("pact-plugin"));
+  assert_eq!(refused["details"]["plugins"], json!(["csv"]));
+
+  assert_eq!(summary(&events)["status"], json!("failed"));
+  assert_eq!(summary(&events)["variants"]["verified"], json!(1));
+  assert_eq!(summary(&events)["variants"]["failed"], json!(3));
+  assert_eq!(payloads(&events, "verification/interaction-started").len(), 1);
+  // The stub answers one request and stops listening, so a second would have failed to connect.
+  let seen = requests
+    .recv_timeout(Duration::from_secs(5))
+    .expect("the plain request reached the provider");
+  assert_eq!(seen, "GET /plain HTTP/1.1");
+}
+
+/// A plugin that contributes only a matcher (pact-plugins' `creditcard` example) is named in the
+/// pact's metadata alone. The interaction using its matcher needs it; the one beside it that does
+/// not still verifies.
+#[test]
+fn an_interaction_using_a_plugins_matcher_needs_the_plugins_the_pact_names() {
+  let (base_url, requests) = stub_provider(vec![canned(200, r#"["visa"]"#)]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![fixture("v4-plugin-matcher-only.json")],
+    &base_url,
+    None,
+  );
+
+  assert_eq!(
+    verdicts(&events),
+    vec![
+      (
+        "a request for a Visa card".to_string(),
+        "failed".to_string(),
+        Some("pact-plugin/creditcard".to_string())
+      ),
+      (
+        "a request for the card brands".to_string(),
+        "verified".to_string(),
+        None
+      ),
+    ]
+  );
+  // The stub answers one request and stops listening, so a second would have failed to connect.
+  let seen = requests
+    .recv_timeout(Duration::from_secs(5))
+    .expect("the plain request reached the provider");
+  assert_eq!(seen, "GET /brands HTTP/1.1");
+}
+
 /// A pact_gem pact from pact-jvm's provider test resources — v1-era, five interactions, a bare
 /// `provider_state` string rather than v3's list, and a lower-case `get` method. Every one of
 /// those is a thing the engine must normalise rather than refuse: the states arrive as one state

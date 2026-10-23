@@ -58,9 +58,15 @@ pub struct Subject {
 pub enum ExplainError {
   KindUnsupported(String),
   Missing(&'static str),
-  NoSuchInteraction { index: usize, count: usize },
+  NoSuchInteraction {
+    index: usize,
+    count: usize,
+  },
   Invalid(Vec<Problem>),
   NotReadable(String),
+  /// A v1–v4 interaction that needs these pact plugins (staged plan S1.8): `verify` refuses it, so
+  /// there is no plan to explain.
+  NeedsPlugins(Vec<String>),
 }
 
 /// Compile the named subject.
@@ -153,11 +159,19 @@ fn legacy(document: &Value, index: usize) -> Result<Plan, ExplainError> {
     contract::ContractError::Invalid { problems } => ExplainError::Invalid(problems),
     other => ExplainError::NotReadable(other.to_string()),
   })?;
-  let interactions = legacy_pact::http_interactions(pact.as_ref());
-  let interaction = interactions.get(index).ok_or(ExplainError::NoSuchInteraction {
-    index,
-    count: interactions.len(),
-  })?;
+  let interactions = legacy_pact::interactions(pact.as_ref());
+  let interaction = match interactions.get(index) {
+    Some(legacy_pact::PactInteraction::Http(interaction)) => interaction,
+    Some(legacy_pact::PactInteraction::NeedsPlugins(needs)) => {
+      return Err(ExplainError::NeedsPlugins(needs.plugins.clone()));
+    }
+    None => {
+      return Err(ExplainError::NoSuchInteraction {
+        index,
+        count: interactions.len(),
+      });
+    }
+  };
   let request = legacy_pact::legacy_request(&interaction.request)
     .map_err(|err| ExplainError::NotReadable(err.to_string()))?;
   let response = legacy_pact::legacy_response(&interaction.response)

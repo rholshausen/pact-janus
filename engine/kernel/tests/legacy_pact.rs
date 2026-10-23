@@ -346,3 +346,39 @@ fn an_xml_body_that_is_not_xml_is_malformed() {
       .expect_err("not XML");
   assert!(error.contains("body is not valid XML"), "{error}");
 }
+
+/// Staged plan S1.8: which interactions need a pact plugin. One names it in its
+/// `pluginConfiguration`; one using a matcher `pact_models` does not know needs the plugins the pact
+/// names; and a rule like that in a pact that names no plugin is nobody's, so the interaction is
+/// HTTP and its rule compiles to an error node, as an unknown rule always has.
+#[rstest]
+#[case::configuration("v4-plugins-mixed.json", vec![vec![], vec!["csv"], vec!["protobuf"], vec!["avro"]])]
+#[case::matcher_only("v4-plugin-matcher-only.json", vec![vec!["creditcard"], vec![]])]
+fn an_interaction_needs_the_plugins_it_names_or_whose_rules_it_uses(
+  #[case] name: &str,
+  #[case] expected: Vec<Vec<&str>>,
+) {
+  let pact = legacy_pact::read(name, &fixture(name)).expect("the fixture reads");
+  let needed: Vec<Vec<String>> = legacy_pact::interactions(pact.as_ref())
+    .into_iter()
+    .map(|interaction| match interaction {
+      legacy_pact::PactInteraction::Http(_) => vec![],
+      legacy_pact::PactInteraction::NeedsPlugins(needs) => needs.plugins,
+    })
+    .collect();
+  assert_eq!(needed, expected);
+}
+
+#[test]
+fn a_rule_no_named_plugin_provides_is_not_a_plugins() {
+  let mut document = fixture("v4-plugin-matcher-only.json");
+  document["metadata"].as_object_mut().unwrap().remove("plugins");
+  let pact = legacy_pact::read("test", &document).expect("the pact reads");
+  let interactions = legacy_pact::interactions(pact.as_ref());
+  assert_eq!(interactions.len(), 2);
+  assert!(
+    interactions
+      .iter()
+      .all(|interaction| matches!(interaction, legacy_pact::PactInteraction::Http(_)))
+  );
+}

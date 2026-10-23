@@ -98,21 +98,48 @@ impl Finding {
 pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
   let pact = legacy_pact::read(source, doc)?;
   let mut conversion = Conversion::default();
-  let http = legacy_pact::http_interactions(pact.as_ref());
+  let mut http = Vec::new();
+  let mut needing_plugins = Vec::new();
+  for interaction in legacy_pact::interactions(pact.as_ref()) {
+    match interaction {
+      legacy_pact::PactInteraction::Http(interaction) => http.push(*interaction),
+      legacy_pact::PactInteraction::NeedsPlugins(needs) => needing_plugins.push(needs),
+    }
+  }
 
   // Every interaction the pact declared, HTTP or not — a message interaction cannot be converted
   // by a design that has no message support yet, and vanishing silently is exactly the outcome
   // §8.1's honesty rule forbids.
   let declared = pact.interactions().len();
-  if declared > http.len() {
+  let messages = declared - http.len() - needing_plugins.len();
+  if messages > 0 {
     conversion.finding(Finding::new(
       "interaction-dropped",
       "lossy",
       "/interactions".to_string(),
       format!(
-        "{} of {declared} interactions are not HTTP request/response and were not converted; \
-         message interactions have no contract form yet",
-        declared - http.len()
+        "{messages} of {declared} interactions are not HTTP request/response and were not converted; \
+         message interactions have no contract form yet"
+      ),
+    ));
+  }
+  // One that needs a pact plugin (staged plan S1.8): its body or rules are the plugin's, and a
+  // contract converted without it would assert less than the pact does.
+  for needs in &needing_plugins {
+    let named = needs
+      .plugins
+      .iter()
+      .map(|plugin| format!("'{plugin}'"))
+      .collect::<Vec<_>>()
+      .join(", ");
+    conversion.finding(Finding::new(
+      "interaction-dropped",
+      "lossy",
+      "/interactions".to_string(),
+      format!(
+        "'{}' needs the pact plugin(s) {named} and was not converted; pact plugins have no contract \
+         form yet",
+        needs.description
       ),
     ));
   }

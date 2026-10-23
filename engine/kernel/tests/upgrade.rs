@@ -426,6 +426,40 @@ fn interactions_that_cannot_be_converted_are_counted_rather_than_vanishing() {
   assert!(finding.message.contains("3 of 3"), "{}", finding.message);
 }
 
+/// An interaction that needs a pact plugin (staged plan S1.8) is not converted as the HTTP or message
+/// it looks like: its body and rules are the plugin's. Each is reported by name, and the one plain
+/// interaction beside them converts.
+#[test]
+fn an_interaction_that_needs_a_pact_plugin_is_dropped_naming_it() {
+  let upgraded = upgrade(&fixture("v4-plugins-mixed.json"));
+  let descriptions: Vec<&str> = upgraded
+    .contract
+    .interactions
+    .iter()
+    .map(|interaction| interaction.description.as_str())
+    .collect();
+  assert_eq!(descriptions, vec!["a plain JSON request"]);
+  let dropped: Vec<&str> = upgraded
+    .findings
+    .iter()
+    .filter(|finding| finding.code == "interaction-dropped")
+    .map(|finding| finding.message.as_str())
+    .collect();
+  assert_eq!(dropped.len(), 3, "{dropped:?}");
+  for (description, plugin) in [
+    ("request for a report", "csv"),
+    ("calculate rectangle area request", "protobuf"),
+    ("an area response for a circle", "avro"),
+  ] {
+    assert!(
+      dropped
+        .iter()
+        .any(|message| message.contains(&format!("'{description}' needs the pact plugin(s) '{plugin}'"))),
+      "{dropped:?}"
+    );
+  }
+}
+
 /// Contract-file spec §4.2 identifies an interaction by description *and* states, so a pact with
 /// two identical ones would produce a contract that cannot be read back. Disambiguated, not
 /// dropped — and reported either way.

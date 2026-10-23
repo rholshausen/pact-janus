@@ -616,6 +616,11 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   parts-in wherever the parts come from: a wire-level transport binding and a
   `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
   MUST produce identical results for the same parts (spike 1.5, finding 6).
+  A v1–v4 interaction that needs a pact-plugins plugin (its `pluginConfiguration` names one, or it
+  uses a matcher only a plugin the pact names provides) is refused by name before anything runs for
+  it: its result is `failed` with `component-unavailable`, `details.component` naming the first
+  plugin as `pact-plugin/<name>`, `details.plugins` every one, and `details.reason` `pact-plugin`
+  (ADR 0045). The rest of the pact verifies, and the summary counts the refusal as a failure.
 - **A `broker` source** names the broker (§8.7's descriptor), the provider, its
   `consumer-version-selectors` (passed to the broker as written), the provider version's
   `provider-branch` and `provider-tags`, and whether to `include-pending` and

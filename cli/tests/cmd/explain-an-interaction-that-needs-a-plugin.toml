@@ -1,0 +1,6 @@
+# Staged plan S1.8: verify refuses an interaction that needs a pact plugin, so there is no plan to
+# explain, and no hint about --spec, because the document was read.
+bin.name = "janus"
+args = ["explain", "cli/tests/cmd/fixtures/plugin-pact.json", "--index", "1"]
+status.code = 2
+fs.cwd = "../../.."

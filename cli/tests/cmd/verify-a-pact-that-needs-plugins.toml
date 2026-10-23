@@ -1,0 +1,6 @@
+# Staged plan S1.8: an interaction that needs a pact plugin is refused by the plugin's name before
+# anything runs, so nothing listens at the provider URL and nothing is sent to it. The run fails.
+bin.name = "janus"
+args = ["verify", "cli/tests/cmd/fixtures/plugin-pact.json", "--provider-url", "http://127.0.0.1:9"]
+status.code = 1
+fs.cwd = "../../.."
