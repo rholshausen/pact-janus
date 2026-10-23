@@ -1,0 +1,47 @@
+{
+  "description": "Verifying a pending message interaction",
+  "expected": "pass",
+  "mutations": true,
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "body": {
+            "json": {
+              "description": "basic"
+            }
+          },
+          "method": "POST",
+          "path": "/"
+        },
+        "response": {
+          "body": {
+            "json": {
+              "one": "cat",
+              "two": "b"
+            }
+          },
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V4/message_provider.feature",
+    "scenario": "Verifying a pending message interaction",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

@@ -154,6 +154,15 @@ For more information, try '--help'.
 ```
 
 ```console
+$ janus verify pact.json --provider-url http://127.0.0.1:1 --transports message
+? 2
+error: invalid value 'message' for '--transports <NAME:PORT[/PATH]>': 'message' is not a transport: it must be NAME:PORT[/PATH]
+
+For more information, try '--help'.
+
+```
+
+```console
 $ janus explain pact.json --index first
 ? 2
 error: invalid value 'first' for '--index <N>': invalid digit found in string

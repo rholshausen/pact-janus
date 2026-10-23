@@ -1,0 +1,72 @@
+{
+  "description": "Verifying multiple Pact files",
+  "expected": "pass",
+  "pacts": [
+    "pact-1.json",
+    "pact-2.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "body": {
+            "json": {
+              "description": "basic"
+            }
+          },
+          "method": "POST",
+          "path": "/"
+        },
+        "response": {
+          "body": {
+            "json": {
+              "one": "a",
+              "two": "b"
+            }
+          },
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "status": 200
+        }
+      },
+      {
+        "request": {
+          "body": {
+            "json": {
+              "description": "xml"
+            }
+          },
+          "method": "POST",
+          "path": "/"
+        },
+        "response": {
+          "body": {
+            "text": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<values><one>A</one><two>B</two></values>"
+          },
+          "headers": {
+            "Content-Type": [
+              "application/xml"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL3htbCJ9"
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V3/message_provider.feature",
+    "scenario": "Verifying multiple Pact files",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

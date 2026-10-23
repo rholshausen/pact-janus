@@ -409,9 +409,17 @@ pub fn case_id(root: &Path, dir: &Path) -> String {
     .join("/")
 }
 
-/// The interactions of a v1-v4 pact, read the way today's verifier reads them, as HTTP
-/// interactions. Message interactions are not this harness's yet (S1.7) and are an error.
-pub fn http_interactions(pact: &Value, source: &str) -> Result<Vec<SynchronousHttp>, String> {
+/// One interaction of a v1-v4 pact, as the route a provider honouring it answers with.
+pub struct InteractionRoute {
+  pub route: Route,
+  /// A message (staged plan S1.7): its status is not part of what it is, so no mutation changes it.
+  pub message: bool,
+}
+
+/// Every interaction of a v1-v4 pact as the route a provider honouring it answers with, read the
+/// way today's verifier reads them: an HTTP interaction's request and response
+/// ([`Route::from_interaction`]), or a message's request and the message ([`Route::from_message`]).
+pub fn routes_of(pact: &Value, source: &str) -> Result<Vec<InteractionRoute>, String> {
   let pact =
     pact_models::pact::load_pact_from_json(source, pact).map_err(|err| format!("{source}: {err}"))?;
   let pact = pact.as_v4_pact().map_err(|err| format!("{source}: {err}"))?;
@@ -419,14 +427,103 @@ pub fn http_interactions(pact: &Value, source: &str) -> Result<Vec<SynchronousHt
     .interactions
     .iter()
     .map(|interaction| {
-      interaction.as_v4_http().ok_or_else(|| {
-        format!(
-          "{source}: '{}' is not an HTTP interaction",
-          interaction.description()
-        )
-      })
+      if let Some(http) = interaction.as_v4_http() {
+        return Ok(InteractionRoute {
+          route: Route::from_interaction(&http),
+          message: false,
+        });
+      }
+      Route::from_message(interaction.as_ref())
+        .map(|route| InteractionRoute { route, message: true })
+        .ok_or_else(|| {
+          format!(
+            "{source}: '{}' is neither an HTTP interaction nor a message",
+            interaction.description()
+          )
+        })
     })
     .collect()
+}
+
+/// Where a pact keeps its interactions: a v3 message pact under `messages`, any other under
+/// `interactions`.
+pub fn interactions_key(pact: &Value) -> &'static str {
+  if pact.get("interactions").is_none() && pact.get("messages").is_some() {
+    "messages"
+  } else {
+    "interactions"
+  }
+}
+
+impl Route {
+  /// The route a message provider honouring this message would answer with (staged plan S1.7): the
+  /// request today's verifier sends to ask for it — a POST of its description, its states and a
+  /// synchronous message's request (`pact_verifier`'s `messages.rs`) — recognised by that body, and
+  /// the message: its contents, labelled with its content type, and its metadata as base64 JSON in a
+  /// `Pact-Message-Metadata` header. `None` for an interaction that is not a message.
+  pub fn from_message(
+    interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + std::panic::RefUnwindSafe),
+  ) -> Option<Route> {
+    let states: Vec<Value> = interaction
+      .provider_states()
+      .iter()
+      .map(|state| state.to_json())
+      .collect();
+    let mut request = serde_json::Map::new();
+    request.insert(
+      "description".to_string(),
+      Value::String(interaction.description()),
+    );
+    let contents = if let Some(sync) = interaction.as_v4_sync_message() {
+      request.insert("request".to_string(), sync.request.to_json());
+      sync.response.first().cloned().unwrap_or_default()
+    } else {
+      interaction.as_v4_async_message()?.contents
+    };
+    if !states.is_empty() {
+      request.insert("providerStates".to_string(), Value::Array(states));
+    }
+
+    let content_type = contents.message_content_type();
+    let mut headers = BTreeMap::new();
+    let body =
+      present(&contents.contents, content_type.clone()).map(|(bytes, json)| Body::from_bytes(&bytes, json));
+    if let (Some(content_type), Some(_)) = (&content_type, &body) {
+      headers.insert("Content-Type".to_string(), vec![content_type.to_string()]);
+    }
+    if !contents.metadata.is_empty() {
+      let metadata: serde_json::Map<String, Value> = contents
+        .metadata
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+      headers.insert(
+        "Pact-Message-Metadata".to_string(),
+        vec![BASE64.encode(Value::Object(metadata).to_string())],
+      );
+    }
+    Some(Route {
+      states: interaction
+        .provider_states()
+        .iter()
+        .map(|state| state.name.clone())
+        .collect(),
+      request: RequestExample {
+        method: "POST".to_string(),
+        path: "/".to_string(),
+        query: None,
+        headers: BTreeMap::new(),
+        body: Some(Body::Json(Value::Object(request))),
+        patterns: BTreeMap::new(),
+      },
+      response: ResponseSpec {
+        status: 200,
+        delay_ms: None,
+        headers,
+        body,
+      },
+    })
+  }
 }
 
 #[cfg(test)]
@@ -463,8 +560,9 @@ mod tests {
       }],
       "metadata": { "pactSpecification": { "version": "2.0.0" } }
     });
-    let interactions = http_interactions(&pact, "test").unwrap();
-    let route = Route::from_interaction(&interactions[0]);
+    let routes = routes_of(&pact, "test").unwrap();
+    assert!(!routes[0].message);
+    let route = &routes[0].route;
     assert_eq!(route.states, vec!["s".to_string()]);
     assert_eq!(route.request.method, "GET");
     assert_eq!(
@@ -478,6 +576,39 @@ mod tests {
     assert_eq!(
       route.response.headers.get("Content-Type"),
       Some(&vec!["application/json".to_string()])
+    );
+  }
+
+  #[test]
+  fn a_message_route_is_todays_request_for_it_and_the_message() {
+    let pact = json!({
+      "consumer": { "name": "c" }, "provider": { "name": "p" },
+      "messages": [{
+        "description": "an order was shipped", "providerStates": [{ "name": "an order", "params": { "id": 1 } }],
+        "contents": { "id": 1 },
+        "metaData": { "contentType": "application/json", "topic": "orders" }
+      }],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    });
+    let routes = routes_of(&pact, "test").unwrap();
+    assert!(routes[0].message);
+    let route = &routes[0].route;
+    assert_eq!(
+      (route.request.method.as_str(), route.request.path.as_str()),
+      ("POST", "/")
+    );
+    assert_eq!(
+      route.request.body,
+      Some(Body::Json(json!({
+        "description": "an order was shipped",
+        "providerStates": [{ "name": "an order", "params": { "id": 1 } }]
+      })))
+    );
+    assert_eq!(route.response.body, Some(Body::Json(json!({ "id": 1 }))));
+    let metadata = &route.response.headers["Pact-Message-Metadata"][0];
+    assert_eq!(
+      serde_json::from_slice::<Value>(&BASE64.decode(metadata).unwrap()).unwrap(),
+      json!({ "contentType": "application/json", "topic": "orders" })
     );
   }
 }

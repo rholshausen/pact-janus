@@ -86,6 +86,15 @@
         "transport": {
           "type": "object",
           "description": "The interaction's transport descriptor: 'kind' and 'mode' (passive or emissive), plus whatever the transport component put there (contract spec §4.3)."
+        },
+        "pact-message": {
+          "type": "object",
+          "description": "A v1-v4 message interaction's: what today's verifier sends to ask a provider for the message ('request': its description, its providerStates, and a synchronous message's request), whether it is 'synchronous', and the 'transport' the pact names for it, if any. What the 'http' hook's 'pact-message' format sends and routes by (spec.md §3.4, §8.4; staged plan S1.7).",
+          "properties": {
+            "request": { "type": "object" },
+            "synchronous": { "type": "boolean" },
+            "transport": { "type": "string" }
+          }
         }
       }
     },

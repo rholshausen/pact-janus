@@ -1,0 +1,24 @@
+{
+  "consumer": {
+    "name": "order-ui"
+  },
+  "provider": {
+    "name": "order-service"
+  },
+  "messages": [
+    {
+      "description": "an order was shipped",
+      "contents": {
+        "id": "42"
+      },
+      "metaData": {
+        "contentType": "application/json"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

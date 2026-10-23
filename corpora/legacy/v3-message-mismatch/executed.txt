@@ -1,0 +1,38 @@
+(
+  :"an order was shipped" (
+    :message (
+      :metadata (
+        :"$.contentType" (
+          %legacy:header-value (
+            $.message.metadata.contentType => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.destination" (
+          %match:regex (
+            $.message.metadata.destination => 'queue',
+            '^(?:\\w+\\d+)$'
+          ) => ERROR(Expected 'queue' to match '^(?:\w+\d+)$')
+        ) => BOOL(false)
+      ) => BOOL(false),
+      :body (
+        %legacy:message-type (
+          $.message.content-type => 'application/json',
+          'application/json'
+        ) => BOOL(true),
+        :"$.id" (
+          %match:type (
+            $.message.body.id => '77',
+            '42'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.status" (
+          %match:equality (
+            $.message.body.status => 'PENDING',
+            'SHIPPED'
+          ) => ERROR(Expected 'PENDING' to equal 'SHIPPED')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

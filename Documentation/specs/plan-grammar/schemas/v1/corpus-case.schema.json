@@ -52,7 +52,7 @@
         "index": {
           "type": "integer",
           "minimum": 0,
-          "description": "For kind 'pact-interaction': which interaction."
+          "description": "For kind 'pact-interaction': which interaction, by its position among the pact's interactions (a v3 message pact's messages). An HTTP interaction compiles to its request and response; a message to the produced message it is compared with, rooted at a 'message' part (staged plan S1.7)."
         },
         "variant": {
           "type": "string",

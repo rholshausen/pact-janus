@@ -87,7 +87,10 @@ Three sources are the source of truth and take precedence over this file when th
 > with a `client` member and tries a state call three times; hook secrets never reach a log; `exec`
 > deadlines end the process group and scripts' memory and stack are bounded), and S1.8 (ADR 0045: a
 > v1–v4 interaction that needs a pact plugin is refused by name before anything runs, and the rest of
-> its pact verifies).
+> its pact verifies), and S1.7 (ADR 0046: a v1–v4 message is asked of the provider through a
+> `produce-message` hook; unless one is configured, `janus verify` adds one that asks as today's verifier
+> does, routed by `--transports`; a transport names its own parts and rejects a request that does not
+> match).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -322,6 +325,7 @@ janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus
              [--base-path <p>] [-H <KEY=VALUE>]... [--request-timeout <ms>] [--connect-timeout <ms>]
              [--disable-ssl-verification] [--ca-cert <pem>]... [--client-cert <pem> --client-key <pem>]
              [--proxy <url> [--no-proxy <hosts>]] [--http-version 1.1|2|negotiate]   # S1.5, ADR 0035
+             [--transports <name:port[/path]>]...   # where HTTP interactions and messages go (S1.7, ADR 0046)
 janus verify --broker-url <url> --provider-name <name> --provider-url <url>
              [--consumer-version-selectors <json>]... [--enable-pending] [--include-wip-pacts-since <date>]
              [--provider-version <v>] [--provider-branch <b>] [--provider-tags <t,...>] [--publish]

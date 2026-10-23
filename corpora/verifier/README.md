@@ -35,6 +35,15 @@ this one.
 | `mutations` | Also run every interaction against mutated responses |
 | `broker` | Fetch the pacts from a Pact Broker instead of files, and publish results back (below) |
 
+A message (staged plan S1.7) is a route too, the one a message provider honouring it answers with:
+a `POST /` whose body is today's verifier's request for the message (its `description`, its
+`providerStates`, and a synchronous message's `request`), answered with the message, labelled with its
+content type, and its metadata as base64 JSON in a `Pact-Message-Metadata` header. Both verifiers ask
+the provider's own URL for it, `janus verify` through the `produce-message` hook it adds itself (ADR
+0046). `cargo run -p pact_janus_verifier_diff -- routes <pact>...` prints the routes a provider
+honouring a pact's interactions answers with, HTTP or message, as `provider.routes` takes them. A
+message's mutations leave its status alone: a status is not part of a message.
+
 The scripted provider recognises a request strictly by its example: method, path, query, the headers
 the route names, and the body when the route has one. It answers anything else with a 404, as pact's
 mock server does, so a verifier that sends the wrong request fails as it would against a real
@@ -114,9 +123,15 @@ interaction of a pact it did not fetch is `absent` there too.
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
   match and that do not, and mutations.
+- `messages/`: message pacts (S1.7, ADR 0046): pact-js's message example, an asynchronous event under
+  matchers with its queue in its metadata, answered by the provider's own message factory; pact-jvm's
+  v3 message, v4 message with metadata rules, and v4 synchronous message; a v4 pact that mixes an HTTP
+  interaction and a message; and `error-status`, a producer that answers the message with a 500, which
+  today's verifier passes and `janus verify` fails, a deliberate difference.
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
-  HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it,
-  its broker scenarios as broker fixtures.
+  HTTP provider scenarios, V1 to V4, and its V3 and V4 message provider scenarios (Apache-2.0), each
+  pact built as the suite's own harness builds it, its broker scenarios as broker fixtures, and its
+  message provider as the suite's message proxy answers.
   Generated: `cargo run -p pact_janus_verifier_diff -- import-compatibility-suite <checkout>`
   rewrites the directory, and its `import.json` records the commit and every scenario skipped, with
   the plan item that will let it in.

@@ -1,0 +1,43 @@
+{
+  "description": "Message with plain text body (negative case)",
+  "expected": "fail",
+  "pacts": [
+    "pact-1.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "routes": [
+      {
+        "request": {
+          "body": {
+            "json": {
+              "description": "basic"
+            }
+          },
+          "method": "POST",
+          "path": "/"
+        },
+        "response": {
+          "body": {
+            "text": "Hello World"
+          },
+          "headers": {
+            "Content-Type": [
+              "text/plain"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6InRleHQvcGxhaW4ifQ=="
+            ]
+          },
+          "status": 200
+        }
+      }
+    ],
+    "state-callback": "none"
+  },
+  "source": {
+    "feature": "features/V3/message_provider.feature",
+    "scenario": "Message with plain text body (negative case)",
+    "suite": "https://github.com/pact-foundation/pact-compatibility-suite"
+  }
+}

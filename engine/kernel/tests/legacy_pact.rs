@@ -362,7 +362,7 @@ fn an_interaction_needs_the_plugins_it_names_or_whose_rules_it_uses(
   let needed: Vec<Vec<String>> = legacy_pact::interactions(pact.as_ref())
     .into_iter()
     .map(|interaction| match interaction {
-      legacy_pact::PactInteraction::Http(_) => vec![],
+      legacy_pact::PactInteraction::Http(_) | legacy_pact::PactInteraction::Message(_) => vec![],
       legacy_pact::PactInteraction::NeedsPlugins(needs) => needs.plugins,
     })
     .collect();

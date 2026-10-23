@@ -203,9 +203,25 @@ impl Canned {
 /// line it saw. Scripted rather than routed, for the same reason `verification.rs`'s is: what is
 /// under test here is the document, and a router would be a second thing that could be wrong.
 fn stub_provider(replies: Vec<Canned>) -> (String, Receiver<String>) {
+  let (tx, rx) = mpsc::channel();
+  let base_url = serve_canned(replies, move |line, _| {
+    let _ = tx.send(line);
+  });
+  (base_url, rx)
+}
+
+/// [`stub_provider`], reporting each request's body too: what a message provider is asked.
+fn recording_stub(replies: Vec<Canned>) -> (String, Receiver<(String, Value)>) {
+  let (tx, rx) = mpsc::channel();
+  let base_url = serve_canned(replies, move |line, body| {
+    let _ = tx.send((line, serde_json::from_slice(&body).unwrap_or(Value::Null)));
+  });
+  (base_url, rx)
+}
+
+fn serve_canned(replies: Vec<Canned>, report: impl Fn(String, Vec<u8>) + Send + 'static) -> String {
   let listener = TcpListener::bind("127.0.0.1:0").expect("an OS-assigned port always binds");
   let base_url = format!("http://{}", listener.local_addr().unwrap());
-  let (tx, rx) = mpsc::channel();
   thread::spawn(move || {
     for canned in replies {
       let Ok((stream, _)) = listener.accept() else {
@@ -249,10 +265,10 @@ fn stub_provider(replies: Vec<Canned>) -> (String, Receiver<String>) {
       let _ = stream.write_all(head.as_bytes());
       let _ = stream.write_all(&canned.body);
       let _ = stream.flush();
-      let _ = tx.send(request_line.trim_end().to_string());
+      report(request_line.trim_end().to_string(), body);
     }
   });
-  (base_url, rx)
+  base_url
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -829,10 +845,35 @@ fn a_reply_of_another_content_type_fails_on_its_type() {
   );
 }
 
-/// A pact whose interactions are all messages reads clean and verifies nothing — an honest empty
-/// run, which is a different answer from a misparse and from a refusal.
+// ---------------------------------------------------------------------------------------------
+// Message pacts (staged plan S1.7)
+// ---------------------------------------------------------------------------------------------
+
+/// Today's verifier's way of asking a provider for a message, as a verifier configuration names it:
+/// a `produce-message` hook in `pact-message` format.
+fn message_hooks(url: &str) -> Value {
+  json!({
+    "version": 1,
+    "hooks": {
+      "produce-message": [{
+        "name": "provider",
+        "run": { "kind": "http", "url": url, "format": "pact-message" },
+        "changes": ["parts"],
+      }],
+    },
+  })
+}
+
+/// The base64 JSON a message provider sends its metadata in, as today's verifier reads it.
+fn message_metadata(metadata: Value) -> String {
+  use base64::Engine as _;
+  base64::engine::general_purpose::STANDARD.encode(metadata.to_string())
+}
+
+/// A message interaction no hook produces was never asked of the provider: it fails before anything
+/// is scored, naming the hook that would produce it, rather than being skipped as it was before S1.7.
 #[test]
-fn a_message_only_pact_verifies_nothing_and_says_so() {
+fn a_message_no_hook_produces_fails_naming_the_hook() {
   let (base_url, _requests) = stub_provider(vec![]);
   let mut engine = engine_with_everything();
 
@@ -843,9 +884,176 @@ fn a_message_only_pact_verifies_nothing_and_says_so() {
     None,
   );
 
-  assert_eq!(started(&events)["interactions"], json!(0));
-  assert_eq!(summary(&events)["variants"]["total"], json!(0));
-  assert_eq!(summary(&events)["status"], json!("verified"));
+  assert_eq!(started(&events)["interactions"], json!(3));
+  let results = results(&events);
+  assert_eq!(results.len(), 3);
+  for result in &results {
+    assert_eq!(result["status"], json!("failed"), "{result}");
+    assert_eq!(
+      result["error"]["code"],
+      json!("component-unavailable"),
+      "{result}"
+    );
+    assert_eq!(
+      result["error"]["details"]["component"],
+      json!("hook/produce-message"),
+      "{result}"
+    );
+  }
+  assert_eq!(summary(&events)["status"], json!("failed"));
+}
+
+/// pact-jvm's v3 message pact, verified as today's verifier verifies one: the provider is asked for
+/// each message by a POST of its description and states, and what it answers is the message, its
+/// metadata in a `Pact-Message-Metadata` header. The metadata rules decide, not the examples.
+#[test]
+fn a_v3_message_pact_verifies_through_a_pact_message_hook() {
+  let (base_url, requests) =
+    recording_stub(vec![
+    canned(200, r#"{"testParam1": "value3", "testParam2": "value4"}"#),
+    canned(200, r#"{"testParam1": "value1", "testParam2": "value2"}"#)
+      .with_header("pact-message-metadata", &message_metadata(json!({ "destination": "Y002" }))),
+    canned(200, r#"{"testParam1": "value1", "testParam2": "value2"}"#).with_header(
+      "pact-message-metadata",
+      &message_metadata(json!({
+        "metadata1": "metadataValue1", "metadata2": "metadataValue2", "metadata3": 10, "partitionKey": "abc01"
+      })),
+    ),
+  ]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![fixture("test_consumer_v3-MessageProvider.json")],
+    &base_url,
+    Some(message_hooks(&base_url)),
+  );
+
+  let asked: Vec<(String, Value)> = (0..3)
+    .map(|_| {
+      requests
+        .recv_timeout(Duration::from_secs(5))
+        .expect("the provider was asked")
+    })
+    .collect();
+  assert_eq!(asked[0].0, "POST / HTTP/1.1");
+  assert_eq!(
+    asked[0].1,
+    json!({ "description": "a test message", "providerStates": [{ "name": "SomeProviderState2" }] }),
+    "today's request for a message, and nothing else"
+  );
+  let statuses: Vec<&Value> = results(&events).iter().map(|result| &result["status"]).collect();
+  assert_eq!(
+    statuses,
+    vec![&json!("verified"), &json!("verified"), &json!("failed")]
+  );
+  let failed = &results(&events)[2];
+  assert_eq!(
+    failed["mismatches"][0]["path"],
+    json!("$.message.metadata.partitionKey"),
+    "{failed}"
+  );
+}
+
+/// A message whose contents differ fails on them, and one of another content type fails on its type,
+/// as today's verifier fails it before it compares contents.
+#[test]
+fn a_message_fails_on_its_contents_and_on_its_content_type() {
+  let (base_url, _requests) = recording_stub(vec![
+    canned(200, r#"{"testParam1": "value3", "testParam2": "other"}"#),
+    canned_as(200, "text/plain", b"testParam1=value1"),
+  ]);
+  let mut engine = engine_with_everything();
+  let mut pact = fixture("test_consumer_v3-MessageProvider.json");
+  pact["messages"].as_array_mut().unwrap().truncate(2);
+  pact["messages"][1]["metaData"]
+    .as_object_mut()
+    .unwrap()
+    .remove("destination");
+  pact["messages"][1]
+    .as_object_mut()
+    .unwrap()
+    .remove("matchingRules");
+
+  let events = verify(&mut engine, vec![pact], &base_url, Some(message_hooks(&base_url)));
+
+  let messages = mismatch_messages(&events);
+  assert!(
+    messages
+      .iter()
+      .any(|m| m.contains("'other'") && m.contains("'value4'")),
+    "{messages:?}"
+  );
+  assert!(
+    messages
+      .iter()
+      .any(|m| m == "Expected message with content type application/json but was text/plain"),
+    "{messages:?}"
+  );
+  assert_eq!(summary(&events)["status"], json!("failed"));
+}
+
+/// A v4 synchronous message: today's verifier sends its request with the description, and compares
+/// the provider's answer with its first response.
+#[test]
+fn a_v4_synchronous_message_sends_its_request_and_compares_the_response() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Synchronous/Messages",
+      "description": "a square's area",
+      "request": { "contents": { "content": { "side": 3 }, "contentType": "application/json", "encoded": false } },
+      "response": [{
+        "contents": { "content": { "area": 9 }, "contentType": "application/json", "encoded": false },
+        "matchingRules": { "content": { "$.area": { "combine": "AND", "matchers": [{ "match": "integer" }] } } },
+      }],
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } },
+  });
+  let (base_url, requests) = recording_stub(vec![canned(200, r#"{"area": 16}"#)]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(&mut engine, vec![pact], &base_url, Some(message_hooks(&base_url)));
+
+  let (_, asked) = requests
+    .recv_timeout(Duration::from_secs(5))
+    .expect("the provider was asked");
+  assert_eq!(asked["description"], json!("a square's area"));
+  assert_eq!(asked["request"]["contents"]["content"], json!({ "side": 3 }));
+  assert_all_verified(&events, 1);
+}
+
+/// A run over a pact that mixes HTTP and message interactions drives the first through the HTTP
+/// transport and asks the producer for the second.
+#[test]
+fn a_mixed_pact_drives_its_requests_and_produces_its_messages() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [
+      {
+        "type": "Synchronous/HTTP", "description": "a plain request",
+        "request": { "method": "GET", "path": "/plain" },
+        "response": { "status": 200, "headers": { "Content-Type": ["application/json"] },
+                      "body": { "content": { "ok": true }, "contentType": "application/json", "encoded": false } },
+      },
+      {
+        "type": "Asynchronous/Messages", "description": "an order was shipped",
+        "contents": { "content": { "id": 42 }, "contentType": "application/json", "encoded": false },
+      },
+    ],
+    "metadata": { "pactSpecification": { "version": "4.0" } },
+  });
+  let (base_url, requests) =
+    recording_stub(vec![canned(200, r#"{"ok": true}"#), canned(200, r#"{"id": 42}"#)]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(&mut engine, vec![pact], &base_url, Some(message_hooks(&base_url)));
+
+  let lines: Vec<String> = (0..2)
+    .map(|_| requests.recv_timeout(Duration::from_secs(5)).expect("asked").0)
+    .collect();
+  assert_eq!(lines, vec!["GET /plain HTTP/1.1", "POST / HTTP/1.1"]);
+  assert_all_verified(&events, 2);
 }
 
 /// A tiny HTTP endpoint that records the `pact-state-change` documents it is sent and answers

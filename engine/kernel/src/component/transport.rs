@@ -76,6 +76,9 @@ pub struct Dispose {
   pub instance: String,
   pub event: String,
   pub disposition: String,
+  /// Why, for the transport to say in its own way: a `reject` of an arrival that did not match
+  /// carries `{ "mismatches": [...] }` (kernel-boundary review finding 9, staged plan S1.7).
+  pub details: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -83,6 +86,20 @@ pub struct DisposeResult {}
 
 /// Part name -> the slot names in it that carry content (component-interfaces spec §5.5).
 pub type ContentSlots = std::collections::BTreeMap<String, Vec<String>>;
+
+/// Which of a transport's parts starts an exchange and which answers it (component-interfaces spec
+/// §5.7, staged plan S1.7). The engine reads part names from here and never spells one: HTTP's are
+/// `request` and `response`, and a transport whose kind has no answer, such as a published message,
+/// has none (kernel-boundary review finding 8).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExchangeParts {
+  /// The part an exchange starts with: what a drive instance sends, and what a serve instance
+  /// receives.
+  pub initiating: String,
+  /// The part that answers it: what a drive instance's reply carries, and what a serve instance
+  /// replies with.
+  pub answering: Option<String>,
+}
 
 /// Native binding (spec §9.1): one method per operation, taking that operation's request document
 /// and returning `Result<ResultDocument, ComponentError>` — the same documents a byte-pipe binding
@@ -104,6 +121,9 @@ pub trait TransportComponent: ::std::marker::Send + ::std::marker::Sync {
   /// of `TransportContribution.content-slots` — required, so no transport is silently mistaken for
   /// one whose slots are all plain.
   fn content_slots(&self) -> ContentSlots;
+  /// Which part starts an exchange and which answers it: the in-tree form of
+  /// `TransportContribution.exchange-parts`.
+  fn exchange_parts(&self) -> ExchangeParts;
   fn start(&self, req: Start) -> Result<StartResult, ComponentError>;
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError>;
   fn send(&self, req: Send) -> Result<SendResult, ComponentError>;

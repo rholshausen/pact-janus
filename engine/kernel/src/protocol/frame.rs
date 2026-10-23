@@ -318,6 +318,25 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` naming `hook/produce-message` (staged plan S1.7): a message interaction
+  /// whose message no `produce-message` hook produced, so the provider was never asked for it.
+  /// `reason` is `message-not-produced` and `part` names the part the plan scores.
+  pub fn message_not_produced(part: &str) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!(
+        "no produce-message hook produced the '{part}' this interaction's message is scored from, so \
+         the provider was never asked for it"
+      ),
+      details: Some(Box::new(serde_json::json!({
+        "component": "hook/produce-message",
+        "reason": "message-not-produced",
+        "part": part,
+      }))),
+    }
+  }
+
   /// `component-unavailable` naming `broker` (spec §8.7, ADR 0032): the broker client is a native
   /// host capability, and this engine has none — the offline WASM artifact never does.
   pub fn broker_unavailable(what: &str) -> Self {

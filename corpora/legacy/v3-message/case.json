@@ -1,0 +1,76 @@
+{
+  "description": "a v3 message, compared as today's verifier compares one (staged plan S1.7): each metadata key the pact names by its rule, else as a MIME type for contentType, else by equality; the contents' type, equivalent to the pact's; then the contents, as a response body is",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "messages": [
+        {
+          "description": "an order was shipped",
+          "providerStates": [
+            {
+              "name": "an order exists"
+            }
+          ],
+          "contents": {
+            "id": "42",
+            "status": "SHIPPED"
+          },
+          "metaData": {
+            "contentType": "application/json",
+            "destination": "X001"
+          },
+          "matchingRules": {
+            "body": {
+              "$.id": {
+                "matchers": [
+                  {
+                    "match": "type"
+                  }
+                ]
+              }
+            },
+            "metadata": {
+              "destination": {
+                "matchers": [
+                  {
+                    "match": "regex",
+                    "regex": "\\w+\\d+"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.message.content-type": "application/json; charset=utf-8",
+    "$.message.metadata": {
+      "contentType": "application/json; charset=utf-8",
+      "destination": "Y002",
+      "partition": 3
+    },
+    "$.message.body": {
+      "id": "77",
+      "status": "SHIPPED",
+      "extra": true
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

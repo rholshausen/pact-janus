@@ -1,13 +1,18 @@
 {
   "$comment": "Written by `verifier-diff import-compatibility-suite`; regenerate rather than edit. Each skipped scenario names what will let it in.",
   "commit": "1acfa1ecbd9d63e4465c687b3cdd7e0d3ac5811c",
-  "imported": 33,
+  "imported": 52,
   "licence": "Apache-2.0",
   "skipped": [
     {
       "feature": "features/V1/http_provider.feature",
-      "reason": "S1.9: request filters as hooks",
+      "reason": "pact_verifier_cli takes no request filter (only pact_verifier's library and the FFI do), so the harness cannot give today's verifier the one this scenario configures; janus verify's is a before-request hook (S1.9, ADR 0044), tested with the hooks",
       "scenario": "Verifying a HTTP request with a request filter configured"
+    },
+    {
+      "feature": "features/V3/message_provider.feature",
+      "reason": "the suite marks it work in progress (@wip), and its own harness does not run it",
+      "scenario": "Supports messages with body formatted for the Kafka schema registry"
     }
   ],
   "suite": "https://github.com/pact-foundation/pact-compatibility-suite"

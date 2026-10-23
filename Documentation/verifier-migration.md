@@ -7,8 +7,8 @@ migration note for providers. Behaviour with no option gets a row too, where a p
 
 It is filled in by area as each area is built. The provider connection is complete
 ([S1.5](staged-implementation-plan.md), [ADR 0035](decisions/0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md)),
-and so are provider states and request filters, which become hooks (S1.9), and pact plugins, which
-are refused by name until S5.2 (S1.8). S1.13 adds the rest:
+and so are provider states and request filters, which become hooks (S1.9), pact plugins, which
+are refused by name until S5.2 (S1.8), and message pacts (S1.7). S1.13 adds the rest:
 pact sources, the Pact Broker, filtering, publishing and reporting.
 
 Where a row says the two differ, [`corpora/verifier/`](../corpora/verifier/README.md) has a fixture
@@ -23,7 +23,7 @@ today's do; a Pact Broker is reached with the defaults below, as today's verifie
 | Today | `janus verify` | Notes |
 |---|---|---|
 | `--hostname`/`-h`, `--port`/`-p`, `--transport`/`--scheme` (`PACT_PROVIDER_HOSTNAME`, `PACT_PROVIDER_PORT`, `PACT_PROVIDER_TRANSPORT`) | `--provider-url <scheme>://<host>:<port>` | One URL in place of three options. Janus's `--transport` names the transport component (`http`, which speaks both `http` and `https`), not the scheme. Whether `janus verify` also takes today's three spellings is S1.13's to decide |
-| `--transports <kind:port>...` | none yet | A transport per interaction kind, for plugin-backed interactions: the pact-plugins bridge is S5.2, and until then S1.8 refuses such an interaction by name |
+| `--transports <NAME:PORT[/PATH]>...` | `--transports <NAME:PORT[/PATH]>`, repeatable or several in one quoted value | Plain HTTP on the provider URL's host, as today. An `http` entry is where HTTP interactions go; a message is asked for where [Message pacts](#message-pacts) says. A plugin transport (`grpc`) has nothing to route until the bridge (S5.2): S1.8 refuses such an interaction by name. Fixtures `messages/*`, and `cli/tests/cli.rs` |
 | `--base-path` (`PACT_PROVIDER_BASE_PATH`) | `--base-path`, the same variable; or a path in `--provider-url` | Fixture `connection/header-and-base-path` |
 | `--request-timeout` (`PACT_PROVIDER_REQUEST_TIMEOUT`), default 5000 ms | `--request-timeout`, the same variable and default | Today's also bounds a state-change call. Janus's state-change call is an `http` hook with its own `timeout-ms`, default 5000 ms. Fixtures `connection/request-timeout` and `connection/request-timeout-raised` |
 | `--header`/`-H KEY=VALUE`, repeatable | `--header`/`-H KEY=VALUE`, repeatable | Added to every request, replacing the pact's header of that name. **Differs:** Janus replaces a header whose name differs only in case; today's verifier keeps the pact's and sends its value (fixture `connection/header-case`, ADR 0035) |
@@ -71,6 +71,43 @@ others). Janus has no bridge to them yet: that is [S5.2](staged-implementation-p
 
 `janus upgrade` drops such an interaction from the contract it writes, with an `interaction-dropped`
 finding naming the plugin, and `janus explain` refuses it as `verify` does.
+
+## Message pacts
+
+Today's verifiers verify a v3 message pact, and a v4 pact's asynchronous and synchronous messages, by
+asking the provider for each message over HTTP. `janus verify` asks the same way, through a
+`produce-message` hook ([S1.7](staged-implementation-plan.md),
+[ADR 0046](decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)).
+A provider that verifies messages today needs no configuration: when the verifier configuration names
+no `produce-message` hook, `janus verify` adds one, `provider-messages`, which does what today's
+verifier does. A provider whose producer is reached some other way names its own:
+
+```yaml
+version: 1
+hooks:
+  produce-message:
+    - name: messages
+      run: { kind: http, url: "http://localhost:8081/messages", format: pact-message,
+             headers: { authorization: "Bearer ${MESSAGE_TOKEN}" } }
+      changes: [parts]
+```
+
+A configuration's own `produce-message` hooks replace the default whole. A `script` or `exec` hook can
+produce the message too, as the `message` part with `metadata` and `body` slots (lifecycle-hooks spec
+§3.4).
+
+| Today | `janus verify` | Notes |
+|---|---|---|
+| A message is asked for by a POST of `{ description, providerStates }`, and a synchronous message's `request` too | The same POST, from `provider-messages` or an `http` hook with `format: pact-message` | Fixtures `messages/*` and `compatibility-suite/v3-messages`, `v4-messages` |
+| The POST goes to the `--transports` entry the interaction's transport names, else to one named `message` or `async-message` (`sync-message`), else to the provider's URL | The same, from `--transports` | `cli/tests/cli.rs` |
+| The reply's body is the message; its `Content-Type` and the base64 JSON of a `Pact-Message-Metadata` header are its metadata | The same | |
+| `--header` and a request filter reach the message POST | `--header` does. A `before-request` hook does not run, since no request is sent: a credential goes in the `produce-message` hook's `headers` | |
+| A synchronous message's reply must be a success; an asynchronous message is read from any reply | **Differs:** every reply must be a 2xx. A producer that answered 500 has not produced the message | Fixture `messages/error-status`, in the ledger |
+| A synchronous message with more than one response compares the first, and fails | The same | |
+| A provider with no message endpoint fails each message on the request | The same, through the hook; with a configuration whose `produce-message` hooks select no interaction, a message fails as `component-unavailable` naming `hook/produce-message` | |
+
+`janus upgrade` still drops a message interaction, with an `interaction-dropped` finding: a contract has
+no message form until the consumer side has one (S6.2). `janus explain` shows a message's plan.
 
 ## Provider states and request filters
 

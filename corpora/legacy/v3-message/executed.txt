@@ -1,0 +1,38 @@
+(
+  :"an order was shipped" (
+    :message (
+      :metadata (
+        :"$.contentType" (
+          %legacy:header-value (
+            $.message.metadata.contentType => 'application/json; charset=utf-8',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.destination" (
+          %match:regex (
+            $.message.metadata.destination => 'Y002',
+            '^(?:\\w+\\d+)$'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:message-type (
+          $.message.content-type => 'application/json; charset=utf-8',
+          'application/json'
+        ) => BOOL(true),
+        :"$.id" (
+          %match:type (
+            $.message.body.id => '77',
+            '42'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.status" (
+          %match:equality (
+            $.message.body.status => 'SHIPPED',
+            'SHIPPED'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

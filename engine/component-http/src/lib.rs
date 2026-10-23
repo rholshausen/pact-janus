@@ -20,8 +20,9 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use drive::DriveInstance;
 use pact_janus_kernel::component::{
-  ComponentError, ContentSlots, Dispose, DisposeResult, Inbound, Part, Parts, PollInbound, PollInboundResult,
-  Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult, TransportComponent,
+  ComponentError, ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, Part, Parts, PollInbound,
+  PollInboundResult, Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult,
+  TransportComponent,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -244,6 +245,15 @@ impl TransportComponent for HttpTransport {
     ])
   }
 
+  /// An exchange starts with a request and is answered with a response (component-interfaces spec
+  /// §5.7): the names the engine reads instead of spelling them.
+  fn exchange_parts(&self) -> ExchangeParts {
+    ExchangeParts {
+      initiating: "request".to_string(),
+      answering: Some("response".to_string()),
+    }
+  }
+
   fn start(&self, req: Start) -> Result<StartResult, ComponentError> {
     match req.role.as_str() {
       "serve" => self.start_serve(req),
@@ -393,10 +403,27 @@ impl TransportComponent for HttpTransport {
     let mut instances = self.instances.lock().expect("instance lock poisoned");
     if let Some(Instance::Serve(instance)) = instances.get_mut(&req.instance) {
       // HTTP has no disposition concept (spec §5.3: "a transport whose kind has no such concept
-      // ignores it") — but an arrival disposed without a reply would otherwise hang its
-      // connection, so answer it minimally before dropping it.
+      // ignores it"), but an arrival disposed without a reply would otherwise hang its connection,
+      // so it is answered before it is dropped. A request the engine rejected because it did not
+      // match is answered with a 500 naming every mismatch, so the consumer's own HTTP client sees
+      // a clear failure rather than a response it did not earn (kernel-boundary review finding 9).
       if let Some(request) = instance.pending.remove(&req.event) {
-        let _ = request.respond(tiny_http::Response::from_data(Vec::new()).with_status_code(500));
+        let mismatches = (req.disposition == "reject")
+          .then(|| req.details.as_ref().and_then(|details| details.get("mismatches")))
+          .flatten();
+        let response = match mismatches {
+          Some(mismatches) => {
+            let body = serde_json::to_vec(mismatches).unwrap_or_default();
+            let mut response = tiny_http::Response::from_data(body).with_status_code(500);
+            if let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+            {
+              response = response.with_header(header);
+            }
+            response
+          }
+          None => tiny_http::Response::from_data(Vec::new()).with_status_code(500),
+        };
+        let _ = request.respond(response);
       }
     }
     Ok(DisposeResult {})

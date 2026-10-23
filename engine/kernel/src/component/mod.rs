@@ -38,6 +38,6 @@ pub use matcher::{Apply, ApplyResult, MatcherComponent};
 pub use parts::{Part, Parts, SlotValue};
 pub use registry::{ContentRegistry, media_type_matches};
 pub use transport::{
-  ContentSlots, Dispose, DisposeResult, Inbound, PollInbound, PollInboundResult, Reply, ReplyResult, Send,
-  SendResult, Start, StartResult, Stop, StopResult, TransportComponent,
+  ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, PollInbound, PollInboundResult, Reply,
+  ReplyResult, Send, SendResult, Start, StartResult, Stop, StopResult, TransportComponent,
 };

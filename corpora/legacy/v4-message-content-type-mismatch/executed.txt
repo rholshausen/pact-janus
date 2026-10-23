@@ -1,0 +1,26 @@
+(
+  :"an order was shipped" (
+    :message (
+      :metadata (
+        :"$.contentType" (
+          %legacy:header-value (
+            $.message.metadata.contentType => 'text/plain',
+            'application/json'
+          ) => ERROR(Expected 'text/plain' to equal 'application/json')
+        ) => BOOL(false)
+      ) => BOOL(false),
+      :body (
+        %legacy:message-type (
+          $.message.content-type => 'text/plain',
+          'application/json'
+        ) => ERROR(Expected message with content type application/json but was text/plain),
+        :"$.id" (
+          %match:equality (
+            $.message.body.id => NULL,
+            '42'
+          ) => ERROR(Expected <absent> to equal '42')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

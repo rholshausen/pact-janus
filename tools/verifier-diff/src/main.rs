@@ -75,6 +75,14 @@ enum Command {
   },
   /// Check the corpus and the ledger without running anything
   Check,
+  /// Print the routes a scripted provider honouring these pacts answers with, as a fixture's
+  /// `provider.routes` takes them: an HTTP interaction's request and response, or a message's
+  /// request and the message
+  Routes {
+    /// v1-v4 pact files
+    #[arg(value_name = "PACT", required = true)]
+    pacts: Vec<PathBuf>,
+  },
   /// Regenerate corpora/verifier/compatibility-suite from a pact-compatibility-suite checkout
   ImportCompatibilitySuite {
     /// The checkout
@@ -114,6 +122,10 @@ fn main() -> ExitCode {
       println!("{summary}");
       true
     }),
+    Command::Routes { pacts } => routes(&pacts).map(|routes| {
+      println!("{routes}");
+      true
+    }),
     Command::ImportCompatibilitySuite { suite } => {
       import::import(&suite, &corpus.join("compatibility-suite")).map(|summary| {
         println!("verifier-diff: {summary}");
@@ -129,6 +141,20 @@ fn main() -> ExitCode {
       ExitCode::from(2)
     }
   }
+}
+
+/// Every route of these pacts, in order, as pretty JSON.
+fn routes(pacts: &[PathBuf]) -> Result<String, String> {
+  let mut routes = Vec::new();
+  for path in pacts {
+    let text = std::fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
+    let document: serde_json::Value =
+      serde_json::from_str(&text).map_err(|err| format!("{}: {err}", path.display()))?;
+    for interaction in fixture::routes_of(&document, &path.display().to_string())? {
+      routes.push(interaction.route);
+    }
+  }
+  serde_json::to_string_pretty(&routes).map_err(|err| err.to_string())
 }
 
 /// The pinned version of today's verifier (`tools/verifier-diff/pact-verifier.json`).

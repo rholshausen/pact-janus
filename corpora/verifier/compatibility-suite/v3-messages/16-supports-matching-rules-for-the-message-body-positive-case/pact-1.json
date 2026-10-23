@@ -1,0 +1,38 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "messages": [
+    {
+      "contents": {
+        "one": "a",
+        "two": "b"
+      },
+      "description": "basic",
+      "matchingRules": {
+        "body": {
+          "$.one": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "include",
+                "value": "a"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

@@ -1,0 +1,32 @@
+(
+  :"A message with metadata" (
+    :message (
+      :metadata (
+        :"$.contentType" (
+          %legacy:header-value (
+            $.message.metadata.contentType,
+            'application/json'
+          )
+        ),
+        :"$.someKey" (
+          %match:type (
+            $.message.metadata.someKey,
+            'someString'
+          )
+        )
+      ),
+      :body (
+        %legacy:message-type (
+          $.message.content-type,
+          'application/json'
+        ),
+        :"$.someField" (
+          %match:type (
+            $.message.body.someField,
+            'someValue'
+          )
+        )
+      )
+    )
+  )
+)

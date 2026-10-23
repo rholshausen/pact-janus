@@ -1,0 +1,38 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "compatibility-suite",
+        "text": [
+          "comment one",
+          "comment two"
+        ]
+      },
+      "contents": {
+        "content": {
+          "one": "a",
+          "two": "b"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "basic",
+      "metadata": {
+        "contentType": "application/json"
+      },
+      "pending": false,
+      "type": "Asynchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

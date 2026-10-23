@@ -295,7 +295,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | `expect` | structural assertions | `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:count`, `expect:size`, `expect:entries`, `expect:absent` | |
 | `check` | boolean checks | `check:exists`, `check:equals`, `check:null` | |
 | `match` | one per value operator of the shape language (§4.3) | `match:*` | |
-| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as`, `legacy:mime-part` | |
+| `legacy` | v1–v4 semantics no shape compiles to (§4.4) | `legacy:only-entries`, `legacy:array-contains`, `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type`, `legacy:header-value`, `legacy:body-type`, `legacy:message-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as`, `legacy:mime-part` | |
 
 **Every core action takes at least a fixed number of children**, and a node with fewer is malformed:
 
@@ -303,7 +303,7 @@ set is these six, so a namespace outside it is a component's to take and stays t
 |---|---|
 | 0 | `flow:and`, `flow:or`, `flow:apply`, `flow:tee`, `value:join` |
 | 1 | `flow:error`; `value:join-with`, `value:length`, `value:lower-case`, `value:upper-case`, `value:to-string`; `check:exists`, `check:null`; `expect:object`, `expect:array`, `expect:empty`, `expect:not-empty`, `expect:absent`; `match:any`, `match:string`, `match:number`, `match:integer`, `match:decimal`, `match:boolean`, `match:null`, `match:datetime`, `match:date`, `match:time`, `match:semver`, `match:any-of`, `match:contains`; `legacy:only-entries`, `legacy:xml-children`, `legacy:xml-only-children` |
-| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type`, `legacy:parses-as` |
+| 2 | `flow:if`, `flow:for-each`; `check:equals`; `expect:count`, `expect:entries`; `match:equality`, `match:type`, `match:regex`, `match:include`, `match:content-type`; `legacy:array-contains`, `legacy:header-value`, `legacy:body-type`, `legacy:message-type`, `legacy:parses-as` |
 | 3 | `expect:size`; `legacy:min-type`, `legacy:max-type`, `legacy:mime-part` |
 | 4 | `legacy:min-max-type` |
 
@@ -399,6 +399,7 @@ one is the shape compiler's but for a single v1–v4 use:
 | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` | legacy only | v1–v4's `MinType`/`MaxType`/`MinMaxType`: a type check plus a size bound, enforced only when the resolved value is an array — a string's characters and an object's members are not items — and never emitted bounded for a cascaded rule, which the legacy compiler reduces to `match:type` (design 3.5's write-up of exactly why). The shape language has no single operator combining the two — `type` and `each-like`'s cardinality are separate operators there. |
 | `legacy:header-value` | legacy only | v1–v4's default (no matching rule) header comparison — not plain string equality: a MIME-shaped value compares type and parameters as a set (order- and case-insensitive on the parameter values, extra actual parameters allowed), a comma-separated one tolerates whitespace around the commas, anything else is exact and case-sensitive. Shapes match a header's value with the ordinary value operators (§4.3) instead. |
 | `legacy:body-type` | legacy only | v1–v4's check that a body is of the pact's content type before it is compared (ADR 0036): its children are the received `Content-Type` and the pact's type. An absent value agrees, as does an unknown type on either side (`*/*`), the same type and subtype, or a suffix type whose suffix is the pact's subtype (`application/hal+json` for `application/json`); when the pact's type has parameters, the received one must have the same. The legacy compiler emits it only when the pact names no `Content-Type` header, since `legacy:header-value` checks one it names; today's verifier checks a named one a second time before the body, and Janus deliberately does not ([ADR 0043](../../decisions/0043-check-a-pacts-content-type-once-on-the-header.md)). A shape's body type is its slot's declared content type (contract-file spec §5.5) instead. |
+| `legacy:message-type` | legacy only | v1–v4's check that a produced message's contents are of the pact's content type before they are compared (staged plan S1.7, [ADR 0046](../../decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)): its children are the produced message's content type and the pact's. Stricter than `legacy:body-type`, as today's verifier is for a message (`ContentType::is_equivalent_to`): two XML types agree when the pact's has no parameters or the same ones; otherwise the type and subtype must be the same, a `+suffix` aside, and when the pact's type has parameters the suffix and parameters must be too. A message with no content type has the unknown one, `*/*`, which agrees with nothing else. Fails with today's `Expected message with content type <pact's> but was <produced>` |
 | `legacy:xml-children` | legacy only | an XML element's child elements, as their names, one per child (ADR 0039): what a size rule or `notEmpty` on an element counts. Absent for an absent element |
 | `legacy:xml-only-children` | legacy only | an XML element has no child element but those its children name (ADR 0039), failing with today's `Unexpected child <name/>`. A response's element is held to it where a type rule reaches its children; a request's is closed by `legacy:only-entries` |
 | `legacy:parses-as` | legacy only | a string read as today's verifier reads one against a type rule (ADR 0039): its second child is `number` or `decimal` (parses as a floating-point number), `integer` (as an unsigned one) or `boolean` (`true` or `false`). Shapes compare a value's kind with `match:number` and the rest instead |
@@ -452,7 +453,7 @@ mapping**, one name to one name:
 | `match:array-contains` | `legacy:array-contains` |
 | `match:min-type`, `match:max-type`, `match:min-max-type` | `legacy:min-type`, `legacy:max-type`, `legacy:min-max-type` |
 | `match:header-value` | `legacy:header-value` |
-| — | `legacy:body-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as` and `legacy:mime-part`, which v0 did not have |
+| — | `legacy:body-type`, `legacy:message-type`, `legacy:xml-children`, `legacy:xml-only-children`, `legacy:parses-as` and `legacy:mime-part`, which v0 did not have |
 | every other `expect:*`, `check:*` and `match:*` action | the same name |
 | `<component>:<name>` | the same name |
 

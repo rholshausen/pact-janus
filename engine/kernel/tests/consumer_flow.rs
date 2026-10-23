@@ -487,6 +487,12 @@ impl TransportComponent for UndeliverableTransport {
   fn content_slots(&self) -> component::ContentSlots {
     component::ContentSlots::new()
   }
+  fn exchange_parts(&self) -> component::ExchangeParts {
+    component::ExchangeParts {
+      initiating: "request".to_string(),
+      answering: Some("response".to_string()),
+    }
+  }
   fn start(&self, _: component::Start) -> Result<component::StartResult, component::ComponentError> {
     Ok(component::StartResult {
       endpoint: json!({ "kind": "http", "base-url": "http://unused" }),

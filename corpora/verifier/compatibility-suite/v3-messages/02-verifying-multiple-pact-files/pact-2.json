@@ -1,0 +1,22 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "messages": [
+    {
+      "contents": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<values><one>A</one><two>B</two></values>",
+      "description": "xml",
+      "metadata": {
+        "contentType": "application/xml"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

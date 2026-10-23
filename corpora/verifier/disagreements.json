@@ -84,6 +84,20 @@
       "today": "fail",
       "janus": "pass",
       "reason": "ADR 0043: the reply adds a parameter (version=2) to the pact's application/json; charset=UTF-8, which the header check allows, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring exactly the pact's parameters, and fails"
+    },
+    {
+      "case": "messages/error-status",
+      "key": "run",
+      "today": "pass",
+      "janus": "fail",
+      "reason": "ADR 0046: a message provider's reply that is not a 2xx fails the produce-message hook that asked for it, as an http hook's always does; today's verifier reads an asynchronous message from the body of any reply"
+    },
+    {
+      "case": "messages/error-status",
+      "key": "0/0",
+      "today": "pass",
+      "janus": "fail",
+      "reason": "ADR 0046: a message provider's reply that is not a 2xx fails the produce-message hook that asked for it, as an http hook's always does; today's verifier reads an asynchronous message from the body of any reply"
     }
   ]
 }

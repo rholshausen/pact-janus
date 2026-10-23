@@ -318,14 +318,34 @@ fn compile_input(input: &Input) -> Result<(Plan, String), Refusal> {
         .as_ref()
         .ok_or("kind 'pact-interaction' requires 'pact'")?;
       let pact = legacy_pact::read("corpus case", pact_json).map_err(|err| err.to_string())?;
-      let interactions = legacy_pact::http_interactions(pact.as_ref());
+      let interactions = legacy_pact::interactions(pact.as_ref());
       let index = input.index.unwrap_or(0);
-      let interaction = interactions.get(index).ok_or_else(|| {
-        format!(
-          "no HTTP interaction at index {index} (pact has {})",
-          interactions.len()
-        )
-      })?;
+      let interaction = match interactions.get(index) {
+        Some(legacy_pact::PactInteraction::Http(interaction)) => interaction,
+        // A message's plan is the produced message's (staged plan S1.7).
+        Some(legacy_pact::PactInteraction::Message(message)) => {
+          let plan = legacy_pact::message_plan(message).map_err(|err| err.to_string())?;
+          return Ok((plan, message.description.clone()));
+        }
+        Some(legacy_pact::PactInteraction::NeedsPlugins(needs)) => {
+          return Err(
+            format!(
+              "the interaction at index {index} needs the pact plugin(s) {:?}",
+              needs.plugins
+            )
+            .into(),
+          );
+        }
+        None => {
+          return Err(
+            format!(
+              "no interaction at index {index} (pact has {})",
+              interactions.len()
+            )
+            .into(),
+          );
+        }
+      };
       let legacy_request =
         legacy_pact::legacy_request(&interaction.request).map_err(|err| err.to_string())?;
       let legacy_response =

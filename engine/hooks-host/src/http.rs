@@ -86,13 +86,15 @@ impl HttpHooks {
   }
 }
 
-/// What a state call is sent as: today's `{ state, params, action }` body, or the same as query
-/// parameters (today's `--state-change-as-query`), or this specification's context document.
+/// What a hook is sent as: today's `{ state, params, action }` body, or the same as query
+/// parameters (today's `--state-change-as-query`), or today's request for a message (`pact-message`),
+/// or this specification's context document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Format {
   Context,
   StateChange,
   StateChangeQuery,
+  Message,
 }
 
 impl HookInvoker for HttpHooks {
@@ -100,6 +102,15 @@ impl HookInvoker for HttpHooks {
     let Some(url) = run.get("url").and_then(Value::as_str) else {
       return Err(HookFailure::errored("an http hook must name a url"));
     };
+    let is_message = run.get("format").and_then(Value::as_str) == Some("pact-message");
+    // Today's routing of a message's request (`pact-message`): to the transport the pact names, or
+    // the message one, else `url`.
+    let routed = if is_message {
+      message_url(run, context)
+    } else {
+      None
+    };
+    let url = routed.as_deref().unwrap_or(url);
     // What a message may say about the endpoint: never its user information.
     let shown = without_userinfo(url);
     let method = run
@@ -117,11 +128,12 @@ impl HookInvoker for HttpHooks {
     {
       "pact-state-change" => Format::StateChange,
       "pact-state-change-query" => Format::StateChangeQuery,
+      "pact-message" => Format::Message,
       format if context_format.reads(format) => Format::Context,
       other => {
         return Err(HookFailure::errored(format!(
           "'{other}' is not a body format this engine knows ('{}', 'pact-state-change', \
-           'pact-state-change-query')",
+           'pact-state-change-query', 'pact-message')",
           context_format.writes()
         )));
       }
@@ -146,6 +158,9 @@ impl HookInvoker for HttpHooks {
         Some(serde_json::to_vec(&state_change_body(context)).expect("a json! value always serializes"))
       }
       Format::StateChangeQuery => None,
+      Format::Message => {
+        Some(serde_json::to_vec(&message_request(context)).expect("a json! value always serializes"))
+      }
     };
     let request = || {
       let mut request = http::Request::builder()
@@ -201,6 +216,11 @@ impl HookInvoker for HttpHooks {
       });
     }
 
+    if format == Format::Message {
+      // Read before the empty-body rule below: an empty reply is a message with no contents.
+      return Ok(produced_message(&response));
+    }
+
     if text.trim().is_empty() {
       // A v3 state endpoint that returns nothing is `ok` — which is exactly what makes today's
       // providers verifiable unchanged.
@@ -232,6 +252,116 @@ impl HookInvoker for HttpHooks {
         ..InvokeResult::default()
       }),
     }
+  }
+}
+
+/// Today's request for a message (`pact-message`, staged plan S1.7): what `pact_verifier` POSTs to
+/// a message provider — its `description`, its `providerStates`, and a synchronous message's
+/// `request` — which the engine hands a hook as `interaction.pact-message.request`. An interaction
+/// with none is asked for by its description and states alone.
+fn message_request(context: &Value) -> Value {
+  let interaction = context.get("interaction");
+  if let Some(request) = interaction.and_then(|i| i.pointer("/pact-message/request")) {
+    return request.clone();
+  }
+  let mut request = json!({
+    "description": interaction.and_then(|i| i.get("description")).cloned().unwrap_or(Value::Null),
+  });
+  if let Some(Value::Array(states)) = interaction.and_then(|i| i.get("states"))
+    && !states.is_empty()
+  {
+    request["providerStates"] = Value::Array(states.clone());
+  }
+  request
+}
+
+/// Where today's verifier sends a message's request (staged plan S1.7): the entry of the hook's
+/// `transports` (today's `--transports`) named by the transport the pact names for the interaction;
+/// or, when it names none, the first named `message`, or `async-message` (`sync-message` for a
+/// synchronous message). `None` sends it to the hook's `url`, which is also where a transport the
+/// pact names but `transports` does not goes, as today.
+fn message_url(run: &Value, context: &Value) -> Option<String> {
+  let transports = run.get("transports")?.as_array()?;
+  let pact_message = context.pointer("/interaction/pact-message");
+  let named = pact_message
+    .and_then(|m| m.get("transport"))
+    .and_then(Value::as_str);
+  let synchronous = pact_message
+    .and_then(|m| m.get("synchronous"))
+    .and_then(Value::as_bool)
+    .unwrap_or(false);
+  let kind = if synchronous {
+    "sync-message"
+  } else {
+    "async-message"
+  };
+  transports
+    .iter()
+    .find(|entry| {
+      let name = entry.get("name").and_then(Value::as_str);
+      match named {
+        Some(named) => name == Some(named),
+        None => name == Some("message") || name == Some(kind),
+      }
+    })
+    .and_then(|entry| entry.get("url"))
+    .and_then(Value::as_str)
+    .map(str::to_string)
+}
+
+/// A message provider's 2xx reply, read as today's verifier reads it (`messages.rs`): its body is
+/// the message's contents, labelled with the reply's `Content-Type`; its metadata is `contentType`,
+/// the reply's `Content-Type` or empty, with every member of the base64 JSON in a
+/// `Pact-Message-Metadata` header over it. Produced as the `message` part, which the engine scores.
+fn produced_message(response: &http::Response<Vec<u8>>) -> InvokeResult {
+  let header = |name: &str| {
+    response
+      .headers()
+      .get(name)
+      .and_then(|value| value.to_str().ok())
+      .map(str::to_string)
+  };
+  let content_type = header("content-type");
+  let mut metadata = serde_json::Map::new();
+  metadata.insert(
+    "contentType".to_string(),
+    json!(content_type.clone().unwrap_or_default()),
+  );
+  if let Some(encoded) = header("pact-message-metadata") {
+    use base64::Engine as _;
+    let decoded = base64::engine::general_purpose::STANDARD
+      .decode(encoded.trim())
+      .ok()
+      .and_then(|bytes| serde_json::from_slice::<serde_json::Map<String, Value>>(&bytes).ok());
+    match decoded {
+      Some(members) => metadata.extend(members),
+      // Today's verifier reads one it cannot decode as no metadata, and so does this.
+      None => tracing::debug!("the Pact-Message-Metadata header is not base64 JSON; ignored"),
+    }
+  }
+  let mut part = serde_json::Map::new();
+  part.insert("metadata".to_string(), json!({ "content": metadata }));
+  if !response.body().is_empty() {
+    use base64::Engine as _;
+    let mut body = json!({
+      "content": base64::engine::general_purpose::STANDARD.encode(response.body()),
+      "encoded": "base64",
+    });
+    if let Some(content_type) = content_type {
+      body["content-type"] = json!(content_type);
+    }
+    part.insert("body".to_string(), body);
+  }
+  let mut changes = serde_json::Map::new();
+  let mut parts = serde_json::Map::new();
+  parts.insert(
+    pact_janus_kernel::legacy::pact::MESSAGE_PART.to_string(),
+    Value::Object(part),
+  );
+  changes.insert("parts".to_string(), Value::Object(parts));
+  InvokeResult {
+    changes,
+    ..InvokeResult::ok()
   }
 }
 

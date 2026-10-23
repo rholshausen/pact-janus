@@ -116,8 +116,20 @@
         },
         "format": {
           "type": "string",
-          "description": "kind 'http': the body shape. 'janus' is this specification's context document. 'pact-state-change' is the v3/v4 provider-state body ({ state, params, action }) so an existing state-change endpoint keeps working unchanged — the migration case B5 exists for; 'pact-state-change-query' sends the same as query parameters and no body, as today's --state-change-as-query does (spec.md §8.4).",
-          "x-known-values": ["janus", "pact-state-change", "pact-state-change-query"]
+          "description": "kind 'http': the body shape. 'janus' is this specification's context document. 'pact-state-change' is the v3/v4 provider-state body ({ state, params, action }) so an existing state-change endpoint keeps working unchanged — the migration case B5 exists for; 'pact-state-change-query' sends the same as query parameters and no body, as today's --state-change-as-query does; 'pact-message', at produce-message, is today's request for a message, and the reply is read as the message (spec.md §8.4).",
+          "x-known-values": ["janus", "pact-state-change", "pact-state-change-query", "pact-message"]
+        },
+        "transports": {
+          "type": "array",
+          "description": "kind 'http', format 'pact-message': today's --transports, each a name and the URL it stands for. A message goes to the one named by the transport its pact names, else to the first named 'message' or 'async-message' ('sync-message' for a synchronous message), else to 'url' (spec.md §8.4).",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
         },
         "client": {
           "type": "object",

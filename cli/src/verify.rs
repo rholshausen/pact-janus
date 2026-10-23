@@ -12,7 +12,7 @@
 //! is why `janus verify` needs no flag saying which kind of file it was given.
 
 use crate::Outcome;
-use crate::args::{Output, VerifyArgs};
+use crate::args::{Output, TransportEntry, VerifyArgs};
 use crate::engine;
 use crate::error::Error;
 use crate::highlight;
@@ -63,23 +63,24 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     options["publish"] = publish;
   }
 
+  let provider = provider_options(args)?;
   let mut target = json!({
     "transports": [{
       "transport": args.transport,
-      "options": provider_options(args)?,
+      "options": provider,
     }]
   });
-  if let Some(mut hooks) = hooks {
-    // One file, two members, two owners (lifecycle-hooks spec §6.1): the components are design
-    // 2.6's and ride beside the hooks, not inside them.
-    if let Some(components) = hooks
-      .as_object_mut()
-      .and_then(|config| config.remove("components"))
-    {
-      target["components"] = components;
-    }
-    target["hooks"] = hooks;
+  let mut hooks = hooks.unwrap_or_else(|| json!({ "version": 1 }));
+  // One file, two members, two owners (lifecycle-hooks spec §6.1): the components are design
+  // 2.6's and ride beside the hooks, not inside them.
+  if let Some(components) = hooks
+    .as_object_mut()
+    .and_then(|config| config.remove("components"))
+  {
+    target["components"] = components;
   }
+  add_message_producer(&mut hooks, args, &target["transports"][0]["options"])?;
+  target["hooks"] = hooks;
 
   let mut engine = engine::start()?;
   let started = engine::call(
@@ -138,13 +139,12 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
 /// and keys are read here and passed as text (ADR 0035 decision 3): the engine reads no file for
 /// them. Only what was asked for is sent, so the engine's defaults are the defaults.
 fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
-  let mut base_url = args.provider_url.trim_end_matches('/').to_string();
-  if let Some(path) = args.base_path.as_deref().map(|path| path.trim_matches('/'))
-    && !path.is_empty()
-  {
-    base_url.push('/');
-    base_url.push_str(path);
-  }
+  // An `http` entry in `--transports` is where HTTP interactions go, as today: its port and its
+  // path, on the provider URL's host, in place of the URL and `--base-path`.
+  let base_url = match args.transports.iter().find(|entry| entry.name == "http") {
+    Some(entry) => transport_url(args, entry)?,
+    None => provider_base_url(args),
+  };
   let mut options = json!({ "base-url": base_url });
   if !args.headers.is_empty() {
     // A later --header of the same name replaces an earlier one, as today's verifier's map does.
@@ -205,6 +205,87 @@ fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
     options["client"] = Value::Object(client);
   }
   Ok(options)
+}
+
+/// The provider URL with `--base-path` after it: where HTTP interactions go, and where a message is
+/// asked for when no `--transports` entry says otherwise.
+fn provider_base_url(args: &VerifyArgs) -> String {
+  let mut base_url = args.provider_url.trim_end_matches('/').to_string();
+  if let Some(path) = args.base_path.as_deref().map(|path| path.trim_matches('/'))
+    && !path.is_empty()
+  {
+    base_url.push('/');
+    base_url.push_str(path);
+  }
+  base_url
+}
+
+/// A `--transports` entry's URL, as today's verifier makes one (`ProviderTransport::base_url`):
+/// plain HTTP, the provider URL's host, the entry's port and its path, `--base-path` not included.
+fn transport_url(args: &VerifyArgs, entry: &TransportEntry) -> Result<String, Error> {
+  let provider = url::Url::parse(&args.provider_url)
+    .map_err(|err| format!("--provider-url {}: {err}", args.provider_url))?;
+  let host = provider.host_str().ok_or_else(|| {
+    format!(
+      "--provider-url {} names no host for --transports",
+      args.provider_url
+    )
+  })?;
+  Ok(format!(
+    "http://{host}:{}{}",
+    entry.port,
+    entry.path.as_deref().unwrap_or_default()
+  ))
+}
+
+/// The name of the `produce-message` hook `janus verify` adds when the configuration names none.
+const MESSAGE_PRODUCER: &str = "provider-messages";
+
+/// Unless the configuration names a `produce-message` hook, ask the provider for each message as
+/// today's verifier does (staged plan S1.7): an `http` hook in `pact-message` format, POSTed to the
+/// `--transports` entry the message is routed to, else the provider URL, with the `--header`s and
+/// the client options the provider is reached with. A configuration's own hooks at the point replace
+/// it whole, since the hooks at a point chain and a second producer would overwrite the first.
+fn add_message_producer(hooks: &mut Value, args: &VerifyArgs, provider: &Value) -> Result<(), Error> {
+  let configured = hooks
+    .pointer("/hooks/produce-message")
+    .and_then(Value::as_array)
+    .is_some_and(|entries| !entries.is_empty());
+  if configured {
+    return Ok(());
+  }
+  let transports = args
+    .transports
+    .iter()
+    .map(|entry| Ok(json!({ "name": entry.name, "url": transport_url(args, entry)? })))
+    .collect::<Result<Vec<_>, Error>>()?;
+  let mut run = json!({
+    "kind": "http",
+    "url": provider_base_url(args),
+    "format": "pact-message",
+  });
+  if !transports.is_empty() {
+    run["transports"] = json!(transports);
+  }
+  if let Some(headers) = provider.get("headers") {
+    run["headers"] = headers.clone();
+  }
+  if let Some(client) = provider.get("client") {
+    run["client"] = client.clone();
+  }
+  let mut entry = json!({ "name": MESSAGE_PRODUCER, "run": run, "changes": ["parts"] });
+  if let Some(ms) = args.request_timeout {
+    entry["timeout-ms"] = json!(ms);
+  }
+  let Some(config) = hooks.as_object_mut() else {
+    return Err(String::from("the verifier configuration is not an object").into());
+  };
+  let points = config.entry("hooks").or_insert_with(|| json!({}));
+  let Some(points) = points.as_object_mut() else {
+    return Err(String::from("the verifier configuration's hooks are not an object").into());
+  };
+  points.insert("produce-message".to_string(), json!([entry]));
+  Ok(())
 }
 
 /// A `broker` source (protocol spec §8.3) from the command line. The engine reads no credential

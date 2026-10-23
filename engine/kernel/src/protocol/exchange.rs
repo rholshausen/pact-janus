@@ -26,7 +26,7 @@ use crate::common::ContentTypes;
 use crate::component::{
   ContentComponent, ContentSlots, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
-use crate::plan::{Mismatch, Plan, Status, execute_with, outcome};
+use crate::plan::{Plan, Status, execute_with, outcome};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -121,13 +121,18 @@ fn handle_inbound(
       instance: instance.to_string(),
       event: inbound.event,
       disposition: "unmatched".to_string(),
+      details: None,
     });
     return;
   };
 
+  // The part names are the transport's (kernel-boundary review finding 8): the arrival is matched
+  // against the plan's subtree for the part that starts an exchange, and answered with the part
+  // that answers one.
+  let names = transport.exchange_parts();
   let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
   let executed = execute_with(&armed.request_plan, &resolver, None, Some(contributions));
-  let request_subtree = find_container(&executed, "request").unwrap_or(&executed);
+  let request_subtree = find_container(&executed, &names.initiating).unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
 
   // The one line plan task 4.6's report leans on: `RUST_LOG=debug` names the variant a failure
@@ -142,20 +147,42 @@ fn handle_inbound(
     }
   }
 
-  let reply_parts = match status {
-    Status::Matched => response_parts(
-      &armed.response_parts,
-      &transport.content_slots(),
-      armed.content_types.get("response"),
-      content,
-    ),
-    Status::Mismatched => mismatch_reply(&mismatches, content),
+  // A match is answered with the variant's reply; a mismatch is rejected, and how a kind says
+  // "no" is the transport's business (kernel-boundary review finding 9): HTTP answers a 500 naming
+  // every mismatch.
+  let delivered = match (status, &names.answering) {
+    (Status::Matched, Some(answering)) => transport
+      .reply(Reply {
+        instance: instance.to_string(),
+        event: inbound.event,
+        parts: response_parts(
+          &armed.response_parts,
+          answering,
+          &transport.content_slots(),
+          armed.content_types.get(answering),
+          content,
+        ),
+      })
+      .map(|_| ()),
+    (Status::Matched, None) => transport
+      .dispose(Dispose {
+        instance: instance.to_string(),
+        event: inbound.event,
+        disposition: "accept".to_string(),
+        details: None,
+      })
+      .map(|_| ()),
+    (Status::Mismatched, _) => transport
+      .dispose(Dispose {
+        instance: instance.to_string(),
+        event: inbound.event,
+        disposition: "reject".to_string(),
+        details: Some(serde_json::json!({
+          "mismatches": mismatches.iter().map(mismatch_json).collect::<Vec<_>>(),
+        })),
+      })
+      .map(|_| ()),
   };
-  let delivered = transport.reply(Reply {
-    instance: instance.to_string(),
-    event: inbound.event,
-    parts: reply_parts,
-  });
 
   // A variant is verified only if the consumer actually got the response it was armed with: a
   // request that matched but whose reply never reached the client (the client gave up, or the
@@ -191,19 +218,20 @@ fn handle_inbound(
     );
 }
 
-/// The generated `response` payload, wired for reply (component-interfaces spec §4).
+/// The generated payload of the part that answers, wired for reply (component-interfaces spec §4).
 /// Only the slots the transport declares as content go through the content component
 /// (component-interfaces spec §5.5); every other slot — an HTTP response's `headers` map is as
 /// structured as any body — is handed over as its plain JSON value.
 fn response_parts(
   response: &BTreeMap<String, BTreeMap<String, Value>>,
+  answering: &str,
   content_slots: &ContentSlots,
   declared_types: Option<&BTreeMap<String, String>>,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
   let mut parts = Parts::new();
-  if let Some(slots) = response.get("response") {
-    let declared = content_slots.get("response");
+  if let Some(slots) = response.get(answering) {
+    let declared = content_slots.get(answering);
     let mut part = Part::new();
     for (slot_name, value) in slots {
       let is_content = declared.is_some_and(|names| names.contains(slot_name));
@@ -217,21 +245,7 @@ fn response_parts(
       };
       part.insert(slot_name.clone(), wired);
     }
-    parts.insert("response".to_string(), part);
+    parts.insert(answering.to_string(), part);
   }
-  parts
-}
-
-/// The reply sent when the recorded request didn't match what was armed: a `500` naming every
-/// mismatch, so the consumer's own HTTP client sees a clear failure rather than a hang or the
-/// response it did not earn. Refining this into a real "why your request didn't match" experience
-/// is plan task 4.6's job, not this wiring's.
-fn mismatch_reply(mismatches: &[Mismatch], content: Option<&dyn ContentComponent>) -> Parts {
-  let body = Value::Array(mismatches.iter().map(mismatch_json).collect());
-  let mut part = Part::new();
-  part.insert("status".to_string(), plain_slot(&Value::from(500)));
-  part.insert("body".to_string(), encode_slot(&body, None, content));
-  let mut parts = Parts::new();
-  parts.insert("response".to_string(), part);
   parts
 }

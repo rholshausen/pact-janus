@@ -1,0 +1,40 @@
+{
+  "description": "A message provider that answers with the message and a 500: today's verifier reads the body of an asynchronous message's reply whatever its status, and passes; janus verify fails a reply that is not a 2xx, as an http hook's always is (ADR 0046)",
+  "source": "staged plan S1.7; pact_verifier's verify_message_from_provider, which checks no status, where verify_sync_message_from_provider requires a success",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "an order was shipped"
+            }
+          }
+        },
+        "response": {
+          "status": 500,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "body": {
+            "json": {
+              "id": "42"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

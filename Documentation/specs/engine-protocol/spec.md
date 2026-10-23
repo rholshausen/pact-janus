@@ -616,6 +616,11 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   parts-in wherever the parts come from: a wire-level transport binding and a
   `produce-message`/`consume-message` hook (design 2.7) are interchangeable sources and
   MUST produce identical results for the same parts (spike 1.5, finding 6).
+  A v1–v4 message interaction is verified through the `produce-message` hooks of `target.hooks`
+  (lifecycle-hooks spec §3.4, ADR 0046): they produce its `message` part, which is compared with the
+  message the pact expects; it needs no transport. When no hook produces it, its result is `failed`
+  with `component-unavailable`, `details.component` `hook/produce-message` and `details.reason`
+  `message-not-produced`.
   A v1–v4 interaction that needs a pact-plugins plugin (its `pluginConfiguration` names one, or it
   uses a matcher only a plugin the pact names provides) is refused by name before anything runs for
   it: its result is `failed` with `component-unavailable`, `details.component` naming the first

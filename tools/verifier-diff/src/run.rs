@@ -155,11 +155,16 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
   let mut cases = Vec::new();
   if fixture.mutations {
     for (p, (file, document)) in pacts.iter().enumerate() {
-      for (i, interaction) in fixture::http_interactions(document, file)?.iter().enumerate() {
-        let route = Route::from_interaction(interaction);
+      for (i, interaction) in fixture::routes_of(document, file)?.into_iter().enumerate() {
+        let route = interaction.route;
+        let key = fixture::interactions_key(document);
         let mut single = document.clone();
-        single["interactions"] = json!([document["interactions"][i].clone()]);
-        for mutation in mutate::mutations(&route.response) {
+        single[key] = json!([document[key][i].clone()]);
+        // A message's status is not part of the message (staged plan S1.7), so nothing changes it.
+        let mutations = mutate::mutations(&route.response)
+          .into_iter()
+          .filter(|mutation| !(interaction.message && mutation.id.starts_with("status/")));
+        for mutation in mutations {
           cases.push(Case {
             id: format!("{id}/mutations/{p}/{i}/{}", mutation.id),
             pacts: vec![(file.clone(), single.clone())],
@@ -252,7 +257,7 @@ fn expected_of(pacts: &[(String, Value)]) -> Vec<Expected> {
       .as_str()
       .unwrap_or_default()
       .to_string();
-    for (i, interaction) in document["interactions"]
+    for (i, interaction) in document[fixture::interactions_key(document)]
       .as_array()
       .into_iter()
       .flatten()

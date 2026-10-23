@@ -84,7 +84,15 @@
         "url": { "type": "string" },
         "method": { "type": "string", "x-known-values": ["POST", "PUT", "GET"] },
         "headers": { "type": "object", "additionalProperties": { "type": "string" } },
-        "format": { "type": "string", "x-known-values": ["janus", "pact-state-change", "pact-state-change-query"] },
+        "format": { "type": "string", "x-known-values": ["janus", "pact-state-change", "pact-state-change-query", "pact-message"] },
+        "transports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "properties": { "name": { "type": "string" }, "url": { "type": "string" } }
+          }
+        },
         "client": { "type": "object" }
       }
     }

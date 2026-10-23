@@ -140,6 +140,10 @@
           "type": "string",
           "description": "Open vocabulary. A transport whose kind has no such concept ignores it.",
           "x-known-values": ["accept", "reject", "release"]
+        },
+        "details": {
+          "type": "object",
+          "description": "Why, for the transport to say in its own way. A 'reject' of an arrival that did not match carries { mismatches: [...] }, which the built-in HTTP transport answers as a 500 whose body they are (spec.md §5.7)."
         }
       }
     },

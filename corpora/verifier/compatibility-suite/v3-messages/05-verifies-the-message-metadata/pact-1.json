@@ -1,0 +1,31 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "messages": [
+    {
+      "contents": {
+        "one": "a",
+        "two": "b"
+      },
+      "description": "basic",
+      "metadata": {
+        "Origin": "Some Text",
+        "TagData": {
+          "ID": "100",
+          "weight": 100.5
+        },
+        "contentType": "application/json",
+        "key": "value"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

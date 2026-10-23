@@ -1,0 +1,71 @@
+{
+  "description": "a v4 synchronous message: its first response is the message the provider's answer is compared with, its `content` rules read as a body's (staged plan S1.7)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/Messages",
+          "description": "a square's area",
+          "request": {
+            "contents": {
+              "content": {
+                "side": 3
+              },
+              "contentType": "application/json",
+              "encoded": false
+            }
+          },
+          "response": [
+            {
+              "contents": {
+                "content": {
+                  "area": 9
+                },
+                "contentType": "application/json",
+                "encoded": false
+              },
+              "matchingRules": {
+                "content": {
+                  "$.area": {
+                    "combine": "AND",
+                    "matchers": [
+                      {
+                        "match": "integer"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.message.content-type": "application/json",
+    "$.message.metadata": {
+      "contentType": "application/json"
+    },
+    "$.message.body": {
+      "area": 16
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

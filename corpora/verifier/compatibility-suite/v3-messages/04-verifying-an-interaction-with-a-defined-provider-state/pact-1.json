@@ -1,0 +1,30 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "messages": [
+    {
+      "contents": {
+        "one": "a",
+        "two": "b"
+      },
+      "description": "basic",
+      "metadata": {
+        "contentType": "application/json"
+      },
+      "providerStates": [
+        {
+          "name": "state one"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

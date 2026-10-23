@@ -53,19 +53,21 @@ use crate::broker::{
 };
 use crate::common::ContentTypes;
 use crate::component::{
-  ContentComponent, PactGenerators, Parts, Send as SendRequest, Stop, TransportComponent, Unavailable,
+  ContentComponent, ExchangeParts, PactGenerators, Parts, Send as SendRequest, Stop, TransportComponent,
+  Unavailable,
 };
 use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
-use crate::legacy::compile::compile_response as compile_legacy_response;
-use crate::legacy::pact::{self as legacy_pact, PactInteraction, PluginInteraction, RequestTemplate};
+use crate::legacy::compile::{self as legacy_compile, compile_response as compile_legacy_response};
+use crate::legacy::pact::{
+  self as legacy_pact, MessageInteraction, PactInteraction, PluginInteraction, RequestTemplate,
+};
 use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
 use crate::variant::params;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
@@ -361,13 +363,7 @@ impl Source {
   fn interaction_pending(&self, index: usize) -> bool {
     match self {
       Source::Janus(_) => false,
-      Source::Legacy(pact) => pact
-        .interactions
-        .get(index)
-        .is_some_and(|interaction| match interaction {
-          PactInteraction::Http(http) => http.pending,
-          PactInteraction::NeedsPlugins(needs) => needs.pending,
-        }),
+      Source::Legacy(pact) => pact.interactions.get(index).is_some_and(PactInteraction::pending),
     }
   }
 
@@ -1270,10 +1266,21 @@ impl Replay {
   }
 }
 
+/// Where the parts a replay scores come from.
+enum Answer {
+  /// The replay's request is sent through the target for its transport, and its reply is scored.
+  Driven,
+  /// A `produce-message` hook produces them (lifecycle-hooks spec §3.4, staged plan S1.7): a
+  /// message, asked of the provider's own producer. `part` is the one the plan scores, named by
+  /// whoever prepared the replay.
+  Produced { part: String },
+}
+
 /// Everything one replay needs, with nothing left to decide: what to send, what scores the reply,
 /// how the reply's values are read back, and what the hooks are told.
 struct Ready {
   variant: String,
+  answer: Answer,
   origin: Value,
   assignment: Value,
   states: Vec<contract::ResolvedState>,
@@ -1358,18 +1365,11 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
           "resolved": disagreement.0, "recorded": disagreement.1,
         }));
       }
-      let Some(request) = recorded_request(variant) else {
-        return Replay::Broken {
-          variant: variant.id.clone(),
-          error: json!({ "code": "contract-invalid", "problems": [{
-            "pointer": "/parts/request",
-            "message": "the recorded variant has no request part to replay",
-          }] }),
-        };
-      };
+      let request = recorded_parts(variant);
       let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
       Replay::Ready(Box::new(Ready {
         variant: variant.id.clone(),
+        answer: Answer::Driven,
         origin: json!(variant.origin),
         assignment: json!(variant.assignment),
         // Pinned to this variant (shape spec §7.1, variant-semantics spec §5.2 step 3): an
@@ -1415,32 +1415,18 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
 fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
   let interaction = match &pact.interactions[index] {
     PactInteraction::Http(http) => http,
+    PactInteraction::Message(message) => return prepare_legacy_message(pact, message, index, format),
     PactInteraction::NeedsPlugins(needs) => return refuse_plugin_interaction(pact, needs, index, format),
   };
-  let states: Vec<contract::ResolvedState> = interaction
-    .provider_states
-    .iter()
-    .map(|state| contract::ResolvedState {
-      name: state.name.clone(),
-      // v3 state parameters travel as they stand — a `state-setup` hook in `pact-state-change`
-      // format hands the provider exactly the `{state, params, action}` it received before Janus
-      // existed (lifecycle-hooks spec §8.4). v1/v2's bare state string arrives here as a state
-      // with no parameters, which is what it is.
-      params: (!state.params.is_empty())
-        .then(|| state.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
-    })
-    .collect();
-  let mut reference = json!({
-    "contract": { "consumer": pact.consumer, "provider": pact.provider },
-    "index": index,
-    "description": interaction.description,
-    "states": states.iter().map(|state| state.name.clone()).collect::<Vec<_>>(),
-    "format": format,
-  });
-  // The broker's id for the interaction, which a published result is keyed by (spec §8.3).
-  if let Some(id) = &interaction.id {
-    reference["id"] = json!(id);
-  }
+  let states = legacy_states(&interaction.provider_states);
+  let reference = legacy_reference(
+    pact,
+    index,
+    &interaction.description,
+    &states,
+    format,
+    interaction.id.as_ref(),
+  );
   // v1–v4 pacts are HTTP request/response documents by their own specification, so there is
   // nothing to read a transport kind out of: the interaction has one.
   let transport = DEFAULT_TRANSPORT_KIND.to_string();
@@ -1465,6 +1451,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
     transport,
     replays: vec![Replay::Ready(Box::new(Ready {
       variant: LEGACY_VARIANT.to_string(),
+      answer: Answer::Driven,
       origin: json!(crate::variant::Origin::Base),
       assignment: json!([]),
       plan: compile_legacy_response(&response),
@@ -1484,6 +1471,124 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
     }))],
   }
 }
+
+/// A v1–v4 interaction's provider states as a variant needs them. v3 state parameters travel as
+/// they stand — a `state-setup` hook in `pact-state-change` format hands the provider exactly the
+/// `{state, params, action}` it received before Janus existed (lifecycle-hooks spec §8.4). v1/v2's
+/// bare state string arrives here as a state with no parameters, which is what it is.
+fn legacy_states<S>(states: &[S]) -> Vec<contract::ResolvedState>
+where
+  S: legacy_pact::StateLike,
+{
+  states.iter().map(legacy_pact::StateLike::resolved).collect()
+}
+
+/// How a v1–v4 interaction is named in every event of the run.
+fn legacy_reference(
+  pact: &LegacyPact,
+  index: usize,
+  description: &str,
+  states: &[contract::ResolvedState],
+  format: &str,
+  id: Option<&String>,
+) -> Value {
+  let mut reference = json!({
+    "contract": { "consumer": pact.consumer, "provider": pact.provider },
+    "index": index,
+    "description": description,
+    "states": states.iter().map(|state| state.name.clone()).collect::<Vec<_>>(),
+    "format": format,
+  });
+  // The broker's id for the interaction, which a published result is keyed by (spec §8.3).
+  if let Some(id) = id {
+    reference["id"] = json!(id);
+  }
+  reference
+}
+
+/// A v1–v4 message interaction (staged plan S1.7): one variant, as an HTTP one has, whose message is
+/// produced by a `produce-message` hook rather than driven through a transport (lifecycle-hooks spec
+/// §3.4), and compared with the one the pact expects as today's verifier compares it. The hooks are
+/// told what today's verifier would POST for it (`pact-message`), which the `http` hook's
+/// `pact-message` format sends.
+fn prepare_legacy_message(
+  pact: &LegacyPact,
+  message: &MessageInteraction,
+  index: usize,
+  format: &str,
+) -> Prepared {
+  let states = legacy_states(&message.provider_states);
+  let reference = legacy_reference(
+    pact,
+    index,
+    &message.description,
+    &states,
+    format,
+    message.id.as_ref(),
+  );
+  // The transport it is routed by, which a hook's `when` selects on: the one the pact names, else
+  // the message kind.
+  let transport = message
+    .transport
+    .clone()
+    .unwrap_or_else(|| MESSAGE_TRANSPORT_KIND.to_string());
+
+  let expected = match legacy_pact::legacy_message(message.expected.as_ref(), message.responses) {
+    Ok(expected) => expected,
+    Err(err) => {
+      let part = if message.synchronous {
+        "response/0"
+      } else {
+        "contents"
+      };
+      return Prepared {
+        reference,
+        transport,
+        replays: vec![Replay::Broken {
+          variant: LEGACY_VARIANT.to_string(),
+          error: json!({
+            "code": "contract-invalid",
+            "problems": [{ "pointer": format!("/interactions/{index}/{part}"), "message": err.to_string() }],
+          }),
+        }],
+      };
+    }
+  };
+
+  let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+  let mut pact_message = json!({ "request": message.request, "synchronous": message.synchronous });
+  if let Some(named) = &message.transport {
+    pact_message["transport"] = json!(named);
+  }
+  Prepared {
+    reference,
+    transport: transport.clone(),
+    replays: vec![Replay::Ready(Box::new(Ready {
+      variant: LEGACY_VARIANT.to_string(),
+      answer: Answer::Produced {
+        part: legacy_pact::MESSAGE_PART.to_string(),
+      },
+      origin: json!(crate::variant::Origin::Base),
+      assignment: json!([]),
+      plan: legacy_compile::compile_message(&expected, legacy_pact::MESSAGE_PART),
+      resolve: legacy_message_resolver,
+      content_types: legacy_pact::message_types(&expected),
+      states,
+      request: Parts::new(),
+      generate_from: None,
+      warnings: Vec::new(),
+      interaction: json!({
+        "description": message.description,
+        "states": states_json,
+        "transport": { "kind": transport },
+        "pact-message": pact_message,
+      }),
+    }))],
+  }
+}
+
+/// The kind a v1–v4 message is routed by when its pact names no transport.
+const MESSAGE_TRANSPORT_KIND: &str = "message";
 
 /// An interaction that needs a pact-plugins plugin (staged plan S1.8): refused before anything runs,
 /// with no state set up and nothing sent, as `component-unavailable` naming each plugin it needs. It
@@ -1531,6 +1636,17 @@ fn legacy_resolver(
   legacy_pact::header_captures(parts_resolver(parts, declared, content), parts)
 }
 
+/// A produced message read the way a message's plan addresses it: the generic slot captures, the
+/// contents decoded as the pact's content type, and the content type today's verifier takes the
+/// produced one to have ([`legacy_pact::message_captures`]).
+fn legacy_message_resolver(
+  parts: &Parts,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> CapturedValues {
+  legacy_pact::message_captures(parts_resolver(parts, declared, content), parts)
+}
+
 /// A v1–v4 body design 3.5 cannot compile, as the error a result carries: a body that claimed to be
 /// JSON, or another type, and was not is a **document** problem, carrying a pointer into the pact its
 /// author can act on. Every body kind is compiled since S1.23, so none is refused as a missing
@@ -1566,15 +1682,16 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
     };
 
     // Contract-file spec §4.3: an unknown kind is `component-unavailable` naming it, never a
-    // silent skip — a verifier that cannot speak an interaction's transport has not verified it.
-    let Some(target) = target else {
+    // silent skip — a verifier that cannot speak an interaction's transport has not verified it. A
+    // produced message needs no transport: a hook produces it.
+    if target.is_none() && matches!(ready.answer, Answer::Driven) {
       let error = json!({
         "code": "component-unavailable",
         "component": format!("transport/{}", prepared.transport),
       });
       report_failure(ctx, tally, &reference, &ready.variant, error);
       continue;
-    };
+    }
 
     for warning in &ready.warnings {
       ctx.stream.emit("verification/warning", warning.clone());
@@ -1633,7 +1750,11 @@ struct Exchange<'a> {
 /// the exchange itself, `after-response`, then teardown per state in **reverse** order — which
 /// runs whether the exchange passed, failed or never ran, because the state a failed exchange left
 /// behind is exactly the state that will make the next variant fail for the wrong reason.
-fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContext<'_>) -> (Value, Flow) {
+fn verify_exchange(
+  exchange: &Exchange<'_>,
+  target: Option<&Target>,
+  ctx: &mut RunContext<'_>,
+) -> (Value, Flow) {
   let mut scratch = ExchangeScratch::default();
   let base = Occurrence {
     interaction: Some(exchange.ready.interaction.clone()),
@@ -1642,7 +1763,7 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
       "assignment": exchange.ready.assignment,
     })),
     exchange: Some(json!({ "id": exchange.id })),
-    endpoint: Some(target.endpoint.clone()),
+    endpoint: target.map(|target| target.endpoint.clone()),
     transport: Some(exchange.transport.to_string()),
     ..Occurrence::default()
   };
@@ -1684,53 +1805,47 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
     }
   }
 
-  // 2. before-request, then the exchange itself. The request is the recorded one, cloned because
-  //    `before-request` may rewrite it and the recording must survive the run unchanged; or, for a
-  //    pact with request generators, generated now that the states have answered (ADR 0034), so a
-  //    `before-request` hook signs the request that is actually sent.
-  let mut parts = (result.is_none()).then(|| match &exchange.ready.generate_from {
-    None => exchange.ready.request.clone(),
-    Some(request) => generated_request(exchange, request, &scratch, ctx),
-  });
-
-  if let (None, Some(request)) = (&result, parts.as_mut()) {
-    let (status, aborted) = hook_point(ctx, "before-request", &base, Some(request), &mut scratch);
-    if let Some(abort) = aborted {
-      flow = Flow::Abort(abort.clone());
-      result = Some(hook_failure_payload(
-        exchange,
-        "failed",
-        &abort.hook,
-        &abort.error,
-      ));
-    } else if let HookStatus::FailExchange { hook, error } | HookStatus::StateUnavailable { hook, error } =
-      status
-    {
-      // A `before-request` hook that failed to sign a request would otherwise produce a 401 the
-      // report would attribute to the provider; the hook's own error names the real cause.
-      result = Some(hook_failure_payload(exchange, "failed", &hook, &error));
-    }
-  }
-
+  // 2. The exchange itself: before-request and a driven send, or produce-message (spec §4.1:
+  //    whichever the interaction calls for, never both).
   let mut reply = None;
   let mut executed_plan = None;
-  if result.is_none()
-    && let Some(request) = parts
-  {
-    match drive(
-      exchange,
-      request,
-      target,
-      ctx.content,
-      ctx.actions,
-      ctx.executed_plans,
-    ) {
-      Ok(driven) => {
-        executed_plan = driven.executed;
-        result = Some(driven.payload);
-        reply = driven.reply;
-      }
-      Err(payload) => result = Some(payload),
+  if result.is_none() {
+    match (&exchange.ready.answer, target) {
+      (Answer::Produced { part }, _) => match produce(exchange, part, &base, ctx, &mut scratch) {
+        Produced::Scored(driven) => {
+          result = Some(driven.payload);
+          executed_plan = driven.executed;
+        }
+        Produced::Failed(payload) => result = Some(payload),
+        Produced::Aborted(abort) => {
+          result = Some(hook_failure_payload(
+            exchange,
+            "failed",
+            &abort.hook,
+            &abort.error,
+          ));
+          flow = Flow::Abort(abort);
+        }
+      },
+      (Answer::Driven, Some(target)) => match drive_exchange(exchange, target, &base, ctx, &mut scratch) {
+        Ok(driven) => {
+          result = Some(driven.payload);
+          reply = driven.reply;
+          executed_plan = driven.executed;
+        }
+        Err(Stopped::Failed(payload)) => result = Some(payload),
+        Err(Stopped::Aborted(abort)) => {
+          result = Some(hook_failure_payload(
+            exchange,
+            "failed",
+            &abort.hook,
+            &abort.error,
+          ));
+          flow = Flow::Abort(abort);
+        }
+      },
+      // Unreachable: `verify_prepared` reports a driven replay with no target before it gets here.
+      (Answer::Driven, None) => {}
     }
   }
 
@@ -1782,6 +1897,111 @@ fn verify_exchange(exchange: &Exchange<'_>, target: &Target, ctx: &mut RunContex
   }
 
   (payload, flow)
+}
+
+/// Why an exchange stopped before it had a result to score.
+enum Stopped {
+  /// The variant failed: its result payload.
+  Failed(Value),
+  /// A hook ended the run.
+  Aborted(Abort),
+}
+
+/// A driven exchange (spec §4.1): the replay's request — the recorded one, cloned because
+/// `before-request` may rewrite it and the recording must survive the run unchanged; or, for a pact
+/// with request generators, generated now that the states have answered (ADR 0034), so a
+/// `before-request` hook signs the request that is actually sent — then `before-request`, then the
+/// send and the score.
+fn drive_exchange(
+  exchange: &Exchange<'_>,
+  target: &Target,
+  base: &Occurrence,
+  ctx: &mut RunContext<'_>,
+  scratch: &mut ExchangeScratch,
+) -> Result<Driven, Stopped> {
+  let names = target.component.exchange_parts();
+  let request = match &exchange.ready.generate_from {
+    None => exchange.ready.request.clone(),
+    Some(request) => generated_request(exchange, request, scratch, ctx),
+  };
+  let Some(mut request) = sent_parts(&request, &names) else {
+    return Err(Stopped::Failed(json!({
+      "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed",
+      "error": { "code": "contract-invalid", "problems": [{
+        "pointer": format!("/parts/{}", names.initiating),
+        "message": format!("the recorded variant has no '{}' part to send", names.initiating),
+      }] },
+    })));
+  };
+
+  let (status, aborted) = hook_point(ctx, "before-request", base, Some(&mut request), scratch);
+  if let Some(abort) = aborted {
+    return Err(Stopped::Aborted(abort));
+  }
+  if let HookStatus::FailExchange { hook, error } | HookStatus::StateUnavailable { hook, error } = status {
+    // A `before-request` hook that failed to sign a request would otherwise produce a 401 the
+    // report would attribute to the provider; the hook's own error names the real cause.
+    return Err(Stopped::Failed(hook_failure_payload(
+      exchange, "failed", &hook, &error,
+    )));
+  }
+
+  drive(
+    exchange,
+    request,
+    target,
+    ctx.content,
+    ctx.actions,
+    ctx.executed_plans,
+  )
+  .map_err(Stopped::Failed)
+}
+
+/// What a `produce-message` exchange came to.
+enum Produced {
+  /// The hooks produced the message, and it was scored.
+  Scored(Driven),
+  /// The variant failed before anything was scored: a hook failed, or none produced the message.
+  Failed(Value),
+  /// A hook ended the run.
+  Aborted(Abort),
+}
+
+/// A produced exchange (lifecycle-hooks spec §3.4, staged plan S1.7): the `produce-message` hooks
+/// are handed empty parts and produce the message, and `part` of what they produced is scored, as a
+/// driven reply is. Where the parts came from is not a matching input (spike 1.5 finding 6): from
+/// here on this is [`drive`]'s scoring.
+fn produce(
+  exchange: &Exchange<'_>,
+  part: &str,
+  base: &Occurrence,
+  ctx: &mut RunContext<'_>,
+  scratch: &mut ExchangeScratch,
+) -> Produced {
+  let mut parts = Parts::new();
+  let (status, aborted) = hook_point(ctx, "produce-message", base, Some(&mut parts), scratch);
+  if let Some(abort) = aborted {
+    return Produced::Aborted(abort);
+  }
+  if let HookStatus::FailExchange { hook, error } | HookStatus::StateUnavailable { hook, error } = status {
+    return Produced::Failed(hook_failure_payload(exchange, "failed", &hook, &error));
+  }
+  if !parts.contains_key(part) {
+    // No hook ran, or none produced the part: the provider was never asked, so nothing about it
+    // was verified, and the result says how to ask it.
+    return Produced::Failed(json!({
+      "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed",
+      "error": EngineError::message_not_produced(part),
+    }));
+  }
+  Produced::Scored(score(
+    exchange,
+    parts,
+    part,
+    ctx.content,
+    ctx.actions,
+    ctx.executed_plans,
+  ))
 }
 
 /// A pact's request with its generators applied (ADR 0034), in the wire vocabulary a transport
@@ -1863,10 +2083,6 @@ fn hook_failure_payload(exchange: &Exchange<'_>, status: &str, hook: &str, error
   })
 }
 
-/// Send the recorded request and score the reply against this replay's plan — pinned to the
-/// variant on the shape path, compiled from matching rules on the v1–v4 path, and by here just a
-/// plan either way. `Ok` carries the result payload and the inbound parts (for `after-response`);
-/// `Err` carries a payload for the cases where nothing came back to match.
 /// What one driven exchange produced: the result payload, the inbound parts (for
 /// `after-response`), and the executed plan when the run was asked for one.
 struct Driven {
@@ -1875,6 +2091,9 @@ struct Driven {
   executed: Option<Value>,
 }
 
+/// Send the request and score the reply against this replay's plan ([`score`]) — pinned to the
+/// variant on the shape path, compiled from matching rules on the v1–v4 path, and by here just a
+/// plan either way. `Err` carries a payload for the cases where nothing came back to match.
 fn drive(
   exchange: &Exchange<'_>,
   request: Parts,
@@ -1885,6 +2104,21 @@ fn drive(
 ) -> Result<Driven, Value> {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
+  let names = target.component.exchange_parts();
+  let Some(answering) = names.answering.as_deref() else {
+    // A drive instance whose kind has no answer cannot be scored against a reply; saying so beats
+    // a variant verified against nothing.
+    let error = EngineError::component_failed(
+      &format!("transport/{}", target.kind),
+      &crate::component::ComponentError::synthesised(
+        "no-answering-part",
+        "the transport names no part that answers an exchange, so there is no reply to match",
+      ),
+    );
+    return Err(json!({
+      "interaction": reference, "variant": variant, "status": "failed", "error": error,
+    }));
+  };
 
   let request = encode_declared(
     request,
@@ -1929,14 +2163,35 @@ fn drive(
     }));
   };
 
+  Ok(score(
+    exchange,
+    reply,
+    answering,
+    content,
+    actions,
+    executed_plans,
+  ))
+}
+
+/// Score a reply, or a produced message, against the replay's plan. Only the `answering` part is
+/// scored. A request was replayed verbatim, so matching it against itself would assert nothing; the
+/// provider answers for the response (variant-semantics §5.2). A shape-compiled plan carries every
+/// part and the answering subtree is picked out of it, by the name the transport gives it; a v1–v4
+/// plan is compiled from the response or the message alone, so its root already *is* that subtree
+/// and the fallback is the whole of it.
+fn score(
+  exchange: &Exchange<'_>,
+  reply: Parts,
+  answering: &str,
+  content: Option<&dyn ContentComponent>,
+  actions: &dyn ActionApplier,
+  executed_plans: ExecutedPlans,
+) -> Driven {
+  let reference = exchange.reference;
+  let variant = &exchange.ready.variant;
   let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
   let executed = execute_with(&exchange.ready.plan, &resolver, None, Some(actions));
-  // Only the response half is scored. The request was replayed verbatim, so matching it against
-  // itself would assert nothing; the provider answers for the response (variant-semantics §5.2).
-  // A shape-compiled plan carries both parts and the `response` subtree is picked out of it; a
-  // v1–v4 plan is compiled from the response alone, so its root already *is* that subtree and the
-  // fallback is the whole of it.
-  let response = find_container(&executed, "response").unwrap_or(&executed);
+  let response = find_container(&executed, answering).unwrap_or(&executed);
   let (status, mismatches) = outcome(response);
 
   let matched = status == Status::Matched;
@@ -1954,7 +2209,7 @@ fn drive(
     }
   };
 
-  // The response subtree that was scored, not the whole tree. The resolver holds only the reply,
+  // The answering subtree that was scored, not the whole tree. The resolver holds only the reply,
   // so a shape-compiled plan's request half resolves every path to absence and would show the
   // request failing, when the verdict never looked at it. A v1–v4 plan is the response alone, so
   // this is also what makes the two paths read the same.
@@ -1968,11 +2223,11 @@ fn drive(
     })
   });
 
-  Ok(Driven {
+  Driven {
     payload,
     reply: Some(reply),
     executed,
-  })
+  }
 }
 
 /// This engine's resolution against the one the contract recorded, when they differ (§6.4).
@@ -2085,15 +2340,20 @@ fn assignment_of(variant: &contract::RecordedVariant) -> Assignment {
   assignment
 }
 
-/// The recorded request example, wired for `transport/send` (variant-semantics spec §5.2 step 2:
-/// "the provider sees the bytes the consumer actually sent"). No conversion happens because none
-/// is needed — a contract's `SlotValue` *is* the component interface's `SlotValue`
-/// (component-interfaces spec §4), which is the whole point of that reuse.
-fn recorded_request(variant: &contract::RecordedVariant) -> Option<Parts> {
-  let request = variant.parts.get("request")?;
-  let mut parts: Parts = BTreeMap::new();
-  parts.insert("request".to_string(), request.clone());
-  Some(parts)
+/// The recorded variant's parts, in the wire form `transport/send` takes (variant-semantics spec
+/// §5.2 step 2: "the provider sees the bytes the consumer actually sent"). No conversion happens
+/// because none is needed — a contract's `SlotValue` *is* the component interface's `SlotValue`
+/// (component-interfaces spec §4), which is the whole point of that reuse. Which of them is sent is
+/// the transport's to say ([`sent_parts`]), so nothing here names one.
+fn recorded_parts(variant: &contract::RecordedVariant) -> Parts {
+  variant.parts.clone()
+}
+
+/// The part a replay sends: the one the transport starts an exchange with (kernel-boundary review
+/// finding 8). `None` when the replay has no such part, which is the document's problem.
+fn sent_parts(parts: &Parts, names: &ExchangeParts) -> Option<Parts> {
+  let part = parts.get(&names.initiating)?;
+  Some(Parts::from([(names.initiating.clone(), part.clone())]))
 }
 
 #[cfg(test)]

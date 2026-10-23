@@ -1,0 +1,85 @@
+{
+  "description": "a v3 message whose metadata breaks its rule and whose contents differ from an example no rule covers: each is a mismatch at its own path (staged plan S1.7)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "messages": [
+        {
+          "description": "an order was shipped",
+          "providerStates": [
+            {
+              "name": "an order exists"
+            }
+          ],
+          "contents": {
+            "id": "42",
+            "status": "SHIPPED"
+          },
+          "metaData": {
+            "contentType": "application/json",
+            "destination": "X001"
+          },
+          "matchingRules": {
+            "body": {
+              "$.id": {
+                "matchers": [
+                  {
+                    "match": "type"
+                  }
+                ]
+              }
+            },
+            "metadata": {
+              "destination": {
+                "matchers": [
+                  {
+                    "match": "regex",
+                    "regex": "\\w+\\d+"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.message.content-type": "application/json",
+    "$.message.metadata": {
+      "contentType": "application/json",
+      "destination": "queue"
+    },
+    "$.message.body": {
+      "id": "77",
+      "status": "PENDING"
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.message.metadata.destination",
+        "message": "Expected 'queue' to match '^(?:\\w+\\d+)$'",
+        "action": "match:regex"
+      },
+      {
+        "path": "$.message.body.status",
+        "message": "Expected 'PENDING' to equal 'SHIPPED'",
+        "action": "match:equality"
+      }
+    ]
+  }
+}

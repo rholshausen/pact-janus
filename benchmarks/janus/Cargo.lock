@@ -1730,6 +1730,7 @@ dependencies = [
 name = "pact_janus_hooks_host"
 version = "0.3.0"
 dependencies = [
+ "base64 0.22.1",
  "http",
  "pact_janus_http_client",
  "pact_janus_kernel",

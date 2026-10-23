@@ -1129,6 +1129,23 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       }
     }
 
+    // A produced message's content type against the pact's (staged plan S1.7): the check today's
+    // verifier makes before it compares a message's contents (`match_message_contents`), stricter
+    // than `legacy:body-type`'s. A message with no content type has the unknown one, `*/*`.
+    "legacy:message-type" => {
+      let value = value_of(&children[0]);
+      let expected = plain_text(&value_of(&children[1]));
+      let actual = as_text(&value).unwrap_or_else(|| "*/*".to_string());
+      if message_types_equivalent(&expected, &actual) {
+        NodeResult::Value(RuntimeValue::Bool(true))
+      } else {
+        NodeResult::Error {
+          message: format!("Expected message with content type {expected} but was {actual}"),
+          path: locus(children),
+        }
+      }
+    }
+
     _ => NodeResult::Error {
       message: format!("unknown or unavailable action '{name}'"),
       path: None,
@@ -1167,6 +1184,43 @@ fn body_types_agree(expected: &str, actual: &str) -> bool {
     same || (e_main == a_main && a_sub.rsplit_once('+').is_some_and(|(_, suffix)| suffix == e_sub))
   } else {
     same && e_params == a_params
+  }
+}
+
+/// `legacy:message-type` (legacy only, staged plan S1.7): whether a produced message's content type
+/// `actual` is equivalent to the pact's `expected`, as `pact_models`' `ContentType::is_equivalent_to`
+/// decides. Two XML types (`application/xml`, `text/xml`) are equivalent when the pact's has no
+/// parameters or the same ones. Otherwise the type and subtype must be the same, a `+suffix` aside,
+/// and when the pact's has parameters the suffix and the parameters must be the same too. Unlike
+/// `legacy:body-type`, an unknown type agrees with nothing but itself.
+fn message_types_equivalent(expected: &str, actual: &str) -> bool {
+  let parse = |value: &str| {
+    let (base, params) = mime_parts(value);
+    let base = base.to_ascii_lowercase();
+    let mut params: Vec<(String, String)> = params
+      .into_iter()
+      .map(|(k, v)| (k.to_ascii_lowercase(), v.to_ascii_lowercase()))
+      .collect();
+    params.sort();
+    let (main, sub) = base.split_once('/')?;
+    let (sub, suffix) = match sub.split_once('+') {
+      Some((sub, suffix)) => (sub.to_string(), Some(suffix.to_string())),
+      None => (sub.to_string(), None),
+    };
+    Some((main.to_string(), sub, suffix, params))
+  };
+  let (Some(e), Some(a)) = (parse(expected), parse(actual)) else {
+    return expected.trim().eq_ignore_ascii_case(actual.trim());
+  };
+  let strict_xml = |(main, sub, _, _): &(String, String, Option<String>, Vec<(String, String)>)| {
+    (main == "application" || main == "text") && sub == "xml"
+  };
+  if strict_xml(&e) && strict_xml(&a) {
+    e.3.is_empty() || e.3 == a.3
+  } else if e.3.is_empty() {
+    e.0 == a.0 && e.1 == a.1
+  } else {
+    e == a
   }
 }
 

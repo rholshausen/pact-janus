@@ -380,7 +380,8 @@ engine drives; the transport never calls in.
   an HTTP mock and a sync-message mock literally the same engine loop.
 
 `reply` completes an arrival that has a reply half. `dispose` completes one either way, with a
-`disposition` from an open vocabulary — `accept`, `reject`, `release` — and it exists because spike 1.5
+`disposition` from an open vocabulary — `accept`, `reject`, `release` — and optional `details` saying
+why (a `reject` of an arrival that did not match carries its mismatches, §5.7), and it exists because spike 1.5
 found the gap: an in-memory broker can drop an unwanted message silently, a real one must acknowledge,
 negative-acknowledge or release it for redelivery, and an interface with no way to say which will grow
 a broker-shaped hole in Phase 8. The engine MUST dispose of every arrival it polls; a transport whose
@@ -472,6 +473,27 @@ not parse, a version it does not speak) fail `transport/start` with `invalid-con
 member by pointer (`/client/tls/ca-certificates/0`). Verification starts every target before the
 run, so a misconfigured provider fails the call rather than its first request (engine-protocol
 spec §8.3).
+
+### 5.7 Which part starts an exchange, and which answers it
+
+The engine matches an arrival and builds a reply, and it drives a provider and scores what comes
+back, and each needs to know which part is which. A transport **declares** them, as `exchange-parts`
+in its `TransportContribution`: `initiating`, the part an exchange starts with, and `answering`, the
+part that answers it. HTTP's are `request` and `response`; a kind with no reply half, such as a
+published message, names no `answering` part. The kernel spells no part name of its own (staged plan
+S1.7, closing kernel-boundary review findings 8 and 9):
+
+- **Serving.** An arrival is matched against the plan's subtree for the `initiating` part. A match is
+  answered with the variant's `answering` part, through `reply`, or, for a kind with none, completed
+  with `dispose` and `accept`. A mismatch is completed with `dispose` and `reject`, whose `details`
+  carry `{ "mismatches": [...] }`; how a kind says no is the transport's. The built-in HTTP transport
+  answers a 500 whose body is the mismatches, as JSON.
+- **Driving.** The recorded variant's `initiating` part is sent, and the plan's subtree for the
+  `answering` part is scored against the reply. A transport with no `answering` part cannot drive a
+  verification, which fails as `component-failed` rather than verify against nothing.
+
+Every transport the engine serves or drives with declares them; an in-tree one does so in code
+(§9.1), as it declares its content slots.
 
 ## 6. The content interface
 

@@ -4,6 +4,11 @@
 //! deliberately not `http`: until 8.3 the kernel armed only `"http"` transports, so any other kind
 //! would have served nothing (kernel-boundary review, finding 7).
 //!
+//! Its parts are its own, `ask` and `answer`, never HTTP's: until staged plan S1.7 the kernel matched
+//! an arrival's `request` subtree and replied with its `response` part, and a transport had to use
+//! those names to be served at all (kernel-boundary review, finding 8). It names them in its
+//! `exchange_parts`, and the kernel reads them from there.
+//!
 //! The component is a stub loaded by a stub loader. Spike 8.3 drove a real out-of-process one, a
 //! Node `tcp` transport over the subprocess binding; its code is gone (staged plan S0.12) and what it
 //! found is `spikes/8.3-subprocess-transport/FINDINGS.md`.
@@ -35,7 +40,7 @@ fn part(slots: &[(&str, Value)]) -> component::Parts {
   for (name, value) in slots {
     part.insert(name.to_string(), slot(value.clone()));
   }
-  part_named("request", part)
+  part_named("ask", part)
 }
 
 fn part_named(name: &str, part: component::Part) -> component::Parts {
@@ -50,12 +55,20 @@ fn part_named(name: &str, part: component::Part) -> component::Parts {
 struct LineTransport {
   arrival: Mutex<Option<String>>,
   replies: Mutex<Vec<component::Parts>>,
+  /// Every arrival disposed of without a reply: its disposition and the engine's details.
+  disposed: Mutex<Vec<(String, Option<Value>)>>,
   answer: Mutex<String>,
 }
 
 impl TransportComponent for LineTransport {
   fn content_slots(&self) -> component::ContentSlots {
     component::ContentSlots::new()
+  }
+  fn exchange_parts(&self) -> component::ExchangeParts {
+    component::ExchangeParts {
+      initiating: "ask".to_string(),
+      answering: Some("answer".to_string()),
+    }
   }
   fn start(&self, req: component::Start) -> Result<component::StartResult, ComponentError> {
     Ok(component::StartResult {
@@ -72,7 +85,7 @@ impl TransportComponent for LineTransport {
       slot(json!(self.answer.lock().unwrap().clone())),
     );
     Ok(component::SendResult {
-      reply: Some(part_named("response", response)),
+      reply: Some(part_named("answer", response)),
     })
   }
   fn poll_inbound(
@@ -95,7 +108,8 @@ impl TransportComponent for LineTransport {
     self.replies.lock().unwrap().push(req.parts);
     Ok(component::ReplyResult {})
   }
-  fn dispose(&self, _: component::Dispose) -> Result<component::DisposeResult, ComponentError> {
+  fn dispose(&self, req: component::Dispose) -> Result<component::DisposeResult, ComponentError> {
+    self.disposed.lock().unwrap().push((req.disposition, req.details));
     Ok(component::DisposeResult {})
   }
 }
@@ -151,8 +165,8 @@ fn ping() -> Value {
   json!({
     "description": "ping, over a line",
     "transport": { "kind": "line", "mode": "passive" },
-    "parts": { "request": { "line": { "shape": "equality", "example": "PING" } },
-               "response": { "line": { "shape": "equality", "example": "PONG" } } }
+    "parts": { "ask": { "line": { "shape": "equality", "example": "PING" } },
+               "answer": { "line": { "shape": "equality", "example": "PONG" } } }
   })
 }
 
@@ -204,7 +218,7 @@ fn a_declared_transport_of_another_kind_serves_a_passive_interaction() {
     std::thread::sleep(Duration::from_millis(5));
   }
   assert_eq!(
-    transport.replies.lock().unwrap()[0]["response"]["line"].content,
+    transport.replies.lock().unwrap()[0]["answer"]["line"].content,
     json!("PONG")
   );
   let finalised = send(
@@ -213,6 +227,64 @@ fn a_declared_transport_of_another_kind_serves_a_passive_interaction() {
     json!({ "session": session }),
   );
   assert_eq!(finalised["ok"]["results"][0]["status"], "verified", "{finalised}");
+}
+
+/// An arrival that does not match is the transport's to refuse in its own way (kernel-boundary
+/// review, finding 9): the engine disposes of it as `reject`, naming every mismatch, and replies
+/// nothing. Before staged plan S1.7 it replied with an HTTP 500 the kernel wrote itself.
+#[test]
+fn an_arrival_that_does_not_match_is_rejected_with_its_mismatches() {
+  let transport = Arc::new(LineTransport::default());
+  let mut engine = engine(&transport, line_hello());
+  let session = send(
+    &mut engine,
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" }, "components": declared() } }),
+  )["ok"]["session"]
+    .clone();
+  let handle = send(
+    &mut engine,
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": ping() }),
+  )["ok"]["handle"]
+    .clone();
+  let variant = send(
+    &mut engine,
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  )["ok"]["variants"][0]["id"]
+    .clone();
+  send(
+    &mut engine,
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "line" }),
+  );
+  send(
+    &mut engine,
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": variant }),
+  );
+
+  *transport.arrival.lock().unwrap() = Some("PANG".to_string());
+  let waited = Instant::now();
+  while transport.disposed.lock().unwrap().is_empty() {
+    assert!(waited.elapsed() < Duration::from_secs(5), "never disposed of");
+    std::thread::sleep(Duration::from_millis(5));
+  }
+  let (disposition, details) = transport.disposed.lock().unwrap()[0].clone();
+  assert_eq!(disposition, "reject");
+  let mismatches = details.expect("a rejection says why")["mismatches"].clone();
+  assert_eq!(mismatches[0]["path"], json!("$.ask.line"), "{mismatches}");
+  assert!(
+    transport.replies.lock().unwrap().is_empty(),
+    "nothing was replied"
+  );
+  let finalised = send(
+    &mut engine,
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(finalised["ok"]["results"][0]["status"], "failed", "{finalised}");
 }
 
 #[test]
@@ -225,7 +297,7 @@ fn a_declared_transport_drives_a_verification() {
       "transport": { "kind": "line", "mode": "passive" },
       "parts": ping()["parts"],
       "selection": { "variants": [ { "id": "base", "origin": "base", "assignment": [],
-        "parts": { "request": { "line": { "content": "PING" } }, "response": { "line": { "content": "PONG" } } } } ],
+        "parts": { "ask": { "line": { "content": "PING" } }, "answer": { "line": { "content": "PONG" } } } } ],
         "report": {} } } ] });
   for (answer, status) in [("PONG", "verified"), ("PANG", "failed")] {
     *transport.answer.lock().unwrap() = answer.to_string();

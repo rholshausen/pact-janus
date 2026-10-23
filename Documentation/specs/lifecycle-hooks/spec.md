@@ -254,6 +254,17 @@ application under test is what emits and the engine matches what it emitted. Not
 is §3.5, where the engine produces and user code receives. That the roles swap and the direction does
 not is the whole reason these points are named for the direction.
 
+A v1–v4 message interaction — a v3 message, a v4 asynchronous or synchronous message — is verified
+this way (staged plan S1.7, [ADR 0046](../../decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)).
+Its hooks produce one part, `message`, with two slots: `metadata`, the message's metadata as one
+object, and `body`, its contents as octets labelled with their content type. A synchronous message's
+`message` is its response. The context's `interaction` carries `pact-message`: what today's verifier
+sends to ask for the message (`request`), whether it is `synchronous`, and the `transport` the pact
+names for it, if any. The occurrence's transport, which `when` selects on (§6.3), is that one, else
+`message`. When no hook produces the `message` part, the variant fails as `component-unavailable`
+naming `hook/produce-message`, with `reason: message-not-produced`: the provider was never asked.
+`janus verify` adds a producer of its own when its configuration names none (§8.4).
+
 Normative, from spike 1.5 finding 6 and protocol §8.3: **a hook and a wire transport are interchangeable
 sources of the same parts and MUST produce identical results.** The engine matches the parts it was
 given; where they came from is not a matching input. §13 makes that a corpus obligation rather than a
@@ -657,6 +668,22 @@ the way today's verifiers read it: a 2xx whose body is a JSON object with no `ou
 returns nothing is `ok`, and one that returns `{"outcome": "unsupported", …}` is a result, which reaches
 the state-unavailable path without the endpoint knowing what Janus is. Any other 2xx body (text, or JSON
 that is not an object) is `ok` with no values, as today's verifiers treat it.
+
+`format: pact-message`, at `produce-message`, asks a provider for a message as today's verifier does
+(staged plan S1.7): it POSTs `interaction.pact-message.request` — the message's `description`, its
+`providerStates`, and a synchronous message's `request` — and reads a 2xx reply as the message. Its body
+is the `body` slot, labelled with the reply's `Content-Type`; its metadata is `contentType`, that
+`Content-Type` or empty, with every member of the base64 JSON in a `Pact-Message-Metadata` header over
+it. The produced part is `message`. `transports` is today's `--transports`, each entry a `name` and a
+`url`: a message goes to the entry named by the transport its pact names, or, when it names none, to the
+first named `message` or `async-message` (`sync-message` for a synchronous one), else to `url`, which is
+also where a named transport no entry has goes, as today. A reply that is not a 2xx fails the hook,
+where today's verifier reads an asynchronous message from any reply
+([ADR 0046](../../decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)).
+`janus verify` adds one such hook, named `provider-messages`, when its configuration names no
+`produce-message` hook: its `url` is the provider URL, its `transports` are `--transports`, and it takes
+the `--header`s and the client options the provider is reached with. Hooks at a point chain, so a
+configuration's own producer replaces it whole.
 
 Availability depends on the embedding's network access, which for the WASM-embedded engine is a grant and
 not a given (§8.5).

@@ -34,7 +34,11 @@ readability:
   `v3-multipart-body-mismatch/` are multipart bodies, compared part by part over the multipart
   component's document, each part by its own type (ADR 0040). `v3-values/`, `v4-each-key/`,
   `v4-each-value/`, `v4-array-contains/` and their `-mismatch` twins are the rules about a
-  collection's entries, compiled as today's verifier applies them (ADR 0042).
+  collection's entries, compiled as today's verifier applies them (ADR 0042). `v3-message/`,
+  `v3-message-mismatch/`, `v4-message-content-type-mismatch/` and `v4-synchronous-message/` are
+  messages, compared as today's verifier compares one: metadata key by key, the contents' content type,
+  then the contents (ADR 0046). A message's plan is rooted at the `message` part a `produce-message`
+  hook produces, and its case names the interaction by its position in the pact, as every case does.
 
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with

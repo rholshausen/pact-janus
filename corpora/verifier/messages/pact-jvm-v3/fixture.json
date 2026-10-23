@@ -1,0 +1,51 @@
+{
+  "description": "pact-jvm's v3 message pact for an AMQP provider: one message, a provider state, and a contentType in its metadata",
+  "source": "pact-jvm provider/junit5/src/test/resources/amqp_pacts/message_test_consumer-test_provider.json (Apache-2.0) at e419148, verified there by @PactVerifyProvider methods; here the provider answers today's verifier's POST with the message (staged plan S1.7)",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "SomeProviderState"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "a V3 test message",
+              "providerStates": [
+                {
+                  "name": "SomeProviderState"
+                }
+              ]
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "body": {
+            "json": {
+              "testParam1": "value1",
+              "testParam2": "value2"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

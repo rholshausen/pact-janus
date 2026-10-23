@@ -144,6 +144,104 @@ pub struct LegacyResponse {
   pub matching_rules: MatchingRules,
 }
 
+/// A v1–v4 message (staged plan S1.7): an asynchronous message, or the response a synchronous one
+/// expects, as the legacy layer read it ([`crate::legacy::pact::legacy_message`]).
+pub struct LegacyMessage {
+  /// Its metadata, by key, as the pact gives it.
+  pub metadata: BTreeMap<String, Value>,
+  /// Its contents, read by their content type as a body is. `None` when it declares none, which
+  /// asserts nothing about a produced message's, as today.
+  pub body: Option<LegacyBody>,
+  /// Its content type as today's verifier takes it: the contents' own, else the metadata's
+  /// `contentType`, else detected. A produced message's must be equivalent to it.
+  pub content_type: Option<String>,
+  /// Its rules: `body` for the contents and `metadata` for the metadata. `pact_models` reads a v4
+  /// message's `content` rules into `body`, the one category it has for contents, so pact-jvm's
+  /// `body` and pact-js's `content` are the same rules, as they are today.
+  pub matching_rules: MatchingRules,
+  /// How many messages it expects back: one, or a synchronous message's response count. Today's
+  /// verifier compares one, so any other count that is not zero fails, as it does today.
+  pub responses: usize,
+}
+
+/// Compile a v1–v4 message to a plan rooted at `part` (staged plan S1.7), as today's verifier
+/// compares one (`pact_matching::match_message`): every metadata key the pact names, by its rule,
+/// else as a MIME type for `contentType`, else by equality; then, when the pact declares contents,
+/// the produced message's content type, which must be equivalent to the pact's, and the contents
+/// as a response body is compared, unexpected members allowed.
+pub fn compile_message(message: &LegacyMessage, part: &str) -> model::Plan {
+  let mut slots = Vec::new();
+  if message.responses > 1 {
+    slots.push(Node::action(
+      "flow:error",
+      vec![Node::value(Literal::string(format!(
+        "Expected a message with {} responses, but the actual response had 1",
+        message.responses
+      )))],
+    ));
+  }
+  if !message.metadata.is_empty() {
+    let category = rules_for(&message.matching_rules, "metadata");
+    let base = format!("$.{}", path::root(part, "metadata"));
+    let nodes = message
+      .metadata
+      .iter()
+      .map(|(key, example)| {
+        let at = member_path(&base, key);
+        let resolve = Node::resolve(at.clone());
+        let fragments = vec!["$".to_string(), key.clone()];
+        let text = if example.is_string() { Text::Yes } else { Text::No };
+        let node = match best_rule(category.as_ref(), &fragments, false) {
+          Some((list, cascaded)) => {
+            rule_list_node(&list, cascaded, resolve, &Literal::from_json(example), text)
+          }
+          None if key.eq_ignore_ascii_case("contenttype") || key.eq_ignore_ascii_case("content-type") => {
+            let expected = match example {
+              Value::String(text) => text.clone(),
+              other => other.to_string(),
+            };
+            Node::action(
+              "legacy:header-value",
+              vec![resolve, Node::value(Literal::string(&expected))],
+            )
+          }
+          None => Node::action(
+            "match:equality",
+            vec![resolve, Node::value(Literal::from_json(example))],
+          ),
+        };
+        Node::container(Some(at), vec![node])
+      })
+      .collect();
+    slots.push(Node::container(Some("metadata".to_string()), nodes));
+  }
+  if let Some(body) = &message.body {
+    let root_path = format!("$.{}", path::root(part, "body"));
+    let mut nodes = Vec::new();
+    if let Some(content_type) = &message.content_type {
+      nodes.push(Node::action(
+        "legacy:message-type",
+        vec![
+          Node::resolve(format!("$.{part}.content-type")),
+          Node::value(Literal::string(content_type)),
+        ],
+      ));
+    }
+    nodes.extend(compile_body_content(
+      body,
+      rules_for(&message.matching_rules, "body").as_ref(),
+      false,
+      &root_path,
+    ));
+    slots.push(Node::container(Some("body".to_string()), nodes));
+  }
+  model::Plan {
+    grammar: model::GRAMMAR_VERSION,
+    root: Node::container(Some(part.to_string()), slots),
+    variant: None,
+  }
+}
+
 /// Compile a v1–v4 request to a plan.
 pub fn compile_request(req: &LegacyRequest) -> model::Plan {
   let mut slots = vec![

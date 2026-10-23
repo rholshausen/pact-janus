@@ -264,7 +264,8 @@ fn dispose_without_a_reply_still_completes_the_connection() {
     .dispose(Dispose {
       instance: "t-3".to_string(),
       event: polled.event,
-      disposition: "reject".to_string(),
+      disposition: "release".to_string(),
+      details: None,
     })
     .unwrap();
 
@@ -275,6 +276,46 @@ fn dispose_without_a_reply_still_completes_the_connection() {
   transport
     .stop(Stop {
       instance: "t-3".to_string(),
+    })
+    .unwrap();
+}
+
+/// A request the engine rejected because it did not match is answered with a 500 naming every
+/// mismatch: how HTTP says "no" (kernel-boundary review finding 9), decided here, not in the kernel.
+#[test]
+fn a_rejected_arrival_is_answered_with_a_500_naming_its_mismatches() {
+  let transport = HttpTransport::new();
+  let (host, port) = start_serve(&transport, "t-9");
+
+  let client = std::thread::spawn(move || raw_http_request(&host, port, "GET", "/orders", &[], b""));
+  let polled = transport
+    .poll_inbound(PollInbound {
+      instance: "t-9".to_string(),
+      timeout_ms: 2000,
+    })
+    .unwrap()
+    .inbound
+    .unwrap();
+
+  let mismatches = json!([{ "path": "$.request.path", "message": "Expected '/orders' to equal '/order'" }]);
+  transport
+    .dispose(Dispose {
+      instance: "t-9".to_string(),
+      event: polled.event,
+      disposition: "reject".to_string(),
+      details: Some(json!({ "mismatches": mismatches })),
+    })
+    .unwrap();
+
+  let response = client.join().unwrap();
+  assert_eq!(response.status, 500);
+  assert_eq!(
+    serde_json::from_slice::<serde_json::Value>(&response.body).unwrap(),
+    mismatches
+  );
+  transport
+    .stop(Stop {
+      instance: "t-9".to_string(),
     })
     .unwrap();
 }

@@ -20,7 +20,7 @@
 //! generators to apply is kept as a [`RequestTemplate`], so the verification path never holds a
 //! `pact_models` type (the module docs of [`crate::legacy`]).
 
-use super::compile::{LegacyBody, LegacyPart, LegacyRequest, LegacyResponse};
+use super::compile::{LegacyBody, LegacyMessage, LegacyPart, LegacyRequest, LegacyResponse};
 use crate::common::ContentTypes;
 use crate::component::{
   ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
@@ -43,6 +43,7 @@ use pact_models::pact::Pact;
 use pact_models::path_exp::DocPath;
 use pact_models::provider_states::ProviderState;
 use pact_models::v4::http_parts::{HttpRequest, HttpResponse};
+use pact_models::v4::message_parts::MessageContents;
 use serde_json::{Map, Value, json};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -96,19 +97,70 @@ pub struct PluginInteraction {
   pub plugins: Vec<String>,
 }
 
+/// The part a v1–v4 message is produced as (staged plan S1.7): what a `produce-message` hook in
+/// `pact-message` format answers with, and what a message's plan is rooted at. Its slots are
+/// `metadata`, the message's metadata as one object, and `body`, its contents as octets labelled
+/// with their content type.
+pub const MESSAGE_PART: &str = "message";
+
+/// A v3 message, or a v4 asynchronous or synchronous message, that needs no plugin (staged plan
+/// S1.7). Verified as today's verifier verifies one: the provider is asked for the message, and what
+/// it produces is compared with the one the pact expects.
+pub struct MessageInteraction {
+  pub description: String,
+  pub id: Option<String>,
+  pub pending: bool,
+  pub provider_states: Vec<ProviderState>,
+  /// The transport the pact names for it, a v4 interaction's `transport`: today's verifier sends the
+  /// request for it to the provider transport of that name.
+  pub transport: Option<String>,
+  /// Whether it is a v4 synchronous message: a request the provider answers with a message.
+  pub synchronous: bool,
+  /// What today's verifier POSTs to ask for the message: its `description`, its `providerStates`,
+  /// and a synchronous message's `request`, as `pact_verifier`'s `messages.rs` writes them.
+  pub request: Value,
+  /// The message expected back: an asynchronous message, or a synchronous message's first response.
+  /// `None` for a synchronous message with no response, which expects nothing.
+  pub expected: Option<MessageContents>,
+  /// How many responses a synchronous message expects; 1 for an asynchronous one. Today's verifier
+  /// compares one, so a synchronous message expecting more always fails, as it does today.
+  pub responses: usize,
+}
+
 /// One interaction of a v1–v4 pact that the engine takes on: one it verifies, or one it refuses by
 /// name.
 pub enum PactInteraction {
   Http(Box<LegacyInteraction>),
+  Message(Box<MessageInteraction>),
   NeedsPlugins(PluginInteraction),
+}
+
+impl PactInteraction {
+  /// Whether it is marked pending: a v4 interaction can be.
+  pub fn pending(&self) -> bool {
+    match self {
+      PactInteraction::Http(http) => http.pending,
+      PactInteraction::Message(message) => message.pending,
+      PactInteraction::NeedsPlugins(needs) => needs.pending,
+    }
+  }
+
+  pub fn description(&self) -> &str {
+    match self {
+      PactInteraction::Http(http) => &http.description,
+      PactInteraction::Message(message) => &message.description,
+      PactInteraction::NeedsPlugins(needs) => &needs.description,
+    }
+  }
 }
 
 /// Every interaction in `pact` the engine takes on, in the pact's order. An interaction that needs a
 /// plugin ([`plugins_needed`]) is [`PactInteraction::NeedsPlugins`], whatever its kind. Of the rest,
 /// HTTP ones are [`PactInteraction::Http`]: `Interaction::as_v4_http` is `pact_models`' one downcast
 /// that is uniform across every pact spec version (v1–v3's `RequestResponseInteraction` converts
-/// itself on the call; a genuine v4 `SynchronousHttp` is a passthrough), and it excludes message
-/// interactions (`None`), which are not taken on yet (staged plan S1.7).
+/// itself on the call; a genuine v4 `SynchronousHttp` is a passthrough). Messages are
+/// [`PactInteraction::Message`] (staged plan S1.7): a v3 message converts itself to a v4
+/// asynchronous one, so both versions read alike.
 pub fn interactions(pact: &dyn Pact) -> Vec<PactInteraction> {
   let named: Vec<String> = pact.plugin_data().into_iter().map(|plugin| plugin.name).collect();
   pact
@@ -125,18 +177,66 @@ pub fn interactions(pact: &dyn Pact) -> Vec<PactInteraction> {
           plugins,
         }));
       }
-      interaction.as_v4_http().map(|http| {
-        PactInteraction::Http(Box::new(LegacyInteraction {
+      if let Some(http) = interaction.as_v4_http() {
+        return Some(PactInteraction::Http(Box::new(LegacyInteraction {
           description: http.description,
           id: http.id,
           pending: http.pending,
           provider_states: http.provider_states,
           request: http.request,
           response: http.response,
-        }))
-      })
+        })));
+      }
+      message_interaction(interaction.as_ref()).map(|message| PactInteraction::Message(Box::new(message)))
     })
     .collect()
+}
+
+/// A message interaction as [`MessageInteraction`] holds one, and the request today's verifier
+/// sends for it (`pact_verifier`'s `verify_message_from_provider` and
+/// `verify_sync_message_from_provider`).
+fn message_interaction(
+  interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + RefUnwindSafe),
+) -> Option<MessageInteraction> {
+  let states: Vec<Value> = interaction
+    .provider_states()
+    .iter()
+    .map(ProviderState::to_json)
+    .collect();
+  let mut request = Map::new();
+  request.insert("description".to_string(), json!(interaction.description()));
+  if let Some(sync) = interaction.as_v4_sync_message() {
+    request.insert("request".to_string(), sync.request.to_json());
+    if !states.is_empty() {
+      request.insert("providerStates".to_string(), Value::Array(states));
+    }
+    return Some(MessageInteraction {
+      description: sync.description.clone(),
+      id: sync.id.clone(),
+      pending: sync.pending,
+      provider_states: sync.provider_states.clone(),
+      transport: sync.transport.clone(),
+      synchronous: true,
+      request: Value::Object(request),
+      expected: sync.response.first().cloned(),
+      responses: sync.response.len(),
+    });
+  }
+  let message = interaction.as_v4_async_message()?;
+  if !states.is_empty() {
+    request.insert("providerStates".to_string(), Value::Array(states));
+  }
+  Some(MessageInteraction {
+    description: message.description,
+    id: message.id,
+    pending: message.pending,
+    provider_states: message.provider_states,
+    transport: message.transport,
+    synchronous: false,
+    request: Value::Object(request),
+    expected: Some(message.contents),
+    responses: 1,
+  })
 }
 
 /// Every HTTP interaction in `pact` that needs no plugin: [`interactions`]' `Http` entries.
@@ -145,7 +245,7 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
     .into_iter()
     .filter_map(|interaction| match interaction {
       PactInteraction::Http(http) => Some(*http),
-      PactInteraction::NeedsPlugins(_) => None,
+      PactInteraction::Message(_) | PactInteraction::NeedsPlugins(_) => None,
     })
     .collect()
 }
@@ -168,9 +268,18 @@ fn plugins_needed(
     .unwrap_or_default();
   if plugins.is_empty()
     && !named.is_empty()
-    && interaction.as_v4_http().is_some_and(|http| {
+    && (interaction.as_v4_http().is_some_and(|http| {
       has_plugin_rule(&http.request.matching_rules) || has_plugin_rule(&http.response.matching_rules)
-    })
+    }) || interaction
+      .as_v4_async_message()
+      .is_some_and(|message| has_plugin_rule(&message.contents.matching_rules))
+      || interaction.as_v4_sync_message().is_some_and(|message| {
+        has_plugin_rule(&message.request.matching_rules)
+          || message
+            .response
+            .iter()
+            .any(|response| has_plugin_rule(&response.matching_rules))
+      }))
   {
     plugins = named.to_vec();
   }
@@ -188,6 +297,22 @@ fn has_plugin_rule(rules: &MatchingRules) -> bool {
         .any(|rule| matches!(rule, MatchingRule::Plugin { .. }))
     })
   })
+}
+
+/// A v1–v4 provider state, as the verification path reads one without naming `pact_models`.
+pub trait StateLike {
+  /// The state as a variant needs it: its name, and its parameters when it has any.
+  fn resolved(&self) -> crate::contract::ResolvedState;
+}
+
+impl StateLike for ProviderState {
+  fn resolved(&self) -> crate::contract::ResolvedState {
+    crate::contract::ResolvedState {
+      name: self.name.clone(),
+      params: (!self.params.is_empty())
+        .then(|| self.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
+    }
+  }
 }
 
 /// Why a v1–v4 part could not be handed to design 3.5's compiler: a body that did not parse as the
@@ -230,6 +355,116 @@ pub fn legacy_response(response: &HttpResponse) -> Result<LegacyResponse, Unsupp
     content_type: body_type(response),
     matching_rules: response.matching_rules.clone(),
   })
+}
+
+/// A message to design 3.5's own input type (staged plan S1.7): its metadata, its contents read by
+/// their content type as a body is, and its rules (`body` and `metadata`). The content type is
+/// the one today's verifier takes (`MessageContents::message_content_type`): the contents' own, else
+/// the metadata's `contentType`, else one detected from the contents. `responses` is
+/// [`MessageInteraction::responses`].
+pub fn legacy_message(
+  message: Option<&MessageContents>,
+  responses: usize,
+) -> Result<LegacyMessage, Unsupported> {
+  let Some(message) = message else {
+    return Ok(LegacyMessage {
+      metadata: BTreeMap::new(),
+      body: None,
+      content_type: None,
+      matching_rules: MatchingRules::default(),
+      responses,
+    });
+  };
+  let content_type = message.message_content_type();
+  let body = match &message.contents {
+    OptionalBody::Present(bytes, _, _) if !bytes.is_empty() => Some(read_body(
+      bytes,
+      &content_type.clone().unwrap_or_default(),
+      "contents",
+    )?),
+    _ => None,
+  };
+  Ok(LegacyMessage {
+    metadata: message
+      .metadata
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect(),
+    body,
+    content_type: content_type.map(|content_type| content_type.to_string()),
+    matching_rules: message.matching_rules.clone(),
+    responses,
+  })
+}
+
+/// A message interaction's whole plan, as `explain` and the golden corpus show it (staged plan S1.7):
+/// the produced message's plan ([`super::compile::compile_message`], rooted at [`MESSAGE_PART`])
+/// under a root named for the interaction. There is no request half: what asks the provider for the
+/// message is a hook, not a part of the interaction.
+pub fn message_plan(message: &MessageInteraction) -> Result<crate::plan::Plan, Unsupported> {
+  let expected = legacy_message(message.expected.as_ref(), message.responses)?;
+  let plan = super::compile::compile_message(&expected, MESSAGE_PART);
+  Ok(crate::plan::Plan {
+    root: crate::plan::Node::container(Some(message.description.clone()), vec![plan.root]),
+    ..plan
+  })
+}
+
+/// The content types a produced message is decoded under (ADR 0036 decision 4, as a response's
+/// are): the pact's own for its contents, whatever the provider labelled them. Whether the label
+/// agrees is the plan's to check (`legacy:message-type`).
+pub fn message_types(message: &LegacyMessage) -> ContentTypes {
+  let mut types = ContentTypes::new();
+  if let (Some(content_type), Some(body)) = (&message.content_type, &message.body)
+    && !matches!(body, LegacyBody::Multipart(_))
+  {
+    let is_text =
+      ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
+    let declared = match body {
+      LegacyBody::Document(RuntimeValue::Bytes(_)) if is_text => "application/octet-stream".to_string(),
+      _ => content_type.clone(),
+    };
+    types.insert(
+      MESSAGE_PART.to_string(),
+      BTreeMap::from([("body".to_string(), declared)]),
+    );
+  }
+  types
+}
+
+/// A produced message's content type, as today's verifier takes the one a provider sent
+/// (`calc_content_type` over what `verify_message_from_provider` read back): the label on its
+/// contents, which is the reply's `Content-Type`, else its metadata's `contentType`, else one
+/// detected from the contents. Captured at `$.message.content-type`, where `legacy:message-type`
+/// reads it; absent when none is found.
+pub fn message_captures(resolver: CapturedValues, parts: &Parts) -> CapturedValues {
+  let Some(message) = parts.get(MESSAGE_PART) else {
+    return resolver;
+  };
+  let body = message.get("body");
+  let bytes = body.and_then(|slot| match (slot.encoded.as_deref(), &slot.content) {
+    (Some("base64"), Value::String(text)) => BASE64.decode(text).ok(),
+    (Some("text"), Value::String(text)) => Some(text.as_bytes().to_vec()),
+    (_, Value::Null) => None,
+    (_, value) => serde_json::to_vec(value).ok(),
+  });
+  let labelled = body
+    .and_then(|slot| slot.content_type.as_deref())
+    .and_then(|label| ContentType::parse(label).ok());
+  let from_metadata = message
+    .get("metadata")
+    .and_then(|slot| slot.content.get("contentType"))
+    .and_then(|value| ContentType::parse(header_text(value).as_str()).ok());
+  let detected = bytes
+    .filter(|bytes| !bytes.is_empty())
+    .and_then(|bytes| pact_models::content_types::detect_content_type_from_bytes(&bytes));
+  match labelled.or(from_metadata).or(detected) {
+    Some(content_type) => resolver.capture(
+      format!("$.{MESSAGE_PART}.content-type"),
+      RuntimeValue::String(content_type.to_string()),
+    ),
+    None => resolver,
+  }
 }
 
 /// How today's verifier compares a body of a content type (`pact_matching::compare_bodies`'

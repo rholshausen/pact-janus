@@ -1,0 +1,43 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "messages": [
+    {
+      "contents": {
+        "one": "a",
+        "two": "b"
+      },
+      "description": "basic",
+      "matchingRules": {
+        "metadata": {
+          "Origin": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "\\w{3}-\\d+"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "Origin": "AXP-1000",
+        "TagData": {
+          "ID": "123",
+          "weight": 100.5
+        },
+        "contentType": "application/json"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

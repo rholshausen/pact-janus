@@ -134,6 +134,41 @@ fn header(text: &str) -> Result<(String, String), String> {
   Ok((name.to_string(), value.to_string()))
 }
 
+/// One `--transports` entry (staged plan S1.7): a name, a port and a path, as today's verifier reads
+/// `NAME:PORT[/PATH]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportEntry {
+  pub name: String,
+  pub port: u16,
+  pub path: Option<String>,
+}
+
+/// A `--transports` entry, read as today's verifier reads one: a name of word characters, a port, and
+/// a path starting with `/`.
+fn transport_entry(text: &str) -> Result<TransportEntry, String> {
+  let shape = || format!("'{text}' is not a transport: it must be NAME:PORT[/PATH]");
+  let (name, rest) = text.split_once(':').ok_or_else(shape)?;
+  if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+    return Err(shape());
+  }
+  let (port, path) = match rest.find('/') {
+    Some(at) => (&rest[..at], Some(rest[at..].to_string())),
+    None => (rest, None),
+  };
+  let port = port.parse::<u16>().map_err(|_| shape())?;
+  if path
+    .as_deref()
+    .is_some_and(|path| path.chars().any(char::is_whitespace))
+  {
+    return Err(shape());
+  }
+  Ok(TransportEntry {
+    name: name.to_string(),
+    port,
+    path,
+  })
+}
+
 /// How a command prints its result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Output {
@@ -204,6 +239,18 @@ pub struct VerifyArgs {
     help_heading = "Provider connection"
   )]
   pub headers: Vec<(String, String)>,
+
+  /// Send one kind of interaction to PORT and PATH on the provider URL's host, over plain HTTP, as
+  /// today's --transports: `http` for HTTP interactions, `message` (or `async-message`,
+  /// `sync-message`, or the transport a pact names) for messages; repeatable
+  #[arg(
+    long,
+    value_name = "NAME:PORT[/PATH]",
+    value_delimiter = ' ',
+    value_parser = transport_entry,
+    help_heading = "Provider connection"
+  )]
+  pub transports: Vec<TransportEntry>,
 
   /// How long a request to the provider may take, in milliseconds [default: 5000]
   #[arg(

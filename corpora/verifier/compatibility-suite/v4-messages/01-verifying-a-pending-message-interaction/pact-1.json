@@ -1,0 +1,31 @@
+{
+  "consumer": {
+    "name": "c"
+  },
+  "interactions": [
+    {
+      "contents": {
+        "content": {
+          "one": "a",
+          "two": "b"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "basic",
+      "metadata": {
+        "contentType": "application/json"
+      },
+      "pending": true,
+      "type": "Asynchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "p"
+  }
+}

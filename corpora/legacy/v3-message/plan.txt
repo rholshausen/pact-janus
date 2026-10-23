@@ -1,0 +1,38 @@
+(
+  :"an order was shipped" (
+    :message (
+      :metadata (
+        :"$.contentType" (
+          %legacy:header-value (
+            $.message.metadata.contentType,
+            'application/json'
+          )
+        ),
+        :"$.destination" (
+          %match:regex (
+            $.message.metadata.destination,
+            '^(?:\\w+\\d+)$'
+          )
+        )
+      ),
+      :body (
+        %legacy:message-type (
+          $.message.content-type,
+          'application/json'
+        ),
+        :"$.id" (
+          %match:type (
+            $.message.body.id,
+            '42'
+          )
+        ),
+        :"$.status" (
+          %match:equality (
+            $.message.body.status,
+            'SHIPPED'
+          )
+        )
+      )
+    )
+  )
+)

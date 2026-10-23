@@ -1,0 +1,6 @@
+# Staged plan S1.7: a v1-v4 message's plan is the produced message's, rooted at the `message` part a
+# produce-message hook produces: its metadata key by key, its content type, then its contents.
+bin.name = "janus"
+args = ["explain", "cli/tests/cmd/fixtures/message-pact.json"]
+status.code = 0
+fs.cwd = "../../.."

@@ -1,4 +1,4 @@
-//! Importing the pact-compatibility-suite's HTTP provider scenarios as fixtures.
+//! Importing the pact-compatibility-suite's HTTP and message provider scenarios as fixtures.
 //!
 //! The suite (Apache-2.0) describes each scenario in Gherkin: a table of interactions, a provider
 //! that "returns the response from interaction N, with the following changes", the pacts to verify,
@@ -8,6 +8,11 @@
 //! version — and writes each scenario as a fixture whose scripted provider answers what the mock
 //! server would.
 //!
+//! A message provider scenario (staged plan S1.7) is built as the suite's harness builds it too: its
+//! pacts with `pact_models`, and its provider as the suite's message proxy, which answers today's
+//! verifier's POST for a message with the message, its metadata as base64 JSON in a
+//! `Pact-Message-Metadata` header.
+//!
 //! A scenario this harness cannot express yet is skipped, with the plan item that will let it in,
 //! and `import.json` lists every one. The suite's other assertions (a callback's calls, an error's
 //! wording) are about pact-reference's internals; the fixture keeps only the verdict.
@@ -15,11 +20,15 @@
 use crate::fixture::{
   BrokerSpec, BrokerVerify, Fixture, ProviderSpec, Published, Route, RunVerdict, StateCallback,
 };
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::Bytes;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::{ContentType, JSON, TEXT, XML};
 use pact_models::http_parts::HttpPart;
 use pact_models::interaction::Interaction;
+use pact_models::message::Message;
+use pact_models::message_pact::MessagePact;
 use pact_models::pact::Pact;
 use pact_models::provider_states::ProviderState;
 use pact_models::sync_interaction::RequestResponseInteraction;
@@ -31,12 +40,22 @@ use std::path::Path;
 
 pub const SUITE_URL: &str = "https://github.com/pact-foundation/pact-compatibility-suite";
 
-/// The features imported, and the spec version each is written at.
+/// The features imported, the directory each is written to, and the spec version each is written at.
 const FEATURES: &[(&str, &str, PactSpecification)] = &[
   ("V1/http_provider.feature", "v1", PactSpecification::V1),
   ("V2/http_provider.feature", "v2", PactSpecification::V2),
   ("V3/http_provider.feature", "v3", PactSpecification::V3),
   ("V4/http_provider.feature", "v4", PactSpecification::V4),
+  (
+    "V3/message_provider.feature",
+    "v3-messages",
+    PactSpecification::V3,
+  ),
+  (
+    "V4/message_provider.feature",
+    "v4-messages",
+    PactSpecification::V4,
+  ),
 ];
 
 pub fn import(suite: &Path, out: &Path) -> Result<String, String> {
@@ -64,13 +83,22 @@ pub fn import(suite: &Path, out: &Path) -> Result<String, String> {
         "feature": format!("features/{feature}"),
         "scenario": scenario.name,
       });
-      match fixture_from(
-        scenario,
-        &interactions,
-        *spec,
-        &mut mutated,
-        &suite.join("fixtures"),
-      ) {
+      let built = if scenario.tags.iter().any(|tag| tag == "@wip") {
+        Err(Skip(
+          "the suite marks it work in progress (@wip), and its own harness does not run it".to_string(),
+        ))
+      } else if feature.contains("message_provider") {
+        message_fixture_from(scenario, *spec, &suite.join("fixtures"))
+      } else {
+        fixture_from(
+          scenario,
+          &interactions,
+          *spec,
+          &mut mutated,
+          &suite.join("fixtures"),
+        )
+      };
+      match built {
         Ok((mut fixture, pacts)) => {
           fixture.source = source;
           let dir = out.join(dir).join(&name);
@@ -232,7 +260,14 @@ fn fixture_from(
         outcome,
       ));
     } else if text.starts_with("a request filter is configured") {
-      return Err(Skip("S1.9: request filters as hooks".to_string()));
+      // Not a gap in Janus: its request filter is a `before-request` hook (S1.9, ADR 0044), tested
+      // with the hooks. Today's command line has none to give, so the two cannot be compared here.
+      return Err(Skip(
+        "pact_verifier_cli takes no request filter (only pact_verifier's library and the FFI do), so \
+         the harness cannot give today's verifier the one this scenario configures; janus verify's is a \
+         before-request hook (S1.9, ADR 0044), tested with the hooks"
+          .to_string(),
+      ));
     } else if text == "the verification is run" {
     } else if text == "the verification will be successful" {
       expected = Some(RunVerdict::Pass);
@@ -318,6 +353,291 @@ fn fixture_from(
     },
     pacts,
   ))
+}
+
+/// A message provider scenario (staged plan S1.7), as the suite's harness runs it
+/// (pact-reference's `compatibility-suite/tests/v3_steps/message.rs` and
+/// `v4_steps/message_provider.rs`): the messages its provider "can generate", each by name, and the
+/// pacts it verifies, each one message whose description is that name.
+fn message_fixture_from(
+  scenario: &Scenario,
+  spec: PactSpecification,
+  fixtures: &Path,
+) -> Result<(Fixture, Vec<(String, Value)>), Skip> {
+  let mut produced: Vec<(String, Message)> = Vec::new();
+  let mut verified: Vec<(Message, bool, HashMap<String, Value>)> = Vec::new();
+  let mut callback = StateCallback::None;
+  let mut expected = None;
+  let mut asserting = false;
+  let quoted = |text: &str| -> Option<(String, String)> {
+    // `"name":"fixture"` or `"name" with "fixture"`.
+    let (name, rest) = cucumber_string(text)?;
+    let rest = rest.strip_prefix(':').or_else(|| rest.strip_prefix(" with "))?;
+    let (fixture, _) = cucumber_string(rest)?;
+    Some((name, fixture))
+  };
+
+  for step in &scenario.steps {
+    let text = step.text.as_str();
+    asserting |= step.keyword == "Then";
+    if let Some(rest) = text.strip_prefix("a provider is started that can generate the ") {
+      let rest = rest.replacen(" message with ", " with ", 1);
+      let (name, fixture) = quoted(&rest).ok_or_else(|| unsupported(text))?;
+      let mut message = Message {
+        description: name.clone(),
+        ..Message::default()
+      };
+      message_body(&fixture, &mut message, fixtures).map_err(|err| Skip(format!("S1.1: {err}")))?;
+      if rest.ends_with("and the following metadata:") {
+        // The suite's harness skips the provider table's header row.
+        for row in step.table.iter().skip(1) {
+          message.metadata.insert(row[0].clone(), metadata_value(&row[1])?);
+        }
+      }
+      produced.push((name, message));
+    } else if let Some(rest) = text.strip_prefix("a Pact file for ") {
+      let mut pending = false;
+      let mut comments = HashMap::new();
+      let mut message = Message::default();
+      if let Some(name) = rest
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix("\" is to be verified with the following:"))
+      {
+        message.description = name.to_string();
+        for row in &step.table {
+          match row[0].as_str() {
+            "body" => {
+              message_body(&row[1], &mut message, fixtures).map_err(|err| Skip(format!("S1.1: {err}")))?
+            }
+            "matching rules" => {
+              message.matching_rules =
+                matching_rules(&row[1], fixtures).map_err(|err| Skip(format!("S1.1: {err}")))?;
+            }
+            "metadata" => {
+              for entry in row[1].split(';') {
+                let (key, value) = entry.trim().split_once('=').ok_or_else(|| unsupported(text))?;
+                message.metadata.insert(key.to_string(), metadata_value(value)?);
+              }
+            }
+            _ => {}
+          }
+        }
+      } else {
+        let (name, fixture) = quoted(rest).ok_or_else(|| unsupported(text))?;
+        message.description = name;
+        message_body(&fixture, &mut message, fixtures).map_err(|err| Skip(format!("S1.1: {err}")))?;
+        let how = rest
+          .split_once(" is to be verified")
+          .map(|(_, how)| how)
+          .ok_or_else(|| unsupported(text))?;
+        match how {
+          "" => {}
+          ", but is marked pending" => pending = true,
+          " with the following comments:" => comments = comments_from(&step.table),
+          // The suite's harness keeps the pact table's header row as metadata too.
+          " with the following metadata:" => {
+            for row in &step.table {
+              message.metadata.insert(row[0].clone(), metadata_value(&row[1])?);
+            }
+          }
+          other => match other
+            .strip_prefix(" with provider state \"")
+            .and_then(|rest| rest.strip_suffix('"'))
+          {
+            Some(state) => message.provider_states.push(ProviderState {
+              name: state.to_string(),
+              params: HashMap::new(),
+            }),
+            None => return Err(unsupported(text)),
+          },
+        }
+      }
+      verified.push((message, pending, comments));
+    } else if text == "a provider state callback is configured" {
+      callback = StateCallback::Ok;
+    } else if text == "the verification is run" {
+    } else if text == "the verification will be successful" {
+      expected = Some(RunVerdict::Pass);
+    } else if text == "the verification will NOT be successful" {
+      expected = Some(RunVerdict::Fail);
+    } else if asserting {
+      // An assertion about pact-reference's own behaviour, which the comparison does not read.
+    } else {
+      return Err(unsupported(text));
+    }
+  }
+  if produced.is_empty() || verified.is_empty() {
+    return Err(Skip(
+      "the scenario starts no provider or verifies no pact".to_string(),
+    ));
+  }
+
+  // The suite's message proxy answers a POST naming a message it can generate, and nothing else.
+  let mut routes = Vec::new();
+  let mut pacts = Vec::new();
+  for (index, (message, pending, comments)) in verified.into_iter().enumerate() {
+    if let Some((_, answer)) = produced.iter().find(|(name, _)| *name == message.description) {
+      let mut route = Route::from_message(&message).ok_or_else(|| Skip("S1.1: not a message".to_string()))?;
+      let mut answered =
+        Route::from_message(answer).ok_or_else(|| Skip("S1.1: not a message".to_string()))?;
+      // The proxy always sends the metadata, and labels contents with no type as plain text.
+      answered.response.headers.insert(
+        "Pact-Message-Metadata".to_string(),
+        vec![BASE64.encode(json!(answer.metadata).to_string())],
+      );
+      if answered.response.body.is_some() && !answered.response.headers.contains_key("Content-Type") {
+        answered
+          .response
+          .headers
+          .insert("Content-Type".to_string(), vec!["text/plain".to_string()]);
+      }
+      route.response = answered.response;
+      route.states.clear();
+      routes.push(route);
+    }
+    pacts.push((
+      format!("pact-{}.json", index + 1),
+      message_pact_json(message, spec, pending, comments)?,
+    ));
+  }
+  if routes.is_empty() {
+    return Err(Skip(
+      "S1.1: the provider generates no message a pact asks for".to_string(),
+    ));
+  }
+  let mutations = expected == Some(RunVerdict::Pass) && callback == StateCallback::None && pacts.len() == 1;
+  Ok((
+    Fixture {
+      description: scenario.name.clone(),
+      source: Value::Null,
+      pacts: pacts.iter().map(|(file, _)| file.clone()).collect(),
+      provider: ProviderSpec::Scripted {
+        state_callback: callback,
+        routes,
+      },
+      expected,
+      mutations,
+      broker: None,
+      connection: Default::default(),
+    },
+    pacts,
+  ))
+}
+
+/// A Cucumber `{string}` at the start of `text`, its `\"` escapes undone, and what follows it.
+fn cucumber_string(text: &str) -> Option<(String, &str)> {
+  let rest = text.strip_prefix('"')?;
+  let mut value = String::new();
+  let mut chars = rest.char_indices();
+  while let Some((at, c)) = chars.next() {
+    match c {
+      '\\' => match chars.next() {
+        Some((_, escaped)) => value.push(escaped),
+        None => return None,
+      },
+      '"' => return Some((value, &rest[at + 1..])),
+      other => value.push(other),
+    }
+  }
+  None
+}
+
+/// A message's contents, set as the suite's harness sets them (its `setup_body` for messages): the
+/// same rules as an HTTP body's, with the content type in the metadata's `contentType` rather than
+/// a header.
+fn message_body(body: &str, message: &mut Message, fixtures: &Path) -> Result<(), String> {
+  if body.is_empty() {
+    return Ok(());
+  }
+  let mut set = |bytes: Vec<u8>, content_type: ContentType| {
+    message
+      .metadata
+      .insert("contentType".to_string(), json!(content_type.to_string()));
+    message.contents = OptionalBody::Present(Bytes::from(bytes), Some(content_type), None);
+  };
+  if let Some(json) = body.strip_prefix("JSON:") {
+    set(json.trim().as_bytes().to_vec(), JSON.clone());
+  } else if let Some(xml) = body.strip_prefix("XML:") {
+    set(xml.trim().as_bytes().to_vec(), XML.clone());
+  } else if let Some(file) = body.strip_prefix("file:") {
+    let file = file.trim();
+    let path = fixtures.join(file);
+    let bytes = std::fs::read(&path).map_err(|err| format!("{}: {err}", path.display()))?;
+    if file.ends_with("-body.xml") {
+      let (content_type, contents) = body_fixture(&String::from_utf8_lossy(&bytes));
+      let parsed = ContentType::parse(content_type.as_str()).unwrap_or_else(|_| TEXT.clone());
+      message
+        .metadata
+        .insert("contentType".to_string(), json!(content_type));
+      message.contents = OptionalBody::Present(Bytes::from(contents.into_bytes()), Some(parsed), None);
+    } else {
+      set(bytes, file_content_type(file));
+    }
+  } else {
+    set(body.as_bytes().to_vec(), file_content_type(body));
+  }
+  Ok(())
+}
+
+/// The suite's `determine_content_type` for a message, which has no type before its contents are set.
+fn file_content_type(name: &str) -> ContentType {
+  if name.ends_with(".json") {
+    JSON.clone()
+  } else if name.ends_with(".xml") {
+    XML.clone()
+  } else if name.ends_with(".jpg") {
+    ContentType::from("image/jpeg")
+  } else if name.ends_with(".pdf") {
+    ContentType::from("application/pdf")
+  } else {
+    TEXT.clone()
+  }
+}
+
+/// A metadata value as the suite writes one: `JSON: …` is that JSON, anything else a string.
+fn metadata_value(text: &str) -> Result<Value, Skip> {
+  match text.strip_prefix("JSON:") {
+    Some(json) => serde_json::from_str(json.trim()).map_err(|err| Skip(format!("S1.1: metadata: {err}"))),
+    None => Ok(Value::String(text.to_string())),
+  }
+}
+
+/// The pact the suite writes for a message: consumer `c`, provider `p`, one message, at the
+/// feature's spec version; a v4 one as an asynchronous message, pending or with comments as asked.
+fn message_pact_json(
+  message: Message,
+  spec: PactSpecification,
+  pending: bool,
+  comments: HashMap<String, Value>,
+) -> Result<Value, Skip> {
+  let pact = MessagePact {
+    consumer: Consumer {
+      name: "c".to_string(),
+    },
+    provider: Provider {
+      name: "p".to_string(),
+    },
+    messages: vec![message],
+    specification_version: spec,
+    ..MessagePact::default()
+  };
+  let mut document = if spec == PactSpecification::V4 {
+    let mut v4 = pact.as_v4_pact().map_err(|err| Skip(format!("S1.1: {err}")))?;
+    for interaction in v4.interactions.iter_mut() {
+      if let Some(message) = interaction.as_v4_async_message_mut() {
+        message.pending = pending;
+        message.comments = comments.clone();
+      }
+    }
+    v4.to_json(spec)
+  } else {
+    pact.to_json(spec)
+  }
+  .map_err(|err| Skip(format!("S1.1: {err}")))?;
+  if let Some(metadata) = document.get_mut("metadata").and_then(Value::as_object_mut) {
+    metadata.remove("pactRust");
+  }
+  Ok(document)
 }
 
 fn unsupported(text: &str) -> Skip {
@@ -647,6 +967,8 @@ struct Feature {
 #[derive(Debug)]
 struct Scenario {
   name: String,
+  /// Its tags, `@wip` among them.
+  tags: Vec<String>,
   steps: Vec<Step>,
 }
 
@@ -660,8 +982,18 @@ struct Step {
 fn parse_feature(text: &str) -> Feature {
   let mut feature = Feature::default();
   let mut in_background = false;
+  // The tags on the lines before a scenario.
+  let mut tags: Vec<String> = Vec::new();
   for line in text.lines().map(str::trim) {
-    if line.is_empty() || line.starts_with('#') || line.starts_with('@') || line.starts_with("Feature:") {
+    if line.starts_with('@') {
+      tags.extend(line.split_whitespace().map(str::to_string));
+      continue;
+    }
+    if line.starts_with("Feature:") {
+      tags.clear();
+      continue;
+    }
+    if line.is_empty() || line.starts_with('#') {
       continue;
     }
     if line.starts_with("Background:") {
@@ -670,6 +1002,7 @@ fn parse_feature(text: &str) -> Feature {
       in_background = false;
       feature.scenarios.push(Scenario {
         name: name.trim().to_string(),
+        tags: std::mem::take(&mut tags),
         steps: vec![],
       });
     } else if line.starts_with('|') {
@@ -711,6 +1044,19 @@ fn parse_feature(text: &str) -> Feature {
 mod tests {
   use super::*;
   use pretty_assertions::assert_eq;
+
+  #[test]
+  fn a_cucumber_string_undoes_its_escapes() {
+    assert_eq!(
+      cucumber_string(r#""JSON: { \"one\": \"a\" }" and more"#),
+      Some((r#"JSON: { "one": "a" }"#.to_string(), " and more"))
+    );
+    assert_eq!(
+      cucumber_string(r#""basic":"x""#),
+      Some(("basic".to_string(), r#":"x""#))
+    );
+    assert_eq!(cucumber_string(r#""unterminated"#), None);
+  }
 
   const FEATURE: &str = r#"
 @provider

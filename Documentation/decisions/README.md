@@ -62,6 +62,7 @@ superseding ADR instead.
 | [0043](0043-check-a-pacts-content-type-once-on-the-header.md) | Check a pact's Content-Type once, on the header | accepted |
 | [0044](0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md) | Reach a hook endpoint as a provider is, and try a state call three times | accepted |
 | [0045](0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md) | Refuse an interaction that needs a pact plugin by name, and verify the rest | accepted |
+| [0046](0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md) | Ask a provider for a message through `produce-message`, and let the transport name its parts | accepted |
 
 ## Decision backlog
 

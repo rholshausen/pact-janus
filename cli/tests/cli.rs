@@ -570,6 +570,138 @@ fn a_hook_secret_appears_nowhere_janus_verify_prints() {
   );
 }
 
+/// A server answering every request with `reply`, reporting each request's method, path and body.
+fn answering(reply: &'static str) -> (String, std::sync::mpsc::Receiver<(String, String, String)>) {
+  let server = tiny_http::Server::http("127.0.0.1:0").expect("the server binds");
+  let port = server.server_addr().to_ip().expect("an IP address").port();
+  let (tx, rx) = std::sync::mpsc::channel();
+  std::thread::spawn(move || {
+    for mut request in server.incoming_requests() {
+      let mut body = String::new();
+      let _ = request.as_reader().read_to_string(&mut body);
+      let _ = tx.send((request.method().to_string(), request.url().to_string(), body));
+      let header =
+        tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).expect("a header");
+      let _ = request.respond(tiny_http::Response::from_string(reply).with_header(header));
+    }
+  });
+  (port.to_string(), rx)
+}
+
+/// A v4 pact with an HTTP interaction and a message, as pact-js and pact-jvm write one.
+fn mixed_pact() -> String {
+  let path = temp("mixed-pact.json");
+  let pact = json!({
+    "consumer": { "name": "web-app" }, "provider": { "name": "order-service" },
+    "interactions": [
+      { "type": "Synchronous/HTTP", "description": "a health check",
+        "request": { "method": "GET", "path": "/health" },
+        "response": { "status": 200, "headers": { "Content-Type": ["application/json"] },
+                      "body": { "content": { "ok": true }, "contentType": "application/json", "encoded": false } } },
+      { "type": "Asynchronous/Messages", "description": "an order was shipped",
+        "contents": { "content": { "ok": true }, "contentType": "application/json", "encoded": false } },
+    ],
+    "metadata": { "pactSpecification": { "version": "4.0" } },
+  });
+  std::fs::write(&path, pact.to_string()).expect("the pact is written");
+  path
+}
+
+/// Staged plan S1.7: a message is asked for as today's verifier asks for one, a POST of its
+/// description, sent where `--transports` routes it, with HTTP interactions still at the provider URL.
+#[test]
+fn verify_asks_for_a_message_where_transports_sends_it() {
+  let (http_port, http_requests) = answering(r#"{"ok": true}"#);
+  let (message_port, message_requests) = answering(r#"{"ok": true}"#);
+  let pact = mixed_pact();
+  let output = janus(&[
+    "verify",
+    &pact,
+    "--provider-url",
+    &format!("http://127.0.0.1:{http_port}"),
+    "--transports",
+    &format!("message:{message_port}/messages"),
+  ]);
+  assert_eq!(code(&output), 0, "{}{}", stdout(&output), stderr(&output));
+  let (method, path, _) = http_requests
+    .try_recv()
+    .expect("the HTTP interaction reached the provider URL");
+  assert_eq!((method.as_str(), path.as_str()), ("GET", "/health"));
+  let (method, path, body) = message_requests
+    .try_recv()
+    .expect("the message was asked of the message transport");
+  assert_eq!((method.as_str(), path.as_str()), ("POST", "/messages"));
+  assert_eq!(
+    serde_json::from_str::<Value>(&body).unwrap(),
+    json!({ "description": "an order was shipped" })
+  );
+  assert!(
+    http_requests.try_recv().is_err(),
+    "the message was not sent to the HTTP port"
+  );
+}
+
+/// With no `--transports` entry for it, a message is asked of the provider URL, as today.
+#[test]
+fn verify_asks_the_provider_url_for_a_message_when_nothing_routes_it() {
+  let (port, requests) = answering(r#"{"ok": true}"#);
+  let pact = mixed_pact();
+  let output = janus(&[
+    "verify",
+    &pact,
+    "--provider-url",
+    &format!("http://127.0.0.1:{port}"),
+  ]);
+  assert_eq!(code(&output), 0, "{}{}", stdout(&output), stderr(&output));
+  let asked: Vec<(String, String)> = requests
+    .try_iter()
+    .map(|(method, path, _)| (method, path))
+    .collect();
+  assert_eq!(
+    asked,
+    vec![
+      ("GET".to_string(), "/health".to_string()),
+      ("POST".to_string(), "/".to_string())
+    ]
+  );
+}
+
+/// A configuration that names its own producer replaces the default whole: the provider URL is not
+/// asked for the message.
+#[test]
+fn a_configured_producer_replaces_the_default() {
+  let (port, requests) = answering(r#"{"ok": true}"#);
+  let (producer_port, producer_requests) = answering(r#"{"ok": true}"#);
+  let pact = mixed_pact();
+  let config = temp("message-producer.yaml");
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\nhooks:\n  produce-message:\n    - name: producer\n      run:\n        kind: http\n        \
+       url: \"http://127.0.0.1:{producer_port}/produce\"\n        format: pact-message\n      changes: [parts]\n"
+    ),
+  )
+  .expect("the configuration is written");
+  let output = janus(&[
+    "verify",
+    &pact,
+    "--provider-url",
+    &format!("http://127.0.0.1:{port}"),
+    "--config",
+    &config,
+  ]);
+  assert_eq!(code(&output), 0, "{}{}", stdout(&output), stderr(&output));
+  assert_eq!(
+    requests.try_iter().count(),
+    1,
+    "only the HTTP interaction reached the provider URL"
+  );
+  let (_, path, _) = producer_requests
+    .try_recv()
+    .expect("the configured producer was asked");
+  assert_eq!(path, "/produce");
+}
+
 #[test]
 fn verify_reads_a_directory_and_skips_what_is_not_a_contract_or_a_pact() {
   let provider = provider();

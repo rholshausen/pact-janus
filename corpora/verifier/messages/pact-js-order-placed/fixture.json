@@ -1,0 +1,63 @@
+{
+  "description": "pact-js's message example: an asynchronous OrderPlaced event, its body under matchers and its queue in its metadata, produced by the provider's own message factory",
+  "source": "pact-js examples/messages (MIT) at 8a8f27a: consumer.test.ts's interaction, as the v4 pact pact_ffi writes for it, and provider.ts's createOrderPlacedEvent('order-999') with providerWithMetadata's metadata as the provider's answer. MessageProviderPact answers today's verifier's POST through a local proxy, so the scripted provider answers it the same way (staged plan S1.7)",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "an order has been placed"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "an OrderPlaced event",
+              "providerStates": [
+                {
+                  "name": "an order has been placed"
+                }
+              ]
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJxdWV1ZSI6Im9yZGVycy5wbGFjZWQiLCJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "body": {
+            "json": {
+              "orderId": "order-999",
+              "customerId": "customer-001",
+              "totalAmount": 149.95,
+              "currency": "GBP",
+              "items": [
+                {
+                  "productId": "prod-a",
+                  "quantity": 1
+                },
+                {
+                  "productId": "prod-b",
+                  "quantity": 3
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

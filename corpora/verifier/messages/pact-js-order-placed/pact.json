@@ -1,0 +1,111 @@
+{
+  "consumer": {
+    "name": "OrderConsumer"
+  },
+  "interactions": [
+    {
+      "contents": {
+        "content": {
+          "currency": "USD",
+          "customerId": "customer-456",
+          "items": [
+            {
+              "productId": "prod-789",
+              "quantity": 2
+            }
+          ],
+          "orderId": "order-123",
+          "totalAmount": 99.99
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "an OrderPlaced event",
+      "matchingRules": {
+        "body": {
+          "$.currency": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "^[A-Z]{3}$"
+              }
+            ]
+          },
+          "$.customerId": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.items": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type",
+                "min": 1
+              }
+            ]
+          },
+          "$.items[*].productId": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.items[*].quantity": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "integer"
+              }
+            ]
+          },
+          "$.orderId": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.totalAmount": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "decimal"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json",
+        "queue": "orders.placed"
+      },
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "an order has been placed"
+        }
+      ],
+      "type": "Asynchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pactRust": {
+      "ffi": "0.4.28",
+      "models": "1.3.5"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "OrderProvider"
+  }
+}

@@ -1,0 +1,17 @@
+(
+  :"a square's area" (
+    :message (
+      :body (
+        %legacy:message-type (
+          $.message.content-type,
+          'application/json'
+        ),
+        :"$.area" (
+          %match:integer (
+            $.message.body.area
+          )
+        )
+      )
+    )
+  )
+)

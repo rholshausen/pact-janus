@@ -22,6 +22,9 @@ http = "1"
 # tree through reqwest.
 url = "2"
 tracing = "0.1"
+# A `pact-message` reply's `Pact-Message-Metadata` header and its contents (staged plan S1.7).
+# Already in the tree through the kernel.
+base64 = "0.22"
 
 # Ends an exec hook's process group at its deadline, safely (spec §5.4). Already in the tree through
 # wasmtime.

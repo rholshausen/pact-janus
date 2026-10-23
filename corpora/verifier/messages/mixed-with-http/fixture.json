@@ -1,0 +1,77 @@
+{
+  "description": "A v4 pact with an HTTP interaction and a message, answered by one provider: the request goes to the provider, and the message is asked of the same base URL, as today's verifier asks for it when no --transports entry routes it elsewhere",
+  "source": "staged plan S1.7; pact_verifier's messages.rs, which falls back to the provider's own URL when no message transport is configured",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "an order exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/orders/42"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": "42",
+              "status": "SHIPPED"
+            }
+          }
+        }
+      },
+      {
+        "states": [
+          "an order exists"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "an order was shipped",
+              "providerStates": [
+                {
+                  "name": "an order exists",
+                  "params": {
+                    "id": "42"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24iLCJ0b3BpYyI6Im9yZGVycyJ9"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": "42",
+              "trackingNumber": "1Z999"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

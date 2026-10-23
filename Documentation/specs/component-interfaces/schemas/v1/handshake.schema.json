@@ -121,6 +121,15 @@
           "description": "Which slots of which parts carry content — octets a content component encodes and decodes (spec.md §5.5) — as part name -> slot names. Every other slot carries a plain JSON value the engine passes through unencoded. Absent means no slot carries content.",
           "additionalProperties": { "type": "array", "items": { "type": "string" } }
         },
+        "exchange-parts": {
+          "type": "object",
+          "description": "Which part starts an exchange and which answers it (spec.md §5.7): the names the engine reads instead of spelling any. HTTP's are 'request' and 'response'; a kind with no reply half names no 'answering' part. Every transport the engine serves or drives with declares them.",
+          "required": ["initiating"],
+          "properties": {
+            "initiating": { "type": "string", "minLength": 1 },
+            "answering": { "type": "string", "minLength": 1 }
+          }
+        },
         "roles": {
           "type": "array",
           "description": "Which roles it supports: 'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1). A transport may support both.",

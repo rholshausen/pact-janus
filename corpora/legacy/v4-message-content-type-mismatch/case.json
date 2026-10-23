@@ -1,0 +1,63 @@
+{
+  "description": "a v4 message produced as text: the contents' type must be equivalent to the pact's, as today's verifier checks before it compares contents (staged plan S1.7)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Asynchronous/Messages",
+          "description": "an order was shipped",
+          "contents": {
+            "content": {
+              "id": "42"
+            },
+            "contentType": "application/json",
+            "encoded": false
+          },
+          "metadata": {
+            "contentType": "application/json"
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.message.content-type": "text/plain",
+    "$.message.metadata": {
+      "contentType": "text/plain"
+    },
+    "$.message.body": "{\"id\": \"42\"}"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.message.metadata.contentType",
+        "message": "Expected 'text/plain' to equal 'application/json'",
+        "action": "legacy:header-value"
+      },
+      {
+        "path": "$.message.content-type",
+        "message": "Expected message with content type application/json but was text/plain",
+        "action": "legacy:message-type"
+      },
+      {
+        "path": "$.message.body.id",
+        "message": "Expected <absent> to equal '42'",
+        "action": "match:equality"
+      }
+    ]
+  }
+}

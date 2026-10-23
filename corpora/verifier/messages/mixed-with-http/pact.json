@@ -1,0 +1,96 @@
+{
+  "consumer": {
+    "name": "order-ui"
+  },
+  "provider": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a request for an order",
+      "providerStates": [
+        {
+          "name": "an order exists",
+          "params": {
+            "id": "42"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/42"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "id": "42",
+            "status": "SHIPPED"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.status": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "PENDING|SHIPPED"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Asynchronous/Messages",
+      "description": "an order was shipped",
+      "providerStates": [
+        {
+          "name": "an order exists",
+          "params": {
+            "id": "42"
+          }
+        }
+      ],
+      "contents": {
+        "content": {
+          "id": "42",
+          "trackingNumber": "1Z999"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "matchingRules": {
+        "body": {
+          "$.trackingNumber": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json",
+        "topic": "orders"
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}

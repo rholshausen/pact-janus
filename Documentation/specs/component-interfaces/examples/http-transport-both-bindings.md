@@ -29,8 +29,10 @@ interface, two bindings".
   "component": { "name": "http", "version": "1.0.0" },
   "interfaces": ["transport", "matcher"],
   "contributes": {
-    "transports": [ { "kind": "http", "roles": ["serve", "drive"] },
-                    { "kind": "https", "roles": ["serve", "drive"] } ],
+    "transports": [ { "kind": "http", "roles": ["serve", "drive"],
+                      "exchange-parts": { "initiating": "request", "answering": "response" } },
+                    { "kind": "https", "roles": ["serve", "drive"],
+                      "exchange-parts": { "initiating": "request", "answering": "response" } } ],
     "operators": [ { "name": "http:status-class", "comparability": "exact", "variant-facet": "value" } ],
     "actions":   [ { "name": "http:status-class" } ]
   },

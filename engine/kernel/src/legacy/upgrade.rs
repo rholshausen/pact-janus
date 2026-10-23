@@ -103,6 +103,9 @@ pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
   for interaction in legacy_pact::interactions(pact.as_ref()) {
     match interaction {
       legacy_pact::PactInteraction::Http(interaction) => http.push(*interaction),
+      // Verified since staged plan S1.7, but not converted: a contract has no message form until the
+      // consumer side has one (S6.2). Counted below, with whatever else is not HTTP.
+      legacy_pact::PactInteraction::Message(_) => {}
       legacy_pact::PactInteraction::NeedsPlugins(needs) => needing_plugins.push(needs),
     }
   }

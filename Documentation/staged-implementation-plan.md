@@ -649,6 +649,30 @@ item in 1a is done when S1.1 agrees.
   producer is invoked. Consumer-side message interactions are S6.2.
   *Exit:* corpus cases for message interactions; pact-jvm's and pact-js's message provider examples
   verify identically in S1.1.
+  *Done 2026-10-23* ([ADR 0046](decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)).
+  A transport names its own parts: its contribution declares `exchange-parts`, HTTP's `request` and
+  `response`, and the kernel spells none. A served request that does not match is disposed of as
+  `reject` with its mismatches, which the HTTP transport answers with the 500 the kernel used to write.
+  `declared_transport.rs`'s line transport now uses parts of its own, so both findings have a test. A
+  v1–v4 message is one replay that drives no transport: its `produce-message` hooks produce a `message`
+  part (`metadata`, `body`), compared as today's verifier compares a message, with a new legacy action,
+  `legacy:message-type`, for its stricter content-type check. The `http` hook gained `format:
+  pact-message`, today's POST and reply. Not foreseen: today's verifier routes a message by
+  `--transports`, with a fallback to the provider URL that hook selectors cannot express. So `janus
+  verify` takes `--transports`, and the hook's `transports` member applies today's rule. When the
+  configuration names no producer, `janus verify` adds one, so a provider that verifies messages today
+  needs no configuration; a message no hook produces fails as `component-unavailable` naming
+  `hook/produce-message`. Not foreseen either: a v4
+  message's `content` rules are `pact_models`' `body` category, so pact-jvm's `body` and pact-js's
+  `content` are the same rules. S1.1's corpus has `messages/`: pact-js's example, three pact-jvm
+  pacts (v3, v4 with metadata rules, a synchronous Kafka request), a pact mixing HTTP and a message,
+  all mutated, and the compatibility suite's V3 and V4 message provider scenarios, imported as its
+  harness builds them (19 more, the one `@wip` skipped). Every verdict agrees but `messages/error-status`:
+  today's verifier reads an asynchronous message from a 500 and passes, Janus fails it, deliberately.
+  The whole corpus is 1124 verdicts over 538 cases: 1110 agree and 14 are known. Four corpus cases
+  cover messages. Left out: `janus upgrade` still drops
+  a message (S6.2); provider-side `consume-message`, which today's verifier does not have; a transport
+  for a real broker (S6.3).
 - **S1.8 Plugin-backed v4 interactions are refused by name** — **S**. A v4 pact whose interaction
   requires a pact-plugins plugin (protobuf, gRPC, Avro, CSV) cannot verify "exactly as today" until the
   bridge (S5.2). Until then the verifier fails that interaction before anything runs, as

@@ -61,26 +61,31 @@ Options:
   -h, --help                Print help
 
 Provider connection:
-      --base-path <PATH>          A path to put in front of every request's path [env:
-                                  PACT_PROVIDER_BASE_PATH=]
-  -H, --header <KEY=VALUE>        A header for every request to the provider, replacing the
-                                  interaction's own of that name; repeatable
-      --request-timeout <MS>      How long a request to the provider may take, in milliseconds
-                                  [default: 5000] [env: PACT_PROVIDER_REQUEST_TIMEOUT=]
-      --connect-timeout <MS>      How long connecting to the provider may take, in milliseconds
-      --disable-ssl-verification  Accept any certificate the provider presents
-      --ca-cert <FILE>            A PEM file of CA certificates to trust beside the system's;
-                                  repeatable
-      --client-cert <FILE>        A PEM certificate (or chain) to present when the provider asks for
-                                  one
-      --client-key <FILE>         The PEM private key of --client-cert
-      --proxy <URL>               Reach the provider through this proxy. Without it, HTTPS_PROXY,
-                                  HTTP_PROXY, ALL_PROXY and NO_PROXY are read
-      --no-proxy <HOSTS>          Hosts to reach directly rather than through --proxy,
-                                  comma-separated, as NO_PROXY
-      --http-version <VERSION>    The HTTP versions to speak to the provider: 1.1, as today's
-                                  verifier; 2 only; or negotiate, offering both over TLS [default:
-                                  1.1] [possible values: 1.1, 2, negotiate]
+      --base-path <PATH>               A path to put in front of every request's path [env:
+                                       PACT_PROVIDER_BASE_PATH=]
+  -H, --header <KEY=VALUE>             A header for every request to the provider, replacing the
+                                       interaction's own of that name; repeatable
+      --transports <NAME:PORT[/PATH]>  Send one kind of interaction to PORT and PATH on the provider
+                                       URL's host, over plain HTTP, as today's --transports: `http`
+                                       for HTTP interactions, `message` (or `async-message`,
+                                       `sync-message`, or the transport a pact names) for messages;
+                                       repeatable
+      --request-timeout <MS>           How long a request to the provider may take, in milliseconds
+                                       [default: 5000] [env: PACT_PROVIDER_REQUEST_TIMEOUT=]
+      --connect-timeout <MS>           How long connecting to the provider may take, in milliseconds
+      --disable-ssl-verification       Accept any certificate the provider presents
+      --ca-cert <FILE>                 A PEM file of CA certificates to trust beside the system's;
+                                       repeatable
+      --client-cert <FILE>             A PEM certificate (or chain) to present when the provider
+                                       asks for one
+      --client-key <FILE>              The PEM private key of --client-cert
+      --proxy <URL>                    Reach the provider through this proxy. Without it,
+                                       HTTPS_PROXY, HTTP_PROXY, ALL_PROXY and NO_PROXY are read
+      --no-proxy <HOSTS>               Hosts to reach directly rather than through --proxy,
+                                       comma-separated, as NO_PROXY
+      --http-version <VERSION>         The HTTP versions to speak to the provider: 1.1, as today's
+                                       verifier; 2 only; or negotiate, offering both over TLS
+                                       [default: 1.1] [possible values: 1.1, 2, negotiate]
 
 Pact Broker:
       --broker-url <URL>

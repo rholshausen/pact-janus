@@ -1,0 +1,42 @@
+{
+  "description": "pact-jvm's v4 asynchronous message with a type rule on a body member and on a metadata key",
+  "source": "pact-jvm provider/junit5/src/test/resources/amqp_pacts/message_with_metadata_v4.json (Apache-2.0) at e419148 (staged plan S1.7)",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "A message with metadata"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24iLCJzb21lS2V5Ijoic29tZVN0cmluZyJ9"
+            ]
+          },
+          "body": {
+            "json": {
+              "someField": "someValue"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

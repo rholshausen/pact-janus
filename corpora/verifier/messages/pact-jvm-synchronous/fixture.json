@@ -1,0 +1,66 @@
+{
+  "description": "pact-jvm's v4 synchronous message, a Kafka request and its reply: today's verifier sends the request with the description and compares the reply with the first response",
+  "source": "pact-jvm provider/junit5/src/test/resources/amqp_pacts/kafka-request-reply.json (Apache-2.0) at e419148 (staged plan S1.7)",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "a test message",
+              "request": {
+                "contents": {
+                  "content": {
+                    "name": "abcd123"
+                  },
+                  "contentType": "application/json",
+                  "encoded": false
+                },
+                "matchingRules": {
+                  "body": {
+                    "$.name": {
+                      "combine": "AND",
+                      "matchers": [
+                        {
+                          "match": "type"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "metadata": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifQ=="
+            ]
+          },
+          "body": {
+            "json": {
+              "name": "321dcba"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

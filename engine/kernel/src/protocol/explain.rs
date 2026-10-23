@@ -162,6 +162,11 @@ fn legacy(document: &Value, index: usize) -> Result<Plan, ExplainError> {
   let interactions = legacy_pact::interactions(pact.as_ref());
   let interaction = match interactions.get(index) {
     Some(legacy_pact::PactInteraction::Http(interaction)) => interaction,
+    // A message's plan is the produced message's (staged plan S1.7): there is no request to show,
+    // since what asks the provider for it is a hook, not a part of the interaction.
+    Some(legacy_pact::PactInteraction::Message(message)) => {
+      return legacy_pact::message_plan(message).map_err(|err| ExplainError::NotReadable(err.to_string()));
+    }
     Some(legacy_pact::PactInteraction::NeedsPlugins(needs)) => {
       return Err(ExplainError::NeedsPlugins(needs.plugins.clone()));
     }

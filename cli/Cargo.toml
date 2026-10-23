@@ -41,6 +41,9 @@ pact_janus_component_host = { path = "../engine/component-host" }
 # native binaries, so a `broker` source and `publish` work through `janus` and every SDK alike.
 pact_janus_broker_client = { path = "../engine/broker-client" }
 serde_json = "1"
+# `--transports` entries are on the provider URL's host (staged plan S1.7). Already in the tree
+# behind `pact_janus_hooks_host`.
+url = "2"
 # A policy document is authored by a person (design 2.8 §7.1's project layer), so it is YAML or
 # JSON — the same choice the hook loader makes for `verifier.janus.yaml`, and the same crate,
 # already in the tree behind `pact_janus_hooks_host`.
