@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792739581363,
+  "lastUpdate": 1792739583480,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -21558,6 +21558,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20290,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9f90fb4d8ab1651739adbede9e5c37aaf0e849b9",
+          "message": "feat: S1.7 message pacts are verified, asked of the provider through produce-message (ADR 0046)\n\nA transport names its own parts (exchange-parts: initiating, answering;\nHTTP's are request and response), and the kernel spells none. A served\nrequest that does not match is disposed of as `reject` with its\nmismatches, which the HTTP transport answers with the 500 the kernel used\nto write. Closes kernel-boundary review findings 8 and 9; the line\ntransport in declared_transport.rs now uses parts of its own.\n\nA v3 message and a v4 asynchronous or synchronous message is one replay\nthat drives no transport: its produce-message hooks produce a `message`\npart (metadata, body), compared as today's verifier compares a message,\nwith legacy:message-type for its content-type check. When no hook\nproduces it, it fails as component-unavailable naming\nhook/produce-message.\n\n- The http hook gains `format: pact-message` (today's POST and reply)\n  and `transports`, which routes a message as today's --transports does.\n- janus verify takes --transports NAME:PORT[/PATH], and adds a\n  pact-message producer when the configuration names none.\n- A reply that is not a 2xx fails for every message: a deliberate\n  difference, fixture messages/error-status, in the ledger.\n- explain and the golden corpus show a message's plan; four corpus cases.\n- S1.1: messages/ fixtures from pact-js's and pact-jvm's message\n  examples, a mixed HTTP and message pact, all mutated; the importer reads\n  the compatibility suite's V3 and V4 message provider scenarios (19); a\n  `routes` command prints a pact's routes. The whole corpus is 1124\n  verdicts: 1110 agree, 14 known.\n- The request-filter scenario's skip reason now says why: today's CLI\n  takes no request filter.\n\nFixtures from pact-js examples/messages (MIT, 8a8f27a) and pact-jvm\nprovider/junit5 amqp_pacts (Apache-2.0, e419148).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T17:57:37+11:00",
+          "tree_id": "72966284584948419e34321fc6f8dc8563db4738",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9f90fb4d8ab1651739adbede9e5c37aaf0e849b9"
+        },
+        "date": 1792739582942,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26388,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20175,
             "unit": "requests per second",
             "extra": "engines 4"
           }
