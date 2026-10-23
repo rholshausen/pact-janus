@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792735224381,
+  "lastUpdate": 1792735225975,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -21204,6 +21204,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19534,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3094b45487990cf62fb3c45e0f3fa3f0a6c5a2c1",
+          "message": "feat: S1.8 an interaction that needs a pact plugin is refused by name, and the rest of its pact verifies (ADR 0045)\n\nA v1-v4 interaction needs a pact plugin when its pluginConfiguration names\none, or when it uses a rule pact_models reads as a plugin's and the pact\nnames plugins (then it needs all of them, as today's verifier loads).\n\n- janus verify refuses each such interaction before any state or request,\n  as component-unavailable naming pact-plugin/<name>; the rest of the pact\n  verifies, and the summary counts the refusal as a failure.\n- janus upgrade drops it with an interaction-dropped finding naming the\n  plugin; janus explain refuses it with the same error.\n- Previously a CSV/JWT/credit-card HTTP interaction was verified only in\n  part with the built-in components, and a gRPC/Avro message one was\n  skipped silently.\n\nNo S1.1 fixture: today's verifier installs a missing plugin from the\ninternet. The refusals are tested offline in the kernel and the CLI.\nFixtures are trimmed from pact-plugins' examples (MIT).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T16:55:17+11:00",
+          "tree_id": "17b04a6ec47e8f14fb2dccd778bdf314a3bc96cf",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3094b45487990cf62fb3c45e0f3fa3f0a6c5a2c1"
+        },
+        "date": 1792735225624,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25179,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20290,
             "unit": "requests per second",
             "extra": "engines 4"
           }
