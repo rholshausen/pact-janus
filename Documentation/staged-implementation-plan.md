@@ -977,6 +977,17 @@ item in 1a is done when S1.1 agrees.
   or an ADR makes the difference deliberate, since today's own header check passes the same reply.
   *Exit:* the decision recorded, and S1.1's ledger entries for `bodies/content-type-rule-with-a-space`
   gone, or carrying that ADR as their reason.
+  *Done 2026-10-23* ([ADR 0043](decisions/0043-check-a-pacts-content-type-once-on-the-header.md)). The
+  difference is deliberate: Janus checks a pact's `Content-Type` once, on the header, and does not copy
+  today's second check, which pact-jvm does not make either, comparing base types only. Not foreseen:
+  the second check is not only the rule's. When the pact's type has parameters, it requires exactly
+  those parameters unless the rule matches, so a reply that adds one (`; version=2`) fails it with no
+  rule at all, after the header check allowed it. That is the new fixture
+  `bodies/content-type-extra-parameter`. The four ledger entries for the two fixtures carry ADR 0043,
+  and the harness reads 782 verdicts: 768 agree and 14 are known. A probe of the neighbouring cases
+  found no other difference: a charset in another case, a pact type with no parameters, a rule matched
+  with the same charset, and a rule written to allow no space all agree. Nothing the engine does
+  changed.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current

@@ -1,0 +1,32 @@
+{
+  "description": "A pact's Content-Type with a charset and no rule, and a reply that adds a parameter. Today's verifier passes the header, since its parameters are compared as a set and extra ones are allowed, then requires exactly the pact's parameters before it compares the body, and fails it there; janus verify checks the type once, on the header (ADR 0043)",
+  "source": "staged plan S1.26; pact_matching::match_body and pact_models::ContentType::is_equivalent_to",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/order"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=UTF-8; version=2"
+            ]
+          },
+          "body": {
+            "text": "{\"id\": 1}"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": false
+}

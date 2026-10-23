@@ -76,14 +76,28 @@
       "key": "run",
       "today": "fail",
       "janus": "pass",
-      "reason": "S1.26: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the rule once, there; today's verifier checks it again before comparing the body, against the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
+      "reason": "ADR 0043: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring the pact's parameters exactly or the rule to match the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
     },
     {
       "case": "bodies/content-type-rule-with-a-space",
       "key": "0/0",
       "today": "fail",
       "janus": "pass",
-      "reason": "S1.26: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the rule once, there; today's verifier checks it again before comparing the body, against the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
+      "reason": "ADR 0043: the pact's Content-Type rule (application/json; charset=.+) allows the reply's header, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring the pact's parameters exactly or the rule to match the reply's type as pact_models writes it (application/json;charset=iso-8859-1, no space), and fails"
+    },
+    {
+      "case": "bodies/content-type-extra-parameter",
+      "key": "run",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0043: the reply adds a parameter (version=2) to the pact's application/json; charset=UTF-8, which the header check allows, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring exactly the pact's parameters, and fails"
+    },
+    {
+      "case": "bodies/content-type-extra-parameter",
+      "key": "0/0",
+      "today": "fail",
+      "janus": "pass",
+      "reason": "ADR 0043: the reply adds a parameter (version=2) to the pact's application/json; charset=UTF-8, which the header check allows, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring exactly the pact's parameters, and fails"
     }
   ]
 }

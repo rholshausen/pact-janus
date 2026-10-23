@@ -59,6 +59,7 @@ superseding ADR instead.
 | [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted |
 | [0041](0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md) | Refuse a filter that names no recorded variant, and report a narrowed run as filtered | accepted |
 | [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
+| [0043](0043-check-a-pacts-content-type-once-on-the-header.md) | Check a pact's Content-Type once, on the header | accepted |
 
 ## Decision backlog
 

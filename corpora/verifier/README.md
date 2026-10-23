@@ -107,7 +107,9 @@ interaction of a pact it did not fetch is `absent` there too.
   and multipart (S1.23, ADR 0040): a `multipart/form-data` body with rules on a field and a JSON file
   and a base64 PNG, and `every-body-kind`, one v3 pact with an XML, a form, a multipart and a binary body;
   and `content-type-rule-with-a-space`, a rule on the `Content-Type` header that today checks a second
-  time against the reply's type written without the space (S1.26).
+  time against the reply's type written without the space, and `content-type-extra-parameter`, a reply
+  that adds a parameter the header check allows and today's second check does not; both deliberate
+  differences (S1.26, ADR 0043).
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
   match and that do not, and mutations.

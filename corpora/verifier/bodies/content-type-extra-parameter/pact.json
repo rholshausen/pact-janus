@@ -1,0 +1,31 @@
+{
+  "consumer": {
+    "name": "bodies-consumer"
+  },
+  "provider": {
+    "name": "bodies-provider"
+  },
+  "interactions": [
+    {
+      "description": "an order",
+      "request": {
+        "method": "GET",
+        "path": "/order"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "body": {
+          "id": 1
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}
