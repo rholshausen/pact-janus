@@ -1,0 +1,148 @@
+{
+  "description": "A v4 `arrayContains` rule: each variant must match some element of the reply's array, in any order, the same element for two variants if it matches both, and other elements are not compared. A variant with no rules is its element compared by equality. One reply matches and one does not, for each",
+  "source": "staged plan S1.24; pact_matching::matchingrules::compare_lists_with_matchingrule",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "id": 9,
+                  "kind": "pen"
+                },
+                {
+                  "id": 5,
+                  "kind": "cup"
+                },
+                {
+                  "id": 3,
+                  "kind": "book"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "id": 9,
+                  "kind": "pen"
+                },
+                {
+                  "id": 5,
+                  "kind": "cup"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/labels"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "labels": [
+                {
+                  "id": 7
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/codes"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "codes": [
+                {
+                  "code": "Y"
+                },
+                {
+                  "code": "X"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/codes/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "codes": [
+                {
+                  "code": "X",
+                  "extra": true
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

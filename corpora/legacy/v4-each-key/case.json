@@ -1,0 +1,91 @@
+{
+  "description": "a v4 eachKey rule: every key of the reply matches its regex, and the pact's own key need not be there; only the values of the pact's own keys are compared, so the rule on $.prices.* reaches none of the reply's here, as today (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "prices",
+          "description": "prices by code, keys and values both ruled",
+          "request": {
+            "method": "GET",
+            "path": "/prices"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "prices": {
+                  "A1": 1.5
+                }
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.prices": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "eachKey",
+                      "rules": [
+                        {
+                          "match": "regex",
+                          "regex": "[A-Z][0-9]"
+                        }
+                      ],
+                      "value": "A1"
+                    }
+                  ]
+                },
+                "$.prices.*": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/prices",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "prices": {
+        "B2": 3,
+        "C3": 0.25
+      }
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

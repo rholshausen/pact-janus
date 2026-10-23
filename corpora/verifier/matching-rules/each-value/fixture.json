@@ -1,0 +1,104 @@
+{
+  "description": "A v4 `eachValue` rule on an object and on an array: every value of the reply's must match its rules, and only its rules. One reply matches and one does not, for each",
+  "source": "staged plan S1.24; pact_matching::matchingrules::compare_maps_with_matchingrule and compare_lists_with_matchingrule",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/prices"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "prices": {
+                "pear": 2,
+                "plum": 0.75
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/prices/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "prices": {
+                "pear": 2,
+                "plum": "0.75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/ids"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ids": [
+                "b2",
+                "c3",
+                "d4"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/ids/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "ids": [
+                "b2",
+                "33"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

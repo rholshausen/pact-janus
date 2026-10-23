@@ -1,0 +1,84 @@
+(
+  :items (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/items'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.items" (
+          %expect:array (
+            $.response.body.items
+          ),
+          %legacy:array-contains (
+            $.response.body.items,
+            :"$.items[?0]" (
+              :"$.items[?0].id" (
+                %match:integer (
+                  ~>.id
+                )
+              ),
+              :"$.items[?0].kind" (
+                %match:equality (
+                  ~>.kind,
+                  'book'
+                )
+              )
+            ),
+            0,
+            {'id': 1, 'kind': 'book'}
+          ),
+          %legacy:array-contains (
+            $.response.body.items,
+            :"$.items[?1]" (
+              :"$.items[?1].id" (
+                %match:integer (
+                  ~>.id
+                )
+              ),
+              :"$.items[?1].kind" (
+                %match:equality (
+                  ~>.kind,
+                  'pen'
+                )
+              )
+            ),
+            1,
+            {'id': 2, 'kind': 'pen'}
+          )
+        )
+      )
+    )
+  )
+)

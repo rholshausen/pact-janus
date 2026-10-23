@@ -58,6 +58,7 @@ superseding ADR instead.
 | [0039](0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md) | Read XML bodies by element name, through a built-in XML component | accepted |
 | [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted |
 | [0041](0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md) | Refuse a filter that names no recorded variant, and report a narrowed run as filtered | accepted |
+| [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
 
 ## Decision backlog
 

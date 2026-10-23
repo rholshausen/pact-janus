@@ -1,0 +1,69 @@
+(
+  :"prices by code, keys and values both ruled" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/prices'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.prices" (
+          %expect:object (
+            $.response.body.prices
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.prices
+            ),
+            :"$.prices{key}" (
+              %match:regex (
+                ~>.key,
+                '^(?:[A-Z][0-9])$'
+              )
+            )
+          ),
+          %flow:if (
+            %check:exists (
+              $.response.body.prices.A1
+            ),
+            :"$.prices.A1" (
+              %match:number (
+                $.response.body.prices.A1
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

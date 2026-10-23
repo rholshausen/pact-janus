@@ -1,0 +1,86 @@
+(
+  :"tags keyed by colour" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/tags'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.tags" (
+          %expect:object (
+            $.response.body.tags
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.tags
+            ),
+            %flow:if (
+              %check:equals (
+                ~>.key,
+                'blue'
+              ),
+              :"$.tags.blue" (
+                :"$.tags.blue.id" (
+                  %match:integer (
+                    ~>.value.id
+                  )
+                )
+              ),
+              %flow:if (
+                %check:equals (
+                  ~>.key,
+                  'red'
+                ),
+                :"$.tags.red" (
+                  :"$.tags.red.id" (
+                    %match:integer (
+                      ~>.value.id
+                    )
+                  )
+                ),
+                :"$.tags{*}" (
+                  :"$.tags{*}.id" (
+                    %match:integer (
+                      ~>.value.id
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

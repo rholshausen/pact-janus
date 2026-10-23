@@ -1,0 +1,155 @@
+{
+  "consumer": {
+    "name": "matching-rules-consumer"
+  },
+  "provider": {
+    "name": "matching-rules-provider"
+  },
+  "interactions": [
+    {
+      "description": "tags keyed by colour",
+      "request": {
+        "method": "GET",
+        "path": "/tags"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "tags": {
+            "blue": {
+              "id": 2
+            },
+            "red": {
+              "id": 1
+            }
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.tags": {
+              "matchers": [
+                {
+                  "match": "values"
+                }
+              ]
+            },
+            "$.tags.*.id": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "tags keyed by colour, one of them not an integer",
+      "request": {
+        "method": "GET",
+        "path": "/tags/bad"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "tags": {
+            "blue": {
+              "id": 2
+            },
+            "red": {
+              "id": 1
+            }
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.tags": {
+              "matchers": [
+                {
+                  "match": "values"
+                }
+              ]
+            },
+            "$.tags.*.id": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "scores by name",
+      "request": {
+        "method": "GET",
+        "path": "/scores"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "scores": {
+            "alice": 10
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.scores": {
+              "matchers": [
+                {
+                  "match": "values"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "scores by name, one of them another score",
+      "request": {
+        "method": "GET",
+        "path": "/scores/bad"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "scores": {
+            "alice": 10
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.scores": {
+              "matchers": [
+                {
+                  "match": "values"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

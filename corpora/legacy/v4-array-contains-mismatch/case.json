@@ -1,0 +1,124 @@
+{
+  "description": "a v4 arrayContains rule: a variant no element matches is a mismatch on the array, named as today names it (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "items",
+          "description": "items",
+          "request": {
+            "method": "GET",
+            "path": "/items"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "items": [
+                  {
+                    "id": 1,
+                    "kind": "book"
+                  },
+                  {
+                    "id": 2,
+                    "kind": "pen"
+                  }
+                ]
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.items": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "arrayContains",
+                      "variants": [
+                        {
+                          "index": 0,
+                          "rules": {
+                            "$.id": {
+                              "combine": "AND",
+                              "matchers": [
+                                {
+                                  "match": "integer"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rules": {
+                            "$.id": {
+                              "combine": "AND",
+                              "matchers": [
+                                {
+                                  "match": "integer"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/items",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "items": [
+        {
+          "id": 9,
+          "kind": "pen"
+        },
+        {
+          "id": 5,
+          "kind": "cup"
+        }
+      ]
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.items",
+        "message": "Variant at index 0 ({\"id\":1,\"kind\":\"book\"}) was not found in the actual list",
+        "action": "legacy:array-contains"
+      }
+    ]
+  }
+}

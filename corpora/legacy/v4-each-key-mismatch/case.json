@@ -1,0 +1,103 @@
+{
+  "description": "a v4 eachKey rule: a key that does not match its regex is a mismatch at that key, and a value the number rule refuses is another (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "prices",
+          "description": "prices by code, keys and values both ruled",
+          "request": {
+            "method": "GET",
+            "path": "/prices"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "prices": {
+                  "A1": 1.5
+                }
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.prices": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "eachKey",
+                      "rules": [
+                        {
+                          "match": "regex",
+                          "regex": "[A-Z][0-9]"
+                        }
+                      ],
+                      "value": "A1"
+                    }
+                  ]
+                },
+                "$.prices.*": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/prices",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "prices": {
+        "A1": "free",
+        "b2": 3
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "~>.key",
+        "message": "Expected 'b2' to match '^(?:[A-Z][0-9])$'",
+        "action": "match:regex"
+      },
+      {
+        "path": "$.response.body.prices.A1",
+        "message": "Expected a number but got 'free'",
+        "action": "match:number"
+      }
+    ]
+  }
+}

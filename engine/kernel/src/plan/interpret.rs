@@ -349,6 +349,7 @@ fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
     "flow:or" => run_or(children, ctx),
     "flow:for-each" => run_for_each(children, ctx),
     "match:contains" => run_contains(children, ctx),
+    "legacy:array-contains" => run_array_contains(children, ctx),
     _ => {
       let executed_children: Vec<Executed> = children.iter().map(|c| run(c, ctx)).collect();
       let result = if super::actions::is_component_action(name) {
@@ -571,6 +572,67 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
     kind: ExecutedKind::Action {
       name: "match:contains".to_string(),
       children: all_children,
+    },
+    result: Some(result),
+  }
+}
+
+/// `legacy:array-contains` (spec §4.4, staged plan S1.24): v1–v4's `ArrayContains` variant, its
+/// template satisfied by *some* element of the array. Unlike `match:contains`, elements are not
+/// claimed: two variants may both be satisfied by one element, as today's verifier finds them
+/// (`compare_lists_with_matchingrule` searches the whole list for each variant). The attempt kept is
+/// the one that matched. When none did, the template is kept unrun: what an element that is not the
+/// variant failed on is not a mismatch in the reply, and today reports only the variant. Its
+/// optional third and fourth children, the variant's index and the pact's element, name the variant
+/// in today's words when none matched.
+fn run_array_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
+  let resolve_executed = run(&children[0], ctx);
+  let value = value_of(&resolve_executed);
+  let template = &children[1];
+  let described: Vec<Executed> = children[2..].iter().map(|child| run(child, ctx)).collect();
+  let (attempt, result) = match &value {
+    RuntimeValue::Array(items) => {
+      let mut matched = None;
+      for item in items {
+        ctx.current.push(item.clone());
+        let attempt = run(template, ctx);
+        ctx.current.pop();
+        if !child_failed(&attempt) {
+          matched = Some(attempt);
+          break;
+        }
+      }
+      let found = matched.is_some();
+      let result = if found {
+        NodeResult::Value(RuntimeValue::Bool(true))
+      } else {
+        let message = match (described.first(), described.get(1)) {
+          (Some(index), Some(element)) => format!(
+            "Variant at index {} ({}) was not found in the actual list",
+            display(&value_of(index)),
+            display(&value_of(element))
+          ),
+          _ => format!("No element of {} matched the variant", display(&value)),
+        };
+        NodeResult::Error {
+          message,
+          path: locus(std::slice::from_ref(&resolve_executed)),
+        }
+      };
+      (matched.unwrap_or_else(|| skip(template)), result)
+    }
+    _ => (
+      skip(template),
+      NodeResult::Error {
+        message: format!("Expected an array but got {}", display(&value)),
+        path: locus(std::slice::from_ref(&resolve_executed)),
+      },
+    ),
+  };
+  Executed {
+    kind: ExecutedKind::Action {
+      name: "legacy:array-contains".to_string(),
+      children: [vec![resolve_executed, attempt], described].concat(),
     },
     result: Some(result),
   }
@@ -905,25 +967,6 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       Some(as_u64(&value_of(&children[2])).unwrap_or(0)),
       Some(as_u64(&value_of(&children[3])).unwrap_or(0)),
     ),
-
-    "legacy:array-contains" => {
-      // Legacy-only (spec §4.4): reachable once design 3.5's compiler emits it, not yet.
-      let value = value_of(&children[0]);
-      let target = value_of(&children[1]);
-      match &value {
-        RuntimeValue::Array(items) if items.iter().any(|i| runtime_eq(i, &target)) => {
-          NodeResult::Value(RuntimeValue::Bool(true))
-        }
-        RuntimeValue::Array(_) => NodeResult::Error {
-          message: format!("Expected the array to contain {}", display(&target)),
-          path: locus(children),
-        },
-        _ => NodeResult::Error {
-          message: format!("Expected an array but got {}", display(&value)),
-          path: locus(children),
-        },
-      }
-    }
 
     "legacy:header-value" => {
       let value = value_of(&children[0]);

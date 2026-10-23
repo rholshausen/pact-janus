@@ -37,20 +37,24 @@
 //! body is compared part by part, each by its own type, the way today's `match_mime_multipart`
 //! compares one (ADR 0040, [`compile_multipart_body`]). A rule on a value that is text — a path, a header, a query or form value, an XML
 //! attribute or text — reads the text as today's verifier does: `integer` is text that parses as an
-//! integer (`legacy:parses-as`). `Values`, `EachKey`, `EachValue`, `ArrayContains` and
-//! plugin-provided rules compile to a `flow:error` node naming the gap rather than a guess: the 803
-//! specification test cases (plan task 3.7's corpus, `tests/fixtures/spec_testcases`) exercise
-//! none of them, so this is a documented gap, not a silent one.
+//! integer (`legacy:parses-as`). `Values`, `EachKey`, `EachValue` and `ArrayContains` on a body's
+//! object or array describe its entries, and compile as today's `compare_maps_with_matchingrule` and
+//! `compare_lists_with_matchingrule` apply them (staged plan S1.24, ADR 0042,
+//! [`compile_object_entries`], [`compile_array_rules`]); no specification test case covers them, so
+//! S1.1's `matching-rules/` fixtures are their oracle. Declared on text (a path, a header, a query or
+//! form value, XML), they and plugin-provided rules compile to a `flow:error` node naming the gap
+//! rather than a guess: a documented gap, not a silent one.
 
 use crate::legacy::multipart;
 use crate::legacy::xml::{self, rule_name};
 use crate::plan::{self as model, CapturedValues, Literal, Node, RuntimeValue, Status, member_path};
 use crate::shape::path;
 use indexmap::IndexMap;
+use pact_models::matchingrules::expressions::MatchingRuleDefinition;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
 use pact_models::path_exp::{DocPath, PathToken};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A v1–v4 request, decoded down to the parts this compiler needs. Query/header decoding from the
 /// wire (a raw query string, a `Vec<String>` per repeated header) is a transport concern (design
@@ -346,10 +350,14 @@ pub fn anchored_pattern(pattern: &str) -> String {
 /// for the same reason the shape compiler carries one (plan-grammar spec §5.2): a mismatch message
 /// worth reading names what was expected, not just that something failed.
 ///
-/// `Values`, `EachKey`, `EachValue`, `ArrayContains` and plugin-provided rules are a documented gap
-/// (module docs' "Scope"): none of the specification test cases in `tests/fixtures/spec_testcases`
-/// exercise them.
-fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text) -> Node {
+/// On an object or an array, `Values`, `EachKey`, `EachValue` and `ArrayContains` describe its
+/// entries, and the body walk compiles them ([`compile_object_entries`], [`compile_array_rules`]).
+/// What reaches here is the value they land on otherwise: `Values` compares it by equality, and the
+/// other three accept any value in a document, as today's JSON matcher does. A text value one of
+/// them cascaded down to is accepted too, since today's string matcher passes a rule that cannot
+/// cascade (`can_cascade`) when it did. Declared on text itself (a path, a header, a query or form
+/// value, XML), they are still a documented gap, as are plugin-provided rules (module docs' "Scope").
+fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, cascaded: bool) -> Node {
   match rule {
     // Text is read as today's verifier reads it against a type rule (module docs).
     MatchingRule::Number | MatchingRule::Integer | MatchingRule::Decimal | MatchingRule::Boolean
@@ -366,7 +374,13 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text) 
         vec![resolve, Node::value(Literal::string(kind))],
       )
     }
-    MatchingRule::Equality => Node::action("match:equality", vec![resolve, Node::value(example.clone())]),
+    MatchingRule::Equality | MatchingRule::Values => {
+      Node::action("match:equality", vec![resolve, Node::value(example.clone())])
+    }
+    MatchingRule::EachKey(_) | MatchingRule::EachValue(_) if text == Text::No || cascaded => {
+      Node::action("match:any", vec![resolve])
+    }
+    MatchingRule::ArrayContains(_) if text == Text::No => Node::action("match:any", vec![resolve]),
     MatchingRule::Regex(pattern) => Node::action(
       "match:regex",
       vec![resolve, Node::value(Literal::string(anchored_pattern(pattern)))],
@@ -447,9 +461,9 @@ fn rule_list_node(list: &RuleList, cascaded: bool, resolve: Node, example: &Lite
     .iter()
     .map(|rule| match rule {
       MatchingRule::MinType(_) | MatchingRule::MaxType(_) | MatchingRule::MinMaxType(_, _) if cascaded => {
-        rule_node(&MatchingRule::Type, resolve.clone(), example, text)
+        rule_node(&MatchingRule::Type, resolve.clone(), example, text, cascaded)
       }
-      _ => rule_node(rule, resolve.clone(), example, text),
+      _ => rule_node(rule, resolve.clone(), example, text, cascaded),
     })
     .collect();
   combine(list, nodes)
@@ -873,10 +887,10 @@ fn compile_body_scalar(value: &RuntimeValue, ctx: &BodyCtx) -> Node {
 /// `ctx.closed_objects` carries the part-level decision down unchanged (`BodyCtx` docs).
 ///
 /// A rule found directly on the object's own path is deliberately not applied here unless it is
-/// one of the map-entry rules (`Values`/`EachKey`/`EachValue`, module docs' gap): that mirrors the
-/// oracle's own behaviour (a bare `Type`/`Regex`/`Equality` declared on an object path does not
-/// replace the structural walk), confirmed against `tests/fixtures/spec_testcases` rather than
-/// assumed.
+/// one of the map-entry rules ([`is_map_entry_rule`]), which [`compile_object_entries`] compiles:
+/// that mirrors the oracle's own behaviour (a bare `Type`/`Regex`/`Equality` declared on an object
+/// path does not replace the structural walk), confirmed against `tests/fixtures/spec_testcases`
+/// rather than assumed.
 ///
 /// Members are compiled by name, not in the order the pact wrote them (ADR 0037): a v1–v4 JSON
 /// object's members are a set, and a pact's plan must not change when a broker or a formatter
@@ -885,13 +899,7 @@ fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) 
   if let Some((list, false)) = ctx.best()
     && list.rules.iter().any(is_map_entry_rule)
   {
-    return vec![rule_list_node(
-      &list,
-      false,
-      ctx.resolve(),
-      &Literal::from_document(&RuntimeValue::Object(members.clone())),
-      Text::No,
-    )];
+    return compile_object_entries(members, &list, ctx);
   }
   let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
   by_name.sort_by_key(|(name, _)| *name);
@@ -914,10 +922,17 @@ fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) 
   nodes
 }
 
+/// The rules that, declared on an object's own path, describe its entries rather than leave its
+/// members to be walked by name: `pact_models`' values matchers (`is_values_matcher`: `Values`,
+/// `EachValue` and `ArrayContains`) and `EachKey`. Cascaded down to an object, none of them does
+/// anything to it, as today (`compare_maps_with_matchingrule`).
 fn is_map_entry_rule(rule: &MatchingRule) -> bool {
   matches!(
     rule,
-    MatchingRule::Values | MatchingRule::EachKey(_) | MatchingRule::EachValue(_)
+    MatchingRule::Values
+      | MatchingRule::EachKey(_)
+      | MatchingRule::EachValue(_)
+      | MatchingRule::ArrayContains(_)
   )
 }
 
@@ -930,6 +945,9 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 /// rule cascades into the template's own path.
 fn compile_body_array(items: &[RuntimeValue], ctx: &BodyCtx) -> Vec<Node> {
   match ctx.best() {
+    Some((list, cascaded)) if list.rules.iter().any(is_map_entry_rule) => {
+      compile_array_rules(items, &list, cascaded, ctx)
+    }
     Some((list, cascaded)) => {
       let mut nodes = vec![rule_list_node(
         &list,
@@ -963,6 +981,482 @@ fn compile_body_array(items: &[RuntimeValue], ctx: &BodyCtx) -> Vec<Node> {
       nodes
     }
   }
+}
+
+// --- the rules that describe a collection's entries: Values, EachKey, EachValue, ArrayContains ---
+//
+// Staged plan S1.24, ADR 0042. Today's verifier reads these four on an object or an array as being
+// about its entries, not its members by name (`compare_maps_with_matchingrule`,
+// `compare_lists_with_matchingrule`). What follows compiles each the way those functions apply it.
+
+/// The fragment an entry template is compiled under when the actual key is one the pact does not
+/// name: no rule names it, it is not an index, so only a `*` rule reaches it, as only a `*` rule
+/// reaches a key nobody wrote down.
+const ANY_KEY: &str = "\u{0}*";
+
+impl<'a> BodyCtx<'a> {
+  /// One entry of the object under this context, inside a `flow:for-each` over its entries: the
+  /// value is `~>.value`, and rules are looked up at the entry's key, or at [`ANY_KEY`] for a key
+  /// the template does not name. It is labelled as the member it is (`.red`), or as any entry's
+  /// value (`{*}`, shape-language spec §6.2) for a key the template does not name.
+  fn entry(&self, key: Option<&str>) -> BodyCtx<'a> {
+    let mut fragments = self.fragments.clone();
+    fragments.push(key.unwrap_or(ANY_KEY).to_string());
+    BodyCtx {
+      fragments,
+      cursor: Cursor::Relative("~>.value".to_string()),
+      label_path: match key {
+        Some(key) => path::member(&self.label_path, key),
+        None => path::each_entry_value(&self.label_path),
+      },
+      category: self.category,
+      closed_objects: self.closed_objects,
+    }
+  }
+
+  /// The same position, with other rules: what `EachValue` and an `ArrayContains` variant do to
+  /// today's matching context (`clone_with`), which replaces every rule, not only the ones here.
+  fn with_category<'b>(&self, category: Option<&'b MatchingRuleCategory>) -> BodyCtx<'b> {
+    BodyCtx {
+      fragments: self.fragments.clone(),
+      cursor: self.cursor.clone(),
+      label_path: self.label_path.clone(),
+      category,
+      closed_objects: self.closed_objects,
+    }
+  }
+
+  /// The names a rule gives to members of the object under this context: a rule path that reaches
+  /// here and goes on through a named member.
+  fn names_ruled_below(&self) -> BTreeSet<String> {
+    let Some(category) = self.category else {
+      return BTreeSet::new();
+    };
+    let depth = self.fragments.len();
+    category
+      .rules
+      .keys()
+      .filter_map(|rule_path| {
+        let tokens = rule_path.tokens();
+        let reaches = tokens.len() > depth
+          && tokens
+            .iter()
+            .zip(&self.fragments)
+            .all(|(token, fragment)| token_weight(token, fragment, false) > 0);
+        match tokens.get(depth) {
+          Some(PathToken::Field(name)) if reaches => Some(name.clone()),
+          _ => None,
+        }
+      })
+      .collect()
+  }
+}
+
+/// An object whose own path carries one of [`is_map_entry_rule`]'s rules, as today's
+/// `compare_maps` applies each rule of the list in turn, all of them required whatever the list's
+/// logic says:
+///
+/// - `Values` and `ArrayContains` compare every actual entry ([`compile_entry_values`]);
+/// - `EachValue` does the same with only its own rules, at `<path>.*`;
+/// - any other rule, `EachKey` among them, checks the object as a whole and walks it by name
+///   ([`compile_object_walk`]).
+fn compile_object_entries(
+  members: &IndexMap<String, RuntimeValue>,
+  list: &RuleList,
+  ctx: &BodyCtx,
+) -> Vec<Node> {
+  let mut nodes = vec![Node::action("expect:object", vec![ctx.resolve()])];
+  // Today's first check, before any rule: a request's empty object has no entries either.
+  if members.is_empty() && ctx.closed_objects {
+    nodes.push(Node::action("legacy:only-entries", vec![ctx.resolve()]));
+  }
+  let mut walked = false;
+  for rule in &list.rules {
+    match rule {
+      MatchingRule::Values | MatchingRule::ArrayContains(_) => {
+        nodes.extend(compile_entry_values(members, ctx))
+      }
+      MatchingRule::EachValue(definition) => {
+        let (rules, unresolved) = definition_rules(definition);
+        nodes.extend(unresolved);
+        let category = each_value_category(&ctx.fragments, rules);
+        nodes.extend(compile_entry_values(members, &ctx.with_category(Some(&category))));
+      }
+      other => {
+        nodes.extend(object_rule_check(other, members, ctx));
+        if !walked {
+          walked = true;
+          nodes.extend(compile_object_walk(members, list, ctx));
+        }
+      }
+    }
+  }
+  nodes
+}
+
+/// Every actual entry against the pact's: the value the pact gives its key, or the pact's first
+/// value (by key) for a key it does not give. A key the pact gives and the reply lacks is not a
+/// mismatch, nor is a key the reply adds. What today's values matcher does.
+fn compile_entry_values(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) -> Vec<Node> {
+  let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
+  by_name.sort_by_key(|(name, _)| *name);
+  let Some((_, first)) = by_name.first() else {
+    return Vec::new();
+  };
+  let compiled = |value: &RuntimeValue, key: Option<&str>| {
+    let entry = ctx.entry(key);
+    Node::container(Some(entry.label()), compile_body_value(value, &entry))
+  };
+  // A key a rule names but the pact does not is compared against the first value with that rule,
+  // as today looks rules up at the actual key.
+  let ruled: Vec<String> = ctx
+    .names_ruled_below()
+    .into_iter()
+    .filter(|name| !members.contains_key(name))
+    .collect();
+  let mut template = compiled(first, None);
+  let branches = by_name
+    .iter()
+    .map(|(name, value)| (name.as_str(), *value))
+    .chain(ruled.iter().map(|name| (name.as_str(), *first)));
+  let branches: Vec<(&str, &RuntimeValue)> = branches.collect();
+  for (name, value) in branches.into_iter().rev() {
+    template = Node::action(
+      "flow:if",
+      vec![
+        Node::action(
+          "check:equals",
+          vec![
+            Node::resolve_current("~>.key".to_string()),
+            Node::value(Literal::string(name)),
+          ],
+        ),
+        compiled(value, Some(name)),
+        template,
+      ],
+    );
+  }
+  vec![Node::action(
+    "flow:for-each",
+    vec![Node::splat(vec![ctx.resolve()]), template],
+  )]
+}
+
+/// The object walked by name under a rule that is not a values matcher, as today's `match_keys`
+/// and member comparison do: its keys must be the pact's (a request's exactly, a response's at
+/// least) unless the list has `Values`, `EachValue` or `EachKey`; every actual key meets each
+/// `EachKey` rule; and each member the pact gives is compared when the reply has it.
+fn compile_object_walk(
+  members: &IndexMap<String, RuntimeValue>,
+  list: &RuleList,
+  ctx: &BodyCtx,
+) -> Vec<Node> {
+  let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
+  by_name.sort_by_key(|(name, _)| *name);
+  let mut nodes = Vec::new();
+  let any_keys = list.rules.iter().any(|rule| {
+    matches!(
+      rule,
+      MatchingRule::Values | MatchingRule::EachValue(_) | MatchingRule::EachKey(_)
+    )
+  });
+  if !any_keys {
+    if ctx.closed_objects {
+      let mut only = vec![ctx.resolve()];
+      only.extend(
+        by_name
+          .iter()
+          .map(|(name, _)| Node::value(Literal::string(*name))),
+      );
+      nodes.push(Node::action("legacy:only-entries", only));
+    }
+    nodes.extend(
+      by_name
+        .iter()
+        .map(|(name, _)| Node::action("match:any", vec![ctx.member(name).resolve()])),
+    );
+  }
+  for rule in &list.rules {
+    if let MatchingRule::EachKey(definition) = rule {
+      let (rules, unresolved) = definition_rules(definition);
+      nodes.extend(unresolved);
+      let key = Node::resolve_current("~>.key".to_string());
+      let checks: Vec<Node> = rules
+        .iter()
+        .map(|rule| rule_node(rule, key.clone(), &Literal::string(""), Text::Yes, false))
+        .collect();
+      if !checks.is_empty() {
+        let label = path::each_entry_key(&ctx.label_path);
+        nodes.push(Node::action(
+          "flow:for-each",
+          vec![
+            Node::splat(vec![ctx.resolve()]),
+            Node::container(Some(label), checks),
+          ],
+        ));
+      }
+    }
+  }
+  for (name, value) in by_name {
+    let member = ctx.member(name);
+    nodes.push(Node::action(
+      "flow:if",
+      vec![
+        Node::action("check:exists", vec![member.resolve()]),
+        Node::container(Some(member.label()), compile_body_value(value, &member)),
+      ],
+    ));
+  }
+  nodes
+}
+
+/// What a rule other than a values matcher says about an object as a whole, as today's map matcher
+/// reads it: equality is the whole object's, a size bound counts its entries, and a rule about a kind
+/// of value cannot match an object at all.
+fn object_rule_check(
+  rule: &MatchingRule,
+  members: &IndexMap<String, RuntimeValue>,
+  ctx: &BodyCtx,
+) -> Vec<Node> {
+  let bounds = |min: usize, max: Option<usize>| {
+    vec![Node::action(
+      "expect:size",
+      vec![
+        ctx.resolve(),
+        Node::value(Literal::number(min as u64)),
+        Node::value(
+          max
+            .map(|max| Literal::number(max as u64))
+            .unwrap_or_else(Literal::null),
+        ),
+      ],
+    )]
+  };
+  match rule {
+    MatchingRule::Equality => vec![Node::action(
+      "match:equality",
+      vec![
+        ctx.resolve(),
+        Node::value(Literal::from_document(&RuntimeValue::Object(members.clone()))),
+      ],
+    )],
+    MatchingRule::MinType(min) => bounds(*min, None),
+    MatchingRule::MaxType(max) => bounds(0, Some(*max)),
+    MatchingRule::MinMaxType(min, max) => bounds(*min, Some(*max)),
+    MatchingRule::NotEmpty => vec![Node::action("expect:not-empty", vec![ctx.resolve()])],
+    MatchingRule::Regex(_)
+    | MatchingRule::Type
+    | MatchingRule::Values
+    | MatchingRule::EachKey(_)
+    | MatchingRule::EachValue(_)
+    | MatchingRule::ArrayContains(_) => Vec::new(),
+    other => vec![Node::action(
+      "flow:error",
+      vec![Node::value(Literal::string(format!(
+        "Unable to match an object using '{}'",
+        other.name()
+      )))],
+    )],
+  }
+}
+
+/// An array whose rules include one of [`is_map_entry_rule`]'s, as today's
+/// `compare_lists_with_matchingrules` applies them: each rule on its own, combined as the list says.
+/// A pact's empty array is checked against no rule at all, as today.
+fn compile_array_rules(items: &[RuntimeValue], list: &RuleList, cascaded: bool, ctx: &BodyCtx) -> Vec<Node> {
+  let mut nodes = vec![Node::action("expect:array", vec![ctx.resolve()])];
+  if items.is_empty() {
+    return nodes;
+  }
+  // Every element against the pact's first, under `ctx`'s rules: what today's `match_list_contents`
+  // does after every rule but `ArrayContains` and `EachValue`.
+  let contents = |ctx: &BodyCtx| -> Vec<Node> {
+    let item = ctx.template_item();
+    vec![Node::action(
+      "flow:for-each",
+      vec![
+        Node::splat(vec![ctx.resolve()]),
+        Node::container(Some(item.label()), compile_body_value(&items[0], &item)),
+      ],
+    )]
+  };
+  let example = Literal::from_document(&RuntimeValue::Array(items.to_vec()));
+  let per_rule: Vec<(Vec<Node>, bool)> = list
+    .rules
+    .iter()
+    .map(|rule| match rule {
+      MatchingRule::ArrayContains(variants) => (compile_array_contains(items, variants, ctx), false),
+      // Cascaded, today's `EachValue` checks nothing on a list.
+      MatchingRule::EachValue(_) if cascaded => (Vec::new(), false),
+      MatchingRule::EachValue(definition) => {
+        let (rules, mut unresolved) = definition_rules(definition);
+        let category = each_value_category(&ctx.fragments, rules);
+        unresolved.extend(contents(&ctx.with_category(Some(&category))));
+        (unresolved, false)
+      }
+      MatchingRule::Values | MatchingRule::EachKey(_) => (Vec::new(), true),
+      other => {
+        let single = RuleList {
+          rules: vec![other.clone()],
+          rule_logic: RuleLogic::And,
+          cascaded,
+        };
+        (
+          vec![rule_list_node(
+            &single,
+            cascaded,
+            ctx.resolve(),
+            &example,
+            Text::No,
+          )],
+          true,
+        )
+      }
+    })
+    .collect();
+  match list.rule_logic {
+    RuleLogic::And => {
+      let walks = per_rule.iter().any(|(_, walks)| *walks);
+      for (rule_nodes, _) in per_rule {
+        nodes.extend(rule_nodes);
+      }
+      if walks {
+        nodes.extend(contents(ctx));
+      }
+    }
+    RuleLogic::Or => {
+      let alternatives: Vec<Node> = per_rule
+        .into_iter()
+        .map(|(mut rule_nodes, walks)| {
+          if walks {
+            rule_nodes.extend(contents(ctx));
+          }
+          Node::container(Some(ctx.label()), rule_nodes)
+        })
+        .collect();
+      nodes.push(Node::action("flow:or", alternatives));
+    }
+  }
+  nodes
+}
+
+/// `ArrayContains`: each variant, the pact's element at its index under the variant's own rules,
+/// must match some element of the reply, in any order and not necessarily a different one. A
+/// variant with no rules, or none at all, is that element compared by equality.
+fn compile_array_contains(
+  items: &[RuntimeValue],
+  variants: &[(usize, MatchingRuleCategory, ArrayContainsGenerators)],
+  ctx: &BodyCtx,
+) -> Vec<Node> {
+  let variants: Vec<(usize, Option<&MatchingRuleCategory>)> = if variants.is_empty() {
+    (0..items.len()).map(|index| (index, None)).collect()
+  } else {
+    variants
+      .iter()
+      .map(|(index, rules, _)| (*index, Some(rules)))
+      .collect()
+  };
+  variants
+    .into_iter()
+    .map(|(index, rules)| {
+      let Some(item) = items.get(index) else {
+        return Node::action(
+          "flow:error",
+          vec![Node::value(Literal::string(format!(
+            "ArrayContains: variant {index} is missing from the expected list, which has {} items",
+            items.len()
+          )))],
+        );
+      };
+      let element = BodyCtx {
+        fragments: vec!["$".to_string()],
+        cursor: Cursor::Relative("~>".to_string()),
+        label_path: some_element(&ctx.label_path, index),
+        category: rules.filter(|rules| !is_whole_equality(rules)),
+        closed_objects: ctx.closed_objects,
+      };
+      let template = match rules {
+        Some(rules) if !is_whole_equality(rules) => compile_body_value(item, &element),
+        _ => vec![Node::action(
+          "match:equality",
+          vec![element.resolve(), Node::value(Literal::from_document(item))],
+        )],
+      };
+      Node::action(
+        "legacy:array-contains",
+        vec![
+          ctx.resolve(),
+          Node::container(Some(element.label()), template),
+          Node::value(Literal::number(index as u64)),
+          Node::value(Literal::from_document(item)),
+        ],
+      )
+    })
+    .collect()
+}
+
+/// The element an `ArrayContains` variant is matched against (plan-grammar spec §4.4): `[?i]`,
+/// whichever element of the array satisfies variant `i`. Neither `[i]`, the reply's `i`th element,
+/// nor `[*]`, every element, says that, and the shape language has no segment for it, since only
+/// the legacy compiler emits `legacy:array-contains`.
+fn some_element(base: &str, index: usize) -> String {
+  format!("{base}[?{index}]")
+}
+
+/// An `ArrayContains` variant's generators, which verification does not apply to a reply.
+type ArrayContainsGenerators = std::collections::HashMap<DocPath, pact_models::generators::Generator>;
+
+/// A variant `pact_models` read with no `rules`: equality on the empty path, which today applies to
+/// the element as a whole, an object's extra keys included.
+fn is_whole_equality(rules: &MatchingRuleCategory) -> bool {
+  rules.rules.len() == 1
+    && rules.rules.iter().all(|(rule_path, list)| {
+      rule_path
+        .tokens()
+        .iter()
+        .all(|token| matches!(token, PathToken::Root))
+        && list.rules == [MatchingRule::Equality]
+    })
+}
+
+/// An `EachKey` or `EachValue` definition's rules, and a failing node for each reference it names,
+/// which `pact_models` leaves unresolved and today reports as a mismatch.
+fn definition_rules(definition: &MatchingRuleDefinition) -> (Vec<MatchingRule>, Vec<Node>) {
+  let mut rules = Vec::new();
+  let mut unresolved = Vec::new();
+  for rule in &definition.rules {
+    if let Some(rule) = rule.as_ref().left() {
+      rules.push(rule.clone());
+    } else if let Some(reference) = rule.as_ref().right() {
+      unresolved.push(Node::action(
+        "flow:error",
+        vec![Node::value(Literal::string(format!(
+          "Found an un-resolved reference {}",
+          reference.name
+        )))],
+      ));
+    }
+  }
+  (rules, unresolved)
+}
+
+/// The rules `EachValue` matches a collection's values with, and nothing else: its own, at `*` below
+/// the collection, as today's `EachValue` builds a new matching context.
+fn each_value_category(fragments: &[String], rules: Vec<MatchingRule>) -> MatchingRuleCategory {
+  let mut at = DocPath::root();
+  for fragment in fragments.iter().skip(1) {
+    at = at.join(fragment.as_str());
+  }
+  let mut category = MatchingRuleCategory::empty("body");
+  category.rules.insert(
+    at.join("*"),
+    RuleList {
+      rules,
+      rule_logic: RuleLogic::And,
+      cascaded: false,
+    },
+  );
+  category
 }
 
 // --- XML: elements, attributes and text (ADR 0039) ---

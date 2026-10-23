@@ -1,0 +1,84 @@
+(
+  :items (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/items',
+          '/items'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.items" (
+          %expect:array (
+            $.response.body.items => [{'id': 9, 'kind': 'pen'}, {'id': 5, 'kind': 'cup'}, {'id': 3, 'kind': 'book'}]
+          ) => BOOL(true),
+          %legacy:array-contains (
+            $.response.body.items => [{'id': 9, 'kind': 'pen'}, {'id': 5, 'kind': 'cup'}, {'id': 3, 'kind': 'book'}],
+            :"$.items[?0]" (
+              :"$.items[?0].id" (
+                %match:integer (
+                  ~>.id => 3
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[?0].kind" (
+                %match:equality (
+                  ~>.kind => 'book',
+                  'book'
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true),
+            0,
+            {'id': 1, 'kind': 'book'}
+          ) => BOOL(true),
+          %legacy:array-contains (
+            $.response.body.items => [{'id': 9, 'kind': 'pen'}, {'id': 5, 'kind': 'cup'}, {'id': 3, 'kind': 'book'}],
+            :"$.items[?1]" (
+              :"$.items[?1].id" (
+                %match:integer (
+                  ~>.id => 9
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[?1].kind" (
+                %match:equality (
+                  ~>.kind => 'pen',
+                  'pen'
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true),
+            1,
+            {'id': 2, 'kind': 'pen'}
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

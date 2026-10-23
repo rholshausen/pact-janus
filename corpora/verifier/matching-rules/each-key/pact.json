@@ -1,0 +1,211 @@
+{
+  "consumer": {
+    "name": "matching-rules-consumer"
+  },
+  "provider": {
+    "name": "matching-rules-provider"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "key": "counts",
+      "description": "counts by fruit",
+      "request": {
+        "method": "GET",
+        "path": "/counts"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "counts": {
+              "apples": 1
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.counts": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachKey",
+                  "rules": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]+"
+                    }
+                  ],
+                  "value": "apples"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "counts-bad",
+      "description": "counts by fruit, one key not lower case",
+      "request": {
+        "method": "GET",
+        "path": "/counts/bad"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "counts": {
+              "apples": 1
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.counts": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachKey",
+                  "rules": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]+"
+                    }
+                  ],
+                  "value": "apples"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "prices",
+      "description": "prices by code, keys and values both ruled",
+      "request": {
+        "method": "GET",
+        "path": "/prices"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "prices": {
+              "A1": 1.5
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.prices": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachKey",
+                  "rules": [
+                    {
+                      "match": "regex",
+                      "regex": "[A-Z][0-9]"
+                    }
+                  ],
+                  "value": "A1"
+                }
+              ]
+            },
+            "$.prices.*": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "prices-bad",
+      "description": "prices by code, a value not a number",
+      "request": {
+        "method": "GET",
+        "path": "/prices/bad"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "prices": {
+              "A1": 1.5
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.prices": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachKey",
+                  "rules": [
+                    {
+                      "match": "regex",
+                      "regex": "[A-Z][0-9]"
+                    }
+                  ],
+                  "value": "A1"
+                }
+              ]
+            },
+            "$.prices.*": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}

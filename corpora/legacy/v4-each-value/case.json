@@ -1,0 +1,82 @@
+{
+  "description": "a v4 eachValue rule on an object: every value of the reply is held to its rules, here a type rule against the pact's first value (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "prices",
+          "description": "prices by fruit",
+          "request": {
+            "method": "GET",
+            "path": "/prices"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "prices": {
+                  "apple": 1.5
+                }
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.prices": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "eachValue",
+                      "rules": [
+                        {
+                          "match": "type"
+                        }
+                      ],
+                      "value": "1.5"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/prices",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "prices": {
+        "pear": 2,
+        "plum": 0.75
+      }
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

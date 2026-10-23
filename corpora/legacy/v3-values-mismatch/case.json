@@ -1,0 +1,90 @@
+{
+  "description": "a v3 values rule: an entry the pact does not name is held to the rules at its key, here the integer rule on $.tags.*.id (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "description": "tags keyed by colour",
+          "request": {
+            "method": "GET",
+            "path": "/tags"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "tags": {
+                "blue": {
+                  "id": 2
+                },
+                "red": {
+                  "id": 1
+                }
+              }
+            },
+            "matchingRules": {
+              "body": {
+                "$.tags": {
+                  "matchers": [
+                    {
+                      "match": "values"
+                    }
+                  ]
+                },
+                "$.tags.*.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/tags",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "tags": {
+        "green": {
+          "id": "seven"
+        },
+        "red": {
+          "id": 3
+        }
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "~>.value.id",
+        "message": "Expected a integer but got 'seven'",
+        "action": "match:integer"
+      }
+    ]
+  }
+}

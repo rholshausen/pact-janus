@@ -1,0 +1,83 @@
+{
+  "description": "a v3 values rule: each entry of the reply is compared with the pact's value for its key, or the pact's first value (blue) for a key the pact does not give, under the rules at its own key; a key the pact gives and the reply lacks is not a mismatch (staged plan S1.24, ADR 0042)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "description": "tags keyed by colour",
+          "request": {
+            "method": "GET",
+            "path": "/tags"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "tags": {
+                "blue": {
+                  "id": 2
+                },
+                "red": {
+                  "id": 1
+                }
+              }
+            },
+            "matchingRules": {
+              "body": {
+                "$.tags": {
+                  "matchers": [
+                    {
+                      "match": "values"
+                    }
+                  ]
+                },
+                "$.tags.*.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/tags",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "tags": {
+        "green": {
+          "id": 7
+        },
+        "red": {
+          "id": 3
+        }
+      }
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

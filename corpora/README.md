@@ -32,7 +32,9 @@ readability:
   XML bodies, walked element by element over the XML component's document, and `v3-type-rule-on-text/`
   a type rule read against text, as today's verifier reads it (ADR 0039). `v3-multipart-body/` and
   `v3-multipart-body-mismatch/` are multipart bodies, compared part by part over the multipart
-  component's document, each part by its own type (ADR 0040).
+  component's document, each part by its own type (ADR 0040). `v3-values/`, `v4-each-key/`,
+  `v4-each-value/`, `v4-array-contains/` and their `-mismatch` twins are the rules about a
+  collection's entries, compiled as today's verifier applies them (ADR 0042).
 
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with

@@ -1,0 +1,119 @@
+(
+  :"tags keyed by colour" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/tags',
+          '/tags'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.tags" (
+          %expect:object (
+            $.response.body.tags => {'green': {'id': 7}, 'red': {'id': 3}}
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.tags => {'green': {'id': 7}, 'red': {'id': 3}}
+            ) => [{'green': {'id': 7}}, {'red': {'id': 3}}],
+            %flow:if (
+              %check:equals (
+                ~>.key => 'green',
+                'blue'
+              ) => BOOL(false),
+              :"$.tags.blue" (
+                :"$.tags.blue.id" (
+                  %match:integer (
+                    ~>.value.id
+                  )
+                )
+              ),
+              %flow:if (
+                %check:equals (
+                  ~>.key => 'green',
+                  'red'
+                ) => BOOL(false),
+                :"$.tags.red" (
+                  :"$.tags.red.id" (
+                    %match:integer (
+                      ~>.value.id
+                    )
+                  )
+                ),
+                :"$.tags{*}" (
+                  :"$.tags{*}.id" (
+                    %match:integer (
+                      ~>.value.id => 7
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true),
+            %flow:if (
+              %check:equals (
+                ~>.key => 'red',
+                'blue'
+              ) => BOOL(false),
+              :"$.tags.blue" (
+                :"$.tags.blue.id" (
+                  %match:integer (
+                    ~>.value.id
+                  )
+                )
+              ),
+              %flow:if (
+                %check:equals (
+                  ~>.key => 'red',
+                  'red'
+                ) => BOOL(true),
+                :"$.tags.red" (
+                  :"$.tags.red.id" (
+                    %match:integer (
+                      ~>.value.id => 3
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true),
+                :"$.tags{*}" (
+                  :"$.tags{*}.id" (
+                    %match:integer (
+                      ~>.value.id
+                    )
+                  )
+                )
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

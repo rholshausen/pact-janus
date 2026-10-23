@@ -1,0 +1,89 @@
+(
+  :"prices by fruit" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/prices',
+          '/prices'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.prices" (
+          %expect:object (
+            $.response.body.prices => {'pear': 2, 'plum': '0.75'}
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.prices => {'pear': 2, 'plum': '0.75'}
+            ) => [{'pear': 2}, {'plum': '0.75'}],
+            %flow:if (
+              %check:equals (
+                ~>.key => 'pear',
+                'apple'
+              ) => BOOL(false),
+              :"$.prices.apple" (
+                %match:type (
+                  ~>.value,
+                  1.5
+                )
+              ),
+              :"$.prices{*}" (
+                %match:type (
+                  ~>.value => 2,
+                  1.5
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true),
+            %flow:if (
+              %check:equals (
+                ~>.key => 'plum',
+                'apple'
+              ) => BOOL(false),
+              :"$.prices.apple" (
+                %match:type (
+                  ~>.value,
+                  1.5
+                )
+              ),
+              :"$.prices{*}" (
+                %match:type (
+                  ~>.value => '0.75',
+                  1.5
+                ) => ERROR(Expected a number but got '0.75')
+              ) => BOOL(false)
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

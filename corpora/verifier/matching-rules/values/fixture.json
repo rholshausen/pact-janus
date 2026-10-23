@@ -1,0 +1,108 @@
+{
+  "description": "A v3 `values` rule on an object: each entry of the reply is compared with the pact's value for its key, or the pact's first value for a key the pact does not give, and keys are not compared. One reply matches and one does not, with and without a rule on the values",
+  "source": "staged plan S1.24; pact_matching::matchingrules::compare_maps_with_matchingrule",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/tags"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "tags": {
+                "green": {
+                  "id": 7
+                },
+                "red": {
+                  "id": 3
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/tags/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "tags": {
+                "green": {
+                  "id": "seven"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/scores"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "scores": {
+                "bob": 10,
+                "carol": 10
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/scores/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "scores": {
+                "bob": 10,
+                "carol": 11
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

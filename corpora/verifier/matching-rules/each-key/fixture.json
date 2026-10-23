@@ -1,0 +1,103 @@
+{
+  "description": "A v4 `eachKey` rule: every key of the reply's object must match its rules, the pact's keys need not all be there, and the values of those that are are compared. One reply matches and one does not",
+  "source": "staged plan S1.24; pact_matching::CoreMatchingContext::match_keys",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/counts"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "counts": {
+                "pears": 5,
+                "plums": 2
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/counts/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "counts": {
+                "apples": 4,
+                "Pears": 5
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/prices"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "prices": {
+                "B2": 3,
+                "C3": 0.25
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/prices/bad"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "prices": {
+                "A1": "free",
+                "B2": 3
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

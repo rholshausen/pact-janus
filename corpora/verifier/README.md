@@ -108,6 +108,9 @@ interaction of a pact it did not fetch is `absent` there too.
   and a base64 PNG, and `every-body-kind`, one v3 pact with an XML, a form, a multipart and a binary body;
   and `content-type-rule-with-a-space`, a rule on the `Content-Type` header that today checks a second
   time against the reply's type written without the space (S1.26).
+- `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
+  (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
+  match and that do not, and mutations.
 - `compatibility-suite/`: the [pact-compatibility-suite](https://github.com/pact-foundation/pact-compatibility-suite)'s
   HTTP provider scenarios, V1 to V4 (Apache-2.0), each pact built as the suite's own harness builds it,
   its broker scenarios as broker fixtures.
@@ -127,6 +130,7 @@ so closing a gap means deleting its entries in the same change. `run --skeleton`
 for the unexpected disagreements, to fill in once each has a reason.
 
 The comparison is by verdict. Where both verifiers fail an interaction for different reasons, for
-example Janus because it refuses a matching rule it does not compile yet (S1.24) and today's verifier
+example Janus because it refuses a matching rule it does not compile yet (such as `eachValue` on a
+header, ADR 0042) and today's verifier
 because the body differs, that counts as agreement. The ledger entry for the passing case with the same
 rule is what records the gap.

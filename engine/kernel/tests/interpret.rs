@@ -225,6 +225,51 @@ fn contains_finds_a_distinct_element_per_entry() {
   assert_eq!(outcome(&execute(&plan, &one_match)).0, Status::Mismatched);
 }
 
+/// `legacy:array-contains` (ADR 0042) is today's `ArrayContains` variant: some element satisfies the
+/// template, and no element is claimed, so one element satisfies two variants where
+/// `match:contains` above would fail. A variant none matched fails alone, in today's words.
+#[test]
+fn array_contains_lets_one_element_satisfy_two_variants() {
+  let variant = |index: u64| {
+    Node::action(
+      "legacy:array-contains",
+      vec![
+        Node::resolve("$.response.body"),
+        Node::container(
+          None,
+          vec![Node::action(
+            "match:integer",
+            vec![Node::resolve_current("~>.id")],
+          )],
+        ),
+        Node::value(Literal::number(index)),
+        Node::value(Literal::from_json(&json!({ "id": index }))),
+      ],
+    )
+  };
+  let plan = Plan {
+    grammar: GRAMMAR_VERSION,
+    root: Node::container(None, vec![variant(0), variant(1)]),
+    variant: None,
+  };
+
+  let one_element = CapturedValues::from_json(&captured(&[("$.response.body", json!([{ "id": 7 }]))]));
+  assert_eq!(outcome(&execute(&plan, &one_element)).0, Status::Matched);
+
+  let none = CapturedValues::from_json(&captured(&[("$.response.body", json!([{ "id": "x" }]))]));
+  let (status, mismatches) = outcome(&execute(&plan, &none));
+  assert_eq!(status, Status::Mismatched);
+  let messages: Vec<&str> = mismatches.iter().map(|m| m.message.as_str()).collect();
+  assert_eq!(
+    messages,
+    vec![
+      "Variant at index 0 ({\"id\":0}) was not found in the actual list",
+      "Variant at index 1 ({\"id\":1}) was not found in the actual list",
+    ],
+    "only the variants, not what each element failed on"
+  );
+}
+
 #[test]
 fn a_component_operator_is_reported_as_unavailable_not_silently_skipped() {
   let body = json!({ "shape": "protobuf:enum", "example": "SHIPPED" });

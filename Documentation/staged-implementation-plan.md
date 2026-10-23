@@ -933,6 +933,24 @@ item in 1a is done when S1.1 agrees.
   findings table, and has nothing to do with body kinds.
   *Exit:* S1.1 fixtures using each of the four rules, matching and not, agree with today's
   verifier; corpus cases for each.
+  *Done 2026-10-23* ([ADR 0042](decisions/0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md)).
+  The four compile as today's `compare_maps_with_matchingrule` and `compare_lists_with_matchingrule`
+  apply them, on a body's objects and arrays. On an object, `values`, `eachValue` and
+  `arrayContains` are a `flow:for-each` over its entries that compares each with the pact's value
+  for its key, or the pact's first value; `eachKey` holds every key to its rules. On an array,
+  `arrayContains` is one `legacy:array-contains` per variant. That action was in the grammar and
+  never emitted; it now runs a template and lets one element satisfy two variants, as today, which
+  the shape language's `match:contains` does not. S1.1's `matching-rules/` has a fixture per rule,
+  with replies that match and that do not, and mutations: 379 verdicts over 183 cases, all agreeing.
+  The harness reads 780 verdicts over 367 cases: 768 agree and 12 are known. The corpus cases are
+  `legacy/v3-values`, `v4-each-key`, `v4-each-value` and `v4-array-contains`, each with a
+  `-mismatch` twin. Not foreseen: an `arrayContains` variant with no `rules` is equality on the whole
+  element, an object's extra keys included, and `eachKey` compares only the pact's own members, so a
+  `$.prices.*` rule beside it reaches none of the reply's other values. Left out: the four declared
+  on text (a path, a header, a query or form value, XML) are still refused, since today reads each
+  differently and no fixture shows one; `janus upgrade` still converts them approximately (S1.25);
+  and a mismatch inside an entry template is reported at a relative path (`~>.value.id`), as one in
+  any rule-driven array already is, for the CLI output review.
 - **S1.25 `janus upgrade` converts text, binary, form, XML and multipart bodies** — **S**. Split from
   S1.6, which made text and binary bodies verify; S1.21 added form bodies, S1.22 XML ones and S1.23
   multipart ones, which upgrade the same way. `janus upgrade` still carries a body that is not JSON

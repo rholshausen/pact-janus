@@ -1,0 +1,75 @@
+(
+  :"prices by code, keys and values both ruled" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/prices',
+          '/prices'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.prices" (
+          %expect:object (
+            $.response.body.prices => {'B2': 3, 'C3': 0.25}
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.prices => {'B2': 3, 'C3': 0.25}
+            ) => [{'B2': 3}, {'C3': 0.25}],
+            :"$.prices{key}" (
+              %match:regex (
+                ~>.key => 'B2',
+                '^(?:[A-Z][0-9])$'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.prices{key}" (
+              %match:regex (
+                ~>.key => 'C3',
+                '^(?:[A-Z][0-9])$'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %flow:if (
+            %check:exists (
+              $.response.body.prices.A1 => NULL
+            ) => BOOL(false),
+            :"$.prices.A1" (
+              %match:number (
+                $.response.body.prices.A1
+              )
+            )
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)
