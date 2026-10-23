@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792722513783,
+  "lastUpdate": 1792722515559,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -20850,6 +20850,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 48198,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "31ece188f8ee180d738a072596d9b2ac3d0851f3",
+          "message": "fix: the benchmark lock file follows hooks-host, and exec's tests are Unix-only on every target\n\nS1.9 changed hooks-host's dependencies without updating\nbenchmarks/janus/Cargo.lock, so --locked failed in the Benchmarks run and\nthe checks job. The exec deadline tests gated each item to Unix but not\ntheir imports, which Windows clippy refused as unused; the file is now\ngated as a whole.\n\nNo-Changeset: a lock file outside the release and a test file\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T13:23:29+11:00",
+          "tree_id": "5b7c8829941a76f548a1851cc7a45b49c403b002",
+          "url": "https://github.com/rholshausen/pact-janus/commit/31ece188f8ee180d738a072596d9b2ac3d0851f3"
+        },
+        "date": 1792722515231,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26537,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19534,
             "unit": "requests per second",
             "extra": "engines 4"
           }
