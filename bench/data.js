@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792715059169,
+  "lastUpdate": 1792715061275,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -20142,6 +20142,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27812,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2f4150297cc97156526009a32fed5c6e26ce0739",
+          "message": "feat: S1.24 values, eachKey, eachValue and arrayContains verify as today\n\nA v1-v4 pact whose body used one of these four rules failed every\ninteraction that had one: the legacy compiler compiled each to flow:error.\nNo pact-specification case covers them. ADR 0042 compiles them as\npact_matching's compare_maps_with_matchingrule and\ncompare_lists_with_matchingrule apply them, on a body's objects and arrays:\n\n- values, eachValue and arrayContains on an object are a flow:for-each over\n  its entries, dispatching on ~>.key: each entry against the pact's value\n  for its key, or the pact's first value by key; keys are not compared.\n  eachValue swaps in its own rules at <path>.*. Branches are labelled as the\n  member, or {*} for any other key.\n- eachKey holds every key to its rules (labelled {key}), and compares the\n  pact's own members only where the reply has them.\n- arrayContains on an array is one legacy:array-contains per variant. The\n  action was in the grammar and never emitted; it now runs a template, lets\n  one element satisfy two variants (match:contains does not), and fails\n  with today's \"Variant at index 0 (...) was not found in the actual list\".\n  Its template is labelled [?i], specified in plan-grammar spec 4.4.\n- eachValue on an array holds every element to its rules, and checks\n  nothing when cascaded. On a scalar, values is equality and the other\n  three accept any value, as today's JSON matcher does.\n\nS1.1's new matching-rules/ fixtures, one per rule with replies that match\nand that do not and mutations, give 379 verdicts over 183 cases, all\nagreeing with pact_verifier_cli 1.3.5; the whole harness reads 780\nverdicts, 768 agreeing and 12 known. Corpus cases: legacy/v3-values,\nv4-each-key, v4-each-value, v4-array-contains and their -mismatch twins.\n\nLeft out: the four declared on text (path, header, query, form, XML) are\nstill refused; janus upgrade still converts them approximately (S1.25);\nmismatches inside entry templates report relative paths (~>.value.id),\nnoted for the CLI output review.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-23T11:19:52+11:00",
+          "tree_id": "3eea76c7387557ca880fb5cf83ae049d5c3df3fa",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2f4150297cc97156526009a32fed5c6e26ce0739"
+        },
+        "date": 1792715060705,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 62437,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 46004,
             "unit": "requests per second",
             "extra": "engines 4"
           }
