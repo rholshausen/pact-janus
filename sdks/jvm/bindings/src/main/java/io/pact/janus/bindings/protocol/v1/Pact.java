@@ -38,8 +38,15 @@ public class Pact {
     @JsonProperty("pact")
     @JsonPropertyDescription("A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).")
     private Map<String, Object> pact;
+    /**
+     * UpgradeOptions
+     * <p>
+     * How to convert. Open: a member an engine does not know is ignored.
+     * 
+     */
     @JsonProperty("options")
-    private Map<String, Object> options;
+    @JsonPropertyDescription("How to convert. Open: a member an engine does not know is ignored.")
+    private UpgradeOptions options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -63,13 +70,25 @@ public class Pact {
         this.pact = pact;
     }
 
+    /**
+     * UpgradeOptions
+     * <p>
+     * How to convert. Open: a member an engine does not know is ignored.
+     * 
+     */
     @JsonProperty("options")
-    public Map<String, Object> getOptions() {
+    public UpgradeOptions getOptions() {
         return options;
     }
 
+    /**
+     * UpgradeOptions
+     * <p>
+     * How to convert. Open: a member an engine does not know is ignored.
+     * 
+     */
     @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
+    public void setOptions(UpgradeOptions options) {
         this.options = options;
     }
 

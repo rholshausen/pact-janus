@@ -202,6 +202,8 @@ Options:
                            default is warn [possible values: error, warn, info, debug, trace]
       --write <FILE>       Write the contract to this file instead of standard output
       --quiet              Do not print the findings
+      --exclude-pending    Leave the pact's pending interactions out of the contract. Without it,
+                           each is converted without its flag, so its failure fails the run
       --output <FORMAT>    text prints the contract, and the findings on standard error; json prints
                            one document holding both [default: text] [possible values: text, json]
   -h, --help               Print help

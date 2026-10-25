@@ -102,19 +102,52 @@ impl Finding {
   }
 }
 
-/// Convert a v1–v4 pact document to a Janus contract.
+/// What `upgrade/pact`'s `options` may ask of a conversion (engine-protocol spec §8.4).
+#[derive(Debug, Clone, Default)]
+pub struct Options {
+  /// Leave every pending interaction out of the contract, rather than converting it without its
+  /// flag (ADR 0051). Each one left out is a `pending-excluded` finding.
+  pub exclude_pending: bool,
+}
+
+/// Convert a v1–v4 pact document to a Janus contract, with the default [`Options`].
 ///
 /// `Err` only for a document that is not a readable pact at all — everything the conversion cannot
 /// carry across is a *finding*, not an error, because a partial conversion the author can see is
 /// worth more than a refusal they cannot act on.
 pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
+  pact_with(source, doc, &Options::default())
+}
+
+/// Convert a v1–v4 pact document to a Janus contract, as `options` ask.
+pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgraded, ContractError> {
   let pact = legacy_pact::read(source, doc)?;
   let mut conversion = Conversion::default();
+  // Each HTTP interaction beside its position in the pact, so a finding points at the interaction
+  // the author wrote, whatever was left out before it.
   let mut http = Vec::new();
   let mut needing_plugins = Vec::new();
-  for interaction in legacy_pact::interactions(pact.as_ref()) {
+  let mut excluded = 0;
+  for (index, interaction) in legacy_pact::interactions(pact.as_ref()).into_iter().enumerate() {
+    // ADR 0051: a contract has no pending interactions. Asked to, the conversion leaves them out,
+    // so a contract upgraded from a pact whose pending interactions are known to fail verifies as
+    // the pact does; otherwise each converts without its flag, as `pending-dropped` says.
+    if options.exclude_pending && interaction.pending() {
+      excluded += 1;
+      conversion.finding(Finding::new(
+        "pending-excluded",
+        "lossy",
+        format!("/interactions/{index}"),
+        format!(
+          "'{}' is pending and was left out, as asked: the contract says nothing about it. Pending \
+           is the broker's to decide for a contract, from the provider's results (ADR 0051)",
+          interaction.description()
+        ),
+      ));
+      continue;
+    }
     match interaction {
-      legacy_pact::PactInteraction::Http(interaction) => http.push(*interaction),
+      legacy_pact::PactInteraction::Http(interaction) => http.push((index, *interaction)),
       // Verified since staged plan S1.7, but not converted: a contract has no message form until the
       // consumer side has one (S6.2). Counted below, with whatever else is not HTTP.
       legacy_pact::PactInteraction::Message(_) => {}
@@ -126,7 +159,7 @@ pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
   // by a design that has no message support yet, and vanishing silently is exactly the outcome
   // §8.1's honesty rule forbids.
   let declared = pact.interactions().len();
-  let messages = declared - http.len() - needing_plugins.len();
+  let messages = declared - excluded - http.len() - needing_plugins.len();
   if messages > 0 {
     conversion.finding(Finding::new(
       "interaction-dropped",
@@ -162,8 +195,8 @@ pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
   let mut interactions = Vec::with_capacity(http.len());
   let mut seen: Vec<(String, Option<Vec<State>>)> = Vec::new();
   let mut problems = Vec::new();
-  for (index, interaction) in http.iter().enumerate() {
-    match conversion.interaction(index, interaction, &mut seen) {
+  for (index, interaction) in &http {
+    match conversion.interaction(*index, interaction, &mut seen) {
       Ok(converted) => interactions.push(converted),
       Err(mut found) => problems.append(&mut found),
     }
@@ -235,7 +268,9 @@ impl Conversion {
         "lossy",
         format!("{at}/pending"),
         "the interaction is pending, so v1–v4 report its failure without failing the run; a contract \
-         has no pending interactions yet (staged plan S1.28), so a failure of this one fails the run"
+         has no pending interactions, so a failure of this one fails the run. Pending is the broker's \
+         to decide for a contract, from the provider's results; to leave the interaction out instead, \
+         ask the conversion to exclude pending interactions (ADR 0051)"
           .to_string(),
       ));
     }

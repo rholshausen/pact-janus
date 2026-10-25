@@ -1116,6 +1116,17 @@ item in 1a is done when S1.1 agrees.
   does.
   *Exit:* `compatibility-suite/v4/01-verifying-a-pending-http-interaction` leaves
   `upgrade-disagreements.json`, or the flag is decided against in an ADR that the entry cites.
+  *Done 2026-10-25*, decided against in
+  [ADR 0051](decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md),
+  which the entry cites. Pending is a fact about two codebases at a moment, which the broker works out
+  from the provider's results and a fixed contract version cannot follow, so a contract has no
+  pending interactions and a pending contract is the broker's to decide, as a pending pact is.
+  The v1–v4 path keeps honouring the flag. `janus upgrade` still converts a pending interaction
+  without it (`pending-dropped`), and `--exclude-pending` (`upgrade/pact`'s `exclude-pending`
+  option) leaves it out instead (`pending-excluded`), for a pact whose pending interactions are known
+  to fail. Not foreseen: a finding after a message or plugin interaction pointed at the wrong
+  interaction, because upgrade counted only the HTTP ones; every finding now points at the pact's own
+  position.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current

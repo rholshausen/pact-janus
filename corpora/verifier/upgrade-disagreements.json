@@ -34,7 +34,7 @@
       "key": "run",
       "pact": "pass",
       "contract": "fail",
-      "reason": "S1.28: the interaction is pending, so its failure does not fail the pact's run; a contract has no pending interactions, and the upgrade reports pending-dropped"
+      "reason": "ADR 0051: the interaction is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
     },
     {
       "case": "generators/xml-body",

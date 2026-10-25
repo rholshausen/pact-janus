@@ -283,10 +283,17 @@ export const UpgradeFindingCode = {
   RuleCombinationOr: "rule-combination-or",
   RuleNarrowed: "rule-narrowed",
   GeneratorDropped: "generator-dropped",
+  RequestBodyOpened: "request-body-opened",
+  ResponseBodyOpened: "response-body-opened",
+  RequestQueryOpened: "request-query-opened",
+  BodyTypeOnHeader: "body-type-on-header",
+  RuleAsPattern: "rule-as-pattern",
   ContentTypeInferred: "content-type-inferred",
   BodyNotParsed: "body-not-parsed",
   StateParamsUntyped: "state-params-untyped",
   DuplicateDescription: "duplicate-description",
+  PendingDropped: "pending-dropped",
+  PendingExcluded: "pending-excluded",
   InteractionDropped: "interaction-dropped",
 } as const;
 

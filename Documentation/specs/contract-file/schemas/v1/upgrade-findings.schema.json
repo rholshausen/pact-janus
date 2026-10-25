@@ -37,6 +37,7 @@
             "state-params-untyped",
             "duplicate-description",
             "pending-dropped",
+            "pending-excluded",
             "interaction-dropped"
           ]
         },

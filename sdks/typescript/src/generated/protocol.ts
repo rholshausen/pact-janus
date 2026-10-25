@@ -829,9 +829,18 @@ export interface Pact {
   pact: {
     [k: string]: unknown;
   };
-  options?: {
-    [k: string]: unknown;
-  };
+  options?: UpgradeOptions;
+  [k: string]: unknown;
+}
+
+/**
+ * How to convert. Open: a member an engine does not know is ignored.
+ */
+export interface UpgradeOptions {
+  /**
+   * Leave the pact's pending interactions out of the contract, each reported as 'pending-excluded'. Otherwise each is converted without its flag and reported as 'pending-dropped': a contract has no pending interactions (ADR 0051).
+   */
+  "exclude-pending"?: boolean;
   [k: string]: unknown;
 }
 

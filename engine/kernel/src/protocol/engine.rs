@@ -871,7 +871,10 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    match upgrade::pact("pact", &req.pact) {
+    let options = upgrade::Options {
+      exclude_pending: req.options.exclude_pending,
+    };
+    match upgrade::pact_with("pact", &req.pact, &options) {
       Ok(upgraded) => {
         let contract = serde_json::to_value(&upgraded.contract).expect("Contract always serializes");
         let findings = serde_json::to_value(&upgraded.findings).expect("Findings always serialize");
@@ -1042,9 +1045,17 @@ fn parse_body<T: DeserializeOwned>(body: Value) -> Result<T, EngineError> {
 #[derive(serde::Deserialize)]
 struct UpgradePact {
   pact: Value,
-  #[allow(dead_code)]
   #[serde(default)]
-  options: Option<Value>,
+  options: UpgradeOptions,
+}
+
+/// `upgrade/pact`'s `options`. A member this engine does not know is ignored (spec §2.2, rule 2).
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+struct UpgradeOptions {
+  /// Leave pending interactions out of the contract (ADR 0051).
+  #[serde(default)]
+  exclude_pending: bool,
 }
 
 /// A document that could not be read at all. Everything a *conversion* could not carry is a

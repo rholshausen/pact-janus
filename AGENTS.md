@@ -101,7 +101,9 @@ Three sources are the source of truth and take precedence over this file when th
 > asks the session's content registry, reading a whole slot from the arrival itself: its declared or
 > labelled type, else what its octets are detected as; a v1–v4 `contentType` matcher sniffs the octets),
 > and S1.12 (ADR 0050: `verification/explain` takes `components` and `values`, compiling what a run
-> compiles and running captured values in the engine; `janus explain --config` and `--executed` use them).
+> compiles and running captured values in the engine; `janus explain --config` and `--executed` use them),
+> and S1.28 (ADR 0051: a contract has no pending interactions, pending being the broker's to decide;
+> `janus upgrade` converts one without its flag, or leaves it out with `--exclude-pending`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -348,7 +350,7 @@ janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <
             [--as-of <YYYY-MM-DD>] [--output text|json]
 janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
               [--config verifier.janus.yaml]   # the components a run would load (S1.12, ADR 0050)
-janus upgrade <pact.json> [--write <file>] [--quiet] [--output text|json]
+janus upgrade <pact.json> [--write <file>] [--quiet] [--exclude-pending] [--output text|json]
 janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>
               [--branch <b>] [--tag <t>]... [--build-url <url>]
               [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings

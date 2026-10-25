@@ -545,6 +545,11 @@ pub struct UpgradeArgs {
   #[arg(long)]
   pub quiet: bool,
 
+  /// Leave the pact's pending interactions out of the contract. Without it, each is converted
+  /// without its flag, so its failure fails the run
+  #[arg(long)]
+  pub exclude_pending: bool,
+
   /// text prints the contract, and the findings on standard error; json prints one document
   /// holding both
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]

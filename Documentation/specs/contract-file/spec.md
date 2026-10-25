@@ -262,6 +262,15 @@ defensively and fall through (§9).
 `description`, `parts` and `selection` are required; a record without evidence is not an interaction
 this format can carry (§2.2). `content-types` declares the media type of a content slot, and is §5.5's.
 
+An interaction has **no `pending` member**, though a v4 pact's may ([ADR
+0051](../../decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md)).
+Whether a provider has yet to satisfy an interaction is a fact about two codebases at a moment, and a
+contract version's identity is fixed (§2.3), so a flag written into it is never revised as the
+provider catches up. A pending contract is the broker's to decide, from the provider's results, as it
+decides a pending pact; a verifier honours it for a contract exactly as for a pact. Converting a
+pending interaction is §8.4's `pending-dropped`, or `pending-excluded` when the conversion is asked
+to leave it out.
+
 ### 4.2 Identity
 
 An interaction is identified by its **`description` together with its `states`** — the pair today's
@@ -574,7 +583,8 @@ distinguish), and `note` (neither, and still worth reading).
 | `body-not-parsed` | `lossy` or `judgement` | a body is not what its content type says: `lossy` when it could not be read as its type and nothing is asserted about it, `judgement` when it is text that is not UTF-8 and is compared as octets |
 | `state-params-untyped` | `note` | v3 state parameters carried across as-is; the format types them, the pact did not |
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
-| `pending-dropped` | `lossy` | a v4 interaction was marked pending, which a contract has no form for: a failure of it fails the run (ADR 0048, staged plan S1.28) |
+| `pending-dropped` | `lossy` | a v4 interaction was marked pending, which a contract has no form for (§4.1): it is converted, and a failure of it fails the run (ADR 0051) |
+| `pending-excluded` | `lossy` | the conversion was asked to leave pending interactions out (`upgrade/pact`'s `exclude-pending`), and this one was: the contract says nothing about it (ADR 0051) |
 | `interaction-dropped` | `lossy` | an interaction could not be converted at all: a message interaction, or one that needs a pact plugin, named in the message (ADR 0045) |
 
 An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an

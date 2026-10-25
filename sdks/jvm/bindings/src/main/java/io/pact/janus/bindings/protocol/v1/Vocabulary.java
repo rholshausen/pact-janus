@@ -317,13 +317,20 @@ public final class Vocabulary {
     public static final String RULE_COMBINATION_OR = "rule-combination-or";
     public static final String RULE_NARROWED = "rule-narrowed";
     public static final String GENERATOR_DROPPED = "generator-dropped";
+    public static final String REQUEST_BODY_OPENED = "request-body-opened";
+    public static final String RESPONSE_BODY_OPENED = "response-body-opened";
+    public static final String REQUEST_QUERY_OPENED = "request-query-opened";
+    public static final String BODY_TYPE_ON_HEADER = "body-type-on-header";
+    public static final String RULE_AS_PATTERN = "rule-as-pattern";
     public static final String CONTENT_TYPE_INFERRED = "content-type-inferred";
     public static final String BODY_NOT_PARSED = "body-not-parsed";
     public static final String STATE_PARAMS_UNTYPED = "state-params-untyped";
     public static final String DUPLICATE_DESCRIPTION = "duplicate-description";
+    public static final String PENDING_DROPPED = "pending-dropped";
+    public static final String PENDING_EXCLUDED = "pending-excluded";
     public static final String INTERACTION_DROPPED = "interaction-dropped";
 
-    public static final List<String> KNOWN = List.of(EXAMPLE_FROZEN_AS_EQUALITY, RULE_UNMAPPED, RULE_COMBINATION_OR, RULE_NARROWED, GENERATOR_DROPPED, CONTENT_TYPE_INFERRED, BODY_NOT_PARSED, STATE_PARAMS_UNTYPED, DUPLICATE_DESCRIPTION, INTERACTION_DROPPED);
+    public static final List<String> KNOWN = List.of(EXAMPLE_FROZEN_AS_EQUALITY, RULE_UNMAPPED, RULE_COMBINATION_OR, RULE_NARROWED, GENERATOR_DROPPED, REQUEST_BODY_OPENED, RESPONSE_BODY_OPENED, REQUEST_QUERY_OPENED, BODY_TYPE_ON_HEADER, RULE_AS_PATTERN, CONTENT_TYPE_INFERRED, BODY_NOT_PARSED, STATE_PARAMS_UNTYPED, DUPLICATE_DESCRIPTION, PENDING_DROPPED, PENDING_EXCLUDED, INTERACTION_DROPPED);
   }
 
   /** Known values of {@code UpgradeFinding.kind}. */

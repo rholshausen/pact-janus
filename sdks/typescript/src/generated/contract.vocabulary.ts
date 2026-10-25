@@ -31,6 +31,7 @@ export const FindingCode = {
   StateParamsUntyped: "state-params-untyped",
   DuplicateDescription: "duplicate-description",
   PendingDropped: "pending-dropped",
+  PendingExcluded: "pending-excluded",
   InteractionDropped: "interaction-dropped",
 } as const;
 

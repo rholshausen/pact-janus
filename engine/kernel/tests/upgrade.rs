@@ -653,6 +653,67 @@ fn an_interaction_that_needs_a_pact_plugin_is_dropped_naming_it() {
   }
 }
 
+/// A v4 pact with a message, a pending HTTP interaction and a plain one, in that order.
+fn with_a_pending_interaction() -> Value {
+  json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [
+      { "type": "Asynchronous/Messages", "description": "a message",
+        "contents": { "content": { "a": 1 }, "contentType": "application/json" } },
+      { "type": "Synchronous/HTTP", "description": "not built yet", "pending": true,
+        "request": { "method": "GET", "path": "/new" }, "response": { "status": 200 } },
+      { "type": "Synchronous/HTTP", "description": "built",
+        "request": { "method": "GET", "path": "/old" }, "response": { "status": 200 } }
+    ],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  })
+}
+
+fn descriptions(upgraded: &upgrade::Upgraded) -> Vec<&str> {
+  upgraded
+    .contract
+    .interactions
+    .iter()
+    .map(|interaction| interaction.description.as_str())
+    .collect()
+}
+
+/// ADR 0051: a contract has no pending interactions, so by default a pending one converts without
+/// its flag, and the finding says its failure now fails the run. The finding points at the
+/// interaction in the pact, past the message before it.
+#[test]
+fn a_pending_interaction_converts_without_its_flag_by_default() {
+  let upgraded = upgrade(&with_a_pending_interaction());
+  assert_eq!(descriptions(&upgraded), vec!["not built yet", "built"]);
+  let finding = find(&upgraded.findings, "pending-dropped");
+  assert_eq!(finding.kind, "lossy");
+  assert_eq!(finding.path, "/interactions/1/pending");
+  assert!(!codes(&upgraded.findings).contains(&"pending-excluded"));
+}
+
+/// ADR 0051: asked to, the conversion leaves a pending interaction out, naming it, so a contract
+/// upgraded from a pact whose pending interactions fail verifies as the pact does. The message is
+/// still counted as not converted, and the pending interaction is not counted with it.
+#[test]
+fn a_pending_interaction_is_left_out_when_asked() {
+  let options = upgrade::Options {
+    exclude_pending: true,
+  };
+  let upgraded = upgrade::pact_with("test", &with_a_pending_interaction(), &options).expect("converts");
+  assert_eq!(descriptions(&upgraded), vec!["built"]);
+  let finding = find(&upgraded.findings, "pending-excluded");
+  assert_eq!(finding.kind, "lossy");
+  assert_eq!(finding.path, "/interactions/1");
+  assert!(finding.message.contains("'not built yet'"), "{}", finding.message);
+  assert!(finding.target.is_none());
+  assert!(!codes(&upgraded.findings).contains(&"pending-dropped"));
+  let dropped = find(&upgraded.findings, "interaction-dropped");
+  assert!(dropped.message.starts_with("1 of 3 "), "{}", dropped.message);
+  // The plain interaction's own findings point at it where the pact has it.
+  let query = find(&upgraded.findings, "request-query-opened");
+  assert!(query.path.starts_with("/interactions/2/"), "{}", query.path);
+}
+
 /// Contract-file spec §4.2 identifies an interaction by description *and* states, so a pact with
 /// two identical ones would produce a contract that cannot be read back. Disambiguated, not
 /// dropped — and reported either way.

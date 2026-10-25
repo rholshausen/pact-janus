@@ -1007,6 +1007,37 @@ fn upgrade_writes_to_a_file_and_can_print_one_json_document_instead() {
   assert!(document["findings"].is_array());
 }
 
+/// ADR 0051: a contract has no pending interactions. By default `upgrade` converts a pending one
+/// without its flag; `--exclude-pending` leaves it out, and the findings say which happened.
+#[test]
+fn upgrade_converts_a_pending_interaction_or_leaves_it_out_when_asked() {
+  let pact =
+    repo("corpora/verifier/compatibility-suite/v4/01-verifying-a-pending-http-interaction/pact-1.json");
+  let codes = |document: &Value| -> Vec<String> {
+    document["findings"]
+      .as_array()
+      .expect("findings")
+      .iter()
+      .map(|finding| finding["code"].as_str().unwrap_or_default().to_string())
+      .collect()
+  };
+
+  let converted = janus(&["upgrade", &pact, "--output", "json"]);
+  assert_eq!(code(&converted), 0, "{}", stderr(&converted));
+  let converted: Value = serde_json::from_str(&stdout(&converted)).expect("one JSON document");
+  assert_eq!(
+    converted["contract"]["interactions"].as_array().map(Vec::len),
+    Some(1)
+  );
+  assert!(codes(&converted).contains(&"pending-dropped".to_string()));
+
+  let excluded = janus(&["upgrade", &pact, "--exclude-pending", "--output", "json"]);
+  assert_eq!(code(&excluded), 0, "{}", stderr(&excluded));
+  let excluded: Value = serde_json::from_str(&stdout(&excluded)).expect("one JSON document");
+  assert_eq!(excluded["contract"]["interactions"], json!([]));
+  assert_eq!(codes(&excluded), vec!["pending-excluded".to_string()]);
+}
+
 /// **The migration claim, end to end through the CLI.** The same provider verifies the pact where
 /// it stands (plan task 5.4) and the contract that pact upgrades into (contract-file spec §8) —
 /// plan-grammar spec §4.4's two-path agreement, observed rather than asserted.

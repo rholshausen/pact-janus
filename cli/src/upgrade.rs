@@ -35,8 +35,12 @@ pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
 
   let pact = io::read_json(&args.pact)?;
   let mut engine = engine::start()?;
-  let result = engine::call(&mut engine, "upgrade/pact", json!({ "pact": pact }))
-    .map_err(|err| format!("{}: {err}", args.pact.display()))?;
+  let result = engine::call(
+    &mut engine,
+    "upgrade/pact",
+    json!({ "pact": pact, "options": { "exclude-pending": args.exclude_pending } }),
+  )
+  .map_err(|err| format!("{}: {err}", args.pact.display()))?;
 
   if args.output == Output::Json {
     outln!("{}", crate::output::pretty(&result));

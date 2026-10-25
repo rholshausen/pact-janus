@@ -681,6 +681,11 @@ the single example becomes the sole variant). `findings` lists lossy or judgemen
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
 document-out.
 
+`options` is open. `exclude-pending: true` leaves the pact's pending interactions out of the contract,
+each reported as `pending-excluded`. Without it, each is converted without its flag and reported as
+`pending-dropped`, because a contract has no pending interactions
+([ADR 0051](../../decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md)).
+
 ### 8.5 Provider shapes — `provider-shape-session/*`
 
 Schema:
