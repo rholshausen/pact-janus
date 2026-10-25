@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792910596970,
+  "lastUpdate": 1792910598485,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -23682,6 +23682,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 43096,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "bdf3227a11b729225fe430c3c767dac4cbefa1c6",
+          "message": "feat: S1.27 a component's registry credential is declared in its source (ADR 0052)\n\nThe WASM loader read JANUS_OCI_USERNAME and JANUS_OCI_PASSWORD itself\n(Phase 9 finding 16), so two runs of one configuration could differ in\nwhether they started, and nothing in the configuration said why.\n\n- A component's source takes `auth`, in the broker descriptor's shape\n  (basic or bearer), which the loader interpolates like any member.\n- A run presents that credential and no other: a registry that wants\n  one nobody declared refuses as unauthorized, saying where it belongs.\n- janus component push|pull keep the two variables, having no\n  configuration; the declaration they print names them as its auth.\n- Never repeated: the frame log shows an auth member's kind alone,\n  Debug likewise, and a malformed credential is refused unquoted.\n- The test registry demands credentials at its token service or as a\n  Basic challenge; a CLI test runs verify at trace against it.\n- Lifecycle-hooks spec §7.3 names the credential; ADR 0021 amended.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T17:28:39+11:00",
+          "tree_id": "dbd51b41d8a46aa0f8875d50c2f88de972b58001",
+          "url": "https://github.com/rholshausen/pact-janus/commit/bdf3227a11b729225fe430c3c767dac4cbefa1c6"
+        },
+        "date": 1792910598181,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25603,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19559,
             "unit": "requests per second",
             "extra": "engines 4"
           }
