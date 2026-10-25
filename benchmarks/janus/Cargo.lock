@@ -1704,7 +1704,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_http"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.22.1",
  "form_urlencoded",
@@ -1718,7 +1718,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_json"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.22.1",
  "pact_janus_kernel",
@@ -1728,7 +1728,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_hooks_host"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.22.1",
  "http",
@@ -1743,7 +1743,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_http_client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "http",
  "reqwest",
@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_kernel"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_sample_order_service"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde_json",
  "tiny_http",
