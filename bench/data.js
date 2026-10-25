@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792971550586,
+  "lastUpdate": 1792971552311,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -25452,6 +25452,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19558,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "70ccf1c7a8668c67a4706654158d19534daf90a6",
+          "message": "fix: S1.29 the CLI output review, section B: noise and duplication\n\nThe review's second section. janus verify's text says each thing once, in\nthe place a reader looks for it.\n\n- An error's details are no longer printed as raw JSON; the messages that\n  needed them now say it in words (variant-not-found names the recorded ids,\n  hook-http-failed quotes the start of the body). A component's failure\n  leads with its own code.\n- The HTTP client leaves out the layers that only name a library, and the\n  platform's (os error N); so do the OCI loader and the oauth2 component.\n  broker-unreachable no longer says \"the Pact Broker\" of a pact fetched by\n  its URL.\n- A hook that fails an exchange is printed once, under its result; an\n  aborting hook's cause is the summary's.\n- A v1-v4 pact's results no longer end in [base]; summaries leave out zero\n  tallies, use plurals, and count what a run that ended early did not reach,\n  from the summary's new variants.not-run.\n- A run the engine ends before verifying anything (a broker or URL it could\n  not fetch from, no pacts selected, an unrecorded variant) exits 2 with its\n  reason on stderr, as the same refusal for files does. The migration guide\n  gains an exit status table.\n- The hook host's body excerpt no longer drops the last character.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T10:35:11+11:00",
+          "tree_id": "147534ebdb266e88a2fbd0ef345a4c938a5927dc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/70ccf1c7a8668c67a4706654158d19534daf90a6"
+        },
+        "date": 1792971551817,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 61604,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 43306,
             "unit": "requests per second",
             "extra": "engines 4"
           }
