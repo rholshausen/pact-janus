@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792896255611,
+  "lastUpdate": 1792896257708,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -22266,6 +22266,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20374,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "fa39a4406387083e4b971b3d2935ab73d0af504f",
+          "message": "feat: S1.19 contracts carry generators, filled where a value is produced (ADR 0048)\n\njanus upgrade dropped every v1-v4 generator, so a contract replayed a\nrecorded value where its pact sent a generated one.\n\n- A shape's generator is {name, config}; upgrade writes a v1-v4 generator\n  as pact:<type> at the position today's verifier generates into. The\n  example stays the recorded evidence, so a contract's identity is stable.\n- verification/verify fills a contract's request after state-setup and\n  before before-request, from the same provider-state values; a slot\n  carried as octets is decoded and re-encoded by its type.\n- A mock fills its reply on every exchange (S2.3's fresh-per-exchange\n  question). generator/generate's context gains `side`; pact:ProviderState\n  keeps the example on the consumer's side.\n- S1.1's harness also upgrades every fixture's pacts and verifies the\n  contracts, against corpora/verifier/upgrade-disagreements.json: 749 of\n  765 verdicts agree, the other 16 each with a reason.\n- That column found: JSON bodies now declare their type (an unlabelled\n  reply was read as bytes), eachKey and eachValue on a list convert by\n  their own rules, and a pending v4 interaction is reported as\n  pending-dropped (S1.28, new).\n- The form component writes a number or boolean as its text.\n\nThe consumer conformance case moves to S3.6, a DSL generator primitive.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T13:39:32+11:00",
+          "tree_id": "ca3a0045320f3b0fcab82cf15f29f3e9d645fe5c",
+          "url": "https://github.com/rholshausen/pact-janus/commit/fa39a4406387083e4b971b3d2935ab73d0af504f"
+        },
+        "date": 1792896257017,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 35763,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 26403,
             "unit": "requests per second",
             "extra": "engines 4"
           }
