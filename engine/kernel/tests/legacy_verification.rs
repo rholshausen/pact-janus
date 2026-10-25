@@ -1252,3 +1252,30 @@ fn a_missing_part_or_one_of_the_wrong_kind_fails_as_today() {
     ]
   );
 }
+
+/// Staged plan S1.10, ADR 0049: a v1–v4 `contentType` matcher sniffs the reply's octets whatever they
+/// are labelled, as today's verifier does, through the session's content components.
+#[test]
+fn a_content_type_matcher_sniffs_the_replys_octets() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "description": "a document sent as text",
+      "request": { "method": "GET", "path": "/doc" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/plain" },
+        "body": "{\"a\":1}",
+        "matchingRules": { "body": { "$": { "matchers": [{ "match": "contentType", "value": "application/json" }] } } }
+      }
+    }],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  });
+  for (reply, expected) in [(r#"{"b":2}"#, "verified"), ("not a document", "failed")] {
+    let (base_url, _requests) = stub_provider(vec![canned_as(200, "text/plain", reply.as_bytes())]);
+    let mut engine = engine_with_everything();
+    let events = verify(&mut engine, vec![pact.clone()], &base_url, None);
+    let results = results(&events);
+    assert_eq!(results[0]["status"], json!(expected), "{reply}: {}", results[0]);
+  }
+}

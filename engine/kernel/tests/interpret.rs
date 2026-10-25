@@ -382,7 +382,7 @@ struct FakeDetector {
 }
 
 impl ContentDetector for FakeDetector {
-  fn detect(&self, _value: &RuntimeValue) -> Option<String> {
+  fn detect(&self, _value: &RuntimeValue, _at: Option<&str>) -> Option<String> {
     self.answer.map(str::to_string)
   }
 }

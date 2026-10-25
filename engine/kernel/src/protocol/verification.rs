@@ -1298,6 +1298,9 @@ struct Ready {
   /// spec §3.4, ADR 0048): the recorded request is filled with fresh values there once the states
   /// are set up, as a pact's is generated. Empty when nothing is generated.
   fresh: BTreeMap<String, contract::ShapePart>,
+  /// A v1–v4 pact's replay, whose `contentType` matcher sniffs a body's octets whatever its label, as
+  /// today's verifier does; a contract's reads the declared or labelled type first (ADR 0049).
+  legacy: bool,
   /// Pinned to this variant on the shape path, compiled from matching rules on the v1–v4 path.
   plan: plan::Plan,
   /// How the reply becomes the values `plan` resolves against. A function rather than a flag
@@ -1389,6 +1392,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         request,
         generate_from: None,
         fresh: fresh_parts(&interaction.parts),
+        legacy: false,
         warnings,
         interaction: json!({
           "description": interaction.description,
@@ -1470,6 +1474,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       request: legacy_pact::request_parts(&interaction.request),
       generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
       fresh: BTreeMap::new(),
+      legacy: true,
       warnings: Vec::new(),
       interaction: json!({
         "description": interaction.description,
@@ -1585,6 +1590,7 @@ fn prepare_legacy_message(
       request: Parts::new(),
       generate_from: None,
       fresh: BTreeMap::new(),
+      legacy: true,
       warnings: Vec::new(),
       interaction: json!({
         "description": message.description,
@@ -2311,7 +2317,22 @@ fn score(
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
   let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
-  let executed = execute_with(&exchange.ready.plan, &resolver, None, Some(actions));
+  // `match:content-type` reads the reply's own octets and labels (staged plan S1.10, ADR 0049): by
+  // the declared or labelled type on the contract path, by detection on the v1–v4 path.
+  let detection = content.map(|content| crate::component::ContentDetection {
+    content,
+    parts: Some(&reply),
+    declared: Some(&exchange.ready.content_types),
+    by_label: !exchange.ready.legacy,
+  });
+  let executed = execute_with(
+    &exchange.ready.plan,
+    &resolver,
+    detection
+      .as_ref()
+      .map(|detection| detection as &dyn plan::ContentDetector),
+    Some(actions),
+  );
   let response = find_container(&executed, answering).unwrap_or(&executed);
   let (status, mismatches) = outcome(response);
 

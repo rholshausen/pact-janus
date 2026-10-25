@@ -137,7 +137,21 @@ fn handle_inbound(
   // that answers one.
   let names = transport.exchange_parts();
   let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
-  let executed = execute_with(&armed.request_plan, &resolver, None, Some(contributions));
+  // `match:content-type` reads the arrival's own octets and labels (staged plan S1.10, ADR 0049).
+  let detection = content.map(|content| crate::component::ContentDetection {
+    content,
+    parts: Some(&inbound.parts),
+    declared: Some(&armed.content_types),
+    by_label: true,
+  });
+  let executed = execute_with(
+    &armed.request_plan,
+    &resolver,
+    detection
+      .as_ref()
+      .map(|detection| detection as &dyn crate::plan::ContentDetector),
+    Some(contributions),
+  );
   let request_subtree = find_container(&executed, &names.initiating).unwrap_or(&executed);
   let (status, mismatches) = outcome(request_subtree);
 

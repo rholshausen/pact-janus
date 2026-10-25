@@ -191,8 +191,9 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     }
   };
   let json_content = JsonContent::new();
+  let detection = pact_janus_kernel::component::ContentDetection::of(&json_content);
   if let Some(plan) = &plan {
-    let executed = plan::execute_with_content(plan, &resolver, Some(&json_content));
+    let executed = plan::execute_with_content(plan, &resolver, Some(&detection));
     let (status, mismatches) = plan::outcome(&executed);
     if let Err(err) = check_result(status, &mismatches, &case.result) {
       problems.push(format!("result: {err}"));
@@ -214,7 +215,7 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   if let Some(other_input) = &case.also_compiled_from {
     match compile_input(other_input) {
       Ok((other_plan, _)) => {
-        let other_executed = plan::execute_with_content(&other_plan, &resolver, Some(&json_content));
+        let other_executed = plan::execute_with_content(&other_plan, &resolver, Some(&detection));
         let (other_status, other_mismatches) = plan::outcome(&other_executed);
         if let Err(err) = check_result(other_status, &other_mismatches, &case.result) {
           problems.push(format!("also-compiled-from result: {err}"));

@@ -916,8 +916,12 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           message: "no content component is loaded to detect content type".to_string(),
           path: locus(children),
         },
-        Some(content) => match content.detect(&value) {
-          Some(detected) if detected == expected => NodeResult::Value(RuntimeValue::Bool(true)),
+        Some(content) => match content.detect(&value, locus(children).as_deref()) {
+          // By essence, as a media type is compared: case and parameters aside, and `text/*` names
+          // every text type (component-interfaces spec §3.3).
+          Some(detected) if crate::component::media_type_matches(&expected, &detected) => {
+            NodeResult::Value(RuntimeValue::Bool(true))
+          }
           Some(detected) => NodeResult::Error {
             message: format!("Expected content type '{expected}' but detected '{detected}'"),
             path: locus(children),

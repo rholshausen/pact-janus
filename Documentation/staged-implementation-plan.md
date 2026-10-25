@@ -743,6 +743,14 @@ item in 1a is done when S1.1 agrees.
   with no content detector (third-party component report §4); the single `ContentDetector` slot
   becomes a lookup over the session's `ContentRegistry`.
   *Exit:* `corpora/shapes/content-type` runs through `janus verify`, not only `tools/corpus`.
+  *Done 2026-10-25*, as [ADR 0049](decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)
+  decides it. The detector is the session's content registry, through one adapter the live paths and the
+  corpus runner share, and the JSON component has no detector of its own. Not foreseen: by the time a
+  plan resolves a body it has been decoded, so the detector is told the path, and a whole slot is read
+  from the arrival's own parts. On a contract, a declared or labelled type is the type and detection
+  only resolves its absence, as component-interfaces spec §6.5 requires. A v1–v4 `contentType` matcher
+  sniffs the octets, as today. `cli/tests/cli.rs` runs the corpus case's shape through `janus verify`.
+  Nothing built in detects a binary type yet, which no fixture needs.
 - **S1.11 The legacy compiler behind a marked boundary** — **S**. Kernel-boundary review findings 3
   and 6: `plan::legacy` and `legacy_pact` move into their own crate (or a submodule whose `mod.rs`
   states the exception), so "the kernel knows nothing about HTTP or JSON" is checkable by reading the

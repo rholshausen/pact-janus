@@ -371,7 +371,8 @@ string parsing as an ISO-8601 datetime, date or time respectively.
 **`include`** admits strings containing `substring`. **`semver`** admits strings parsing as Semantic
 Versioning 2.0.0. **`content-type`** admits octet sequences detected as the named content type by the
 content-detection rules of the content components in play; it is the one operator that inspects octets
-rather than a decoded document by design.
+rather than a decoded document by design. A slot's declared or labelled type is its type, and detection
+only answers where it has neither (component-interfaces spec §6.5).
 
 ### 4.3 Structural operators, and the must-ignore default
 

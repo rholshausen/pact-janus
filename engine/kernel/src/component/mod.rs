@@ -25,7 +25,8 @@ mod registry;
 mod transport;
 
 pub use content::{
-  Compile, CompileResult, ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult,
+  Compile, CompileResult, ContentComponent, ContentDetection, Decode, DecodeResult, Detect, DetectResult,
+  Encode, EncodeResult,
 };
 pub use error::ComponentError;
 pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators};

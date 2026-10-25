@@ -4,7 +4,9 @@
 //! "nothing to contribute" answer (spec §6.3).
 
 use pact_janus_component_json::JsonContent;
-use pact_janus_kernel::component::{Compile, ContentComponent, Decode, Detect, Encode, SlotValue};
+use pact_janus_kernel::component::{
+  Compile, ContentComponent, ContentDetection, Decode, Detect, Encode, SlotValue,
+};
 use pact_janus_kernel::plan::{ContentDetector, RuntimeValue};
 use serde_json::json;
 
@@ -151,17 +153,18 @@ fn detect_does_not_claim_non_json_octets() {
 }
 
 #[test]
-fn content_detector_adapter_matches_the_interpreters_expectations() {
+fn content_detection_through_the_kernel_adapter_matches_the_interpreters_expectations() {
   // The same path plan::interpret's match:content-type calls through execute_with_content.
   let component = JsonContent::new();
-  let detector: &dyn ContentDetector = &component;
+  let detection = ContentDetection::of(&component);
+  let detector: &dyn ContentDetector = &detection;
   assert_eq!(
-    detector.detect(&RuntimeValue::String(r#"{"a":1}"#.to_string())),
+    detector.detect(&RuntimeValue::String(r#"{"a":1}"#.to_string()), None),
     Some("application/json".to_string())
   );
   assert_eq!(
-    detector.detect(&RuntimeValue::String("plain text".to_string())),
+    detector.detect(&RuntimeValue::String("plain text".to_string()), None),
     None
   );
-  assert_eq!(detector.detect(&RuntimeValue::Bool(true)), None);
+  assert_eq!(detector.detect(&RuntimeValue::Bool(true), None), None);
 }

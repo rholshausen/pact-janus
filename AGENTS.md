@@ -97,7 +97,9 @@ Three sources are the source of truth and take precedence over this file when th
 > `generator` is `{name, config}`, which `janus upgrade` writes for a v1–v4 generator; a verifier fills a
 > contract's request with fresh values after state setup, and a mock its reply on every exchange, while
 > the example stays the evidence; S1.1's harness also verifies every fixture's upgraded contract,
-> against `corpora/verifier/upgrade-disagreements.json`).
+> against `corpora/verifier/upgrade-disagreements.json`), and S1.10 (ADR 0049: `match:content-type`
+> asks the session's content registry, reading a whole slot from the arrival itself: its declared or
+> labelled type, else what its octets are detected as; a v1–v4 `contentType` matcher sniffs the octets).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

@@ -1063,7 +1063,9 @@ fn serving(
         .unwrap_or_default();
       let path = request.url().to_string();
       let _ = tx.send((path.clone(), content_type, body));
+      // An empty content type answers with no `Content-Type` at all.
       let response = match routes.iter().find(|(route, _, _)| *route == path) {
+        Some((_, "", body)) => tiny_http::Response::from_data(body.clone()),
         Some((_, content_type, body)) => tiny_http::Response::from_data(body.clone()).with_header(
           tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).expect("a header"),
         ),
@@ -1189,6 +1191,56 @@ fn a_pact_of_every_body_kind_and_its_upgraded_contract_verify_the_same_provider(
       stdout(&output).contains("4 verified, 1 failed"),
       "{}",
       stdout(&output)
+    );
+  }
+}
+
+/// Staged plan S1.10: `corpora/shapes/content-type`'s shape, run through `janus verify`. The reply's
+/// octets are detected by the session's content components when nothing says what they are, and a
+/// type the reply is labelled with is the type (ADR 0049): detection never overrides one.
+#[test]
+fn a_content_type_shape_is_matched_against_the_replys_octets_through_janus_verify() {
+  let case: Value = serde_json::from_str(
+    &std::fs::read_to_string(repo("corpora/shapes/content-type/case.json")).expect("the corpus case"),
+  )
+  .expect("JSON");
+  let body = case["input"]["spec"]["parts"]["response"]["body"].clone();
+  let contract = temp("content-type.janus.json");
+  let document = json!({
+    "$format": "janus-contract/1",
+    "consumer": { "name": "web-app" }, "provider": { "name": "files" },
+    "interactions": [{
+      "description": case["input"]["spec"]["description"],
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": { "method": { "shape": "equality", "example": "GET" },
+                     "path": { "shape": "equality", "example": "/file" } },
+        "response": { "body": body },
+      },
+      "selection": {
+        "variants": [{ "id": "base", "origin": "base", "assignment": [],
+          "parts": { "request": { "method": { "content": "GET" }, "path": { "content": "/file" } } } }],
+        "report": {},
+      },
+    }],
+  });
+  std::fs::write(&contract, document.to_string()).expect("the contract is written");
+
+  for (label, body, verified) in [
+    ("application/json", r#"{"a":1}"#, true),
+    ("application/json; charset=utf-8", r#"{"a":1}"#, true),
+    ("", r#"{"a":1}"#, true),
+    ("", "a plain sentence", false),
+    ("text/plain", r#"{"a":1}"#, false),
+  ] {
+    let (url, _) = serving(vec![("/file", label, body.as_bytes().to_vec())]);
+    let output = janus(&["verify", &contract, "--provider-url", &url]);
+    assert_eq!(
+      code(&output),
+      if verified { 0 } else { 1 },
+      "labelled {label:?}, {body}:\n{}\n{}",
+      stdout(&output),
+      stderr(&output)
     );
   }
 }

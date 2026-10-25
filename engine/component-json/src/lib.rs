@@ -9,7 +9,7 @@ use pact_janus_kernel::component::{
   Compile, CompileResult, ComponentError, ContentComponent, Decode, DecodeResult, Detect, DetectResult,
   Encode, EncodeResult, SlotValue,
 };
-use pact_janus_kernel::plan::{ContentDetector, RuntimeValue};
+use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::Value;
 
 /// `application/json` — and, per `ContentType::is_json()`, its `+json` suffix and `-json`-suffixed
@@ -129,32 +129,5 @@ impl ContentComponent for JsonContent {
       confidence: media_type.as_ref().map(|_| 1.0),
       media_type,
     })
-  }
-}
-
-impl ContentDetector for JsonContent {
-  fn detect(&self, value: &RuntimeValue) -> Option<String> {
-    let slot_value = match value {
-      RuntimeValue::Bytes(bytes) => SlotValue {
-        content: Value::String(BASE64.encode(bytes)),
-        encoded: Some("base64".to_string()),
-        content_type: None,
-      },
-      RuntimeValue::String(text) => SlotValue {
-        content: Value::String(text.clone()),
-        encoded: Some("text".to_string()),
-        content_type: None,
-      },
-      _ => return None,
-    };
-    ContentComponent::detect(
-      self,
-      Detect {
-        value: slot_value,
-        hint: None,
-      },
-    )
-    .ok()
-    .and_then(|result| result.media_type)
   }
 }

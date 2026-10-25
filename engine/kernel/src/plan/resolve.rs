@@ -30,16 +30,14 @@ pub trait Resolver {
 /// "The kernel does not know what a header is; it knows how to ask" applies here too — the kernel
 /// does not know what JSON looks like, it knows how to ask a content component.
 ///
-/// A single slot, not a registry: its callers (`tools/corpus`, the tests) hand in `JsonContent`.
-/// Decoding and encoding stopped being single-slot in plan task 8.1 — [`crate::component::ContentRegistry`]
-/// routes them by media type — but detection was left as it was, and the live exchange and
-/// verification paths execute without a detector (`Documentation/prototype/kernel-boundary-review.md`,
-/// finding 1's resolution).
+/// The live exchange and verification paths answer it over the session's content registry, with
+/// the arrival's own parts ([`crate::component::ContentDetection`], staged plan S1.10).
 pub trait ContentDetector {
-  /// `None` means this detector doesn't recognise `value` as any type it handles — not "no
-  /// detector was available", which [`super::interpret::execute_with_content`] reports on its own
-  /// when `content` itself is `None`.
-  fn detect(&self, value: &RuntimeValue) -> Option<String>;
+  /// The content type of `value`, which was resolved from `at` when a path resolved it: a whole
+  /// slot (`$.response.body`) is the arrival's octets, which a detector holding them reads instead.
+  /// `None` means no type is known for it, not "no detector was available", which
+  /// [`super::interpret::execute_with_content`] reports on its own when `content` itself is `None`.
+  fn detect(&self, value: &RuntimeValue, at: Option<&str>) -> Option<String>;
 }
 
 /// A resolver over a flat map of absolute path -> already-decoded value, keyed at whatever depth

@@ -65,6 +65,7 @@ superseding ADR instead.
 | [0046](0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md) | Ask a provider for a message through `produce-message`, and let the transport name its parts | accepted |
 | [0047](0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md) | Upgrade a body into its component's document, and check its type on the header | accepted; amended by 0048 |
 | [0048](0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md) | Carry generators on shapes, and fill fresh values where a value is produced | accepted |
+| [0049](0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md) | Match a content type against the arrival's own octets and labels | accepted |
 
 ## Decision backlog
 

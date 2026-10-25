@@ -648,6 +648,12 @@ falls back to the declared media type. Detection MUST NOT be used to *override* 
 only to resolve its absence: a provider that declares the wrong type is a finding, not a thing to
 silently correct.
 
+So `match:content-type` on a whole slot reads the arrival's own slot, not its decoded document: the
+type the interaction declares for it, else the type it arrived labelled with, else what the session's
+registry detects from its octets, asking each component in turn ([ADR 0049](../../decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)). A v1–v4 `contentType`
+matcher is the exception, by specification: it sniffs the octets whatever their label, as today's
+verifier does.
+
 ## 7. The matcher interface
 
 Schema: [`schemas/v1/matcher.schema.json`](schemas/v1/matcher.schema.json).
