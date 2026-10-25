@@ -1,0 +1,43 @@
+(
+  :"names a path cannot hold" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$." (
+          %expect:array (
+            $.response.body['']
+          ),
+          %expect:count (
+            $.response.body[''],
+            1
+          ),
+          :"$.[0]" (
+            %match:type (
+              $.response.body[''][0],
+              'x'
+            )
+          )
+        ),
+        :"$.@{urn:x}rev" (
+          %match:equality (
+            $.response.body['@{urn:x}rev'],
+            '2'
+          )
+        ),
+        :"$.a.b" (
+          %match:equality (
+            $.response.body['a.b'],
+            1
+          )
+        ),
+        :"$.it's" (
+          %match:integer (
+            $.response.body['it\'s']
+          )
+        )
+      )
+    )
+  )
+)

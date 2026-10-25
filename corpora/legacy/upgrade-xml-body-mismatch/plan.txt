@@ -1,0 +1,111 @@
+(
+  :"get a note" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/note'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/xml'
+        ),
+        %expect:object (
+          $.response.body.note
+        ),
+        :"$.note" (
+          %match:equality (
+            $.response.body.note.#namespace,
+            'urn:notes'
+          ),
+          :"$.note.@lang" (
+            %match:regex (
+              $.response.body.note.@lang,
+              '^(?:[a-z]{2})$'
+            )
+          ),
+          :"$.note['@{urn:x}rev']" (
+            %match:equality (
+              $.response.body.note['@{urn:x}rev'],
+              '2'
+            )
+          ),
+          :"$.note.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.note.#text
+              ),
+              %match:equality (
+                $.response.body.note.#text,
+                ''
+              )
+            )
+          ),
+          %expect:not-empty (
+            $.response.body.note.line
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.note.line
+            ),
+            :"$.note.line[*]" (
+              %expect:object (
+                ~>
+              ),
+              :"$.note.line[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text
+                  ),
+                  %match:type (
+                    ~>.#text,
+                    'one'
+                  )
+                )
+              ),
+              %legacy:xml-only-children (
+                ~>
+              )
+            )
+          ),
+          %expect:size (
+            $.response.body.note.to,
+            1,
+            NULL
+          ),
+          :"$.note.to[0]" (
+            :"$.note.to[0].#text" (
+              %match:equality (
+                $.response.body.note.to[0].#text,
+                'Ada'
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

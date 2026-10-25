@@ -370,7 +370,7 @@ fn token_weight(token: &PathToken, fragment: &str, case_insensitive: bool) -> us
 /// The winning rule at `fragments` (spec §module docs' precedence algorithm), and whether it
 /// cascaded down from a shorter (ancestor or wildcard-shallower) path. `None` when the category is
 /// absent or no declared rule reaches this path at all.
-fn best_rule(
+pub(super) fn best_rule(
   category: Option<&MatchingRuleCategory>,
   fragments: &[String],
   case_insensitive: bool,
@@ -405,7 +405,7 @@ fn best_rule(
   best.map(|(_, candidate_path, list)| (list.clone(), candidate_path.len() != fragments.len()))
 }
 
-fn rules_for(rules: &MatchingRules, category: &str) -> Option<MatchingRuleCategory> {
+pub(super) fn rules_for(rules: &MatchingRules, category: &str) -> Option<MatchingRuleCategory> {
   rules.rules_for_category(category).filter(|c| c.is_not_empty())
 }
 
@@ -816,7 +816,7 @@ fn compile_body_content(
 
 /// A form document as the query compiler takes one: each name with its values as text. The form
 /// component writes only strings; anything else is taken as its JSON text rather than dropped.
-fn form_parameters(form: &RuntimeValue) -> BTreeMap<String, Vec<String>> {
+pub(super) fn form_parameters(form: &RuntimeValue) -> BTreeMap<String, Vec<String>> {
   let text = |value: &RuntimeValue| match value {
     RuntimeValue::String(text) => text.clone(),
     other => other.to_json().to_string(),
@@ -1506,7 +1506,7 @@ type ArrayContainsGenerators = std::collections::HashMap<DocPath, pact_models::g
 
 /// A variant `pact_models` read with no `rules`: equality on the empty path, which today applies to
 /// the element as a whole, an object's extra keys included.
-fn is_whole_equality(rules: &MatchingRuleCategory) -> bool {
+pub(super) fn is_whole_equality(rules: &MatchingRuleCategory) -> bool {
   rules.rules.len() == 1
     && rules.rules.iter().all(|(rule_path, list)| {
       rule_path
@@ -1519,7 +1519,7 @@ fn is_whole_equality(rules: &MatchingRuleCategory) -> bool {
 
 /// An `EachKey` or `EachValue` definition's rules, and a failing node for each reference it names,
 /// which `pact_models` leaves unresolved and today reports as a mismatch.
-fn definition_rules(definition: &MatchingRuleDefinition) -> (Vec<MatchingRule>, Vec<Node>) {
+pub(super) fn definition_rules(definition: &MatchingRuleDefinition) -> (Vec<MatchingRule>, Vec<Node>) {
   let mut rules = Vec::new();
   let mut unresolved = Vec::new();
   for rule in &definition.rules {
@@ -1540,7 +1540,7 @@ fn definition_rules(definition: &MatchingRuleDefinition) -> (Vec<MatchingRule>, 
 
 /// The rules `EachValue` matches a collection's values with, and nothing else: its own, at `*` below
 /// the collection, as today's `EachValue` builds a new matching context.
-fn each_value_category(fragments: &[String], rules: Vec<MatchingRule>) -> MatchingRuleCategory {
+pub(super) fn each_value_category(fragments: &[String], rules: Vec<MatchingRule>) -> MatchingRuleCategory {
   let mut at = DocPath::root();
   for fragment in fragments.iter().skip(1) {
     at = at.join(fragment.as_str());
@@ -1623,14 +1623,14 @@ fn compile_xml_body(
 }
 
 /// An element the document holds as a one-element array, as a child list is, or alone.
-fn only_element(value: &RuntimeValue) -> &RuntimeValue {
+pub(super) fn only_element(value: &RuntimeValue) -> &RuntimeValue {
   match value {
     RuntimeValue::Array(items) if items.len() == 1 => &items[0],
     other => other,
   }
 }
 
-fn namespace_of(element: &RuntimeValue) -> Option<&str> {
+pub(super) fn namespace_of(element: &RuntimeValue) -> Option<&str> {
   match element {
     RuntimeValue::Object(members) => match members.get(xml::NAMESPACE) {
       Some(RuntimeValue::String(namespace)) => Some(namespace.as_str()),
@@ -1888,7 +1888,7 @@ fn xml_element_rule(list: &RuleList, cascaded: bool, name: &str, at: &Cursor) ->
 /// Whether a type rule reaches `fragments`: today's `type_matcher_defined`, which asks every rule whose
 /// path matches, the shallower ones included, not only the winner. An empty last fragment stands for a
 /// name the pact does not have, which only a wildcard or a shallower rule reaches.
-fn type_rule_reaches(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> bool {
+pub(super) fn type_rule_reaches(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> bool {
   let Some(category) = category else {
     return false;
   };
@@ -1905,7 +1905,7 @@ fn type_rule_reaches(category: Option<&MatchingRuleCategory>, fragments: &[Strin
 
 /// The names of children a type rule names directly below `fragments`, as document keys (their local
 /// names): a response may not have one the pact lacks.
-fn type_rule_names(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> Vec<String> {
+pub(super) fn type_rule_names(category: Option<&MatchingRuleCategory>, fragments: &[String]) -> Vec<String> {
   let Some(category) = category else {
     return Vec::new();
   };
@@ -1936,7 +1936,7 @@ fn type_rule_names(category: Option<&MatchingRuleCategory>, fragments: &[String]
 
 /// Whether `list` accepts the empty string, which is what today's verifier compares a rule on text
 /// against when an element has none. Answered by running the rule on it.
-fn accepts_empty_text(list: &RuleList, cascaded: bool, example: &Literal) -> bool {
+pub(super) fn accepts_empty_text(list: &RuleList, cascaded: bool, example: &Literal) -> bool {
   let node = rule_list_node(
     list,
     cascaded,
@@ -1956,7 +1956,8 @@ fn accepts_empty_text(list: &RuleList, cascaded: bool, example: &Literal) -> boo
 // --- multipart: parts by name, each by its own type (ADR 0040) ---
 
 /// The part headers today's verifier does not require of the reply's part when the pact's has them.
-const OPTIONAL_PART_HEADERS: [&str; 3] = ["content-type", "content-disposition", "content-transfer-encoding"];
+pub(super) const OPTIONAL_PART_HEADERS: [&str; 3] =
+  ["content-type", "content-disposition", "content-transfer-encoding"];
 
 /// A multipart body, as today's `match_mime_multipart` compares one: each of the pact's parts, in
 /// order, against the reply's first part of its name, or the unnamed part at its position among the
@@ -2101,7 +2102,7 @@ fn compile_part_body(
 
 /// The rules under `$.<key>`, rooted at `$`: what today's `match_file_part` compares a part's body by.
 /// Only a rule naming the part itself counts; a wildcard in its place does not, as today.
-fn rerooted(category: Option<&MatchingRuleCategory>, key: &str) -> Option<MatchingRuleCategory> {
+pub(super) fn rerooted(category: Option<&MatchingRuleCategory>, key: &str) -> Option<MatchingRuleCategory> {
   let category = category?;
   let rules = category
     .rules

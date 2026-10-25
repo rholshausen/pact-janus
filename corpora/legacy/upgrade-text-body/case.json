@@ -1,0 +1,119 @@
+{
+  "description": "a v4 text/plain body and the contract `janus upgrade` converts it into accept the same reply: the body's type is declared, its rule on `$` is the shape, and the pact's check of the reply's type is a content-type header shape a reply with none passes — plan-grammar spec section 4.4's two-path agreement, staged plan S1.25",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get a greeting",
+          "request": {
+            "method": "GET",
+            "path": "/greeting"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "Hello World!",
+              "contentType": "text/plain",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "Hello .+!"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a greeting",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/greeting",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "example": "Hello World!",
+            "pattern": "^(?:Hello .+!)$",
+            "shape": "regex"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "text/plain",
+                      "pattern": "^\\s*(?i:text)/(?:[^;]*\\+)?(?i:plain)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "text/plain"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/text"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/greeting",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": "Hello Ada!"
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

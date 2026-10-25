@@ -550,7 +550,10 @@ and the order between differently named children are not part of the document.
 
 Every engine also has a built-in `multipart` component for every `multipart/*` type, registered after
 form ([ADR 0040](../../decisions/0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md)).
-It splits a body at the boundary its content type names, and a type with no `boundary` does not decode.
+It splits a body at the boundary its content type names. A declared type with no `boundary` takes the
+one the slot is labelled with, since the boundary frames the octets and is not part of what the type
+declares ([ADR 0047](../../decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)),
+and a body neither names a boundary for does not decode.
 Its document is keyed by part name: an object with one member per name, in the order the names first
 appear, each an array of the parts with that name in body order, and the parts with no name under `""`.
 A part is an object of:

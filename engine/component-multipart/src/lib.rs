@@ -456,10 +456,17 @@ impl ContentComponent for MultipartContent {
     is_multipart(content_type)
   }
 
+  /// A declared type that names no boundary takes the one the slot is labelled with: the boundary
+  /// frames these octets, and is not part of what the type declares (ADR 0047). A `janus upgrade`d
+  /// contract declares `multipart/form-data`, and a reply names its own boundary.
   fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError> {
     require_multipart(&req.content_type)?;
+    let labelled =
+      req.value.content_type.as_deref().filter(|label| {
+        boundary(&req.content_type).is_err() && boundary(label).is_ok() && is_multipart(label)
+      });
     Ok(DecodeResult {
-      document: slot_document(self, &req.content_type, &req.value)?,
+      document: slot_document(self, labelled.unwrap_or(&req.content_type), &req.value)?,
       degradations: Vec::new(),
     })
   }

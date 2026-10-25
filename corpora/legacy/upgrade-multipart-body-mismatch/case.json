@@ -1,0 +1,211 @@
+{
+  "description": "a v4 multipart body and the contract `janus upgrade` converts it into refuse a field that is not by its rule, with the same mismatch — plan-grammar spec section 4.4's two-path agreement, staged plan S1.25",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get an upload",
+          "request": {
+            "method": "GET",
+            "path": "/upload"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"o.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 1}\r\n--b--\r\n",
+              "contentType": "multipart/form-data; boundary=b",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.name": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[A-Z][a-z]+"
+                    }
+                  ]
+                },
+                "$.order.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an upload",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/upload",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "name": {
+                "entries": [
+                  {
+                    "members": {
+                      "filename": {
+                        "shape": "forbidden"
+                      },
+                      "headers": {
+                        "members": {},
+                        "shape": "object"
+                      },
+                      "body": {
+                        "example": "Mary",
+                        "pattern": "^(?:[A-Z][a-z]+)$",
+                        "shape": "regex"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                ],
+                "shape": "array"
+              },
+              "order": {
+                "entries": [
+                  {
+                    "members": {
+                      "filename": {
+                        "example": "o.json",
+                        "shape": "type"
+                      },
+                      "headers": {
+                        "members": {
+                          "content-type": {
+                            "of": {
+                              "example": "application/json",
+                              "shape": "equality"
+                            },
+                            "shape": "optional"
+                          }
+                        },
+                        "shape": "object"
+                      },
+                      "body": {
+                        "members": {
+                          "id": {
+                            "example": 1,
+                            "shape": "integer"
+                          }
+                        },
+                        "shape": "object"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                ],
+                "shape": "array"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "multipart/form-data;boundary=b",
+                      "pattern": "^\\s*(?i:multipart)/(?i:form\\-data)\\s*(?:;[^;=]*)*;\\s*(?i:boundary)\\s*=\\s*\"*b\"*\\s*(?:;[^;=]*)*$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "multipart/form-data"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/multipart"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/upload",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": {
+      "name": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"name\""
+          },
+          "body": "ada"
+        }
+      ],
+      "order": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"order\"; filename=\"p.json\"",
+            "content-type": "application/json"
+          },
+          "filename": "p.json",
+          "body": {
+            "id": 42,
+            "gift": true
+          }
+        }
+      ]
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.name[0].body",
+        "message": "Expected 'ada' to match '^(?:[A-Z][a-z]+)$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "description": "a v4 application/octet-stream body and the contract `janus upgrade` converts it into accept the same octets: no component claims the type, so the slot is left undeclared and its shape is equality on a base64 example — plan-grammar spec section 4.4's two-path agreement, staged plan S1.25",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get some octets",
+          "request": {
+            "method": "GET",
+            "path": "/octets"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "AAEC/w==",
+              "contentType": "application/octet-stream",
+              "encoded": "base64"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get some octets",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/octets",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "encoded": "base64",
+            "example": "AAEC/w==",
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/octet-stream",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:octet\\-stream)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/octets",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": "AAEC/w=="
+  },
+  "encoded": {
+    "$.response.body": "base64"
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

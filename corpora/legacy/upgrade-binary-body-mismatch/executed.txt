@@ -1,0 +1,43 @@
+(
+  :"get some octets" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/octets',
+          '/octets'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/octet-stream'
+        ) => BOOL(true),
+        %match:equality (
+          $.response.body => BYTES(3, AAEC),
+          BYTES(4, AAEC/w==)
+        ) => ERROR(Expected BYTES(3, AAEC) to equal BYTES(4, AAEC/w==), differing from byte 3)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

@@ -1,0 +1,79 @@
+(
+  :"get a form" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/form',
+          '/form'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/x-www-form-urlencoded'
+        ) => BOOL(true),
+        :"$.n" (
+          %expect:count (
+            $.response.body.n => ['+903'],
+            1
+          ) => BOOL(true),
+          %legacy:parses-as (
+            $.response.body.n[0] => '+903',
+            'integer'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.ok" (
+          %expect:count (
+            $.response.body.ok => ['true'],
+            1
+          ) => BOOL(true),
+          %match:equality (
+            $.response.body.ok[0] => 'true',
+            'true'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.tag" (
+          %expect:count (
+            $.response.body.tag => ['x', 'y'],
+            2
+          ) => BOOL(true),
+          %match:regex (
+            $.response.body.tag[0] => 'x',
+            '^(?:[a-z])$'
+          ) => BOOL(true),
+          %match:regex (
+            $.response.body.tag[1] => 'y',
+            '^(?:[a-z])$'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        %legacy:only-entries (
+          $.response.body => {'n': ['+903'], 'ok': ['true'], 'tag': ['x', 'y']},
+          'n',
+          'ok',
+          'tag'
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

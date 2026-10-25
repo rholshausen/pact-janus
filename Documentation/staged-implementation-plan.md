@@ -1026,6 +1026,21 @@ item in 1a is done when S1.1 agrees.
   *Exit:* corpus cases in which a text body, a binary body, a form body, an XML body and a multipart
   body upgrade and reach the pact's verdict (`also-compiled-from`), matching and not; and no upgrade has
   a `body-not-parsed` finding.
+  *Done 2026-10-25*, as [ADR 0047](decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)
+  decides it. A text, form, XML or multipart body declares the pact's type, a multipart one without its
+  boundary, which the multipart component now reads from a reply's label, and requires the built-in
+  component. Octets stay undeclared, as bytes. Each body is shaped over its component's document as the
+  legacy compiler compares it, and its evidence is the pact's octets, so a replay sends what the pact's
+  verification sends. The reply-type check: the item asked that a mislabelled reply fail the contract as
+  `legacy:body-type` fails the pact. It is a pattern on the reply's `content-type` header, for JSON
+  bodies too, since a declaration is not a constraint (ADR 0020). The ten `corpora/legacy/upgrade-*-body*`
+  cases are the exit, and a test holds every `upgrade-*` case's `also-compiled-from` to what the upgrade
+  writes. Not foreseen: a number rule on text had converted to a kind no string has since S1.22, in a
+  query, a header or a path too, and now converts to the pattern `legacy:parses-as` reads. `eachValue`
+  and `arrayContains` (S1.24) were converted without their own rules. And the shape compiler resolved
+  a member whose name has a dot or a brace as another member. `engine/kernel/tests/upgrade_agreement.rs`
+  compiles every v1–v4 case in the corpus both ways and finds one verdict, except where a finding says
+  why. A header with no rule still converts to `equality`, which is S3.4.
 
 - **S1.26 A rule on the pact's `Content-Type` header, read as today's body check reads it** — **S**,
   a decision first. Found landing S1.23. Today's verifier checks a rule on the pact's `Content-Type`

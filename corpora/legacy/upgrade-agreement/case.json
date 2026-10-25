@@ -33,6 +33,9 @@
         },
         "response": {
           "status": { "shape": "equality", "example": 200 },
+          "headers": { "shape": "object", "members": {
+            "content-type": { "shape": "optional", "of": { "shape": "array", "entries": [
+              { "shape": "regex", "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$", "example": "application/json" } ] } } } },
           "body": { "shape": "type", "example": 42 }
         }
       }
@@ -43,6 +46,7 @@
     "$.request.path": "/count",
     "$.request.query": {},
     "$.response.status": 200,
+    "$.response.headers": {},
     "$.response.body": 7
   },
   "result": { "status": "matched" }

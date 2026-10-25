@@ -63,6 +63,7 @@ superseding ADR instead.
 | [0044](0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md) | Reach a hook endpoint as a provider is, and try a state call three times | accepted |
 | [0045](0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md) | Refuse an interaction that needs a pact plugin by name, and verify the rest | accepted |
 | [0046](0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md) | Ask a provider for a message through `produce-message`, and let the transport name its parts | accepted |
+| [0047](0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md) | Upgrade a body into its component's document, and check its type on the header | accepted |
 
 ## Decision backlog
 

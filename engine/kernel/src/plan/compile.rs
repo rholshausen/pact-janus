@@ -14,6 +14,7 @@
 //! fallback here means a bad variant id degrades to "compiled unpinned" instead of a panic.
 
 use super::model::{Literal, Node};
+use super::value::member_path;
 use crate::interaction_spec::InteractionSpec;
 use crate::shape::variant_space::{VariantSpace, canonical_point_name, cardinality_region, compute_many};
 use crate::shape::{CoreShape, Example, ShapeKind, ShapeNode, members_by_name, path};
@@ -79,10 +80,14 @@ enum Cursor {
 }
 
 impl Cursor {
+  /// A member, quoted when its name has a character the plain form would end at (`.`, `{`, a
+  /// space) or is empty, so `navigate` reads the member it names: an XML attribute in a namespace
+  /// (`['@{urn:names}id']`, ADR 0039), a multipart part with no name (`['']`, ADR 0040), a JSON
+  /// member named `a.b`.
   fn member(&self, name: &str) -> Cursor {
     match self {
-      Cursor::Absolute(p) => Cursor::Absolute(format!("{p}.{name}")),
-      Cursor::Relative(p) => Cursor::Relative(format!("{p}.{name}")),
+      Cursor::Absolute(p) => Cursor::Absolute(member_path(p, name)),
+      Cursor::Relative(p) => Cursor::Relative(member_path(p, name)),
     }
   }
 

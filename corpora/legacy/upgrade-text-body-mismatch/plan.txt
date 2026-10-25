@@ -1,0 +1,43 @@
+(
+  :"get a greeting" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/greeting'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'text/plain'
+        ),
+        %match:regex (
+          $.response.body,
+          '^(?:Hello .+!)$'
+        )
+      )
+    )
+  )
+)

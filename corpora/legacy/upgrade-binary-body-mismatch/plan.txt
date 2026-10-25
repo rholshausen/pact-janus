@@ -1,0 +1,43 @@
+(
+  :"get some octets" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/octets'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/octet-stream'
+        ),
+        %match:equality (
+          $.response.body,
+          BYTES(4, AAEC/w==)
+        )
+      )
+    )
+  )
+)

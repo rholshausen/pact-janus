@@ -19,12 +19,17 @@ readability:
   `reserved-namespace-operator/`, a shape that asks for core plan actions by name and is refused
   (staged plan S0.13) — the corpus's one case with no plan; and `member-order/`, members declared out
   of name order and compiled by name, with an example and a body that hold the same members in other
-  orders compared as equal (ADR 0037).
+  orders compared as equal (ADR 0037); and `member-name-quoted/`, members whose names a path segment
+  cannot hold (a dot, a brace, a quote, no name at all), each resolved by a quoted segment (ADR 0047).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
   agreement/` compiles the same interaction both ways — a v1–v4 pact directly, and the equivalent
-  hand-authored shape — and asserts they reach the same verdict (plan-grammar spec §4.4).
+  hand-authored shape — and asserts they reach the same verdict (plan-grammar spec §4.4). Every
+  `upgrade-*/` case does the same with the contract `janus upgrade` converts the pact into, and a test
+  in `tools/corpus` holds its `also-compiled-from` to what the upgrade writes. `upgrade-text-body/`,
+  `upgrade-binary-body/`, `upgrade-form-body/`, `upgrade-xml-body/`, `upgrade-multipart-body/` and their
+  `-mismatch` twins are the body kinds that are not JSON, each in its component's document (ADR 0047).
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`

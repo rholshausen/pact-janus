@@ -470,7 +470,7 @@ pub fn message_captures(resolver: CapturedValues, parts: &Parts) -> CapturedValu
 /// How today's verifier compares a body of a content type (`pact_matching::compare_bodies`'
 /// `BODY_MATCHERS`, in its order), which is how the legacy layer reads one (ADR 0036 decision 3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BodyKind {
+pub(super) enum BodyKind {
   Json,
   /// `application/x-www-form-urlencoded`: compared as a query string (ADR 0038).
   Form,
@@ -486,7 +486,7 @@ enum BodyKind {
 }
 
 impl BodyKind {
-  fn of(content_type: &ContentType) -> BodyKind {
+  pub(super) fn of(content_type: &ContentType) -> BodyKind {
     if content_type.is_json() {
       BodyKind::Json
     } else if content_type.base_type() == FORM {
@@ -525,7 +525,7 @@ fn form_document(body: &[u8]) -> Result<RuntimeValue, serde_urlencoded::de::Erro
 
 /// The part's content type as today's verifier takes it (`HttpPart::content_type`): the body's own,
 /// else the `Content-Type` header, else one detected from the body; unknown (`*/*`) when none is.
-fn part_content_type(part: &dyn HttpPart) -> ContentType {
+pub(super) fn part_content_type(part: &dyn HttpPart) -> ContentType {
   part.content_type().unwrap_or_default()
 }
 
@@ -534,7 +534,7 @@ fn part_content_type(part: &dyn HttpPart) -> ContentType {
 /// is `None`; `Null` and `Empty` (a body was declared — explicitly null, or present with zero
 /// bytes) both become [`LegacyBody::Empty`], which design 3.5's compiler treats as "assert the
 /// actual body is absent too". A present body is read by its content type ([`read_body`]).
-fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
+pub(super) fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Unsupported> {
   let bytes = match part.body() {
     OptionalBody::Missing => return Ok(None),
     OptionalBody::Null | OptionalBody::Empty => return Ok(Some(LegacyBody::Empty)),

@@ -64,6 +64,24 @@
             "shape": "equality",
             "example": 200
           },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/json",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
           "body": {
             "shape": "object",
             "members": {
@@ -83,6 +101,7 @@
     "$.request.path": "/delivery",
     "$.request.query": {},
     "$.response.status": 200,
+    "$.response.headers": {},
     "$.response.body": {
       "date": "2026-07-30 or later"
     }

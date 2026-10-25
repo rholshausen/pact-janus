@@ -1,0 +1,87 @@
+(
+  :"get an upload" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/upload',
+          '/upload'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'multipart/form-data;boundary=b'
+        ) => BOOL(true),
+        :"$.name[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.name[0] => {'headers': {'content-disposition': 'form-data; name="name"'}, 'body': 'Ada'},
+              'field',
+              'name'
+            ) => BOOL(true),
+            %flow:and (
+              %match:regex (
+                $.response.body.name[0].body => 'Ada',
+                '^(?:[A-Z][a-z]+)$'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.order[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.order[0] => {'headers': {'content-disposition': 'form-data; name="order"; filename="p.json"', 'content-type': 'application/json'}, 'filename': 'p.json', 'body': {'id': 42, 'gift': true}},
+              'file',
+              'order'
+            ) => BOOL(true),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.order[0].headers.content-type => 'application/json'
+                ) => BOOL(true),
+                %match:equality (
+                  $.response.body.order[0].headers.content-type => 'application/json',
+                  'application/json'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.order[0].headers.content-type => 'application/json',
+                  'application/json'
+                ) => BOOL(true),
+                %flow:and (
+                  :"$.order[0].body.id" (
+                    %match:integer (
+                      $.response.body.order[0].body.id => 42
+                    ) => BOOL(true)
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

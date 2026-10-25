@@ -1,0 +1,43 @@
+(
+  :"names a path cannot hold" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'a': {'b': 2}, 'a.b': 1, '@{urn:x}rev': '2', '': ['y'], 'it\'s': '3'}
+        ) => BOOL(true),
+        :"$." (
+          %expect:array (
+            $.response.body[''] => ['y']
+          ) => BOOL(true),
+          %expect:count (
+            $.response.body[''] => ['y'],
+            1
+          ) => BOOL(true),
+          :"$.[0]" (
+            %match:type (
+              $.response.body[''][0] => 'y',
+              'x'
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.@{urn:x}rev" (
+          %match:equality (
+            $.response.body['@{urn:x}rev'] => '2',
+            '2'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.a.b" (
+          %match:equality (
+            $.response.body['a.b'] => 1,
+            1
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.it's" (
+          %match:integer (
+            $.response.body['it\'s'] => '3'
+          ) => ERROR(Expected a integer but got '3')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

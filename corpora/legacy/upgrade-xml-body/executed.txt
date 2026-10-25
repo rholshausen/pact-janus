@@ -1,0 +1,149 @@
+(
+  :"get a note" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/note',
+          '/note'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/xml'
+        ) => BOOL(true),
+        %expect:object (
+          $.response.body.note => {'#namespace': 'urn:notes', '@lang': 'fr', '@{urn:x}rev': '2', '@extra': 'x', 'to': [{'#text': 'Ada'}], 'line': [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]}
+        ) => BOOL(true),
+        :"$.note" (
+          %match:equality (
+            $.response.body.note.#namespace => 'urn:notes',
+            'urn:notes'
+          ) => BOOL(true),
+          :"$.note.@lang" (
+            %match:regex (
+              $.response.body.note.@lang => 'fr',
+              '^(?:[a-z]{2})$'
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.note['@{urn:x}rev']" (
+            %match:equality (
+              $.response.body.note['@{urn:x}rev'] => '2',
+              '2'
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.note.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.note.#text => NULL
+              ) => BOOL(false),
+              %match:equality (
+                $.response.body.note.#text,
+                ''
+              )
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:not-empty (
+            $.response.body.note.line => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.note.line => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]
+            ) => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}],
+            :"$.note.line[*]" (
+              %expect:object (
+                ~> => {'#text': 'uno'}
+              ) => BOOL(true),
+              :"$.note.line[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => 'uno'
+                  ) => BOOL(true),
+                  %match:type (
+                    ~>.#text => 'uno',
+                    'one'
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'#text': 'uno'}
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.note.line[*]" (
+              %expect:object (
+                ~> => {'#text': 'dos'}
+              ) => BOOL(true),
+              :"$.note.line[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => 'dos'
+                  ) => BOOL(true),
+                  %match:type (
+                    ~>.#text => 'dos',
+                    'one'
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'#text': 'dos'}
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.note.line[*]" (
+              %expect:object (
+                ~> => {'#text': 'tres'}
+              ) => BOOL(true),
+              :"$.note.line[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => 'tres'
+                  ) => BOOL(true),
+                  %match:type (
+                    ~>.#text => 'tres',
+                    'one'
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'#text': 'tres'}
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:size (
+            $.response.body.note.to => [{'#text': 'Ada'}],
+            1,
+            NULL
+          ) => BOOL(true),
+          :"$.note.to[0]" (
+            :"$.note.to[0].#text" (
+              %match:equality (
+                $.response.body.note.to[0].#text => 'Ada',
+                'Ada'
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

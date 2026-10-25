@@ -1039,6 +1039,156 @@ fn a_pact_and_the_contract_it_upgrades_into_verify_the_same_provider() {
   }
 }
 
+/// A provider answering each path with its content type and body, reporting each request's path,
+/// `Content-Type` and body.
+fn serving(
+  routes: Vec<(&'static str, &'static str, Vec<u8>)>,
+) -> (String, std::sync::mpsc::Receiver<(String, String, Vec<u8>)>) {
+  let server = tiny_http::Server::http("127.0.0.1:0").expect("the server binds");
+  let port = server.server_addr().to_ip().expect("an IP address").port();
+  let (tx, rx) = std::sync::mpsc::channel();
+  std::thread::spawn(move || {
+    for mut request in server.incoming_requests() {
+      let mut body = Vec::new();
+      let _ = request.as_reader().read_to_end(&mut body);
+      let content_type = request
+        .headers()
+        .iter()
+        .find(|header| header.field.equiv("Content-Type"))
+        .map(|header| header.value.to_string())
+        .unwrap_or_default();
+      let path = request.url().to_string();
+      let _ = tx.send((path.clone(), content_type, body));
+      let response = match routes.iter().find(|(route, _, _)| *route == path) {
+        Some((_, content_type, body)) => tiny_http::Response::from_data(body.clone()).with_header(
+          tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).expect("a header"),
+        ),
+        None => tiny_http::Response::from_data(Vec::new()).with_status_code(404),
+      };
+      let _ = request.respond(response);
+    }
+  });
+  (format!("http://127.0.0.1:{port}"), rx)
+}
+
+/// Staged plan S1.25: a v4 pact with a body of every kind but JSON, as pact-js and pact-jvm write one.
+fn every_body_kind_pact() -> String {
+  let path = temp("every-body-kind-pact.json");
+  let body = |content: &str, content_type: &str| json!({ "content": content, "contentType": content_type, "encoded": false });
+  let header = |content_type: &str| json!({ "Content-Type": [content_type] });
+  let pact = json!({
+    "consumer": { "name": "web-app" }, "provider": { "name": "files" },
+    "interactions": [
+      { "type": "Synchronous/HTTP", "description": "a greeting",
+        "request": { "method": "GET", "path": "/text" },
+        "response": { "status": 200, "headers": header("text/plain"), "body": body("Hello World!", "text/plain"),
+          "matchingRules": { "body": { "$": { "matchers": [{ "match": "regex", "regex": "Hello .+!" }] } } } } },
+      { "type": "Synchronous/HTTP", "description": "a form",
+        "request": { "method": "POST", "path": "/form", "headers": header("application/x-www-form-urlencoded"),
+                     "body": body("a=1&b=x+y", "application/x-www-form-urlencoded") },
+        "response": { "status": 200, "headers": header("application/x-www-form-urlencoded"),
+          "body": body("n=17&ok=true", "application/x-www-form-urlencoded"),
+          "matchingRules": { "body": { "$.n": { "matchers": [{ "match": "integer" }] } } } } },
+      { "type": "Synchronous/HTTP", "description": "an order as XML",
+        "request": { "method": "POST", "path": "/xml", "headers": header("application/xml"),
+                     "body": body("<query id=\"1\"/>", "application/xml") },
+        "response": { "status": 200, "headers": header("application/xml"),
+          "body": body("<o:order xmlns:o=\"urn:o\" id=\"7\"><item>a</item></o:order>", "application/xml"),
+          "matchingRules": { "body": { "$.urn:o:order['@id']": { "matchers": [{ "match": "integer" }] } } } } },
+      { "type": "Synchronous/HTTP", "description": "an upload",
+        "request": { "method": "GET", "path": "/upload" },
+        "response": { "status": 200, "headers": header("multipart/form-data; boundary=b"),
+          "body": body("--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b--\r\n", "multipart/form-data; boundary=b"),
+          "matchingRules": {
+            "header": { "Content-Type": { "matchers": [{ "match": "regex", "regex": "multipart/form-data; boundary=.*" }] } },
+            "body": { "$.name": { "matchers": [{ "match": "regex", "regex": "[A-Z][a-z]+" }] } } } } },
+      { "type": "Synchronous/HTTP", "description": "some octets",
+        "request": { "method": "GET", "path": "/bytes" },
+        "response": { "status": 200,
+          "body": { "content": "AAEC/w==", "contentType": "application/octet-stream", "encoded": "base64" } } },
+    ],
+    "metadata": { "pactSpecification": { "version": "4.0" } },
+  });
+  std::fs::write(&path, pact.to_string()).expect("the pact is written");
+  path
+}
+
+/// Staged plan S1.25: every body kind but JSON upgrades into a contract the same provider verifies,
+/// and the provider gets the same requests from both. A reply with another type fails both.
+#[test]
+fn a_pact_of_every_body_kind_and_its_upgraded_contract_verify_the_same_provider() {
+  let upgraded = temp("every-body-kind.janus.json");
+  let converted = janus(&["upgrade", &every_body_kind_pact(), "--output", "json"]);
+  assert_eq!(code(&converted), 0, "{}", stderr(&converted));
+  let document: Value = serde_json::from_str(&stdout(&converted)).expect("JSON");
+  assert!(
+    !document["findings"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .any(|f| f["code"] == "body-not-parsed"),
+    "{document}"
+  );
+  std::fs::write(&upgraded, document["contract"].to_string()).expect("the contract is written");
+
+  let routes = |text_type: &'static str| {
+    vec![
+      ("/text", text_type, b"Hello Ada!".to_vec()),
+      (
+        "/form",
+        "application/x-www-form-urlencoded",
+        b"ok=true&n=42".to_vec(),
+      ),
+      (
+        "/xml",
+        "application/xml",
+        b"<order xmlns=\"urn:o\" id=\"8\"><item>a</item></order>".to_vec(),
+      ),
+      (
+        "/upload",
+        "multipart/form-data; boundary=other",
+        b"--other\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nAda\r\n--other--\r\n".to_vec(),
+      ),
+      ("/bytes", "application/octet-stream", vec![0, 1, 2, 255]),
+    ]
+  };
+  let mut sent = Vec::new();
+  for source in [every_body_kind_pact(), upgraded.clone()] {
+    let (url, requests) = serving(routes("text/plain"));
+    let output = janus(&["verify", &source, "--provider-url", &url]);
+    assert_eq!(
+      code(&output),
+      0,
+      "{source}:\n{}\n{}",
+      stdout(&output),
+      stderr(&output)
+    );
+    assert!(
+      stdout(&output).contains("5 verified, 0 failed"),
+      "{}",
+      stdout(&output)
+    );
+    let mut received: Vec<(String, String, Vec<u8>)> = requests.try_iter().collect();
+    received.sort();
+    sent.push(received);
+  }
+  assert_eq!(
+    sent[0], sent[1],
+    "the provider got other requests from the contract"
+  );
+
+  for source in [every_body_kind_pact(), upgraded] {
+    let (url, _) = serving(routes("text/html"));
+    let output = janus(&["verify", &source, "--provider-url", &url]);
+    assert_eq!(code(&output), 1, "{source}:\n{}", stdout(&output));
+    assert!(
+      stdout(&output).contains("4 verified, 1 failed"),
+      "{}",
+      stdout(&output)
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // publish, and verify from a broker (staged plan S1.3)
 // ---------------------------------------------------------------------------------------------

@@ -93,6 +93,24 @@
             },
             "shape": "object"
           },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/json",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
           "status": {
             "example": 200,
             "shape": "equality"
@@ -106,6 +124,7 @@
     "$.request.path": "/orders/66",
     "$.request.query": {},
     "$.response.status": 200,
+    "$.response.headers": {},
     "$.response.body": {
       "items": [
         {

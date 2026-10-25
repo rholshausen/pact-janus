@@ -397,22 +397,148 @@ fn narrowing_a_header_comparison_to_equality_is_a_judgement_not_a_silent_tighten
   assert!(finding.message.contains("MIME parameters"), "{}", finding.message);
 }
 
-/// The one body the engine cannot read: carried as bytes on the variant, asserted about nowhere,
-/// and reported. A shape invented for it would claim something the conversion does not know.
-#[test]
-fn a_body_no_content_component_can_read_is_carried_as_bytes_and_asserted_about_nowhere() {
-  let upgraded = upgrade(&fixture("XMLConsumer-XMLProvider.json"));
-  let finding = find(&upgraded.findings, "body-not-parsed");
-  assert_eq!(finding.kind, "lossy");
+/// A v4 pact with one interaction, answered with `body`.
+fn v4_answering(body: Value) -> Value {
+  json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{ "type": "Synchronous/HTTP", "description": "an interaction",
+      "request": { "method": "GET", "path": "/" }, "response": { "status": 200, "body": body } }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  })
+}
+
+/// Staged plan S1.25: a body a built-in component reads declares its type and requires the component,
+/// and its evidence is the pact's octets, as text where they are UTF-8. A multipart type is declared
+/// without its boundary, which a reply names for itself (ADR 0047).
+#[rstest::rstest]
+#[case::text("Hello", "text/plain", "text/plain", "content/text")]
+#[case::form(
+  "a=1&b=x+y",
+  "application/x-www-form-urlencoded",
+  "application/x-www-form-urlencoded",
+  "content/form"
+)]
+#[case::xml("<note>hi</note>", "application/xml", "application/xml", "content/xml")]
+#[case::multipart(
+  "--b\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\nx\r\n--b--\r\n",
+  "multipart/form-data; boundary=b",
+  "multipart/form-data",
+  "content/multipart"
+)]
+fn a_body_a_built_in_component_reads_declares_its_type(
+  #[case] content: &str,
+  #[case] content_type: &str,
+  #[case] declared: &str,
+  #[case] component: &str,
+) {
+  let upgraded = upgrade(&v4_answering(
+    json!({ "content": content, "contentType": content_type, "encoded": false }),
+  ));
   let interaction = &upgraded.contract.interactions[0];
   assert!(
-    !interaction.parts["response"].contains_key("body"),
-    "no shape was invented for a body nothing could read"
+    !codes(&upgraded.findings).contains(&"body-not-parsed"),
+    "{:?}",
+    codes(&upgraded.findings)
   );
-  assert!(
-    interaction.selection.variants[0].parts["response"].contains_key("body"),
-    "the example itself still rides with the variant"
+  assert_eq!(
+    interaction
+      .content_types
+      .as_ref()
+      .map(|types| types["response"]["body"].as_str()),
+    Some(declared)
   );
+  assert_eq!(
+    interaction
+      .requires
+      .as_ref()
+      .map(|requires| requires[0].component.as_str()),
+    Some(component)
+  );
+  let evidence = &interaction.selection.variants[0].parts["response"]["body"];
+  assert_eq!(evidence.content, json!(content));
+  assert_eq!(evidence.encoded.as_deref(), Some("text"));
+  // The type as `pact_models` writes it, which is the one the pact's own verification uses.
+  assert_eq!(
+    evidence.content_type.as_deref(),
+    Some(content_type.replace("; ", ";").as_str())
+  );
+}
+
+/// Octets no component claims are left undeclared, which an undeclared slot already means (ADR 0036
+/// decision 2), and shaped as bytes with a base64 example.
+#[test]
+fn a_binary_body_is_bytes_and_undeclared() {
+  let upgraded = upgrade(&v4_answering(
+    json!({ "content": "AAEC/w==", "contentType": "image/png", "encoded": "base64" }),
+  ));
+  let interaction = &upgraded.contract.interactions[0];
+  assert_eq!(interaction.content_types, None);
+  assert_eq!(interaction.requires, None);
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body"),
+    &json!({ "shape": "equality", "example": "AAEC/w==", "encoded": "base64" })
+  );
+}
+
+/// A body that is not what its type says is still carried across and asserted about nowhere, and a
+/// text body that is not UTF-8 is compared as octets, as the pact's verification compares it.
+#[test]
+fn a_body_that_is_not_its_type_is_reported() {
+  let malformed = upgrade(&v4_answering(
+    json!({ "content": "<unclosed", "contentType": "application/xml", "encoded": false }),
+  ));
+  assert_eq!(find(&malformed.findings, "body-not-parsed").kind, "lossy");
+  assert!(!malformed.contract.interactions[0].parts["response"].contains_key("body"));
+  assert!(malformed.contract.interactions[0].selection.variants[0].parts["response"].contains_key("body"));
+
+  let latin1 = upgrade(&v4_answering(
+    json!({ "content": "/w==", "contentType": "text/plain", "encoded": "base64" }),
+  ));
+  assert_eq!(find(&latin1.findings, "body-not-parsed").kind, "judgement");
+  assert_eq!(shape(&latin1, 0, "response", "body")["encoded"], json!("base64"));
+  assert_eq!(latin1.contract.interactions[0].content_types, None);
+}
+
+/// A form is closed in a response too (`legacy:only-entries`), and a shape is not; a number rule on
+/// text is the pattern the text is read by.
+#[test]
+fn a_form_body_says_it_admits_more_names_and_reads_its_text() {
+  let upgraded = upgrade(&pact_with(
+    get_slash(),
+    json!({ "status": 200, "headers": { "Content-Type": "application/x-www-form-urlencoded" }, "body": "n=17",
+            "matchingRules": { "body": { "$.n": { "matchers": [{ "match": "integer" }] } } } }),
+  ));
+  assert_eq!(find(&upgraded.findings, "response-body-opened").kind, "lossy");
+  assert_eq!(find(&upgraded.findings, "rule-as-pattern").kind, "note");
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body"),
+    &json!({ "shape": "object", "members": { "n": { "shape": "array", "entries": [
+      { "shape": "regex", "pattern": "^\\+?[0-9]+$", "example": "17" }
+    ] } } })
+  );
+}
+
+/// A pact that names no `Content-Type` header checks the reply's type before its body; the contract
+/// checks it on the header, a reply with none passing, and says what the pattern does not admit.
+#[test]
+fn a_body_with_no_content_type_header_checks_the_type_on_the_header() {
+  let upgraded = upgrade(&pact_with(get_slash(), json!({ "status": 200, "body": "Hello" })));
+  let finding = find(&upgraded.findings, "body-type-on-header");
+  assert_eq!(finding.kind, "judgement");
+  assert_eq!(
+    finding.target.as_deref(),
+    Some("/interactions/0/parts/response/headers/members/content-type")
+  );
+  let header = &shape(&upgraded, 0, "response", "headers")["members"]["content-type"];
+  assert_eq!(header["shape"], json!("optional"));
+  assert_eq!(header["of"]["entries"][0]["example"], json!("text/plain"));
+
+  // A pact that names one checks it there already.
+  let named = upgrade(&pact_with(
+    get_slash(),
+    json!({ "status": 200, "headers": { "Content-Type": "text/plain" }, "body": "Hello" }),
+  ));
+  assert!(!codes(&named.findings).contains(&"body-type-on-header"));
 }
 
 /// A message interaction has no contract form yet. Vanishing silently is exactly the outcome the

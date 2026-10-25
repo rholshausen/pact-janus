@@ -90,7 +90,10 @@ Three sources are the source of truth and take precedence over this file when th
 > its pact verifies), and S1.7 (ADR 0046: a v1–v4 message is asked of the provider through a
 > `produce-message` hook; unless one is configured, `janus verify` adds one that asks as today's verifier
 > does, routed by `--transports`; a transport names its own parts and rejects a request that does not
-> match).
+> match), and S1.25 (ADR 0047: `janus upgrade` converts text, binary, form, XML and multipart bodies
+> into their components' documents, declaring the type a component reads; a pact that names no
+> `Content-Type` header has its reply-type check written as a pattern on the header; every v1–v4
+> corpus case reaches one verdict compiled directly and upgraded).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

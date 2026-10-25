@@ -1,0 +1,87 @@
+(
+  :"get an upload" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/upload'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'multipart/form-data;boundary=b'
+        ),
+        :"$.name[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.name[0],
+              'field',
+              'name'
+            ),
+            %flow:and (
+              %match:regex (
+                $.response.body.name[0].body,
+                '^(?:[A-Z][a-z]+)$'
+              )
+            )
+          )
+        ),
+        :"$.order[0]" (
+          %flow:if (
+            %legacy:mime-part (
+              $.response.body.order[0],
+              'file',
+              'order'
+            ),
+            %flow:and (
+              %flow:if (
+                %check:exists (
+                  $.response.body.order[0].headers.content-type
+                ),
+                %match:equality (
+                  $.response.body.order[0].headers.content-type,
+                  'application/json'
+                )
+              ),
+              %flow:if (
+                %legacy:body-type (
+                  $.response.body.order[0].headers.content-type,
+                  'application/json'
+                ),
+                %flow:and (
+                  :"$.order[0].body.id" (
+                    %match:integer (
+                      $.response.body.order[0].body.id
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

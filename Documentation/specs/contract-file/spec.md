@@ -400,6 +400,10 @@ bytes were spelled. So the type is declared beside the parts, nested the same wa
   A verifier encodes a replayed request slot through that component, and decodes the reply's
   declared slots under the declared type rather than the type the provider labelled them with — the
   consumer's shape is about the document as the consumer declared it.
+- **A converted contract's evidence is the pact's octets.** `janus upgrade` records a declared body as
+  the pact recorded it, `text` when it is UTF-8 and `base64` otherwise, with the pact's type, so a
+  replay sends the bytes the pact's verification sends; and it declares a multipart type without its
+  boundary, which a reply names for itself (§8.2).
 - **A declared type needs a component.** An interaction declaring `text/csv` cannot be matched by an
   engine with no `text/csv` content component, and SHOULD say so in `requires` (§7) so the union check
   fails the run before it starts rather than at the first body.
@@ -491,6 +495,17 @@ slot, this position, this constraint", which is where a shape node goes.
 | `arrayContains` | `contains` | |
 | `statusCode` | `http:status-class` | a component operator, not a core one — the kernel does not know what a status class is (shape spec §3.5) |
 
+**Bodies** are converted by their type, as the legacy compiler compares them ([ADR
+0047](../../decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)).
+JSON is walked as the table says. A text body that is UTF-8, a form, XML and multipart declare their
+type in `content-types` (§5.5) and require the built-in component that reads it. Their shapes are over
+that component's document: text as one value at `$`, a form as each name's values, XML element by
+element, multipart part by part. A binary body, or text that is not UTF-8, is bytes with a base64
+example, left undeclared. A number or boolean rule on text (an attribute, a form, query or header value,
+a path) becomes the pattern v1–v4 read the text by (`rule-as-pattern`). When the pact names no
+`Content-Type` header, its check that the reply's type agrees with its body's becomes an `optional`
+pattern on the reply's `content-type` header (`body-type-on-header`).
+
 Two constructs need judgement rather than a row:
 
 - **Several rules at one path combined with `AND`.** Where one rule subsumes the other, the narrower
@@ -542,12 +557,15 @@ distinguish), and `note` (neither, and still worth reading).
 | `example-frozen-as-equality` | `note` | a position had no rule, so its example became an `equality` constraint |
 | `rule-unmapped` | `lossy` | no shape equivalent, including unresolvable `AND` combinations |
 | `rule-combination-or` | `lossy` | `combine: "OR"` the shape language cannot name |
-| `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator |
+| `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator, or what v1–v4 compare loosely became exact: a header with no rule, a group of XML children or multipart parts the reply may have more of (ADR 0047) |
 | `generator-dropped` | `lossy` | a generator with no shape equivalent |
-| `request-body-opened` | `lossy` | a request body was an object: v1–v4 close it to unnamed members, shapes cannot (ADR 0007) |
+| `request-body-opened` | `lossy` | a request body was an object, a form or XML: v1–v4 close it to unnamed members, names, attributes and children, shapes cannot (ADR 0007) |
+| `response-body-opened` | `lossy` | a response form, or an XML element a type rule reaches the children of: v1–v4 close it to names or children the pact does not have, shapes cannot (ADR 0047) |
+| `body-type-on-header` | `judgement` | the pact named no `Content-Type` header, and its check of the reply's type became a pattern on the header, which refuses a label that is not a type or has a wildcard (ADR 0047) |
+| `rule-as-pattern` | `note` | a number or boolean rule on text became the pattern v1–v4 read the text by; an integer's admits values too large for 64 bits (ADR 0047) |
 | `request-query-opened` | `lossy` | every request: v1–v4 close its query to unnamed parameters — one with no query admits none — and shapes cannot (ADR 0007) |
 | `content-type-inferred` | `judgement` | the pact declared no content type and one was inferred from the body |
-| `body-not-parsed` | `judgement` | a body could not be parsed as its declared content type and was carried as bytes |
+| `body-not-parsed` | `lossy` or `judgement` | a body is not what its content type says: `lossy` when it could not be read as its type and nothing is asserted about it, `judgement` when it is text that is not UTF-8 and is compared as octets |
 | `state-params-untyped` | `note` | v3 state parameters carried across as-is; the format types them, the pact did not |
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
 | `interaction-dropped` | `lossy` | an interaction could not be converted at all: a message interaction, or one that needs a pact plugin, named in the message (ADR 0045) |

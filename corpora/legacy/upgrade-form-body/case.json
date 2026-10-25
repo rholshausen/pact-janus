@@ -1,0 +1,171 @@
+{
+  "description": "a v4 form body and the contract `janus upgrade` converts it into accept the same form: each name's values in order and as many, the integer rule on text the pattern it is read by — plan-grammar spec section 4.4's two-path agreement, staged plan S1.25",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get a form",
+          "request": {
+            "method": "GET",
+            "path": "/form"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "n=17&ok=true&tag=a&tag=b",
+              "contentType": "application/x-www-form-urlencoded",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.n": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                },
+                "$.tag": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a form",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/form",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "n": {
+                "entries": [
+                  {
+                    "example": "17",
+                    "pattern": "^\\+?[0-9]+$",
+                    "shape": "regex"
+                  }
+                ],
+                "shape": "array"
+              },
+              "ok": {
+                "entries": [
+                  {
+                    "example": "true",
+                    "shape": "equality"
+                  }
+                ],
+                "shape": "array"
+              },
+              "tag": {
+                "entries": [
+                  {
+                    "example": "a",
+                    "pattern": "^(?:[a-z])$",
+                    "shape": "regex"
+                  },
+                  {
+                    "example": "b",
+                    "pattern": "^(?:[a-z])$",
+                    "shape": "regex"
+                  }
+                ],
+                "shape": "array"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/x-www-form-urlencoded",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:x\\-www\\-form\\-urlencoded)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/x-www-form-urlencoded"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/form"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/form",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": {
+      "n": [
+        "+903"
+      ],
+      "ok": [
+        "true"
+      ],
+      "tag": [
+        "x",
+        "y"
+      ]
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

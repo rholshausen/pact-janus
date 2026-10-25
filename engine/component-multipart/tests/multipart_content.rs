@@ -242,6 +242,26 @@ fn a_type_with_no_boundary_does_not_decode(#[case] content_type: &str) {
   assert!(result.is_err(), "{result:?}");
 }
 
+/// A declared type with no boundary decodes octets labelled with one at that boundary (ADR 0047): a
+/// contract declares the type, and a reply names its own boundary.
+#[test]
+fn a_declared_type_with_no_boundary_reads_the_labels() {
+  let decoded = |declared: &str, label: &str| {
+    MultipartContent::new().decode(Decode {
+      content_type: declared.to_string(),
+      value: octets(MIXED.as_bytes(), label),
+      options: None,
+    })
+  };
+  assert_eq!(
+    decoded("multipart/mixed", MIXED_TYPE).expect("decodes").document,
+    decode(MIXED.as_bytes(), MIXED_TYPE)
+  );
+  // A declared boundary is the one used, and a label with none gives none.
+  assert!(decoded("multipart/mixed; boundary=other", MIXED_TYPE).is_err());
+  assert!(decoded("multipart/mixed", "multipart/mixed").is_err());
+}
+
 #[rstest]
 #[case("multipart/form-data", true)]
 #[case("multipart/mixed; boundary=x", true)]

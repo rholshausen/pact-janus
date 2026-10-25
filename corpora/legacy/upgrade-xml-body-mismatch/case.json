@@ -1,0 +1,198 @@
+{
+  "description": "a v4 XML body and the contract `janus upgrade` converts it into refuse an attribute that is not by its rule, with the same mismatch — plan-grammar spec section 4.4's two-path agreement, staged plan S1.25",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get a note",
+          "request": {
+            "method": "GET",
+            "path": "/note"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "<?xml version=\"1.0\"?><n:note xmlns:n=\"urn:notes\" xmlns:x=\"urn:x\" lang=\"en\" x:rev=\"2\"><to>Ada</to><line>one</line><line>two</line></n:note>",
+              "contentType": "application/xml",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.urn:notes:note['@lang']": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]{2}"
+                    }
+                  ]
+                },
+                "$.urn:notes:note.line": {
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a note",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/note",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "note": {
+                "members": {
+                  "#namespace": {
+                    "example": "urn:notes",
+                    "shape": "equality"
+                  },
+                  "@lang": {
+                    "example": "en",
+                    "pattern": "^(?:[a-z]{2})$",
+                    "shape": "regex"
+                  },
+                  "@{urn:x}rev": {
+                    "example": "2",
+                    "shape": "equality"
+                  },
+                  "#text": {
+                    "shape": "forbidden"
+                  },
+                  "line": {
+                    "items": {
+                      "members": {},
+                      "shape": "object"
+                    },
+                    "min": 1,
+                    "shape": "each-like"
+                  },
+                  "to": {
+                    "entries": [
+                      {
+                        "members": {
+                          "#text": {
+                            "example": "Ada",
+                            "shape": "equality"
+                          }
+                        },
+                        "shape": "object"
+                      }
+                    ],
+                    "shape": "array"
+                  }
+                },
+                "shape": "object"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/xml",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:xml)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/xml"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/xml"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/note",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": {
+      "note": {
+        "#namespace": "urn:notes",
+        "@lang": "fra",
+        "@{urn:x}rev": "2",
+        "@extra": "x",
+        "to": [
+          {
+            "#text": "Ada"
+          }
+        ],
+        "line": [
+          {
+            "#text": "uno"
+          },
+          {
+            "#text": "dos"
+          },
+          {
+            "#text": "tres"
+          }
+        ]
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.note.@lang",
+        "message": "Expected 'fra' to match '^(?:[a-z]{2})$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

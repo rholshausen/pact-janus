@@ -1,0 +1,41 @@
+{
+  "description": "a member whose name a path segment cannot hold is resolved by a quoted segment, as `navigate` reads one: a name with a dot is one member, not two; a namespaced XML attribute's Clark name and a multipart body's unnamed parts (\"\") are members too (staged plan S1.25, ADR 0047)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "names a path cannot hold",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "a.b": { "shape": "equality", "example": 1 },
+              "@{urn:x}rev": { "shape": "equality", "example": "2" },
+              "": { "shape": "array", "entries": [{ "shape": "type", "example": "x" }] },
+              "it's": { "shape": "integer", "example": 3 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "a": { "b": 2 },
+      "a.b": 1,
+      "@{urn:x}rev": "2",
+      "": ["y"],
+      "it's": "3"
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body['it\\'s']",
+        "message": "Expected a integer but got '3'",
+        "action": "match:integer"
+      }
+    ]
+  }
+}
