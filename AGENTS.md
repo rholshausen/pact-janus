@@ -110,7 +110,11 @@ Three sources are the source of truth and take precedence over this file when th
 > today's spellings and variables where they mean what they did, its filters as `options.filter`,
 > pacts by URL as a `urls` source, and `--exit-on-first-error` as `stop-on-first-failure`;
 > `Documentation/verifier-migration.md` has a row for every option), and its exit waits on pilot
-> providers accepting the dropped rows.
+> providers accepting the dropped rows. S1.29, the CLI output review, is done: an engine error's
+> `details` are not printed in text, a component's failure leads with its own code, a hook's failure
+> is printed once under the result it failed, a run the engine ends before it verifies anything
+> exits 2, and a stopped or aborted run's summary counts `variants.not-run`. S1.30 holds what the
+> review found in what the engine reports.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

@@ -1186,6 +1186,24 @@ item in 1a is done when S1.1 agrees.
   same refusal for files does, which settles ADR 0041's open consequence. Today's verifier exits 1
   for each of these, and for a pact file it cannot read; `Documentation/verifier-migration.md` says so.
   *Exit:* each finding fixed, with the trycmd and snapbox cases that pin the output changed to match.
+  *Done 2026-10-26*, in three commits, one per kind. Two findings moved to S1.30, since the engine
+  writes the text and the corpora pin it: "Expected a integer", and the `pair(s)` and `variant(s)`
+  in `janus check`'s report. Not foreseen:
+  - `verify` and `upgrade` called a source they could not read "the session's interactions cannot
+    produce a valid contract", `consumer-session/finalise`'s message. Reading a document now has its
+    own.
+  - The hook host's body excerpt always dropped the last character.
+  - A stopped run's summary could not say how much it left: the count was only ever the hook
+    report's, which a run with no hooks does not have. The summary now has `variants.not-run`
+    (protocol spec §9.6).
+  - Several messages leaned on their `details`. `variant-not-found` now names the recorded ids, and
+    `hook-http-failed` quotes the reply's body.
+  - The registry's credentials hint said "declare them" with nothing for "them" to name.
+  - `broker-unreachable` said "the Pact Broker" of a pact fetched by its URL.
+  Errors that name a file by its position are mapped back to the file by the CLI, which alone knows
+  it. The URL flags are checked as the command line is read. The help names `pact_verifier_cli`, puts
+  `--log-level` and `--no-colour` under "Global options", and shows every variable as
+  `[env: NAME]`, never its value.
 
 - **S1.30 Mismatch paths and absent values in plan text** — **S**, split from S1.29 because each
   changes what the engine reports, and so the specifications and corpora. A mismatch inside a

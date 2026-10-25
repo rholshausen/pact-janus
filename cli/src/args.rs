@@ -32,12 +32,13 @@ pub struct Cli {
     alias = "loglevel",
     global = true,
     value_enum,
-    value_name = "LEVEL"
+    value_name = "LEVEL",
+    help_heading = "Global options"
   )]
   pub log_level: Option<LogLevel>,
 
   /// Print no colour, on a terminal too (as NO_COLOR does)
-  #[arg(long, alias = "no-color", global = true)]
+  #[arg(long, alias = "no-color", global = true, help_heading = "Global options")]
   pub no_colour: bool,
 
   #[command(subcommand)]
@@ -224,12 +225,16 @@ pub enum Output {
                         which includes pacts a broker or URL could not supply.",
   arg_required_else_help = true
 )]
+// Every option read from the environment hides the variable's value in `--help`, here and in
+// `publish`: so each is shown one way, `[env: NAME]`, and help never prints a credential or whatever
+// a CI job happened to set.
 pub struct VerifyArgs {
   /// Janus contracts or v1-v4 pact files, or directories of them. Not with --broker-url or --url
   #[arg(value_name = "CONTRACT_OR_PACT")]
   pub sources: Vec<PathBuf>,
 
-  /// The base URL of the provider under test. Or --hostname and --port, as today's verifier
+  /// The base URL of the provider under test. Or --hostname and --port, as pact_verifier_cli
+  /// takes it
   #[arg(long, short = 'u', alias = "provider-base-url", value_name = "URL", value_parser = absolute_url)]
   pub provider_url: Option<String>,
 
@@ -240,6 +245,7 @@ pub struct VerifyArgs {
     long,
     value_name = "HOST",
     env = "PACT_PROVIDER_HOSTNAME",
+    hide_env_values = true,
     help_heading = "Provider connection"
   )]
   pub hostname: Option<String>,
@@ -250,6 +256,7 @@ pub struct VerifyArgs {
     short = 'p',
     value_name = "PORT",
     env = "PACT_PROVIDER_PORT",
+    hide_env_values = true,
     help_heading = "Provider connection"
   )]
   pub port: Option<u16>,
@@ -278,6 +285,7 @@ pub struct VerifyArgs {
     long,
     value_name = "URL", value_parser = absolute_url,
     env = "PACT_WEBHOOK_CALLBACK_URL",
+    hide_env_values = true,
     help_heading = "Loading pacts"
   )]
   pub webhook_callback_url: Option<String>,
@@ -300,13 +308,14 @@ pub struct VerifyArgs {
   #[arg(long = "variant", value_name = "ID")]
   pub variants: Vec<String>,
 
-  /// The transport to bind to the provider. `https`, today's verifier's spelling, is the `http`
+  /// The transport to bind to the provider. `https`, pact_verifier_cli's spelling, is the `http`
   /// transport over TLS
   #[arg(
     long,
     value_name = "KIND",
     default_value = "http",
-    env = "PACT_PROVIDER_TRANSPORT"
+    env = "PACT_PROVIDER_TRANSPORT",
+    hide_env_values = true
   )]
   pub transport: String,
 
@@ -316,7 +325,7 @@ pub struct VerifyArgs {
 
   // Today's state-change options, written as the hooks they become (staged plan S1.13, ADR 0053).
   // A configuration with state-setup hooks of its own says it once, there.
-  /// Set up each interaction's provider states by POSTing them here, as today's verifier: a
+  /// Set up each interaction's provider states by POSTing them here, as pact_verifier_cli does: a
   /// state-setup hook in pact-state-change format
   #[arg(
     long,
@@ -324,6 +333,7 @@ pub struct VerifyArgs {
     alias = "provider-states-setup-url",
     value_name = "URL", value_parser = absolute_url,
     env = "PACT_PROVIDER_STATE_CHANGE_URL",
+    hide_env_values = true,
     help_heading = "Provider states"
   )]
   pub state_change_url: Option<String>,
@@ -333,6 +343,7 @@ pub struct VerifyArgs {
     long,
     requires = "state_change_url",
     env = "PACT_PROVIDER_STATE_CHANGE_AS_QUERY",
+    hide_env_values = true,
     help_heading = "Provider states"
   )]
   pub state_change_as_query: bool,
@@ -342,6 +353,7 @@ pub struct VerifyArgs {
     long,
     requires = "state_change_url",
     env = "PACT_PROVIDER_STATE_CHANGE_TEARDOWN",
+    hide_env_values = true,
     help_heading = "Provider states"
   )]
   pub state_change_teardown: bool,
@@ -354,6 +366,7 @@ pub struct VerifyArgs {
     long,
     value_name = "REGEX",
     env = "PACT_DESCRIPTION",
+    hide_env_values = true,
     help_heading = "Filtering interactions"
   )]
   pub filter_description: Option<String>,
@@ -364,13 +377,19 @@ pub struct VerifyArgs {
     long,
     value_name = "REGEX",
     env = "PACT_PROVIDER_STATE",
+    hide_env_values = true,
     conflicts_with = "filter_no_state",
     help_heading = "Filtering interactions"
   )]
   pub filter_state: Option<String>,
 
   /// Verify only the interactions with no provider state
-  #[arg(long, env = "PACT_PROVIDER_NO_STATE", help_heading = "Filtering interactions")]
+  #[arg(
+    long,
+    env = "PACT_PROVIDER_NO_STATE",
+    hide_env_values = true,
+    help_heading = "Filtering interactions"
+  )]
   pub filter_no_state: bool,
 
   /// Verify only this consumer's pacts and contracts; repeatable
@@ -398,6 +417,7 @@ pub struct VerifyArgs {
     long,
     value_name = "PATH",
     env = "PACT_PROVIDER_BASE_PATH",
+    hide_env_values = true,
     help_heading = "Provider connection"
   )]
   pub base_path: Option<String>,
@@ -418,7 +438,7 @@ pub struct VerifyArgs {
   pub custom_provider_header: Vec<(String, String)>,
 
   /// Send one kind of interaction to PORT and PATH on the provider URL's host, over plain HTTP, as
-  /// today's --transports: `http` for HTTP interactions, `message` (or `async-message`,
+  /// pact_verifier_cli's --transports does: `http` for HTTP interactions, `message` (or `async-message`,
   /// `sync-message`, or the transport a pact names) for messages; repeatable
   #[arg(
     long,
@@ -434,6 +454,7 @@ pub struct VerifyArgs {
     long,
     value_name = "MS",
     env = "PACT_PROVIDER_REQUEST_TIMEOUT",
+    hide_env_values = true,
     value_parser = clap::value_parser!(u64).range(1..),
     help_heading = "Provider connection"
   )]
@@ -489,7 +510,7 @@ pub struct VerifyArgs {
   )]
   pub no_proxy: Vec<String>,
 
-  /// The HTTP versions to speak to the provider: 1.1, as today's verifier; 2 only; or negotiate,
+  /// The HTTP versions to speak to the provider: 1.1, as pact_verifier_cli does; 2 only; or negotiate,
   /// offering both over TLS [default: 1.1]
   #[arg(
     long,
@@ -509,6 +530,7 @@ pub struct VerifyArgs {
     alias = "pact-broker-base-url",
     value_name = "URL", value_parser = absolute_url,
     env = "PACT_BROKER_BASE_URL",
+    hide_env_values = true,
     help_heading = "Pact Broker"
   )]
   pub broker_url: Option<String>,
@@ -520,6 +542,7 @@ pub struct VerifyArgs {
     alias = "provider",
     value_name = "NAME",
     env = "PACT_PROVIDER_NAME",
+    hide_env_values = true,
     help_heading = "Pact Broker"
   )]
   pub provider_name: Option<String>,
@@ -535,7 +558,7 @@ pub struct VerifyArgs {
   )]
   pub consumer_version_selectors: Vec<String>,
 
-  /// Consumer version tags, comma-separated: the latest pact for each, as today's verifier selects
+  /// Consumer version tags, comma-separated: the latest pact for each, as pact_verifier_cli selects
   /// them. Not with --consumer-version-selectors
   #[arg(
     long,
@@ -553,17 +576,18 @@ pub struct VerifyArgs {
     long,
     value_name = "N",
     env = "PACT_BROKER_HTTP_RETRIES",
+    hide_env_values = true,
     help_heading = "Pact Broker"
   )]
   pub retries: Option<u32>,
 
   /// Ask the broker which pacts are pending: their failures are reported, and do not fail the run.
-  /// Only with --consumer-version-selectors, as today's verifier
+  /// Only with --consumer-version-selectors, as with pact_verifier_cli
   #[arg(long, requires = "broker_url", help_heading = "Pact Broker")]
   pub enable_pending: bool,
 
   /// Also verify the work-in-progress pacts published since this date (YYYY-MM-DD); they are
-  /// pending. Only with --consumer-version-selectors, as today's verifier
+  /// pending. Only with --consumer-version-selectors, as with pact_verifier_cli
   #[arg(
     long,
     value_name = "DATE",
