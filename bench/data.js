@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792897636801,
+  "lastUpdate": 1792897638846,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -22620,6 +22620,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 26403,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "a6d1ce6171651a44543f8fc18ec5f364e93d8365",
+          "message": "feat: S1.10 content-type shapes match in live runs, through the session's registry (ADR 0049)\n\nmatch:content-type failed every live verification and mock exchange with\n\"no content component is loaded\": only the corpus runner gave the\ninterpreter a detector.\n\n- The detector is the session's content registry, through one adapter\n  (ContentDetection) the live paths and the corpus runner share; the JSON\n  component has no detector of its own.\n- The detector is told the path a value came from, so a whole slot is read\n  from the arrival's own octets and label rather than its decoded document.\n- On a contract, the declared or labelled type is the type and detection\n  only resolves its absence (component-interfaces spec 6.5); a v1-v4\n  contentType matcher sniffs the octets, as today's verifier does.\n- Types are compared by essence (media_type_matches).\n\ncorpora/shapes/content-type's shape now runs through janus verify in\ncli/tests/cli.rs. Built-in detection knows JSON only.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T14:01:48+11:00",
+          "tree_id": "82441298aae2a71b7431a1d51bb4ea8a6900d765",
+          "url": "https://github.com/rholshausen/pact-janus/commit/a6d1ce6171651a44543f8fc18ec5f364e93d8365"
+        },
+        "date": 1792897638200,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 38798,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30077,
             "unit": "requests per second",
             "extra": "engines 4"
           }
