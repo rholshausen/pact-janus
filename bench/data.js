@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792899002454,
+  "lastUpdate": 1792899004325,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -22974,6 +22974,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30077,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "828afbbb09eafb9beeb2e16d1b7f1f5e102d35e5",
+          "message": "feat: S1.12 explain compiles what a run compiles, and runs captured values (ADR 0050)\n\nverification/explain loaded no components, so it printed the generic plan\nwhere verify runs a component's fragment (Phase 9 finding 23), and janus\nexplain --executed ran the plan through the kernel's Rust API, the one\nplace the CLI stepped outside the protocol (finding 31).\n\n- verification/explain takes `components`, resolved and checked as a\n  run's are; a contract's content-types now reach the compiler. An\n  interaction no loaded component can carry is refused as\n  component-unavailable, as verify refuses it.\n- It takes `values` (and `encoded`), runs the plan with the run's content\n  detection and contributed actions, and returns `executed`: status,\n  mismatches and the executed text.\n- janus explain --config loads a configuration's components; --executed\n  sends its values in the same call.\n- The protocol client's explain.test.ts declares the CSV component and\n  runs csv:integer; CI's sdk-tooling job builds the component for it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T14:24:30+11:00",
+          "tree_id": "e3d18ee3388ece44605026432c438ccd098fe429",
+          "url": "https://github.com/rholshausen/pact-janus/commit/828afbbb09eafb9beeb2e16d1b7f1f5e102d35e5"
+        },
+        "date": 1792899003772,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 38877,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30545,
             "unit": "requests per second",
             "extra": "engines 4"
           }
