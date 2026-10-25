@@ -1,0 +1,117 @@
+{
+  "$comment": "Every verdict janus verify gives a pact and the contract janus upgrade converts it into differently, each with what accounts for it: the staged-plan item that closes it, or the ADR that says why the conversion cannot say what the pact does. `verifier-diff run` fails on one not listed here, and on an entry nothing disagrees on any more. Staged plan S1.19; plan-grammar spec section 4.4.",
+  "disagreements": [
+    {
+      "case": "bodies/content-type-extra-parameter",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a parameter (version=2) fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "bodies/content-type-extra-parameter",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a parameter (version=2) fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "bodies/xml-rules",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "bodies/xml-rules",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "compatibility-suite/v4/01-verifying-a-pending-http-interaction",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S1.28: the interaction is pending, so its failure does not fail the pact's run; a contract has no pending interactions, and the upgrade reports pending-dropped"
+    },
+    {
+      "case": "generators/xml-body",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0048: the contract's generated XML body is written back by the XML component, which declares and quotes the document otherwise than sxd-document, and this provider recognises the body byte for byte; the document is the same"
+    },
+    {
+      "case": "generators/xml-body",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0048: the contract's generated XML body is written back by the XML component, which declares and quotes the document otherwise than sxd-document, and this provider recognises the body byte for byte; the document is the same"
+    },
+    {
+      "case": "matching-rules/array-contains",
+      "key": "0/2",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[0].id/other-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[0].id/other-type",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[1].id/other-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[1].id/other-type",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[0].id/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[0].id/missing",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[1].id/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "matching-rules/array-contains/mutations/0/2/body/$.labels[1].id/missing",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0047: each arrayContains variant became an entry of contains, which needs a distinct element per entry, where v1-v4 let one element satisfy two variants. The upgrade reports it as rule-narrowed"
+    }
+  ]
+}

@@ -207,6 +207,15 @@ generator's output MUST be admitted by the node's own shape; an engine SHOULD ch
 generator whose output its own shape rejects as a component error, not as a test failure. Generator
 configuration is design 2.6's surface; this specification only reserves the member.
 
+The member is `{ "name": "<component>:<generator>", "config": { … } }` ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)): `name` is what
+`generator/generate` names, and `config` is the component's, passed as it stands. A generator changes
+what is produced, never what is admitted, and the example is still what a contract records: a mock fills
+a fresh value into its reply each time it serves one, and a verifier into the request it sends
+(variant semantics §5.2). The positions filled are those the shape walks: an `object`'s members, an
+`array`'s entries, every element of an `each-like`, every value of an `each-entry`, and what an
+`optional` or `nullable` wraps when it is there. Nothing below a `contains` entry is filled, since which
+element it claims is known only once it is matched.
+
 ### 3.5 Component operators and namespacing
 
 The core operator vocabulary is unnamespaced. A component — content handler, matcher component, plugin

@@ -537,6 +537,10 @@ to send. What pinning does not do is demand an exact list length. A cardinality 
 region (shape spec §6.4), so `min+1` takes any list longer than the minimum, and a consumer sending a
 list whose length is its own data meets it with that list.
 
+A response position whose shape names a generator (shape spec §3.4) is filled with a fresh value each
+time the mock serves the variant, a new one for every exchange ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)). What is recorded is
+still the example, so recording the same variant twice writes the same contract.
+
 ### 4.2 Exercised
 
 A variant is **exercised** when the interaction actually ran under it: for a passive interaction, the
@@ -609,7 +613,9 @@ For each recorded variant, in order:
 
 1. resolve the interaction's provider states for that variant (§6) and run `state-setup`;
 2. send the **recorded request example** for that variant — replay is by example, so the provider sees
-   the bytes the consumer actually sent, not a re-derivation;
+   the bytes the consumer actually sent, not a re-derivation. The one exception is a position whose
+   shape names a generator (shape spec §3.4): it is filled with a fresh value once the states have
+   answered, from their values, as a v1–v4 pact's request is generated ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md));
 3. match the response against the interaction's shape **pinned to that variant** (shape spec §7.1): an
    `optional` pinned to `absent` admits only `⊥`, an `any-of` pinned to `SHIPPED` admits only that, an
    `each-like` pinned to `min+1` admits any length in that point's region (shape spec §6.4) — a

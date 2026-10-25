@@ -1,0 +1,49 @@
+(
+  :"get a user" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'POST'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/users'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.request.headers.content-type,
+          'application/json'
+        ),
+        :"$.userId" (
+          %match:type (
+            $.request.body.userId,
+            100
+          )
+        ),
+        %legacy:only-entries (
+          $.request.body,
+          'userId'
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          201
+        )
+      )
+    )
+  )
+)

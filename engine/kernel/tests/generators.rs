@@ -36,6 +36,11 @@ fn engine() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  // As every embedding registers them, after JSON (ADR 0036 to ADR 0039).
+  engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
+  engine.declare_in_tree("content", "xml", "1.0.0");
+  engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
+  engine.declare_in_tree("content", "form", "1.0.0");
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   send(
@@ -429,4 +434,146 @@ fn a_consumer_side_generator_is_left_alone() {
     requests[0].headers.get("location"),
     Some(&"http://localhost:1234/things/1".to_string())
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Staged plan S1.19, ADR 0048: the contract a pact upgrades into generates the same request
+// ---------------------------------------------------------------------------------------------
+
+/// The contract `janus upgrade` converts `pact` into, with its generators on its shapes.
+fn upgraded(pact: &Value) -> Value {
+  let upgraded = pact_janus_kernel::legacy::upgrade::pact("test", pact).expect("the pact upgrades");
+  assert!(
+    !upgraded.findings.iter().any(|f| f.code == "generator-dropped"),
+    "{:?}",
+    upgraded.findings
+  );
+  serde_json::to_value(&upgraded.contract).expect("a contract serializes")
+}
+
+/// Verify the contract `pact` upgrades into against a fresh stub, returning its events and what the
+/// provider received.
+fn verify_upgraded(
+  pact: &Value,
+  state_reply: &'static str,
+  with_states: bool,
+) -> (Vec<Value>, Vec<Received>) {
+  let (base_url, received) = stub("{}", state_reply);
+  let states = with_states.then(|| format!("{base_url}/states"));
+  let events = verify(&mut engine(), upgraded(pact), &base_url, states.as_deref());
+  (events, provider_requests(&received))
+}
+
+#[test]
+fn a_contracts_request_generators_are_fed_by_the_state_change_reply() {
+  let pact = pact(
+    json!([{ "name": "an order exists" }]),
+    json!({
+      "method": "GET",
+      "path": "/orders/1",
+      "generators": { "path": { "type": "ProviderState", "expression": "/orders/${id}" } }
+    }),
+  );
+  let (events, requests) = verify_upgraded(&pact, r#"{"id": 1234}"#, true);
+  assert_eq!(
+    of_kind(&events, "verification/interaction-result")[0]["status"],
+    json!("verified")
+  );
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert_eq!(requests[0].line, "GET /orders/1234 HTTP/1.1");
+}
+
+#[test]
+fn a_contracts_value_generators_reach_the_header_the_query_and_the_body() {
+  let pact = pact(
+    json!([{ "name": "a state", "params": { "name": "Ada" } }]),
+    json!({
+      "method": "POST",
+      "path": "/things",
+      "query": { "v1": ["1"] },
+      "headers": { "X-Test": "1", "Content-Type": "application/json" },
+      "body": { "one": 1, "two": "fixed", "items": [{ "id": 1 }, { "id": 2 }] },
+      "matchingRules": { "body": { "$.items": { "matchers": [{ "match": "type" }] } } },
+      "generators": {
+        "header": { "X-Test": { "type": "RandomInt", "min": 100, "max": 100 } },
+        "query": { "v1": { "type": "RandomInt", "min": 200, "max": 200 } },
+        "body": {
+          "$.one": { "type": "RandomInt", "min": 300, "max": 300 },
+          "$.two": { "type": "ProviderState", "expression": "${name}" },
+          "$.items[*].id": { "type": "RandomInt", "min": 9, "max": 9 }
+        }
+      }
+    }),
+  );
+  let (events, requests) = verify_upgraded(&pact, "{}", false);
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert_eq!(requests[0].line, "POST /things?v1=200 HTTP/1.1");
+  assert_eq!(requests[0].headers.get("x-test"), Some(&"100".to_string()));
+  let body: Value = serde_json::from_str(&requests[0].body).expect("a JSON body");
+  assert_eq!(
+    body,
+    json!({ "one": 300, "two": "Ada", "items": [{ "id": 9 }, { "id": 9 }] })
+  );
+}
+
+#[test]
+fn a_contracts_form_and_xml_bodies_are_generated() {
+  let form = pact(
+    json!([{ "name": "an order exists" }]),
+    json!({
+      "method": "POST",
+      "path": "/orders",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "body": "a=1&b=2&b=3&id=1&note=as+is",
+      "generators": { "body": {
+        "$.b": { "type": "RandomInt", "min": 7, "max": 7 },
+        "$.b[1]": { "type": "RandomInt", "min": 8, "max": 8 },
+        "$.id": { "type": "ProviderState", "expression": "${id}" }
+      } }
+    }),
+  );
+  let (events, requests) = verify_upgraded(&form, r#"{"id": 1234}"#, true);
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert_eq!(requests[0].body, "a=1&b=7&b=8&id=1234&note=as+is");
+
+  let xml = pact(
+    json!([]),
+    json!({
+      "method": "POST",
+      "path": "/things",
+      "headers": { "Content-Type": "application/xml" },
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a id=\"1\"><b>2</b><c>as is</c></a>",
+      "generators": { "body": {
+        "$.a['@id']": { "type": "RandomInt", "min": 7, "max": 7 },
+        "$.a.b['#text']": { "type": "RandomInt", "min": 8, "max": 8 }
+      } }
+    }),
+  );
+  let (events, requests) = verify_upgraded(&xml, "{}", false);
+  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  // Written back by the XML component, which keeps what a verdict reads (ADR 0039 decision 2).
+  let document = pact_janus_kernel::legacy::xml::document(requests[0].body.as_bytes()).expect("XML");
+  assert_eq!(
+    document.to_json(),
+    json!({ "a": { "@id": "7", "b": [{ "#text": "8" }], "c": [{ "#text": "as is" }] } })
+  );
+}
+
+#[test]
+fn a_contracts_generator_that_produces_nothing_sends_the_recorded_value_and_warns() {
+  let pact = pact(
+    json!([{ "name": "an order exists" }]),
+    json!({
+      "method": "GET",
+      "path": "/orders/1",
+      "generators": { "path": { "type": "ProviderState", "expression": "/orders/${id}" } }
+    }),
+  );
+  let (events, requests) = verify_upgraded(&pact, "{}", true);
+  let warnings = of_kind(&events, "verification/warning");
+  assert_eq!(warnings.len(), 1, "{events:?}");
+  assert_eq!(warnings[0]["code"], json!("generator-failed"));
+  assert_eq!(warnings[0]["target"], json!("$.request.path"));
+  assert_eq!(warnings[0]["generator"], json!("pact:ProviderState"));
+  assert_eq!(requests[0].line, "GET /orders/1 HTTP/1.1");
 }

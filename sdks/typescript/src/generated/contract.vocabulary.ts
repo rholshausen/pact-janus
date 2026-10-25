@@ -30,6 +30,7 @@ export const FindingCode = {
   BodyNotParsed: "body-not-parsed",
   StateParamsUntyped: "state-params-untyped",
   DuplicateDescription: "duplicate-description",
+  PendingDropped: "pending-dropped",
   InteractionDropped: "interaction-dropped",
 } as const;
 

@@ -1,0 +1,165 @@
+{
+  "description": "a v3 response with RandomInt and Regex generators, and the contract `janus upgrade` converts it into, which carries each on its shape: both admit a reply a mock generated in place of the example, as its rules say it may be — plan-grammar spec section 4.4's two-path agreement, staged plan S1.19",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get a user",
+          "providerStates": [
+            {
+              "name": "a user exists",
+              "params": {
+                "id": 1234
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "path": "/users/1"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": 1,
+              "token": "abc-1"
+            },
+            "matchingRules": {
+              "body": {
+                "$.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                },
+                "$.token": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[a-z]+-\\d+"
+                    }
+                  ]
+                }
+              }
+            },
+            "generators": {
+              "body": {
+                "$.id": {
+                  "type": "RandomInt",
+                  "min": 1,
+                  "max": 999
+                },
+                "$.token": {
+                  "type": "Regex",
+                  "regex": "[a-z]+-\\d+"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a user",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/users/1",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "id": {
+                "example": 1,
+                "generator": {
+                  "name": "pact:RandomInt",
+                  "config": {
+                    "max": 999,
+                    "min": 1
+                  }
+                },
+                "shape": "integer"
+              },
+              "token": {
+                "example": "abc-1",
+                "generator": {
+                  "name": "pact:Regex",
+                  "config": {
+                    "regex": "[a-z]+-\\d+"
+                  }
+                },
+                "pattern": "^(?:[a-z]+-\\d+)$",
+                "shape": "regex"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/json",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/json"
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/users/1",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": {
+      "id": 572,
+      "token": "xqz-90"
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

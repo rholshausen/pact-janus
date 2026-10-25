@@ -491,14 +491,15 @@ slot, this position, this constraint", which is where a shape node goes.
 | `contentType` | `content-type` | |
 | `min`, `max`, `minmax` on an array | `each-like` with `min`/`max` | the bound is the declaring array's own: a rule that only *cascades* to a nested array gives it `each-like` with `min: 0` and no `max`, because v1–v4 never re-apply a bound below the array that declared it. A bare `type` on an array names no bound and becomes `each-like`'s default `min: 1` — stricter than v1–v4, which admit `[]` — reported as `rule-narrowed` (`judgement`) |
 | `values` | `each-entry` over values | |
-| `eachKey`, `eachValue` | `each-entry` over keys / values | |
+| `eachKey`, `eachValue` | `each-entry` over keys / values | each by the rule's own matchers. `eachKey` leaves the values open, since v1–v4 compare a member the pact names only when the reply has it (`rule-unmapped`). `eachValue` on a list is `each-like` with `min: 0` (ADR 0048) |
 | `arrayContains` | `contains` | |
 | `statusCode` | `http:status-class` | a component operator, not a core one — the kernel does not know what a status class is (shape spec §3.5) |
 
 **Bodies** are converted by their type, as the legacy compiler compares them ([ADR
 0047](../../decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)).
-JSON is walked as the table says. A text body that is UTF-8, a form, XML and multipart declare their
-type in `content-types` (§5.5) and require the built-in component that reads it. Their shapes are over
+JSON is walked as the table says, and declares its type in `content-types` (§5.5) with no requirement,
+since every engine reads JSON (ADR 0048). A text body that is UTF-8, a form, XML and multipart declare
+their type and require the built-in component that reads it. Their shapes are over
 that component's document: text as one value at `$`, a form as each name's values, XML element by
 element, multipart part by part. A binary body, or text that is not UTF-8, is bytes with a base64
 example, left undeclared. A number or boolean rule on text (an attribute, a form, query or header value,
@@ -515,9 +516,14 @@ Two constructs need judgement rather than a row:
   language expresses that only where the alternatives are value sets it can name; where it cannot, the
   converter keeps the first rule and reports `rule-combination-or` as `lossy`.
 
-**Generators** map onto the shape's `generator` member where the generator kind has an equivalent, and
-produce `generator-dropped` where it does not. A dropped generator is lossy but not dangerous — it
-weakens what the contract can *produce*, never what it *accepts*.
+**Generators** map onto the shape's `generator` member (shape spec §3.4) at the position today's
+verifier generates into, naming the built-in `pact` component's generator and its configuration: `{
+"name": "pact:RandomInt", "config": { "min": 1, "max": 100 } }` ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)). A verifier fills a
+request's when it sends it, and a mock a response's when it serves it. A generator no component provides
+(`MockServerURL`, a plugin's), one today's verifier does not apply (in a text, binary or multipart body),
+or one whose path names no position of the converted shape produces `generator-dropped`. A dropped
+generator is lossy but not dangerous — it weakens what the contract can *produce*, never what it
+*accepts*.
 
 ### 8.3 The single example becomes the sole variant
 
@@ -558,7 +564,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `rule-unmapped` | `lossy` | no shape equivalent, including unresolvable `AND` combinations |
 | `rule-combination-or` | `lossy` | `combine: "OR"` the shape language cannot name |
 | `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator, or what v1–v4 compare loosely became exact: a header with no rule, a group of XML children or multipart parts the reply may have more of (ADR 0047) |
-| `generator-dropped` | `lossy` | a generator with no shape equivalent |
+| `generator-dropped` | `lossy` | a generator no component provides, one today's verifier does not apply, or one whose path names no position of the converted shape |
 | `request-body-opened` | `lossy` | a request body was an object, a form or XML: v1–v4 close it to unnamed members, names, attributes and children, shapes cannot (ADR 0007) |
 | `response-body-opened` | `lossy` | a response form, or an XML element a type rule reaches the children of: v1–v4 close it to names or children the pact does not have, shapes cannot (ADR 0047) |
 | `body-type-on-header` | `judgement` | the pact named no `Content-Type` header, and its check of the reply's type became a pattern on the header, which refuses a label that is not a type or has a wildcard (ADR 0047) |
@@ -568,6 +574,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `body-not-parsed` | `lossy` or `judgement` | a body is not what its content type says: `lossy` when it could not be read as its type and nothing is asserted about it, `judgement` when it is text that is not UTF-8 and is compared as octets |
 | `state-params-untyped` | `note` | v3 state parameters carried across as-is; the format types them, the pact did not |
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
+| `pending-dropped` | `lossy` | a v4 interaction was marked pending, which a contract has no form for: a failure of it fails the run (ADR 0048, staged plan S1.28) |
 | `interaction-dropped` | `lossy` | an interaction could not be converted at all: a message interaction, or one that needs a pact plugin, named in the message (ADR 0045) |
 
 An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an

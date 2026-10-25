@@ -72,7 +72,7 @@ Five constructs, four outcomes. `$.id`, `$.status` and `$.customer.id` map strai
           "body": { "shape": "object",
                     "members": {
                       "id": { "shape": "integer", "example": 42,
-                              "generator": { "type": "RandomInt", "min": 1, "max": 100 } },
+                              "generator": { "name": "pact:RandomInt", "config": { "min": 1, "max": 100 } } },
                       "status": { "shape": "regex", "pattern": "^(?:PENDING|SHIPPED)$", "example": "PENDING" },
                       "total": { "shape": "number", "example": 10.0 },
                       "callbackUrl": { "shape": "equality", "example": "http://localhost:1234/orders/42" },

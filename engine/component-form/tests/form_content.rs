@@ -101,9 +101,19 @@ fn what_decode_produces_encodes_back_to_itself() {
   assert_eq!(decode(octets(&body)), Ok(document));
 }
 
+/// A number or a boolean is written as its text, as the XML component writes one (ADR 0048): a
+/// generator in place of a form value may answer with a number.
+#[test]
+fn a_number_or_a_boolean_is_written_as_its_text() {
+  assert_eq!(
+    encode(json!({ "a": 1, "b": [true, "x", 2.5] })),
+    Ok("a=1&b=true&b=x&b=2.5".to_string())
+  );
+}
+
 #[rstest]
 #[case::not_an_object(json!(["a"]))]
-#[case::a_number(json!({ "a": 1 }))]
+#[case::a_null(json!({ "a": null }))]
 #[case::a_nested_object(json!({ "a": [{ "b": "c" }] }))]
 fn a_document_that_is_not_names_and_strings_does_not_encode(#[case] document: Value) {
   assert_eq!(encode(document), Err("encode-failed".to_string()));

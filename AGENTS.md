@@ -93,7 +93,11 @@ Three sources are the source of truth and take precedence over this file when th
 > match), and S1.25 (ADR 0047: `janus upgrade` converts text, binary, form, XML and multipart bodies
 > into their components' documents, declaring the type a component reads; a pact that names no
 > `Content-Type` header has its reply-type check written as a pattern on the header; every v1–v4
-> corpus case reaches one verdict compiled directly and upgraded).
+> corpus case reaches one verdict compiled directly and upgraded), and S1.19 (ADR 0048: a shape's
+> `generator` is `{name, config}`, which `janus upgrade` writes for a v1–v4 generator; a verifier fills a
+> contract's request with fresh values after state setup, and a mock its reply on every exchange, while
+> the example stays the evidence; S1.1's harness also verifies every fixture's upgraded contract,
+> against `corpora/verifier/upgrade-disagreements.json`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -248,7 +252,9 @@ today's verifier (`pact_verifier_cli`, at the version `tools/verifier-diff/pact-
 and `janus verify` on every pact in `corpora/verifier/` against the same provider, and compares the
 verdicts interaction by interaction. Every disagreement is in `corpora/verifier/disagreements.json`
 with the plan item or ADR that accounts for it, or CI's `verifier-diff` job fails — and so does an
-entry nothing disagrees on any more, so a change that closes a gap deletes its entries. Its broker
+entry nothing disagrees on any more, so a change that closes a gap deletes its entries. It also
+upgrades each fixture's pacts and verifies the contracts, comparing `janus verify`'s verdicts on the
+two (S1.19): those differences are in `corpora/verifier/upgrade-disagreements.json`, by the same rules. Its broker
 cases (S1.3) publish their pacts to the Pact Broker `tools/verifier-diff/pact-broker.json` pins, a
 container `.github/scripts/pact-broker.sh` starts, and compare what each run published too:
 

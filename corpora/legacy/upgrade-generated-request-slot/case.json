@@ -1,0 +1,140 @@
+{
+  "description": "a v3 request slot a ProviderState generator fills, and the contract `janus upgrade` converts it into, which carries the generator on the slot's shape (`generator: {name: pact:ProviderState, config}`): both admit the value a verifier generates in place of the example, since a generator changes what is sent and never what is admitted — plan-grammar spec section 4.4's two-path agreement, staged plan S1.19",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get a user",
+          "providerStates": [
+            {
+              "name": "a user exists",
+              "params": {
+                "id": 1234
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "path": "/users",
+            "body": {
+              "userId": 100
+            },
+            "matchingRules": {
+              "body": {
+                "$.userId": {
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                }
+              }
+            },
+            "generators": {
+              "body": {
+                "$.userId": {
+                  "type": "ProviderState",
+                  "expression": "${id}",
+                  "dataType": "INTEGER"
+                }
+              }
+            }
+          },
+          "response": {
+            "status": 201
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a user",
+      "parts": {
+        "request": {
+          "body": {
+            "members": {
+              "userId": {
+                "example": 100,
+                "generator": {
+                  "name": "pact:ProviderState",
+                  "config": {
+                    "dataType": "INTEGER",
+                    "expression": "${id}"
+                  }
+                },
+                "shape": "type"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/json",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "method": {
+            "example": "POST",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/users",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 201,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "request": {
+          "body": "application/json"
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/users",
+    "$.request.query": {},
+    "$.request.headers": {},
+    "$.request.body": {
+      "userId": 1234
+    },
+    "$.response.status": 201
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

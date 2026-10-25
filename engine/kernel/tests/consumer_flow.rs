@@ -680,3 +680,87 @@ fn declared_response_headers_are_served_and_a_json_body_is_labelled() {
   );
   assert_eq!(finalised["ok"]["results"][0]["status"], "verified");
 }
+
+/// Staged plan S1.19, ADR 0048: a reply shape's generator is asked for a fresh value every time the
+/// mock serves it, on the consumer's side, and the contract records the example, so recording the
+/// same interaction twice writes the same contract.
+#[test]
+fn a_generated_response_value_is_fresh_each_exchange_and_the_example_is_recorded() {
+  let mut engine = engine_with_real_components();
+  hello(&mut engine);
+  let created = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" } } }),
+  );
+  let session = created["ok"]["session"].as_str().unwrap().to_string();
+  let mut interaction = order_interaction();
+  interaction["states"] = json!([{ "name": "an order exists", "params": { "id": 66 } }]);
+  interaction["parts"]["response"]["body"] = json!({ "shape": "object", "members": {
+    "token": { "shape": "string", "example": "e2d3f9c0-0000-4000-8000-000000000000",
+               "generator": { "name": "pact:Uuid" } },
+    "id": { "shape": "integer", "example": 1,
+            "generator": { "name": "pact:ProviderState", "config": { "expression": "${id}" } } } } });
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  let handle = added["ok"]["handle"]
+    .as_str()
+    .unwrap_or_else(|| panic!("{added}"))
+    .to_string();
+  send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let started = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let addr = started["ok"]["endpoint"]["base-url"]
+    .as_str()
+    .unwrap()
+    .trim_start_matches("http://")
+    .to_string();
+
+  let mut tokens = Vec::new();
+  for attempt in 0..2 {
+    send(
+      &mut engine,
+      &format!("r-6-{attempt}"),
+      "consumer-session/serve-variant",
+      json!({ "session": session, "handle": handle, "variant": "base" }),
+    );
+    let (status, body) = http_get(&addr, "/orders/66");
+    assert_eq!(status, 200);
+    let token = body["token"].as_str().expect("a token").to_string();
+    assert_eq!(token.len(), 36, "{token}");
+    assert_ne!(token, "e2d3f9c0-0000-4000-8000-000000000000");
+    // A provider-state value is the provider's to give: the mock keeps the example, as today's does.
+    assert_eq!(body["id"], json!(1));
+    tokens.push(token);
+  }
+  assert_ne!(tokens[0], tokens[1], "a fresh value for every exchange");
+
+  let finalised = send(
+    &mut engine,
+    "r-7",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  assert_eq!(finalised["ok"]["results"][0]["status"], "verified");
+  let recorded =
+    &finalised["ok"]["contract"]["interactions"][0]["selection"]["variants"][0]["parts"]["response"]["body"];
+  assert_eq!(
+    recorded["content"]["token"],
+    json!("e2d3f9c0-0000-4000-8000-000000000000"),
+    "{recorded}"
+  );
+}

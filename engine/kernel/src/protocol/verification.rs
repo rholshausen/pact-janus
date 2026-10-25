@@ -65,9 +65,11 @@ use crate::legacy::pact::{
   self as legacy_pact, MessageInteraction, PactInteraction, PluginInteraction, RequestTemplate,
 };
 use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
+use crate::shape::fresh;
 use crate::variant::params;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
@@ -1292,6 +1294,10 @@ struct Ready {
   /// generator reads what they returned. `None` on the shape path, and for a pact request with
   /// none, which replays `request` as it stands.
   generate_from: Option<Box<RequestTemplate>>,
+  /// A contract's request shapes, by part, for the parts whose shapes name a generator (shape-language
+  /// spec §3.4, ADR 0048): the recorded request is filled with fresh values there once the states
+  /// are set up, as a pact's is generated. Empty when nothing is generated.
+  fresh: BTreeMap<String, contract::ShapePart>,
   /// Pinned to this variant on the shape path, compiled from matching rules on the v1–v4 path.
   plan: plan::Plan,
   /// How the reply becomes the values `plan` resolves against. A function rather than a flag
@@ -1382,6 +1388,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         states: states.unwrap_or_default(),
         request,
         generate_from: None,
+        fresh: fresh_parts(&interaction.parts),
         warnings,
         interaction: json!({
           "description": interaction.description,
@@ -1462,6 +1469,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       states,
       request: legacy_pact::request_parts(&interaction.request),
       generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
+      fresh: BTreeMap::new(),
       warnings: Vec::new(),
       interaction: json!({
         "description": interaction.description,
@@ -1576,6 +1584,7 @@ fn prepare_legacy_message(
       states,
       request: Parts::new(),
       generate_from: None,
+      fresh: BTreeMap::new(),
       warnings: Vec::new(),
       interaction: json!({
         "description": message.description,
@@ -1921,6 +1930,7 @@ fn drive_exchange(
 ) -> Result<Driven, Stopped> {
   let names = target.component.exchange_parts();
   let request = match &exchange.ready.generate_from {
+    None if !exchange.ready.fresh.is_empty() => fresh_request(exchange, scratch, ctx),
     None => exchange.ready.request.clone(),
     Some(request) => generated_request(exchange, request, scratch, ctx),
   };
@@ -2014,6 +2024,23 @@ fn generated_request(
   scratch: &ExchangeScratch,
   ctx: &RunContext<'_>,
 ) -> Parts {
+  let provider_state = provider_state(exchange, scratch);
+  let (generated, failures) = request.generate(&provider_state, &PactGenerators);
+  let failures = failures
+    .into_iter()
+    .map(|failure| fresh::Failure {
+      target: failure.target,
+      generator: failure.generator,
+      message: failure.message,
+    })
+    .collect();
+  warn_generator_failures(exchange, failures, ctx);
+  generated
+}
+
+/// The provider-state values a generator reads (ADR 0034 decision 3): every state's `params` in
+/// order, then whatever the `state-setup` hooks returned, a later one replacing an earlier one.
+fn provider_state(exchange: &Exchange<'_>, scratch: &ExchangeScratch) -> Map<String, Value> {
   let mut provider_state = Map::new();
   for state in &exchange.ready.states {
     for (name, value) in state.params.iter().flatten() {
@@ -2021,8 +2048,103 @@ fn generated_request(
     }
   }
   provider_state.extend(scratch.values.iter().map(|(k, v)| (k.clone(), v.clone())));
+  provider_state
+}
 
-  let (generated, failures) = request.generate(&provider_state, &PactGenerators);
+/// A contract's recorded request with every position its shapes give a generator filled with a fresh
+/// value, on the provider's side (ADR 0048), the states having answered: the request a
+/// `before-request` hook sees and the provider gets. Each slot is filled as the document its shape is
+/// about: a slot carried as octets is decoded by its declared type, or the type it is labelled with,
+/// and encoded back by the same one.
+fn fresh_request(exchange: &Exchange<'_>, scratch: &ExchangeScratch, ctx: &RunContext<'_>) -> Parts {
+  let provider_state = provider_state(exchange, scratch);
+  let fresh = fresh::Fresh {
+    generators: &PactGenerators,
+    side: "provider",
+    provider_state: &provider_state,
+  };
+  let mut request = exchange.ready.request.clone();
+  let mut failures = Vec::new();
+  for (part_name, slots) in request.iter_mut() {
+    let Some(shapes) = exchange.ready.fresh.get(part_name) else {
+      continue;
+    };
+    for (slot_name, slot) in slots.iter_mut() {
+      let Some(shape) = shapes.get(slot_name).filter(|shape| fresh::has_generators(shape)) else {
+        continue;
+      };
+      let at = format!("$.{part_name}.{slot_name}");
+      let declared = crate::common::declared_type(Some(&exchange.ready.content_types), part_name, slot_name);
+      fill_slot(slot, shape, declared, &at, &fresh, ctx.content, &mut failures);
+    }
+  }
+  warn_generator_failures(exchange, failures, ctx);
+  request
+}
+
+/// One slot, filled where its shape gives a generator ([`fresh_request`]). A slot carried as octets
+/// that cannot be read as a document, or written back, is sent as recorded, and says so.
+fn fill_slot(
+  slot: &mut crate::component::SlotValue,
+  shape: &Value,
+  declared: Option<&str>,
+  at: &str,
+  fresh: &fresh::Fresh<'_>,
+  content: Option<&dyn ContentComponent>,
+  failures: &mut Vec<fresh::Failure>,
+) {
+  if matches!(slot.encoded.as_deref(), None | Some("json")) {
+    fresh::fill(shape, &mut slot.content, at, fresh, failures);
+    return;
+  }
+  let unread = |failures: &mut Vec<fresh::Failure>, message: String| {
+    failures.push(fresh::Failure {
+      target: at.to_string(),
+      generator: "every generator in this slot".to_string(),
+      message,
+    })
+  };
+  let Some(content_type) = declared.or(slot.content_type.as_deref()).map(str::to_string) else {
+    return unread(
+      failures,
+      "the slot's recorded octets have no content type to read them as a document by, so nothing in \
+       them was generated; the recorded value was sent"
+        .to_string(),
+    );
+  };
+  let document = super::wire::decode_slot(slot, Some(&content_type), content);
+  if matches!(
+    document,
+    plan::RuntimeValue::Absent | plan::RuntimeValue::Bytes(_)
+  ) {
+    return unread(
+      failures,
+      format!(
+        "the slot's recorded octets could not be read as '{content_type}', so nothing in them was \
+         generated; the recorded value was sent"
+      ),
+    );
+  }
+  let mut document = document.to_json();
+  let before = failures.len();
+  fresh::fill(shape, &mut document, at, fresh, failures);
+  let mut encoded = encode_slot(&document, Some(&content_type), content);
+  if !matches!(encoded.encoded.as_deref(), Some("base64" | "text")) {
+    failures.truncate(before);
+    return unread(
+      failures,
+      format!("the generated document could not be written as '{content_type}'; the recorded value was sent"),
+    );
+  }
+  if encoded.content_type.is_none() {
+    encoded.content_type = slot.content_type.clone();
+  }
+  *slot = encoded;
+}
+
+/// Each generator that produced nothing, as a `generator-failed` warning before the result it
+/// qualifies (ADR 0034 decision 5).
+fn warn_generator_failures(exchange: &Exchange<'_>, failures: Vec<fresh::Failure>, ctx: &RunContext<'_>) {
   for failure in failures {
     tracing::warn!(target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was sent");
     ctx.stream.emit(
@@ -2034,7 +2156,6 @@ fn generated_request(
       }),
     );
   }
-  generated
 }
 
 /// What a point's hooks decided about this exchange, with the abort separated out because it ends
@@ -2347,6 +2468,15 @@ fn assignment_of(variant: &contract::RecordedVariant) -> Assignment {
 /// the transport's to say ([`sent_parts`]), so nothing here names one.
 fn recorded_parts(variant: &contract::RecordedVariant) -> Parts {
   variant.parts.clone()
+}
+
+/// The parts whose shapes name a generator somewhere, which a replay fills (ADR 0048).
+fn fresh_parts(parts: &BTreeMap<String, contract::ShapePart>) -> BTreeMap<String, contract::ShapePart> {
+  parts
+    .iter()
+    .filter(|(_, slots)| slots.values().any(fresh::has_generators))
+    .map(|(name, slots)| (name.clone(), slots.clone()))
+    .collect()
 }
 
 /// The part a replay sends: the one the transport starts an exchange with (kernel-boundary review

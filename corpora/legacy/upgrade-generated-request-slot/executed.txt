@@ -1,0 +1,49 @@
+(
+  :"get a user" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'POST'
+          ) => 'POST',
+          'POST'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/users',
+          '/users'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.request.headers.content-type => NULL,
+          'application/json'
+        ) => BOOL(true),
+        :"$.userId" (
+          %match:type (
+            $.request.body.userId => 1234,
+            100
+          ) => BOOL(true)
+        ) => BOOL(true),
+        %legacy:only-entries (
+          $.request.body => {'userId': 1234},
+          'userId'
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 201,
+          201
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

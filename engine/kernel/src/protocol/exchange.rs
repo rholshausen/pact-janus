@@ -48,6 +48,12 @@ pub(crate) struct ArmedExchange {
   /// The interaction's declared content types (contract-file spec §5.5): how the inbound request's
   /// slots are decoded and the reply's encoded.
   pub content_types: ContentTypes,
+  /// The interaction's shapes, by part, for the parts whose shapes name a generator (ADR 0048): a
+  /// reply is filled with fresh values there each time it is served. The recorded evidence stays
+  /// `response_parts`, so a contract recorded twice is the same contract.
+  pub fresh: BTreeMap<String, crate::contract::ShapePart>,
+  /// The variant's resolved provider-state parameters, which a reply's generators read.
+  pub provider_state: serde_json::Map<String, Value>,
 }
 
 /// Shared between `serve_variant` (arms) and this module's background loop (matches, replies,
@@ -156,7 +162,7 @@ fn handle_inbound(
         instance: instance.to_string(),
         event: inbound.event,
         parts: response_parts(
-          &armed.response_parts,
+          &fresh_reply(&armed, answering),
           answering,
           &transport.content_slots(),
           armed.content_types.get(answering),
@@ -216,6 +222,37 @@ fn handle_inbound(
         mismatches: recorded,
       },
     );
+}
+
+/// The armed reply, with every position the answering part's shapes give a generator filled with a
+/// fresh value, on the consumer's side (ADR 0048): a new value for every exchange. A generator that
+/// produces nothing leaves the armed value, and says so in the log.
+fn fresh_reply(armed: &ArmedExchange, answering: &str) -> BTreeMap<String, BTreeMap<String, Value>> {
+  let mut reply = armed.response_parts.clone();
+  let (Some(shapes), Some(slots)) = (armed.fresh.get(answering), reply.get_mut(answering)) else {
+    return reply;
+  };
+  let fresh = crate::shape::fresh::Fresh {
+    generators: &crate::component::PactGenerators,
+    side: "consumer",
+    provider_state: &armed.provider_state,
+  };
+  let mut failures = Vec::new();
+  for (slot_name, value) in slots.iter_mut() {
+    if let Some(shape) = shapes.get(slot_name) {
+      crate::shape::fresh::fill(
+        shape,
+        value,
+        &format!("$.{answering}.{slot_name}"),
+        &fresh,
+        &mut failures,
+      );
+    }
+  }
+  for failure in failures {
+    tracing::warn!(handle = %armed.handle, variant = %armed.variant_id, target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was served");
+  }
+  reply
 }
 
 /// The generated payload of the part that answers, wired for reply (component-interfaces spec §4).

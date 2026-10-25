@@ -197,6 +197,127 @@ pub fn judge(results: &[CaseResult], ledger: &Ledger) -> Judgement {
   judgement
 }
 
+/// The upgrade ledger (`corpora/verifier/upgrade-disagreements.json`, staged plan S1.19): every
+/// verdict `janus verify` gives a pact and the contract `janus upgrade` converts it into differently,
+/// with what accounts for it, as the disagreement ledger lists today's verifier's. Plan-grammar spec
+/// §4.4 asks the two to agree; where they cannot, the upgrade says so in a finding, and the reason
+/// names the ADR or item behind it.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpgradeLedger {
+  #[serde(rename = "$comment", default, skip_serializing_if = "String::is_empty")]
+  pub comment: String,
+  pub disagreements: Vec<UpgradeEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpgradeEntry {
+  pub case: String,
+  pub key: String,
+  /// `janus verify` on the pact.
+  pub pact: Verdict,
+  /// `janus verify` on the contract it upgrades into.
+  pub contract: Verdict,
+  pub reason: String,
+}
+
+impl UpgradeLedger {
+  pub fn check(&self) -> Result<(), String> {
+    let mut problems = Vec::new();
+    let mut seen = BTreeSet::new();
+    for entry in &self.disagreements {
+      if !names_its_reason(&entry.reason) {
+        problems.push(format!(
+          "{} {}: the reason must start with a staged-plan item (S1.6) or an ADR (ADR 0007), not '{}'",
+          entry.case, entry.key, entry.reason
+        ));
+      }
+      if entry.pact == entry.contract {
+        problems.push(format!(
+          "{} {}: both verdicts are {}; that is an agreement",
+          entry.case, entry.key, entry.pact
+        ));
+      }
+      if !seen.insert((&entry.case, &entry.key)) {
+        problems.push(format!("{} {}: listed twice", entry.case, entry.key));
+      }
+    }
+    if problems.is_empty() {
+      Ok(())
+    } else {
+      Err(problems.join("\n"))
+    }
+  }
+}
+
+/// What a run found about upgraded contracts, against the upgrade ledger.
+#[derive(Debug, Default, Serialize)]
+pub struct UpgradeJudgement {
+  pub compared: usize,
+  pub agreed: usize,
+  pub known: Vec<UpgradeEntry>,
+  pub unexpected: Vec<UpgradeEntry>,
+  pub stale: Vec<UpgradeEntry>,
+}
+
+impl UpgradeJudgement {
+  pub fn passed(&self) -> bool {
+    self.unexpected.is_empty() && self.stale.is_empty()
+  }
+}
+
+pub fn judge_upgrades(results: &[CaseResult], ledger: &UpgradeLedger) -> UpgradeJudgement {
+  let mut judgement = UpgradeJudgement::default();
+  let mut matched = BTreeSet::new();
+  let mut ran = BTreeSet::new();
+  for result in results {
+    for compared in &result.compared {
+      let Some(contract) = compared.upgraded else {
+        continue;
+      };
+      ran.insert(result.id.as_str());
+      judgement.compared += 1;
+      if contract == compared.janus {
+        judgement.agreed += 1;
+        continue;
+      }
+      let listed = ledger.disagreements.iter().find(|entry| {
+        entry.case == result.id
+          && entry.key == compared.key
+          && entry.pact == compared.janus
+          && entry.contract == contract
+      });
+      match listed {
+        Some(entry) => {
+          matched.insert((entry.case.clone(), entry.key.clone()));
+          judgement.known.push(entry.clone());
+        }
+        None => judgement.unexpected.push(UpgradeEntry {
+          case: result.id.clone(),
+          key: compared.key.clone(),
+          pact: compared.janus,
+          contract,
+          reason: format!(
+            "pact: {}; contract: {}",
+            compared.janus_detail.as_deref().unwrap_or("-"),
+            compared.upgraded_detail.as_deref().unwrap_or("-")
+          ),
+        }),
+      }
+    }
+  }
+  judgement.stale = ledger
+    .disagreements
+    .iter()
+    .filter(|entry| {
+      ran.contains(entry.case.as_str()) && !matched.contains(&(entry.case.clone(), entry.key.clone()))
+    })
+    .cloned()
+    .collect();
+  judgement
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -214,6 +335,8 @@ mod tests {
         janus,
         today_detail: None,
         janus_detail: None,
+        upgraded: None,
+        upgraded_detail: None,
       }],
       expected: None,
       expected_published: Default::default(),
@@ -300,5 +423,40 @@ mod tests {
     let problems = ledger.check().unwrap_err();
     assert!(problems.contains("must start with"), "{problems}");
     assert!(problems.contains("that is an agreement"), "{problems}");
+  }
+
+  #[test]
+  fn an_upgraded_contract_is_held_to_the_pacts_verdict_and_the_upgrade_ledger() {
+    let mut differs = result("a", Verdict::Pass, Verdict::Pass);
+    differs.compared[0].upgraded = Some(Verdict::Fail);
+    let mut agrees = result("b", Verdict::Pass, Verdict::Pass);
+    agrees.compared[0].upgraded = Some(Verdict::Pass);
+    let unlisted = judge_upgrades(&[differs.clone(), agrees.clone()], &UpgradeLedger::default());
+    assert_eq!(
+      (unlisted.compared, unlisted.agreed, unlisted.unexpected.len()),
+      (2, 1, 1)
+    );
+    assert!(!unlisted.passed());
+
+    let ledger = UpgradeLedger {
+      disagreements: vec![UpgradeEntry {
+        case: "a".to_string(),
+        key: "run".to_string(),
+        pact: Verdict::Pass,
+        contract: Verdict::Fail,
+        reason: "S3.4: a header with no rule".to_string(),
+      }],
+      ..UpgradeLedger::default()
+    };
+    assert!(ledger.check().is_ok());
+    assert!(judge_upgrades(&[differs], &ledger).passed());
+    let stale = judge_upgrades(
+      &[agrees.clone(), result("a", Verdict::Pass, Verdict::Pass)],
+      &ledger,
+    );
+    assert!(stale.passed(), "a case with no upgraded verdict ran no upgrade");
+    let mut now_agrees = result("a", Verdict::Pass, Verdict::Pass);
+    now_agrees.compared[0].upgraded = Some(Verdict::Pass);
+    assert_eq!(judge_upgrades(&[now_agrees], &ledger).stale.len(), 1);
   }
 }

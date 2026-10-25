@@ -710,13 +710,16 @@ Two members are known ([ADR 0034](../../decisions/0034-apply-a-pacts-request-gen
 - **`example`**: the value recorded where the generated one will go. A generator may keep its type, as a
   v1–v4 `RandomInt` generating into a string produces a string.
 - **`provider-state`**: the exchange's provider-state values (lifecycle-hooks spec §3.2), what a
-  `ProviderState` generator's expression reads.
+  `ProviderState` generator's expression reads. A mock passes its variant's resolved state parameters.
+- **`side`**: `provider` when a verifier fills the request it sends, `consumer` when a mock fills its
+  reply ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)). A generator for one side keeps the `example` when asked on the other, as
+  `pact:ProviderState` does on the consumer's.
 
 Every engine has one generator component built in, `pact`, answering for the v1–v4 vocabulary:
 `pact:RandomInt`, `pact:RandomDecimal`, `pact:RandomHexadecimal`, `pact:RandomString`, `pact:Regex`,
 `pact:Uuid`, `pact:Date`, `pact:Time`, `pact:DateTime`, `pact:RandomBoolean` and `pact:ProviderState`,
 each configured by the members a pact gives that generator (its `type` aside). Verifying a v1–v4 pact
-applies its request generators through it.
+applies its request generators through it, and `janus upgrade` names it on the shapes it writes.
 
 ### 7.4 Contributing variant dimensions
 

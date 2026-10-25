@@ -34,6 +34,7 @@ use super::multipart as legacy_multipart;
 use super::pact::{self as legacy_pact, BodyKind, LegacyInteraction, Unsupported};
 use super::xml::{self as legacy_xml, rule_name};
 use crate::common::{ContentTypes, Requirement, State, Transport};
+use crate::component::PactGenerators;
 use crate::component::{Parts, SlotValue};
 use crate::contract::{
   self, Contract, ContractError, Interaction, Party, Problem, RecordedSelection, RecordedVariant,
@@ -44,9 +45,10 @@ use crate::variant::{self, SamplingPolicy};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
-use pact_models::generators::Generators;
+use pact_models::generators::{Generator, Generators};
 use pact_models::http_parts::HttpPart;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
+use pact_models::path_exp::{DocPath, PathToken};
 use pact_models::v4::http_parts::{HttpRequest, HttpResponse};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -227,6 +229,16 @@ impl Conversion {
       description = disambiguated;
     }
     seen.push((description.clone(), states.clone()));
+    if interaction.pending {
+      self.finding(Finding::new(
+        "pending-dropped",
+        "lossy",
+        format!("{at}/pending"),
+        "the interaction is pending, so v1–v4 report its failure without failing the run; a contract \
+         has no pending interactions yet (staged plan S1.28), so a failure of this one fails the run"
+          .to_string(),
+      ));
+    }
 
     let mut declarations = Declarations::default();
     let mut parts: BTreeMap<String, ShapePart> = BTreeMap::new();
@@ -451,7 +463,7 @@ impl Conversion {
         self.multi_map_slot(category.as_ref(), &query, false, &query_where),
       );
     }
-    self.headers_and_body(
+    let body = self.headers_and_body(
       &mut part,
       request,
       request.headers.as_ref(),
@@ -460,7 +472,7 @@ impl Conversion {
       at,
       decl,
     );
-    self.generators(&request.generators, &format!("{at}/request/generators"));
+    self.place_generators(&mut part, request, &request.generators, body, "request", at, decl);
     part
   }
 
@@ -468,7 +480,7 @@ impl Conversion {
     let rules = &response.matching_rules;
     let mut part = ShapePart::new();
     part.insert("status".to_string(), self.status_slot(response, at, decl));
-    self.headers_and_body(
+    let body = self.headers_and_body(
       &mut part,
       response,
       response.headers.as_ref(),
@@ -477,7 +489,15 @@ impl Conversion {
       at,
       decl,
     );
-    self.generators(&response.generators, &format!("{at}/response/generators"));
+    self.place_generators(
+      &mut part,
+      response,
+      &response.generators,
+      body,
+      "response",
+      at,
+      decl,
+    );
     part
   }
 
@@ -494,7 +514,7 @@ impl Conversion {
     part_name: &str,
     at: &str,
     decl: &mut Declarations,
-  ) {
+  ) -> Option<BodyKindShaped> {
     let headers_at = Where::slot(at, part_name, "headers");
     let named = headers.is_some_and(|headers| {
       headers
@@ -516,10 +536,10 @@ impl Conversion {
     if let Some(slot) = slot {
       part.insert("headers".to_string(), slot);
     }
-    if let Some(body) = body {
-      decl.body(part_name, &body);
-      part.insert("body".to_string(), body.shape);
-    }
+    let body = body?;
+    decl.body(part_name, &body);
+    part.insert("body".to_string(), body.shape);
+    Some(body.kind)
   }
 
   /// `status`, with the one component operator contract-file spec §8.2's table names: a v4
@@ -673,7 +693,12 @@ impl Conversion {
       // shape would assert something the pact did not.
       Ok(None) => return None,
       // Declared and empty: v1–v4 require the actual body be absent too, which is `forbidden`.
-      Ok(Some(LegacyBody::Empty)) => return Some(ConvertedBody::of(json!({ "shape": "forbidden" }))),
+      Ok(Some(LegacyBody::Empty)) => {
+        return Some(ConvertedBody::of(
+          json!({ "shape": "forbidden" }),
+          BodyKindShaped::Empty,
+        ));
+      }
       Ok(Some(body)) => body,
       Err(Unsupported::Malformed(message)) => {
         self.finding(Finding::at(
@@ -718,7 +743,15 @@ impl Conversion {
           self.opened(at, "request-body-opened", OPENED_MEMBERS);
         }
         let ctx = BodyCtx::root(at);
-        ConvertedBody::of(self.body_shape(category.as_ref(), &document.to_json(), &ctx))
+        // Declared too, so a reply is decoded as JSON whatever it is labelled, as the pact's
+        // verification decodes it (ADR 0036 decision 4, ADR 0048 decision 10).
+        ConvertedBody::declared(
+          self.body_shape(category.as_ref(), &document.to_json(), &ctx),
+          &content_type.to_string(),
+          "json",
+          BodyKindShaped::Json,
+        )
+        .requiring_nothing()
       }
       // Text that is UTF-8 is a string, and the text component reads it (ADR 0036 decision 1).
       (BodyKind::Text, LegacyBody::Document(RuntimeValue::String(text))) => {
@@ -729,7 +762,7 @@ impl Conversion {
           at,
           Text::No,
         );
-        ConvertedBody::declared(shape, &content_type.to_string(), "text")
+        ConvertedBody::declared(shape, &content_type.to_string(), "text", BodyKindShaped::Text)
       }
       // Octets: a binary type, or text that is not UTF-8. No component claims them, so the slot is
       // left undeclared, and an undeclared slot of a type nobody claims is bytes (ADR 0036 decision 2).
@@ -747,7 +780,10 @@ impl Conversion {
           ));
         }
         let list = best_rule(category.as_ref(), &["$".to_string()], false);
-        ConvertedBody::of(self.bytes_shape(list.map(|(list, _)| list), bytes, at))
+        ConvertedBody::of(
+          self.bytes_shape(list.map(|(list, _)| list), bytes, at),
+          BodyKindShaped::Bytes,
+        )
       }
       (_, LegacyBody::Form(form)) => {
         self.opened(
@@ -760,26 +796,34 @@ impl Conversion {
           OPENED_NAMES,
         );
         let shape = self.multi_map_slot(category.as_ref(), &form_parameters(form), false, at);
-        ConvertedBody::declared(shape, &content_type.to_string(), "form")
+        ConvertedBody::declared(shape, &content_type.to_string(), "form", BodyKindShaped::Form)
       }
       (_, LegacyBody::Xml(document)) => {
         if closed {
           self.opened(at, "request-body-opened", OPENED_XML);
         }
         let shape = self.xml_body(document, category.as_ref(), closed, at);
-        ConvertedBody::declared(shape, &content_type.to_string(), "xml")
+        ConvertedBody::declared(shape, &content_type.to_string(), "xml", BodyKindShaped::Xml)
       }
       (_, LegacyBody::Multipart(parts)) => {
         let shape = self.multipart_body(parts, category.as_ref(), closed, at);
         // The boundary is the octets' own, so a reply's is read from its label (ADR 0047).
-        ConvertedBody::declared(shape, &without_boundary(&content_type.to_string()), "multipart")
+        ConvertedBody::declared(
+          shape,
+          &without_boundary(&content_type.to_string()),
+          "multipart",
+          BodyKindShaped::Multipart,
+        )
       }
       // A JSON document of another kind (a string or a number, say), read as JSON.
       (_, LegacyBody::Document(document)) => {
         let ctx = BodyCtx::root(at);
-        ConvertedBody::of(self.body_shape(category.as_ref(), &document.to_json(), &ctx))
+        ConvertedBody::of(
+          self.body_shape(category.as_ref(), &document.to_json(), &ctx),
+          BodyKindShaped::Json,
+        )
       }
-      (_, LegacyBody::Empty) => ConvertedBody::of(json!({ "shape": "forbidden" })),
+      (_, LegacyBody::Empty) => ConvertedBody::of(json!({ "shape": "forbidden" }), BodyKindShaped::Empty),
     };
     converted.checked_type = checked_type.filter(|_| has_content);
     if converted.declared.is_some()
@@ -871,12 +915,43 @@ impl Conversion {
         }
         _ => None,
       };
-      let values = self.body_shape(own.as_ref().or(rules), &sample, &ctx.entry_value());
-      let mut shape = json!({ "shape": "each-entry", "values": values, "min": 0 });
-      if let MatchingRule::EachKey(_) = rule {
-        shape["keys"] = json!({ "shape": "string", "example": first.map(|(name, _)| name) });
+      // `eachKey` asks something of every key, by its own rules, and nothing of the values but the
+      // pact's own members, which v1–v4 compare only when the reply has them. `each-entry` cannot
+      // say "this member, when it is there", so the values are left open, and that is reported.
+      if let MatchingRule::EachKey(definition) = rule {
+        let (own, _) = definition_rules(definition);
+        let example = Value::String(first.map(|(name, _)| name.clone()).unwrap_or_default());
+        let list = RuleList {
+          rules: own,
+          rule_logic: RuleLogic::And,
+          cascaded: false,
+        };
+        let keys = if list.rules.is_empty() {
+          json!({ "shape": "string", "example": example })
+        } else {
+          self.shape_for(Some(list), &example, &ctx.at, Text::Yes)
+        };
+        self.finding(Finding::at(
+          "rule-unmapped",
+          "lossy",
+          &ctx.at,
+          "an eachKey rule became each-entry's keys; v1–v4 also compare each member the pact names when \
+           the reply has it, which each-entry cannot say, so the values are left open, or held to a rule \
+           that reaches them, which v1–v4 apply to the pact's members alone"
+            .to_string(),
+        ));
+        // A rule that reaches the values (`$.prices.*`) is applied to every one: stricter than v1–v4,
+        // which apply it to the pact's own members, so a false failure rather than a false pass.
+        let entry = ctx.entry_value();
+        let values = if matches!(best_rule(rules, &entry.fragments, false), Some((_, false))) {
+          self.body_shape(rules, &sample, &entry)
+        } else {
+          json!({ "shape": "any" })
+        };
+        return json!({ "shape": "each-entry", "keys": keys, "values": values, "min": 0 });
       }
-      return shape;
+      let values = self.body_shape(own.as_ref().or(rules), &sample, &ctx.entry_value());
+      return json!({ "shape": "each-entry", "values": values, "min": 0 });
     }
     let mut shapes = Map::new();
     for (name, value) in members {
@@ -906,6 +981,15 @@ impl Conversion {
     };
     if let Some(MatchingRule::ArrayContains(variants)) = list.rules.first() {
       return self.contains_shape(items, variants, ctx);
+    }
+    // `eachValue` on a list matches every element by its own rules alone, and any length, as the
+    // legacy compiler applies it (ADR 0042).
+    if !cascaded && let Some(MatchingRule::EachValue(definition)) = list.rules.first() {
+      let (own, _) = definition_rules(definition);
+      let own = each_value_category(&ctx.fragments, own);
+      let template = items.first().cloned().unwrap_or(Value::Null);
+      let items_shape = self.body_shape(Some(&own), &template, &ctx.template_item());
+      return json!({ "shape": "each-like", "items": items_shape, "min": 0 });
     }
     // A rule that cascaded here from a shallower path carries no bound for this array: `min`/`max`
     // size the array that declared them, and v1–v4 never re-apply them below it (`pact_matching`
@@ -1545,26 +1629,337 @@ impl Conversion {
     });
   }
 
-  /// v1–v4 generators produce values; the shape language's `generator` member names a *component*
-  /// that does. The engine's built-in `pact` component implements the v1–v4 vocabulary (ADR 0034),
-  /// and verifying a pact applies it, but writing a generator onto a shape and applying it for a
-  /// contract is staged plan S1.19. Until then dropping one is lossy but never dangerous: it
-  /// weakens what a contract can *produce*, never what it *accepts*.
-  fn generators(&mut self, generators: &Generators, pointer: &str) {
-    if generators.is_empty() {
-      return;
+  /// A v1–v4 generator onto the shape at its target (shape-language spec §3.4, ADR 0048), naming the
+  /// built-in `pact` component's generator and its configuration: a verifier fills a request's when it
+  /// sends it, as it generates a pact's (ADR 0034), and a mock a response's when it serves it. What
+  /// the contract accepts is unchanged. A generator no component provides, or one at a target today's
+  /// verifier does not generate, is dropped and reported: lossy, never dangerous, since it weakens what
+  /// a contract can *produce*, never what it *accepts*.
+  #[allow(clippy::too_many_arguments)]
+  fn place_generators(
+    &mut self,
+    part: &mut ShapePart,
+    http: &dyn HttpPart,
+    generators: &Generators,
+    body: Option<BodyKindShaped>,
+    part_name: &str,
+    at: &str,
+    decl: &mut Declarations,
+  ) {
+    let mut placed_in_body = false;
+    let mut every: Vec<(String, String, &DocPath, &Generator)> = generators
+      .categories
+      .iter()
+      .flat_map(|(category, generators)| {
+        let category = category_name(category).to_string();
+        generators
+          .iter()
+          .map(move |(path, generator)| (category.clone(), path.to_string(), path, generator))
+      })
+      .collect();
+    every.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+    for (category, path, key, generator) in every {
+      // Where the pact holds it: a body generator under its path, a header or query one under its
+      // name, and a path or status one as the category itself.
+      let pointer = match category.as_str() {
+        "body" => format!("{at}/{part_name}/generators/body/{}", escape_pointer(&path)),
+        "header" | "query" => format!(
+          "{at}/{part_name}/generators/{category}/{}",
+          escape_pointer(key.first_field().unwrap_or(&path))
+        ),
+        _ => format!("{at}/{part_name}/generators/{category}"),
+      };
+      let name = generator.name();
+      if !PactGenerators::GENERATORS.contains(&name.as_str()) {
+        let why = if matches!(generator, Generator::MockServerURL(..)) {
+          "a MockServerURL generator writes the consumer's mock server URL, which no generator component \
+           provides yet; the recorded value is kept"
+            .to_string()
+        } else {
+          format!("no generator component provides '{name}'; the recorded value is kept")
+        };
+        self.finding(Finding::new("generator-dropped", "lossy", pointer, why));
+        continue;
+      }
+      let (slot, targets) = match category.as_str() {
+        "path" => ("path", vec![String::new()]),
+        "status" => ("status", vec![String::new()]),
+        "header" => match key.first_field() {
+          Some(header) => (
+            "headers",
+            vec![format!(
+              "/members/{}/entries/0",
+              escape_pointer(&header.to_ascii_lowercase())
+            )],
+          ),
+          None => ("headers", Vec::new()),
+        },
+        "query" => match key.first_field() {
+          Some(name) => {
+            let count = part
+              .get("query")
+              .and_then(|query| query.pointer(&format!("/members/{}/entries", escape_pointer(name))))
+              .and_then(Value::as_array)
+              .map_or(0, Vec::len);
+            (
+              "query",
+              (0..count)
+                .map(|index| format!("/members/{}/entries/{index}", escape_pointer(name)))
+                .collect(),
+            )
+          }
+          None => ("query", Vec::new()),
+        },
+        "body" => {
+          let tokens = key.tokens();
+          let shape = part.get("body").cloned().unwrap_or(Value::Null);
+          let targets = match body {
+            Some(BodyKindShaped::Json) => {
+              let mut out = Vec::new();
+              json_targets(
+                &shape,
+                tokens.get(1..).unwrap_or_default(),
+                String::new(),
+                &mut out,
+              );
+              out
+            }
+            Some(BodyKindShaped::Form) => form_target(&shape, tokens).into_iter().collect(),
+            Some(BodyKindShaped::Xml) => xml_targets(&shape, tokens),
+            _ => {
+              self.finding(Finding::new(
+                "generator-dropped",
+                "lossy",
+                pointer,
+                "a body generator applies to a JSON, form or XML body, as today's verifier applies \
+                 one, and this body is not one; it was dropped, as today's verifier ignores it"
+                  .to_string(),
+              ));
+              continue;
+            }
+          };
+          ("body", targets)
+        }
+        other => {
+          self.finding(Finding::new(
+            "generator-dropped",
+            "lossy",
+            pointer,
+            format!("a generator for the '{other}' category has no slot here; it was dropped"),
+          ));
+          continue;
+        }
+      };
+      let node = generator_node(generator);
+      let mut placed = 0;
+      if let Some(slot_shape) = part.get_mut(slot) {
+        for target in &targets {
+          if let Some(Value::Object(shape)) = slot_shape.pointer_mut(target)
+            && shape.get("shape").and_then(Value::as_str) != Some("forbidden")
+          {
+            shape.insert(crate::shape::fresh::GENERATOR.to_string(), node.clone());
+            placed += 1;
+          }
+        }
+      }
+      if placed == 0 {
+        self.finding(Finding::new(
+          "generator-dropped",
+          "lossy",
+          pointer,
+          format!(
+            "the generator's path names no value the pact's example has, or one the contract shapes as \
+             a list rule's template (`{path}`); it was dropped"
+          ),
+        ));
+      } else if slot == "body" {
+        placed_in_body = true;
+      }
     }
-    let count: usize = generators.categories.values().map(|c| c.len()).sum();
-    self.finding(Finding::new(
-      "generator-dropped",
-      "lossy",
-      pointer.to_string(),
-      format!(
-        "{count} generator(s) were dropped: a contract does not carry generators yet (staged plan \
-         S1.19), though verifying the pact applies them. What the contract accepts is unchanged"
-      ),
-    ));
+    // A request body is filled as its document, and a JSON one is read by the type the pact gives it,
+    // so its evidence carries that type.
+    if placed_in_body
+      && part_name == "request"
+      && body == Some(BodyKindShaped::Json)
+      && !decl.evidence.contains_key(part_name)
+      && let OptionalBody::Present(bytes, _, _) = http.body()
+    {
+      let content_type = legacy_pact::part_content_type(http).to_string();
+      decl
+        .evidence
+        .insert(part_name.to_string(), octets(bytes, &content_type));
+    }
   }
+}
+
+/// A generator category as a pact's `generators` member names it.
+fn category_name(category: &pact_models::generators::GeneratorCategory) -> &'static str {
+  use pact_models::generators::GeneratorCategory;
+  match category {
+    GeneratorCategory::METHOD => "method",
+    GeneratorCategory::PATH => "path",
+    GeneratorCategory::HEADER => "header",
+    GeneratorCategory::QUERY => "query",
+    GeneratorCategory::BODY => "body",
+    GeneratorCategory::STATUS => "status",
+    GeneratorCategory::METADATA => "metadata",
+  }
+}
+
+/// A generator as a shape's `generator` member: the `pact` component's name for it and its
+/// configuration, the members the pact gives it but its `type`.
+fn generator_node(generator: &Generator) -> Value {
+  let mut config = generator
+    .to_json()
+    .and_then(|json| json.as_object().cloned())
+    .unwrap_or_default();
+  config.remove("type");
+  let mut node = json!({ "name": PactGenerators::qualified(&generator.name()) });
+  if !config.is_empty() {
+    node["config"] = Value::Object(config);
+  }
+  node
+}
+
+/// Every node of a JSON body's shape a generator's path names, as pointers into the shape: a member
+/// by name, or every member for `*`; an entry by index, or every entry or an `each-like`'s template
+/// for `[*]`; `optional` and `nullable` looked through. An index into an `each-like` names one element
+/// where the template is every element, so it names nothing.
+fn json_targets(shape: &Value, tokens: &[PathToken], at: String, out: &mut Vec<String>) {
+  let operator = shape.get("shape").and_then(Value::as_str).unwrap_or_default();
+  if matches!(operator, "optional" | "nullable") {
+    if let Some(of) = shape.get("of") {
+      json_targets(of, tokens, format!("{at}/of"), out);
+    }
+    return;
+  }
+  let Some((token, rest)) = tokens.split_first() else {
+    out.push(at);
+    return;
+  };
+  let mut each = |key: &str, child: &Value| json_targets(child, rest, format!("{at}/{key}"), out);
+  match (token, operator) {
+    (PathToken::Field(name), "object") => {
+      if let Some(member) = shape.pointer(&format!("/members/{}", escape_pointer(name))) {
+        each(&format!("members/{}", escape_pointer(name)), member);
+      }
+    }
+    (PathToken::Star, "object") => {
+      for (name, member) in shape
+        .get("members")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+      {
+        each(&format!("members/{}", escape_pointer(name)), member);
+      }
+    }
+    (PathToken::Field(_) | PathToken::Star, "each-entry") => {
+      if let Some(values) = shape.get("values") {
+        each("values", values);
+      }
+    }
+    (PathToken::Index(index), "array" | "contains") => {
+      if let Some(entry) = shape.pointer(&format!("/entries/{index}")) {
+        each(&format!("entries/{index}"), entry);
+      }
+    }
+    (PathToken::StarIndex | PathToken::Star, "array") => {
+      for (index, entry) in shape
+        .get("entries")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+      {
+        each(&format!("entries/{index}"), entry);
+      }
+    }
+    (PathToken::StarIndex | PathToken::Star, "each-like") => {
+      if let Some(items) = shape.get("items") {
+        each("items", items);
+      }
+    }
+    _ => {}
+  }
+}
+
+/// The value a form body's generator names (`FormUrlEncodedHandler`): `$.<name>` is the name's first
+/// value, `$.<name>[i]` its `i`th.
+fn form_target(shape: &Value, tokens: &[PathToken]) -> Option<String> {
+  let (name, index) = match tokens {
+    [PathToken::Root, PathToken::Field(name)] => (name, 0),
+    [PathToken::Root, PathToken::Field(name), PathToken::Index(index)] => (name, *index),
+    _ => return None,
+  };
+  let target = format!("/members/{}/entries/{index}", escape_pointer(name));
+  shape.pointer(&target).map(|_| target)
+}
+
+/// The values an XML body's generator names (`XmlHandler`): its path goes element by element from the
+/// root, every child of a name, and ends at an attribute (`@name`) or the text (`#text`). Names are
+/// matched by local name, since ADR 0039's document keeps no prefixes.
+fn xml_targets(shape: &Value, tokens: &[PathToken]) -> Vec<String> {
+  let local = |name: &str| name.rsplit(':').next().unwrap_or(name).to_string();
+  let fields: Vec<&str> = tokens
+    .iter()
+    .filter_map(|token| match token {
+      PathToken::Field(name) => Some(name.as_str()),
+      _ => None,
+    })
+    .collect();
+  let Some((root, rest)) = fields.split_first() else {
+    return Vec::new();
+  };
+  let mut current = vec![format!("/members/{}", escape_pointer(&local(root)))];
+  for (position, field) in rest.iter().enumerate() {
+    let last = position + 1 == rest.len();
+    let mut next = Vec::new();
+    for at in &current {
+      let Some(element) = shape.pointer(at) else {
+        continue;
+      };
+      let members = element.get("members").and_then(Value::as_object);
+      if let Some(attribute) = field.strip_prefix('@').filter(|_| last) {
+        let wanted = local(attribute);
+        for key in members.into_iter().flatten().map(|(key, _)| key) {
+          let name = key.strip_prefix('@').unwrap_or_default();
+          let name = name.rsplit('}').next().unwrap_or(name);
+          if key.starts_with('@') && name == wanted {
+            next.push(format!("{at}/members/{}", escape_pointer(key)));
+          }
+        }
+      } else if *field == legacy_xml::TEXT && last {
+        next.push(format!("{at}/members/{}", legacy_xml::TEXT));
+      } else {
+        let group = format!("{at}/members/{}", escape_pointer(&local(field)));
+        match shape
+          .pointer(&group)
+          .and_then(|group| group.get("shape"))
+          .and_then(Value::as_str)
+        {
+          Some("each-like") => next.push(format!("{group}/items")),
+          Some("array") => {
+            let count = shape
+              .pointer(&format!("{group}/entries"))
+              .and_then(Value::as_array)
+              .map_or(0, Vec::len);
+            next.extend((0..count).map(|index| format!("{group}/entries/{index}")));
+          }
+          _ => {}
+        }
+      }
+    }
+    current = next;
+  }
+  // A path that stops at an element names no value.
+  if rest
+    .last()
+    .is_none_or(|field| !field.starts_with('@') && *field != legacy_xml::TEXT)
+  {
+    return Vec::new();
+  }
+  current
 }
 
 /// A position's pointer cut back to the slot that contains it: five segments
@@ -1738,6 +2133,8 @@ impl Text {
 /// read as the pact's verification reads it.
 struct ConvertedBody {
   shape: Value,
+  /// Which document the shape is over, which says where a body generator's path lands.
+  kind: BodyKindShaped,
   /// Its type, for `content-types` (contract-file spec §5.5): a body a built-in component reads.
   declared: Option<String>,
   /// That component, for `requires` (§7).
@@ -1750,9 +2147,10 @@ struct ConvertedBody {
 }
 
 impl ConvertedBody {
-  fn of(shape: Value) -> ConvertedBody {
+  fn of(shape: Value, kind: BodyKindShaped) -> ConvertedBody {
     ConvertedBody {
       shape,
+      kind,
       declared: None,
       component: None,
       evidence: None,
@@ -1760,13 +2158,39 @@ impl ConvertedBody {
     }
   }
 
-  fn declared(shape: Value, content_type: &str, component: &'static str) -> ConvertedBody {
+  /// JSON is the content component every engine is built with, which an undeclared slot already
+  /// assumes, so a JSON body's declaration needs no requirement.
+  fn requiring_nothing(self) -> ConvertedBody {
+    ConvertedBody {
+      component: None,
+      ..self
+    }
+  }
+
+  fn declared(
+    shape: Value,
+    content_type: &str,
+    component: &'static str,
+    kind: BodyKindShaped,
+  ) -> ConvertedBody {
     ConvertedBody {
       declared: Some(content_type.to_string()),
       component: Some(component),
-      ..ConvertedBody::of(shape)
+      ..ConvertedBody::of(shape, kind)
     }
   }
+}
+
+/// Which document a converted body's shape is over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyKindShaped {
+  Json,
+  Text,
+  Bytes,
+  Form,
+  Xml,
+  Multipart,
+  Empty,
 }
 
 /// What an interaction declares beside its parts: its slots' content types and the components it

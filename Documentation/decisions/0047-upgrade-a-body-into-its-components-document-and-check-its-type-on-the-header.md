@@ -1,6 +1,6 @@
 # 0047 — Upgrade a body into its component's document, and check its type on the header
 
-- **Status**: accepted
+- **Status**: accepted; decision 1's "JSON stays undeclared" amended by [ADR 0048](0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md) decision 10
 - **Date**: 2026-10-25
 - **Plan tasks**: S1.25
 - **Evidence**: `engine/kernel/tests/upgrade_agreement.rs`, which compiles every v1–v4 case in

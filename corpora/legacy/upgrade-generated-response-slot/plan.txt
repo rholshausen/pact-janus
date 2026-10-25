@@ -1,0 +1,50 @@
+(
+  :"get a user" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/users/1'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
+        :"$.id" (
+          %match:integer (
+            $.response.body.id
+          )
+        ),
+        :"$.token" (
+          %match:regex (
+            $.response.body.token,
+            '^(?:[a-z]+-\\d+)$'
+          )
+        )
+      )
+    )
+  )
+)

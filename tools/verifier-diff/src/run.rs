@@ -106,6 +106,12 @@ pub struct Compared {
   pub today_detail: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub janus_detail: Option<String>,
+  /// `janus verify`'s verdict on the contract the pact upgrades into (staged plan S1.19), in a case
+  /// whose every pact upgrades into a contract with the same interactions. Compared with `janus`.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub upgraded: Option<Verdict>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub upgraded_detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -336,6 +342,8 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     janus: janus_run.0,
     today_detail: today_run.1,
     janus_detail: janus_run.1,
+    upgraded: None,
+    upgraded_detail: None,
   }];
   for ((entry, today), janus) in expected.iter().zip(today).zip(janus) {
     compared.push(Compared {
@@ -345,7 +353,19 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
       janus: janus.0,
       today_detail: today.1,
       janus_detail: janus.1,
+      upgraded: None,
+      upgraded_detail: None,
     });
+  }
+  // The contracts the pacts upgrade into, verified by `janus verify` against a provider of their
+  // own: plan-grammar spec §4.4's two-path agreement, observed (staged plan S1.19).
+  if let Some((run, upgraded)) = upgraded_run(case, tools, work, &expected)? {
+    compared[0].upgraded = Some(run.0);
+    compared[0].upgraded_detail = run.1;
+    for (compared, upgraded) in compared.iter_mut().skip(1).zip(upgraded) {
+      compared.upgraded = Some(upgraded.0);
+      compared.upgraded_detail = upgraded.1;
+    }
   }
   Ok(CaseResult {
     id: case.id.clone(),
@@ -355,6 +375,56 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     expected_published: BTreeMap::new(),
     broker: None,
   })
+}
+
+/// `janus verify` on the contracts `janus upgrade` converts the case's pacts into, or `None` when a
+/// pact upgrades into a contract without all of its interactions: a message, or one that needs a
+/// plugin, has no contract form yet, and its verdict has nothing to be compared with.
+fn upgraded_run(
+  case: &Case,
+  tools: &Tools,
+  work: &Path,
+  expected: &[Expected],
+) -> Result<Option<(Judged, Vec<Judged>)>, String> {
+  let mut contracts = Vec::new();
+  for (p, (file, document)) in case.pacts.iter().enumerate() {
+    let pact = work.join(format!("{p}-{file}"));
+    let output = Command::new(&tools.janus)
+      .args(["upgrade"])
+      .arg(&pact)
+      .args(["--output", "json"])
+      .env("RUST_LOG", "off")
+      .output()
+      .map_err(|err| format!("could not run {}: {err}", tools.janus.display()))?;
+    if !output.status.success() {
+      return Ok(None);
+    }
+    let upgraded: Value = serde_json::from_slice(&output.stdout)
+      .map_err(|err| format!("{}: the upgrade is not JSON: {err}", pact.display()))?;
+    let interactions = |value: &Value| value.as_array().map_or(0, Vec::len);
+    if interactions(&upgraded["contract"]["interactions"])
+      != interactions(&document[fixture::interactions_key(document)])
+    {
+      return Ok(None);
+    }
+    let contract = work.join(format!("{p}-{file}.janus.json"));
+    std::fs::write(
+      &contract,
+      serde_json::to_vec_pretty(&upgraded["contract"]).unwrap_or_default(),
+    )
+    .map_err(|err| format!("{}: {err}", contract.display()))?;
+    contracts.push(contract);
+  }
+  let provider = Started::start(&case.provider, &case.connection)?;
+  Ok(Some(run_janus(
+    tools,
+    &case.connection,
+    &Source::Files(&contracts),
+    &provider.base_url,
+    provider.state_url.as_deref(),
+    work,
+    expected,
+  )))
 }
 
 /// One broker case at a time: the broker is shared, and its SQLite database is not one to race.
@@ -416,6 +486,8 @@ fn run_broker_case(case: &Case, spec: &BrokerSpec, tools: &Tools, work: &Path) -
     janus: janus.run.0,
     today_detail: today.run.1,
     janus_detail: janus.run.1,
+    upgraded: None,
+    upgraded_detail: None,
   }];
   for ((entry, today), janus) in expected.iter().zip(today.interactions).zip(janus.interactions) {
     compared.push(Compared {
@@ -425,6 +497,8 @@ fn run_broker_case(case: &Case, spec: &BrokerSpec, tools: &Tools, work: &Path) -
       janus: janus.0,
       today_detail: today.1,
       janus_detail: janus.1,
+      upgraded: None,
+      upgraded_detail: None,
     });
   }
   let mut expected_published = BTreeMap::new();
@@ -445,6 +519,8 @@ fn run_broker_case(case: &Case, spec: &BrokerSpec, tools: &Tools, work: &Path) -
       janus: janus.0,
       today_detail: today.1,
       janus_detail: janus.1,
+      upgraded: None,
+      upgraded_detail: None,
     });
   }
   Ok(CaseResult {

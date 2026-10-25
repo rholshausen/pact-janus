@@ -90,9 +90,19 @@ export type Shape = unknown & {
    */
   "content-type"?: string;
   /**
-   * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+   * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example' (spec.md §3.4, ADR 0048). The example is still what a contract records.
    */
   generator?: {
+    /**
+     * The generator, namespaced by its component: '<component>:<generator>', as generator/generate names it, such as 'pact:RandomInt'.
+     */
+    name?: string;
+    /**
+     * The generator's configuration, the component's own and passed as it stands.
+     */
+    config?: {
+      [k: string]: unknown;
+    };
     [k: string]: unknown;
   };
   [k: string]: unknown;

@@ -183,9 +183,21 @@ fn load_ledger(corpus: &Path) -> Result<ledger::Ledger, String> {
   Ok(ledger)
 }
 
+fn load_upgrade_ledger(corpus: &Path) -> Result<ledger::UpgradeLedger, String> {
+  let path = corpus.join("upgrade-disagreements.json");
+  let text = std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
+  let ledger: ledger::UpgradeLedger =
+    serde_json::from_str(&text).map_err(|err| format!("{}: {err}", path.display()))?;
+  ledger
+    .check()
+    .map_err(|problems| format!("{}:\n{problems}", path.display()))?;
+  Ok(ledger)
+}
+
 /// Every case, and the ledger, read and checked: what CI can verify with no verifier installed.
 fn cases(corpus: &Path) -> Result<(Vec<run::Case>, ledger::Ledger), String> {
   let ledger = load_ledger(corpus)?;
+  let upgrades = load_upgrade_ledger(corpus)?;
   let mut cases = Vec::new();
   for (id, dir, fixture) in fixture::load_corpus(corpus)? {
     cases.extend(run::expand(&id, &dir, &fixture)?);
@@ -194,8 +206,15 @@ fn cases(corpus: &Path) -> Result<(Vec<run::Case>, ledger::Ledger), String> {
   let unknown: Vec<String> = ledger
     .disagreements
     .iter()
-    .filter(|entry| !ids.contains(entry.case.as_str()))
-    .map(|entry| format!("  {} {}", entry.case, entry.key))
+    .map(|entry| (&entry.case, &entry.key))
+    .chain(
+      upgrades
+        .disagreements
+        .iter()
+        .map(|entry| (&entry.case, &entry.key)),
+    )
+    .filter(|(case, _)| !ids.contains(case.as_str()))
+    .map(|(case, key)| format!("  {case} {key}"))
     .collect();
   if !unknown.is_empty() {
     return Err(format!(
@@ -315,6 +334,8 @@ fn run(
 
   let judgement = ledger::judge(&results, &ledger);
   report(&judgement, &version, filter.is_some());
+  let upgrades = ledger::judge_upgrades(&results, &load_upgrade_ledger(corpus)?);
+  report_upgrades(&upgrades);
   if skeleton && !judgement.unexpected.is_empty() {
     let entries: Vec<ledger::Entry> = judgement
       .unexpected
@@ -327,12 +348,53 @@ fn run(
     println!("\n{}", serde_json::to_string_pretty(&entries).unwrap_or_default());
   }
   if let Some(path) = json {
-    let document =
-      serde_json::json!({ "pact-verifier": version, "judgement": judgement, "results": results });
+    let document = serde_json::json!({
+      "pact-verifier": version, "judgement": judgement, "upgrades": upgrades, "results": results,
+    });
     std::fs::write(&path, serde_json::to_string_pretty(&document).unwrap_or_default())
       .map_err(|err| format!("{}: {err}", path.display()))?;
   }
-  Ok(judgement.passed())
+  Ok(judgement.passed() && upgrades.passed())
+}
+
+/// The upgraded contracts' verdicts against the pacts' (staged plan S1.19).
+fn report_upgrades(judgement: &ledger::UpgradeJudgement) {
+  println!(
+    "verifier-diff: janus verify on each pact and on the contract it upgrades into, {} verdict(s)",
+    judgement.compared
+  );
+  println!(
+    "  {} agree, {} known disagreement(s), {} unexpected, {} stale ledger entr{}",
+    judgement.agreed,
+    judgement.known.len(),
+    judgement.unexpected.len(),
+    judgement.stale.len(),
+    if judgement.stale.len() == 1 { "y" } else { "ies" },
+  );
+  for entry in &judgement.unexpected {
+    println!(
+      "UNEXPECTED  {} [{}]  pact: {}  contract: {}",
+      entry.case, entry.key, entry.pact, entry.contract
+    );
+    println!("            {}", entry.reason);
+  }
+  for entry in &judgement.stale {
+    println!(
+      "STALE       {} [{}]  listed as pact: {}  contract: {} ({})",
+      entry.case, entry.key, entry.pact, entry.contract, entry.reason
+    );
+  }
+  if !judgement.unexpected.is_empty() {
+    let entries: Vec<ledger::UpgradeEntry> = judgement
+      .unexpected
+      .iter()
+      .map(|entry| ledger::UpgradeEntry {
+        reason: format!("S?.?: TODO ({})", entry.reason),
+        ..entry.clone()
+      })
+      .collect();
+    println!("\n{}", serde_json::to_string_pretty(&entries).unwrap_or_default());
+  }
 }
 
 fn report(judgement: &ledger::Judgement, version: &str, filtered: bool) {

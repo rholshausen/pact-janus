@@ -340,6 +340,21 @@ impl ConsumerSession {
       .map(|t| t.kind.clone());
     if let Some(kind) = passive_kind {
       let request_plan = contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id));
+      // What a reply's generators read (ADR 0048): the variant's resolved state parameters.
+      let space = plan::variant_space(&entry.spec);
+      let mut provider_state = serde_json::Map::new();
+      for state in params::resolve_states(entry.spec.states.as_ref(), &space, &assignment)
+        .into_iter()
+        .flatten()
+      {
+        provider_state.extend(state.params.into_iter().flatten());
+      }
+      let fresh: BTreeMap<String, contract::ShapePart> = entry
+        .raw_parts
+        .iter()
+        .filter(|(_, slots)| slots.values().any(crate::shape::fresh::has_generators))
+        .map(|(name, slots)| (name.clone(), slots.clone()))
+        .collect();
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.state.lock().expect("exchange state lock poisoned");
         state.armed = Some(ArmedExchange {
@@ -348,6 +363,8 @@ impl ConsumerSession {
           request_plan: request_plan.clone(),
           response_parts: parts.clone(),
           content_types: entry.spec.content_types.clone().unwrap_or_default(),
+          fresh: fresh.clone(),
+          provider_state: provider_state.clone(),
         });
       }
     }

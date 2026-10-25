@@ -63,7 +63,7 @@ public class Shape {
      */
     @JsonProperty("example")
     @JsonPropertyDescription("A value this shape admits, and the value produced for this node unless a variant point or generator selects another. For 'equality' it is also the operator's parameter: the shape admits exactly this value. Carries bytes when tagged (see 'encoded'); untagged it is the natural JSON value (Engine Protocol spec \u00a72.5).")
-    private java.lang.Object example;
+    private Object example;
     /**
      * Representation tag for 'example'. Absent means the example is its natural JSON value; 'base64' means it is the base64 of an octet sequence (Engine Protocol spec §2.4).
      * 
@@ -141,7 +141,7 @@ public class Shape {
      */
     @JsonProperty("options")
     @JsonPropertyDescription("The literal values admitted ('any-of'). Values, not shapes \u2014 a union of shapes is expressed with 'one-of' (spec.md \u00a74.4).")
-    private List<java.lang.Object> options;
+    private List<Object> options;
     /**
      * Member name whose value selects the alternative ('one-of').
      * 
@@ -192,14 +192,14 @@ public class Shape {
     @JsonPropertyDescription("Content type the value's octets must be detected as ('content-type').")
     private java.lang.String contentType;
     /**
-     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example' (spec.md §3.4, ADR 0048). The example is still what a contract records.
      * 
      */
     @JsonProperty("generator")
-    @JsonPropertyDescription("Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.")
-    private Map<String, Object> generator;
+    @JsonPropertyDescription("Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example' (spec.md \u00a73.4, ADR 0048). The example is still what a contract records.")
+    private Generator generator;
     @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
 
     /**
      * The operator. Open vocabulary; an unknown operator is a named failure, never an ignored constraint (spec.md §3.7).
@@ -226,7 +226,7 @@ public class Shape {
      * 
      */
     @JsonProperty("example")
-    public java.lang.Object getExample() {
+    public Object getExample() {
         return example;
     }
 
@@ -235,7 +235,7 @@ public class Shape {
      * 
      */
     @JsonProperty("example")
-    public void setExample(java.lang.Object example) {
+    public void setExample(Object example) {
         this.example = example;
     }
 
@@ -422,7 +422,7 @@ public class Shape {
      * 
      */
     @JsonProperty("options")
-    public List<java.lang.Object> getOptions() {
+    public List<Object> getOptions() {
         return options;
     }
 
@@ -431,7 +431,7 @@ public class Shape {
      * 
      */
     @JsonProperty("options")
-    public void setOptions(List<java.lang.Object> options) {
+    public void setOptions(List<Object> options) {
         this.options = options;
     }
 
@@ -562,30 +562,30 @@ public class Shape {
     }
 
     /**
-     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example' (spec.md §3.4, ADR 0048). The example is still what a contract records.
      * 
      */
     @JsonProperty("generator")
-    public Map<String, Object> getGenerator() {
+    public Generator getGenerator() {
         return generator;
     }
 
     /**
-     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example'.
+     * Generator component reference and configuration (design 2.6), used where a value must be produced fresh rather than replayed from 'example' (spec.md §3.4, ADR 0048). The example is still what a contract records.
      * 
      */
     @JsonProperty("generator")
-    public void setGenerator(Map<String, Object> generator) {
+    public void setGenerator(Generator generator) {
         this.generator = generator;
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
+    public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
+    public void setAdditionalProperty(java.lang.String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
@@ -713,7 +713,7 @@ public class Shape {
     }
 
     @Override
-    public boolean equals(java.lang.Object other) {
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }

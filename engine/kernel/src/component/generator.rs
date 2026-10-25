@@ -3,7 +3,9 @@
 //! component every engine has built in, [`PactGenerators`] (ADR 0034).
 
 use super::ComponentError;
-use pact_models::generators::{GenerateValue, Generator, NoopVariantMatcher, VariantMatcher};
+use pact_models::generators::{
+  GenerateValue, Generator, GeneratorTestMode, NoopVariantMatcher, VariantMatcher,
+};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
@@ -88,6 +90,15 @@ impl GeneratorComponent for PactGenerators {
 
     let context = req.context.unwrap_or(Value::Null);
     let example = context.get("example").cloned().unwrap_or(Value::Null);
+    // A generator runs on the side it is for, as today: `ProviderState` on the provider's, when a
+    // verifier sends a request. Asked on the other side, it keeps the recorded value (ADR 0048).
+    let side = match context.get("side").and_then(Value::as_str) {
+      Some("consumer") => GeneratorTestMode::Consumer,
+      _ => GeneratorTestMode::Provider,
+    };
+    if !generator.corresponds_to_mode(&side) {
+      return Ok(GenerateResult { value: example });
+    }
     let provider_state: HashMap<&str, Value> = context
       .get("provider-state")
       .and_then(Value::as_object)
@@ -151,6 +162,24 @@ mod tests {
       json!({ "example": 1 }),
     );
     assert_eq!(number.unwrap(), json!(5));
+  }
+
+  /// A mock asks on the consumer side, where today's mock server keeps a `ProviderState` value as
+  /// recorded (ADR 0048).
+  #[test]
+  fn a_provider_state_expression_asked_on_the_consumer_side_keeps_the_example() {
+    let value = generate(
+      "pact:ProviderState",
+      json!({ "expression": "/orders/${id}" }),
+      json!({ "example": "/orders/1", "side": "consumer", "provider-state": { "id": 1234 } }),
+    );
+    assert_eq!(value.unwrap(), json!("/orders/1"));
+    let value = generate(
+      "pact:RandomInt",
+      json!({ "min": 7, "max": 7 }),
+      json!({ "example": 1, "side": "consumer" }),
+    );
+    assert_eq!(value.unwrap(), json!(7));
   }
 
   #[test]

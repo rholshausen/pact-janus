@@ -851,6 +851,18 @@ item in 1a is done when S1.1 agrees.
   no `generator-dropped` left for the vocabulary `pact` provides; corpus cases for a generated
   request slot and a generated response slot; and a consumer conformance case for a served
   generated value.
+  *Done 2026-10-25*, as [ADR 0048](decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)
+  decides it, with the conformance case moved to S3.6: no DSL can attach a generator yet, and adding
+  one is a behavioural-specification change for both SDKs. A shape's `generator` is `{name, config}`,
+  and the example is still what a contract records, since a contract's identity is its content. A
+  verifier fills a contract's request after state setup, and a mock its reply on every exchange, which
+  answers S2.3's question. `generator/generate`'s context gains `side`. The harness half of the exit
+  became a column for every fixture: S1.1's harness upgrades each case's pacts and verifies the
+  contracts too, against `corpora/verifier/upgrade-disagreements.json`. 749 of 765 verdicts agree,
+  and each of the other 16 has a reason: the header narrowing (S3.4), `contains` (ADR 0047), a
+  pending interaction (S1.28, new), and an XML body written in other bytes. Not foreseen: that column
+  found S1.25's conversion decoding an unlabelled JSON reply as bytes (JSON bodies now declare their
+  type), and `eachKey` and `eachValue` on a list converted against their own rules.
 - **S1.20 Member order in the document model, and the legacy body compiler retyped** — **M**. The
   shared prerequisite for form and XML bodies (S1.21, S1.22), split from S1.6. The document model
   loses member order (finding 11, formerly stage 5), though XML children and form fields are ordered.
@@ -1077,6 +1089,17 @@ item in 1a is done when S1.1 agrees.
   *Exit:* finding 16 closed; a component declaration's registry credential reaches the registry and
   nothing a run reports or logs, with a test, as S1.9's hook secrets have.
 
+- **S1.28 Pending interactions in a contract** — **S**. Split from S1.19 on 2026-10-25, which found
+  it through S1.1's upgraded column. A v4 interaction may be `pending`: today's verifier reports its
+  failure and does not fail the run, as a pending pact's is reported. `janus verify` does the same for
+  a pact (S1.3). A contract has no pending interaction, so `janus upgrade` drops the flag
+  (`pending-dropped`), and a failure of the upgraded interaction fails the run. The decision is whether
+  pending belongs in the contract at all, beside the broker's pending pacts. If it does, it belongs on
+  the interaction, under contract-file spec §3.2's placement rule, since it changes what a verifier
+  does.
+  *Exit:* `compatibility-suite/v4/01-verifying-a-pending-http-interaction` leaves
+  `upgrade-disagreements.json`, or the flag is decided against in an ADR that the entry cites.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.
@@ -1123,7 +1146,9 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* the TypeScript SDK's own withholding logic is deleted; a conformance case fails a suite on
   the variant that failed.
 - **S2.3 Plans cached per (handle, variant)** — **S**. Arming a variant recompiles its plan (finding
-  28); the cache, and a decision on what a fresh-per-exchange generator means under it.
+  28); the cache, and a decision on what a fresh-per-exchange generator means under it. S1.19 decided
+  that one (ADR 0048): a reply's generated positions are filled every time it is served, after the
+  cached plan and the armed reply, so the cache holds no generated value.
   *Exit:* the 100 KB request scenario in S0.3's trend drops to the small-exchange cost.
 - **S2.4 Two SDKs rebuilt from the SDK specification** — **L**. JavaScript/TypeScript and JVM, each
   with generated bindings, an idiomatic layer, the test-framework integrations people use (Jest and
@@ -1200,6 +1225,15 @@ The RFC's answer to optional fields, delivered to users.
   framework registers tests dynamically, a per-variant result list where it does not, and the exchange
   loop's match decision as an event a host can surface while the run is going (variant ergonomics
   report, recommendations 1–3).
+- **S3.6 Generators in the DSL** — **S**. Split from S1.19 on 2026-10-25. A shape carries a generator
+  and a mock fills it fresh on every exchange (ADR 0048), but no DSL can attach one, so a consumer
+  suite writes no generated value unless it hands the engine an interaction specification. A DSL
+  primitive naming a generator and its configuration, specified in the behavioural specification
+  first and implemented in both SDKs. The SDK specification refuses `like(v)` with a random function,
+  on ADR 0008's grounds. A declared generator does not run into that refusal: the engine generates the
+  value and the recording stays the example.
+  *Exit:* the consumer conformance case for a served generated value that S1.19's exit named, passing
+  in both SDKs.
 
 **Done when** the RFC's consumer example runs natively in both SDKs, the demo runs on them, and the DSL
 is frozen as the major version's surface.
@@ -1389,7 +1423,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.26 | A rule on the pact's `Content-Type` header passes a reply that today's body check fails, when its regex expects a space before a parameter | found landing S1.23; ADR 0036 decision 4 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
-| S2.3 | Arming a variant recompiles its plan: cache per (handle, variant), and decide what a fresh-per-exchange generator means | finding 28 |
+| S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |

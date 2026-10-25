@@ -10,6 +10,7 @@
 //! recorded document (ADR 0037).
 
 mod canonical;
+pub mod fresh;
 mod model;
 mod parse;
 pub(crate) mod path;

@@ -47,6 +47,7 @@
   "also-compiled-from": {
     "kind": "spec",
     "spec": {
+      "content-types": { "response": { "body": "application/json" } },
       "description": "get a delivery date",
       "parts": {
         "request": {

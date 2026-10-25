@@ -30,6 +30,8 @@ readability:
   in `tools/corpus` holds its `also-compiled-from` to what the upgrade writes. `upgrade-text-body/`,
   `upgrade-binary-body/`, `upgrade-form-body/`, `upgrade-xml-body/`, `upgrade-multipart-body/` and their
   `-mismatch` twins are the body kinds that are not JSON, each in its component's document (ADR 0047).
+  `upgrade-generated-request-slot/` and `upgrade-generated-response-slot/` carry generators on their
+  shapes, and admit a generated value where the example was (ADR 0048).
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`

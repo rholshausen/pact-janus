@@ -978,15 +978,19 @@ fn upgrade_writes_canonical_bytes_and_reports_its_findings() {
   assert!(findings.contains("rule-narrowed"), "{findings}");
   assert!(findings.contains("NOTE"), "{findings}");
 
-  // One that loses more says so under the same heading: this pact carries generators, and the
-  // contract format names a generator *component* nothing implements yet.
-  let lossy = janus(&[
+  // A pact's generators are carried onto the shapes, naming the built-in `pact` component (staged
+  // plan S1.19, ADR 0048), and nothing is said about losing them.
+  let generated = janus(&[
     "upgrade",
     &repo("engine/kernel/tests/fixtures/legacy-pacts/V3Consumer-ProviderStateService.json"),
   ]);
-  let findings = stderr(&lossy);
-  assert!(findings.contains("LOSSY"), "{findings}");
-  assert!(findings.contains("generator-dropped"), "{findings}");
+  assert!(
+    stdout(&generated).contains("\"name\":\"pact:ProviderState\""),
+    "{}",
+    stdout(&generated)
+  );
+  let findings = stderr(&generated);
+  assert!(!findings.contains("generator-dropped"), "{findings}");
 }
 
 #[test]

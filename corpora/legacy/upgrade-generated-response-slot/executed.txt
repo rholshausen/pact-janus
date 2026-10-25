@@ -1,0 +1,50 @@
+(
+  :"get a user" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/users/1',
+          '/users/1'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => NULL,
+          'application/json'
+        ) => BOOL(true),
+        :"$.id" (
+          %match:integer (
+            $.response.body.id => 572
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.token" (
+          %match:regex (
+            $.response.body.token => 'xqz-90',
+            '^(?:[a-z]+-\\d+)$'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

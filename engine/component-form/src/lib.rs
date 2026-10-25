@@ -57,19 +57,27 @@ pub fn write(document: &RuntimeValue) -> Result<String, String> {
   let RuntimeValue::Object(members) = document else {
     return Err("a form body is an object of names and their values".to_string());
   };
-  let mut pairs: Vec<(&str, &str)> = Vec::new();
+  // A number or a boolean is written as its text, as the XML component writes one: a generator
+  // asked for a value in place of a form value's text may answer with a number (ADR 0048).
+  let text = |value: &RuntimeValue| match value {
+    RuntimeValue::String(value) => Some(value.clone()),
+    RuntimeValue::Number(number) => Some(number.to_string()),
+    RuntimeValue::Bool(flag) => Some(flag.to_string()),
+    _ => None,
+  };
+  let mut pairs: Vec<(&str, String)> = Vec::new();
   for (name, values) in members {
     match values {
-      RuntimeValue::String(value) => pairs.push((name, value)),
       RuntimeValue::Array(values) => {
         for value in values {
-          let RuntimeValue::String(value) = value else {
-            return Err(format!("the values of '{name}' must be strings"));
-          };
+          let value = text(value).ok_or_else(|| format!("the values of '{name}' must be strings"))?;
           pairs.push((name, value));
         }
       }
-      _ => return Err(format!("'{name}' must be a string or a list of strings")),
+      value => {
+        let value = text(value).ok_or_else(|| format!("'{name}' must be a string or a list of strings"))?;
+        pairs.push((name, value));
+      }
     }
   }
   serde_urlencoded::to_string(pairs).map_err(|err| err.to_string())

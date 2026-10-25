@@ -54,6 +54,7 @@
   "also-compiled-from": {
     "kind": "spec",
     "spec": {
+      "content-types": { "response": { "body": "application/json" } },
       "description": "get an order",
       "parts": {
         "request": {

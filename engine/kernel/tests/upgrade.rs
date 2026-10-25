@@ -338,14 +338,81 @@ fn an_or_combination_is_reported_as_its_own_kind_of_loss() {
 /// A dropped generator is lossy but never dangerous: it weakens what the contract can *produce*,
 /// never what it *accepts*, and the message says so.
 #[test]
-fn generators_are_dropped_and_counted() {
+fn generators_are_written_onto_the_shape_at_their_target() {
   let upgraded = upgrade(&fixture("V3Consumer-ProviderStateService.json"));
-  let finding = find(&upgraded.findings, "generator-dropped");
-  assert_eq!(finding.kind, "lossy");
   assert!(
-    finding.message.contains("accepts is unchanged"),
-    "{}",
-    finding.message
+    !codes(&upgraded.findings).contains(&"generator-dropped"),
+    "{:?}",
+    codes(&upgraded.findings)
+  );
+  let generator = json!({
+    "name": "pact:ProviderState",
+    "config": { "dataType": "INTEGER", "expression": "userId" },
+  });
+  assert_eq!(
+    shape(&upgraded, 0, "request", "body")["members"]["userId"]["generator"],
+    generator
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body")["members"]["userId"]["generator"],
+    generator
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "response", "headers")["members"]["location"]["entries"][0]["generator"]["name"],
+    json!("pact:ProviderState")
+  );
+  // A request body a generator fills is read by the type the pact gives it.
+  let evidence = &upgraded.contract.interactions[0].selection.variants[0].parts["request"]["body"];
+  assert_eq!(evidence.encoded.as_deref(), Some("text"));
+  assert!(
+    evidence
+      .content_type
+      .as_deref()
+      .is_some_and(|ct| ct.starts_with("application/json"))
+  );
+}
+
+/// Staged plan S1.19: a generator is placed wherever today's verifier generates one, and dropped,
+/// naming why, where it does not.
+#[test]
+fn a_generator_no_component_provides_or_today_ignores_is_dropped_and_said_so() {
+  let upgraded = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/orders/1", "query": { "page": ["1", "2"] },
+            "generators": {
+              "path": { "type": "ProviderState", "expression": "/orders/${id}" },
+              "query": { "page": { "type": "RandomInt", "min": 1, "max": 9 } } } }),
+    json!({ "status": 200, "headers": { "Content-Type": "text/plain" }, "body": "x",
+            "generators": {
+              "status": { "type": "RandomInt", "min": 200, "max": 200 },
+              "body": { "$": { "type": "RandomString" } },
+              "header": { "Location": { "type": "MockServerURL", "example": "http://x/1", "regex": ".*(/1)$" } } } }),
+  ));
+  assert_eq!(
+    shape(&upgraded, 0, "request", "path")["generator"]["name"],
+    json!("pact:ProviderState")
+  );
+  for index in 0..2 {
+    assert_eq!(
+      shape(&upgraded, 0, "request", "query")["members"]["page"]["entries"][index]["generator"],
+      json!({ "name": "pact:RandomInt", "config": { "min": 1, "max": 9 } })
+    );
+  }
+  assert_eq!(
+    shape(&upgraded, 0, "response", "status")["generator"]["name"],
+    json!("pact:RandomInt")
+  );
+  let dropped: Vec<&str> = upgraded
+    .findings
+    .iter()
+    .filter(|f| f.code == "generator-dropped")
+    .map(|f| f.path.as_str())
+    .collect();
+  assert_eq!(
+    dropped,
+    vec![
+      "/interactions/0/response/generators/body/$",
+      "/interactions/0/response/generators/header/Location"
+    ]
   );
 }
 

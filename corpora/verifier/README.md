@@ -152,3 +152,18 @@ example Janus because it refuses a matching rule it does not compile yet (such a
 header, ADR 0042) and today's verifier
 because the body differs, that counts as agreement. The ledger entry for the passing case with the same
 rule is what records the gap.
+
+## Upgraded contracts
+
+Every case whose pacts all convert into contracts with every interaction is run a third time
+(staged plan S1.19, [ADR 0048](../../Documentation/decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)):
+`janus upgrade` converts each pact, and `janus verify` verifies the contracts against a provider of
+their own. Each verdict is compared with `janus verify`'s on the pact itself. That is plan-grammar spec
+§4.4's two-path agreement, observed against a provider rather than over captured values. A case with a
+message, or an interaction that needs a plugin, has no contract form for it yet, so it is left out.
+
+[`upgrade-disagreements.json`](upgrade-disagreements.json) is this comparison's ledger, with
+`pact` and `contract` in place of `today` and `janus`, and it is held to the same rules: a difference
+it does not list fails the run, and so does an entry nothing differs on any more. A reason names what
+accounts for the difference. Most are a loss `janus upgrade` reports as a finding, because the shape
+language cannot say what v1–v4 do there.
