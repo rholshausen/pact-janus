@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792890697608,
+  "lastUpdate": 1792890699693,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -21912,6 +21912,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20175,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0f4019b69669132993f9f9ac0479a496dac6d952",
+          "message": "feat: S1.25 janus upgrade converts text, binary, form, XML and multipart bodies (ADR 0047)\n\nA body that was not JSON was carried across with body-not-parsed and nothing\nasserted about it, so a contract verified less than its pact.\n\n- A text, form, XML or multipart body declares the pact's type in\n  content-types and requires the built-in component that reads it; a\n  multipart type is declared without its boundary. Each body is shaped over\n  its component's document as the legacy compiler compares it. Octets stay\n  undeclared, as bytes with a base64 example.\n- A converted body's evidence is the pact's octets (text when UTF-8), so a\n  replay sends what the pact's verification sends.\n- A pact that names no Content-Type header has its reply-type check\n  (legacy:body-type) written as an optional pattern on the reply's\n  content-type header, for JSON bodies too.\n- A number or boolean rule on text converts to the pattern legacy:parses-as\n  reads, where it converted to a kind no string has; eachValue and\n  arrayContains convert with their own rules.\n- The multipart component takes a boundary from a slot's label when the\n  declared type names none.\n- The shape compiler quotes a member name a path cannot hold (a.b, '',\n  @{urn:x}id), which it resolved as another member.\n\nNew findings: response-body-opened, body-type-on-header, rule-as-pattern.\nTen corpora/legacy/upgrade-*-body* cases, a test holding every upgrade-*\ncase to what the upgrade writes, a two-path test over every v1-v4 corpus\ncase, and a live CLI test of every body kind.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T12:06:15+11:00",
+          "tree_id": "47ae51430c98748d973ce8e1e9700cf3e3a5aee3",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0f4019b69669132993f9f9ac0479a496dac6d952"
+        },
+        "date": 1792890699150,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27003,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20374,
             "unit": "requests per second",
             "extra": "engines 4"
           }
