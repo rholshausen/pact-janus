@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792915508477,
+  "lastUpdate": 1792915510792,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -24390,6 +24390,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 44120,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "fe8916ef50548193473e6af0f1af2036db7fd556",
+          "message": "test: test stubs report a request before replying to it\n\nCI's Linux agent failed a_state_parameter_feeds_a_provider_state_path_generator\nwith \"index out of bounds: the len is 0\": the stub provider wrote its\nreply and only then sent the request it saw down its channel. The run\ncould finish and the test read the channel (try_iter, which does not\nwait) before the stub thread got that far.\n\nEvery stub that reported after replying now reports first: generators.rs,\nlegacy_verification.rs (whose S1.13 filter and stop tests read the same\nway), verification.rs and component-http's http_drive.rs.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T18:47:41+11:00",
+          "tree_id": "84757c934be2845838e9c78f5ef81776c2bddb20",
+          "url": "https://github.com/rholshausen/pact-janus/commit/fe8916ef50548193473e6af0f1af2036db7fd556"
+        },
+        "date": 1792915510100,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25318,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19511,
             "unit": "requests per second",
             "extra": "engines 4"
           }
