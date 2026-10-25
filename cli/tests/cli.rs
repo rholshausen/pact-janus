@@ -1748,12 +1748,17 @@ fn a_broker_credential_reaches_the_broker_and_appears_nowhere_else(#[case] kind:
     assert!(stdout(&verified).contains("published"), "{}", stdout(&verified));
   }
 
-  // The wrong credential is refused, and is not repeated either.
+  // The wrong credential is refused, and is not repeated either. A run that could not fetch its
+  // pacts verified nothing: the command could not run (staged plan S1.29).
   let args = verify("text");
   let args: Vec<&str> = args.iter().map(String::as_str).collect();
   let refused = run(&args, &wrong);
-  assert_eq!(code(&refused), 1, "{}\n{}", stdout(&refused), stderr(&refused));
-  assert!(stdout(&refused).contains("with 401"), "{}", stdout(&refused));
+  assert_eq!(code(&refused), 2, "{}\n{}", stdout(&refused), stderr(&refused));
+  assert!(
+    stderr(&refused).contains("janus verify: broker-refused: ") && stderr(&refused).contains("with 401"),
+    "{}",
+    stderr(&refused)
+  );
 }
 
 #[test]
