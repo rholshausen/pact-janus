@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792969758766,
+  "lastUpdate": 1792969760517,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -25098,6 +25098,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19610,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "4f93a29c902648d40385c9f00232180c07e54c70",
+          "message": "fix: S1.29 the CLI output review, section A: output that was wrong\n\nStaged plan S1.29 (the review of every command's output after stage 1a) and\nS1.30 (the findings that change what the engine reports) are added to the\nplan. This is the review's first section: output that was wrong.\n\n- upgrade/pact refuses a document that is not a pact (contract-invalid),\n  instead of converting it into an empty contract reported as exact. The\n  check moves into the legacy reader, so explain's v1-v4 path has it too.\n- verification/explain refuses a variant the interaction does not record\n  (variant-not-found, with the recorded ids), as a run does (ADR 0041).\n- A source document that cannot be read says so, not \"the session's\n  interactions cannot produce a valid contract\"; one that is neither a\n  contract nor a pact says that.\n- janus verify names the file an engine error is about, with positions\n  inside it; URL flags are checked as the command line is read; explain\n  --index past the end is a usage error, and --spec is suggested only for a\n  document the engine could not identify; publish no longer says a broker it\n  never reached refused the contracts.\n- An error's continuation lines are indented with it; pact_models' warnings\n  are not logged by default; the WASM compiler's trace is capped as the HTTP\n  libraries' is, so --log-level trace no longer slows component loading; the\n  help says trace, not debug, shows the frames.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T09:53:34+11:00",
+          "tree_id": "384c40b43c40a4540dc2b63bd78ca8ed77a1272a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/4f93a29c902648d40385c9f00232180c07e54c70"
+        },
+        "date": 1792969760174,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25546,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19558,
             "unit": "requests per second",
             "extra": "engines 4"
           }
