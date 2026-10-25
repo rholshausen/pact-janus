@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792907712674,
+  "lastUpdate": 1792907714750,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -23328,6 +23328,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30545,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f95d664cf18608e9a55f40147c5296b42fa72a76",
+          "message": "feat: S1.28 a contract has no pending interactions; upgrade can exclude them (ADR 0051)\n\nA v4 interaction may be pending, and janus upgrade converted it without\nits flag, so the upgraded contract failed where the pact passed. Pending\nis a fact about two codebases at a moment: the broker works it out from\nthe provider's results, and a fixed contract version cannot follow it.\n\n- ADR 0051: a contract has no pending interactions (contract-file spec\n  §4.1); a pending contract is the broker's to decide, as a pending pact\n  is. The v1-v4 path keeps honouring the flag, as today's verifier does.\n- upgrade/pact reads options.exclude-pending, and janus upgrade takes\n  --exclude-pending: each pending interaction is left out and reported\n  as pending-excluded. By default it is still converted (pending-dropped).\n- Every upgrade finding points at the interaction's position in the\n  pact; it used to count only HTTP interactions.\n- The protocol's upgrade schema lists every finding code the\n  contract-file spec does; bindings regenerated (UpgradeOptions).\n- The S1.1 upgrade ledger's pending entry cites ADR 0051.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T16:50:43+11:00",
+          "tree_id": "b72a721521f2f37816e8d5490e7fc80722d1075e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f95d664cf18608e9a55f40147c5296b42fa72a76"
+        },
+        "date": 1792907714037,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 54786,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 43096,
             "unit": "requests per second",
             "extra": "engines 4"
           }
