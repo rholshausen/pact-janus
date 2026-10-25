@@ -171,7 +171,7 @@ impl EngineError {
       category: "document".to_string(),
       message: match found {
         Some(found) => format!("contract {index} is not a Janus contract (found {found})"),
-        None => format!("contract {index} is not a Janus contract"),
+        None => format!("contract {index} is neither a Janus contract nor a v1–v4 pact"),
       },
       details: Some(Box::new(
         serde_json::json!({ "index": index, "found": found, "expected": crate::contract::FORMAT }),
@@ -405,6 +405,17 @@ impl EngineError {
   /// validly produce a contract — currently only two interactions sharing a description and
   /// state list. `problems` carries RFC 6901 pointers into the contract that would have been
   /// written.
+  /// `contract-invalid` for a document a host handed in to be read — a source to verify, a pact to
+  /// upgrade or explain — that is not a contract or pact this engine can read, at `problems`.
+  pub fn document_invalid(problems: &[crate::error::Problem]) -> Self {
+    EngineError {
+      code: "contract-invalid".to_string(),
+      category: "document".to_string(),
+      message: "the document is not a contract or pact this engine can read".to_string(),
+      details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+    }
+  }
+
   pub fn contract_invalid(problems: &[crate::error::Problem]) -> Self {
     EngineError {
       code: "contract-invalid".to_string(),

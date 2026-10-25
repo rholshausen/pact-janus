@@ -110,14 +110,17 @@ pub fn run(args: &PublishArgs) -> Result<Outcome, Error> {
   if published {
     return Ok(Outcome::Done);
   }
-  let failed: Vec<&str> = publications
+  // Not "the broker refused them": a broker nobody could reach refused nothing. Why each was not
+  // published is in what was printed above it, or in the document.
+  let failed: Vec<String> = publications
     .iter()
     .filter(|publication| publication["status"] != json!("published"))
     .filter_map(|publication| publication["consumer"].as_str())
+    .map(str::to_string)
     .collect();
   Err(Error::Failed(format!(
-    "the broker did not accept {}'s contracts",
-    failed.join("', '")
+    "the contracts for {} were not published",
+    failed.join(", ")
   )))
 }
 

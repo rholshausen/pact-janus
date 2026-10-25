@@ -1156,6 +1156,49 @@ item in 1a is done when S1.1 agrees.
   interaction, because upgrade counted only the HTTP ones; every finding now points at the pact's own
   position.
 
+- **S1.29 The CLI output review** — **S**. The CLI's text grew an item at a time (S1.1–S1.28), and
+  the oddities each item met were collected for one pass rather than polished inline. A review of
+  every command's output on 2026-10-26, run against the sample provider, corpus fixtures and the
+  error paths, found three kinds of thing:
+  - *Wrong:* an error's `details` line indented as if it belonged to nothing; `--help` saying
+    `--log-level debug` shows the frames, which only `trace` does; `janus upgrade` turning a document
+    that is not a pact into an empty contract it calls an exact conversion; `janus explain --variant`
+    ignoring an id no pact records, which `verify` refuses (ADR 0041); `explain --index` past the end
+    reported as a malformed frame, with a hint to pass `--spec`; `janus publish` saying a broker it
+    never reached "did not accept" the contracts; engine errors naming a file by its position
+    (`contract 0`) when the CLI knows its path; a `--provider-url` that is not a URL refused by the
+    transport, in the transport's terms; `pact_models` warnings at the default log level; and
+    `--log-level trace` making a WASM component take seconds to load, since its compiler logs at
+    `trace` too.
+  - *Noise:* every engine error's `details` printed as raw JSON under its message; error chains that
+    carry the HTTP library's layers (`error sending request: client error (Connect): tcp connect
+    error: ...`) and the component wrapper's (`component-failed: the 'transport/http' component
+    failed: ... [transport-failed]`); a hook that fails an exchange printed twice, the first time
+    before the interaction it belongs to, and an aborting hook's error printed twice; `[base]` after
+    every interaction of a pact, which has no other variant; summaries that list every zero tally and
+    write `interaction(s)`; a run that never started printed as one that "did not complete (0
+    interaction(s) in 0 document(s))"; a run stopped at its first failure counting only what it
+    reached; and `(os error 2)`-style suffixes.
+  - *Help text:* "as today's verifier" for `pact_verifier_cli`, the plan's word and not a user's;
+    the global options interleaved with each command's own; and environment variables shown two ways.
+  Decided with the review: a run the engine ends before it verifies anything — the broker or a URL
+  cannot be fetched, no pacts are selected, a variant is named that nothing records — exits 2, as the
+  same refusal for files does, which settles ADR 0041's open consequence. Today's verifier exits 1
+  for each of these, and for a pact file it cannot read; `Documentation/verifier-migration.md` says so.
+  *Exit:* each finding fixed, with the trycmd and snapbox cases that pin the output changed to match.
+
+- **S1.30 Mismatch paths and absent values in plan text** — **S**, split from S1.29 because each
+  changes what the engine reports, and so the specifications and corpora. A mismatch inside a
+  `flow:for-each` template is reported at a relative path (`~>.value`, `~>`) without saying which key
+  or index, as every rule-driven array has been since the prototype and ADR 0042's entry templates
+  are; a mismatch from an action whose first child is not a `resolve` has no path at all
+  (`expect:size(legacy:xml-children(...))`); an absent value prints as `NULL` in executed plan text,
+  indistinguishable from a null; and a container for a member with no name is labelled `"$."` or
+  `"$.[0]"` (a multipart body's unnamed parts). Also the article in kind messages ("Expected a
+  integer", "a array").
+  *Exit:* every mismatch the corpora record has an absolute path; plan-grammar spec §3 says how an
+  absent value prints, and the corpus snapshots follow it.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.
@@ -1477,6 +1520,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.24 | `Values`, `EachKey`, `EachValue` and `ArrayContains` compile to an error node | split from S1.6; task 3.5 |
 | S1.25 | `upgrade` carries a body that is not JSON across with nothing asserted about it | split from S1.6; ADR 0036 |
 | S1.26 | A rule on the pact's `Content-Type` header passes a reply that today's body check fails, when its regex expects a space before a parameter | found landing S1.23; ADR 0036 decision 4 |
+| S1.29 | The CLI's output, grown an item at a time: errors that are wrong, duplicated or carry raw `details`, summaries, help text, and exit 1 for a broker run that never started | collected through S1.1–S1.28; ADR 0041 |
+| S1.30 | Relative and missing mismatch paths; an absent value printed as `NULL`; unnamed members' labels; "a integer" | S1.22, S1.24, S1.25; ADR 0042 |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |

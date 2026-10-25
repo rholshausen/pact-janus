@@ -1071,7 +1071,7 @@ fn contract_error(err: crate::contract::ContractError) -> EngineError {
   match err {
     ContractError::NotAContract => EngineError::not_a_contract(0, None),
     ContractError::VersionUnsupported { format } => EngineError::not_a_contract(0, Some(&format)),
-    ContractError::Invalid { problems } => EngineError::contract_invalid(&problems),
+    ContractError::Invalid { problems } => EngineError::document_invalid(&problems),
   }
 }
 
@@ -1106,6 +1106,10 @@ fn explain_error(err: ExplainError) -> EngineError {
       "verification/explain: no interaction at index {index}; the document has {count}"
     )),
     ExplainError::Invalid(problems) => EngineError::interaction_invalid(&problems),
+    ExplainError::DocumentInvalid(problems) => EngineError::document_invalid(&problems),
+    ExplainError::VariantNotRecorded { variant, recorded } => {
+      EngineError::variant_not_recorded(std::slice::from_ref(&variant), &recorded)
+    }
     ExplainError::NotReadable(message) => EngineError::malformed_frame(message),
     ExplainError::NeedsPlugins(plugins) => EngineError::pact_plugins_unavailable(&plugins),
     ExplainError::Unavailable(unavailable) => EngineError::component_unresolved(&unavailable),
@@ -1123,7 +1127,7 @@ pub(super) fn verify_error(err: VerifyError) -> EngineError {
     }
     VerifyError::SourceIncomplete(message) => EngineError::malformed_frame(message),
     VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
-    VerifyError::ContractInvalid { problems } => EngineError::contract_invalid(&problems),
+    VerifyError::ContractInvalid { problems } => EngineError::document_invalid(&problems),
   }
 }
 

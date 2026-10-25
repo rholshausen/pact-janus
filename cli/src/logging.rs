@@ -34,6 +34,10 @@ where
 /// implementation and the tests' own clients are ureq. Their `debug` is kept, and says nothing
 /// secret.
 ///
+/// The WASM loader's compiler is held to `debug` too, for a different reason: at `trace`, cranelift,
+/// its register allocator and wasmtime log every instruction they compile, and loading one component
+/// takes seconds instead of milliseconds.
+///
 /// The cap is a second filter an event must also pass, not a directive in `filter`: a directive
 /// sets the target's level, so `ureq_proto=debug` would log its `debug` at `warn` too.
 fn without_credentials<S>(filter: EnvFilter) -> impl Filter<S>
@@ -48,7 +52,10 @@ where
       .with_target("hyper", LevelFilter::DEBUG)
       .with_target("hyper_util", LevelFilter::DEBUG)
       .with_target("h2", LevelFilter::DEBUG)
-      .with_target("rustls", LevelFilter::DEBUG),
+      .with_target("rustls", LevelFilter::DEBUG)
+      .with_target("cranelift", LevelFilter::DEBUG)
+      .with_target("regalloc2", LevelFilter::DEBUG)
+      .with_target("wasmtime", LevelFilter::DEBUG),
   )
 }
 
@@ -123,6 +130,26 @@ mod tests {
     #[case] expected: Vec<&str>,
   ) {
     assert_eq!(logged(filter), expected);
+  }
+
+  /// The WASM loader's compiler is held to `debug`: at `trace` it logs every instruction it compiles.
+  #[test]
+  fn the_wasm_compiler_never_logs_at_trace() {
+    let captured = Captured::default();
+    tracing::subscriber::with_default(
+      subscriber(EnvFilter::new("trace"), captured.clone(), false),
+      || {
+        tracing::trace!(target: "cranelift_codegen::machinst::lower", "compiler-trace");
+        tracing::trace!(target: "regalloc2::ion", "compiler-trace");
+        tracing::trace!(target: "wasmtime_cranelift::compiler", "compiler-trace");
+        tracing::debug!(target: "wasmtime::runtime", "compiler-debug");
+        tracing::trace!(target: "pact_janus_component_host", "loader-trace");
+      },
+    );
+    let text = String::from_utf8(captured.0.lock().expect("the buffer").clone()).expect("utf-8");
+    assert!(!text.contains("compiler-trace"), "{text}");
+    assert!(text.contains("compiler-debug"), "{text}");
+    assert!(text.contains("loader-trace"), "{text}");
   }
 
   /// The engine's own client (ADR 0035) is held to `debug` too, at every layer beneath it.

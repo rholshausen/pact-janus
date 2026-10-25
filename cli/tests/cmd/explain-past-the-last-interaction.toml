@@ -1,0 +1,6 @@
+# An --index past the document's last interaction is a usage error naming the flag and what is there,
+# not a refusal from the engine with a hint about --spec (staged plan S1.29).
+bin.name = "janus"
+args = ["explain", "samples/order-service/pacts/web-app-order-service.json", "--index", "5"]
+status.code = 2
+fs.cwd = "../../.."

@@ -139,13 +139,14 @@ fn clap_exit(err: &clap::Error) -> ExitCode {
 }
 
 /// `--log-level` wins; without it `RUST_LOG` is read, so the finer directives a maintainer reaches
-/// for still work; the default is `warn`.
+/// for still work; the default is `warn`, with `pact_models` at `error`: it warns about a pact with
+/// no metadata whenever one is read, which the format the CLI prints already says.
 fn init_tracing(level: Option<LogLevel>, colour: bool) {
   use tracing_subscriber::EnvFilter;
   logging::to_stderr(
     match level {
       Some(level) => EnvFilter::new(level.as_str()),
-      None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
+      None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,pact_models=error")),
     },
     colour,
   );

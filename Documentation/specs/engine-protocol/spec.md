@@ -691,7 +691,9 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   path, with `encoded` tagging any that are octets, it also runs the plan against them, with the run's
   content detection and its components' contributed actions, and returns `executed`: the verdict,
   each mismatch, and the executed text form. That is how a host matches captured values offline. A
-  run's own executed plans arrive on its event stream (§9).
+  run's own executed plans arrive on its event stream (§9). A `variant` the interaction does not
+  record is `variant-not-found`, with the `recorded` ids in its details, as a run refuses it (ADR
+  0041); a v1–v4 interaction records only `base`.
 
 ### 8.4 Upgrade — `upgrade/*`
 
@@ -705,7 +707,9 @@ Converts a v1–v4 pact document to a Janus contract per design 2.5's rules (mat
 the single example becomes the sole variant). `findings` lists lossy or judgement-call spots
 (each with a code from an open vocabulary, a JSON pointer location and prose) so the CLI's
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
-document-out.
+document-out. A document without the members every pact file has (`consumer` and `provider`
+objects, an `interactions` or `messages` array) is not converted: it is `contract-invalid`, with a
+problem at the empty pointer, the whole document.
 
 `options` is open. `exclude-pending: true` leaves the pact's pending interactions out of the contract,
 each reported as `pending-excluded`. Without it, each is converted without its flag and reported as

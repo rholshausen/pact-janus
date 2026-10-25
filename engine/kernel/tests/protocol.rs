@@ -692,3 +692,59 @@ fn a_malformed_observation_is_a_value_not_a_panic() {
   // session adds no error vocabulary of its own.
   assert_eq!(response["error"]["code"], json!("malformed-frame"));
 }
+
+/// A v3 pact with one HTTP interaction, the smallest `upgrade/pact` and `verification/explain` read.
+fn minimal_pact() -> Value {
+  json!({
+    "consumer": { "name": "web-app" },
+    "provider": { "name": "order-service" },
+    "interactions": [{
+      "description": "a request for an order",
+      "request": { "method": "GET", "path": "/orders/66" },
+      "response": { "status": 200 }
+    }],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  })
+}
+
+/// `pact_models` reads `{}` as an empty pact; `upgrade/pact` must not, or a document that is not a
+/// pact becomes an empty contract reported as an exact conversion (staged plan S1.29).
+#[test]
+fn upgrading_a_document_that_is_not_a_pact_is_contract_invalid() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let spec = json!({ "description": "a request", "parts": { "response": { "status": { "shape": "equality", "example": 200 } } } });
+  let response = send(&mut engine, "r-2", "upgrade/pact", json!({ "pact": spec }));
+  assert_eq!(response["error"]["code"], "contract-invalid", "{response}");
+  assert_eq!(
+    response["error"]["details"]["problems"][0]["pointer"], "",
+    "{response}"
+  );
+
+  let response = send(
+    &mut engine,
+    "r-3",
+    "upgrade/pact",
+    json!({ "pact": minimal_pact() }),
+  );
+  assert!(response.get("ok").is_some(), "{response}");
+}
+
+/// A v1–v4 interaction records one variant, `base`; explaining another is refused as a run refuses
+/// it (ADR 0041), and so is one a contract does not record.
+#[test]
+fn explaining_a_variant_the_document_does_not_record_is_variant_not_found() {
+  let mut engine = Engine::new();
+  hello(&mut engine);
+  let explain = |variant: &str| json!({ "interaction": { "kind": "contract-interaction", "contract": minimal_pact(), "variant": variant } });
+  let response = send(&mut engine, "r-2", "verification/explain", explain("shipped"));
+  assert_eq!(response["error"]["code"], "variant-not-found", "{response}");
+  assert_eq!(
+    response["error"]["details"]["recorded"],
+    json!(["base"]),
+    "{response}"
+  );
+
+  let response = send(&mut engine, "r-3", "verification/explain", explain("base"));
+  assert!(response.get("ok").is_some(), "{response}");
+}

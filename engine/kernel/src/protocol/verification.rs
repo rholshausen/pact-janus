@@ -681,7 +681,7 @@ fn read_contract(index: usize, doc: &Value) -> Result<Contract, VerifyError> {
 /// would turn "this is not a contract" into "a contract with nothing in it". A run that verified
 /// nothing and reported success is exactly the misparse ADR 0011 exists to prevent.
 fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
-  if !looks_like_a_pact(doc) {
+  if !legacy_pact::looks_like_a_pact(doc) {
     return Err(VerifyError::NotAContract {
       index,
       found: legacy_hint(doc),
@@ -715,14 +715,6 @@ fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
 /// The members every v1–v4 pact file has by its own specification: named parties and a body of
 /// interactions (or messages, for a pact this engine reads and then finds nothing HTTP in — which
 /// is a pact that verifies zero interactions, a different and honest answer from a misparse).
-pub(super) fn looks_like_a_pact(doc: &Value) -> bool {
-  let has = |name: &str| doc.get(name).is_some_and(Value::is_object);
-  has("consumer")
-    && has("provider")
-    && (doc.get("interactions").is_some_and(Value::is_array)
-      || doc.get("messages").is_some_and(Value::is_array))
-}
-
 /// What a document that is neither a contract nor a readable pact looks like, for the refusal's
 /// message: a pact file says so in its own metadata, and naming "pactSpecification 3.0.0" is far
 /// more useful than "no `$format`".
@@ -1936,7 +1928,7 @@ fn refuse_plugin_interaction(
 }
 
 /// The sole variant of a converted interaction (contract-file spec §8.3).
-const LEGACY_VARIANT: &str = "base";
+pub(super) const LEGACY_VARIANT: &str = "base";
 
 /// A reply read the way design 3.5's plans address it: the generic slot captures, the body decoded
 /// as the pact's content type ([`legacy_pact::response_types`]), plus one string per header name

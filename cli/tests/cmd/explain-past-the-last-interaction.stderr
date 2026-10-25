@@ -1,0 +1,5 @@
+error: invalid value '5' for '--index <N>': the document has 2 interactions, at 0 to 1
+
+Usage: janus explain [OPTIONS] <DOCUMENT>
+
+For more information, try '--help'.

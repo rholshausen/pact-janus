@@ -20,7 +20,7 @@ use std::path::PathBuf;
   bin_name = "janus",
   about = "Verify contracts and pacts against a provider, explain matching plans, upgrade pacts, \
            and decide whether a consumer can deploy",
-  after_help = "Every command drives the same engine an SDK embeds. --log-level debug shows the \
+  after_help = "Every command drives the same engine an SDK embeds. --log-level trace shows the \
                 protocol frames it exchanges.",
   arg_required_else_help = true
 )]
@@ -192,6 +192,16 @@ fn transport_entry(text: &str) -> Result<TransportEntry, String> {
   })
 }
 
+/// A URL with a scheme, checked when the command line is read: one that is not would otherwise be
+/// refused by whatever reached for it first, in that component's terms.
+fn absolute_url(text: &str) -> Result<String, String> {
+  match url::Url::parse(text) {
+    Ok(url) if url.has_host() => Ok(text.to_string()),
+    Ok(_) => Err("it names no host".to_string()),
+    Err(err) => Err(format!("not a URL: {err}")),
+  }
+}
+
 /// How a command prints its result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Output {
@@ -211,7 +221,7 @@ pub struct VerifyArgs {
   pub sources: Vec<PathBuf>,
 
   /// The base URL of the provider under test. Or --hostname and --port, as today's verifier
-  #[arg(long, short = 'u', alias = "provider-base-url", value_name = "URL")]
+  #[arg(long, short = 'u', alias = "provider-base-url", value_name = "URL", value_parser = absolute_url)]
   pub provider_url: Option<String>,
 
   // Today's verifier's spellings for where the provider is and where the pacts are (staged plan
@@ -250,14 +260,14 @@ pub struct VerifyArgs {
 
   /// A pact to fetch by its URL, with the broker's credentials; repeatable. Its result is published
   /// when a Pact Broker served it
-  #[arg(long = "url", value_name = "URL", help_heading = "Loading pacts")]
+  #[arg(long = "url", value_name = "URL", value_parser = absolute_url, help_heading = "Loading pacts")]
   pub urls: Vec<String>,
 
   /// The pact a Pact Broker webhook named: fetched by its URL, and its result published with
   /// --publish
   #[arg(
     long,
-    value_name = "URL",
+    value_name = "URL", value_parser = absolute_url,
     env = "PACT_WEBHOOK_CALLBACK_URL",
     help_heading = "Loading pacts"
   )]
@@ -303,7 +313,7 @@ pub struct VerifyArgs {
     long,
     short = 's',
     alias = "provider-states-setup-url",
-    value_name = "URL",
+    value_name = "URL", value_parser = absolute_url,
     env = "PACT_PROVIDER_STATE_CHANGE_URL",
     help_heading = "Provider states"
   )]
@@ -488,7 +498,7 @@ pub struct VerifyArgs {
     long,
     short = 'b',
     alias = "pact-broker-base-url",
-    value_name = "URL",
+    value_name = "URL", value_parser = absolute_url,
     env = "PACT_BROKER_BASE_URL",
     help_heading = "Pact Broker"
   )]
@@ -802,7 +812,7 @@ pub struct PublishArgs {
   #[arg(
     short = 'b',
     long,
-    value_name = "URL",
+    value_name = "URL", value_parser = absolute_url,
     env = "PACT_BROKER_BASE_URL",
     hide_env_values = true,
     help_heading = "Pact Broker"

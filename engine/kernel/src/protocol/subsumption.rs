@@ -148,7 +148,7 @@ fn consumer_contract(document: &Value) -> Result<(Contract, String), Subsumption
   // Identification before parsing, as everywhere else (ADR 0011): `pact_models` will read `{}` as
   // an empty pact, and "a contract with nothing in it" is exactly the misparse that would turn a
   // typo into a report full of silent passes.
-  if !super::verification::looks_like_a_pact(document) {
+  if !crate::legacy::pact::looks_like_a_pact(document) {
     return Err(SubsumptionError::Document {
       member: "contract",
       error: ContractError::NotAContract,

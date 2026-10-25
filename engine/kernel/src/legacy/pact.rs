@@ -57,12 +57,35 @@ pub fn read(
   source: &str,
   json: &Value,
 ) -> Result<Box<dyn Pact + Send + Sync + RefUnwindSafe>, ContractError> {
+  if !looks_like_a_pact(json) {
+    return Err(ContractError::Invalid {
+      problems: vec![Problem {
+        pointer: String::new(),
+        message:
+          "not a v1–v4 pact: a pact has consumer and provider objects, and an interactions or messages array"
+            .to_string(),
+      }],
+    });
+  }
   pact_models::pact::load_pact_from_json(source, json).map_err(|err| ContractError::Invalid {
     problems: vec![Problem {
       pointer: String::new(),
       message: err.to_string(),
     }],
   })
+}
+
+/// Whether a document carries the members the pact specification requires of every pact file.
+///
+/// `pact_models` is deliberately lenient — it reads `{}` as an empty pact — so identification
+/// happens here, before it parses, rather than being delegated to a parser whose tolerance would
+/// turn "this is not a pact" into "a pact with nothing in it" (ADR 0011).
+pub fn looks_like_a_pact(doc: &Value) -> bool {
+  let has = |name: &str| doc.get(name).is_some_and(Value::is_object);
+  has("consumer")
+    && has("provider")
+    && (doc.get("interactions").is_some_and(Value::is_array)
+      || doc.get("messages").is_some_and(Value::is_array))
 }
 
 /// One HTTP interaction of a v1–v4 pact, in the terms every caller here needs: what it is called,

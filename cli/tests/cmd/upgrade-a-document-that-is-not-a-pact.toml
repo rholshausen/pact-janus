@@ -1,0 +1,5 @@
+# A document that is not a pact is refused, not converted into an empty contract (staged plan S1.29).
+bin.name = "janus"
+args = ["upgrade", "cli/tests/cmd/fixtures/order-spec.json"]
+status.code = 2
+fs.cwd = "../../.."

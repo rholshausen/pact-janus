@@ -79,6 +79,13 @@ pub enum ExplainError {
     count: usize,
   },
   Invalid(Vec<Problem>),
+  /// A contract or pact that cannot be read as one, at these positions.
+  DocumentInvalid(Vec<Problem>),
+  /// A variant the interaction does not record: a v1–v4 interaction records only `base`.
+  VariantNotRecorded {
+    variant: String,
+    recorded: Vec<String>,
+  },
   NotReadable(String),
   /// A v1–v4 interaction that needs these pact plugins (staged plan S1.8): `verify` refuses it, so
   /// there is no plan to explain.
@@ -120,7 +127,7 @@ pub fn compile(subject: &Subject, scope: &Scope) -> Result<Plan, ExplainError> {
           "'{other}' is not a format this engine reads (expected '{}')",
           contract::FORMAT
         ))),
-        None => legacy(document, index),
+        None => legacy(document, index, subject.variant.as_deref()),
       }
     }
     other => Err(ExplainError::KindUnsupported(other.to_string())),
@@ -171,7 +178,15 @@ fn janus(document: &Value, index: usize, variant: Option<&str>, scope: &Scope) -
     .variants
     .iter()
     .find(|v| v.id == wanted)
-    .ok_or_else(|| ExplainError::NotReadable(format!("the interaction records no variant '{wanted}'")))?;
+    .ok_or_else(|| ExplainError::VariantNotRecorded {
+      variant: wanted.to_string(),
+      recorded: interaction
+        .selection
+        .variants
+        .iter()
+        .map(|v| v.id.clone())
+        .collect(),
+    })?;
   let mut assignment = Assignment::new();
   for entry in &recorded.assignment {
     if let (Some(dimension), Some(point)) = (
@@ -240,11 +255,20 @@ pub fn execute(
 
 /// A v1–v4 pact's interaction, through design 3.5's compiler: request and response together, which
 /// is the whole interaction's verdict in one renderable plan.
-fn legacy(document: &Value, index: usize) -> Result<Plan, ExplainError> {
+fn legacy(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan, ExplainError> {
   let pact = legacy_pact::read("explain", document).map_err(|err| match err {
-    contract::ContractError::Invalid { problems } => ExplainError::Invalid(problems),
+    contract::ContractError::Invalid { problems } => ExplainError::DocumentInvalid(problems),
     other => ExplainError::NotReadable(other.to_string()),
   })?;
+  // One example is one variant: a v1–v4 interaction records `base` and nothing else, and a run
+  // refuses any other id (ADR 0041), so explaining one would describe a run that cannot happen.
+  let base = super::verification::LEGACY_VARIANT;
+  if let Some(wanted) = variant.filter(|wanted| *wanted != base) {
+    return Err(ExplainError::VariantNotRecorded {
+      variant: wanted.to_string(),
+      recorded: vec![base.to_string()],
+    });
+  }
   let interactions = legacy_pact::interactions(pact.as_ref());
   let interaction = match interactions.get(index) {
     Some(legacy_pact::PactInteraction::Http(interaction)) => interaction,

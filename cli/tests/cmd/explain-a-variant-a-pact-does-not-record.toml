@@ -1,0 +1,6 @@
+# A v1-v4 interaction records one variant, `base`: explaining any other is refused, as verify refuses
+# it (ADR 0041), rather than explaining a run that cannot happen (staged plan S1.29).
+bin.name = "janus"
+args = ["explain", "samples/order-service/pacts/web-app-order-service.json", "--variant", "shipped"]
+status.code = 2
+fs.cwd = "../../.."

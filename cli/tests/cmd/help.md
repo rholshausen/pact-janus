@@ -31,7 +31,7 @@ Options:
   -h, --help               Print help
   -V, --version            Print version
 
-Every command drives the same engine an SDK embeds. --log-level debug shows the protocol frames it
+Every command drives the same engine an SDK embeds. --log-level trace shows the protocol frames it
 exchanges.
 
 ```

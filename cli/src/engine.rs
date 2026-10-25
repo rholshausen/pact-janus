@@ -26,7 +26,7 @@ pub fn start() -> Result<Engine, String> {
       "capabilities": {},
     }),
   )?;
-  tracing::debug!(?hello, "handshake complete");
+  tracing::debug!(%hello, "handshake complete");
   Ok(engine)
 }
 
@@ -34,13 +34,66 @@ pub fn start() -> Result<Engine, String> {
 /// rendered the way the protocol's own taxonomy reads (spec §10.2): the code first, because that
 /// is the part a user can look up, then whatever detail the engine attached.
 pub fn call(engine: &mut Engine, op: &str, body: Value) -> Result<Value, String> {
+  request(engine, op, body).map_err(|error| render_error(&error))
+}
+
+/// [`call`] for an operation handed `documents` as `source.contracts`, read from these files in
+/// this order: an error about one of them names its file, and its positions are within that file.
+/// The engine can only say "contract 1", since it was never told there were files.
+pub fn call_with_files(
+  engine: &mut Engine,
+  op: &str,
+  body: Value,
+  files: &[String],
+) -> Result<Value, String> {
+  request(engine, op, body).map_err(|mut error| match locate(&mut error, files) {
+    Some(file) => format!("{file}: {}", render_error(&error)),
+    None => render_error(&error),
+  })
+}
+
+fn request(engine: &mut Engine, op: &str, body: Value) -> Result<Value, Value> {
   let request = json!({ "type": "request", "id": next_id(), "op": op, "body": body });
-  let bytes = engine.dispatch(&serde_json::to_vec(&request).map_err(|err| err.to_string())?);
-  let response: Value = serde_json::from_slice(&bytes).map_err(|err| err.to_string())?;
+  let bytes =
+    engine.dispatch(&serde_json::to_vec(&request).map_err(|err| json!({ "message": err.to_string() }))?);
+  let response: Value =
+    serde_json::from_slice(&bytes).map_err(|err| json!({ "message": err.to_string() }))?;
   if let Some(ok) = response.get("ok") {
     return Ok(ok.clone());
   }
-  Err(render_error(&response["error"]))
+  Err(response["error"].clone())
+}
+
+/// The file an error is about, from its `details.index` or its problems' `/source/contracts/<i>`
+/// pointers, which are rewritten to start within that file.
+fn locate<'f>(error: &mut Value, files: &'f [String]) -> Option<&'f str> {
+  const PREFIX: &str = "/source/contracts/";
+  let index_of = |pointer: &str| -> Option<(usize, usize)> {
+    let rest = pointer.strip_prefix(PREFIX)?;
+    let digits = rest.find('/').unwrap_or(rest.len());
+    Some((rest[..digits].parse().ok()?, PREFIX.len() + digits))
+  };
+  let index = match error["details"]["index"].as_u64() {
+    Some(index) => usize::try_from(index).ok()?,
+    None => {
+      let pointer = error["details"]["problems"][0]["pointer"].as_str()?;
+      index_of(pointer)?.0
+    }
+  };
+  let file = files.get(index)?;
+  let problems = error
+    .get_mut("details")
+    .and_then(|details| details.get_mut("problems"))
+    .and_then(Value::as_array_mut);
+  for problem in problems.into_iter().flatten() {
+    let Some(pointer) = problem["pointer"].as_str() else {
+      continue;
+    };
+    if let Some((_, end)) = index_of(pointer).filter(|(at, _)| *at == index) {
+      problem["pointer"] = json!(pointer[end..].to_string());
+    }
+  }
+  Some(file)
 }
 
 /// An engine error as a line a user can act on.
@@ -59,9 +112,12 @@ pub fn render_error(error: &Value) -> String {
     text.push_str(&format!(" [{component_code}]"));
   } else if let Some(problems) = error["details"]["problems"].as_array() {
     for problem in problems {
-      let pointer = problem["pointer"].as_str().unwrap_or("");
       let message = problem["message"].as_str().unwrap_or("");
-      text.push_str(&format!("\n  {pointer}: {message}"));
+      // An empty pointer is the whole document, which needs no position.
+      match problem["pointer"].as_str().filter(|pointer| !pointer.is_empty()) {
+        Some(pointer) => text.push_str(&format!("\n  {pointer}: {message}")),
+        None => text.push_str(&format!("\n  {message}")),
+      }
     }
   } else if let Some(details) = error.get("details").filter(|d| !d.is_null()) {
     text.push_str(&format!("\n  {details}"));

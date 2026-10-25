@@ -725,6 +725,54 @@ fn verify_reads_a_directory_and_skips_what_is_not_a_contract_or_a_pact() {
   assert!(stdout(&output).contains("VERIFIED"), "{}", stdout(&output));
 }
 
+/// The engine knows a run's documents by position; the CLI knows their files. A refusal names the
+/// file, and a position within it (staged plan S1.29).
+#[test]
+fn a_document_the_engine_refuses_is_named_by_its_file() {
+  let notes = temp("notes.json");
+  std::fs::write(&notes, r#"{"hello":"world"}"#).expect("writing a stray file");
+  let output = janus(&[
+    "verify",
+    &order_pact(),
+    &notes,
+    "--provider-url",
+    "http://127.0.0.1:9",
+  ]);
+  assert_eq!(code(&output), 2, "{}", stderr(&output));
+  assert!(
+    stderr(&output).starts_with(&format!(
+      "janus verify: {notes}: contract-version-unsupported: contract 1 is neither a Janus contract nor a v1–v4 pact"
+    )),
+    "{}",
+    stderr(&output)
+  );
+
+  let invalid = temp("invalid-contract.json");
+  std::fs::write(
+    &invalid,
+    r#"{"$format":"janus-contract/1","consumer":{"name":"a"},"provider":{"name":"b"},"interactions":[{"description":3}]}"#,
+  )
+  .expect("writing a contract");
+  let output = janus(&[
+    "verify",
+    &order_pact(),
+    &invalid,
+    "--provider-url",
+    "http://127.0.0.1:9",
+  ]);
+  assert_eq!(code(&output), 2, "{}", stderr(&output));
+  assert!(
+    stderr(&output).starts_with(&format!("janus verify: {invalid}: contract-invalid: ")),
+    "{}",
+    stderr(&output)
+  );
+  assert!(
+    stderr(&output).contains("\n  /interactions/0/description: "),
+    "{}",
+    stderr(&output)
+  );
+}
+
 #[test]
 fn verify_json_prints_the_summary_document_a_script_can_read() {
   let provider = provider();
@@ -1706,7 +1754,7 @@ fn publishing_to_a_broker_nobody_answers_for_fails_and_names_it() {
     stdout(&output)
   );
   assert!(
-    stderr(&output).contains("janus publish: the broker did not accept web-app's contracts"),
+    stderr(&output).contains("janus publish: the contracts for web-app were not published"),
     "{}",
     stderr(&output)
   );
@@ -2282,14 +2330,17 @@ fn a_registry_credential_is_declared_reaches_the_registry_and_appears_nowhere_el
   let cache = temp("oci-auth-verify-cache");
   let _ = std::fs::remove_dir_all(&cache);
   let verified = janus_command()
-    .args(["verify", &csv_contract(), "--provider-url", provider.base_url(), "--config", &config])
-    // Everything that could print the credential at `trace` — the frames, the loader, the HTTP
-    // library the registry client sends through — and the WASM compiler at `info`, whose own
-    // `trace` costs a minute and says nothing about credentials.
-    .env(
-      "RUST_LOG",
-      "info,pact_janus_kernel=trace,pact_janus_component_host=trace,pact_janus_cli=trace,ureq=trace,ureq_proto=trace",
-    )
+    .args([
+      "verify",
+      &csv_contract(),
+      "--provider-url",
+      provider.base_url(),
+      "--config",
+      &config,
+    ])
+    // Everything at `trace`: the frames, the loader, the HTTP library the registry client sends
+    // through. The WASM compiler's own `trace` is held back by the CLI, which keeps this quick.
+    .args(["--log-level", "trace"])
     .env("JANUS_COMPONENT_CACHE", &cache)
     .env("REGISTRY_USER", "bob")
     .env("REGISTRY_PASSWORD", "s3cret-registry")

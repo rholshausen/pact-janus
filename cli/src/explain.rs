@@ -18,10 +18,11 @@
 use crate::Outcome;
 use crate::args::ExplainArgs;
 use crate::engine;
-use crate::error::Error;
+use crate::error::{self, Error};
 use crate::highlight;
 use crate::io;
-use serde_json::json;
+use clap::error::ErrorKind;
+use serde_json::{Value, json};
 
 pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   let document = io::read_json(&args.document)?;
@@ -60,12 +61,20 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
     request["values"] = values;
   }
 
+  if let Some(index) = args.index {
+    check_index(&document, index)?;
+  }
+
   let mut engine = engine::start()?;
   let result = engine::call(&mut engine, "verification/explain", request).map_err(|err| {
     // A document with no `$format` that is also not a pact reaches the engine as a
-    // contract-interaction and is refused there. Saying so beats a bare parse error. A missing
-    // component is not a parse error: the document was read.
-    if args.spec || err.starts_with("component-unavailable") {
+    // contract-interaction and is refused there, as one it cannot identify. Saying which flag reads
+    // it as a specification beats the refusal alone; any other error is about a document that was
+    // identified, and the hint would mislead.
+    let unidentified = ["contract-invalid", "contract-version-unsupported"]
+      .iter()
+      .any(|code| err.starts_with(&format!("{code}:")));
+    if args.spec || !unidentified {
       err
     } else {
       format!(
@@ -96,4 +105,30 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
       Ok(Outcome::Done)
     }
   }
+}
+
+/// `--index` past the document's last interaction is the command line asking for something that is
+/// not there: a usage error naming the flag, before the engine is asked. A contract's interactions,
+/// a v4 pact's, and a v3 message pact's messages are each counted where the document keeps them; a
+/// document with neither is left for the engine to refuse by what it is.
+fn check_index(document: &Value, index: usize) -> Result<(), Error> {
+  let Some(count) = ["interactions", "messages"]
+    .iter()
+    .find_map(|member| document[member].as_array().map(Vec::len))
+  else {
+    return Ok(());
+  };
+  if index < count {
+    return Ok(());
+  }
+  let has = match count {
+    0 => "the document has no interactions".to_string(),
+    1 => "the document has one interaction, at 0".to_string(),
+    _ => format!("the document has {count} interactions, at 0 to {}", count - 1),
+  };
+  Err(error::usage(
+    &["explain"],
+    ErrorKind::ValueValidation,
+    format!("invalid value '{index}' for '--index <N>': {has}"),
+  ))
 }

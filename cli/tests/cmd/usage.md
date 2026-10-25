@@ -33,7 +33,7 @@ Options:
   -h, --help               Print help
   -V, --version            Print version
 
-Every command drives the same engine an SDK embeds. --log-level debug shows the protocol frames it
+Every command drives the same engine an SDK embeds. --log-level trace shows the protocol frames it
 exchanges.
 
 ```
@@ -166,6 +166,15 @@ For more information, try '--help'.
 $ janus explain pact.json --index first
 ? 2
 error: invalid value 'first' for '--index <N>': invalid digit found in string
+
+For more information, try '--help'.
+
+```
+
+```console
+$ janus verify pact.json --provider-url localhost
+? 2
+error: invalid value 'localhost' for '--provider-url <URL>': not a URL: relative URL without a base
 
 For more information, try '--help'.
 

@@ -28,7 +28,7 @@ const POLL_WAIT_MS: u64 = 10_000;
 pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   // Where the provider is, before anything is read: a usage error, not a file's.
   provider_url(args)?;
-  let source = source(args)?;
+  let (source, files) = source(args)?;
 
   let hooks = match &args.config {
     None => None,
@@ -87,7 +87,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   target["hooks"] = hooks;
 
   let mut engine = engine::start()?;
-  let started = engine::call(
+  let started = engine::call_with_files(
     &mut engine,
     "verification/verify",
     json!({
@@ -95,6 +95,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
       "target": target,
       "options": options,
     }),
+    &files,
   )?;
   let stream = started["stream"].as_str().unwrap_or_default().to_string();
 
@@ -397,8 +398,9 @@ fn add_state_change(hooks: &mut Value, args: &VerifyArgs, provider: &Value) -> R
 /// Where the pacts come from: files and directories, a Pact Broker's selection, or pacts by URL,
 /// with today's spellings for each (staged plan S1.13). One kind per run. A broker URL that only
 /// the environment gave (`PACT_BROKER_BASE_URL`, which a CI job sets for every pact command) gives
-/// way to files or URLs named on the command line.
-fn source(args: &VerifyArgs) -> Result<Value, Error> {
+/// way to files or URLs named on the command line. Beside it, the file each inline document was read
+/// from, in order, so an error about one can name it.
+fn source(args: &VerifyArgs) -> Result<(Value, Vec<String>), Error> {
   let conflict = |message: &str| error::usage(&["verify"], ErrorKind::ArgumentConflict, message);
   let mut files = args.sources.clone();
   files.extend(args.files.iter().cloned());
@@ -433,7 +435,7 @@ fn source(args: &VerifyArgs) -> Result<Value, Error> {
     if let Some(client) = broker_client(args) {
       source["client"] = client;
     }
-    return Ok(source);
+    return Ok((source, Vec::new()));
   }
   if !files.is_empty() {
     if broker_url.is_some() {
@@ -444,13 +446,11 @@ fn source(args: &VerifyArgs) -> Result<Value, Error> {
         "--publish needs --broker-url or --url: a file has no broker to publish to",
       ));
     }
-    let documents = io::read_all_documents(&files)?;
-    return Ok(
-      json!({ "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() }),
-    );
+    let (paths, documents): (Vec<_>, Vec<_>) = io::read_all_documents(&files)?.into_iter().unzip();
+    return Ok((json!({ "kind": "inline", "contracts": documents }), paths));
   }
   match broker_url {
-    Some(url) => broker_source(args, url),
+    Some(url) => Ok((broker_source(args, url)?, Vec::new())),
     None => Err(error::usage(
       &["verify"],
       ErrorKind::MissingRequiredArgument,
@@ -669,11 +669,16 @@ fn report(event: &Value) {
   }
 }
 
+/// An error under the result or hook line it belongs to: every line of it at the same indent.
 fn print_error(error: &Value) {
   if error.is_null() {
     return;
   }
-  outln!("          {}", engine::render_error(error).replace('\n', "\n  "));
+  const INDENT: &str = "          ";
+  outln!(
+    "{INDENT}{}",
+    engine::render_error(error).replace('\n', &format!("\n{INDENT}"))
+  );
 }
 
 fn render_summary(summary: &Value) -> String {
@@ -815,7 +820,7 @@ mod todays_options {
       "--token",
       "t",
     ]);
-    let source = source(&args).unwrap();
+    let (source, _) = source(&args).unwrap();
     assert_eq!(
       source["consumer-version-selectors"],
       json!([{ "tag": "main", "latest": true }, { "tag": "prod", "latest": true }])
@@ -843,7 +848,7 @@ mod todays_options {
       "pw",
     ]);
     assert_eq!(
-      source(&args).unwrap(),
+      source(&args).unwrap().0,
       json!({
         "kind": "urls", "urls": ["https://broker.example/pacts/1", "https://files.example/p.json"],
         "auth": { "kind": "basic", "username": "bob", "password": "pw" },
@@ -859,7 +864,7 @@ mod todays_options {
       "http://localhost:8080",
     ]);
     assert_eq!(
-      source(&webhook).unwrap(),
+      source(&webhook).unwrap().0,
       json!({ "kind": "urls", "urls": ["https://broker.example/pacts/2"] })
     );
   }
