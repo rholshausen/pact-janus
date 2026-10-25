@@ -120,6 +120,36 @@ fn a_fetch_asks_as_todays_verifier_does_and_reads_pending_and_notices() {
   );
 }
 
+/// ADR 0053: today's `--url`. A pact a broker served carries its links and can be published to them;
+/// one that carries none cannot. Either is fetched with one GET and is never pending.
+#[test]
+fn a_pact_fetched_by_url_is_publishable_when_it_carries_the_brokers_link() {
+  let (url, seen) = stub(200);
+  let client = HalBrokerClient::new();
+  let from_broker = client
+    .fetch_pact(&descriptor(&url), &format!("{url}/pacts/1"))
+    .unwrap();
+  assert!(from_broker.publishable);
+  assert!(!from_broker.pending);
+  assert_eq!(from_broker.document["consumer"]["name"], "web");
+  assert_eq!(
+    from_broker.handle["pb:publish-verification-results"]["href"],
+    json!(format!("{url}/pacts/1/verification-results"))
+  );
+
+  let elsewhere = client
+    .fetch_pact(&descriptor(&url), &format!("{url}/files/web.json"))
+    .unwrap();
+  assert!(!elsewhere.publishable);
+  let paths: Vec<String> = seen
+    .lock()
+    .unwrap()
+    .iter()
+    .map(|(_, path, _)| path.clone())
+    .collect();
+  assert_eq!(paths, vec!["/pacts/1", "/files/web.json"]);
+}
+
 #[test]
 fn a_publish_records_the_branch_and_tags_then_posts_the_result_keyed_by_interaction_id() {
   let (url, seen) = stub(200);

@@ -1,0 +1,61 @@
+{
+  "consumer": {
+    "name": "web"
+  },
+  "provider": {
+    "name": "orders"
+  },
+  "interactions": [
+    {
+      "description": "get order 1",
+      "providerStates": [
+        {
+          "name": "an order exists"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": "1"
+        }
+      }
+    },
+    {
+      "description": "get order 2",
+      "providerStates": [
+        {
+          "name": "no orders"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/orders/2"
+      },
+      "response": {
+        "status": 404
+      }
+    },
+    {
+      "description": "health check",
+      "request": {
+        "method": "GET",
+        "path": "/health"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

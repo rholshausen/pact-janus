@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -25,7 +26,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "publish"
+    "publish",
+    "variants",
+    "variant",
+    "filter",
+    "stop-on-first-failure"
 })
 public class VerifyOptions {
 
@@ -38,6 +43,36 @@ public class VerifyOptions {
     @JsonProperty("publish")
     @JsonPropertyDescription("Publish each fetched pact's result to that pact's own link when the run ends (spec.md \u00a78.3). Only for a source of kind 'broker': an inline document has no link to publish to. A publish that fails is reported per pact and does not change the verdict.")
     private PublishResults publish;
+    /**
+     * Replay only these recorded variants (spec.md §8.3, ADR 0041). An id no document records is refused as variant-not-found.
+     * 
+     */
+    @JsonProperty("variants")
+    @JsonPropertyDescription("Replay only these recorded variants (spec.md \u00a78.3, ADR 0041). An id no document records is refused as variant-not-found.")
+    private List<String> variants;
+    /**
+     * One variant, as 'variants' with one id.
+     * 
+     */
+    @JsonProperty("variant")
+    @JsonPropertyDescription("One variant, as 'variants' with one id.")
+    private String variant;
+    /**
+     * InteractionFilter
+     * <p>
+     * Replay only the interactions every given member admits, as today's verifier's --filter-* options select them (spec.md §8.3, ADR 0053). A regular expression is searched for, unanchored. A filter that admits no interaction of the run's documents is refused as filter-matches-nothing; a run it narrows is filtered, and its narrowed pacts are not published (ADR 0041).
+     * 
+     */
+    @JsonProperty("filter")
+    @JsonPropertyDescription("Replay only the interactions every given member admits, as today's verifier's --filter-* options select them (spec.md \u00a78.3, ADR 0053). A regular expression is searched for, unanchored. A filter that admits no interaction of the run's documents is refused as filter-matches-nothing; a run it narrows is filtered, and its narrowed pacts are not published (ADR 0041).")
+    private InteractionFilter filter;
+    /**
+     * End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.
+     * 
+     */
+    @JsonProperty("stop-on-first-failure")
+    @JsonPropertyDescription("End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.")
+    private Boolean stopOnFirstFailure;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -63,6 +98,82 @@ public class VerifyOptions {
         this.publish = publish;
     }
 
+    /**
+     * Replay only these recorded variants (spec.md §8.3, ADR 0041). An id no document records is refused as variant-not-found.
+     * 
+     */
+    @JsonProperty("variants")
+    public List<String> getVariants() {
+        return variants;
+    }
+
+    /**
+     * Replay only these recorded variants (spec.md §8.3, ADR 0041). An id no document records is refused as variant-not-found.
+     * 
+     */
+    @JsonProperty("variants")
+    public void setVariants(List<String> variants) {
+        this.variants = variants;
+    }
+
+    /**
+     * One variant, as 'variants' with one id.
+     * 
+     */
+    @JsonProperty("variant")
+    public String getVariant() {
+        return variant;
+    }
+
+    /**
+     * One variant, as 'variants' with one id.
+     * 
+     */
+    @JsonProperty("variant")
+    public void setVariant(String variant) {
+        this.variant = variant;
+    }
+
+    /**
+     * InteractionFilter
+     * <p>
+     * Replay only the interactions every given member admits, as today's verifier's --filter-* options select them (spec.md §8.3, ADR 0053). A regular expression is searched for, unanchored. A filter that admits no interaction of the run's documents is refused as filter-matches-nothing; a run it narrows is filtered, and its narrowed pacts are not published (ADR 0041).
+     * 
+     */
+    @JsonProperty("filter")
+    public InteractionFilter getFilter() {
+        return filter;
+    }
+
+    /**
+     * InteractionFilter
+     * <p>
+     * Replay only the interactions every given member admits, as today's verifier's --filter-* options select them (spec.md §8.3, ADR 0053). A regular expression is searched for, unanchored. A filter that admits no interaction of the run's documents is refused as filter-matches-nothing; a run it narrows is filtered, and its narrowed pacts are not published (ADR 0041).
+     * 
+     */
+    @JsonProperty("filter")
+    public void setFilter(InteractionFilter filter) {
+        this.filter = filter;
+    }
+
+    /**
+     * End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.
+     * 
+     */
+    @JsonProperty("stop-on-first-failure")
+    public Boolean getStopOnFirstFailure() {
+        return stopOnFirstFailure;
+    }
+
+    /**
+     * End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.
+     * 
+     */
+    @JsonProperty("stop-on-first-failure")
+    public void setStopOnFirstFailure(Boolean stopOnFirstFailure) {
+        this.stopOnFirstFailure = stopOnFirstFailure;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -81,6 +192,22 @@ public class VerifyOptions {
         sb.append('=');
         sb.append(((this.publish == null)?"<null>":this.publish));
         sb.append(',');
+        sb.append("variants");
+        sb.append('=');
+        sb.append(((this.variants == null)?"<null>":this.variants));
+        sb.append(',');
+        sb.append("variant");
+        sb.append('=');
+        sb.append(((this.variant == null)?"<null>":this.variant));
+        sb.append(',');
+        sb.append("filter");
+        sb.append('=');
+        sb.append(((this.filter == null)?"<null>":this.filter));
+        sb.append(',');
+        sb.append("stopOnFirstFailure");
+        sb.append('=');
+        sb.append(((this.stopOnFirstFailure == null)?"<null>":this.stopOnFirstFailure));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -96,7 +223,11 @@ public class VerifyOptions {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.filter == null)? 0 :this.filter.hashCode()));
         result = ((result* 31)+((this.publish == null)? 0 :this.publish.hashCode()));
+        result = ((result* 31)+((this.stopOnFirstFailure == null)? 0 :this.stopOnFirstFailure.hashCode()));
+        result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
+        result = ((result* 31)+((this.variants == null)? 0 :this.variants.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
     }
@@ -110,7 +241,7 @@ public class VerifyOptions {
             return false;
         }
         VerifyOptions rhs = ((VerifyOptions) other);
-        return (((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return (((((((this.filter == rhs.filter)||((this.filter!= null)&&this.filter.equals(rhs.filter)))&&((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish))))&&((this.stopOnFirstFailure == rhs.stopOnFirstFailure)||((this.stopOnFirstFailure!= null)&&this.stopOnFirstFailure.equals(rhs.stopOnFirstFailure))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.variants == rhs.variants)||((this.variants!= null)&&this.variants.equals(rhs.variants))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

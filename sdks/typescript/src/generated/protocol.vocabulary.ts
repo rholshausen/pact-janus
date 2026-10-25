@@ -38,6 +38,7 @@ export const CompatibilityReportFormat = {
 export const ContractSourceKind = {
   Inline: "inline",
   Broker: "broker",
+  Urls: "urls",
 } as const;
 
 /**
@@ -84,6 +85,7 @@ export const EngineErrorCode = {
   SessionNotFound: "session-not-found",
   HandleNotFound: "handle-not-found",
   VariantNotFound: "variant-not-found",
+  FilterMatchesNothing: "filter-matches-nothing",
   StreamNotFound: "stream-not-found",
   InteractionInvalid: "interaction-invalid",
   ContractInvalid: "contract-invalid",

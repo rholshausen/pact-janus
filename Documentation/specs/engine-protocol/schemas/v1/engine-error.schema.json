@@ -19,6 +19,7 @@
         "session-not-found",
         "handle-not-found",
         "variant-not-found",
+        "filter-matches-nothing",
         "stream-not-found",
         "interaction-invalid",
         "contract-invalid",

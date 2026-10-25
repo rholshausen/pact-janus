@@ -21,7 +21,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * ContractSource
  * <p>
- * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+ * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -35,7 +35,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "provider-tags",
     "include-pending",
     "include-wip-since",
-    "require-pacts"
+    "require-pacts",
+    "urls",
+    "auth",
+    "client"
 })
 public class ContractSource {
 
@@ -111,6 +114,29 @@ public class ContractSource {
     @JsonProperty("require-pacts")
     @JsonPropertyDescription("For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.")
     private Boolean requirePacts;
+    /**
+     * For kind 'urls': the pacts, by URL. Each is fetched at its URL's origin with 'auth', the credentials every pact is fetched and published with, and 'client', is never pending, and is published to its own links when a Pact Broker served it; one from anywhere else is not published.
+     * 
+     */
+    @JsonProperty("urls")
+    @JsonPropertyDescription("For kind 'urls': the pacts, by URL. Each is fetched at its URL's origin with 'auth', the credentials every pact is fetched and published with, and 'client', is never pending, and is published to its own links when a Pact Broker served it; one from anywhere else is not published.")
+    private List<java.lang.String> urls;
+    /**
+     * BrokerAuth
+     * <p>
+     * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
+     * 
+     */
+    @JsonProperty("auth")
+    @JsonPropertyDescription("Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.")
+    private BrokerAuth auth;
+    /**
+     * For kind 'urls': the HTTP client options every pact is fetched with, as a broker descriptor's.
+     * 
+     */
+    @JsonProperty("client")
+    @JsonPropertyDescription("For kind 'urls': the HTTP client options every pact is fetched with, as a broker descriptor's.")
+    private Map<String, Object> client;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -300,6 +326,64 @@ public class ContractSource {
         this.requirePacts = requirePacts;
     }
 
+    /**
+     * For kind 'urls': the pacts, by URL. Each is fetched at its URL's origin with 'auth', the credentials every pact is fetched and published with, and 'client', is never pending, and is published to its own links when a Pact Broker served it; one from anywhere else is not published.
+     * 
+     */
+    @JsonProperty("urls")
+    public List<java.lang.String> getUrls() {
+        return urls;
+    }
+
+    /**
+     * For kind 'urls': the pacts, by URL. Each is fetched at its URL's origin with 'auth', the credentials every pact is fetched and published with, and 'client', is never pending, and is published to its own links when a Pact Broker served it; one from anywhere else is not published.
+     * 
+     */
+    @JsonProperty("urls")
+    public void setUrls(List<java.lang.String> urls) {
+        this.urls = urls;
+    }
+
+    /**
+     * BrokerAuth
+     * <p>
+     * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
+     * 
+     */
+    @JsonProperty("auth")
+    public BrokerAuth getAuth() {
+        return auth;
+    }
+
+    /**
+     * BrokerAuth
+     * <p>
+     * Credentials for the broker. 'bearer' takes 'token'; 'basic' takes 'username' and 'password'.
+     * 
+     */
+    @JsonProperty("auth")
+    public void setAuth(BrokerAuth auth) {
+        this.auth = auth;
+    }
+
+    /**
+     * For kind 'urls': the HTTP client options every pact is fetched with, as a broker descriptor's.
+     * 
+     */
+    @JsonProperty("client")
+    public Map<String, Object> getClient() {
+        return client;
+    }
+
+    /**
+     * For kind 'urls': the HTTP client options every pact is fetched with, as a broker descriptor's.
+     * 
+     */
+    @JsonProperty("client")
+    public void setClient(Map<String, Object> client) {
+        this.client = client;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -354,6 +438,18 @@ public class ContractSource {
         sb.append('=');
         sb.append(((this.requirePacts == null)?"<null>":this.requirePacts));
         sb.append(',');
+        sb.append("urls");
+        sb.append('=');
+        sb.append(((this.urls == null)?"<null>":this.urls));
+        sb.append(',');
+        sb.append("auth");
+        sb.append('=');
+        sb.append(((this.auth == null)?"<null>":this.auth));
+        sb.append(',');
+        sb.append("client");
+        sb.append('=');
+        sb.append(((this.client == null)?"<null>":this.client));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -369,17 +465,20 @@ public class ContractSource {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.includeWipSince == null)? 0 :this.includeWipSince.hashCode()));
-        result = ((result* 31)+((this.includePending == null)? 0 :this.includePending.hashCode()));
-        result = ((result* 31)+((this.requirePacts == null)? 0 :this.requirePacts.hashCode()));
-        result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
+        result = ((result* 31)+((this.auth == null)? 0 :this.auth.hashCode()));
         result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
-        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.contracts == null)? 0 :this.contracts.hashCode()));
         result = ((result* 31)+((this.broker == null)? 0 :this.broker.hashCode()));
-        result = ((result* 31)+((this.consumerVersionSelectors == null)? 0 :this.consumerVersionSelectors.hashCode()));
         result = ((result* 31)+((this.providerBranch == null)? 0 :this.providerBranch.hashCode()));
         result = ((result* 31)+((this.providerTags == null)? 0 :this.providerTags.hashCode()));
+        result = ((result* 31)+((this.includeWipSince == null)? 0 :this.includeWipSince.hashCode()));
+        result = ((result* 31)+((this.includePending == null)? 0 :this.includePending.hashCode()));
+        result = ((result* 31)+((this.urls == null)? 0 :this.urls.hashCode()));
+        result = ((result* 31)+((this.requirePacts == null)? 0 :this.requirePacts.hashCode()));
+        result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
+        result = ((result* 31)+((this.client == null)? 0 :this.client.hashCode()));
+        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.consumerVersionSelectors == null)? 0 :this.consumerVersionSelectors.hashCode()));
         return result;
     }
 
@@ -392,7 +491,7 @@ public class ContractSource {
             return false;
         }
         ContractSource rhs = ((ContractSource) other);
-        return ((((((((((((this.includeWipSince == rhs.includeWipSince)||((this.includeWipSince!= null)&&this.includeWipSince.equals(rhs.includeWipSince)))&&((this.includePending == rhs.includePending)||((this.includePending!= null)&&this.includePending.equals(rhs.includePending))))&&((this.requirePacts == rhs.requirePacts)||((this.requirePacts!= null)&&this.requirePacts.equals(rhs.requirePacts))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.broker == rhs.broker)||((this.broker!= null)&&this.broker.equals(rhs.broker))))&&((this.consumerVersionSelectors == rhs.consumerVersionSelectors)||((this.consumerVersionSelectors!= null)&&this.consumerVersionSelectors.equals(rhs.consumerVersionSelectors))))&&((this.providerBranch == rhs.providerBranch)||((this.providerBranch!= null)&&this.providerBranch.equals(rhs.providerBranch))))&&((this.providerTags == rhs.providerTags)||((this.providerTags!= null)&&this.providerTags.equals(rhs.providerTags))));
+        return (((((((((((((((this.auth == rhs.auth)||((this.auth!= null)&&this.auth.equals(rhs.auth)))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.broker == rhs.broker)||((this.broker!= null)&&this.broker.equals(rhs.broker))))&&((this.providerBranch == rhs.providerBranch)||((this.providerBranch!= null)&&this.providerBranch.equals(rhs.providerBranch))))&&((this.providerTags == rhs.providerTags)||((this.providerTags!= null)&&this.providerTags.equals(rhs.providerTags))))&&((this.includeWipSince == rhs.includeWipSince)||((this.includeWipSince!= null)&&this.includeWipSince.equals(rhs.includeWipSince))))&&((this.includePending == rhs.includePending)||((this.includePending!= null)&&this.includePending.equals(rhs.includePending))))&&((this.urls == rhs.urls)||((this.urls!= null)&&this.urls.equals(rhs.urls))))&&((this.requirePacts == rhs.requirePacts)||((this.requirePacts!= null)&&this.requirePacts.equals(rhs.requirePacts))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.client == rhs.client)||((this.client!= null)&&this.client.equals(rhs.client))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.consumerVersionSelectors == rhs.consumerVersionSelectors)||((this.consumerVersionSelectors!= null)&&this.consumerVersionSelectors.equals(rhs.consumerVersionSelectors))));
     }
 
 }

@@ -42,6 +42,15 @@ pub struct BrokerAuth {
   pub password: Option<String>,
 }
 
+/// The kind alone: the secrets are never shown.
+impl std::fmt::Debug for BrokerAuth {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("BrokerAuth")
+      .field("kind", &self.kind)
+      .finish_non_exhaustive()
+  }
+}
+
 impl std::fmt::Debug for BrokerDescriptor {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("BrokerDescriptor")
@@ -71,6 +80,17 @@ pub fn without_userinfo(url: &str) -> String {
   }
 }
 
+/// `scheme://host[:port]` of `url`, without user information: where a pact fetched by its URL is
+/// reached, and how it is named.
+pub fn origin(url: &str) -> String {
+  let url = without_userinfo(url);
+  let Some((scheme, rest)) = url.split_once("://") else {
+    return url;
+  };
+  let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+  format!("{scheme}://{}", &rest[..authority_end])
+}
+
 /// What a `broker` source asks for (spec §8.3).
 #[derive(Debug, Clone)]
 pub struct FetchRequest {
@@ -95,6 +115,9 @@ pub struct FetchedPact {
   pub notices: Vec<String>,
   /// The client's own way back to this pact, handed back to [`BrokerClient::publish_results`].
   pub handle: Value,
+  /// Whether a result can be published for it: a pact a broker selected can be, and one fetched by
+  /// its URL when the document carries a broker's link to publish to (ADR 0053).
+  pub publishable: bool,
 }
 
 /// One pact's verification result, to publish (spec §8.3's `options.publish`).
@@ -164,6 +187,11 @@ pub trait BrokerClient: Send + Sync {
   /// document (`broker-unreachable`, `broker-refused`, `broker-response-invalid`; spec §10.2), which
   /// the run reports as `component-failed` naming `broker`.
   fn fetch_for_verification(&self, request: &FetchRequest) -> Result<Vec<FetchedPact>, ComponentError>;
+
+  /// One pact, by its URL (spec §8.3's `urls` source, ADR 0053): today's `--url` and
+  /// `--webhook-callback-url`. `broker` carries the credentials and client options it is fetched
+  /// with, and its `url` is the pact URL's origin. It is never pending.
+  fn fetch_pact(&self, broker: &BrokerDescriptor, url: &str) -> Result<FetchedPact, ComponentError>;
 
   /// Publish one pact's result to that pact's own link.
   fn publish_results(&self, request: &PublishRequest<'_>) -> Result<(), ComponentError>;

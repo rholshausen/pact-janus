@@ -69,6 +69,7 @@ superseding ADR instead.
 | [0050](0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md) | `explain` compiles what a run compiles, and runs captured values | accepted |
 | [0051](0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md) | Leave pending out of the contract, and let upgrade exclude pending interactions | accepted |
 | [0052](0052-declare-a-components-registry-credential-in-its-source.md) | Declare a component's registry credential in its source | accepted |
+| [0053](0053-take-todays-verifier-options-where-they-mean-what-they-did.md) | Take today's verifier options where they mean what they did | accepted |
 
 ## Decision backlog
 

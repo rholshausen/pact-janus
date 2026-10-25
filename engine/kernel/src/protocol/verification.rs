@@ -49,7 +49,7 @@ use super::frame::EngineError;
 use super::scope::Scope;
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
 use crate::broker::{
-  BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, InteractionResult, PublishRequest,
+  BrokerAuth, BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, InteractionResult, PublishRequest,
 };
 use crate::common::ContentTypes;
 use crate::component::{
@@ -76,9 +76,104 @@ use std::thread::{self, JoinHandle};
 /// Which recorded variants a run replays (variant-semantics spec §5.1). The default is all of
 /// them; a host may narrow it for debugging, and a narrowed run **must be reported as filtered** —
 /// a partial run is not a pass, and a summary that did not say so would read like one (ADR 0041).
+/// It narrows by variant id, and by interaction as today's `--filter-*` options do (ADR 0053).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Filter {
   variants: Option<Vec<String>>,
+  interactions: Option<InteractionFilter>,
+}
+
+/// `options.filter` (spec §8.3, ADR 0053): interactions by description, provider state and
+/// consumer, as today's verifier selects them. Every member given must admit an interaction.
+#[derive(Debug, Clone)]
+struct InteractionFilter {
+  /// Searched for in the description, unanchored, as today's `--filter-description`.
+  description: Option<regex::Regex>,
+  state: Option<StateFilter>,
+  /// The consumers whose documents are verified, by name.
+  consumers: Option<Vec<String>>,
+  /// The filter as the request gave it, for the error that says it matched nothing.
+  given: Value,
+}
+
+#[derive(Debug, Clone)]
+enum StateFilter {
+  /// An interaction one of whose provider states' names this is found in.
+  Matching(regex::Regex),
+  /// An interaction with no provider state: today's `--filter-no-state`.
+  None,
+}
+
+impl InteractionFilter {
+  fn from_option(given: &Value) -> Result<InteractionFilter, EngineError> {
+    let malformed = |message: String| EngineError::malformed_frame(format!("options.filter: {message}"));
+    let Value::Object(members) = given else {
+      return Err(malformed("must be an object".to_string()));
+    };
+    let pattern = |name: &str| -> Result<Option<regex::Regex>, EngineError> {
+      match members.get(name) {
+        None => Ok(None),
+        Some(Value::String(text)) => regex::Regex::new(text)
+          .map(Some)
+          .map_err(|err| malformed(format!("'{name}' is not a regular expression: {err}"))),
+        Some(_) => Err(malformed(format!("'{name}' must be a string"))),
+      }
+    };
+    let description = pattern("description")?;
+    let state = match (pattern("state")?, members.get("no-state")) {
+      (Some(_), Some(Value::Bool(true))) => {
+        return Err(malformed(
+          "'state' and 'no-state' cannot both be given: no interaction could match both".to_string(),
+        ));
+      }
+      (Some(regex), _) => Some(StateFilter::Matching(regex)),
+      (None, Some(Value::Bool(true))) => Some(StateFilter::None),
+      (None, None | Some(Value::Bool(false))) => None,
+      (None, Some(_)) => return Err(malformed("'no-state' must be a boolean".to_string())),
+    };
+    let consumers = match members.get("consumers") {
+      None => None,
+      Some(Value::Array(names)) if !names.is_empty() => Some(
+        names
+          .iter()
+          .map(|name| name.as_str().map(str::to_string))
+          .collect::<Option<Vec<_>>>()
+          .ok_or_else(|| malformed("'consumers' must be a list of names".to_string()))?,
+      ),
+      Some(_) => {
+        return Err(malformed(
+          "'consumers' must be a list naming at least one consumer".to_string(),
+        ));
+      }
+    };
+    Ok(InteractionFilter {
+      description,
+      state,
+      consumers,
+      given: given.clone(),
+    })
+  }
+
+  fn admits(&self, source: &Source, index: usize) -> bool {
+    if let Some(consumers) = &self.consumers
+      && !consumers.iter().any(|name| name == source.consumer())
+    {
+      return false;
+    }
+    if let Some(description) = &self.description
+      && !description.is_match(source.interaction_description(index))
+    {
+      return false;
+    }
+    match &self.state {
+      None => true,
+      Some(StateFilter::None) => source.interaction_states(index).is_empty(),
+      Some(StateFilter::Matching(regex)) => source
+        .interaction_states(index)
+        .iter()
+        .any(|state| regex.is_match(state)),
+    }
+  }
 }
 
 /// When a run emits `verification/executed-plan` (spec §9.6) — the event `explain --executed`
@@ -145,8 +240,13 @@ impl Filter {
       .get("variant")
       .and_then(Value::as_str)
       .map(|id| vec![id.to_string()]);
+    let interactions = options
+      .get("filter")
+      .map(InteractionFilter::from_option)
+      .transpose()?;
     Ok(Filter {
       variants: listed.or(single),
+      interactions,
     })
   }
 
@@ -157,33 +257,64 @@ impl Filter {
     }
   }
 
+  /// Whether the run replays any of `source`'s interaction at `index`: what `options.filter` decides.
+  /// Its variants are then each admitted, or not, by id.
+  fn admits_interaction(&self, source: &Source, index: usize) -> bool {
+    self
+      .interactions
+      .as_ref()
+      .is_none_or(|filter| filter.admits(source, index))
+  }
+
+  /// How many of `source`'s variants the run replays.
+  fn admitted(&self, source: &Source) -> usize {
+    (0..source.interactions())
+      .filter(|index| self.admits_interaction(source, *index))
+      .map(|index| {
+        source
+          .interaction_variant_ids(index)
+          .into_iter()
+          .filter(|id| self.admits(id))
+          .count()
+      })
+      .sum()
+  }
+
   /// Refuse a filter that names an id no document records (variant-semantics spec §5.1, ADR 0041):
   /// it is a typo, and a run of it would replay less than it was asked to, or nothing. A run with no
   /// documents has nothing to narrow, so it is not refused.
+  ///
+  /// So is an interaction filter that admits nothing, in this run's documents (ADR 0053): today's
+  /// verifiers pass such a run, verifying nothing.
   pub(crate) fn check(&self, sources: &[Source]) -> Result<(), EngineError> {
-    let Some(wanted) = &self.variants else {
-      return Ok(());
-    };
     if sources.is_empty() {
       return Ok(());
     }
-    let recorded: std::collections::BTreeSet<&str> = sources.iter().flat_map(Source::variant_ids).collect();
-    let unknown: Vec<String> = wanted
-      .iter()
-      .filter(|id| !recorded.contains(id.as_str()))
-      .cloned()
-      .collect();
-    if unknown.is_empty() {
-      return Ok(());
+    if let Some(wanted) = &self.variants {
+      let recorded: std::collections::BTreeSet<&str> = sources.iter().flat_map(Source::variant_ids).collect();
+      let unknown: Vec<String> = wanted
+        .iter()
+        .filter(|id| !recorded.contains(id.as_str()))
+        .cloned()
+        .collect();
+      if !unknown.is_empty() {
+        let recorded: Vec<String> = recorded.into_iter().map(str::to_string).collect();
+        return Err(EngineError::variant_not_recorded(&unknown, &recorded));
+      }
     }
-    let recorded: Vec<String> = recorded.into_iter().map(str::to_string).collect();
-    Err(EngineError::variant_not_recorded(&unknown, &recorded))
+    if let Some(filter) = &self.interactions
+      && sources.iter().all(|source| self.admitted(source) == 0)
+    {
+      let interactions = sources.iter().map(Source::interactions).sum();
+      return Err(EngineError::filter_matches_nothing(&filter.given, interactions));
+    }
+    Ok(())
   }
 
   /// Whether the filter excludes any variant `source` records: what makes a run, and a pair,
   /// filtered (ADR 0041 decision 2). A filter that admits everything leaves a whole run.
   fn narrows(&self, source: &Source) -> bool {
-    self.variants.is_some() && source.variant_ids().iter().any(|id| !self.admits(id))
+    (self.variants.is_some() || self.interactions.is_some()) && self.admitted(source) < source.variants()
   }
 }
 
@@ -203,10 +334,10 @@ pub struct Verify {
   pub options: Option<Value>,
 }
 
-/// Where the contracts come from. An open vocabulary. `inline` is read here; files and URLs are the
-/// host's business, which keeps filesystem access out of a kernel that must build for
-/// `wasm32-wasip2`. `broker` is fetched in the run by a broker client, a native host capability
-/// (spec §8.3, ADR 0032); an engine with none refuses it by name before the run starts.
+/// Where the contracts come from. An open vocabulary. `inline` is read here; files are the host's
+/// business, which keeps filesystem access out of a kernel that must build for `wasm32-wasip2`.
+/// `broker` and `urls` are fetched in the run by a broker client, a native host capability (spec
+/// §8.3, ADR 0032, ADR 0053); an engine with none refuses them by name before the run starts.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ContractSource {
@@ -231,6 +362,15 @@ pub struct ContractSource {
   pub include_wip_since: Option<String>,
   #[serde(default = "pacts_required")]
   pub require_pacts: bool,
+  /// For `urls`: the pacts, by URL (ADR 0053).
+  #[serde(default)]
+  pub urls: Vec<String>,
+  /// For `urls`: the credentials each is fetched with, as a broker descriptor's.
+  #[serde(default)]
+  pub auth: Option<BrokerAuth>,
+  /// For `urls`: the HTTP client options each is fetched with, as a broker descriptor's.
+  #[serde(default)]
+  pub client: Option<Value>,
 }
 
 fn pacts_required() -> bool {
@@ -238,6 +378,36 @@ fn pacts_required() -> bool {
 }
 
 impl ContractSource {
+  /// What a source the run fetches asks of the broker client: a `broker` source's selection, or a
+  /// `urls` source's pacts. `None` for a source read before the run.
+  pub(crate) fn fetch(&self) -> Result<Option<Fetch>, VerifyError> {
+    match self.kind.as_str() {
+      "broker" => self
+        .fetch_request()
+        .map(|request| Some(Fetch::Selected(Box::new(request)))),
+      "urls" if self.urls.is_empty() => Err(VerifyError::SourceIncomplete(
+        "a 'urls' source needs at least one URL in 'urls'".to_string(),
+      )),
+      "urls" => Ok(Some(Fetch::Urls(
+        self
+          .urls
+          .iter()
+          .map(|url| {
+            (
+              url.clone(),
+              BrokerDescriptor {
+                url: crate::broker::origin(url),
+                auth: self.auth.clone(),
+                client: self.client.clone(),
+              },
+            )
+          })
+          .collect(),
+      ))),
+      _ => Ok(None),
+    }
+  }
+
   /// A `broker` source as the client's request, or what it is missing.
   pub(crate) fn fetch_request(&self) -> Result<FetchRequest, VerifyError> {
     let missing = |member: &str| VerifyError::SourceIncomplete(format!("a 'broker' source needs '{member}'"));
@@ -386,13 +556,45 @@ impl Source {
 
   /// The id of every variant this document records, one per result it will produce, in order.
   fn variant_ids(&self) -> Vec<&str> {
+    (0..self.interactions())
+      .flat_map(|index| self.interaction_variant_ids(index))
+      .collect()
+  }
+
+  /// The ids of the variants the interaction at `index` records.
+  fn interaction_variant_ids(&self, index: usize) -> Vec<&str> {
     match self {
-      Source::Janus(contract) => contract
-        .interactions
+      Source::Janus(contract) => contract.interactions[index]
+        .selection
+        .variants
         .iter()
-        .flat_map(|i| i.selection.variants.iter().map(|v| v.id.as_str()))
+        .map(|v| v.id.as_str())
         .collect(),
-      Source::Legacy(pact) => vec![LEGACY_VARIANT; pact.interactions.len()],
+      Source::Legacy(_) => vec![LEGACY_VARIANT],
+    }
+  }
+
+  fn interaction_description(&self, index: usize) -> &str {
+    match self {
+      Source::Janus(contract) => &contract.interactions[index].description,
+      Source::Legacy(pact) => pact.interactions[index].description(),
+    }
+  }
+
+  /// The names of the provider states the interaction at `index` needs.
+  fn interaction_states(&self, index: usize) -> Vec<&str> {
+    match self {
+      Source::Janus(contract) => contract.interactions[index]
+        .states
+        .iter()
+        .flatten()
+        .map(|state| state.name.as_str())
+        .collect(),
+      Source::Legacy(pact) => pact.interactions[index]
+        .provider_states()
+        .iter()
+        .map(|state| state.name.as_str())
+        .collect(),
     }
   }
 
@@ -572,17 +774,37 @@ pub(crate) enum Sources {
 
 pub(crate) struct BrokerFetch {
   pub client: Arc<dyn BrokerClient>,
-  pub request: FetchRequest,
+  pub fetch: Fetch,
   pub require_pacts: bool,
   /// The run's scope, which every fetched document's requirements are checked against before
   /// anything is verified, as an inline document's are before `verify` answers.
   pub scope: Scope,
 }
 
-/// A run's broker, once it has fetched: the client, which broker, and how to publish.
+/// What a fetched run asks of the broker client.
+pub(crate) enum Fetch {
+  /// A `broker` source: the pacts for verification its selectors choose.
+  Selected(Box<FetchRequest>),
+  /// A `urls` source: each pact by its URL, with the descriptor it is fetched and published with.
+  Urls(Vec<(String, BrokerDescriptor)>),
+}
+
+impl Fetch {
+  /// The provider a `broker` source names; a `urls` source names none until its pacts arrive.
+  pub(crate) fn provider(&self) -> Option<&str> {
+    match self {
+      Fetch::Selected(request) => Some(&request.provider),
+      Fetch::Urls(_) => None,
+    }
+  }
+}
+
+/// A run's broker, once it has fetched: the client, and per source the broker it came from, what
+/// the broker said about it, and how to publish.
 struct BrokerRun {
   client: Arc<dyn BrokerClient>,
-  broker: BrokerDescriptor,
+  /// Per source, in order: the broker its result is published to.
+  brokers: Vec<BrokerDescriptor>,
   publish: Option<PublishOptions>,
   /// Per source, in order: what the broker said about it.
   fetched: Vec<FetchedPact>,
@@ -605,6 +827,12 @@ pub(crate) fn start(
   stream: Arc<Stream>,
 ) -> Run {
   let executed_plans = ExecutedPlans::from_options(options.as_ref());
+  // Today's --exit-on-first-error (ADR 0053): end the run at the first failure that fails it.
+  let stop_on_failure = options
+    .as_ref()
+    .and_then(|options| options.get("stop-on-first-failure"))
+    .and_then(Value::as_bool)
+    .unwrap_or(false);
   let thread_stream = Arc::clone(&stream);
   let crashed = match &sources {
     Sources::Read(sources) => crashed_summary(sources, &filter),
@@ -616,11 +844,11 @@ pub(crate) fn start(
       let (sources, broker) = match sources {
         Sources::Read(sources) => (sources, None),
         Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
-          Ok((sources, fetched)) => (
+          Ok((sources, fetched, brokers)) => (
             sources,
             Some(BrokerRun {
               client: fetch.client,
-              broker: fetch.request.broker,
+              brokers,
               publish,
               fetched,
             }),
@@ -640,6 +868,7 @@ pub(crate) fn start(
         hooks,
         filter,
         executed_plans,
+        stop_on_failure,
         thread_stream,
       )
     })
@@ -650,24 +879,51 @@ pub(crate) fn start(
 /// Fetch a broker source's pacts and read them (spec §8.3), reporting what was fetched as a
 /// `verification/fetched` event. A run that cannot get past this ends here: the summary it ends
 /// with is the `Err`.
+#[allow(clippy::type_complexity)]
 fn fetch_sources(
   fetch: &BrokerFetch,
   filter: &Filter,
   stream: &Stream,
-) -> Result<(Vec<Source>, Vec<FetchedPact>), Value> {
+) -> Result<(Vec<Source>, Vec<FetchedPact>, Vec<BrokerDescriptor>), Value> {
   let failed = |error: EngineError| {
     let mut summary = crashed_summary(&[], filter);
     summary["error"] = serde_json::to_value(error).unwrap_or(Value::Null);
     summary
   };
-  let fetched = fetch
-    .client
-    .fetch_for_verification(&fetch.request)
-    .map_err(|error| failed(EngineError::component_failed("broker", &error)))?;
+  let (fetched, brokers, named) = match &fetch.fetch {
+    Fetch::Selected(request) => {
+      let fetched = fetch
+        .client
+        .fetch_for_verification(request)
+        .map_err(|error| failed(EngineError::component_failed("broker", &error)))?;
+      let brokers = vec![request.broker.clone(); fetched.len()];
+      (fetched, brokers, request.broker.display_url())
+    }
+    // ADR 0053: each pact by its URL, as today's --url and --webhook-callback-url fetch one.
+    Fetch::Urls(urls) => {
+      let mut fetched = Vec::with_capacity(urls.len());
+      for (url, broker) in urls {
+        let pact = fetch
+          .client
+          .fetch_pact(broker, url)
+          .map_err(|error| failed(EngineError::component_failed("broker", &error)))?;
+        fetched.push(pact);
+      }
+      let named = urls
+        .first()
+        .map(|(_, broker)| broker.display_url())
+        .unwrap_or_default();
+      (
+        fetched,
+        urls.iter().map(|(_, broker)| broker.clone()).collect(),
+        named,
+      )
+    }
+  };
   stream.emit(
     "verification/fetched",
     json!({
-      "broker": fetch.request.broker.display_url(),
+      "broker": named,
       "pacts": fetched.iter().map(|pact| json!({
         "consumer": pact.document["consumer"]["name"],
         "pending": pact.pending,
@@ -677,7 +933,8 @@ fn fetch_sources(
     }),
   );
   if fetched.is_empty() && fetch.require_pacts {
-    return Err(failed(EngineError::pacts_not_found(&fetch.request.provider)));
+    let provider = fetch.fetch.provider().unwrap_or_default();
+    return Err(failed(EngineError::pacts_not_found(provider)));
   }
   let mut sources = Vec::with_capacity(fetched.len());
   for (index, pact) in fetched.iter().enumerate() {
@@ -691,7 +948,7 @@ fn fetch_sources(
   // ADR 0041: a filter naming an id none of them records ends the run here, before anything runs
   // or is published, as one that fetched nothing does.
   filter.check(&sources).map_err(failed)?;
-  Ok((sources, fetched))
+  Ok((sources, fetched, brokers))
 }
 
 fn stop_targets(targets: &[Target]) {
@@ -744,6 +1001,7 @@ fn run(
   hooks: Option<HookRunner>,
   filter: Filter,
   executed_plans: ExecutedPlans,
+  stop_on_failure: bool,
   stream: Arc<Stream>,
 ) {
   let RunComponents {
@@ -792,6 +1050,8 @@ fn run(
   // variants the filter skipped in it. What its `pairs` entry counts and its published result is
   // made of (ADR 0033). A source the run never reached has none.
   let mut ran: Vec<SourceRun> = Vec::with_capacity(sources.len());
+  // The run ended at its first failure, as `stop-on-first-failure` asked (ADR 0053).
+  let mut stopped = false;
   if aborted.is_none() {
     'sources: for (position, source) in sources.iter().enumerate() {
       let first = tally.results.len();
@@ -801,6 +1061,13 @@ fn run(
         .and_then(|broker| broker.fetched.get(position))
         .is_some_and(|fetched| fetched.pending);
       for index in 0..source.interactions() {
+        // ADR 0053: an interaction the filter leaves out is not prepared, and its variants count
+        // as skipped, as one the variant filter leaves out does.
+        if !filter.admits_interaction(source, index) {
+          tally.skipped += source.interaction_variant_ids(index).len();
+          tracing::debug!(interaction = index, "interaction excluded by the run's filter");
+          continue;
+        }
         let flow = verify_prepared(
           source.prepare(index, &contributions),
           &mut RunContext {
@@ -812,11 +1079,15 @@ fn run(
             stream: &stream,
             hooks: hooks.as_mut(),
             pending: source_pending || source.interaction_pending(index),
+            stop_on_failure,
           },
           &mut tally,
         );
-        if let Flow::Abort(abort) = flow {
-          aborted = Some(abort);
+        if !matches!(flow, Flow::Continue) {
+          match flow {
+            Flow::Abort(abort) => aborted = Some(abort),
+            _ => stopped = true,
+          }
           ran.push(SourceRun {
             results: first..tally.results.len(),
             skipped: tally.skipped - skipped,
@@ -844,6 +1115,7 @@ fn run(
     narrowed: &narrowed,
     hooks: None,
     aborted: &aborted,
+    stopped,
     pending: broker
       .as_ref()
       .map(|broker| broker.fetched.iter().map(|fetched| fetched.pending).collect()),
@@ -851,7 +1123,7 @@ fn run(
     ran: &ran,
   };
 
-  if aborted.is_some() {
+  if aborted.is_some() || stopped {
     // Everything the run did not reach is counted as not run, never folded into the failed tally
     // (spec §10.2): a verification that stopped early and one that failed are different results.
     let not_run = variants.saturating_sub(tally.verified + tally.failed + tally.state_unavailable);
@@ -919,12 +1191,28 @@ fn publish(
   // Only a source the run finished: a partial result published as the pact's would be a verdict
   // on interactions nobody verified.
   let finished = ran.iter().filter(|run| run.complete);
-  for (((source, fetched), run), narrowed) in sources.iter().zip(&broker.fetched).zip(finished).zip(narrowed)
+  for ((((source, fetched), run), narrowed), from) in sources
+    .iter()
+    .zip(&broker.fetched)
+    .zip(finished)
+    .zip(narrowed)
+    .zip(&broker.brokers)
   {
     // Nor a source the filter narrowed (ADR 0041 decision 4): what it replayed is not the pact's
     // result. Said, not silently left out, so a reader knows why the broker did not hear of it.
     if *narrowed {
       let entry = json!({ "consumer": source.consumer(), "outcome": "skipped", "reason": "filtered" });
+      let mut event = entry.clone();
+      event["provider-version"] = json!(options.provider_version);
+      stream.emit("verification/published", event);
+      publication.push(entry);
+      continue;
+    }
+    // Nor one fetched by a URL that is not a broker's (ADR 0053): it has nowhere to be published,
+    // as today's verifier says of a pact URL source.
+    if !fetched.publishable {
+      let entry =
+        json!({ "consumer": source.consumer(), "outcome": "skipped", "reason": "not-from-a-broker" });
       let mut event = entry.clone();
       event["provider-version"] = json!(options.provider_version);
       stream.emit("verification/published", event);
@@ -945,7 +1233,7 @@ fn publish(
       })
       .collect();
     let request = PublishRequest {
-      broker: &broker.broker,
+      broker: from,
       handle: &fetched.handle,
       provider_version: &options.provider_version,
       branch: options.branch.as_deref(),
@@ -1008,6 +1296,8 @@ struct Abort {
 enum Flow {
   Continue,
   Abort(Abort),
+  /// A failure ended the run, as `stop-on-first-failure` asked (ADR 0053).
+  Stop,
 }
 
 /// Per-run counters and the failure list the summary carries, so a host that only reads the
@@ -1111,6 +1401,8 @@ struct Report<'a> {
   narrowed: &'a [bool],
   hooks: Option<&'a HookRunner>,
   aborted: &'a Option<Abort>,
+  /// The run ended at its first failure (ADR 0053).
+  stopped: bool,
   /// For a broker source: per source, whether it was pending.
   pending: Option<Vec<bool>>,
   /// For a run that published: per source, what happened.
@@ -1208,6 +1500,10 @@ fn summary(report: &Report<'_>) -> Value {
       json!({ "point": abort.point, "hook": abort.hook, "error": abort.error }),
     );
   }
+  // What it did not reach is neither verified nor failed: the counts say what it did.
+  if report.stopped {
+    map.insert("stopped".to_string(), json!("first-failure"));
+  }
   summary
 }
 
@@ -1225,6 +1521,8 @@ struct RunContext<'a> {
   /// The interaction is pending — its pact is, or it is itself (a v4 interaction marked so): its
   /// results say `pending: true`, and its failures do not fail the run (spec §8.3).
   pending: bool,
+  /// End the run at the first failure that fails it (ADR 0053). A pending failure does not.
+  stop_on_failure: bool,
 }
 
 impl RunContext<'_> {
@@ -1682,6 +1980,11 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
   let reference = prepared.reference;
 
   for replay in prepared.replays {
+    // A failure that fails the run, since the last replay, ends it when asked (ADR 0053).
+    let failing = tally.failed + tally.state_unavailable - tally.pending_failed;
+    if ctx.stop_on_failure && failing > 0 {
+      return Flow::Stop;
+    }
     if !ctx.filter.admits(replay.variant()) {
       tally.skipped += 1;
       tracing::debug!(variant = %replay.variant(), "variant excluded by the run's filter");
@@ -1735,6 +2038,10 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
     if let Flow::Abort(abort) = flow {
       return Flow::Abort(abort);
     }
+  }
+  let failing = tally.failed + tally.state_unavailable - tally.pending_failed;
+  if ctx.stop_on_failure && failing > 0 {
+    return Flow::Stop;
   }
   Flow::Continue
 }

@@ -26,7 +26,8 @@ Commands:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
   -h, --help               Print help
   -V, --version            Print version
 
@@ -39,28 +40,38 @@ exchanges.
 $ janus verify --help
 Replay Janus contracts or v1-v4 pacts at a running provider
 
-Usage: janus verify [OPTIONS] --provider-url <URL> [CONTRACT_OR_PACT]...
+Usage: janus verify [OPTIONS] [CONTRACT_OR_PACT]...
 
 Arguments:
   [CONTRACT_OR_PACT]...  Janus contracts or v1-v4 pact files, or directories of them. Not with
-                         --broker-url
+                         --broker-url or --url
 
 Options:
-  -l, --log-level <LEVEL>   How much to log on standard error. Without it, RUST_LOG is read; the
-                            default is warn [possible values: error, warn, info, debug, trace]
-  -u, --provider-url <URL>  The base URL of the provider under test
-      --config <FILE>       A verifier configuration (verifier.janus.yaml): the hooks that set up
-                            provider states or authenticate, and the components the contracts need
-      --variant <ID>        Replay only this variant; repeatable. An id no document records is
-                            refused, and a run that left a variant out is reported as filtered,
-                            never as verified, and is not published
-      --transport <KIND>    The transport to bind to the provider [default: http]
-      --explain-failures    Print the executed plan for every variant that fails
-  -o, --output <FORMAT>     text prints progress and a summary; json prints only the run summary
-                            document [default: text] [possible values: text, json]
-  -h, --help                Print help
+  -l, --log-level <LEVEL>    How much to log on standard error. Without it, RUST_LOG is read; the
+                             default is warn [possible values: off, error, warn, info, debug, trace]
+  -u, --provider-url <URL>   The base URL of the provider under test. Or --hostname and --port, as
+                             today's verifier
+      --no-colour            Print no colour, on a terminal too (as NO_COLOR does)
+      --config <FILE>        A verifier configuration (verifier.janus.yaml): the hooks that set up
+                             provider states or authenticate, and the components the contracts need
+      --variant <ID>         Replay only this variant; repeatable. An id no document records is
+                             refused, and a run that left a variant out is reported as filtered,
+                             never as verified, and is not published
+      --transport <KIND>     The transport to bind to the provider. `https`, today's verifier's
+                             spelling, is the `http` transport over TLS [env:
+                             PACT_PROVIDER_TRANSPORT=] [default: http]
+      --exit-on-first-error  Stop at the first failure that fails the run; what it did not reach is
+                             not run
+      --explain-failures     Print the executed plan for every variant that fails
+  -o, --output <FORMAT>      text prints progress and a summary; json prints only the run summary
+                             document [default: text] [possible values: text, json]
+  -h, --help                 Print help
 
 Provider connection:
+      --hostname <HOST>                The provider's host, when there is no --provider-url
+                                       [default: localhost] [env: PACT_PROVIDER_HOSTNAME=]
+  -p, --port <PORT>                    The provider's port, when there is no --provider-url
+                                       [default: 80, or 443 for https] [env: PACT_PROVIDER_PORT=]
       --base-path <PATH>               A path to put in front of every request's path [env:
                                        PACT_PROVIDER_BASE_PATH=]
   -H, --header <KEY=VALUE>             A header for every request to the provider, replacing the
@@ -87,14 +98,49 @@ Provider connection:
                                        verifier; 2 only; or negotiate, offering both over TLS
                                        [default: 1.1] [possible values: 1.1, 2, negotiate]
 
+Loading pacts:
+  -f, --file <FILE>                 A pact or contract to verify; repeatable, as the positional ones
+  -d, --dir <DIR>                   A directory of pacts or contracts to verify; repeatable
+      --url <URL>                   A pact to fetch by its URL, with the broker's credentials;
+                                    repeatable. Its result is published when a Pact Broker served it
+      --webhook-callback-url <URL>  The pact a Pact Broker webhook named: fetched by its URL, and
+                                    its result published with --publish [env:
+                                    PACT_WEBHOOK_CALLBACK_URL=]
+      --ignore-no-pacts-error       Pass, verifying nothing, when the broker selects no pacts
+
+Provider states:
+  -s, --state-change-url <URL>  Set up each interaction's provider states by POSTing them here, as
+                                today's verifier: a state-setup hook in pact-state-change format
+                                [env: PACT_PROVIDER_STATE_CHANGE_URL=]
+      --state-change-as-query   Send each state change as query parameters instead of a body [env:
+                                PACT_PROVIDER_STATE_CHANGE_AS_QUERY=]
+      --state-change-teardown   Also tear each interaction's provider states down after it, at the
+                                same URL [env: PACT_PROVIDER_STATE_CHANGE_TEARDOWN=]
+
+Filtering interactions:
+      --filter-description <REGEX>  Verify only the interactions whose description this regular
+                                    expression is found in [env: PACT_DESCRIPTION=]
+      --filter-state <REGEX>        Verify only the interactions one of whose provider states' names
+                                    this regular expression is found in [env: PACT_PROVIDER_STATE=]
+      --filter-no-state             Verify only the interactions with no provider state [env:
+                                    PACT_PROVIDER_NO_STATE=]
+  -c, --filter-consumer <NAME>      Verify only this consumer's pacts and contracts; repeatable
+
 Pact Broker:
-      --broker-url <URL>
-          Fetch the pacts to verify from this Pact Broker instead of from files
-      --provider-name <NAME>
-          The provider whose pacts to fetch
+  -b, --broker-url <URL>
+          Fetch the pacts to verify from this Pact Broker instead of from files [env:
+          PACT_BROKER_BASE_URL=]
+  -n, --provider-name <NAME>
+          The provider whose pacts to fetch [env: PACT_PROVIDER_NAME=]
       --consumer-version-selectors <JSON>
           A consumer version selector, as the broker reads it, in JSON; repeatable
           (https://docs.pact.io/pact_broker/advanced_topics/consumer_version_selectors)
+      --consumer-version-tags <TAGS>
+          Consumer version tags, comma-separated: the latest pact for each, as today's verifier
+          selects them. Not with --consumer-version-selectors
+      --retries <N>
+          How many times a broker request is tried again when the broker is unavailable [default: 2]
+          [env: PACT_BROKER_HTTP_RETRIES=]
       --enable-pending
           Ask the broker which pacts are pending: their failures are reported, and do not fail the
           run. Only with --consumer-version-selectors, as today's verifier
@@ -108,7 +154,7 @@ Pact Broker:
       --provider-tags <TAGS>
           The provider version's tags, comma-separated
       --publish
-          Publish each pact's result back to the broker
+          Publish each pact's result back to the broker it came from, with --broker-url or --url
       --build-url <URL>
           The build that ran this verification, recorded with each published result
       --user <USER>
@@ -117,7 +163,7 @@ Pact Broker:
       --password <PASSWORD>
           The broker's password, for basic authentication [env: PACT_BROKER_PASSWORD] [alias:
           --broker-password]
-      --token <TOKEN>
+  -t, --token <TOKEN>
           A bearer token for the broker; used instead of --user when both are given [env:
           PACT_BROKER_TOKEN] [alias: --broker-token]
 
@@ -137,8 +183,10 @@ Arguments:
 
 Options:
   -l, --log-level <LEVEL>      How much to log on standard error. Without it, RUST_LOG is read; the
-                               default is warn [possible values: error, warn, info, debug, trace]
+                               default is warn [possible values: off, error, warn, info, debug,
+                               trace]
       --provider-shape <PATH>  A provider shape document, or a directory of them; repeatable
+      --no-colour              Print no colour, on a terminal too (as NO_COLOR does)
       --verification <FILE>    A run summary written by `janus verify --output json`; repeatable
       --policy <FILE>          A subsumption policy (YAML or JSON): when to warn and when to block,
                                and any exemptions
@@ -172,7 +220,8 @@ Arguments:
 Options:
       --index <N>          Which interaction of a contract or pact, counting from 0
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
       --variant <ID>       Compile for this recorded variant of a Janus contract
       --spec               Read the document as an interaction specification, which cannot identify
                            itself
@@ -199,8 +248,9 @@ Arguments:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
       --write <FILE>       Write the contract to this file instead of standard output
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
       --quiet              Do not print the findings
       --exclude-pending    Leave the pact's pending interactions out of the contract. Without it,
                            each is converted without its flag, so its failure fails the run
@@ -226,9 +276,10 @@ Arguments:
 Options:
   -a, --consumer-app-version <VERSION>  The version of the consumer these contracts belong to
   -l, --log-level <LEVEL>               How much to log on standard error. Without it, RUST_LOG is
-                                        read; the default is warn [possible values: error, warn,
-                                        info, debug, trace]
+                                        read; the default is warn [possible values: off, error,
+                                        warn, info, debug, trace]
       --branch <BRANCH>                 The consumer version's branch
+      --no-colour                       Print no colour, on a terminal too (as NO_COLOR does)
   -t, --tag <TAG>                       A tag for the consumer version; repeatable, or
                                         comma-separated
       --build-url <URL>                 The build that produced the contracts
@@ -267,7 +318,8 @@ Commands:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
   -h, --help               Print help
 
 Loopback registries (localhost, 127.0.0.1) are plain HTTP; everything else is HTTPS. Credentials,
@@ -291,9 +343,10 @@ Arguments:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
       --output <FORMAT>    text prints a summary and the declaration to paste; json prints one
                            document [default: text] [possible values: text, json]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
   -h, --help               Print help
 
 ```
@@ -310,7 +363,8 @@ Arguments:
 Options:
       --digest <sha256:...>  The manifest digest the artifact must match
   -l, --log-level <LEVEL>    How much to log on standard error. Without it, RUST_LOG is read; the
-                             default is warn [possible values: error, warn, info, debug, trace]
+                             default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour            Print no colour, on a terminal too (as NO_COLOR does)
       --output <FORMAT>      text prints a summary and the declaration to paste; json prints one
                              document [default: text] [possible values: text, json]
   -h, --help                 Print help
@@ -329,7 +383,8 @@ Arguments:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
   -h, --help               Print help
 
 For example, for bash: janus completions bash > ~/.local/share/bash-completion/completions/janus

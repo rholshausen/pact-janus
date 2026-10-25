@@ -98,6 +98,13 @@
       "today": "pass",
       "janus": "fail",
       "reason": "ADR 0046: a message provider's reply that is not a 2xx fails the produce-message hook that asked for it, as an http hook's always does; today's verifier reads an asynchronous message from the body of any reply"
+    },
+    {
+      "case": "filters/matches-nothing",
+      "key": "run",
+      "today": "pass",
+      "janus": "error",
+      "reason": "ADR 0053, as ADR 0041 decision 1 decided for --variant: a filter that matches no interaction is refused before anything runs (filter-matches-nothing, exit 2); today's verifier verifies nothing and passes"
     }
   ]
 }

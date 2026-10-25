@@ -792,6 +792,22 @@ item in 1a is done when S1.1 agrees.
   decides them (S1.17): a filter that matches nothing is refused, where today's verifiers pass it, and
   a narrowed pact is not published, where `pact_verifier_cli` publishes it. Their rows carry the ADR.
   *Exit:* every row filled; no "dropped" row without a reason a pilot provider accepted.
+  *Built 2026-10-25*, as
+  [ADR 0053](decisions/0053-take-todays-verifier-options-where-they-mean-what-they-did.md) decides;
+  the exit's second half waits on pilot providers. Every row is filled, for `pact_verifier_cli` 1.3.5
+  and the Ruby verifier. `janus verify` takes today's long spellings and variables where they mean
+  what they did, with the Ruby verifier's as aliases. Today's state-change options write the hooks.
+  The `--filter-*` options are `options.filter`, applied in the engine, and pacts by URL
+  (`--url`, `--webhook-callback-url`) a `urls` source, fetched and published through the broker
+  client. `--exit-on-first-error` is `stop-on-first-failure`, and `--consumer-version-tags`,
+  `--retries`, `--ignore-no-pacts-error` and `--no-colour` map onto what exists. The table's
+  [Dropped and not taken](verifier-migration.md#dropped-and-not-taken) lists what a pilot must
+  accept: today's report formats, the log layouts, `--last-failed`, and the Ruby verifier's options
+  that read git, wait, or load Ruby. S1.1's harness compares the filters (`corpora/verifier/filters/`)
+  and the webhook flow (`broker/webhook-callback-url`) against today's verifier, so a fixture can pass
+  the same options to both. Not foreseen: the harness matched today's report to interactions by
+  description alone, so a filtered consumer's interactions took another's results; and today's
+  verifier stops at a pending failure, which `janus verify` does not, since it fails nothing.
 - **S1.17 A filtered run never reads as a pass** — **S**. Found while rebuilding the CLI before stage
   1a, and in neither the findings list nor the earlier revisions. `janus verify --variant <id>` with an
   id no source records replays nothing, and reports `VERIFIED: 0 verified, 0 failed, 0

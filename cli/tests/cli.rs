@@ -947,6 +947,126 @@ fn explain_executed_resolves_a_plan_against_captured_values() {
   assert!(stdout(&failed).contains("ERROR("), "{}", stdout(&failed));
 }
 
+/// Staged plan S1.13, ADR 0053: today's `--filter-*` options, with their spellings and variables.
+/// A filter narrows the run, which then reads as filtered; one that matches nothing is refused, where
+/// today's verifiers verify nothing and pass.
+#[test]
+fn verify_takes_todays_filters_and_refuses_one_that_matches_nothing() {
+  let provider = provider();
+  let config = state_config(&provider);
+  let narrowed = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+    "--filter-description",
+    "does not exist$",
+  ]);
+  let text = stdout(&narrowed);
+  assert_eq!(code(&narrowed), 0, "{text}{}", stderr(&narrowed));
+  assert!(
+    text.contains("FILTERED: 1 verified, 0 failed, 0 state-unavailable, 1 skipped"),
+    "{text}"
+  );
+
+  let by_state = janus_command()
+    .args([
+      "verify",
+      &order_pact(),
+      "--provider-url",
+      provider.base_url(),
+      "--config",
+      &config,
+    ])
+    .env("PACT_PROVIDER_STATE", "^an order exists$")
+    .output()
+    .expect("the janus binary runs");
+  assert!(
+    stdout(&by_state).contains("FILTERED: 1 verified, 0 failed, 0 state-unavailable, 1 skipped"),
+    "{}",
+    stdout(&by_state)
+  );
+
+  let nothing = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--filter-consumer",
+    "someone-else",
+  ]);
+  assert_eq!(code(&nothing), 2, "{}", stdout(&nothing));
+  assert!(
+    stderr(&nothing).contains("filter-matches-nothing"),
+    "{}",
+    stderr(&nothing)
+  );
+}
+
+/// A server answering every request with the bytes of `file`.
+fn serving_file(file: String) -> String {
+  let server = tiny_http::Server::http("127.0.0.1:0").expect("the server binds");
+  let base = format!("http://{}", server.server_addr().to_ip().expect("an IP address"));
+  std::thread::spawn(move || {
+    for request in server.incoming_requests() {
+      let body = std::fs::read(&file).unwrap_or_default();
+      let _ = request.respond(tiny_http::Response::from_data(body));
+    }
+  });
+  base
+}
+
+/// Staged plan S1.13, ADR 0053: today's spellings, end to end. Where the provider is (`--hostname`,
+/// `--port`), its state endpoint (`-s`, which becomes the state-setup hook) and a pact by `--url`.
+/// A pact no broker served is verified, and its result is not published.
+#[test]
+fn verify_takes_todays_spellings_for_the_provider_its_states_and_a_pact_by_url() {
+  let provider = provider();
+  let port = provider.base_url().rsplit(':').next().unwrap().to_string();
+  let pact_url = format!("{}/pacts/web-app-order-service.json", serving_file(order_pact()));
+  let output = janus(&[
+    "verify",
+    "--url",
+    &pact_url,
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    &port,
+    "-s",
+    &format!("{}/_pact/provider-states", provider.base_url()),
+    "--publish",
+    "--provider-version",
+    "1.0.0",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "{text}{}", stderr(&output));
+  assert!(text.contains("VERIFIED: 2 verified, 0 failed"), "{text}");
+  assert!(
+    text.contains("not publishing web-app's result: its pact was not fetched from a Pact Broker"),
+    "{text}"
+  );
+}
+
+/// Today's `--exit-on-first-error`: the run ends at its first failure, and says so. Without the
+/// state endpoint, the first interaction's order does not exist and it fails.
+#[test]
+fn verify_stops_at_the_first_failure_when_asked() {
+  let provider = provider();
+  let output = janus(&[
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    provider.base_url(),
+    "--exit-on-first-error",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 1, "{text}{}", stderr(&output));
+  assert!(text.contains("FAILED: 0 verified, 1 failed"), "{text}");
+  assert!(text.contains("stopped at its first failure"), "{text}");
+}
+
 // ---------------------------------------------------------------------------------------------
 // upgrade
 // ---------------------------------------------------------------------------------------------

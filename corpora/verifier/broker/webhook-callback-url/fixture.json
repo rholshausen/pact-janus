@@ -1,0 +1,48 @@
+{
+  "description": "A pact as a Pact Broker webhook names it: both verifiers are given its broker URL as --webhook-callback-url, beside --broker-url, verify that one pact and publish its result through its own links",
+  "source": {
+    "semantics": "https://docs.pact.io/pact_broker/webhooks#using-webhooks-with-the-contract_requiring_verification_published-event"
+  },
+  "pacts": [
+    "../pacts/widget-admin.json",
+    "../pacts/widget-web.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/widgets/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1,
+              "name": "sprocket"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "broker": {
+    "verify": {
+      "webhook": "widget-web.json",
+      "provider-version": "2.0.0",
+      "provider-branch": "main",
+      "publish": true
+    },
+    "expected-published": {
+      "widget-web.json": "pass",
+      "widget-admin.json": "absent"
+    }
+  }
+}

@@ -51,8 +51,9 @@ public final class Vocabulary {
 
     public static final String INLINE = "inline";
     public static final String BROKER = "broker";
+    public static final String URLS = "urls";
 
-    public static final List<String> KNOWN = List.of(INLINE, BROKER);
+    public static final List<String> KNOWN = List.of(INLINE, BROKER, URLS);
   }
 
   /** Known values of {@code Decision}. */
@@ -101,6 +102,7 @@ public final class Vocabulary {
     public static final String SESSION_NOT_FOUND = "session-not-found";
     public static final String HANDLE_NOT_FOUND = "handle-not-found";
     public static final String VARIANT_NOT_FOUND = "variant-not-found";
+    public static final String FILTER_MATCHES_NOTHING = "filter-matches-nothing";
     public static final String STREAM_NOT_FOUND = "stream-not-found";
     public static final String INTERACTION_INVALID = "interaction-invalid";
     public static final String CONTRACT_INVALID = "contract-invalid";
@@ -111,7 +113,7 @@ public final class Vocabulary {
     public static final String COMPONENT_FAILED = "component-failed";
     public static final String INTERNAL = "internal";
 
-    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, PACTS_NOT_FOUND, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
+    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, FILTER_MATCHES_NOTHING, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, PACTS_NOT_FOUND, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
   }
 
   /** Known values of {@code Event.kind}. */

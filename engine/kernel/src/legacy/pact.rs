@@ -152,6 +152,14 @@ impl PactInteraction {
       PactInteraction::NeedsPlugins(needs) => &needs.description,
     }
   }
+
+  pub fn provider_states(&self) -> &[ProviderState] {
+    match self {
+      PactInteraction::Http(http) => &http.provider_states,
+      PactInteraction::Message(message) => &message.provider_states,
+      PactInteraction::NeedsPlugins(needs) => &needs.provider_states,
+    }
+  }
 }
 
 /// Every interaction in `pact` the engine takes on, in the pact's order. An interaction that needs a

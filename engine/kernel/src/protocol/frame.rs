@@ -255,6 +255,23 @@ impl EngineError {
     }
   }
 
+  /// `filter-matches-nothing` for `verification/verify` (ADR 0053): the run's `options.filter`
+  /// admits no interaction of the documents in it. `filter` is the filter as given, and
+  /// `interactions` how many the documents hold.
+  pub fn filter_matches_nothing(filter: &serde_json::Value, interactions: usize) -> Self {
+    EngineError {
+      code: "filter-matches-nothing".to_string(),
+      category: "session".to_string(),
+      message: format!(
+        "the run's filter matches none of the {interactions} interaction(s) in its documents, so it would verify nothing"
+      ),
+      details: Some(Box::new(serde_json::json!({
+        "filter": filter,
+        "interactions": interactions,
+      }))),
+    }
+  }
+
   /// `variant-budget-exceeded` (variant-semantics spec §3.6, §8): the selection would exceed
   /// `max-variants`. Naming the space size, the selection size it would have been, the budget,
   /// and the dimensions contributing the most points is what turns this into a decision the

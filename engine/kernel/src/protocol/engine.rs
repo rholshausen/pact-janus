@@ -503,9 +503,9 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    // Spec §8.3: a broker source and the publish option need a broker client (ADR 0032), and an
-    // engine with none refuses both before anything starts.
-    let from_broker = req.source.kind == "broker";
+    // Spec §8.3: a broker source, a urls source (ADR 0053) and the publish option need a broker
+    // client (ADR 0032), and an engine with none refuses each before anything starts.
+    let from_broker = matches!(req.source.kind.as_str(), "broker" | "urls");
     let publish = match req.options.as_ref().and_then(|options| options.get("publish")) {
       None => None,
       Some(publish) => match serde_json::from_value::<verification::PublishOptions>(publish.clone()) {
@@ -524,7 +524,11 @@ impl Engine {
     };
     let client = self.broker.clone();
     if from_broker && client.is_none() {
-      return ResponseFrame::err(id, EngineError::broker_unavailable("fetch pacts from a broker"));
+      let what = match req.source.kind.as_str() {
+        "urls" => "fetch pacts by URL",
+        _ => "fetch pacts from a broker",
+      };
+      return ResponseFrame::err(id, EngineError::broker_unavailable(what));
     }
     if publish.is_some() && client.is_none() {
       return ResponseFrame::err(
@@ -536,11 +540,11 @@ impl Engine {
       return ResponseFrame::err(
         id,
         EngineError::malformed_frame(
-          "options.publish needs a source of kind 'broker': an inline document has no link to publish to",
+          "options.publish needs a source of kind 'broker' or 'urls': an inline document has no link to publish to",
         ),
       );
     }
-    let fetch = match from_broker.then(|| req.source.fetch_request()).transpose() {
+    let fetch = match req.source.fetch() {
       Ok(fetch) => fetch,
       Err(err) => return ResponseFrame::err(id, verify_error(err)),
     };
@@ -618,9 +622,10 @@ impl Engine {
     let hooks = match &req.target.hooks {
       None => None,
       Some(document) => {
-        // A broker source names its provider, and no consumer until the fetch.
+        // A broker source names its provider, and no consumer until the fetch; a urls source names
+        // neither.
         let provider = match &fetch {
-          Some(fetch) => Some(fetch.provider.clone()),
+          Some(fetch) => fetch.provider().map(str::to_string),
           None => contracts.first().map(|source| source.provider().to_string()),
         };
         let run = json!({
@@ -652,9 +657,9 @@ impl Engine {
       contributions: scope.contributions(),
     };
     let sources = match (fetch, client) {
-      (Some(request), Some(client)) => verification::Sources::Broker(Box::new(verification::BrokerFetch {
+      (Some(fetch), Some(client)) => verification::Sources::Broker(Box::new(verification::BrokerFetch {
         client,
-        request,
+        fetch,
         require_pacts: req.source.require_pacts,
         scope,
       })),

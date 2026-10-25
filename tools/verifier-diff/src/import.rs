@@ -350,6 +350,7 @@ fn fixture_from(
       mutations,
       broker,
       connection: Default::default(),
+      filter: None,
     },
     pacts,
   ))
@@ -519,6 +520,7 @@ fn message_fixture_from(
       mutations,
       broker: None,
       connection: Default::default(),
+      filter: None,
     },
     pacts,
   ))

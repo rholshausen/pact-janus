@@ -106,7 +106,11 @@ Three sources are the source of truth and take precedence over this file when th
 > `janus upgrade` converts one without its flag, or leaves it out with `--exclude-pending`), and S1.27
 > (ADR 0052: a component's registry credential is its declaration's `source.auth`, interpolated by the
 > loader and never repeated; a run reads no environment for it, and only `janus component push|pull`
-> read `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`).
+> read `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`). S1.13 is built (ADR 0053: `janus verify` takes
+> today's spellings and variables where they mean what they did, its filters as `options.filter`,
+> pacts by URL as a `urls` source, and `--exit-on-first-error` as `stop-on-first-failure`;
+> `Documentation/verifier-migration.md` has a row for every option), and its exit waits on pilot
+> providers accepting the dropped rows.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -344,10 +348,15 @@ janus verify <contract-or-pact>... --provider-url <url> [--config verifier.janus
              [--disable-ssl-verification] [--ca-cert <pem>]... [--client-cert <pem> --client-key <pem>]
              [--proxy <url> [--no-proxy <hosts>]] [--http-version 1.1|2|negotiate]   # S1.5, ADR 0035
              [--transports <name:port[/path]>]...   # where HTTP interactions and messages go (S1.7, ADR 0046)
+             [-s <state-change-url> [--state-change-as-query] [--state-change-teardown]]   # write the state hooks
+             [--filter-description <re>] [--filter-state <re> | --filter-no-state] [-c <consumer>]...
+             [--exit-on-first-error]   # today's options (S1.13, ADR 0053); --hostname/--port for --provider-url
 janus verify --broker-url <url> --provider-name <name> --provider-url <url>
-             [--consumer-version-selectors <json>]... [--enable-pending] [--include-wip-pacts-since <date>]
+             [--consumer-version-selectors <json>]... [--consumer-version-tags <t,...>] [--enable-pending]
+             [--include-wip-pacts-since <date>] [--ignore-no-pacts-error] [--retries <n>]
              [--provider-version <v>] [--provider-branch <b>] [--provider-tags <t,...>] [--publish]
              [--build-url <url>] [--user <u> --password <p> | --token <t>]   # today's spellings (S1.13); --broker-* aliases
+janus verify --url <pact-url>... | --webhook-callback-url <pact-url>   # pacts by URL, published when a broker served them
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
             [--as-of <YYYY-MM-DD>] [--output text|json]

@@ -145,6 +145,7 @@ impl BrokerClient for HalBrokerClient {
       let properties = &pact["verificationProperties"];
       fetched.push(FetchedPact {
         handle: document["_links"].clone(),
+        publishable: true,
         document,
         pending: properties["pending"].as_bool().unwrap_or(false),
         wip: properties["wip"].as_bool().unwrap_or(false),
@@ -157,6 +158,23 @@ impl BrokerClient for HalBrokerClient {
       });
     }
     Ok(fetched)
+  }
+
+  /// Today's `--url` and `--webhook-callback-url` (ADR 0053): the pact at `url`, fetched with the
+  /// run's credentials. A pact a broker served carries its links, and its result can be published
+  /// to them; one from anywhere else cannot.
+  fn fetch_pact(&self, broker: &BrokerDescriptor, url: &str) -> Result<FetchedPact, ComponentError> {
+    let client = connect(broker)?;
+    let document = self.send(&client, broker, "GET", url, None)?;
+    let handle = document["_links"].clone();
+    Ok(FetchedPact {
+      publishable: href(&document, "pb:publish-verification-results").is_some(),
+      handle,
+      document,
+      pending: false,
+      wip: false,
+      notices: vec![],
+    })
   }
 
   fn publish_results(&self, request: &PublishRequest<'_>) -> Result<(), ComponentError> {

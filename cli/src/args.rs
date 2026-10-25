@@ -26,8 +26,19 @@ use std::path::PathBuf;
 )]
 pub struct Cli {
   /// How much to log on standard error. Without it, RUST_LOG is read; the default is warn
-  #[arg(long, short = 'l', global = true, value_enum, value_name = "LEVEL")]
+  #[arg(
+    long,
+    short = 'l',
+    alias = "loglevel",
+    global = true,
+    value_enum,
+    value_name = "LEVEL"
+  )]
   pub log_level: Option<LogLevel>,
+
+  /// Print no colour, on a terminal too (as NO_COLOR does)
+  #[arg(long, alias = "no-color", global = true)]
+  pub no_colour: bool,
 
   #[command(subcommand)]
   pub command: Command,
@@ -75,6 +86,9 @@ impl Command {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LogLevel {
+  // Today's verifier's `none` (staged plan S1.13).
+  #[value(alias = "none")]
+  Off,
   Error,
   Warn,
   Info,
@@ -85,6 +99,7 @@ pub enum LogLevel {
 impl LogLevel {
   pub fn as_str(self) -> &'static str {
     match self {
+      LogLevel::Off => "off",
       LogLevel::Error => "error",
       LogLevel::Warn => "warn",
       LogLevel::Info => "info",
@@ -132,6 +147,14 @@ fn header(text: &str) -> Result<(String, String), String> {
     return Err(format!("the value of '{name}' has a control character in it"));
   }
   Ok((name.to_string(), value.to_string()))
+}
+
+/// A header in the Ruby verifier's `--custom-provider-header` form, `Name: value`.
+fn colon_header(text: &str) -> Result<(String, String), String> {
+  let (name, value) = text
+    .split_once(':')
+    .ok_or_else(|| "a custom provider header is 'Name: value'".to_string())?;
+  header(&format!("{}={}", name.trim(), value.trim_start()))
 }
 
 /// One `--transports` entry (staged plan S1.7): a name, a port and a path, as today's verifier reads
@@ -183,17 +206,70 @@ pub enum Output {
   arg_required_else_help = true
 )]
 pub struct VerifyArgs {
-  /// Janus contracts or v1-v4 pact files, or directories of them. Not with --broker-url
-  #[arg(
-    required_unless_present = "broker_url",
-    conflicts_with = "broker_url",
-    value_name = "CONTRACT_OR_PACT"
-  )]
+  /// Janus contracts or v1-v4 pact files, or directories of them. Not with --broker-url or --url
+  #[arg(value_name = "CONTRACT_OR_PACT")]
   pub sources: Vec<PathBuf>,
 
-  /// The base URL of the provider under test
-  #[arg(long, short = 'u', value_name = "URL")]
-  pub provider_url: String,
+  /// The base URL of the provider under test. Or --hostname and --port, as today's verifier
+  #[arg(long, short = 'u', alias = "provider-base-url", value_name = "URL")]
+  pub provider_url: Option<String>,
+
+  // Today's verifier's spellings for where the provider is and where the pacts are (staged plan
+  // S1.13, ADR 0053), with its environment variables. --provider-url, when given, wins.
+  /// The provider's host, when there is no --provider-url [default: localhost]
+  #[arg(
+    long,
+    value_name = "HOST",
+    env = "PACT_PROVIDER_HOSTNAME",
+    help_heading = "Provider connection"
+  )]
+  pub hostname: Option<String>,
+
+  /// The provider's port, when there is no --provider-url [default: 80, or 443 for https]
+  #[arg(
+    long,
+    short = 'p',
+    value_name = "PORT",
+    env = "PACT_PROVIDER_PORT",
+    help_heading = "Provider connection"
+  )]
+  pub port: Option<u16>,
+
+  /// A pact or contract to verify; repeatable, as the positional ones
+  #[arg(
+    long = "file",
+    short = 'f',
+    value_name = "FILE",
+    help_heading = "Loading pacts"
+  )]
+  pub files: Vec<PathBuf>,
+
+  /// A directory of pacts or contracts to verify; repeatable
+  #[arg(long = "dir", short = 'd', value_name = "DIR", help_heading = "Loading pacts")]
+  pub dirs: Vec<PathBuf>,
+
+  /// A pact to fetch by its URL, with the broker's credentials; repeatable. Its result is published
+  /// when a Pact Broker served it
+  #[arg(long = "url", value_name = "URL", help_heading = "Loading pacts")]
+  pub urls: Vec<String>,
+
+  /// The pact a Pact Broker webhook named: fetched by its URL, and its result published with
+  /// --publish
+  #[arg(
+    long,
+    value_name = "URL",
+    env = "PACT_WEBHOOK_CALLBACK_URL",
+    help_heading = "Loading pacts"
+  )]
+  pub webhook_callback_url: Option<String>,
+
+  /// Pass, verifying nothing, when the broker selects no pacts
+  #[arg(long, help_heading = "Loading pacts")]
+  pub ignore_no_pacts_error: bool,
+
+  // Accepted for the Ruby verifier's scripts: failing when no pacts are found is the default.
+  #[arg(long, hide = true)]
+  pub fail_if_no_pacts_found: bool,
 
   /// A verifier configuration (verifier.janus.yaml): the hooks that set up provider states or
   /// authenticate, and the components the contracts need
@@ -205,9 +281,87 @@ pub struct VerifyArgs {
   #[arg(long = "variant", value_name = "ID")]
   pub variants: Vec<String>,
 
-  /// The transport to bind to the provider
-  #[arg(long, value_name = "KIND", default_value = "http")]
+  /// The transport to bind to the provider. `https`, today's verifier's spelling, is the `http`
+  /// transport over TLS
+  #[arg(
+    long,
+    value_name = "KIND",
+    default_value = "http",
+    env = "PACT_PROVIDER_TRANSPORT"
+  )]
   pub transport: String,
+
+  /// Stop at the first failure that fails the run; what it did not reach is not run
+  #[arg(long)]
+  pub exit_on_first_error: bool,
+
+  // Today's state-change options, written as the hooks they become (staged plan S1.13, ADR 0053).
+  // A configuration with state-setup hooks of its own says it once, there.
+  /// Set up each interaction's provider states by POSTing them here, as today's verifier: a
+  /// state-setup hook in pact-state-change format
+  #[arg(
+    long,
+    short = 's',
+    alias = "provider-states-setup-url",
+    value_name = "URL",
+    env = "PACT_PROVIDER_STATE_CHANGE_URL",
+    help_heading = "Provider states"
+  )]
+  pub state_change_url: Option<String>,
+
+  /// Send each state change as query parameters instead of a body
+  #[arg(
+    long,
+    requires = "state_change_url",
+    env = "PACT_PROVIDER_STATE_CHANGE_AS_QUERY",
+    help_heading = "Provider states"
+  )]
+  pub state_change_as_query: bool,
+
+  /// Also tear each interaction's provider states down after it, at the same URL
+  #[arg(
+    long,
+    requires = "state_change_url",
+    env = "PACT_PROVIDER_STATE_CHANGE_TEARDOWN",
+    help_heading = "Provider states"
+  )]
+  pub state_change_teardown: bool,
+
+  // Today's verifier's filters, with its spellings and variables (staged plan S1.13, ADR 0053). A
+  // filter that matches nothing is refused, and a narrowed run is filtered and not published, as a
+  // --variant is (ADR 0041).
+  /// Verify only the interactions whose description this regular expression is found in
+  #[arg(
+    long,
+    value_name = "REGEX",
+    env = "PACT_DESCRIPTION",
+    help_heading = "Filtering interactions"
+  )]
+  pub filter_description: Option<String>,
+
+  /// Verify only the interactions one of whose provider states' names this regular expression is
+  /// found in
+  #[arg(
+    long,
+    value_name = "REGEX",
+    env = "PACT_PROVIDER_STATE",
+    conflicts_with = "filter_no_state",
+    help_heading = "Filtering interactions"
+  )]
+  pub filter_state: Option<String>,
+
+  /// Verify only the interactions with no provider state
+  #[arg(long, env = "PACT_PROVIDER_NO_STATE", help_heading = "Filtering interactions")]
+  pub filter_no_state: bool,
+
+  /// Verify only this consumer's pacts and contracts; repeatable
+  #[arg(
+    long,
+    short = 'c',
+    value_name = "NAME",
+    help_heading = "Filtering interactions"
+  )]
+  pub filter_consumer: Vec<String>,
 
   /// Print the executed plan for every variant that fails
   #[arg(long)]
@@ -239,6 +393,10 @@ pub struct VerifyArgs {
     help_heading = "Provider connection"
   )]
   pub headers: Vec<(String, String)>,
+
+  // The Ruby verifier's spelling of --header: `Name: value`.
+  #[arg(long, hide = true, value_name = "NAME: VALUE", value_parser = colon_header)]
+  pub custom_provider_header: Vec<(String, String)>,
 
   /// Send one kind of interaction to PORT and PATH on the provider URL's host, over plain HTTP, as
   /// today's --transports: `http` for HTTP interactions, `message` (or `async-message`,
@@ -328,8 +486,10 @@ pub struct VerifyArgs {
   /// Fetch the pacts to verify from this Pact Broker instead of from files
   #[arg(
     long,
+    short = 'b',
+    alias = "pact-broker-base-url",
     value_name = "URL",
-    requires = "provider_name",
+    env = "PACT_BROKER_BASE_URL",
     help_heading = "Pact Broker"
   )]
   pub broker_url: Option<String>,
@@ -337,8 +497,10 @@ pub struct VerifyArgs {
   /// The provider whose pacts to fetch
   #[arg(
     long,
+    short = 'n',
+    alias = "provider",
     value_name = "NAME",
-    requires = "broker_url",
+    env = "PACT_PROVIDER_NAME",
     help_heading = "Pact Broker"
   )]
   pub provider_name: Option<String>,
@@ -347,11 +509,34 @@ pub struct VerifyArgs {
   /// (https://docs.pact.io/pact_broker/advanced_topics/consumer_version_selectors)
   #[arg(
     long = "consumer-version-selectors",
+    alias = "consumer-version-selector",
     value_name = "JSON",
     requires = "broker_url",
     help_heading = "Pact Broker"
   )]
   pub consumer_version_selectors: Vec<String>,
+
+  /// Consumer version tags, comma-separated: the latest pact for each, as today's verifier selects
+  /// them. Not with --consumer-version-selectors
+  #[arg(
+    long,
+    alias = "consumer-version-tag",
+    value_name = "TAGS",
+    value_delimiter = ',',
+    requires = "broker_url",
+    conflicts_with = "consumer_version_selectors",
+    help_heading = "Pact Broker"
+  )]
+  pub consumer_version_tags: Vec<String>,
+
+  /// How many times a broker request is tried again when the broker is unavailable [default: 2]
+  #[arg(
+    long,
+    value_name = "N",
+    env = "PACT_BROKER_HTTP_RETRIES",
+    help_heading = "Pact Broker"
+  )]
+  pub retries: Option<u32>,
 
   /// Ask the broker which pacts are pending: their failures are reported, and do not fail the run.
   /// Only with --consumer-version-selectors, as today's verifier
@@ -369,24 +554,40 @@ pub struct VerifyArgs {
   pub include_wip_pacts_since: Option<String>,
 
   /// The provider version being verified, which --publish publishes results for
-  #[arg(long, value_name = "VERSION", help_heading = "Pact Broker")]
+  #[arg(
+    long,
+    alias = "provider-app-version",
+    value_name = "VERSION",
+    help_heading = "Pact Broker"
+  )]
   pub provider_version: Option<String>,
 
   /// The provider version's branch, which the broker decides pending status from
-  #[arg(long, value_name = "BRANCH", help_heading = "Pact Broker")]
+  #[arg(
+    long,
+    alias = "provider-version-branch",
+    value_name = "BRANCH",
+    help_heading = "Pact Broker"
+  )]
   pub provider_branch: Option<String>,
 
   /// The provider version's tags, comma-separated
   #[arg(
     long,
+    alias = "provider-version-tag",
     value_name = "TAGS",
     value_delimiter = ',',
     help_heading = "Pact Broker"
   )]
   pub provider_tags: Vec<String>,
 
-  /// Publish each pact's result back to the broker
-  #[arg(long, requires_all = ["broker_url", "provider_version"], help_heading = "Pact Broker")]
+  /// Publish each pact's result back to the broker it came from, with --broker-url or --url
+  #[arg(
+    long,
+    alias = "publish-verification-results",
+    requires = "provider_version",
+    help_heading = "Pact Broker"
+  )]
   pub publish: bool,
 
   /// The build that ran this verification, recorded with each published result
@@ -397,6 +598,7 @@ pub struct VerifyArgs {
   #[arg(
     long,
     visible_alias = "broker-user",
+    alias = "broker-username",
     value_name = "USER",
     env = "PACT_BROKER_USERNAME",
     hide_env_values = true,
@@ -418,6 +620,7 @@ pub struct VerifyArgs {
   /// A bearer token for the broker; used instead of --user when both are given
   #[arg(
     long,
+    short = 't',
     visible_alias = "broker-token",
     value_name = "TOKEN",
     env = "PACT_BROKER_TOKEN",

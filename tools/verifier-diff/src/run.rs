@@ -12,6 +12,7 @@
 //! the run published for each pact too, and an interaction the selectors did not fetch is `absent`.
 
 use crate::broker::{self, Broker, RecordingProxy, Traffic};
+use crate::fixture::FilterSpec;
 use crate::fixture::{
   self, BrokerSpec, BrokerVerify, ConnectionSpec, Fixture, ProviderSpec, Published, Route, RunVerdict,
   StateCallback,
@@ -42,6 +43,8 @@ pub struct Case {
   pub broker: Option<BrokerSpec>,
   /// How both verifiers reach the provider.
   pub connection: ConnectionSpec,
+  /// The interactions both are told to verify (S1.13).
+  pub filter: Option<FilterSpec>,
 }
 
 pub enum CaseProvider {
@@ -157,6 +160,11 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
   if let Some(spec) = &fixture.broker {
     check_broker_fixture(spec, &pacts, fixture.mutations)?;
   }
+  // A filter is for a whole fixture as written: a mutation's single interaction would mostly be
+  // filtered away, and a broker case renames every consumer, which a consumer filter cannot follow.
+  if fixture.filter.is_some() && (fixture.mutations || fixture.broker.is_some()) {
+    return Err("a fixture with a filter cannot also be mutated or fetched from a broker".to_string());
+  }
 
   let mut cases = Vec::new();
   if fixture.mutations {
@@ -184,6 +192,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
             expected: None,
             broker: None,
             connection: fixture.connection.clone(),
+            filter: None,
           });
         }
       }
@@ -198,6 +207,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
       expected: fixture.expected,
       broker: fixture.broker.clone(),
       connection: fixture.connection.clone(),
+      filter: fixture.filter.clone(),
     },
   );
   Ok(cases)
@@ -236,7 +246,8 @@ fn check_broker_fixture(spec: &BrokerSpec, pacts: &[(String, Value)], mutations:
     .publish
     .keys()
     .chain(spec.expected_published.keys())
-    .chain(spec.results.iter().map(|result| &result.pact));
+    .chain(spec.results.iter().map(|result| &result.pact))
+    .chain(spec.verify.webhook.iter());
   for name in named {
     if !files.contains(&name.as_str()) {
       return Err(format!(
@@ -253,6 +264,28 @@ struct Expected {
   key: String,
   consumer: String,
   description: String,
+  /// Whether the case's filter admits it. One it does not is absent for both verifiers.
+  admitted: bool,
+}
+
+/// Every interaction of these pacts, keyed by its position, and whether `filter` admits it.
+fn expected_filtered(
+  pacts: &[(String, Value)],
+  filter: Option<&FilterSpec>,
+) -> Result<Vec<Expected>, String> {
+  let mut expected = expected_of(pacts);
+  if let Some(filter) = filter {
+    let interactions = pacts.iter().flat_map(|(_, document)| {
+      document[fixture::interactions_key(document)]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+    });
+    for (entry, interaction) in expected.iter_mut().zip(interactions) {
+      entry.admitted = filter.admits(&entry.consumer, &interaction)?;
+    }
+  }
+  Ok(expected)
 }
 
 /// Every interaction of these pacts, keyed by its position.
@@ -276,6 +309,7 @@ fn expected_of(pacts: &[(String, Value)]) -> Vec<Expected> {
           .as_str()
           .unwrap_or_default()
           .to_string(),
+        admitted: true,
       });
     }
   }
@@ -289,6 +323,8 @@ enum Source<'a> {
     url: String,
     provider: String,
     verify: &'a BrokerVerify,
+    /// The broker URL of the pact `verify.webhook` names.
+    webhook: Option<String>,
   },
 }
 
@@ -305,7 +341,7 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
       .map_err(|err| format!("{}: {err}", path.display()))?;
     files.push(path);
   }
-  let expected = expected_of(&case.pacts);
+  let expected = expected_filtered(&case.pacts, case.filter.as_ref())?;
 
   // Each verifier gets a provider of its own, freshly started: a provider remembers things — the
   // states set up, a callback that has already failed once, the orders a state created — and what
@@ -315,6 +351,7 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     run_today(
       tools,
       &case.connection,
+      case.filter.as_ref(),
       &Source::Files(&files),
       provider.port,
       provider.state_url.as_deref(),
@@ -327,6 +364,7 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
     run_janus(
       tools,
       &case.connection,
+      case.filter.as_ref(),
       &Source::Files(&files),
       &provider.base_url,
       provider.state_url.as_deref(),
@@ -419,6 +457,7 @@ fn upgraded_run(
   Ok(Some(run_janus(
     tools,
     &case.connection,
+    case.filter.as_ref(),
     &Source::Files(&contracts),
     &provider.base_url,
     provider.state_url.as_deref(),
@@ -575,10 +614,21 @@ fn broker_side(
 
   let provider = Started::start(&case.provider, &case.connection)?;
   let proxy = RecordingProxy::start(broker.base_url())?;
+  let webhook = match &spec.verify.webhook {
+    None => None,
+    Some(file) => {
+      let pact = pacts
+        .iter()
+        .find(|pact| &pact.file == file)
+        .ok_or_else(|| format!("verify.webhook names '{file}', which the fixture does not publish"))?;
+      Some(format!("{}{}", proxy.base_url(), broker::pact_path(pact)))
+    }
+  };
   let source = Source::Broker {
     url: proxy.base_url(),
     provider: provider_name,
     verify: &spec.verify,
+    webhook,
   };
   let side_work = work.join(match side {
     Side::Today => "today",
@@ -589,6 +639,7 @@ fn broker_side(
     Side::Today => run_today(
       tools,
       &case.connection,
+      case.filter.as_ref(),
       &source,
       provider.port,
       provider.state_url.as_deref(),
@@ -598,6 +649,7 @@ fn broker_side(
     Side::Janus => run_janus(
       tools,
       &case.connection,
+      case.filter.as_ref(),
       &source,
       &provider.base_url,
       provider.state_url.as_deref(),
@@ -776,8 +828,17 @@ fn tls_front(plain: &str) -> pact_janus_test_servers::TlsProvider {
 /// The broker options, in today's verifier's spelling. `janus verify` is given the same spelling:
 /// S1.13 maps today's options onto janus's, and until a janus option exists its absence is the
 /// disagreement the ledger records.
-fn broker_args(command: &mut Command, url: &str, provider: &str, verify: &BrokerVerify) {
+fn broker_args(
+  command: &mut Command,
+  url: &str,
+  provider: &str,
+  verify: &BrokerVerify,
+  webhook: Option<&str>,
+) {
   command.args(["--broker-url", url, "--provider-name", provider]);
+  if let Some(pact) = webhook {
+    command.args(["--webhook-callback-url", pact]);
+  }
   for selector in &verify.selectors {
     command
       .arg("--consumer-version-selectors")
@@ -798,9 +859,11 @@ fn broker_args(command: &mut Command, url: &str, provider: &str, verify: &Broker
   }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_today(
   tools: &Tools,
   connection: &ConnectionSpec,
+  filter: Option<&FilterSpec>,
   source: &Source,
   port: u16,
   state_url: Option<&str>,
@@ -820,8 +883,9 @@ fn run_today(
       url,
       provider,
       verify,
+      webhook,
     } => {
-      broker_args(&mut command, url, provider, verify);
+      broker_args(&mut command, url, provider, verify, webhook.as_deref());
       true
     }
   };
@@ -845,6 +909,7 @@ fn run_today(
     command.args(["--transport", "https"]);
   }
   connection_args(&mut command, connection);
+  command.args(filter.map(FilterSpec::args).unwrap_or_default());
   let output = match command.output() {
     Ok(output) => output,
     Err(err) => {
@@ -879,12 +944,16 @@ fn run_today(
     .iter()
     .map(|entry| {
       // In order, matched by consumer and description: the report says which interaction each is.
+      // A result that names no consumer is any consumer's, except for an interaction the filter
+      // left out, which takes only one that names it: today's report does not say which pact a
+      // result is from, and a left-out pact's interactions would take the admitted pact's.
       let found = results.iter().enumerate().find(|(index, result)| {
         !used[*index]
           && result["description"].as_str() == Some(entry.description.as_str())
-          && result["consumer"]
-            .as_str()
-            .is_none_or(|consumer| consumer == entry.consumer)
+          && match result["consumer"].as_str() {
+            Some(consumer) => consumer == entry.consumer,
+            None => entry.admitted,
+          }
       });
       match found {
         Some((index, result)) => {
@@ -917,6 +986,7 @@ fn run_today(
         }
         // From a broker, an interaction the report does not have is one the selectors did not fetch.
         None if from_broker => (Verdict::Absent, Some("not fetched".to_string())),
+        None if !entry.admitted => (Verdict::Absent, Some("filtered".to_string())),
         None => (Verdict::Error, Some("not in the report".to_string())),
       }
     })
@@ -958,9 +1028,11 @@ fn mismatch_text(mismatch: &Value) -> String {
   }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_janus(
   tools: &Tools,
   connection: &ConnectionSpec,
+  filter: Option<&FilterSpec>,
   source: &Source,
   base_url: &str,
   state_url: Option<&str>,
@@ -977,10 +1049,12 @@ fn run_janus(
       url,
       provider,
       verify,
-    } => broker_args(&mut command, url, provider, verify),
+      webhook,
+    } => broker_args(&mut command, url, provider, verify, webhook.as_deref()),
   }
   command.args(["--provider-url", base_url, "--output", "json"]);
   connection_args(&mut command, connection);
+  command.args(filter.map(FilterSpec::args).unwrap_or_default());
   command.env("RUST_LOG", "off");
   if let Some(url) = state_url {
     let config = work.join("verifier.janus.yaml");
@@ -1003,7 +1077,15 @@ fn run_janus(
   };
   if output.status.code() == Some(2) {
     let said = first_line(&output.stderr).unwrap_or_default();
-    return everything_errs(expected, said);
+    // A refused run verified nothing; what the filter left out it would not have verified anyway.
+    let judged = expected
+      .iter()
+      .map(|entry| match entry.admitted {
+        true => (Verdict::Error, Some(said.clone())),
+        false => (Verdict::Absent, Some("filtered".to_string())),
+      })
+      .collect();
+    return ((Verdict::Error, Some(said)), judged);
   }
   let summary: Value = match serde_json::from_slice(&output.stdout) {
     Ok(summary) => summary,
@@ -1041,14 +1123,25 @@ fn run_janus(
     .iter()
     .map(|name| variants[name].as_u64().unwrap_or(0))
     .sum::<u64>();
-  let accounted = counted == expected.iter().filter(|entry| in_run(entry)).count() as u64
-    && variants["skipped"].as_u64().unwrap_or(0) == 0;
+  // A v1-v4 interaction is one variant: those the filter admits are counted, the rest skipped.
+  let admitted = expected
+    .iter()
+    .filter(|entry| in_run(entry) && entry.admitted)
+    .count() as u64;
+  let left_out = expected
+    .iter()
+    .filter(|entry| in_run(entry) && !entry.admitted)
+    .count() as u64;
+  let accounted = counted == admitted && variants["skipped"].as_u64().unwrap_or(0) == left_out;
 
   let judged = expected
     .iter()
     .map(|entry| {
       if !in_run(entry) {
         return (Verdict::Absent, Some("not fetched".to_string()));
+      }
+      if !entry.admitted {
+        return (Verdict::Absent, Some("filtered".to_string()));
       }
       let index: usize = entry
         .key

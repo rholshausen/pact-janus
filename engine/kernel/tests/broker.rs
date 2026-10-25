@@ -9,7 +9,8 @@
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::broker::{
-  BrokerClient, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact, PublishRequest,
+  BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
+  PublishRequest,
 };
 use pact_janus_kernel::component::{ComponentError, TransportComponent};
 use pact_janus_kernel::protocol::Engine;
@@ -33,6 +34,8 @@ struct FakeBroker {
   fail_fetch: bool,
   fail_publish: bool,
   fetched: Mutex<Vec<FetchRequest>>,
+  /// Each pact fetched by its URL: the URL, the origin it was reached at, and the credential's kind.
+  urls: Mutex<Vec<Value>>,
   published: Mutex<Vec<Value>>,
   /// Each publication of contracts, with every contract's content parsed back.
   publications: Mutex<Vec<Value>>,
@@ -55,6 +58,27 @@ impl BrokerClient for FakeBroker {
       return Err(refused("the broker answered 401"));
     }
     Ok(self.pacts.clone())
+  }
+
+  /// A pact by its URL: the served pact whose consumer the URL's last segment names, publishable
+  /// unless the URL says it is not a broker's.
+  fn fetch_pact(&self, broker: &BrokerDescriptor, url: &str) -> Result<FetchedPact, ComponentError> {
+    self.urls.lock().unwrap().push(json!({
+      "url": url, "origin": broker.url, "auth": broker.auth.as_ref().map(|auth| auth.kind.clone()),
+    }));
+    if self.fail_fetch {
+      return Err(refused("the broker answered 401"));
+    }
+    let consumer = url.rsplit('/').next().unwrap_or_default();
+    let mut pact = self
+      .pacts
+      .iter()
+      .find(|pact| pact.document["consumer"]["name"] == consumer)
+      .cloned()
+      .ok_or_else(|| refused("the server answered 404"))?;
+    pact.pending = false;
+    pact.publishable = !url.contains("/files/");
+    Ok(pact)
   }
 
   fn publish_results(&self, request: &PublishRequest<'_>) -> Result<(), ComponentError> {
@@ -166,6 +190,7 @@ fn fetched(document: Value, pending: bool) -> FetchedPact {
     wip: false,
     notices: vec![format!("{consumer} was selected")],
     handle: json!({ "pact": consumer }),
+    publishable: true,
   }
 }
 
@@ -432,6 +457,36 @@ fn a_pact_the_filter_narrowed_is_not_published_and_the_rest_are() {
   assert_eq!(sent.len(), 1, "only web's result reached the broker: {sent:?}");
   assert_eq!(sent[0]["handle"], json!({ "pact": "web" }));
   assert_eq!(sent[0]["success"], true);
+}
+
+/// ADR 0053: today's `--filter-consumer`, as `options.filter.consumers`. The pact it leaves out is
+/// narrowed to nothing, so it is not published, and says why, as ADR 0041 decision 4 has it.
+#[test]
+fn a_pact_the_consumer_filter_leaves_out_is_not_published() {
+  let broker = Arc::new(FakeBroker {
+    pacts: vec![
+      fetched(pact("web", json!({ "id": 1 })), false),
+      fetched(pact("mobile", json!({ "id": 1 })), false),
+    ],
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let events = verify(
+    &mut engine,
+    json!({}),
+    json!({ "filter": { "consumers": ["web"] }, "publish": { "provider-version": "2.0.0" } }),
+  );
+
+  let summary = &events.last().unwrap()["payload"];
+  assert_eq!(summary["status"], "filtered", "{summary}");
+  assert_eq!(
+    summary["publication"],
+    json!([
+      { "consumer": "web", "outcome": "published" },
+      { "consumer": "mobile", "outcome": "skipped", "reason": "filtered" }
+    ])
+  );
+  assert_eq!(broker.published.lock().unwrap().len(), 1);
 }
 
 /// ADR 0041 decision 1, for a broker source: the documents are only known once fetched, so the run
@@ -716,4 +771,88 @@ fn a_document_that_cannot_be_verified_cannot_be_published_and_is_named_by_its_po
     .unwrap();
   assert!(pointer.starts_with("/contracts/0/interactions/0"), "{pointer}");
   assert!(broker.publications.lock().unwrap().is_empty());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pacts by URL (staged plan S1.13, ADR 0053): today's --url and --webhook-callback-url
+// ---------------------------------------------------------------------------------------------
+
+/// A `urls` source fetches each pact by its URL, at that URL's origin with the run's credential, and
+/// verifies it; a pact a broker served is published to its own link, and one from anywhere else is
+/// not, and says so. Neither is pending.
+#[test]
+fn a_pact_fetched_by_url_is_verified_and_published_when_a_broker_served_it() {
+  let broker = Arc::new(FakeBroker {
+    pacts: vec![
+      fetched(pact("web", json!({ "id": 1 })), true),
+      fetched(pact("mobile", json!({ "id": 1 })), false),
+    ],
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let events = verify(
+    &mut engine,
+    json!({
+      "kind": "urls",
+      "urls": ["https://broker.example/pacts/web", "https://files.example/files/mobile"],
+      "auth": { "kind": "bearer", "token": "s3cret-token" },
+    }),
+    json!({ "publish": { "provider-version": "2.0.0" } }),
+  );
+
+  assert_eq!(
+    *broker.urls.lock().unwrap(),
+    vec![
+      json!({ "url": "https://broker.example/pacts/web", "origin": "https://broker.example", "auth": "bearer" }),
+      json!({ "url": "https://files.example/files/mobile", "origin": "https://files.example", "auth": "bearer" }),
+    ]
+  );
+  assert!(broker.fetched.lock().unwrap().is_empty(), "nothing was selected");
+  let fetched = of_kind(&events, "verification/fetched");
+  assert_eq!(
+    fetched[0]["pacts"][0]["pending"], false,
+    "a pact by URL is never pending"
+  );
+
+  let summary = &events.last().unwrap()["payload"];
+  assert_eq!(summary["status"], "verified", "{summary}");
+  assert_eq!(
+    summary["publication"],
+    json!([
+      { "consumer": "web", "outcome": "published" },
+      { "consumer": "mobile", "outcome": "skipped", "reason": "not-from-a-broker" }
+    ])
+  );
+  assert_eq!(broker.published.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn a_urls_source_needs_a_url_and_a_pact_that_cannot_be_fetched_ends_the_run() {
+  let broker = Arc::new(FakeBroker {
+    fail_fetch: true,
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let refused = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "urls", "urls": [] },
+      "target": { "transports": [{ "transport": "http", "options": { "base-url": "http://127.0.0.1:1" } }] },
+    }),
+  );
+  assert!(
+    refused["error"]["message"].as_str().unwrap().contains("'urls'"),
+    "{refused}"
+  );
+
+  let events = verify(
+    &mut engine,
+    json!({ "kind": "urls", "urls": ["https://broker.example/pacts/web"] }),
+    json!({}),
+  );
+  let summary = &events.last().unwrap()["payload"];
+  assert_eq!(summary["status"], "failed");
+  assert_eq!(summary["error"]["code"], "component-failed", "{summary}");
 }

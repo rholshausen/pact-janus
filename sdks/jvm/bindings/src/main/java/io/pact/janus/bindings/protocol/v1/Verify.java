@@ -34,12 +34,12 @@ public class Verify {
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.
      * (Required)
      * 
      */
     @JsonProperty("source")
-    @JsonPropertyDescription("Where the contracts come from \u2014 Janus contracts or v1\u2013v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md \u00a78.3, ADR 0032), behind the 'broker' capability.")
+    @JsonPropertyDescription("Where the contracts come from \u2014 Janus contracts or v1\u2013v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md \u00a78.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.")
     private ContractSource source;
     /**
      * VerificationTarget
@@ -66,7 +66,7 @@ public class Verify {
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.
      * (Required)
      * 
      */
@@ -78,7 +78,7 @@ public class Verify {
     /**
      * ContractSource
      * <p>
-     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+     * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.
      * (Required)
      * 
      */

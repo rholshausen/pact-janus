@@ -897,6 +897,46 @@ export interface Verify {
  */
 export interface VerifyOptions {
   publish?: PublishResults;
+  /**
+   * Replay only these recorded variants (spec.md §8.3, ADR 0041). An id no document records is refused as variant-not-found.
+   *
+   * @minItems 1
+   */
+  variants?: [string, ...string[]];
+  /**
+   * One variant, as 'variants' with one id.
+   */
+  variant?: string;
+  filter?: InteractionFilter;
+  /**
+   * End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.
+   */
+  "stop-on-first-failure"?: boolean;
+  [k: string]: unknown;
+}
+
+/**
+ * Replay only the interactions every given member admits, as today's verifier's --filter-* options select them (spec.md §8.3, ADR 0053). A regular expression is searched for, unanchored. A filter that admits no interaction of the run's documents is refused as filter-matches-nothing; a run it narrows is filtered, and its narrowed pacts are not published (ADR 0041).
+ */
+export interface InteractionFilter {
+  /**
+   * A regular expression found in the interaction's description.
+   */
+  description?: string;
+  /**
+   * A regular expression found in the name of one of the interaction's provider states. Not with 'no-state'.
+   */
+  state?: string;
+  /**
+   * Only interactions with no provider state.
+   */
+  "no-state"?: boolean;
+  /**
+   * Only these consumers' documents, by name.
+   *
+   * @minItems 1
+   */
+  consumers?: [string, ...string[]];
   [k: string]: unknown;
 }
 
@@ -910,7 +950,7 @@ export interface VerifyResult {
 }
 
 /**
- * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability.
+ * Where the contracts come from — Janus contracts or v1–v4 pacts. Open vocabulary. 'inline': the documents are in the request. 'broker': the run fetches them from a Pact Broker, the pacts for verification for 'provider' (spec.md §8.3, ADR 0032), behind the 'broker' capability. 'urls': the run fetches each pact by its URL, as today's verifier's --url and --webhook-callback-url do (ADR 0053), behind the same capability.
  */
 export interface ContractSource {
   kind: string;
@@ -949,6 +989,19 @@ export interface ContractSource {
    * For kind 'broker': a fetch that finds no pacts ends the run as failed. False makes it a run with nothing to verify, which passes.
    */
   "require-pacts"?: boolean;
+  /**
+   * For kind 'urls': the pacts, by URL. Each is fetched at its URL's origin with 'auth', the credentials every pact is fetched and published with, and 'client', is never pending, and is published to its own links when a Pact Broker served it; one from anywhere else is not published.
+   *
+   * @minItems 1
+   */
+  urls?: [string, ...string[]];
+  auth?: BrokerAuth;
+  /**
+   * For kind 'urls': the HTTP client options every pact is fetched with, as a broker descriptor's.
+   */
+  client?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 

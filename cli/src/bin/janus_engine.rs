@@ -33,6 +33,7 @@ fn main() {
 
   pact_janus_cli::logging::to_stderr(
     EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+    true,
   );
 
   tracing::info!(

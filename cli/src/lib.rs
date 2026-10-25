@@ -87,7 +87,11 @@ where
     Ok(cli) => cli,
     Err(err) => return clap_exit(&err),
   };
-  init_tracing(cli.log_level);
+  // Today's --no-colour (staged plan S1.13): the plans `explain` and `verify` print, and the logs.
+  if cli.no_colour {
+    anstream::ColorChoice::Never.write_global();
+  }
+  init_tracing(cli.log_level, !cli.no_colour);
 
   let name = cli.command.name();
   match dispatch(cli.command) {
@@ -136,10 +140,13 @@ fn clap_exit(err: &clap::Error) -> ExitCode {
 
 /// `--log-level` wins; without it `RUST_LOG` is read, so the finer directives a maintainer reaches
 /// for still work; the default is `warn`.
-fn init_tracing(level: Option<LogLevel>) {
+fn init_tracing(level: Option<LogLevel>, colour: bool) {
   use tracing_subscriber::EnvFilter;
-  logging::to_stderr(match level {
-    Some(level) => EnvFilter::new(level.as_str()),
-    None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
-  });
+  logging::to_stderr(
+    match level {
+      Some(level) => EnvFilter::new(level.as_str()),
+      None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")),
+    },
+    colour,
+  );
 }

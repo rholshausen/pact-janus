@@ -28,7 +28,8 @@ Commands:
 
 Options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
-                           default is warn [possible values: error, warn, info, debug, trace]
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
   -h, --help               Print help
   -V, --version            Print version
 
@@ -114,7 +115,7 @@ error: unexpected argument '--nonsense' found
 
   tip: to pass '--nonsense' as a value, use '-- --nonsense'
 
-Usage: janus verify --provider-url <URL> <CONTRACT_OR_PACT>...
+Usage: janus verify <CONTRACT_OR_PACT>...
 
 For more information, try '--help'.
 
@@ -123,10 +124,9 @@ For more information, try '--help'.
 ```console
 $ janus verify pact.json
 ? 2
-error: the following required arguments were not provided:
-  --provider-url <URL>
+error: say where the provider is: --provider-url <URL>, or --hostname and --port
 
-Usage: janus verify --provider-url <URL> <CONTRACT_OR_PACT>...
+Usage: janus verify [OPTIONS] [CONTRACT_OR_PACT]...
 
 For more information, try '--help'.
 
@@ -221,10 +221,9 @@ not mixed in one run.
 ```console
 $ janus verify --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2
 ? 2
-error: the following required arguments were not provided:
-  --provider-name <NAME>
+error: --broker-url needs --provider-name: the provider whose pacts to fetch
 
-Usage: janus verify --provider-url <URL> --broker-url <URL> --provider-name <NAME> [CONTRACT_OR_PACT]...
+Usage: janus verify [OPTIONS] [CONTRACT_OR_PACT]...
 
 For more information, try '--help'.
 
@@ -233,9 +232,9 @@ For more information, try '--help'.
 ```console
 $ janus verify pact.json --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2 --provider-name p
 ? 2
-error: the argument '[CONTRACT_OR_PACT]...' cannot be used with '--broker-url <URL>'
+error: files and --broker-url: one kind of source per run
 
-Usage: janus verify --provider-url <URL> --provider-name <NAME> <CONTRACT_OR_PACT>...
+Usage: janus verify [OPTIONS] [CONTRACT_OR_PACT]...
 
 For more information, try '--help'.
 
@@ -249,7 +248,7 @@ $ janus verify --provider-url http://127.0.0.1:1 --broker-url http://127.0.0.1:2
 error: the following required arguments were not provided:
   --provider-version <VERSION>
 
-Usage: janus verify --provider-url <URL> --broker-url <URL> --provider-name <NAME> --provider-version <VERSION> --publish [CONTRACT_OR_PACT]...
+Usage: janus verify --provider-version <VERSION> --provider-url <URL> --broker-url <URL> --provider-name <NAME> --publish [CONTRACT_OR_PACT]...
 
 For more information, try '--help'.
 

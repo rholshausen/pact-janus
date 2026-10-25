@@ -41,6 +41,84 @@ pub struct Fixture {
   /// How both verifiers reach the provider, given to each in its own spelling (S1.5).
   #[serde(default, skip_serializing_if = "ConnectionSpec::is_default")]
   pub connection: ConnectionSpec,
+  /// The interactions both verifiers are told to verify, with today's `--filter-*` options, which
+  /// `janus verify` spells the same way (S1.13, ADR 0053). What it leaves out is absent for both.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub filter: Option<FilterSpec>,
+}
+
+/// Today's `--filter-description`, `--filter-state`, `--filter-no-state` and `--filter-consumer`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct FilterSpec {
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub description: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub state: Option<String>,
+  #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+  pub no_state: bool,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub consumers: Vec<String>,
+}
+
+impl FilterSpec {
+  /// The options, as both verifiers spell them.
+  pub fn args(&self) -> Vec<String> {
+    let mut args = Vec::new();
+    if let Some(description) = &self.description {
+      args.extend(["--filter-description".to_string(), description.clone()]);
+    }
+    if let Some(state) = &self.state {
+      args.extend(["--filter-state".to_string(), state.clone()]);
+    }
+    if self.no_state {
+      args.push("--filter-no-state".to_string());
+    }
+    for consumer in &self.consumers {
+      args.extend(["--filter-consumer".to_string(), consumer.clone()]);
+    }
+    args
+  }
+
+  /// Whether it admits an interaction of `consumer`'s, as today's verifier decides: each regular
+  /// expression searched for, unanchored, and a state filter met by any of the interaction's states.
+  pub fn admits(&self, consumer: &str, interaction: &Value) -> Result<bool, String> {
+    let found = |pattern: &str, text: &str| {
+      regex::Regex::new(pattern)
+        .map(|regex| regex.is_match(text))
+        .map_err(|err| format!("'{pattern}' is not a regular expression: {err}"))
+    };
+    if !self.consumers.is_empty() && !self.consumers.iter().any(|name| name == consumer) {
+      return Ok(false);
+    }
+    if let Some(description) = &self.description
+      && !found(
+        description,
+        interaction["description"].as_str().unwrap_or_default(),
+      )?
+    {
+      return Ok(false);
+    }
+    let states: Vec<&str> = match (&interaction["providerStates"], &interaction["providerState"]) {
+      (Value::Array(states), _) => states.iter().filter_map(|state| state["name"].as_str()).collect(),
+      (_, Value::String(state)) => vec![state.as_str()],
+      _ => vec![],
+    };
+    if self.no_state {
+      return Ok(states.is_empty());
+    }
+    match &self.state {
+      Some(state) => {
+        for name in states {
+          if found(state, name)? {
+            return Ok(true);
+          }
+        }
+        Ok(false)
+      }
+      None => Ok(true),
+    }
+  }
 }
 
 /// The provider-connection options both verifiers are given (S1.5), in today's verifier's terms:
@@ -151,6 +229,10 @@ pub struct BrokerVerify {
   /// Publish the results.
   #[serde(default, skip_serializing_if = "std::ops::Not::not")]
   pub publish: bool,
+  /// Verify one pact as a Pact Broker webhook names it, by its file name: its broker URL is given
+  /// as `--webhook-callback-url`, beside `--broker-url`, in place of the selectors (S1.13).
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub webhook: Option<String>,
 }
 
 impl Default for BrokerVerify {
@@ -162,6 +244,7 @@ impl Default for BrokerVerify {
       provider_version: first_version(),
       provider_branch: None,
       publish: false,
+      webhook: None,
     }
   }
 }

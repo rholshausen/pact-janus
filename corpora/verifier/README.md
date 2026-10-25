@@ -34,6 +34,7 @@ this one.
 | `expected` | `pass` or `fail`, when the source says what the run should conclude. Today's verifier is held to it, so a fixture it disagrees with is a fixture translated wrongly |
 | `mutations` | Also run every interaction against mutated responses |
 | `broker` | Fetch the pacts from a Pact Broker instead of files, and publish results back (below) |
+| `filter` | Today's `--filter-*` options, given to both verifiers (staged plan S1.13): `description`, `state`, `no-state`, `consumers`. An interaction it leaves out is absent for both. Not with `mutations` or `broker` |
 
 A message (staged plan S1.7) is a route too, the one a message provider honouring it answers with:
 a `POST /` whose body is today's verifier's request for the message (its `description`, its

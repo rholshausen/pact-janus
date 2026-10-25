@@ -1279,3 +1279,164 @@ fn a_content_type_matcher_sniffs_the_replys_octets() {
     assert_eq!(results[0]["status"], json!(expected), "{reply}: {}", results[0]);
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Filtering by interaction (staged plan S1.13, ADR 0053): today's --filter-* options
+// ---------------------------------------------------------------------------------------------
+
+/// A v3 pact for `consumer`: two interactions with a provider state and one with none.
+fn pact_to_filter(consumer: &str) -> Value {
+  json!({
+    "consumer": { "name": consumer }, "provider": { "name": "orders" },
+    "interactions": [
+      { "description": "get order 1", "providerStates": [{ "name": "an order exists" }],
+        "request": { "method": "GET", "path": "/orders/1" }, "response": { "status": 200 } },
+      { "description": "get order 2", "providerStates": [{ "name": "no orders" }],
+        "request": { "method": "GET", "path": "/orders/2" }, "response": { "status": 200 } },
+      { "description": "health check",
+        "request": { "method": "GET", "path": "/health" }, "response": { "status": 200 } }
+    ],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  })
+}
+
+fn verify_filtered(engine: &mut Engine, documents: Vec<Value>, base_url: &str, filter: Value) -> Value {
+  send(
+    engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": documents },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ] },
+      "options": { "filter": filter },
+    }),
+  )
+}
+
+/// Each of today's filters, as `options.filter`, over two pacts of three interactions each: a
+/// description or a provider-state name searched for by regular expression, no provider state at
+/// all, both together, and the consumers whose pacts are verified. What it leaves out is skipped,
+/// and the run says it was filtered.
+#[rstest::rstest]
+#[case::description(json!({ "description": "order" }), &["GET /orders/1", "GET /orders/2"], 4)]
+#[case::state(json!({ "state": "exists" }), &["GET /orders/1"], 2)]
+#[case::no_state(json!({ "no-state": true }), &["GET /health"], 2)]
+#[case::description_and_state(json!({ "description": "^get", "state": "no orders" }), &["GET /orders/2"], 2)]
+#[case::consumers(json!({ "consumers": ["mobile"], "description": "health" }), &["GET /health"], 1)]
+fn a_filter_replays_the_interactions_it_matches_and_says_the_run_was_filtered(
+  #[case] filter: Value,
+  #[case] paths: &[&str],
+  #[case] replays: usize,
+) {
+  let mut engine = engine_with_everything();
+  let (base_url, requests) = stub_provider((0..replays).map(|_| canned(200, "")).collect());
+  let started = verify_filtered(
+    &mut engine,
+    vec![pact_to_filter("web"), pact_to_filter("mobile")],
+    &base_url,
+    filter,
+  );
+  let stream = started["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify failed: {started}"))
+    .to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  let seen: Vec<String> = requests.try_iter().collect();
+  assert_eq!(seen.len(), replays, "{seen:?}");
+  for line in &seen {
+    assert!(
+      paths.iter().any(|path| line.starts_with(path)),
+      "{line} was replayed"
+    );
+  }
+  assert_eq!(results(&events).len(), replays, "{events:#?}");
+  let summary = summary(&events);
+  assert_eq!(summary["status"], json!("filtered"), "{summary}");
+  assert_eq!(summary["filtered"], json!(true));
+  assert_eq!(
+    summary["variants"],
+    json!({ "total": 6, "verified": replays, "failed": 0, "state-unavailable": 0, "skipped": 6 - replays }),
+    "{summary}"
+  );
+}
+
+/// ADR 0053, as ADR 0041 decided for a variant filter: a filter that matches no interaction is a
+/// mistake, refused before anything runs. Today's verifiers pass it, having verified nothing.
+#[test]
+fn a_filter_that_matches_no_interaction_is_refused_before_anything_runs() {
+  let mut engine = engine_with_everything();
+  let refused = verify_filtered(
+    &mut engine,
+    vec![pact_to_filter("web")],
+    "http://127.0.0.1:1",
+    json!({ "description": "nothing is called this" }),
+  );
+  let error = &refused["error"];
+  assert_eq!(error["code"], json!("filter-matches-nothing"), "{refused}");
+  assert_eq!(error["category"], json!("session"));
+  assert_eq!(
+    error["details"]["filter"],
+    json!({ "description": "nothing is called this" })
+  );
+  assert_eq!(error["details"]["interactions"], json!(3));
+}
+
+#[rstest::rstest]
+#[case::state_and_no_state(json!({ "state": "x", "no-state": true }))]
+#[case::not_a_regex(json!({ "description": "(" }))]
+#[case::no_consumers(json!({ "consumers": [] }))]
+#[case::not_an_object(json!("order"))]
+fn a_filter_that_cannot_be_read_is_a_malformed_request(#[case] filter: Value) {
+  let mut engine = engine_with_everything();
+  let refused = verify_filtered(
+    &mut engine,
+    vec![pact_to_filter("web")],
+    "http://127.0.0.1:1",
+    filter,
+  );
+  assert_eq!(refused["error"]["code"], json!("malformed-frame"), "{refused}");
+}
+
+/// ADR 0053: today's `--exit-on-first-error`, as `options.stop-on-first-failure`. The run ends at
+/// the first failure; what it did not reach is neither verified nor failed, and the summary says
+/// why it stopped.
+#[test]
+fn a_run_asked_to_stop_on_its_first_failure_replays_nothing_after_it() {
+  let mut engine = engine_with_everything();
+  // The first interaction expects 200 and gets 500; nothing else is answered.
+  let (base_url, requests) = stub_provider(vec![canned(500, "")]);
+  let started = send(
+    &mut engine,
+    "v-1",
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [pact_to_filter("web")] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ] },
+      "options": { "stop-on-first-failure": true },
+    }),
+  );
+  let stream = started["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify failed: {started}"))
+    .to_string();
+  let events = drain_run(&mut engine, &stream);
+
+  assert_eq!(
+    requests.try_iter().count(),
+    1,
+    "nothing after the failure was sent"
+  );
+  assert_eq!(results(&events).len(), 1);
+  let summary = summary(&events);
+  assert_eq!(summary["status"], json!("failed"), "{summary}");
+  assert_eq!(summary["stopped"], json!("first-failure"));
+  assert_eq!(
+    summary["variants"],
+    json!({ "total": 1, "verified": 0, "failed": 1, "state-unavailable": 0, "skipped": 0 })
+  );
+  assert!(
+    summary.get("aborted").is_none(),
+    "a stop is not a hook's abort: {summary}"
+  );
+}

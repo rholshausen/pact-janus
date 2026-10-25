@@ -231,7 +231,7 @@ impl Broker {
   }
 }
 
-fn pact_path(pact: &PublishedPact) -> String {
+pub fn pact_path(pact: &PublishedPact) -> String {
   format!(
     "/pacts/provider/{}/consumer/{}/version/{}",
     encode(&pact.provider),

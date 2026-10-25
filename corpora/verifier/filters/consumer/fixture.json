@@ -1,0 +1,62 @@
+{
+  "description": "--filter-consumer: only the named consumer's pacts. Today's verifier leaves the other pact out of its report; janus verify counts its interactions as skipped",
+  "source": "staged plan S1.13; pact_verifier's FilterInfo and filter_consumers",
+  "pacts": [
+    "web-orders.json",
+    "mobile-orders.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "an order exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/orders/1"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": "1"
+            }
+          }
+        }
+      },
+      {
+        "states": [
+          "no orders"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/orders/2"
+        },
+        "response": {
+          "status": 404
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/health"
+        },
+        "response": {
+          "status": 200
+        }
+      }
+    ]
+  },
+  "filter": {
+    "consumers": [
+      "mobile"
+    ]
+  }
+}

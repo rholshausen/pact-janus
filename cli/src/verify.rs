@@ -14,9 +14,10 @@
 use crate::Outcome;
 use crate::args::{Output, TransportEntry, VerifyArgs};
 use crate::engine;
-use crate::error::Error;
+use crate::error::{self, Error};
 use crate::highlight;
 use crate::io;
+use clap::error::ErrorKind;
 use serde_json::{Value, json};
 
 /// How long one `events/poll` may wait for something to happen. An empty answer only means
@@ -25,13 +26,9 @@ use serde_json::{Value, json};
 const POLL_WAIT_MS: u64 = 10_000;
 
 pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
-  let source = match &args.broker_url {
-    Some(url) => broker_source(args, url)?,
-    None => {
-      let documents = io::read_all_documents(&args.sources)?;
-      json!({ "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() })
-    }
-  };
+  // Where the provider is, before anything is read: a usage error, not a file's.
+  provider_url(args)?;
+  let source = source(args)?;
 
   let hooks = match &args.config {
     None => None,
@@ -42,11 +39,17 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   };
 
   let mut options = json!({});
+  if let Some(filter) = interaction_filter(args) {
+    options["filter"] = filter;
+  }
   if !args.variants.is_empty() {
     options["variants"] = json!(args.variants);
   }
   if args.explain_failures {
     options["executed-plan"] = json!("on-failure");
+  }
+  if args.exit_on_first_error {
+    options["stop-on-first-failure"] = json!(true);
   }
   if args.publish {
     // `requires_all` guarantees the version; the branch and tags are the provider version's.
@@ -66,7 +69,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   let provider = provider_options(args)?;
   let mut target = json!({
     "transports": [{
-      "transport": args.transport,
+      "transport": transport_kind(args),
       "options": provider,
     }]
   });
@@ -79,6 +82,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   {
     target["components"] = components;
   }
+  add_state_change(&mut hooks, args, &target["transports"][0]["options"])?;
   add_message_producer(&mut hooks, args, &target["transports"][0]["options"])?;
   target["hooks"] = hooks;
 
@@ -134,6 +138,24 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   })
 }
 
+/// `options.filter` from today's `--filter-*` options (ADR 0053), when any is given.
+fn interaction_filter(args: &VerifyArgs) -> Option<Value> {
+  let mut filter = serde_json::Map::new();
+  if let Some(description) = &args.filter_description {
+    filter.insert("description".to_string(), json!(description));
+  }
+  if let Some(state) = &args.filter_state {
+    filter.insert("state".to_string(), json!(state));
+  }
+  if args.filter_no_state {
+    filter.insert("no-state".to_string(), json!(true));
+  }
+  if !args.filter_consumer.is_empty() {
+    filter.insert("consumers".to_string(), json!(args.filter_consumer));
+  }
+  (!filter.is_empty()).then_some(Value::Object(filter))
+}
+
 /// The HTTP transport's drive options (component-interfaces spec §5.6) from the command line:
 /// `base-url` with `--base-path` after it, `--header`s, and the HTTP client options. Certificates
 /// and keys are read here and passed as text (ADR 0035 decision 3): the engine reads no file for
@@ -143,13 +165,13 @@ fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
   // path, on the provider URL's host, in place of the URL and `--base-path`.
   let base_url = match args.transports.iter().find(|entry| entry.name == "http") {
     Some(entry) => transport_url(args, entry)?,
-    None => provider_base_url(args),
+    None => provider_base_url(args)?,
   };
   let mut options = json!({ "base-url": base_url });
-  if !args.headers.is_empty() {
+  if !args.headers.is_empty() || !args.custom_provider_header.is_empty() {
     // A later --header of the same name replaces an earlier one, as today's verifier's map does.
     let mut headers = serde_json::Map::new();
-    for (name, value) in &args.headers {
+    for (name, value) in args.custom_provider_header.iter().chain(&args.headers) {
       headers.retain(|existing, _| !existing.eq_ignore_ascii_case(name));
       headers.insert(name.clone(), json!(value));
     }
@@ -209,28 +231,60 @@ fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
 
 /// The provider URL with `--base-path` after it: where HTTP interactions go, and where a message is
 /// asked for when no `--transports` entry says otherwise.
-fn provider_base_url(args: &VerifyArgs) -> String {
-  let mut base_url = args.provider_url.trim_end_matches('/').to_string();
+fn provider_base_url(args: &VerifyArgs) -> Result<String, Error> {
+  let mut base_url = provider_url(args)?.trim_end_matches('/').to_string();
   if let Some(path) = args.base_path.as_deref().map(|path| path.trim_matches('/'))
     && !path.is_empty()
   {
     base_url.push('/');
     base_url.push_str(path);
   }
-  base_url
+  Ok(base_url)
+}
+
+/// Where the provider is: `--provider-url`, or today's `--hostname`, `--port` and `--transport
+/// https` (staged plan S1.13), which default to localhost and the scheme's port, as today's do.
+fn provider_url(args: &VerifyArgs) -> Result<String, Error> {
+  if let Some(url) = &args.provider_url {
+    return Ok(url.clone());
+  }
+  if args.hostname.is_none() && args.port.is_none() {
+    return Err(error::usage(
+      &["verify"],
+      ErrorKind::MissingRequiredArgument,
+      "say where the provider is: --provider-url <URL>, or --hostname and --port",
+    ));
+  }
+  let scheme = if args.transport == "https" {
+    "https"
+  } else {
+    "http"
+  };
+  let host = args.hostname.as_deref().unwrap_or("localhost");
+  Ok(match args.port {
+    Some(port) => format!("{scheme}://{host}:{port}"),
+    None => format!("{scheme}://{host}"),
+  })
+}
+
+/// The transport component to bind: `--transport`, where today's `https` is the `http` transport
+/// over TLS, the scheme [`provider_url`] gives it.
+fn transport_kind(args: &VerifyArgs) -> &str {
+  match args.transport.as_str() {
+    "https" => "http",
+    kind => kind,
+  }
 }
 
 /// A `--transports` entry's URL, as today's verifier makes one (`ProviderTransport::base_url`):
 /// plain HTTP, the provider URL's host, the entry's port and its path, `--base-path` not included.
 fn transport_url(args: &VerifyArgs, entry: &TransportEntry) -> Result<String, Error> {
-  let provider = url::Url::parse(&args.provider_url)
-    .map_err(|err| format!("--provider-url {}: {err}", args.provider_url))?;
-  let host = provider.host_str().ok_or_else(|| {
-    format!(
-      "--provider-url {} names no host for --transports",
-      args.provider_url
-    )
-  })?;
+  let provider_url = provider_url(args)?;
+  let provider =
+    url::Url::parse(&provider_url).map_err(|err| format!("--provider-url {provider_url}: {err}"))?;
+  let host = provider
+    .host_str()
+    .ok_or_else(|| format!("--provider-url {provider_url} names no host for --transports"))?;
   Ok(format!(
     "http://{host}:{}{}",
     entry.port,
@@ -261,7 +315,7 @@ fn add_message_producer(hooks: &mut Value, args: &VerifyArgs, provider: &Value) 
     .collect::<Result<Vec<_>, Error>>()?;
   let mut run = json!({
     "kind": "http",
-    "url": provider_base_url(args),
+    "url": provider_base_url(args)?,
     "format": "pact-message",
   });
   if !transports.is_empty() {
@@ -288,9 +342,148 @@ fn add_message_producer(hooks: &mut Value, args: &VerifyArgs, provider: &Value) 
   Ok(())
 }
 
+/// The name of the hooks `janus verify` writes for today's state-change options.
+const STATE_CHANGE: &str = "state-change-url";
+
+/// Today's `--state-change-url`, `--state-change-as-query` and `--state-change-teardown`, written as
+/// the hooks they become (staged plan S1.13, ADR 0053): an `http` hook in `pact-state-change` format
+/// at `state-setup`, and at `state-teardown` too when asked, bounded by `--request-timeout` and
+/// reached with the client options the provider is, as today's verifier reaches it. A configuration
+/// with `state-setup` hooks of its own is refused: the states would be set up twice.
+fn add_state_change(hooks: &mut Value, args: &VerifyArgs, provider: &Value) -> Result<(), Error> {
+  let Some(url) = &args.state_change_url else {
+    return Ok(());
+  };
+  let configured = hooks
+    .pointer("/hooks/state-setup")
+    .and_then(Value::as_array)
+    .is_some_and(|entries| !entries.is_empty());
+  if configured {
+    return Err(error::usage(
+      &["verify"],
+      ErrorKind::ArgumentConflict,
+      "--state-change-url and a configuration with state-setup hooks of its own would set the states up twice; say it once",
+    ));
+  }
+  let format = match args.state_change_as_query {
+    true => "pact-state-change-query",
+    false => "pact-state-change",
+  };
+  let mut run = json!({ "kind": "http", "url": url, "format": format });
+  if let Some(client) = provider.get("client") {
+    run["client"] = client.clone();
+  }
+  let mut entry = json!({ "name": STATE_CHANGE, "run": run });
+  if let Some(ms) = args.request_timeout {
+    entry["timeout-ms"] = json!(ms);
+  }
+  let Some(config) = hooks.as_object_mut() else {
+    return Err(String::from("the verifier configuration is not an object").into());
+  };
+  let points = config.entry("hooks").or_insert_with(|| json!({}));
+  let Some(points) = points.as_object_mut() else {
+    return Err(String::from("the verifier configuration's hooks are not an object").into());
+  };
+  points.insert("state-setup".to_string(), json!([entry.clone()]));
+  if args.state_change_teardown {
+    let teardown = points.entry("state-teardown").or_insert_with(|| json!([]));
+    if let Some(entries) = teardown.as_array_mut() {
+      entries.push(entry);
+    }
+  }
+  Ok(())
+}
+
+/// Where the pacts come from: files and directories, a Pact Broker's selection, or pacts by URL,
+/// with today's spellings for each (staged plan S1.13). One kind per run. A broker URL that only
+/// the environment gave (`PACT_BROKER_BASE_URL`, which a CI job sets for every pact command) gives
+/// way to files or URLs named on the command line.
+fn source(args: &VerifyArgs) -> Result<Value, Error> {
+  let conflict = |message: &str| error::usage(&["verify"], ErrorKind::ArgumentConflict, message);
+  let mut files = args.sources.clone();
+  files.extend(args.files.iter().cloned());
+  files.extend(args.dirs.iter().cloned());
+  let mut urls = args.urls.clone();
+  let webhook = args.webhook_callback_url.is_some();
+  if let Some(url) = &args.webhook_callback_url {
+    if !urls.is_empty() || !files.is_empty() {
+      return Err(conflict(
+        "--webhook-callback-url verifies the one pact the webhook named; not with files or --url",
+      ));
+    }
+    urls.push(url.clone());
+  }
+  let from_environment = std::env::var("PACT_BROKER_BASE_URL").ok();
+  let broker_url = args
+    .broker_url
+    .as_ref()
+    .filter(|url| !(files.len() + urls.len() > 0 && from_environment.as_ref() == Some(*url)));
+  if !urls.is_empty() {
+    // The webhook's broker is the one its pact came from; today's verifier needs both named.
+    if broker_url.is_some() && !webhook {
+      return Err(conflict("--url and --broker-url: one kind of source per run"));
+    }
+    if !files.is_empty() {
+      return Err(conflict("--url and files: one kind of source per run"));
+    }
+    let mut source = json!({ "kind": "urls", "urls": urls });
+    if let Some(auth) = broker_auth(args) {
+      source["auth"] = auth;
+    }
+    if let Some(client) = broker_client(args) {
+      source["client"] = client;
+    }
+    return Ok(source);
+  }
+  if !files.is_empty() {
+    if broker_url.is_some() {
+      return Err(conflict("files and --broker-url: one kind of source per run"));
+    }
+    if args.publish {
+      return Err(conflict(
+        "--publish needs --broker-url or --url: a file has no broker to publish to",
+      ));
+    }
+    let documents = io::read_all_documents(&files)?;
+    return Ok(
+      json!({ "kind": "inline", "contracts": documents.into_iter().map(|(_, doc)| doc).collect::<Vec<_>>() }),
+    );
+  }
+  match broker_url {
+    Some(url) => broker_source(args, url),
+    None => Err(error::usage(
+      &["verify"],
+      ErrorKind::MissingRequiredArgument,
+      "say what to verify: contract or pact files, --broker-url with --provider-name, or --url",
+    )),
+  }
+}
+
+/// The broker's credentials, from today's options and variables: a token, else a username.
+fn broker_auth(args: &VerifyArgs) -> Option<Value> {
+  if let Some(token) = &args.token {
+    return Some(json!({ "kind": "bearer", "token": token }));
+  }
+  args.user.as_ref().map(|user| {
+    json!({ "kind": "basic", "username": user, "password": args.password.clone().unwrap_or_default() })
+  })
+}
+
+/// The broker's HTTP client options: today's `--retries`, when given.
+fn broker_client(args: &VerifyArgs) -> Option<Value> {
+  args.retries.map(|retries| json!({ "retries": retries }))
+}
+
 /// A `broker` source (protocol spec §8.3) from the command line. The engine reads no credential
 /// from its environment (§8.7): the CLI does, by today's names, and passes them in the descriptor.
 fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
+  let Some(provider) = &args.provider_name else {
+    return Err(error::usage(
+      &["verify"],
+      ErrorKind::MissingRequiredArgument,
+      "--broker-url needs --provider-name: the provider whose pacts to fetch",
+    ));
+  };
   let mut selectors = Vec::with_capacity(args.consumer_version_selectors.len());
   for selector in &args.consumer_version_selectors {
     let parsed: Value = serde_json::from_str(selector)
@@ -300,12 +493,17 @@ fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
     }
     selectors.push(parsed);
   }
+  // Today's --consumer-version-tags: the latest pact for each tag (pact_verifier_cli's
+  // consumer_tags_to_selectors).
+  for tag in &args.consumer_version_tags {
+    selectors.push(json!({ "tag": tag, "latest": true }));
+  }
   let mut broker = json!({ "url": url });
-  if let Some(token) = &args.token {
-    broker["auth"] = json!({ "kind": "bearer", "token": token });
-  } else if let Some(user) = &args.user {
-    broker["auth"] =
-      json!({ "kind": "basic", "username": user, "password": args.password.clone().unwrap_or_default() });
+  if let Some(auth) = broker_auth(args) {
+    broker["auth"] = auth;
+  }
+  if let Some(client) = broker_client(args) {
+    broker["client"] = client;
   }
   // Today's verifier asks for pending and work-in-progress pacts only when it has selectors to
   // send: with none, it fetches the latest pact from each consumer from an older endpoint that
@@ -320,7 +518,7 @@ fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
   let mut source = json!({
     "kind": "broker",
     "broker": broker,
-    "provider": args.provider_name,
+    "provider": provider,
     "consumer-version-selectors": selectors,
     "include-pending": args.enable_pending && selecting,
   });
@@ -332,6 +530,9 @@ fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
   }
   if let Some(since) = args.include_wip_pacts_since.as_ref().filter(|_| selecting) {
     source["include-wip-since"] = json!(since);
+  }
+  if args.ignore_no_pacts_error {
+    source["require-pacts"] = json!(false);
   }
   Ok(source)
 }
@@ -416,9 +617,12 @@ fn report(event: &Value) {
       let version = payload["provider-version"].as_str().unwrap_or("?");
       match payload["outcome"].as_str() {
         Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
-        Some("skipped") => {
-          outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out")
-        }
+        Some("skipped") => match payload["reason"].as_str() {
+          Some("not-from-a-broker") => {
+            outln!("  not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
+          }
+          _ => outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out"),
+        },
         _ => {
           outln!("  PUBLISH FAILED for {consumer}'s result");
           print_error(&payload["error"]);
@@ -507,6 +711,9 @@ fn render_summary(summary: &Value) -> String {
   if summary["filtered"] == json!(true) {
     text.push_str("\nThis was a filtered run: unreplayed variants are not passing ones.");
   }
+  if summary["stopped"] == json!("first-failure") {
+    text.push_str("\nThe run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run.");
+  }
   // The abort is the headline of a run that ended this way, so it carries its cause: "the auth
   // hook failed" sends a reader to the logs for what the report already knows.
   if let Some(abort) = summary.get("aborted").filter(|a| !a.is_null()) {
@@ -566,6 +773,194 @@ mod tests {
       "FAILED: the run did not complete (2 interaction(s) in 1 document(s))\n\
        The engine stopped the run:\n  \
        internal: the verification run stopped unexpectedly: boom"
+    );
+  }
+}
+
+/// Today's options, as the engine receives them (staged plan S1.13, ADR 0053): each command line is
+/// parsed as clap parses it and turned into the request's source, options and hooks.
+#[cfg(test)]
+mod todays_options {
+  use super::*;
+  use crate::args::{Cli, Command};
+  use clap::Parser;
+  use pretty_assertions::assert_eq;
+
+  fn verify_args(line: &[&str]) -> VerifyArgs {
+    let mut argv = vec!["janus", "verify"];
+    argv.extend(line);
+    match Cli::try_parse_from(argv)
+      .expect("the command line parses")
+      .command
+    {
+      Command::Verify(args) => args,
+      other => panic!("not verify: {other:?}"),
+    }
+  }
+
+  #[test]
+  fn consumer_version_tags_are_the_latest_pact_for_each_tag_and_retries_the_brokers_client() {
+    let args = verify_args(&[
+      "-b",
+      "https://broker.example",
+      "-n",
+      "orders",
+      "--provider-url",
+      "http://localhost:8080",
+      "--consumer-version-tags",
+      "main,prod",
+      "--retries",
+      "8",
+      "--ignore-no-pacts-error",
+      "--token",
+      "t",
+    ]);
+    let source = source(&args).unwrap();
+    assert_eq!(
+      source["consumer-version-selectors"],
+      json!([{ "tag": "main", "latest": true }, { "tag": "prod", "latest": true }])
+    );
+    assert_eq!(source["broker"]["client"], json!({ "retries": 8 }));
+    assert_eq!(
+      source["broker"]["auth"],
+      json!({ "kind": "bearer", "token": "t" })
+    );
+    assert_eq!(source["require-pacts"], json!(false));
+  }
+
+  #[test]
+  fn a_url_and_a_webhooks_url_are_pacts_fetched_with_the_brokers_credentials() {
+    let args = verify_args(&[
+      "--url",
+      "https://broker.example/pacts/1",
+      "--url",
+      "https://files.example/p.json",
+      "--provider-url",
+      "http://localhost:8080",
+      "--user",
+      "bob",
+      "--password",
+      "pw",
+    ]);
+    assert_eq!(
+      source(&args).unwrap(),
+      json!({
+        "kind": "urls", "urls": ["https://broker.example/pacts/1", "https://files.example/p.json"],
+        "auth": { "kind": "basic", "username": "bob", "password": "pw" },
+      })
+    );
+    // Today's verifier needs the webhook's broker named too; it is the one the pact came from.
+    let webhook = verify_args(&[
+      "--webhook-callback-url",
+      "https://broker.example/pacts/2",
+      "--broker-url",
+      "https://broker.example",
+      "--provider-url",
+      "http://localhost:8080",
+    ]);
+    assert_eq!(
+      source(&webhook).unwrap(),
+      json!({ "kind": "urls", "urls": ["https://broker.example/pacts/2"] })
+    );
+  }
+
+  #[rstest::rstest]
+  #[case::url_and_broker(&["--url", "https://a/p", "-b", "https://b", "-n", "p"])]
+  #[case::url_and_file(&["--url", "https://a/p", "-f", "pact.json"])]
+  #[case::webhook_and_file(&["--webhook-callback-url", "https://a/p", "pact.json"])]
+  #[case::nothing(&[])]
+  #[case::publish_from_files(&["pact.json", "--publish", "--provider-version", "1"])]
+  fn one_kind_of_source_per_run(#[case] line: &[&str]) {
+    let mut line = line.to_vec();
+    line.extend(["--provider-url", "http://localhost:8080"]);
+    assert!(matches!(source(&verify_args(&line)), Err(Error::Usage(_))));
+  }
+
+  #[test]
+  fn hostname_port_and_https_are_the_provider_url_and_the_http_transport() {
+    let args = verify_args(&[
+      "pact.json",
+      "--hostname",
+      "orders.local",
+      "--port",
+      "8443",
+      "--transport",
+      "https",
+    ]);
+    assert_eq!(provider_url(&args).unwrap(), "https://orders.local:8443");
+    assert_eq!(transport_kind(&args), "http");
+    let defaulted = verify_args(&["pact.json", "-p", "8080"]);
+    assert_eq!(provider_url(&defaulted).unwrap(), "http://localhost:8080");
+    assert!(matches!(
+      provider_url(&verify_args(&["pact.json"])),
+      Err(Error::Usage(_))
+    ));
+  }
+
+  #[test]
+  fn todays_state_change_options_are_the_hooks_they_become() {
+    let args = verify_args(&[
+      "pact.json",
+      "--provider-url",
+      "http://localhost:8080",
+      "-s",
+      "http://localhost:8080/states",
+      "--state-change-as-query",
+      "--state-change-teardown",
+      "--request-timeout",
+      "2000",
+    ]);
+    let mut hooks = json!({ "version": 1 });
+    add_state_change(&mut hooks, &args, &json!({})).unwrap();
+    let entry = json!({
+      "name": "state-change-url", "timeout-ms": 2000,
+      "run": { "kind": "http", "url": "http://localhost:8080/states", "format": "pact-state-change-query" },
+    });
+    assert_eq!(hooks["hooks"]["state-setup"], json!([entry]));
+    assert_eq!(hooks["hooks"]["state-teardown"], json!([entry]));
+
+    let mut configured = json!({ "version": 1, "hooks": { "state-setup": [{ "name": "mine" }] } });
+    assert!(matches!(
+      add_state_change(&mut configured, &args, &json!({})),
+      Err(Error::Usage(_))
+    ));
+  }
+
+  #[test]
+  fn the_ruby_verifiers_spellings_are_read_as_janus_verifys() {
+    let args = verify_args(&[
+      "--provider-base-url",
+      "http://localhost:8080",
+      "--pact-broker-base-url",
+      "https://broker.example",
+      "--provider",
+      "orders",
+      "--provider-app-version",
+      "1.2.3",
+      "--provider-version-branch",
+      "main",
+      "--publish-verification-results",
+      "--broker-username",
+      "bob",
+      "--custom-provider-header",
+      "Authorization: Bearer x",
+      "--provider-states-setup-url",
+      "http://localhost:8080/states",
+    ]);
+    assert_eq!(args.provider_url.as_deref(), Some("http://localhost:8080"));
+    assert_eq!(args.broker_url.as_deref(), Some("https://broker.example"));
+    assert_eq!(args.provider_name.as_deref(), Some("orders"));
+    assert_eq!(args.provider_version.as_deref(), Some("1.2.3"));
+    assert_eq!(args.provider_branch.as_deref(), Some("main"));
+    assert!(args.publish);
+    assert_eq!(args.user.as_deref(), Some("bob"));
+    assert_eq!(
+      args.custom_provider_header,
+      vec![("Authorization".to_string(), "Bearer x".to_string())]
+    );
+    assert_eq!(
+      args.state_change_url.as_deref(),
+      Some("http://localhost:8080/states")
     );
   }
 }

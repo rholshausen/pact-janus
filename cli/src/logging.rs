@@ -9,9 +9,10 @@ use tracing_subscriber::layer::{Filter, Layer as _, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// Installs the subscriber for this process: `filter`'s events on stderr, without credentials.
-pub fn to_stderr(filter: EnvFilter) {
-  subscriber(filter, std::io::stderr, stderr_supports_colour()).init();
+/// Installs the subscriber for this process: `filter`'s events on stderr, without credentials, and
+/// in colour only where stderr shows it and `colour` allows it (`--no-colour` does not).
+pub fn to_stderr(filter: EnvFilter, colour: bool) {
+  subscriber(filter, std::io::stderr, colour && stderr_supports_colour()).init();
 }
 
 fn subscriber<W>(filter: EnvFilter, writer: W, ansi: bool) -> impl Subscriber + Send + Sync

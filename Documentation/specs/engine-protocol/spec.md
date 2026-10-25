@@ -600,10 +600,11 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   per-interaction/per-variant results and the final summary are all events; the stream's
   terminal event carries the summary document and ends the session. `source` is an open
   descriptor of where the contracts come from. Kind `"inline"`: the contract documents — Janus
-  contracts or v1–v4 pacts — are in the request; reading files and URLs is the host's business.
+  contracts or v1–v4 pacts — are in the request; reading files is the host's business, and so is a URL the host fetches itself.
   Kind `"broker"`: the run fetches the pacts for verification of `provider` from a Pact Broker,
   behind the `broker` capability (ADR 0032, which replaces this section's earlier rule that
-  fetching from a broker is host business). `target` describes the provider
+  fetching from a broker is host business). Kind `"urls"`: the run fetches each pact by its URL,
+  through the same capability (below). `target` describes the provider
   under test: transport bindings (open descriptors again) plus open options such as state-
   change configuration (design 2.7 owns hook config). Each binding is started in the `drive` role
   before `verify` answers, so options its transport cannot act on fail the call with
@@ -639,12 +640,26 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   an `error`: `component-failed` naming `broker`, carrying the client's own error. A fetch that
   finds no pacts ends it with `status: failed` and `pacts-not-found`, unless the source says
   `require-pacts: false`.
+- **A `urls` source** names pacts by `urls`, as today's verifier's `--url` and
+  `--webhook-callback-url` do ([ADR
+  0053](../../decisions/0053-take-todays-verifier-options-where-they-mean-what-they-did.md)), and
+  the `auth` and HTTP `client` options each is fetched with, in the broker descriptor's shapes. Each
+  is fetched at its URL's origin, in the run, and reported by `verification/fetched` as a broker
+  source's are. None is pending. One a Pact Broker served carries its links and is published to them;
+  one from anywhere else is not, and its publication is `skipped` with `reason: "not-from-a-broker"`.
+  A pact that cannot be fetched ends the run as a broker fetch that fails does. A `urls` source with
+  no URL is `malformed-frame`.
+- **`options.stop-on-first-failure: true`** ends the run at the first failure that fails it, as
+  today's `--exit-on-first-error` (ADR 0053). A pending failure does not stop it. What the run did not
+  reach is not run, a source it did not finish is not published, and the summary says
+  `stopped: "first-failure"`.
 - **`options.publish`** (`provider-version`, and optionally `branch`, `tags`, `build-url`)
   publishes each fetched pact's result to that pact's own link when the run ends, keyed by the
   broker's interaction ids, which the run carries from the fetched documents into its results.
   Each publication is a `verification/published` event, and the summary's `publication` lists
   them. A publish that fails is reported and does not change the verdict. `publish` with an
   `inline` source is refused before the run starts: an inline document has no link to publish to.
+  It is allowed with a `urls` source, whose pacts are published when a broker served them (above).
   A pact the run's filter narrowed is not published: its event and its `publication` entry have the
   outcome `skipped`, with `reason: "filtered"` (below).
 - **`options.variants`** (a list of ids), or `options.variant` (one), narrows the run to those
@@ -655,6 +670,17 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   itself for an inline source, and for a `broker` source by ending the run right after
   `verification/fetched`, as `pacts-not-found` does. An empty list is `malformed-frame`. A run is
   **filtered** when the filter excluded at least one recorded variant, and then reports as §9.6 says.
+- **`options.filter`** narrows the run by interaction, as today's verifier's `--filter-*` options do
+  ([ADR 0053](../../decisions/0053-take-todays-verifier-options-where-they-mean-what-they-did.md)):
+  `description`, a regular expression searched for in the interaction's description; `state`, one
+  searched for in the name of any of its provider states, or `no-state: true`, an interaction with
+  none; and `consumers`, the consumers whose documents are verified. An interaction is replayed when
+  every member given admits it, and then each of its variants as `options.variants` admits it; the
+  rest are skipped. A filter that admits no interaction of the run's documents is refused as
+  `filter-matches-nothing`, with the `filter` as given and how many `interactions` there were, as
+  `variant-not-found` is: by `verify` for an inline source, after `verification/fetched` for a
+  `broker` one. A filter that cannot be read (a pattern that is not a regular expression, `state`
+  with `no-state`, an empty `consumers`) is `malformed-frame`. A run it narrows is filtered, as above.
 - **`explain`** compiles one interaction (from a spec or a contract interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). It compiles what
@@ -933,8 +959,8 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
 | `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034) | before the result it qualifies; a warning never changes a verdict |
 | `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
-| `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` source, before the first interaction (§8.3) |
-| `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it) | one per pact, when `options.publish` asks (§8.3) |
+| `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` or `urls` source, before the first interaction (§8.3); a `urls` source's broker is its first URL's origin |
+| `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it; `not-from-a-broker`: a `urls` source's pact no broker served) | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 | `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
 | `broker/finished` | the outcome: `status` (`published` or `failed`), the broker (its URL, without credentials), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed | carries `last: true`; ends the broker session |
@@ -958,7 +984,8 @@ otherwise. `filtered` is not a pass: it says what was replayed passed, and that 
 does `verification/started`'s. A
 run from a `broker` source also says, positionally beside `consumers`, which
 sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
-run, and, when it published, a `publication` entry per pact (§8.3).
+run, and, when it published, a `publication` entry per pact (§8.3). A run that `stop-on-first-failure`
+ended says `stopped: "first-failure"`; its `variants` count what it reached.
 
 A run always ends its stream. One the engine cannot complete — a bug stopped it part way — still
 emits `verification/finished`, with `status: failed` and an `error` member holding an `EngineError`
@@ -988,7 +1015,7 @@ a bug). An `EngineError` carries:
 | Category | Meaning / host fallback for unknown codes in it | v1 codes |
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
-| `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `stream-not-found` |
+| `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `filter-matches-nothing`, `stream-not-found` |
 | `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded`, `pacts-not-found` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
