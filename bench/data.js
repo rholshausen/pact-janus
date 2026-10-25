@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792914600300,
+  "lastUpdate": 1792914602122,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -24036,6 +24036,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19559,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "1fb6092fbd3ba7fb376cfabe9c4f9f1a9ff8b986",
+          "message": "feat: S1.13 janus verify takes today's verifier options (ADR 0053)\n\nEvery option of pact_verifier_cli 1.3.5 and the Ruby verifier now has a\nrow in Documentation/verifier-migration.md: an option, a hook, or a\nreason it was dropped, which pilot providers still have to accept.\n\n- Today's long spellings and environment variables are taken where they\n  mean what they did, the Ruby verifier's as hidden aliases; -h and -u\n  are not. --hostname/--port/--transport https locate the provider.\n- -s/--state-change-url, --state-change-as-query and\n  --state-change-teardown write the state hooks.\n- The --filter-* options are options.filter, applied in the engine; a\n  filter that matches nothing is filter-matches-nothing (ADR 0041's\n  rules for a narrowed run hold).\n- --url and --webhook-callback-url are a `urls` source, fetched by the\n  broker client's new fetch_pact and published when a broker served it.\n- --exit-on-first-error is options.stop-on-first-failure; a pending\n  failure does not stop the run.\n- --consumer-version-tags, --retries, --ignore-no-pacts-error,\n  --no-colour, --loglevel and -t map onto what exists.\n- One kind of source per run; a broker URL only PACT_BROKER_BASE_URL\n  gave yields to files or URLs on the command line.\n- verifier-diff: fixtures pass a filter to both verifiers\n  (corpora/verifier/filters/) and a broker case can name a pact as a\n  webhook would (broker/webhook-callback-url); a filtered consumer's\n  interactions no longer take another's results.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T18:45:38+11:00",
+          "tree_id": "904bd9c995bbfdb986f4ec912ca42b2a84340d4d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/1fb6092fbd3ba7fb376cfabe9c4f9f1a9ff8b986"
+        },
+        "date": 1792914601622,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 60232,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 44120,
             "unit": "requests per second",
             "extra": "engines 4"
           }
