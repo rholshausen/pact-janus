@@ -1195,7 +1195,8 @@ item in 1a is done when S1.1 agrees.
   (`expect:size(legacy:xml-children(...))`); an absent value prints as `NULL` in executed plan text,
   indistinguishable from a null; and a container for a member with no name is labelled `"$."` or
   `"$.[0]"` (a multipart body's unnamed parts). Also the article in kind messages ("Expected a
-  integer", "a array").
+  integer", "a array"), and the plurals in `subsumption/decide`'s report text, which `janus check`
+  prints (`0 pair(s) blocked`, `2 of 2 variant(s)`) and the corpora pin.
   *Exit:* every mismatch the corpora record has an absolute path; plan-grammar spec §3 says how an
   absent value prints, and the corpus snapshots follow it.
 

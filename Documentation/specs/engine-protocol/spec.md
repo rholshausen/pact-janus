@@ -989,7 +989,9 @@ does `verification/started`'s. A
 run from a `broker` source also says, positionally beside `consumers`, which
 sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
 run, and, when it published, a `publication` entry per pact (§8.3). A run that `stop-on-first-failure`
-ended says `stopped: "first-failure"`; its `variants` count what it reached.
+ended says `stopped: "first-failure"`; its `variants` count what it reached, and `variants.not-run`
+the recorded variants it did not reach, which no other tally counts. A run a hook aborted carries
+`not-run` too.
 
 A run always ends its stream. One the engine cannot complete — a bug stopped it part way — still
 emits `verification/finished`, with `status: failed` and an `error` member holding an `EngineError`

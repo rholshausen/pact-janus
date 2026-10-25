@@ -174,7 +174,7 @@ impl WasmLoader {
           if err.code == "unauthorized" && auth.is_none() {
             err
               .message
-              .push_str("; declare them as the component source's 'auth'");
+              .push_str("; the registry wants credentials: declare them as the component source's 'auth'");
           }
           err
         })?;

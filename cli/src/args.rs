@@ -192,6 +192,14 @@ fn transport_entry(text: &str) -> Result<TransportEntry, String> {
   })
 }
 
+/// A position counting from 0, said in words when it is not one: Rust's "invalid digit found in
+/// string" names nothing on the command line.
+fn position(text: &str) -> Result<usize, String> {
+  text
+    .parse()
+    .map_err(|_| "not a position: it must be a whole number, counting from 0".to_string())
+}
+
 /// A URL with a scheme, checked when the command line is read: one that is not would otherwise be
 /// refused by whatever reached for it first, in that component's terms.
 fn absolute_url(text: &str) -> Result<String, String> {
@@ -211,8 +219,9 @@ pub enum Output {
 
 #[derive(Debug, Args)]
 #[command(
-  after_help = "Exit status: 0 verified; 1 the provider failed verification, or the run \
-                        was aborted; 2 the command could not run.",
+  after_help = "Exit status: 0 verified, or a filtered run that nothing failed; 1 the provider \
+                        failed verification, or the run was aborted; 2 the command could not run, \
+                        which includes pacts a broker or URL could not supply.",
   arg_required_else_help = true
 )]
 pub struct VerifyArgs {
@@ -712,7 +721,7 @@ pub struct ExplainArgs {
   pub document: PathBuf,
 
   /// Which interaction of a contract or pact, counting from 0
-  #[arg(long, value_name = "N", conflicts_with = "spec")]
+  #[arg(long, value_name = "N", conflicts_with = "spec", value_parser = position)]
   pub index: Option<usize>,
 
   /// Compile for this recorded variant of a Janus contract

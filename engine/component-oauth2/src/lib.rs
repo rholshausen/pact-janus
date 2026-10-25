@@ -197,7 +197,17 @@ fn fetch(config: &Value, deadline_ms: u64) -> Result<Token, Value> {
     .post(url)
     .header("content-type", "application/x-www-form-urlencoded")
     .send(form.as_str())
-    .map_err(|err| error("token-endpoint-unreachable", format!("{url}: {err}")))?;
+    .map_err(|err| {
+      // ureq says "io: " in front of a socket's own error, which names nothing a reader needs.
+      let why = match err {
+        ureq::Error::Io(err) => format!(
+          "could not connect: {}",
+          pact_janus_kernel::error::without_os_error(&err.to_string())
+        ),
+        other => other.to_string(),
+      };
+      error("token-endpoint-unreachable", format!("{url}: {why}"))
+    })?;
 
   let status = response.status().as_u16();
   let body = response.body_mut().read_to_string().unwrap_or_default();

@@ -20,7 +20,6 @@ mod options;
 
 pub use options::{ClientCertificate, ClientOptions, HttpVersion, OptionsError, Proxy};
 
-use std::error::Error as _;
 use std::fmt;
 use std::future::Future;
 use std::net::ToSocketAddrs;
@@ -143,21 +142,42 @@ impl fmt::Display for SendError {
 impl std::error::Error for SendError {}
 
 /// An error and every cause beneath it, without the URL reqwest would put in front: the caller
-/// names the request in its own terms, without any user information.
+/// names the request in its own terms, without any user information. The layers that only say
+/// which library was in the way — reqwest's "error sending request", hyper's "client error
+/// (Connect)", its connector's "tcp connect error" — are left out, so what remains is the cause:
+/// `could not connect: Connection refused (os error 111)`.
 fn describe(err: reqwest::Error) -> String {
   let err = err.without_url();
-  let mut message = err.to_string();
-  let mut source = err.source();
-  while let Some(cause) = source {
-    let text = cause.to_string();
+  let mut layers: Vec<String> = Vec::new();
+  let mut cause: Option<&dyn std::error::Error> = Some(&err);
+  while let Some(error) = cause {
+    let text = without_os_error(error.to_string());
     // Some layers repeat their cause in their own message; say it once.
-    if !message.contains(&text) {
-      message.push_str(": ");
-      message.push_str(&text);
+    if !layers.iter().any(|layer| layer.contains(&text)) {
+      layers.push(text);
     }
-    source = cause.source();
+    cause = error.source();
   }
-  message
+  let wrapper = |layer: &String| {
+    layer == "error sending request" || layer == "tcp connect error" || layer.starts_with("client error (")
+  };
+  let kept: Vec<&String> = layers.iter().filter(|layer| !wrapper(layer)).collect();
+  if kept.is_empty() {
+    return layers.join(": ");
+  }
+  kept
+    .iter()
+    .map(|layer| layer.as_str())
+    .collect::<Vec<_>>()
+    .join(": ")
+}
+
+/// `Connection refused`, without the `(os error 111)` the platform's own number adds.
+fn without_os_error(text: String) -> String {
+  match text.rfind(" (os error ") {
+    Some(at) if text.ends_with(')') => text[..at].to_string(),
+    _ => text,
+  }
 }
 
 /// A URL as today's verifier reads one, by the WHATWG URL standard, which percent-encodes what a

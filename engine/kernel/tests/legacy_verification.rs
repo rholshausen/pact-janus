@@ -1437,7 +1437,8 @@ fn a_run_asked_to_stop_on_its_first_failure_replays_nothing_after_it() {
   assert_eq!(summary["stopped"], json!("first-failure"));
   assert_eq!(
     summary["variants"],
-    json!({ "total": 1, "verified": 0, "failed": 1, "state-unavailable": 0, "skipped": 0 })
+    json!({ "total": 1, "verified": 0, "failed": 1, "state-unavailable": 0, "skipped": 0, "not-run": 2 }),
+    "what it reached, and the two it did not"
   );
   assert!(
     summary.get("aborted").is_none(),

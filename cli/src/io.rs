@@ -38,7 +38,7 @@ fn read_identified(
     return Ok(vec![(path.display().to_string(), read_json(path)?)]);
   }
   let mut entries: Vec<_> = std::fs::read_dir(path)
-    .map_err(|err| format!("{}: {err}", path.display()))?
+    .map_err(|err| format!("{}: {}", path.display(), io_error(&err)))?
     .filter_map(Result::ok)
     .map(|entry| entry.path())
     .filter(|entry| entry.extension().and_then(|e| e.to_str()) == Some("json"))
@@ -47,7 +47,7 @@ fn read_identified(
   let mut documents = Vec::new();
   for entry in entries {
     let name = entry.display().to_string();
-    let bytes = std::fs::read(&entry).map_err(|err| format!("{name}: {err}"))?;
+    let bytes = std::fs::read(&entry).map_err(|err| format!("{name}: {}", io_error(&err)))?;
     match serde_json::from_slice::<Value>(&bytes) {
       Ok(document) if keep(&bytes, &document) => documents.push((name, document)),
       _ => tracing::debug!(file = %name, "not {what}; skipped"),
@@ -75,13 +75,25 @@ fn is_verifiable(bytes: &[u8], document: &Value) -> bool {
 /// for the same reason: these documents carry hand-written prose — a hook's purpose, an
 /// exemption's `reason` — and YAML is where prose is bearable.
 pub fn read_config(path: &Path) -> Result<Value, String> {
-  let text = std::fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
+  let text =
+    std::fs::read_to_string(path).map_err(|err| format!("{}: {}", path.display(), io_error(&err)))?;
   serde_yaml_ng::from_str(&text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
 pub fn read_json(path: &Path) -> Result<Value, String> {
-  let text = std::fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
-  serde_json::from_str(&text).map_err(|err| format!("{}: {err}", path.display()))
+  let text =
+    std::fs::read_to_string(path).map_err(|err| format!("{}: {}", path.display(), io_error(&err)))?;
+  serde_json::from_str(&text).map_err(|err| format!("{}: not JSON: {err}", path.display()))
+}
+
+/// An I/O error as a person reads it: `No such file or directory`, without the `(os error 2)` the
+/// platform's own number adds.
+pub fn io_error(err: &std::io::Error) -> String {
+  let text = err.to_string();
+  match text.rfind(" (os error ") {
+    Some(at) if text.ends_with(')') => text[..at].to_string(),
+    _ => text,
+  }
 }
 
 /// The documents at every path, in the order given, failing when there are none at all: a run

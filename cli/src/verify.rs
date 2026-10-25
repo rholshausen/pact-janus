@@ -100,6 +100,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   let stream = started["stream"].as_str().unwrap_or_default().to_string();
 
   let text = args.output == Output::Text;
+  let mut reporter = Reporter::default();
   let summary = loop {
     let polled = engine::call(
       &mut engine,
@@ -114,7 +115,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     let mut last = None;
     for event in events {
       if text {
-        report(&event);
+        reporter.report(&event);
       }
       if event["last"] == json!(true) {
         last = Some(event["payload"].clone());
@@ -125,11 +126,23 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     }
   };
 
-  if text {
+  // A run the engine ended before it had anything to count — a broker or a URL it could not fetch,
+  // no pacts selected, a variant nothing records — did not run, and says why as any command that
+  // could not run does: exit 2, not an answer about the provider (staged plan S1.29).
+  let tallied = summary["variants"].is_object();
+  if text && tallied {
     outln!();
     outln!("{}", render_summary(&summary));
-  } else {
+  } else if !text {
     outln!("{}", crate::output::pretty(&summary));
+  }
+  if !tallied {
+    return Err(Error::Failed(
+      match summary.get("error").filter(|e| !e.is_null()) {
+        Some(error) => engine::render_error(error),
+        None => "the run ended before it verified anything".to_string(),
+      },
+    ));
   }
   // A filtered run did what it was asked: its summary says it is not a pass, and its result is not
   // published (ADR 0041 decision 5).
@@ -180,7 +193,8 @@ fn provider_options(args: &VerifyArgs) -> Result<Value, Error> {
   }
 
   let pem = |flag: &str, path: &std::path::Path| {
-    std::fs::read_to_string(path).map_err(|err| Error::from(format!("{flag} {}: {err}", path.display())))
+    std::fs::read_to_string(path)
+      .map_err(|err| Error::from(format!("{flag} {}: {}", path.display(), io::io_error(&err))))
   };
   let mut client = serde_json::Map::new();
   let mut tls = serde_json::Map::new();
@@ -537,135 +551,189 @@ fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
   Ok(source)
 }
 
-/// One event, rendered. The vocabulary is open (spec §9.6), so an unrecognised kind is *printed*
-/// rather than dropped: a host that silently ignored an event kind it did not know would hide
-/// exactly the information a newer engine added to tell it something.
-fn report(event: &Value) {
-  let payload = &event["payload"];
-  match event["kind"].as_str().unwrap_or_default() {
-    "verification/started" => {
-      let providers = join(&payload["providers"]);
-      let formats = join(&payload["formats"]);
-      outln!(
-        "Verifying {} interaction(s) in {} document(s) [{formats}] against {providers}",
-        payload["interactions"],
-        payload["contracts"]
-      );
-      if payload["filtered"] == json!(true) {
-        outln!("  (filtered run: not every recorded variant will be replayed)");
-      }
-      outln!();
-    }
-    "verification/interaction-result" => {
-      let description = payload["interaction"]["description"].as_str().unwrap_or("?");
-      let variant = payload["variant"].as_str().unwrap_or("?");
-      match payload["status"].as_str().unwrap_or("failed") {
-        "verified" => outln!("  ok      {description} [{variant}]"),
-        "state-unavailable" => {
-          outln!("  STATE   {description} [{variant}]");
-          outln!("          the provider cannot reach a state this contract declares");
-          print_error(&payload["error"]);
-        }
-        _ if payload["pending"] == json!(true) => {
-          outln!("  PENDING {description} [{variant}]");
-          outln!("          failed, and pending: reported, and not failing the run");
-          for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
-            outln!(
-              "          {}: {}",
-              mismatch["path"].as_str().unwrap_or(""),
-              mismatch["message"].as_str().unwrap_or("")
-            );
-          }
-          print_error(&payload["error"]);
-        }
-        _ => {
-          outln!("  FAILED  {description} [{variant}]");
-          for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
-            outln!(
-              "          {}: {}",
-              mismatch["path"].as_str().unwrap_or(""),
-              mismatch["message"].as_str().unwrap_or("")
-            );
-          }
-          print_error(&payload["error"]);
-        }
-      }
-    }
-    "verification/fetched" => {
-      let pacts = payload["pacts"].as_array().cloned().unwrap_or_default();
-      outln!(
-        "Fetched {} pact(s) from {}",
-        pacts.len(),
-        payload["broker"].as_str().unwrap_or("the broker")
-      );
-      for pact in &pacts {
-        let consumer = pact["consumer"].as_str().unwrap_or("?");
-        let status = match (pact["wip"] == json!(true), pact["pending"] == json!(true)) {
-          (true, _) => " (work in progress, pending)",
-          (false, true) => " (pending)",
-          _ => "",
-        };
-        outln!("  {consumer}{status}");
-        for notice in pact["notices"].as_array().into_iter().flatten() {
-          outln!("    {}", notice.as_str().unwrap_or_default());
-        }
-      }
-      outln!();
-    }
-    "verification/published" => {
-      let consumer = payload["consumer"].as_str().unwrap_or("?");
-      let version = payload["provider-version"].as_str().unwrap_or("?");
-      match payload["outcome"].as_str() {
-        Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
-        Some("skipped") => match payload["reason"].as_str() {
-          Some("not-from-a-broker") => {
-            outln!("  not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
-          }
-          _ => outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out"),
-        },
-        _ => {
-          outln!("  PUBLISH FAILED for {consumer}'s result");
-          print_error(&payload["error"]);
-        }
-      }
-    }
-    "verification/warning" => {
-      let code = payload["code"].as_str().unwrap_or("warning");
-      match (payload["target"].as_str(), payload["message"].as_str()) {
-        (Some(target), Some(message)) => outln!("  warn    {code} at {target}: {message}"),
-        (None, Some(message)) => outln!("  warn    {code}: {message}"),
-        _ => outln!("  warn    {code}"),
-      }
-    }
-    // `--explain-failures` is this event arriving: the executed plan for the variant that just
-    // failed, printed where the failure is, rather than left for a second command to re-derive.
-    "verification/executed-plan" => {
-      outln!();
-      outln!(
-        "  --- executed plan: {} [{}] ---",
-        payload["interaction"]["description"].as_str().unwrap_or("?"),
-        payload["variant"].as_str().unwrap_or("?")
-      );
-      for line in highlight::plan(payload["text"].as_str().unwrap_or("")).lines() {
-        outln_styled!("  {line}");
-      }
-      outln!();
-    }
-    "verification/hook" => {
-      let outcome = payload["outcome"].as_str().unwrap_or("ok");
-      if outcome != "continue" && outcome != "ok" {
+/// What `janus verify` prints as a run's events arrive.
+///
+/// A hook that fails an exchange, or finds its state unreachable, is reported by the result that
+/// follows it too, so its event is held and printed under that result's line, once, where a reader
+/// looks for why the interaction failed. A hook that aborts the run is the summary's headline, and
+/// is printed there.
+#[derive(Default)]
+struct Reporter {
+  held_hook: Option<Value>,
+}
+
+impl Reporter {
+  /// One event, rendered. The vocabulary is open (spec §9.6), so an unrecognised kind is *printed*
+  /// rather than dropped: a host that silently ignored an event kind it did not know would hide
+  /// exactly the information a newer engine added to tell it something.
+  fn report(&mut self, event: &Value) {
+    let payload = &event["payload"];
+    match event["kind"].as_str().unwrap_or_default() {
+      "verification/started" => {
+        let providers = join(&payload["providers"]);
+        let formats = join(&payload["formats"]);
         outln!(
-          "  hook    {} at {}: {outcome}",
-          payload["hook"].as_str().unwrap_or("?"),
-          payload["point"].as_str().unwrap_or("?")
+          "Verifying {} in {} [{formats}] against {providers}",
+          count(&payload["interactions"], "interaction", "interactions"),
+          count(&payload["contracts"], "document", "documents"),
         );
-        print_error(&payload["error"]);
+        if payload["filtered"] == json!(true) {
+          outln!("  (filtered run: not every recorded variant will be replayed)");
+        }
+        outln!();
       }
+      "verification/interaction-result" => self.result(payload),
+      "verification/fetched" => {
+        let pacts = payload["pacts"].as_array().cloned().unwrap_or_default();
+        outln!(
+          "Fetched {} from {}",
+          count(&json!(pacts.len()), "pact", "pacts"),
+          payload["broker"].as_str().unwrap_or("the broker")
+        );
+        for pact in &pacts {
+          let consumer = pact["consumer"].as_str().unwrap_or("?");
+          let status = match (pact["wip"] == json!(true), pact["pending"] == json!(true)) {
+            (true, _) => " (work in progress, pending)",
+            (false, true) => " (pending)",
+            _ => "",
+          };
+          outln!("  {consumer}{status}");
+          for notice in pact["notices"].as_array().into_iter().flatten() {
+            outln!("    {}", notice.as_str().unwrap_or_default());
+          }
+        }
+        outln!();
+      }
+      "verification/published" => {
+        let consumer = payload["consumer"].as_str().unwrap_or("?");
+        let version = payload["provider-version"].as_str().unwrap_or("?");
+        match payload["outcome"].as_str() {
+          Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
+          Some("skipped") => match payload["reason"].as_str() {
+            Some("not-from-a-broker") => {
+              outln!("  not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
+            }
+            _ => {
+              outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out")
+            }
+          },
+          _ => {
+            outln!("  PUBLISH FAILED for {consumer}'s result");
+            print_error(&payload["error"]);
+          }
+        }
+      }
+      "verification/warning" => {
+        let code = payload["code"].as_str().unwrap_or("warning");
+        match (payload["target"].as_str(), payload["message"].as_str()) {
+          (Some(target), Some(message)) => outln!("  warn    {code} at {target}: {message}"),
+          (None, Some(message)) => outln!("  warn    {code}: {message}"),
+          _ => outln!("  warn    {code}"),
+        }
+      }
+      // `--explain-failures` is this event arriving: the executed plan for the variant that just
+      // failed, printed where the failure is, rather than left for a second command to re-derive.
+      "verification/executed-plan" => {
+        outln!();
+        outln!(
+          "  --- executed plan: {}{} ---",
+          payload["interaction"]["description"].as_str().unwrap_or("?"),
+          variant_label(payload)
+        );
+        for line in highlight::plan(payload["text"].as_str().unwrap_or("")).lines() {
+          outln_styled!("  {line}");
+        }
+        outln!();
+      }
+      "verification/hook" => {
+        let outcome = payload["outcome"].as_str().unwrap_or("ok");
+        if outcome == "continue" || outcome == "ok" {
+          return;
+        }
+        match payload["effect"].as_str() {
+          Some("failed-exchange" | "state-unavailable") => self.held_hook = Some(payload.clone()),
+          // Its error is the summary's headline, where the run's end is explained.
+          Some("aborted-run") => outln!(
+            "  hook    {} at {}: {}, and aborted the run",
+            payload["hook"].as_str().unwrap_or("?"),
+            payload["point"].as_str().unwrap_or("?"),
+            outcome
+          ),
+          _ => {
+            print_hook(payload, "  hook    ");
+            print_error(&payload["error"]);
+          }
+        }
+      }
+      // The result line that follows says everything these two carry; printing them as well would
+      // double every run's output for no reader's benefit.
+      "verification/interaction-started" | "verification/finished" => {}
+      other => outln!("  event   {other}: {payload}"),
     }
-    // The result line that follows says everything these two carry; printing them as well would
-    // double every run's output for no reader's benefit.
-    "verification/interaction-started" | "verification/finished" => {}
-    other => outln!("  event   {other}: {payload}"),
+  }
+
+  fn result(&mut self, payload: &Value) {
+    let line = format!(
+      "{}{}",
+      payload["interaction"]["description"].as_str().unwrap_or("?"),
+      variant_label(payload)
+    );
+    match payload["status"].as_str().unwrap_or("failed") {
+      "verified" => outln!("  ok      {line}"),
+      "state-unavailable" => {
+        outln!("  STATE   {line}");
+        outln!("          the provider cannot reach a state this contract declares");
+      }
+      _ if payload["pending"] == json!(true) => {
+        outln!("  PENDING {line}");
+        outln!("          failed, and pending: reported, and not failing the run");
+      }
+      _ => outln!("  FAILED  {line}"),
+    }
+    for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
+      outln!(
+        "          {}: {}",
+        mismatch["path"].as_str().unwrap_or(""),
+        mismatch["message"].as_str().unwrap_or("")
+      );
+    }
+    // The hook's error is the result's: said once, after which hook it was.
+    if let Some(hook) = self.held_hook.take() {
+      print_hook(&hook, "          ");
+    }
+    print_error(&payload["error"]);
+  }
+}
+
+/// `hook auth at before-request: failed`, after `indent`.
+fn print_hook(payload: &Value, indent: &str) {
+  outln!(
+    "{indent}{} at {}: {}",
+    payload["hook"].as_str().unwrap_or("?"),
+    payload["point"].as_str().unwrap_or("?"),
+    payload["outcome"].as_str().unwrap_or("?")
+  );
+}
+
+/// ` [shipped]`, the variant a result is about, or nothing for a v1–v4 pact's: one example is one
+/// variant, always `base`, and naming it on every line says nothing.
+fn variant_label(payload: &Value) -> String {
+  let pact = payload["interaction"]["format"]
+    .as_str()
+    .is_some_and(|format| format.starts_with("pact/"));
+  match payload["variant"].as_str() {
+    Some(_) if pact => String::new(),
+    Some(variant) => format!(" [{variant}]"),
+    None => String::new(),
+  }
+}
+
+/// `1 interaction`, `2 interactions`.
+fn count(n: &Value, one: &str, many: &str) -> String {
+  match n.as_u64() {
+    Some(1) => format!("1 {one}"),
+    Some(n) => format!("{n} {many}"),
+    None => format!("? {many}"),
   }
 }
 
@@ -681,38 +749,40 @@ fn print_error(error: &Value) {
   );
 }
 
+/// `FAILED: 0 verified, 2 failed (2 interactions)`: what the run reached, the tallies that are not
+/// zero beside the two that always matter, and how much there was. Variants are named only when
+/// there are more of them than interactions, as there are only in a contract.
 fn render_summary(summary: &Value) -> String {
   let status = summary["status"].as_str().unwrap_or("failed").to_uppercase();
   let variants = &summary["variants"];
-  let mut text = if variants.is_object() {
-    // `variants.total` counts what the run reached. An aborted run reached less than it planned,
-    // and the rest is in the hook report as not run (lifecycle-hooks spec §10.2) — counted beside
-    // the tallies, never folded into them, so "of 0 variant(s)" does not read as a run with nothing
-    // in it.
-    let not_run = summary["hooks"]["aborted"]["exchanges-not-run"]
-      .as_u64()
-      .unwrap_or(0);
-    format!(
-      "{status}: {} verified, {} failed, {} state-unavailable, {} skipped{} (of {} variant(s) across {} interaction(s))",
-      variants["verified"],
-      variants["failed"],
-      variants["state-unavailable"],
-      variants["skipped"],
-      if not_run > 0 {
-        format!(", {not_run} not run")
-      } else {
-        String::new()
-      },
-      variants["total"].as_u64().unwrap_or(0) + not_run,
-      summary["interactions"],
-    )
+  let tally = |name: &str| variants[name].as_u64().unwrap_or(0);
+  let mut counts = vec![
+    format!("{} verified", tally("verified")),
+    format!("{} failed", tally("failed")),
+  ];
+  for (name, label) in [
+    ("state-unavailable", "state-unavailable"),
+    ("skipped", "skipped"),
+    // `variants.total` counts what the run reached; an aborted or stopped run reached less than it
+    // planned, and the rest is counted beside the tallies, never folded into them.
+    ("not-run", "not run"),
+  ] {
+    if tally(name) > 0 {
+      counts.push(format!("{} {label}", tally(name)));
+    }
+  }
+  let total = tally("total") + tally("not-run");
+  let interactions = summary["interactions"].as_u64().unwrap_or(0);
+  let scope = if total == interactions {
+    count(&json!(interactions), "interaction", "interactions")
   } else {
-    // A run the engine could not complete has no tallies to report (protocol spec §9.6).
     format!(
-      "{status}: the run did not complete ({} interaction(s) in {} document(s))",
-      summary["interactions"], summary["contracts"]
+      "{} across {}",
+      count(&json!(total), "variant", "variants"),
+      count(&json!(interactions), "interaction", "interactions")
     )
   };
+  let mut text = format!("{status}: {} ({scope})", counts.join(", "));
   if summary["filtered"] == json!(true) {
     text.push_str("\nThis was a filtered run: unreplayed variants are not passing ones.");
   }
@@ -735,12 +805,6 @@ fn render_summary(summary: &Value) -> String {
       None => text.push('.'),
     }
   }
-  if let Some(error) = summary.get("error").filter(|e| !e.is_null()) {
-    text.push_str(&format!(
-      "\nThe engine stopped the run:\n  {}",
-      engine::render_error(error).replace('\n', "\n  ")
-    ));
-  }
   text
 }
 
@@ -759,26 +823,40 @@ fn join(value: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
-  use super::render_summary;
+  use super::{render_summary, variant_label};
   use pretty_assertions::assert_eq;
   use serde_json::json;
 
-  /// A run the engine could not complete ends with a summary that has no tallies, and an error
-  /// (protocol spec §9.6). It reads as a failure with its cause, not as a run of nulls.
+  /// The tallies that are zero are left out, but for the two that always matter; variants are named
+  /// only when there are more of them than interactions.
   #[test]
-  fn a_run_that_did_not_complete_says_so_and_why() {
-    let summary = json!({
-      "status": "failed",
-      "contracts": 1,
-      "interactions": 2,
-      "error": { "code": "internal", "message": "the verification run stopped unexpectedly: boom" },
+  fn a_summary_says_what_the_run_reached_and_how_much_there_was() {
+    let pact_run = json!({
+      "status": "failed", "interactions": 2,
+      "variants": { "total": 2, "verified": 0, "failed": 2, "state-unavailable": 0, "skipped": 0 },
     });
     assert_eq!(
-      render_summary(&summary),
-      "FAILED: the run did not complete (2 interaction(s) in 1 document(s))\n\
-       The engine stopped the run:\n  \
-       internal: the verification run stopped unexpectedly: boom"
+      render_summary(&pact_run),
+      "FAILED: 0 verified, 2 failed (2 interactions)"
     );
+
+    let contract_run = json!({
+      "status": "failed", "interactions": 1, "stopped": "first-failure",
+      "variants": { "total": 2, "verified": 1, "failed": 1, "state-unavailable": 1, "skipped": 0, "not-run": 3 },
+    });
+    assert_eq!(
+      render_summary(&contract_run),
+      "FAILED: 1 verified, 1 failed, 1 state-unavailable, 3 not run (5 variants across 1 interaction)\n\
+       The run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run."
+    );
+  }
+
+  #[test]
+  fn a_pacts_one_variant_goes_unnamed() {
+    let pact = json!({ "interaction": { "format": "pact/3.0.0" }, "variant": "base" });
+    let contract = json!({ "interaction": { "format": "janus-contract/1" }, "variant": "shipped" });
+    assert_eq!(variant_label(&pact), "");
+    assert_eq!(variant_label(&contract), " [shipped]");
   }
 }
 

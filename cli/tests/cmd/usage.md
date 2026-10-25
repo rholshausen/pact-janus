@@ -165,7 +165,7 @@ For more information, try '--help'.
 ```console
 $ janus explain pact.json --index first
 ? 2
-error: invalid value 'first' for '--index <N>': invalid digit found in string
+error: invalid value 'first' for '--index <N>': not a position: it must be a whole number, counting from 0
 
 For more information, try '--help'.
 

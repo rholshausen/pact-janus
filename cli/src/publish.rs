@@ -66,8 +66,11 @@ pub fn run(args: &PublishArgs) -> Result<Outcome, Error> {
     }
     if text {
       outln!(
-        "Publishing {} contract(s) for {consumer} version {}",
-        contracts.len(),
+        "Publishing {} for {consumer} version {}",
+        match contracts.len() {
+          1 => "1 contract".to_string(),
+          n => format!("{n} contracts"),
+        },
         args.consumer_app_version
       );
     }

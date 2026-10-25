@@ -35,6 +35,9 @@ use std::time::Duration;
 /// excerpt").
 const BODY_EXCERPT: usize = 1024;
 
+/// How much of a failed reply's body its error message quotes: a line's worth.
+const MESSAGE_EXCERPT: usize = 200;
+
 /// How many times a state call is tried again by default (ADR 0044): today's verifier's design,
 /// three attempts in all.
 const STATE_RETRIES: u32 = 2;
@@ -205,12 +208,19 @@ impl HookInvoker for HttpHooks {
     let text = String::from_utf8_lossy(response.body()).to_string();
 
     if !(200..300).contains(&status) {
+      // The body is usually why: say it in the message, as the oauth2 hook does for its token
+      // endpoint, and not only in the details a person reading text never sees.
+      let body = excerpt(&text);
+      let message = match text.trim() {
+        "" => format!("{shown} answered {status}"),
+        text => format!("{shown} answered {status}: {}", cut(text, MESSAGE_EXCERPT)),
+      };
       return Ok(InvokeResult {
         outcome: Some(Outcome::Failed),
         error: Some(json!({
           "code": "hook-http-failed",
-          "message": format!("{shown} answered {status}"),
-          "details": { "status": status, "body": excerpt(&text) },
+          "message": message,
+          "details": { "status": status, "body": body },
         })),
         ..InvokeResult::default()
       });
@@ -463,18 +473,31 @@ fn state_change_body(context: &Value) -> Value {
 }
 
 fn excerpt(text: &str) -> String {
-  let end = text
-    .char_indices()
-    .map(|(i, _)| i)
-    .take_while(|i| *i <= BODY_EXCERPT)
-    .last()
-    .unwrap_or(0);
-  text[..end].to_string()
+  cut(text, BODY_EXCERPT)
+}
+
+/// `text`, or its first `max` bytes at a character boundary and an ellipsis when it is longer.
+fn cut(text: &str, max: usize) -> String {
+  if text.len() <= max {
+    return text.to_string();
+  }
+  let mut end = max;
+  while !text.is_char_boundary(end) {
+    end -= 1;
+  }
+  format!("{}…", &text[..end])
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn an_excerpt_keeps_a_short_body_whole_and_cuts_a_long_one_at_a_character() {
+    assert_eq!(cut(r#"{"error":"not-found"}"#, 200), r#"{"error":"not-found"}"#);
+    assert_eq!(cut("ééé", 3), "é…");
+    assert_eq!(cut("abc", 3), "abc");
+  }
 
   #[test]
   fn the_state_change_body_is_the_v3_document_and_nothing_else() {

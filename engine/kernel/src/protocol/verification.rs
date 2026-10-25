@@ -1100,6 +1100,14 @@ fn run(
     Some(broker) => publish(broker, &sources, &ran, &narrowed, &tally, &stream),
     None => vec![],
   };
+  // Everything a run that ended early did not reach is counted as not run, never folded into the
+  // failed tally (spec §10.2): a verification that stopped early and one that failed are different
+  // results.
+  let not_run = if aborted.is_some() || stopped {
+    variants.saturating_sub(tally.verified + tally.failed + tally.state_unavailable + tally.skipped)
+  } else {
+    0
+  };
   let report = Report {
     tally: &tally,
     sources: &sources,
@@ -1108,6 +1116,7 @@ fn run(
     hooks: None,
     aborted: &aborted,
     stopped,
+    not_run,
     pending: broker
       .as_ref()
       .map(|broker| broker.fetched.iter().map(|fetched| fetched.pending).collect()),
@@ -1115,13 +1124,10 @@ fn run(
     ran: &ran,
   };
 
-  if aborted.is_some() || stopped {
-    // Everything the run did not reach is counted as not run, never folded into the failed tally
-    // (spec §10.2): a verification that stopped early and one that failed are different results.
-    let not_run = variants.saturating_sub(tally.verified + tally.failed + tally.state_unavailable);
-    if let Some(runner) = hooks.as_mut() {
-      runner.note_exchanges_not_run(not_run);
-    }
+  if (aborted.is_some() || stopped)
+    && let Some(runner) = hooks.as_mut()
+  {
+    runner.note_exchanges_not_run(not_run);
   }
 
   // `after-verification` runs once, after the last exchange, **whether the run passed, failed or
@@ -1395,6 +1401,8 @@ struct Report<'a> {
   aborted: &'a Option<Abort>,
   /// The run ended at its first failure (ADR 0053).
   stopped: bool,
+  /// For a run that ended early, aborted or stopped: the variants it did not reach.
+  not_run: usize,
   /// For a broker source: per source, whether it was pending.
   pending: Option<Vec<bool>>,
   /// For a run that published: per source, what happened.
@@ -1453,6 +1461,10 @@ fn summary(report: &Report<'_>) -> Value {
     },
     "failures": tally.failures,
   });
+  // A run that ended early says what it did not reach, beside what it did (spec §9.6).
+  if aborted.is_some() || report.stopped {
+    summary["variants"]["not-run"] = json!(report.not_run);
+  }
   let map = summary.as_object_mut().expect("a json! object literal");
   // Positionally beside `consumers` (spec §9.6): which sources were pending, so a reader can tell
   // a pending pact's failures from the ones that fail the run.

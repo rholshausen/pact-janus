@@ -41,3 +41,12 @@ pub fn push_pointer_segment(pointer: &mut String, segment: &str) {
   pointer.push('/');
   pointer.push_str(&segment.replace('~', "~0").replace('/', "~1"));
 }
+
+/// An error's text as a person reads it: `Connection refused`, without the `(os error 111)` the
+/// platform's own number adds. For components and loaders that quote an I/O error in a message.
+pub fn without_os_error(text: &str) -> &str {
+  match text.rfind(" (os error ") {
+    Some(at) if text.ends_with(')') => &text[..at],
+    _ => text,
+  }
+}

@@ -647,13 +647,10 @@ fn error(broker: &BrokerDescriptor, code: &str, message: String, details: Value)
   }
 }
 
+/// The code says the broker could not be reached; the message says which request, and why. A pact
+/// fetched by its URL comes through here too, from wherever it is served.
 fn unreachable(broker: &BrokerDescriptor, message: &str) -> ComponentError {
-  error(
-    broker,
-    "broker-unreachable",
-    format!("the Pact Broker could not be reached: {message}"),
-    json!({}),
-  )
+  error(broker, "broker-unreachable", message.to_string(), json!({}))
 }
 
 fn refused(broker: &BrokerDescriptor, method: &str, url: &str, status: u16, body: &str) -> ComponentError {

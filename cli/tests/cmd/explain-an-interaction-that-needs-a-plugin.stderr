@@ -1,2 +1,1 @@
 janus explain: component-unavailable: this interaction needs the pact plugin(s) 'protobuf', and this engine cannot load pact plugins
-  {"component":"pact-plugin/protobuf","plugins":["protobuf"],"reason":"pact-plugin"}

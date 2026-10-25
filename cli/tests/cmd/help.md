@@ -167,8 +167,9 @@ Pact Broker:
           A bearer token for the broker; used instead of --user when both are given [env:
           PACT_BROKER_TOKEN] [alias: --broker-token]
 
-Exit status: 0 verified; 1 the provider failed verification, or the run was aborted; 2 the command
-could not run.
+Exit status: 0 verified, or a filtered run that nothing failed; 1 the provider failed verification,
+or the run was aborted; 2 the command could not run, which includes pacts a broker or URL could not
+supply.
 
 ```
 

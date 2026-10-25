@@ -96,31 +96,30 @@ fn locate<'f>(error: &mut Value, files: &'f [String]) -> Option<&'f str> {
   Some(file)
 }
 
-/// An engine error as a line a user can act on.
+/// An engine error as a line a user can act on: the code first, because that is the part a user
+/// can look up, then the message, then each problem at its position.
+///
+/// A component's failure leads with the component's own code and message (protocol spec §10.2:
+/// `component-failed` carries the component's error), since that is what failed; the engine's
+/// wrapper only says that a component did. Other `details` are for programs, and are left to
+/// `--output json`: every message says in words what a person needs from them.
 pub fn render_error(error: &Value) -> String {
-  let code = error["code"].as_str().unwrap_or("internal");
-  let mut text = match error["message"].as_str() {
+  let component = &error["details"]["error"];
+  let (code, message) = match (error["code"].as_str(), component["code"].as_str()) {
+    (Some("component-failed"), Some(code)) => (code, component["message"].as_str()),
+    (code, _) => (code.unwrap_or("internal"), error["message"].as_str()),
+  };
+  let mut text = match message {
     Some(message) => format!("{code}: {message}"),
     None => code.to_string(),
   };
-  // `component-failed` carries the component's own error (protocol spec §10.2), whose message the
-  // engine's already includes; its code is the one thing the message does not say.
-  let component_code = error["details"]["error"]["code"]
-    .as_str()
-    .filter(|_| code == "component-failed");
-  if let Some(component_code) = component_code {
-    text.push_str(&format!(" [{component_code}]"));
-  } else if let Some(problems) = error["details"]["problems"].as_array() {
-    for problem in problems {
-      let message = problem["message"].as_str().unwrap_or("");
-      // An empty pointer is the whole document, which needs no position.
-      match problem["pointer"].as_str().filter(|pointer| !pointer.is_empty()) {
-        Some(pointer) => text.push_str(&format!("\n  {pointer}: {message}")),
-        None => text.push_str(&format!("\n  {message}")),
-      }
+  for problem in error["details"]["problems"].as_array().into_iter().flatten() {
+    let message = problem["message"].as_str().unwrap_or("");
+    // An empty pointer is the whole document, which needs no position.
+    match problem["pointer"].as_str().filter(|pointer| !pointer.is_empty()) {
+      Some(pointer) => text.push_str(&format!("\n  {pointer}: {message}")),
+      None => text.push_str(&format!("\n  {message}")),
     }
-  } else if let Some(details) = error.get("details").filter(|d| !d.is_null()) {
-    text.push_str(&format!("\n  {details}"));
   }
   text
 }

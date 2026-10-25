@@ -575,6 +575,14 @@ impl Oci {
       };
       match sent {
         Ok(Ok(response)) => Ok(response),
+        // ureq says "io: " in front of a socket's own error, which names nothing a reader needs.
+        Ok(Err(ureq::Error::Io(err))) => Err(unreachable_registry(
+          reference,
+          &format!(
+            "could not reach the registry: {}",
+            pact_janus_kernel::error::without_os_error(&err.to_string())
+          ),
+        )),
         Ok(Err(err)) => Err(unreachable_registry(reference, &err.to_string())),
         Err(err) => Err(unreachable_registry(
           reference,

@@ -52,7 +52,8 @@ pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
   let contract = canonical(&result["contract"])?;
   match &args.write {
     Some(path) => {
-      std::fs::write(path, &contract).map_err(|err| format!("writing {}: {err}", path.display()))?;
+      std::fs::write(path, &contract)
+        .map_err(|err| format!("writing {}: {}", path.display(), io::io_error(&err)))?;
       errln!("janus upgrade: wrote {}", path.display());
     }
     None => crate::output::out_bytes(&contract),

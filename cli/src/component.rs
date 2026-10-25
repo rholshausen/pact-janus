@@ -34,7 +34,8 @@ pub fn run(command: &ComponentCommand) -> Result<Outcome, Error> {
 }
 
 fn push(loader: &WasmLoader, args: &PushArgs, credentials: Option<&Credentials>) -> Result<Outcome, Error> {
-  let wasm = std::fs::read(&args.component).map_err(|err| format!("{}: {err}", args.component.display()))?;
+  let wasm = std::fs::read(&args.component)
+    .map_err(|err| format!("{}: {}", args.component.display(), crate::io::io_error(&err)))?;
   let pushed = match loader.push(&wasm, &args.reference, credentials) {
     Ok(pushed) => pushed,
     Err(err) => return refused(err, credentials.is_some()),
@@ -143,7 +144,8 @@ fn refused(err: ComponentError, credentials: bool) -> Result<Outcome, Error> {
   if err.code == "unauthorized" && !credentials {
     message.push_str("; set JANUS_OCI_USERNAME and JANUS_OCI_PASSWORD");
   }
-  let message = format!("{message} ({})", err.code);
+  // Code first, as every other error the CLI prints is.
+  let message = format!("{}: {message}", err.code);
   match err.code.as_str() {
     "digest-mismatch" | "not-a-component" | "artifact-mismatch" => Err(Error::Refused(message)),
     _ => Err(Error::Failed(message)),

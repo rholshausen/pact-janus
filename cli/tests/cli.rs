@@ -280,13 +280,13 @@ fn a_request_the_provider_cannot_answer_is_reported_on_one_line() {
   let text = stdout(&output);
   let failures: Vec<&str> = text
     .lines()
-    .filter(|line| line.contains("component-failed"))
+    .filter(|line| line.trim_start().starts_with("transport-failed: "))
     .collect();
   assert_eq!(failures.len(), 2, "{text}");
   assert!(
     failures
       .iter()
-      .all(|line| line.contains("no answer within 500 ms") && line.ends_with("[transport-failed]")),
+      .all(|line| line.ends_with("no answer within 500 ms")),
     "{text}"
   );
   assert!(!text.contains(r#"{"component""#), "{text}");
@@ -341,12 +341,12 @@ fn verify_replays_a_v3_pact_at_a_running_provider_and_exits_zero() {
   assert_data_eq!(
     stdout(&output),
     str![[r#"
-Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+Verifying 2 interactions in 1 document [pact/3.0.0] against order-service
 
-  ok      a request for an order [base]
-  ok      a request for an order that does not exist [base]
+  ok      a request for an order
+  ok      a request for an order that does not exist
 
-VERIFIED: 2 verified, 0 failed, 0 state-unavailable, 0 skipped (of 2 variant(s) across 2 interaction(s))
+VERIFIED: 2 verified, 0 failed (2 interactions)
 
 "#]]
   );
@@ -373,13 +373,13 @@ fn verify_exits_one_and_names_the_position_when_the_provider_disagrees() {
   assert_data_eq!(
     stdout(&output),
     str![[r#"
-Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+Verifying 2 interactions in 1 document [pact/3.0.0] against order-service
 
-  FAILED  a request for an order [base]
+  FAILED  a request for an order
           $.response.body.status: Expected 'SHIPPED' to equal 'CANCELLED'
-  ok      a request for an order that does not exist [base]
+  ok      a request for an order that does not exist
 
-FAILED: 1 verified, 1 failed, 0 state-unavailable, 0 skipped (of 2 variant(s) across 2 interaction(s))
+FAILED: 1 verified, 1 failed (2 interactions)
 
 "#]]
   );
@@ -473,8 +473,7 @@ fn a_variant_no_document_records_is_refused() {
   assert_data_eq!(
     stderr(&output),
     str![[r#"
-janus verify: variant-not-found: no document in this run records the variant 'nothing-is-called-this'
-  {"variant":"nothing-is-called-this","recorded":["base"]}
+janus verify: variant-not-found: no document in this run records the variant 'nothing-is-called-this'; they record 'base'
 
 "#]]
   );
@@ -520,7 +519,7 @@ fn a_filtered_run_says_so_in_its_status_and_its_summary() {
   );
   assert!(
     text.contains(
-      "FILTERED: 2 verified, 0 failed, 0 state-unavailable, 1 skipped (of 3 variant(s) across 2 interaction(s))\n\
+      "FILTERED: 2 verified, 0 failed, 1 skipped (3 variants across 2 interactions)\n\
        This was a filtered run: unreplayed variants are not passing ones."
     ),
     "{text}"
@@ -773,6 +772,32 @@ fn a_document_the_engine_refuses_is_named_by_its_file() {
   );
 }
 
+/// A run that could not fetch its pacts verified nothing, and says so as a command that could not
+/// run: exit 2, the reason on standard error, and no summary of a run that did not happen (staged
+/// plan S1.29).
+#[test]
+fn a_broker_nobody_answers_for_is_the_command_failing_to_run() {
+  let output = janus(&[
+    "verify",
+    "--broker-url",
+    "http://127.0.0.1:9",
+    "--provider-name",
+    "order-service",
+    "--provider-url",
+    "http://127.0.0.1:9",
+    "--retries",
+    "0",
+  ]);
+  assert_eq!(code(&output), 2, "{}{}", stdout(&output), stderr(&output));
+  assert_eq!(stdout(&output), "", "{}", stdout(&output));
+  assert!(
+    stderr(&output).starts_with("janus verify: broker-unreachable: GET http://127.0.0.1:9"),
+    "{}",
+    stderr(&output)
+  );
+  assert!(!stderr(&output).contains("os error"), "{}", stderr(&output));
+}
+
 #[test]
 fn verify_json_prints_the_summary_document_a_script_can_read() {
   let provider = provider();
@@ -823,12 +848,11 @@ fn a_run_aborted_by_a_hook_says_what_the_hook_hit() {
   assert_data_eq!(
     stdout(&output),
     str![[r#"
-Verifying 2 interaction(s) in 1 document(s) [pact/3.0.0] against order-service
+Verifying 2 interactions in 1 document [pact/3.0.0] against order-service
 
-  hook    auth at before-verification: failed
-          token-endpoint-unreachable: http://127.0.0.1:[..]/oauth/token: [..]
+  hook    auth at before-verification: failed, and aborted the run
 
-FAILED: 0 verified, 0 failed, 0 state-unavailable, 0 skipped, 2 not run (of 2 variant(s) across 2 interaction(s))
+FAILED: 0 verified, 0 failed, 2 not run (2 interactions)
 The run was aborted by the 'auth' hook at before-verification:
   token-endpoint-unreachable: http://127.0.0.1:[..]/oauth/token: [..]
 
@@ -1015,7 +1039,7 @@ fn verify_takes_todays_filters_and_refuses_one_that_matches_nothing() {
   let text = stdout(&narrowed);
   assert_eq!(code(&narrowed), 0, "{text}{}", stderr(&narrowed));
   assert!(
-    text.contains("FILTERED: 1 verified, 0 failed, 0 state-unavailable, 1 skipped"),
+    text.contains("FILTERED: 1 verified, 0 failed, 1 skipped (2 interactions)"),
     "{text}"
   );
 
@@ -1032,7 +1056,7 @@ fn verify_takes_todays_filters_and_refuses_one_that_matches_nothing() {
     .output()
     .expect("the janus binary runs");
   assert!(
-    stdout(&by_state).contains("FILTERED: 1 verified, 0 failed, 0 state-unavailable, 1 skipped"),
+    stdout(&by_state).contains("FILTERED: 1 verified, 0 failed, 1 skipped (2 interactions)"),
     "{}",
     stdout(&by_state)
   );
@@ -2379,8 +2403,11 @@ fn a_registry_credential_is_declared_reaches_the_registry_and_appears_nowhere_el
   );
   let everything = format!("{}{}", stdout(&refused), stderr(&refused));
   assert_eq!(code(&refused), 2, "{everything}");
-  assert!(everything.contains("unauthorized"), "{everything}");
-  assert!(everything.contains("source's 'auth'"), "{everything}");
+  assert!(everything.contains("401 Unauthorized"), "{everything}");
+  assert!(
+    everything.contains("the registry wants credentials: declare them as the component source's 'auth'"),
+    "{everything}"
+  );
 }
 
 #[test]

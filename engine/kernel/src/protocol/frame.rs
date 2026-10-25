@@ -244,6 +244,16 @@ impl EngineError {
       [_] => format!("no document in this run records the variant {names}"),
       _ => format!("no document in this run records the variants {names}"),
     };
+    // What they do record, in the message as well as the details: it is the remedy.
+    let recorded_names = recorded
+      .iter()
+      .map(|id| format!("'{id}'"))
+      .collect::<Vec<_>>()
+      .join(", ");
+    let message = match recorded {
+      [] => format!("{message}; they record none"),
+      _ => format!("{message}; they record {recorded_names}"),
+    };
     EngineError {
       code: "variant-not-found".to_string(),
       category: "session".to_string(),
@@ -401,10 +411,6 @@ impl EngineError {
     }
   }
 
-  /// `contract-invalid` (contract-file spec §11, §4.2): the session's own state could never
-  /// validly produce a contract — currently only two interactions sharing a description and
-  /// state list. `problems` carries RFC 6901 pointers into the contract that would have been
-  /// written.
   /// `contract-invalid` for a document a host handed in to be read — a source to verify, a pact to
   /// upgrade or explain — that is not a contract or pact this engine can read, at `problems`.
   pub fn document_invalid(problems: &[crate::error::Problem]) -> Self {
@@ -416,6 +422,10 @@ impl EngineError {
     }
   }
 
+  /// `contract-invalid` (contract-file spec §11, §4.2): the session's own state could never
+  /// validly produce a contract — currently only two interactions sharing a description and
+  /// state list. `problems` carries RFC 6901 pointers into the contract that would have been
+  /// written.
   pub fn contract_invalid(problems: &[crate::error::Problem]) -> Self {
     EngineError {
       code: "contract-invalid".to_string(),

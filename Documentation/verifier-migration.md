@@ -245,6 +245,15 @@ hooks:
 | `pact-provider-verifier --log-level`, default `debug`, and `--log-dir` | `--log-level`, default `warn`, on standard error | **Dropped:** `--log-dir`. Logs go to standard error, which a CI job keeps |
 | `pact-provider-verifier --format`/`-f` (`json`, `RspecJunitFormatter`) and `--out`/`-o <FILE>` | `--output json`, redirected | **Not taken:** RSpec's formats, as `--junit` |
 
+### Exit status
+
+| Today | `janus verify` |
+|---|---|
+| 0 every pact verified | 0, and also for a filtered run that nothing failed (ADR 0041) |
+| 1 a verification failed | 1, and also for a run a hook aborted |
+| 1 a pact could not be loaded: a file that cannot be read, a broker or URL that cannot be fetched from, or a broker that selects no pacts, recorded as a failed result | **Differs:** 2, the command could not run, before anything is verified; so is a `--variant` no pact records. A pipeline that only tests for non-zero sees no difference (staged plan S1.29) |
+| 2 a report could not be written, or the verifier itself failed | 2 |
+
 ## Development options
 
 | Today | `janus verify` | Notes |

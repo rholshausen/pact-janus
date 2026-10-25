@@ -49,6 +49,29 @@ fn a_certificate_nothing_trusts_is_refused() {
   assert!(message.contains("certificate"), "{message}");
 }
 
+/// A refused connection is said as its cause, without the layers that only name the library in the
+/// way ("error sending request: client error (Connect): tcp connect error").
+#[test]
+fn a_refused_connection_says_only_why() {
+  // A port that was listening a moment ago, and is not now.
+  let port = TcpListener::bind("127.0.0.1:0")
+    .expect("a free port")
+    .local_addr()
+    .expect("its address")
+    .port();
+  let err = client(json!({}))
+    .run(get(&format!("http://127.0.0.1:{port}/orders")), None)
+    .expect_err("nothing listens there");
+  let SendError::Connect(message) = &err else {
+    panic!("a refused connection is a connect failure: {err}");
+  };
+  assert!(!message.contains("error sending request"), "{message}");
+  assert!(!message.contains("client error"), "{message}");
+  assert!(!message.contains("tcp connect error"), "{message}");
+  assert!(!message.is_empty(), "{message}");
+  assert_eq!(err.to_string(), format!("could not connect: {message}"));
+}
+
 #[test]
 fn insecure_accepts_any_certificate() {
   let authority = Authority::new("Untrusted CA");
