@@ -150,10 +150,12 @@ fn stub_provider(responses: Vec<Canned>) -> (String, Receiver<String>) {
         canned.body.len(),
         canned.body
       );
+      // Reported before the reply: once the client has its answer, a test may read what the stub saw
+      // without waiting, and a report sent after the reply could not be there yet.
+      let _ = tx.send(request_line.trim_end().to_string());
       let stream = reader.get_mut();
       let _ = stream.write_all(response.as_bytes());
       let _ = stream.flush();
-      let _ = tx.send(request_line.trim_end().to_string());
     }
   });
   (base_url, rx)

@@ -77,16 +77,17 @@ fn stub_provider(
       response.push_str(&format!("{name}: {value}\r\n"));
     }
     response.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
-    let stream = reader.get_mut();
-    stream.write_all(response.as_bytes()).unwrap();
-    stream.write_all(&body).unwrap();
-    stream.flush().unwrap();
-
+    // Reported before the reply: once the client has its answer, a test may read what the stub saw
+    // without waiting, and a report sent after the reply could not be there yet.
     let _ = tx.send(Received {
       request_line: request_line.trim_end().to_string(),
       headers,
       body: request_body,
     });
+    let stream = reader.get_mut();
+    stream.write_all(response.as_bytes()).unwrap();
+    stream.write_all(&body).unwrap();
+    stream.flush().unwrap();
   });
 
   (base_url, rx)

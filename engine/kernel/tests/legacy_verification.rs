@@ -261,11 +261,13 @@ fn serve_canned(replies: Vec<Canned>, report: impl Fn(String, Vec<u8>) + Send + 
         head.push_str(&format!("{name}: {value}\r\n"));
       }
       head.push_str("connection: close\r\n\r\n");
+      // Reported before the reply: once the client has its answer, a test may read what the stub saw
+      // without waiting, and a report sent after the reply could not be there yet.
+      report(request_line.trim_end().to_string(), body);
       let stream = reader.get_mut();
       let _ = stream.write_all(head.as_bytes());
       let _ = stream.write_all(&canned.body);
       let _ = stream.flush();
-      report(request_line.trim_end().to_string(), body);
     }
   });
   base_url
@@ -1095,12 +1097,14 @@ fn state_recorder(count: usize) -> (String, Receiver<String>) {
       let _ = reader.read_exact(&mut body);
       let body = String::from_utf8_lossy(&body).to_string();
       let response = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{}";
-      let stream = reader.get_mut();
-      let _ = stream.write_all(response.as_bytes());
-      let _ = stream.flush();
+      // Reported before the reply: once the client has its answer, a test may read what the stub saw
+      // without waiting, and a report sent after the reply could not be there yet.
       if body.contains("\"setup\"") {
         let _ = tx.send(body);
       }
+      let stream = reader.get_mut();
+      let _ = stream.write_all(response.as_bytes());
+      let _ = stream.flush();
     }
   });
   (url, rx)

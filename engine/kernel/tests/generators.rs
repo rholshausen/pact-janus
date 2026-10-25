@@ -156,14 +156,16 @@ fn stub(reply: &'static str, state_reply: &'static str) -> (String, Receiver<Rec
         "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{answer}",
         answer.len()
       );
-      let stream = reader.get_mut();
-      let _ = stream.write_all(response.as_bytes());
-      let _ = stream.flush();
+      // Reported before the reply: once the client has its answer, a test may read what the stub saw
+      // without waiting, and a report sent after the reply could not be there yet.
       let _ = tx.send(Received {
         line,
         headers,
         body: String::from_utf8_lossy(&body).to_string(),
       });
+      let stream = reader.get_mut();
+      let _ = stream.write_all(response.as_bytes());
+      let _ = stream.flush();
     }
   });
   (base_url, rx)
