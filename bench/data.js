@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792971911221,
+  "lastUpdate": 1792971913448,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -25806,6 +25806,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 43306,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ad8bfa42b292df20d1c42365c66ffdc503993da5",
+          "message": "docs: S1.29 the CLI output review, section D: help text, and S1.29 done\n\nThe review's last section, all in --help:\n\n- Where an option behaves as today's verifier's does, the help names it:\n  pact_verifier_cli, not \"today's verifier\", which is the plan's word.\n- --log-level and --no-colour are listed under \"Global options\" in every\n  command's help, not among the command's own.\n- Every option read from the environment shows as [env: NAME], never its\n  value, so help reads the same whatever the shell holds.\n\nS1.29 meets its exit: the plan records it done, with what it did not\nforesee, and AGENTS.md's status block says so. S1.30 holds the findings\nabout what the engine reports.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T10:39:49+11:00",
+          "tree_id": "4f55008cadd3707c7f7a392700ba6f4afb455990",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ad8bfa42b292df20d1c42365c66ffdc503993da5"
+        },
+        "date": 1792971912805,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25408,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19496,
             "unit": "requests per second",
             "extra": "engines 4"
           }
