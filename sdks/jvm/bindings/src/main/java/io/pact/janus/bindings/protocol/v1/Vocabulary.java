@@ -144,6 +144,26 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(APPLIED, UNUSED, LAPSED);
   }
 
+  /** Known values of {@code Explain.encoded}. */
+  public static final class ExplainEncoded {
+    private ExplainEncoded() {}
+
+    public static final String JSON = "json";
+    public static final String BASE64 = "base64";
+
+    public static final List<String> KNOWN = List.of(JSON, BASE64);
+  }
+
+  /** Known values of {@code ExplainExecuted.status}. */
+  public static final class ExplainExecutedStatus {
+    private ExplainExecutedStatus() {}
+
+    public static final String MATCHED = "matched";
+    public static final String MISMATCHED = "mismatched";
+
+    public static final List<String> KNOWN = List.of(MATCHED, MISMATCHED);
+  }
+
   /** Known values of {@code ExplainSubject.kind}. */
   public static final class ExplainSubjectKind {
     private ExplainSubjectKind() {}

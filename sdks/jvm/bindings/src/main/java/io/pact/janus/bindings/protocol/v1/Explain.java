@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -26,6 +27,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "interaction",
+    "components",
+    "values",
+    "encoded",
     "options"
 })
 public class Explain {
@@ -40,6 +44,27 @@ public class Explain {
     @JsonProperty("interaction")
     @JsonPropertyDescription("What to compile: an interaction specification or one interaction from a contract document.")
     private ExplainSubject interaction;
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md \u00a78.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.")
+    private List<Map<String, Object>> components;
+    /**
+     * Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec §6.1). The result then carries 'executed'.
+     * 
+     */
+    @JsonProperty("values")
+    @JsonPropertyDescription("Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec \u00a76.1). The result then carries 'executed'.")
+    private Map<String, Object> values;
+    /**
+     * The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.
+     * 
+     */
+    @JsonProperty("encoded")
+    @JsonPropertyDescription("The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.")
+    private Map<String, String> encoded;
     @JsonProperty("options")
     private Map<String, Object> options;
     @JsonIgnore
@@ -67,6 +92,60 @@ public class Explain {
     @JsonProperty("interaction")
     public void setInteraction(ExplainSubject interaction) {
         this.interaction = interaction;
+    }
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
+
+    /**
+     * Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec §6.1). The result then carries 'executed'.
+     * 
+     */
+    @JsonProperty("values")
+    public Map<String, Object> getValues() {
+        return values;
+    }
+
+    /**
+     * Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec §6.1). The result then carries 'executed'.
+     * 
+     */
+    @JsonProperty("values")
+    public void setValues(Map<String, Object> values) {
+        this.values = values;
+    }
+
+    /**
+     * The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.
+     * 
+     */
+    @JsonProperty("encoded")
+    public Map<String, String> getEncoded() {
+        return encoded;
+    }
+
+    /**
+     * The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.
+     * 
+     */
+    @JsonProperty("encoded")
+    public void setEncoded(Map<String, String> encoded) {
+        this.encoded = encoded;
     }
 
     @JsonProperty("options")
@@ -97,6 +176,18 @@ public class Explain {
         sb.append('=');
         sb.append(((this.interaction == null)?"<null>":this.interaction));
         sb.append(',');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
+        sb.append("values");
+        sb.append('=');
+        sb.append(((this.values == null)?"<null>":this.values));
+        sb.append(',');
+        sb.append("encoded");
+        sb.append('=');
+        sb.append(((this.encoded == null)?"<null>":this.encoded));
+        sb.append(',');
         sb.append("options");
         sb.append('=');
         sb.append(((this.options == null)?"<null>":this.options));
@@ -116,9 +207,12 @@ public class Explain {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
+        result = ((result* 31)+((this.values == null)? 0 :this.values.hashCode()));
         result = ((result* 31)+((this.interaction == null)? 0 :this.interaction.hashCode()));
         result = ((result* 31)+((this.options == null)? 0 :this.options.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.encoded == null)? 0 :this.encoded.hashCode()));
         return result;
     }
 
@@ -131,7 +225,7 @@ public class Explain {
             return false;
         }
         Explain rhs = ((Explain) other);
-        return ((((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction)))&&((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return (((((((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components)))&&((this.values == rhs.values)||((this.values!= null)&&this.values.equals(rhs.values))))&&((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction))))&&((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoded == rhs.encoded)||((this.encoded!= null)&&this.encoded.equals(rhs.encoded))));
     }
 
 }

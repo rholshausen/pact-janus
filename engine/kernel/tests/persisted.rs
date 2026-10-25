@@ -33,9 +33,13 @@ fn send(engine: &mut Engine, op: &str, body: Value) -> Value {
   serde_json::from_slice(&engine.dispatch(&serde_json::to_vec(&request).unwrap())).unwrap()
 }
 
-/// An engine past its handshake.
+/// An engine past its handshake, with the JSON content component every embedding has: the contract
+/// declares its JSON body, and `explain` checks a declared type as a run does (ADR 0050).
 fn engine() -> Engine {
-  let mut engine = Engine::new();
+  let mut engine = Engine::with_components(
+    std::collections::HashMap::new(),
+    Some(std::sync::Arc::new(pact_janus_component_json::JsonContent::new())),
+  );
   let hello = send(
     &mut engine,
     "engine/hello",

@@ -518,6 +518,11 @@ pub struct ExplainArgs {
   /// form. Exits 1 if the values do not match
   #[arg(long, value_name = "VALUES")]
   pub executed: Option<PathBuf>,
+
+  /// A verifier configuration (verifier.janus.yaml) whose components to load, as janus verify
+  /// loads them, so the plan is the one a run compiles
+  #[arg(long, value_name = "FILE")]
+  pub config: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

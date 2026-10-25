@@ -28,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "kind",
     "spec",
     "contract",
-    "index"
+    "index",
+    "variant"
 })
 public class ExplainSubject {
 
@@ -60,6 +61,13 @@ public class ExplainSubject {
     @JsonProperty("index")
     @JsonPropertyDescription("For kind 'contract-interaction': which interaction.")
     private Long index;
+    /**
+     * For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.
+     * 
+     */
+    @JsonProperty("variant")
+    @JsonPropertyDescription("For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.")
+    private java.lang.String variant;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -137,6 +145,24 @@ public class ExplainSubject {
         this.index = index;
     }
 
+    /**
+     * For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.
+     * 
+     */
+    @JsonProperty("variant")
+    public java.lang.String getVariant() {
+        return variant;
+    }
+
+    /**
+     * For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.
+     * 
+     */
+    @JsonProperty("variant")
+    public void setVariant(java.lang.String variant) {
+        this.variant = variant;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -167,6 +193,10 @@ public class ExplainSubject {
         sb.append('=');
         sb.append(((this.index == null)?"<null>":this.index));
         sb.append(',');
+        sb.append("variant");
+        sb.append('=');
+        sb.append(((this.variant == null)?"<null>":this.variant));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -182,11 +212,12 @@ public class ExplainSubject {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
+        result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
+        result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
         result = ((result* 31)+((this.index == null)? 0 :this.index.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
         result = ((result* 31)+((this.spec == null)? 0 :this.spec.hashCode()));
-        result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
         return result;
     }
 
@@ -199,7 +230,7 @@ public class ExplainSubject {
             return false;
         }
         ExplainSubject rhs = ((ExplainSubject) other);
-        return ((((((this.index == rhs.index)||((this.index!= null)&&this.index.equals(rhs.index)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.spec == rhs.spec)||((this.spec!= null)&&this.spec.equals(rhs.spec))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
+        return (((((((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind)))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.index == rhs.index)||((this.index!= null)&&this.index.equals(rhs.index))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.spec == rhs.spec)||((this.spec!= null)&&this.spec.equals(rhs.spec))));
     }
 
 }

@@ -773,6 +773,15 @@ item in 1a is done when S1.1 agrees.
   prints is the plan `verify` runs.
   *Exit:* the protocol-level test client exercises both; `janus explain --executed` on a CSV
   interaction prints the fragment.
+  *Done 2026-10-25*, as [ADR 0050](decisions/0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md)
+  decides it. `verification/explain` takes `components`, resolved and checked as a run's are, and
+  `values`, which it runs with the run's content detection and contributed actions, returning
+  `executed`. `janus explain --config` reads a configuration's components, and `--executed` sends
+  its values, so the CLI no longer runs a plan through the kernel's API. Not foreseen: `explain`
+  rebuilt a contract's specification without its `content-types`, so no fragment could have been
+  found. And an interaction no loaded component can carry is now refused, as a run refuses it, where
+  `explain` used to print a generic plan. The protocol client's `explain.test.ts` declares the CSV
+  component and runs `csv:integer`; CI's `sdk-tooling` job now builds the component for it.
 - **S1.13 Flag parity with today's verifier CLI** — **S**, but it gates the stage. A table with a row
   per `pact_verifier_cli` and `pact-provider-verifier` option: the `janus` option, the hook, or
   "dropped, because". The table is the migration note for providers:

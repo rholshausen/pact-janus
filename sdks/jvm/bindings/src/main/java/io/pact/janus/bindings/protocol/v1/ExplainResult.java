@@ -26,7 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "text",
-    "plan"
+    "plan",
+    "executed"
 })
 public class ExplainResult {
 
@@ -45,6 +46,15 @@ public class ExplainResult {
     @JsonProperty("plan")
     @JsonPropertyDescription("The structured plan document, when requested via options.")
     private Map<String, Object> plan;
+    /**
+     * ExplainExecuted
+     * <p>
+     * The plan run against the request's 'values', with the run's content detection and the actions its components contribute.
+     * 
+     */
+    @JsonProperty("executed")
+    @JsonPropertyDescription("The plan run against the request's 'values', with the run's content detection and the actions its components contribute.")
+    private ExplainExecuted executed;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -86,6 +96,28 @@ public class ExplainResult {
         this.plan = plan;
     }
 
+    /**
+     * ExplainExecuted
+     * <p>
+     * The plan run against the request's 'values', with the run's content detection and the actions its components contribute.
+     * 
+     */
+    @JsonProperty("executed")
+    public ExplainExecuted getExecuted() {
+        return executed;
+    }
+
+    /**
+     * ExplainExecuted
+     * <p>
+     * The plan run against the request's 'values', with the run's content detection and the actions its components contribute.
+     * 
+     */
+    @JsonProperty("executed")
+    public void setExecuted(ExplainExecuted executed) {
+        this.executed = executed;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -108,6 +140,10 @@ public class ExplainResult {
         sb.append('=');
         sb.append(((this.plan == null)?"<null>":this.plan));
         sb.append(',');
+        sb.append("executed");
+        sb.append('=');
+        sb.append(((this.executed == null)?"<null>":this.executed));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -123,6 +159,7 @@ public class ExplainResult {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.executed == null)? 0 :this.executed.hashCode()));
         result = ((result* 31)+((this.text == null)? 0 :this.text.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.plan == null)? 0 :this.plan.hashCode()));
@@ -138,7 +175,7 @@ public class ExplainResult {
             return false;
         }
         ExplainResult rhs = ((ExplainResult) other);
-        return ((((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.plan == rhs.plan)||((this.plan!= null)&&this.plan.equals(rhs.plan))));
+        return (((((this.executed == rhs.executed)||((this.executed!= null)&&this.executed.equals(rhs.executed)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.plan == rhs.plan)||((this.plan!= null)&&this.plan.equals(rhs.plan))));
     }
 
 }

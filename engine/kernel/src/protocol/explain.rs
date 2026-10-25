@@ -12,23 +12,39 @@
 //! interaction, and a v1–v4 pact's interaction (both `contract-interaction`, told apart the way
 //! ADR 0011 says to — by asking the document what it is, never by guessing at its structure).
 //!
-//! Explaining an *executed* plan is deliberately not here: an execution belongs to a run, so it
-//! arrives on that run's event stream ([`super::events`], spec §9.6's `verification/executed-plan`)
-//! rather than being re-derived from a values file the caller had to write by hand.
+//! **It compiles what a run would compile** (staged plan S1.12, ADR 0050): the request may declare
+//! `components`, resolved exactly as `verify` resolves `target.components`, and a contract's or a
+//! specification's requirements are checked against them, so a component's plan fragment is in the
+//! plan it prints. And it may carry `values`, captured values it runs the plan against, as a golden
+//! corpus case does, with the run's content detection and contributed actions: matching captured
+//! values offline is an engine operation, not something a host does with the kernel's own API. A run's
+//! executed plans still arrive on its event stream (spec §9.6's `verification/executed-plan`).
 
+use super::scope::Scope;
+use crate::component::{ContentDetection, Unavailable};
 use crate::contract::{self, Contract};
 use crate::error::Problem;
 use crate::interaction_spec;
 use crate::legacy::compile::compile_interaction;
 use crate::legacy::pact as legacy_pact;
-use crate::plan::{self, Assignment, Plan};
+use crate::plan::{self, Assignment, CapturedValues, Executed, Plan, RuntimeValue};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 
 /// `verification/explain`'s request body.
 #[derive(Debug, Deserialize)]
 pub struct Explain {
   pub interaction: Subject,
+  /// The project's declared components, resolved as `verify`'s `target.components` are.
+  #[serde(default)]
+  pub components: Vec<Value>,
+  /// Captured values to run the plan against: path to value, as a golden corpus case gives them.
+  #[serde(default)]
+  pub values: Option<Map<String, Value>>,
+  /// The representation of each value in `values`, by path: `base64` for octets.
+  #[serde(default)]
+  pub encoded: Option<Map<String, Value>>,
   #[serde(default)]
   pub options: Option<Value>,
 }
@@ -67,15 +83,26 @@ pub enum ExplainError {
   /// A v1–v4 interaction that needs these pact plugins (staged plan S1.8): `verify` refuses it, so
   /// there is no plan to explain.
   NeedsPlugins(Vec<String>),
+  /// A component the interaction needs, or a fragment one contributes, that the scope cannot
+  /// provide: `verify` would refuse it before anything ran.
+  Unavailable(Unavailable),
+  /// A value `encoded` tags as a representation this engine does not read, or that is not one.
+  Values(String),
 }
 
-/// Compile the named subject.
-pub fn compile(subject: &Subject) -> Result<Plan, ExplainError> {
+/// Compile the named subject, with the scope's components, as a run would.
+pub fn compile(subject: &Subject, scope: &Scope) -> Result<Plan, ExplainError> {
   match subject.kind.as_str() {
     "spec" => {
       let document = subject.spec.as_ref().ok_or(ExplainError::Missing("spec"))?;
       let spec = interaction_spec::parse(document).map_err(|err| ExplainError::Invalid(err.problems))?;
-      Ok(plan::compile(&spec, &Assignment::new(), None))
+      let parts = super::session::raw_parts(document);
+      checked(scope, &spec, &parts)?;
+      Ok(
+        scope
+          .contributions()
+          .compile(&spec, &parts, &Assignment::new(), None),
+      )
     }
     "contract-interaction" => {
       let document = subject
@@ -87,7 +114,7 @@ pub fn compile(subject: &Subject) -> Result<Plan, ExplainError> {
       // shapes happen to be missing, and a contract is never fed to the v1–v4 compiler.
       match document.get("$format").and_then(Value::as_str) {
         Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
-          janus(document, index, subject.variant.as_deref())
+          janus(document, index, subject.variant.as_deref(), scope)
         }
         Some(other) => Err(ExplainError::NotReadable(format!(
           "'{other}' is not a format this engine reads (expected '{}')",
@@ -104,7 +131,7 @@ pub fn compile(subject: &Subject) -> Result<Plan, ExplainError> {
 /// evidence, so this rebuilds the specification and compiles it — the same move the verifier makes
 /// (`super::verification::interaction_spec`), which is what makes an explained plan the plan a run
 /// would actually execute rather than a lookalike.
-fn janus(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan, ExplainError> {
+fn janus(document: &Value, index: usize, variant: Option<&str>, scope: &Scope) -> Result<Plan, ExplainError> {
   let contract: Contract =
     serde_json::from_value(document.clone()).map_err(|err| ExplainError::NotReadable(err.to_string()))?;
   let interaction = contract
@@ -129,10 +156,15 @@ fn janus(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan, 
   if let Some(requires) = &interaction.requires {
     map.insert("requires".to_string(), serde_json::json!(requires));
   }
+  if let Some(content_types) = &interaction.content_types {
+    map.insert("content-types".to_string(), serde_json::json!(content_types));
+  }
   let spec = interaction_spec::parse(&spec_document).map_err(|err| ExplainError::Invalid(err.problems))?;
+  checked(scope, &spec, &interaction.parts)?;
+  let contributions = scope.contributions();
 
   let Some(wanted) = variant else {
-    return Ok(plan::compile(&spec, &Assignment::new(), None));
+    return Ok(contributions.compile(&spec, &interaction.parts, &Assignment::new(), None));
   };
   let recorded = interaction
     .selection
@@ -149,7 +181,61 @@ fn janus(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan, 
       assignment.insert(dimension.to_string(), point.to_string());
     }
   }
-  Ok(plan::compile(&spec, &assignment, Some(&recorded.id)))
+  Ok(contributions.compile(&spec, &interaction.parts, &assignment, Some(&recorded.id)))
+}
+
+/// What `verify` checks before a run starts (component-interfaces spec §2.3): every requirement, and
+/// every declared content type and the fragment its component contributes.
+fn checked(
+  scope: &Scope,
+  spec: &interaction_spec::InteractionSpec,
+  parts: &BTreeMap<String, contract::ShapePart>,
+) -> Result<(), ExplainError> {
+  scope
+    .check(spec.requires.iter().flatten(), spec.content_types.as_ref(), parts)
+    .map_err(ExplainError::Unavailable)
+}
+
+/// `plan` run against captured values, as a run's reply would be: with the scope's content
+/// detection and the actions its components contribute (spec §8.3, ADR 0050).
+pub fn execute(
+  plan: &Plan,
+  values: &Map<String, Value>,
+  encoded: Option<&Map<String, Value>>,
+  scope: &Scope,
+) -> Result<Executed, ExplainError> {
+  use base64::Engine as _;
+  let mut resolver = CapturedValues::new();
+  for (path, value) in values {
+    let value = match encoded
+      .and_then(|encoded| encoded.get(path))
+      .and_then(Value::as_str)
+    {
+      None | Some("json") => RuntimeValue::from_json(value),
+      Some("base64") => value
+        .as_str()
+        .and_then(|text| base64::engine::general_purpose::STANDARD.decode(text).ok())
+        .map(RuntimeValue::Bytes)
+        .ok_or_else(|| ExplainError::Values(format!("'{path}' is tagged base64 and is not base64")))?,
+      Some(other) => {
+        return Err(ExplainError::Values(format!(
+          "'{path}' is tagged '{other}', which this engine does not read"
+        )));
+      }
+    };
+    resolver = resolver.capture(path.clone(), value);
+  }
+  let content = scope.content();
+  let detection = content.as_deref().map(ContentDetection::of);
+  let contributions = scope.contributions();
+  Ok(plan::execute_with(
+    plan,
+    &resolver,
+    detection
+      .as_ref()
+      .map(|detection| detection as &dyn plan::ContentDetector),
+    Some(contributions.as_ref()),
+  ))
 }
 
 /// A v1–v4 pact's interaction, through design 3.5's compiler: request and response together, which

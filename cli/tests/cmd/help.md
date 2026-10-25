@@ -179,6 +179,8 @@ Options:
       --plan               Print the structured plan document (JSON) instead of the text form
       --executed <VALUES>  Run the plan against a JSON object of captured values (path to value) and
                            print the executed form. Exits 1 if the values do not match
+      --config <FILE>      A verifier configuration (verifier.janus.yaml) whose components to load,
+                           as janus verify loads them, so the plan is the one a run compiles
   -h, --help               Print help
 
 To see why a live verification failed, use janus verify --explain-failures instead: it prints the

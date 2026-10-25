@@ -169,8 +169,27 @@
               "type": "integer",
               "minimum": 0,
               "description": "For kind 'contract-interaction': which interaction."
+            },
+            "variant": {
+              "type": "string",
+              "description": "For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan."
             }
           }
+        },
+        "components": {
+          "type": "array",
+          "description": "The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.",
+          "items": { "type": "object" }
+        },
+        "values": {
+          "type": "object",
+          "description": "Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec §6.1). The result then carries 'executed'.",
+          "additionalProperties": true
+        },
+        "encoded": {
+          "type": "object",
+          "description": "The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.",
+          "additionalProperties": { "type": "string", "x-known-values": ["json", "base64"] }
         },
         "options": { "type": "object" }
       }
@@ -187,6 +206,24 @@
         "plan": {
           "type": "object",
           "description": "The structured plan document, when requested via options."
+        },
+        "executed": {
+          "title": "ExplainExecuted",
+          "description": "The plan run against the request's 'values', with the run's content detection and the actions its components contribute.",
+          "type": "object",
+          "required": ["status", "mismatches", "text"],
+          "properties": {
+            "status": { "type": "string", "x-known-values": ["matched", "mismatched"] },
+            "mismatches": {
+              "type": "array",
+              "description": "Each failure, as a run's result reports one: path, message and action.",
+              "items": { "type": "object" }
+            },
+            "text": {
+              "type": "string",
+              "description": "The executed plan's text form (design 2.4)."
+            }
+          }
         }
       }
     }

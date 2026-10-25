@@ -534,7 +534,7 @@ impl ConsumerSession {
 /// already rejected anything not shaped this way by the time this is called, so the fallbacks
 /// below never actually trigger; they just avoid a panic on a document this function is not the
 /// one validating.
-fn raw_parts(interaction: &Value) -> BTreeMap<String, contract::ShapePart> {
+pub(crate) fn raw_parts(interaction: &Value) -> BTreeMap<String, contract::ShapePart> {
   let Some(parts) = interaction.get("parts").and_then(Value::as_object) else {
     return BTreeMap::new();
   };

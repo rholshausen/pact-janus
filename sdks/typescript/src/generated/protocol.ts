@@ -993,6 +993,24 @@ export interface TransportBinding {
 
 export interface Explain {
   interaction: ExplainSubject;
+  /**
+   * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
+  /**
+   * Captured values to run the plan against: absolute path to value, as a golden corpus case gives them (plan-grammar spec §6.1). The result then carries 'executed'.
+   */
+  values?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.
+   */
+  encoded?: {
+    [k: string]: string;
+  };
   options?: {
     [k: string]: unknown;
   };
@@ -1020,6 +1038,10 @@ export interface ExplainSubject {
    * For kind 'contract-interaction': which interaction.
    */
   index?: number;
+  /**
+   * For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.
+   */
+  variant?: string;
   [k: string]: unknown;
 }
 
@@ -1034,5 +1056,24 @@ export interface ExplainResult {
   plan?: {
     [k: string]: unknown;
   };
+  executed?: ExplainExecuted;
+  [k: string]: unknown;
+}
+
+/**
+ * The plan run against the request's 'values', with the run's content detection and the actions its components contribute.
+ */
+export interface ExplainExecuted {
+  status: string;
+  /**
+   * Each failure, as a run's result reports one: path, message and action.
+   */
+  mismatches: {
+    [k: string]: unknown;
+  }[];
+  /**
+   * The executed plan's text form (design 2.4).
+   */
+  text: string;
   [k: string]: unknown;
 }

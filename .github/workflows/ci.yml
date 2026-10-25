@@ -331,7 +331,11 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      # wasm32-wasip2 for the CSV component, which the protocol client's explain test declares
+      # (staged plan S1.12).
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
       - name: Build prerequisites (Linux)
         if: runner.os == 'Linux'
@@ -380,6 +384,9 @@ jobs:
       # time limit, so the engine is built first: a cold build does not fit.
       - name: Build janus-engine
         run: cargo build --package pact_janus_cli --bin janus-engine
+      - name: Build the CSV component
+        working-directory: third-party/janus-csv
+        run: cargo build --release --target wasm32-wasip2
       - name: Protocol client (janus-engine over stdio)
         working-directory: cli/tests/janus-engine-node
         run: npm ci && npm test

@@ -593,7 +593,7 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
 | Operation | Body → Result |
 |---|---|
 | `verification/verify` | `{ source, target, options? }` → `{ session, stream }` |
-| `verification/explain` | `{ interaction, options? }` → `{ text, plan? }` |
+| `verification/explain` | `{ interaction, components?, values?, encoded?, options? }` → `{ text, plan?, executed? }` |
 
 - **`verify`** starts a verification session and returns immediately with its session id and
   the id of the event stream on which the run reports (§9). Progress, hook activity,
@@ -657,8 +657,15 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   **filtered** when the filter excluded at least one recorded variant, and then reports as §9.6 says.
 - **`explain`** compiles one interaction (from a spec or a contract interaction — the body says
   which) and returns the plan's pretty text form, optionally the structured plan document
-  (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). Explain
-  of an *executed* plan is served by the event stream (§9), not by this operation.
+  (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). It compiles what
+  a run compiles ([ADR 0050](../../decisions/0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md)):
+  `components` are resolved as `verify`'s `target.components` are, and the subject's requirements,
+  declared content types and contributed fragments are checked against them, so an interaction a run
+  would refuse is refused here too, as `component-unavailable`. Given `values`, captured values by
+  path, with `encoded` tagging any that are octets, it also runs the plan against them, with the run's
+  content detection and its components' contributed actions, and returns `executed`: the verdict,
+  each mismatch, and the executed text form. That is how a host matches captured values offline. A
+  run's own executed plans arrive on its event stream (§9).
 
 ### 8.4 Upgrade — `upgrade/*`
 

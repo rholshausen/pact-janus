@@ -1886,6 +1886,59 @@ fn pathdiff(target: &str, base: &std::path::Path) -> String {
   relative.join(rest).display().to_string()
 }
 
+/// Staged plan S1.12, ADR 0050: `explain --config` loads the components a run would, so the plan it
+/// prints carries the CSV component's fragment, and `--executed` runs captured values through the
+/// engine, the fragment's `csv:integer` applied by the component. Without the component the
+/// interaction is refused, as `verify` refuses it.
+#[test]
+fn explain_executed_prints_a_components_fragment_and_runs_its_action() {
+  let mut contract: Value =
+    serde_json::from_str(&std::fs::read_to_string(csv_contract()).expect("the contract")).expect("JSON");
+  contract["interactions"][0]["parts"]["response"]["body"]["items"]["members"]["items"] =
+    json!({ "shape": "integer", "example": 1 });
+  let path = temp("reporting-integer.janus.json");
+  std::fs::write(&path, contract.to_string()).expect("writing the contract");
+  let config = temp("explain-csv.yaml");
+  let reference = pathdiff(&csv_component(), &std::env::temp_dir());
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: file, reference: '{reference}' }}\n"
+    ),
+  )
+  .expect("writing the config");
+  let values = temp("csv-values.json");
+  std::fs::write(
+    &values,
+    json!({ "$.response.status": 200, "$.response.body": [{ "id": "66", "status": "PENDING", "items": "x" }] }).to_string(),
+  )
+  .expect("writing the values");
+
+  let refused = janus(&["explain", &path]);
+  assert_eq!(code(&refused), 2, "{}", stdout(&refused));
+  assert!(
+    stderr(&refused).contains("component-unavailable"),
+    "{}",
+    stderr(&refused)
+  );
+
+  let output = janus(&["explain", &path, "--config", &config, "--executed", &values]);
+  assert_eq!(
+    code(&output),
+    1,
+    "the values do not match:\n{}\n{}",
+    stdout(&output),
+    stderr(&output)
+  );
+  let text = stdout(&output);
+  assert!(text.contains(":\"text/csv\""), "{text}");
+  assert!(text.contains("%csv:integer"), "{text}");
+  assert!(
+    text.contains("expected text that spells an integer, got \"x\""),
+    "{text}"
+  );
+}
+
 #[test]
 fn verify_loads_a_declared_component_and_verifies_a_csv_contract() {
   let provider = provider();

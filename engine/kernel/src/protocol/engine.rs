@@ -722,19 +722,39 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    let plan = match explain::compile(&req.interaction) {
+    // The components a run would load, and the requirements a run would check (ADR 0050).
+    let scope = match self.scope(&req.components) {
+      Ok(scope) => scope,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let plan = match explain::compile(&req.interaction, &scope) {
       Ok(plan) => plan,
       Err(err) => return ResponseFrame::err(id, explain_error(err)),
     };
-    let mut result = json!({ "text": crate::plan::render_pretty(&plan) });
-    if req
+    let want_plan = req
       .options
       .as_ref()
       .and_then(|options| options.get("plan"))
       .and_then(Value::as_bool)
-      .unwrap_or(false)
-    {
+      .unwrap_or(false);
+    let mut result = json!({ "text": crate::plan::render_pretty(&plan) });
+    if want_plan {
       result["plan"] = crate::plan::plan_json(&plan);
+    }
+    if let Some(values) = &req.values {
+      let executed = match explain::execute(&plan, values, req.encoded.as_ref(), &scope) {
+        Ok(executed) => executed,
+        Err(err) => return ResponseFrame::err(id, explain_error(err)),
+      };
+      let (status, mismatches) = crate::plan::outcome(&executed);
+      result["executed"] = json!({
+        "status": match status {
+          crate::plan::Status::Matched => "matched",
+          crate::plan::Status::Mismatched => "mismatched",
+        },
+        "mismatches": mismatches.iter().map(super::wire::mismatch_json).collect::<Vec<_>>(),
+        "text": crate::plan::render_executed(&executed),
+      });
     }
     ResponseFrame::ok(id, result)
   }
@@ -1072,6 +1092,8 @@ fn explain_error(err: ExplainError) -> EngineError {
     ExplainError::Invalid(problems) => EngineError::interaction_invalid(&problems),
     ExplainError::NotReadable(message) => EngineError::malformed_frame(message),
     ExplainError::NeedsPlugins(plugins) => EngineError::pact_plugins_unavailable(&plugins),
+    ExplainError::Unavailable(unavailable) => EngineError::component_unresolved(&unavailable),
+    ExplainError::Values(message) => EngineError::malformed_frame(format!("verification/explain: {message}")),
   }
 }
 

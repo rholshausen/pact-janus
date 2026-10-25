@@ -9,7 +9,11 @@
 //! variant that actually failed, against the response the provider actually sent. The offline form
 //! here — `--executed <values.json>` — resolves a plan against a hand-written map of captured
 //! values, which is what a golden-corpus case carries (plan-grammar spec §6.1) and what you reach
-//! for when there is no provider to run at all.
+//! for when there is no provider to run at all. The engine runs it too, in the same call that
+//! compiles the plan (staged plan S1.12, ADR 0050), so nothing here steps outside the protocol.
+//!
+//! `--config` names the verifier configuration whose `components` a run would load, so a plan a
+//! declared component contributes a fragment to is explained as a run compiles it.
 
 use crate::Outcome;
 use crate::args::ExplainArgs;
@@ -17,10 +21,7 @@ use crate::engine;
 use crate::error::Error;
 use crate::highlight;
 use crate::io;
-use pact_janus_kernel::plan::{self, CapturedValues};
-use serde_json::{Value, json};
-use std::collections::BTreeMap;
-use std::path::Path;
+use serde_json::json;
 
 pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   let document = io::read_json(&args.document)?;
@@ -40,14 +41,27 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
     subject
   };
 
+  let mut request = json!({ "interaction": subject, "options": { "plan": args.plan } });
+  if let Some(path) = &args.config {
+    let config = pact_janus_hooks_host::loader::load(path)
+      .map_err(|err| format!("reading {}: {err}", path.display()))?;
+    if let Some(components) = config.get("components") {
+      request["components"] = components.clone();
+    }
+  }
+  if let Some(path) = &args.executed {
+    let values = io::read_json(path)?;
+    if !values.is_object() {
+      return Err(Error::Failed(format!(
+        "{} must be a JSON object of path -> value",
+        path.display()
+      )));
+    }
+    request["values"] = values;
+  }
+
   let mut engine = engine::start()?;
-  let want_plan = args.plan || args.executed.is_some();
-  let result = engine::call(
-    &mut engine,
-    "verification/explain",
-    json!({ "interaction": subject, "options": { "plan": want_plan } }),
-  )
-  .map_err(|err| {
+  let result = engine::call(&mut engine, "verification/explain", request).map_err(|err| {
     // A document with no `$format` that is also not a pact reaches the engine as a
     // contract-interaction and is refused there. Saying so beats a bare parse error. A missing
     // component is not a parse error: the document was read.
@@ -62,7 +76,17 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   })?;
 
   match &args.executed {
-    Some(values) => executed(&result["plan"], values),
+    Some(_) => {
+      let executed = &result["executed"];
+      outln_styled!(
+        "{}",
+        highlight::plan(executed["text"].as_str().unwrap_or_default())
+      );
+      Ok(match executed["status"].as_str() {
+        Some("matched") => Outcome::Done,
+        _ => Outcome::SubjectFailed,
+      })
+    }
     None if args.plan => {
       outln!("{}", crate::output::pretty(&result["plan"]));
       Ok(Outcome::Done)
@@ -72,25 +96,4 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
       Ok(Outcome::Done)
     }
   }
-}
-
-/// The offline executed form: the plan the engine just compiled, run against captured values.
-///
-/// The plan is re-read from the engine's own structured document rather than recompiled here —
-/// same compiler, same plan, one source of truth — and executed by the kernel's interpreter.
-fn executed(document: &Value, values_path: &Path) -> Result<Outcome, Error> {
-  let Value::Object(map) = io::read_json(values_path)? else {
-    return Err(Error::Failed(format!(
-      "{} must be a JSON object of path -> value",
-      values_path.display()
-    )));
-  };
-  let values: BTreeMap<String, Value> = map.into_iter().collect();
-  let plan = plan::from_json(document).map_err(|err| format!("the engine's plan document: {err}"))?;
-  let executed = plan::execute(&plan, &CapturedValues::from_json(&values));
-  outln_styled!("{}", highlight::plan(&plan::render_executed(&executed)));
-  Ok(match plan::outcome(&executed).0 {
-    plan::Status::Matched => Outcome::Done,
-    plan::Status::Mismatched => Outcome::SubjectFailed,
-  })
 }

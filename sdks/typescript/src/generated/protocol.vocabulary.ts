@@ -124,6 +124,24 @@ export const ExemptionResultStatus = {
 } as const;
 
 /**
+ * Known values of `Explain.encoded` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ExplainEncoded = {
+  Json: "json",
+  Base64: "base64",
+} as const;
+
+/**
+ * Known values of `ExplainExecuted.status` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ExplainExecutedStatus = {
+  Matched: "matched",
+  Mismatched: "mismatched",
+} as const;
+
+/**
  * Known values of `ExplainSubject.kind` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
