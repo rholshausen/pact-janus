@@ -1,3 +1,301 @@
+## 0.4.0 (2026-10-25)
+
+### Breaking Changes
+
+#### A filtered run is reported as `filtered`, never `verified`, and is not published
+
+`verification/verify`'s `options.variants` (or `options.variant`) narrows a run to some recorded variants.
+Until now, such a run reported `status: verified` whenever nothing failed, even when the filter named an id
+no document records and nothing was replayed at all. With `options.publish`, every pact it fetched was then
+published to the broker as a success (ADR 0041).
+
+- **A filter naming an id no document records is refused.** It fails with `variant-not-found` (category
+  `session`). `details.variant` is the first unknown id and `details.recorded` lists the ids the documents
+  do record. For an inline source, `verify` answers with the error. For a `broker` source, the run ends
+  right after `verification/fetched` with `status: failed` and the error, and nothing runs or is
+  published. An empty `variants` list is `malformed-frame`.
+- **A run is filtered when its filter left out at least one recorded variant**, not merely when it was
+  given one. A filter that admits everything (for example `base`, over v1–v4 pacts) leaves a whole run.
+- **A filtered run that nothing failed has `status: filtered`.** Each `pairs` entry can now be `filtered`
+  too, after `failed` and `incomplete`. A host that reads a run's status must treat `filtered` as "not
+  verified, not failed". The summary's and `verification/started`'s `filtered` member keeps its place,
+  with this meaning.
+- **A pact the filter narrowed is not published.** Its `verification/published` event and `publication`
+  entry have `outcome: skipped` and `reason: filtered`. A pact the filter did not narrow is published as
+  before.
+- **`subsumption/decide` raises `verification-filtered` per pair**, from the pair's `filtered` status. It
+  no longer raises it for every pair of a run that narrowed only one of them.
+
+`janus verify --variant` follows. An id no document records exits 2. A filtered run prints `FILTERED:` and
+exits 0, since it did what it was asked. `pact_verifier_cli` passes a filter that matches nothing and
+publishes a narrowed pact, and pact-jvm skips publishing it; Janus refuses the first and skips the second.
+
+#### Message pacts are verified
+
+- **Breaking: a v1–v4 message interaction is verified** where it was skipped. A v3 message, and a v4
+  asynchronous or synchronous message, is asked of the provider by the run's `produce-message` hooks,
+  which produce a `message` part (`metadata` and `body` slots), and compared with the message the
+  pact expects as today's verifier compares one (ADR 0046). A message pact whose run used to report
+  `verified` with nothing verified now fails unless the provider produces its messages.
+- **When no hook produces a message**, the variant fails as `component-unavailable` with
+  `details.component` `hook/produce-message` and `details.reason` `message-not-produced`.
+- **The `http` hook has `format: pact-message`**: today's request for a message (the hook context's
+  new `interaction.pact-message.request`), and the reply read as the message. Its `transports` member
+  routes a message as today's `--transports` does. A reply that is not a 2xx fails the hook.
+- **`janus verify` asks for messages as today's verifier does** when its configuration names no
+  `produce-message` hook, and takes `--transports NAME:PORT[/PATH]`; an `http` entry is where HTTP
+  interactions go.
+- **A transport names its own parts.** Its contribution declares `exchange-parts` (`initiating`,
+  `answering`), and the engine spells no part name of its own. A served request that does not match
+  is completed with `transport/dispose`, disposition `reject`, whose new `details` carry the
+  mismatches; the HTTP transport still answers it with a 500 naming them. `TransportComponent` has a
+  new required method, `exchange_parts`.
+- **`verification/explain` shows a message's plan**, rooted at the `message` part, with the new legacy
+  action `legacy:message-type`.
+
+#### An interaction that needs a pact plugin is refused by name
+
+- **Breaking: a v1–v4 interaction that needs a pact-plugins plugin fails** as `component-unavailable`
+  before anything runs for it: no state is set up and nothing is sent. `details.component` is
+  `pact-plugin/<name>`, `details.plugins` lists every plugin it needs, and `details.reason` is
+  `pact-plugin` (ADR 0045). Until this release, a CSV or other plugin-backed HTTP interaction was
+  verified with its body compared as text, which could pass while checking only part of the pact.
+  A gRPC, protobuf or Avro message interaction was skipped and is now reported.
+- **An interaction needs a plugin** when its `pluginConfiguration` names one, or when it uses a
+  matcher only a plugin provides, which needs every plugin the pact's metadata names.
+- **The rest of the pact is verified**, and the summary counts each refusal as a failure.
+- **`upgrade/pact` drops such an interaction** with an `interaction-dropped` finding naming the
+  plugin, and **`verification/explain` refuses it** with the same error.
+
+#### A component's registry credential is declared in its source, and a run reads no environment for it
+
+A component fetched from an OCI registry used to be fetched with `JANUS_OCI_USERNAME` and
+`JANUS_OCI_PASSWORD` from the environment of whatever hosted the engine. So two runs of one configuration
+could differ in whether they started, and nothing in the configuration said why (ADR 0052).
+
+- **A component declaration's `source` takes `auth`**, in the broker descriptor's shape: `basic` with
+  `username` and `password`, or `bearer` with a registry `token`. A host's loader interpolates `${VAR}` in
+  it as in any member, and `hooks-host`'s loader does. A `basic` credential answers a `Basic` challenge and
+  is presented to a `Bearer` challenge's token service; a `bearer` one is presented as it stands.
+- **Breaking: a run presents that credential and no other.** `verification/verify`, `verification/explain`
+  and `consumer-session/create` no longer read the two variables. A registry that wants a credential
+  nobody declared refuses with `unauthorized`, inside `component-unavailable`, and the message says the
+  credential belongs in the component source's `auth`. A configuration that relied on the variables adds
+  `auth: { kind: basic, username: "${JANUS_OCI_USERNAME}", password: "${JANUS_OCI_PASSWORD}" }`.
+- **Refused before anything is fetched:** an `auth` whose kind the loader cannot present, and an `auth`
+  on a source that is not a registry. A malformed `auth` (not an object, a member that is not a string,
+  `basic` without a password, `bearer` without a token) is an invalid declaration, and the message never
+  quotes it.
+- **The credential is never repeated**: the frame log shows an `auth` member's `kind` alone, as for a
+  broker, and no error, event or summary carries it.
+- **`janus component push` and `pull` still read the two variables**, having no configuration. When given
+  them, the declaration they print carries the `auth` above.
+
+`pact_janus_component_host`'s API follows: `Oci::new` takes no credentials, `Oci::pull`/`push` and
+`WasmLoader::pull`/`push` take an `Option<&Credentials>`, and `Credentials` is an enum (`Basic`,
+`Bearer`) with `from_declared`.
+
+### Features
+
+#### `values`, `eachKey`, `eachValue` and `arrayContains` rules verify as today
+
+A v1–v4 pact whose body used one of these four matching rules used to fail every interaction that had
+one: the legacy compiler compiled each to an error. They now compile as today's verifier applies them
+(ADR 0042):
+
+- `values` and `eachValue` on an object compare every entry of the reply with the pact's value for that
+  key, or the pact's first value for a key it does not give. Keys are not compared. `eachValue` uses only
+  its own rules, and on an array holds every element to them.
+- `eachKey` holds every key of the reply to its rules, and compares the pact's own members where the reply
+  has them.
+- `arrayContains` requires each variant to match some element of the reply's array, in any order; one
+  element may satisfy two variants. A variant with no rules is its element compared by equality. A
+  variant that nothing matched fails with today's message,
+  `Variant at index 0 (…) was not found in the actual list`.
+
+Plan grammar v1's `legacy:array-contains`, which no compiler emitted before, now runs a template against
+the array's elements instead of comparing one value: its children are the array, the template, and
+optionally the variant's index and element. These rules on a path, header, query, form value or XML
+element are still refused. `janus upgrade` still converts them approximately.
+
+#### `verification/explain` compiles what a run compiles, and runs captured values
+
+`verification/explain` now prints the plan a run executes, and can run it (ADR 0050).
+
+- **`components`**: the project's declared components, resolved as `verification/verify`'s
+  `target.components` are. A component's plan fragment is now in the plan `explain` prints. A contract's
+  `content-types` reach the compiler, which they did not before.
+- **An interaction a run would refuse is refused**: one whose requirement, declared content type or
+  contributed fragment no loaded component satisfies now fails with `component-unavailable`, as
+  `verify` fails it, where `explain` printed a generic plan.
+- **`values`**, with optional `encoded`: captured values by path, as a golden corpus case gives them. The
+  result then carries `executed`, with `status` (`matched` or `mismatched`), `mismatches` and the executed
+  `text`. They are run with the run's content detection and the actions its components contribute.
+- The subject's `variant` is now in the schema. The engine already read it.
+
+`janus explain` gains `--config <file>`, which loads a verifier configuration's components, and
+`--executed` now runs its values in the engine.
+
+#### Contracts carry generators, filled where a value is produced
+
+A shape node's `generator` member is now `{ "name": "<component>:<generator>", "config": { … } }`, and the
+engine fills fresh values from it where a value is produced (ADR 0048). The example stays what a contract
+records, so recording the same interaction twice still writes the same contract.
+
+- **`verification/verify` fills a contract's request.** After `state-setup` and before `before-request`,
+  every position the request's shapes give a generator gets a fresh value, on the provider's side, from
+  the same provider-state values a pact's generators read. A slot carried as octets is decoded by its
+  declared type, or the type it is labelled with, and encoded back by the same one. A generator that
+  produces nothing keeps the recorded value, with a `generator-failed` warning, as for a pact.
+- **A mock fills its reply on every exchange**, on the consumer's side, with the variant's resolved
+  state parameters as provider-state values.
+- **`generator/generate`'s context has `side`**, `provider` or `consumer`. The built-in `pact`
+  component keeps the example for a generator that does not run on that side: `pact:ProviderState` on
+  the consumer's.
+- **`upgrade/pact` writes a v1–v4 generator onto the shape at its target**, as `pact:<type>` with the
+  pact's members as its `config`, where until now it dropped every one. A generator no component
+  provides (`MockServerURL`), one in a text, binary or multipart body, or one whose path names no
+  position is still `generator-dropped`.
+- **`upgrade/pact` declares a JSON body's type** in `content-types`, with no `requires` entry, so a
+  reply with no `Content-Type` is decoded as JSON, as the pact's verification decodes it. A converted
+  body's evidence is the pact's octets, as text when they are UTF-8.
+- **`eachKey` and `eachValue` convert as the legacy compiler compiles them.** `eachKey`'s keys follow
+  the rule's own matchers and its values are left open, reported as `rule-unmapped`. `eachValue` on a
+  list becomes `each-like` with `min: 0`.
+- **A new finding, `pending-dropped`**, for a v4 interaction marked pending, which a contract has no form
+  for.
+- **The built-in form component writes a number or a boolean as its text**, as the XML component does.
+
+#### Hooks hardened: state calls retried, hook endpoints reached as a provider is, secrets kept out of logs
+
+- **An `http` hook sends through the engine's HTTP client**, the one a provider and a broker are reached
+  through, and takes a `client` member: the HTTP client options (TLS, proxies, timeouts, HTTP version). A
+  state endpoint behind the provider's mutual TLS or private CA is reached with the same options as the
+  provider (ADR 0044).
+- **A state call is tried three times.** At `state-setup` and `state-teardown`, an answer of 5xx, 408 or 429
+  is tried again after 100 ms and then 1 s. `client.retries` changes the count, and at any other point a
+  request is tried once. `timeout-ms` now bounds each attempt. A state endpoint that fails once while it
+  warms up passes, as it does under today's verifier.
+- **`format: pact-state-change-query`** sends a state as query parameters with no body, as today's
+  `--state-change-as-query` does.
+- **An `exec` hook's deadline ends everything the command started**: its process group on Unix, its process
+  tree on Windows. A command that exits while a child it started holds its output open is ended at the
+  deadline too.
+- **A scripted hook's memory and stack are bounded**, at 64 MiB and 256 KiB. A script that allocates or
+  recurses without end fails as `errored` rather than taking the engine's process with it.
+- **No hook secret is logged.** The `trace` log of each frame no longer repeats a hook's `config`, its
+  `run.headers` or `run.env`, or the user information in an `http` hook's URL, and a failing `http` hook's
+  message no longer repeats that user information.
+
+#### `janus verify` takes today's verifier options, and the protocol gains filters, pacts by URL and a stop
+
+`janus verify` now takes `pact_verifier_cli`'s long spellings and environment variables wherever they
+mean what they did, and the Ruby verifier's as aliases (ADR 0053; `Documentation/verifier-migration.md`
+has a row for every option).
+
+Protocol, all additive:
+
+- **`options.filter`** on `verification/verify`: `description` and `state` (regular expressions, searched
+  for), `no-state`, `consumers`. An interaction it leaves out is skipped; a run it narrows is `filtered`
+  and its narrowed pacts are not published (ADR 0041). One that matches no interaction is refused with a
+  new error code, `filter-matches-nothing` (category `session`), carrying the `filter` and how many
+  `interactions` there were. A filter that cannot be read is `malformed-frame`.
+- **A `urls` source**: `{ kind: "urls", urls, auth?, client? }`. Each pact is fetched by its URL in the
+  run, is never pending, and is published to its own links when a Pact Broker served it; otherwise its
+  publication is `skipped` with `reason: "not-from-a-broker"`. `options.publish` is allowed with it.
+- **`options.stop-on-first-failure`**: the run ends at the first failure that fails it (a pending one does
+  not), and the summary says `stopped: "first-failure"`.
+- `verification.schema.json` now also lists `options.variants` and `options.variant`.
+
+For an embedding with its own broker client: `BrokerClient` gains `fetch_pact`, and `FetchedPact` a
+`publishable` member.
+
+CLI:
+
+- Where the provider is: `--hostname`, `--port`/`-p` and `--transport https` when there is no
+  `--provider-url`, which is no longer required on its own.
+- Sources: `--file`/`-f`, `--dir`/`-d`, `--url`, `--webhook-callback-url`, `-b` for `--broker-url`,
+  `-n` for `--provider-name`, and `PACT_BROKER_BASE_URL`, `PACT_PROVIDER_NAME`,
+  `PACT_WEBHOOK_CALLBACK_URL`. One kind of source per run; a broker URL only the environment gave yields
+  to files or URLs on the command line. `--publish` works with `--url` too.
+- `-s`/`--state-change-url`, `--state-change-as-query`, `--state-change-teardown` write the state hooks.
+- `--filter-description`, `--filter-state`, `--filter-no-state`, `--filter-consumer`/`-c`.
+- `--exit-on-first-error`, `--consumer-version-tags`, `--retries`, `--ignore-no-pacts-error`, `-t` for
+  `--token`, and, on every command, `--no-colour` and `--loglevel`, whose levels gain `off` (alias `none`).
+
+#### `upgrade/pact` converts text, binary, form, XML and multipart bodies
+
+Until now, `upgrade/pact` converted only JSON bodies. Any other body was carried across as the pact's octets
+with a `body-not-parsed` finding, and nothing was asserted about it, so the contract verified less than its
+pact (ADR 0047).
+
+- **A body a built-in component reads declares its type.** A text body that is UTF-8, a form, XML and
+  multipart get a `content-types` entry for their slot and a `requires` entry for `content/text`,
+  `content/form`, `content/xml` or `content/multipart`. A multipart type is declared without its
+  `boundary`. Each body's shape is over that component's document, built as the legacy compiler compares
+  the body.
+- **Octets stay undeclared**: a binary body, or text that is not UTF-8, is shaped as bytes with a base64
+  `example` and `encoded: base64`.
+- **A converted body's evidence is the pact's octets**: `encoded: text` when they are UTF-8, `base64`
+  otherwise, with the pact's type in `content-type`. A replay sends them as they stand.
+- **A pact that names no `Content-Type` header** gets a `content-type` member in that part's `headers`
+  shape: `optional`, of a `regex` that admits what the pact's check of the reply's type admits. This
+  applies to JSON bodies too, so a converted JSON interaction with no `Content-Type` header now has a
+  `headers` shape, and a variant space of two.
+- **A number or boolean rule on text** (a path, header, query or form value, an XML attribute or text)
+  converts to the `regex` v1–v4 read the text by, where it converted to `integer`, `number` or
+  `boolean`, which no string satisfies.
+- **`eachValue` and `arrayContains`** convert with their own rules.
+- **New finding codes**: `response-body-opened` (lossy), `body-type-on-header` (judgement) and
+  `rule-as-pattern` (note). `body-not-parsed` is now raised only for a body that is not what its type says.
+  `request-body-opened` and `rule-narrowed` are raised for the new body kinds too.
+
+Two behaviours change outside `upgrade/pact`:
+
+- **The built-in multipart component** decodes a slot whose declared type names no `boundary` at the
+  boundary the slot's own label names.
+- **The shape compiler quotes a member name a path cannot hold**, such as `a.b`, `''` or
+  `@{urn:x}id`. Such a member used to be resolved as a different member, nested or missing, so a shape
+  naming one matched the wrong value.
+
+#### `upgrade/pact` can leave pending interactions out of the contract
+
+A Janus contract has no pending interactions: whether a provider has yet to satisfy one is the broker's
+to decide, from the provider's results, as it decides a pending pact (ADR 0051). `janus verify` keeps
+honouring a v4 pact's `pending` flag, as today's verifier does.
+
+- **`upgrade/pact` reads `options.exclude-pending`.** With `true`, each pending interaction in the pact
+  is left out of the contract and reported as a new finding, `pending-excluded` (`lossy`), pointing at
+  the interaction and naming it. Without it, nothing changes: each is converted without its flag, and
+  reported as `pending-dropped`, whose message now says how to leave it out instead. An interaction
+  left out is not counted again in `interaction-dropped`.
+- **`janus upgrade --exclude-pending`** sends it, for a pact whose pending interactions are known to
+  fail, whose upgraded contract would otherwise fail where the pact passes.
+- **Every finding points at the interaction's position in the pact.** Upgrading used to count only the
+  HTTP interactions, so a finding for one after a message or plugin interaction pointed at the wrong
+  one, and the suffix `duplicate-description` gave a renamed interaction in such a pact was off by as
+  many.
+
+The protocol's `upgrade.schema.json` now lists every finding code the contract-file spec does, and the
+generated bindings carry the new option.
+
+### Fixes
+
+#### `content-type` shapes match in live runs
+
+A `content-type` shape, or a v1–v4 `contentType` matcher, failed every live verification and mock exchange
+with "no content component is loaded": only the golden corpus runner gave the interpreter a detector. Both
+paths now ask the session's content registry (ADR 0049).
+
+- On a contract, a slot's type is the one the interaction declares for it, else the `Content-Type` it
+  arrived with, and only a slot with neither is detected from its octets. A reply that labels JSON
+  `text/plain` fails a `content-type` of `application/json`.
+- A v1–v4 `contentType` matcher detects the type from the reply's octets, whatever they are labelled, as
+  today's verifier does.
+- Types are compared by essence: case and parameters aside, and `text/*` matches any text type.
+- The built-in components detect JSON only. A `contentType` for a binary type such as `image/png` is not
+  detected yet.
+
 ## 0.3.0 (2026-10-22)
 
 ### Breaking Changes
