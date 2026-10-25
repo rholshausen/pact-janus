@@ -1105,6 +1105,18 @@ item in 1a is done when S1.1 agrees.
   fallback for `janus component pull`, which has no configuration, is the decision.
   *Exit:* finding 16 closed; a component declaration's registry credential reaches the registry and
   nothing a run reports or logs, with a test, as S1.9's hook secrets have.
+  *Done 2026-10-25*, as option B, which
+  [ADR 0052](decisions/0052-declare-a-components-registry-credential-in-its-source.md) decides. A
+  component's `source` takes `auth`, in the broker descriptor's shape (`basic` or `bearer`), which the
+  loader interpolates, and a run's loader presents it and nothing else: a registry that wants a
+  credential nobody declared refuses as `unauthorized`, saying where it belongs. The decision the item
+  left open: `janus component push` and `pull` keep the two variables, having no configuration and
+  not being runs, and the declaration they print names them as its `auth`. Lifecycle-hooks spec §7.3
+  names the credential; the frame log, `Debug` and every refusal leave it out, and a malformed one is
+  refused without being quoted, which serde's own message would not have done. `cli/tests/cli.rs`
+  runs `janus verify` at `trace` against a registry whose token service wants the credential.
+  Not foreseen: `--log-level trace` makes loading a component take seconds, since the WASM compiler
+  logs at `trace` too; noted for the CLI output review.
 
 - **S1.28 Pending interactions in a contract** — **S**. Split from S1.19 on 2026-10-25, which found
   it through S1.1's upgraded column. A v4 interaction may be `pending`: today's verifier reports its

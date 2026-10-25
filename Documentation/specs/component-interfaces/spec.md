@@ -1020,10 +1020,31 @@ implied, because a component resolved from a tag nobody wrote down is a componen
 
 The rest is the loader's, and v1's is deliberately minimal: loopback registries (`localhost`,
 `127.0.0.1`, `[::1]`) are reached over plain HTTP and every other over HTTPS; a registry's `Bearer`
-challenge is answered with a token from its token service, and a `Basic` one with credentials. Those
-credentials come from `JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` in the loader's environment — an
-exception to design 2.7 §7.1's rule that a run does not depend on its host's environment, taken because a
-credential decides whether a component can be fetched and never which one runs. The cache lives at
+challenge is answered with a token from its token service, and a `Basic` one with credentials.
+
+The credential is the declaration's `source.auth`, and a run's loader presents no other
+([ADR 0052](../../decisions/0052-declare-a-components-registry-credential-in-its-source.md)):
+
+```json component-config
+{ "components": [
+    { "name": "csv",
+      "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-csv:1.2.0", "digest": "sha256:9f2c…",
+                  "auth": { "kind": "basic", "username": "${REGISTRY_USER}",
+                            "password": "${REGISTRY_TOKEN}" } } } ] }
+```
+
+It is written with `${VAR}` references, which the host's loader interpolates as it does every member
+(design 2.7 §7.1), so a run depends on its configuration and not on the environment of the process
+hosting the engine, and two runs of one document differ in whether they start only by what the document
+names. It takes the broker descriptor's shape (engine-protocol spec §8.7): `basic`, a `username` and
+`password`, answers a `Basic` challenge and is presented to a `Bearer` challenge's token service, which
+is how most registries take them; `bearer` is a registry `token`, presented as it stands to a `Bearer`
+challenge. A loader refuses a kind it cannot present, and a credential on a source that is not a
+registry, before fetching anything. The credential is a secret as design 2.7 §7.3 defines one: the
+engine never repeats it, in an error, an event, a summary or a log, where an `auth` member shows its
+`kind` alone. `janus component push` and `pull`, which have no configuration and are not runs, read
+`JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` instead, and the declaration they print names those two
+variables as its `auth`. The cache lives at
 `JANUS_COMPONENT_CACHE`, else the user cache directory's `pact-janus/components`, laid out as an OCI image
 layout's `blobs/sha256/<hex>`. A load failure the loader produced carries `source: "engine"` and one of
 `digest-mismatch`, `not-a-component`, `artifact-mismatch`, `not-found`, `unauthorized` or `unavailable`

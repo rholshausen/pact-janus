@@ -37,7 +37,7 @@ superseding ADR instead.
 | [0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md) | Write Janus contracts as compact JSON; canonical form carries no formatting promise, and a reader must not assume one of its input | accepted |
 | [0019](0019-an-sdk-refuses-what-it-cannot-spell-and-stops-when-the-engine-does.md) | Refuse at the call what an SDK cannot spell the same way in every language, write what it can, and fail a run at once when the engine errors | accepted |
 | [0020](0020-a-content-slots-type-is-declared-on-the-interaction.md) | Declare a content slot's type on the interaction, beside its parts, not inside them | accepted |
-| [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted |
+| [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted; amended by 0052 |
 | [0022](0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md) | A plan fragment replaces its slot's plan, declares a grammar the engine says it reads, and is checked before anything runs | accepted |
 | [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md) | Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations | accepted |
 | [0024](0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) | Keep request dimensions pinned, and match a cardinality point as a region | accepted |
@@ -68,6 +68,7 @@ superseding ADR instead.
 | [0049](0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md) | Match a content type against the arrival's own octets and labels | accepted |
 | [0050](0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md) | `explain` compiles what a run compiles, and runs captured values | accepted |
 | [0051](0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md) | Leave pending out of the contract, and let upgrade exclude pending interactions | accepted |
+| [0052](0052-declare-a-components-registry-credential-in-its-source.md) | Declare a component's registry credential in its source | accepted |
 
 ## Decision backlog
 

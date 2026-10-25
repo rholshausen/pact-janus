@@ -7,8 +7,10 @@
 //!
 //! This is a deliberately small client for the distribution API: resolve a manifest, fetch two
 //! blobs, and — for `janus component push` — upload two blobs and a manifest. Anonymous access, the
-//! registry token dance and HTTP Basic are covered; credential helpers and `~/.docker/config.json`
-//! are not. What it is careful about is integrity:
+//! registry token dance, HTTP Basic and a registry token are covered; credential helpers and
+//! `~/.docker/config.json` are not. The credential is the caller's, per pull or push: a run's comes
+//! from the component's declaration, and only `janus component push|pull` read the environment
+//! (ADR 0052). What it is careful about is integrity:
 //!
 //! - **nothing is trusted by name.** Every manifest and blob is hashed on arrival — from the
 //!   registry *and* from the cache — and one that does not hash to the digest it was asked for is a
@@ -177,31 +179,70 @@ pub struct Pulled {
   pub wasm: Vec<u8>,
 }
 
-/// Registry credentials, from `JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD` in the environment of
-/// whatever runs the loader, and nowhere else. That is an exception to design 2.7 §7.1 — a run
-/// should not depend on its host process's environment — and a deliberate one: a credential decides
-/// whether bytes can be fetched, never *which* bytes run (the digest decides that), so it changes
-/// whether a run starts and never what it does. Putting it in the declaration would put a secret in
-/// a document the component-config schema has no redaction rule for.
+/// A registry credential (ADR 0052). A run's comes from its component's declaration, `source.auth`,
+/// which the loader interpolated (lifecycle-hooks spec §7.1), so a run depends on no environment;
+/// `janus component push|pull`, which have no configuration, read [`Credentials::from_env`].
+/// `Debug` names the kind alone.
 #[derive(Clone)]
-pub struct Credentials {
-  pub username: String,
-  pub password: String,
+pub enum Credentials {
+  /// A username and password: answers a `Basic` challenge, and is presented to a `Bearer`
+  /// challenge's token service, which is how most registries take them.
+  Basic { username: String, password: String },
+  /// A registry token, presented as it stands to a `Bearer` challenge.
+  Bearer { token: String },
+}
+
+impl fmt::Debug for Credentials {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str(match self {
+      Credentials::Basic { .. } => "Credentials::Basic(***)",
+      Credentials::Bearer { .. } => "Credentials::Bearer(***)",
+    })
+  }
 }
 
 impl Credentials {
+  /// `JANUS_OCI_USERNAME` and `JANUS_OCI_PASSWORD`, for the commands that have no configuration to
+  /// declare a credential in. A run never reads them.
   pub fn from_env() -> Option<Credentials> {
-    Some(Credentials {
+    Some(Credentials::Basic {
       username: std::env::var("JANUS_OCI_USERNAME").ok()?,
       password: std::env::var("JANUS_OCI_PASSWORD").ok()?,
     })
   }
 
-  fn basic(&self) -> String {
-    format!(
-      "Basic {}",
-      BASE64.encode(format!("{}:{}", self.username, self.password))
-    )
+  /// A declaration's `source.auth`. A kind this client cannot present is refused by name.
+  pub fn from_declared(auth: &pact_janus_kernel::component::SourceAuth) -> Result<Credentials, String> {
+    match (auth.kind.as_str(), &auth.username, &auth.password, &auth.token) {
+      ("basic", Some(username), Some(password), _) => Ok(Credentials::Basic {
+        username: username.clone(),
+        password: password.clone(),
+      }),
+      ("bearer", _, _, Some(token)) => Ok(Credentials::Bearer { token: token.clone() }),
+      (kind, ..) => Err(format!(
+        "a registry credential of kind '{kind}' cannot be presented: 'basic' and 'bearer' can"
+      )),
+    }
+  }
+
+  fn basic(&self) -> Option<String> {
+    match self {
+      Credentials::Basic { username, password } => Some(format!(
+        "Basic {}",
+        BASE64.encode(format!("{username}:{password}"))
+      )),
+      Credentials::Bearer { .. } => None,
+    }
+  }
+
+  /// What tells one credential's cached authorization from another's, without holding the secret.
+  fn fingerprint(credentials: Option<&Credentials>) -> String {
+    let secret = match credentials {
+      None => return "anonymous".to_string(),
+      Some(Credentials::Basic { username, password }) => format!("basic\0{username}\0{password}"),
+      Some(Credentials::Bearer { token }) => format!("bearer\0{token}"),
+    };
+    sha256(secret.as_bytes())
   }
 }
 
@@ -209,8 +250,7 @@ impl Credentials {
 pub struct Oci {
   cache: PathBuf,
   agent: ureq::Agent,
-  credentials: Option<Credentials>,
-  /// The `Authorization` a registry last accepted, per `registry/repository`.
+  /// The `Authorization` a registry last accepted, per `registry/repository` and credential.
   authorizations: Mutex<HashMap<String, String>>,
 }
 
@@ -229,7 +269,7 @@ pub fn default_cache() -> PathBuf {
 }
 
 impl Oci {
-  pub fn new(cache: impl Into<PathBuf>, credentials: Option<Credentials>) -> Oci {
+  pub fn new(cache: impl Into<PathBuf>) -> Oci {
     // `http_status_as_error(false)`: a 401 is the start of the token dance and a 404 is an answer,
     // not a transport failure. Redirects are followed — registries hand blobs to a CDN — and ureq
     // does not forward the registry's `Authorization` to wherever they go.
@@ -242,7 +282,6 @@ impl Oci {
     Oci {
       cache: cache.into(),
       agent,
-      credentials,
       authorizations: Mutex::new(HashMap::new()),
     }
   }
@@ -253,7 +292,12 @@ impl Oci {
 
   /// Spec §10.3 steps 1–3: resolve, check, cache. `declared` is the declaration's `digest`; it and a
   /// digest in the reference itself must agree, and whichever is present is the pin.
-  pub fn pull(&self, reference: &Reference, declared: Option<&str>) -> Result<Pulled, ComponentError> {
+  pub fn pull(
+    &self,
+    reference: &Reference,
+    declared: Option<&str>,
+    auth: Option<&Credentials>,
+  ) -> Result<Pulled, ComponentError> {
     let declared = declared.map(check_digest).transpose().map_err(|message| {
       failure(
         "invalid-reference",
@@ -276,7 +320,7 @@ impl Oci {
 
     let (digest, manifest) = match pin {
       Some(pin) => {
-        let manifest = self.content(reference, &pin, "manifests", MAX_MANIFEST_BYTES)?;
+        let manifest = self.content(reference, auth, &pin, "manifests", MAX_MANIFEST_BYTES)?;
         (pin, manifest)
       }
       None => {
@@ -284,7 +328,7 @@ impl Oci {
           .tag
           .as_deref()
           .expect("a reference has a tag or a digest");
-        let manifest = self.fetch(reference, "manifests", tag, MAX_MANIFEST_BYTES)?;
+        let manifest = self.fetch(reference, auth, "manifests", tag, MAX_MANIFEST_BYTES)?;
         let digest = sha256(&manifest);
         tracing::info!(%reference, %digest, "resolved a tag; pin this digest for reproducible runs");
         self.store(&digest, &manifest);
@@ -293,7 +337,7 @@ impl Oci {
     };
 
     let (config, layer) = parse_manifest(&manifest, reference, &digest)?;
-    let config_bytes = self.content(reference, &config.digest, "blobs", config.size)?;
+    let config_bytes = self.content(reference, auth, &config.digest, "blobs", config.size)?;
     check_size(reference, &config, &config_bytes)?;
     let config: Value = serde_json::from_slice(&config_bytes).map_err(|err| {
       failure(
@@ -302,7 +346,7 @@ impl Oci {
         json!({ "reference": reference.to_string() }),
       )
     })?;
-    let wasm = self.content(reference, &layer.digest, "blobs", layer.size)?;
+    let wasm = self.content(reference, auth, &layer.digest, "blobs", layer.size)?;
     check_size(reference, &layer, &wasm)?;
     Ok(Pulled {
       reference: reference.clone(),
@@ -316,10 +360,16 @@ impl Oci {
   /// reference says. Returns the manifest digest — the value a declaration pins. The manifest is
   /// built from the inputs alone (no timestamp, no host name), so the same component pushed twice
   /// has the same digest.
-  pub fn push(&self, reference: &Reference, wasm: &[u8], config: &Value) -> Result<String, ComponentError> {
+  pub fn push(
+    &self,
+    reference: &Reference,
+    wasm: &[u8],
+    config: &Value,
+    auth: Option<&Credentials>,
+  ) -> Result<String, ComponentError> {
     let config = serde_json::to_vec(config).map_err(|err| ComponentError::internal(err.to_string()))?;
-    let config_digest = self.upload(reference, &config)?;
-    let wasm_digest = self.upload(reference, wasm)?;
+    let config_digest = self.upload(reference, auth, &config)?;
+    let wasm_digest = self.upload(reference, auth, wasm)?;
     let manifest = serde_json::to_vec(&json!({
       "schemaVersion": 2,
       "mediaType": MANIFEST_MEDIA_TYPE,
@@ -342,6 +392,7 @@ impl Oci {
     let url = format!("{}/manifests/{target}", reference.api());
     let response = self.send(
       reference,
+      auth,
       "PUT",
       &url,
       &[("content-type", MANIFEST_MEDIA_TYPE)],
@@ -352,10 +403,16 @@ impl Oci {
   }
 
   /// One blob, monolithically (distribution spec: POST then PUT), unless the registry has it.
-  fn upload(&self, reference: &Reference, bytes: &[u8]) -> Result<String, ComponentError> {
+  fn upload(
+    &self,
+    reference: &Reference,
+    auth: Option<&Credentials>,
+    bytes: &[u8],
+  ) -> Result<String, ComponentError> {
     let digest = sha256(bytes);
     let head = self.send(
       reference,
+      auth,
       "HEAD",
       &format!("{}/blobs/{digest}", reference.api()),
       &[],
@@ -366,6 +423,7 @@ impl Oci {
     }
     let started = self.send(
       reference,
+      auth,
       "POST",
       &format!("{}/blobs/uploads/", reference.api()),
       &[],
@@ -384,6 +442,7 @@ impl Oci {
     let url = format!("{location}{separator}digest={}", digest.replace(':', "%3A"));
     let finished = self.send(
       reference,
+      auth,
       "PUT",
       &url,
       &[("content-type", "application/octet-stream")],
@@ -398,6 +457,7 @@ impl Oci {
   fn content(
     &self,
     reference: &Reference,
+    auth: Option<&Credentials>,
     digest: &str,
     kind: &str,
     limit: u64,
@@ -405,7 +465,7 @@ impl Oci {
     if let Some(bytes) = self.cached(digest) {
       return Ok(bytes);
     }
-    let bytes = self.fetch(reference, kind, digest, limit)?;
+    let bytes = self.fetch(reference, auth, kind, digest, limit)?;
     let actual = sha256(&bytes);
     if actual != digest {
       return Err(failure(
@@ -421,6 +481,7 @@ impl Oci {
   fn fetch(
     &self,
     reference: &Reference,
+    auth: Option<&Credentials>,
     kind: &str,
     target: &str,
     limit: u64,
@@ -431,7 +492,7 @@ impl Oci {
     // looking for a typo. Accepted, an index reaches `parse_manifest` and is refused by name.
     let accept = [("accept", ACCEPT_MANIFESTS)];
     let headers: &[(&str, &str)] = if kind == "manifests" { &accept } else { &[] };
-    let response = self.send(reference, "GET", &url, headers, None)?;
+    let response = self.send(reference, auth, "GET", &url, headers, None)?;
     let mut response = expect(reference, response, &[200], &format!("fetching {kind}/{target}"))?;
     tracing::debug!(%reference, %target, "fetched from the registry");
     // One byte over the descriptor's size: ureq refuses a body that *reaches* its limit, and a blob
@@ -488,12 +549,18 @@ impl Oci {
   fn send(
     &self,
     reference: &Reference,
+    auth: Option<&Credentials>,
     method: &str,
     url: &str,
     headers: &[(&str, &str)],
     body: Option<&[u8]>,
   ) -> Result<ureq::http::Response<ureq::Body>, ComponentError> {
-    let key = format!("{}/{}", reference.registry, reference.repository);
+    let key = format!(
+      "{}/{}#{}",
+      reference.registry,
+      reference.repository,
+      Credentials::fingerprint(auth)
+    );
     let attempt = |authorization: Option<&str>| {
       let mut request = ureq::http::Request::builder().method(method).uri(url);
       for (name, value) in headers {
@@ -531,7 +598,7 @@ impl Oci {
       .and_then(|value| value.to_str().ok())
       .unwrap_or_default()
       .to_string();
-    let authorization = self.authorize(reference, &challenge)?;
+    let authorization = self.authorize(reference, auth, &challenge)?;
     let response = attempt(Some(&authorization))?;
     if response.status() != 401 {
       self
@@ -544,8 +611,13 @@ impl Oci {
   }
 
   /// Answer a `WWW-Authenticate` challenge: `Bearer` is the registry token dance (anonymous unless
-  /// credentials are set), `Basic` needs credentials.
-  fn authorize(&self, reference: &Reference, challenge: &str) -> Result<String, ComponentError> {
+  /// there are basic credentials), or the registry token given; `Basic` needs basic credentials.
+  fn authorize(
+    &self,
+    reference: &Reference,
+    auth: Option<&Credentials>,
+    challenge: &str,
+  ) -> Result<String, ComponentError> {
     let (scheme, params) = challenge.split_once(' ').unwrap_or((challenge, ""));
     let denied = |why: &str| {
       failure(
@@ -555,14 +627,20 @@ impl Oci {
       )
     };
     if scheme.eq_ignore_ascii_case("basic") {
-      return self.credentials.as_ref().map(Credentials::basic).ok_or_else(|| {
-        denied("the registry wants credentials; set JANUS_OCI_USERNAME and JANUS_OCI_PASSWORD")
-      });
+      return match auth {
+        Some(credentials) => credentials.basic().ok_or_else(|| {
+          denied("the registry wants a username and password, and the credential given is a token")
+        }),
+        None => Err(denied("the registry wants credentials, and none were given")),
+      };
     }
     if !scheme.eq_ignore_ascii_case("bearer") {
       return Err(denied(&format!(
         "the registry asked for '{scheme}' authentication"
       )));
+    }
+    if let Some(Credentials::Bearer { token }) = auth {
+      return Ok(format!("Bearer {token}"));
     }
     let params = challenge_params(params);
     let realm = params
@@ -577,8 +655,8 @@ impl Oci {
       .cloned()
       .unwrap_or_else(|| format!("repository:{}:pull", reference.repository));
     request = request.query("scope", &scope);
-    if let Some(credentials) = &self.credentials {
-      request = request.header("authorization", &credentials.basic());
+    if let Some(basic) = auth.and_then(Credentials::basic) {
+      request = request.header("authorization", &basic);
     }
     let mut response = request
       .call()

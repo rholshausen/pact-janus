@@ -488,6 +488,38 @@ hooks:
     );
   }
 
+  /// ADR 0052: a component's registry credential is declared, and interpolated like any other
+  /// member, so a run's credential is in its configuration and not the engine's environment. One
+  /// that is malformed fails the load, naming where, without repeating the interpolated secret.
+  #[test]
+  fn a_components_registry_credential_is_interpolated_and_a_malformed_one_never_repeated() {
+    let declared = |auth: Value| {
+      json!({ "components": [
+        { "name": "csv", "source": { "kind": "oci", "reference": "ghcr.io/acme/csv:1", "auth": auth } } ] })
+    };
+    let secrets = env(&[("REGISTRY_USER", "bob"), ("REGISTRY_PASSWORD", "s3cret")]);
+    let resolved = resolve(
+      &declared(
+        json!({ "kind": "basic", "username": "${REGISTRY_USER}", "password": "${REGISTRY_PASSWORD}" }),
+      ),
+      Path::new("."),
+      &secrets,
+    )
+    .expect("resolves");
+    assert_eq!(
+      resolved["components"][0]["source"]["auth"],
+      json!({ "kind": "basic", "username": "bob", "password": "s3cret" })
+    );
+
+    match resolve(&declared(json!("${REGISTRY_PASSWORD}")), Path::new("."), &secrets).expect_err("refused") {
+      LoadError::Invalid(problems) => {
+        assert_eq!(problems[0].pointer, "/components/0");
+        assert!(!problems[0].message.contains("s3cret"), "{}", problems[0].message);
+      }
+      other => panic!("expected an invalid document, got {other:?}"),
+    }
+  }
+
   #[test]
   fn a_component_declaration_the_kernel_cannot_read_fails_the_load_naming_it() {
     let document = json!({ "components": [ { "name": "csv" } ] });

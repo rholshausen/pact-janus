@@ -33,7 +33,7 @@ pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
   ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
-  Unavailable, check_requirements, resolve,
+  SourceAuth, Unavailable, check_requirements, resolve,
 };
 pub use matcher::{Apply, ApplyResult, MatcherComponent};
 pub use parts::{Part, Parts, SlotValue};

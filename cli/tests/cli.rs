@@ -2097,6 +2097,121 @@ fn a_pushed_component_verifies_a_csv_contract_pinned_by_digest_and_then_offline(
   assert!(stdout(&offline).contains("VERIFIED: 1 verified, 0 failed"));
 }
 
+/// ADR 0052, through the binary: a run's registry credential is its component declaration's
+/// `source.auth`, interpolated by the loader. It reaches the registry and nothing `janus verify`
+/// prints, every frame and the loader's and HTTP library's log lines at `trace` included. The variables `janus component push|pull`
+/// read reach no run, and the declaration `pull` prints with them carries them as `auth`.
+#[test]
+fn a_registry_credential_is_declared_reaches_the_registry_and_appears_nowhere_else() {
+  let registry = registry::Registry::start();
+  registry.require_credentials("bob", "s3cret-registry");
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let as_bob = |cache: &str, args: &[&str]| {
+    janus_command()
+      .args(args)
+      .env("JANUS_COMPONENT_CACHE", cache)
+      .env("JANUS_OCI_USERNAME", "bob")
+      .env("JANUS_OCI_PASSWORD", "s3cret-registry")
+      .output()
+      .expect("the janus binary runs")
+  };
+  let pushed = as_bob(
+    &temp("oci-auth-push-cache"),
+    &[
+      "component",
+      "push",
+      &csv_component(),
+      &reference,
+      "--output",
+      "json",
+    ],
+  );
+  assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
+  let digest = serde_json::from_slice::<Value>(&pushed.stdout).unwrap()["digest"]
+    .as_str()
+    .unwrap()
+    .to_string();
+
+  let pull_cache = temp("oci-auth-pull-cache");
+  let _ = std::fs::remove_dir_all(&pull_cache);
+  let pulled = as_bob(&pull_cache, &["component", "pull", &reference]);
+  assert_eq!(code(&pulled), 0, "{}", stderr(&pulled));
+  assert!(
+    stdout(&pulled).contains(
+      r#"auth: { kind: basic, username: "${JANUS_OCI_USERNAME}", password: "${JANUS_OCI_PASSWORD}" } }"#
+    ),
+    "{}",
+    stdout(&pulled)
+  );
+  assert!(
+    !stdout(&pulled).contains("s3cret-registry"),
+    "{}",
+    stdout(&pulled)
+  );
+
+  let provider = provider();
+  let config = temp("oci-auth.janus.yaml");
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\ncomponents:\n  - name: csv\n    source:\n      kind: oci\n      reference: \"{reference}\"\n      digest: \"{digest}\"\n      auth: {{ kind: basic, username: \"${{REGISTRY_USER}}\", password: \"${{REGISTRY_PASSWORD}}\" }}\nhooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
+      provider.base_url()
+    ),
+  )
+  .expect("writing the config");
+  let cache = temp("oci-auth-verify-cache");
+  let _ = std::fs::remove_dir_all(&cache);
+  let verified = janus_command()
+    .args(["verify", &csv_contract(), "--provider-url", provider.base_url(), "--config", &config])
+    // Everything that could print the credential at `trace` — the frames, the loader, the HTTP
+    // library the registry client sends through — and the WASM compiler at `info`, whose own
+    // `trace` costs a minute and says nothing about credentials.
+    .env(
+      "RUST_LOG",
+      "info,pact_janus_kernel=trace,pact_janus_component_host=trace,pact_janus_cli=trace,ureq=trace,ureq_proto=trace",
+    )
+    .env("JANUS_COMPONENT_CACHE", &cache)
+    .env("REGISTRY_USER", "bob")
+    .env("REGISTRY_PASSWORD", "s3cret-registry")
+    .output()
+    .expect("the janus binary runs");
+  let everything = format!("{}{}", stdout(&verified), stderr(&verified));
+  assert_eq!(code(&verified), 0, "{everything}");
+  assert!(
+    everything.contains("VERIFIED: 1 verified, 0 failed"),
+    "{everything}"
+  );
+  assert!(
+    everything.contains("frame in"),
+    "the frames were logged: {everything}"
+  );
+  assert!(
+    !everything.contains("s3cret-registry"),
+    "the credential was printed:\n{everything}"
+  );
+
+  // The same run with the credential only in the environment `component push|pull` read: a run
+  // does not read it, so the registry refuses, and the refusal says where the credential belongs.
+  let undeclared = oci_config(&provider, &reference, &digest);
+  let fresh = temp("oci-auth-undeclared-cache");
+  let _ = std::fs::remove_dir_all(&fresh);
+  let refused = as_bob(
+    &fresh,
+    &[
+      "verify",
+      &csv_contract(),
+      "--provider-url",
+      provider.base_url(),
+      "--config",
+      &undeclared,
+    ],
+  );
+  let everything = format!("{}{}", stdout(&refused), stderr(&refused));
+  assert_eq!(code(&refused), 2, "{everything}");
+  assert!(everything.contains("unauthorized"), "{everything}");
+  assert!(everything.contains("source's 'auth'"), "{everything}");
+}
+
 #[test]
 fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
   let registry = registry::Registry::start();

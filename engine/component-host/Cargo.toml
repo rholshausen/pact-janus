@@ -22,6 +22,7 @@ wasmtime-wasi = { version = "47", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1"
+rstest = "0.24"
 # The engine this loader plugs into, with the in-tree components `janus-engine` registers beside
 # it, and the sample provider a CSV consumer's contract is verified against (plan task 8.1).
 pact_janus_component_http = { path = "../component-http" }

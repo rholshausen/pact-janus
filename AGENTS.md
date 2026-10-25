@@ -103,7 +103,10 @@ Three sources are the source of truth and take precedence over this file when th
 > and S1.12 (ADR 0050: `verification/explain` takes `components` and `values`, compiling what a run
 > compiles and running captured values in the engine; `janus explain --config` and `--executed` use them),
 > and S1.28 (ADR 0051: a contract has no pending interactions, pending being the broker's to decide;
-> `janus upgrade` converts one without its flag, or leaves it out with `--exclude-pending`).
+> `janus upgrade` converts one without its flag, or leaves it out with `--exclude-pending`), and S1.27
+> (ADR 0052: a component's registry credential is its declaration's `source.auth`, interpolated by the
+> loader and never repeated; a run reads no environment for it, and only `janus component push|pull`
+> read `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -427,8 +430,10 @@ skip otherwise.
 `janus component push|pull` (plan task 8.2) is the one command that does not speak the protocol —
 publishing is not an engine operation. `push` writes the artifact's config from the component's own
 handshake; `pull` fetches into the cache, checks every byte, and prints the pinned declaration. A pin
-is fetched by digest alone and a second run fetches nothing. Loopback registries are plain HTTP;
-credentials are `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`; the cache is `JANUS_COMPONENT_CACHE`
+is fetched by digest alone and a second run fetches nothing. Loopback registries are plain HTTP.
+A run's registry credential is its declaration's `source.auth`, `${VAR}`-interpolated by the loader
+(ADR 0052): a run reads no environment for it. Only `push` and `pull`, which have no configuration,
+read `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`. The cache is `JANUS_COMPONENT_CACHE`
 (default: the user cache directory's `pact-janus/components`). The OCI tests run against an in-process
 registry that tampers on request, and against a real one when `JANUS_OCI_REGISTRY` names it
 (`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this).

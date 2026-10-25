@@ -46,6 +46,7 @@ fn declaration(reference: &str, digest: Option<&str>) -> ComponentDeclaration {
       kind: "oci".to_string(),
       reference: Some(reference.to_string()),
       digest: digest.map(str::to_string),
+      auth: None,
     },
     grants: Grants::default(),
     limits: Limits::default(),
@@ -84,7 +85,7 @@ fn load_and_decode(loader: &WasmLoader, declaration: &ComponentDeclaration) -> V
 fn push(registry: &str) -> String {
   let loader = WasmLoader::with_cache(fresh_cache("push")).unwrap();
   let pushed = loader
-    .push(&csv_bytes(), &format!("{registry}/janus-csv:1.0.0"))
+    .push(&csv_bytes(), &format!("{registry}/janus-csv:1.0.0"), None)
     .unwrap_or_else(|err| panic!("{err:?}"));
   pushed.digest
 }
@@ -95,8 +96,8 @@ fn a_pushed_component_carries_its_handshake_and_has_one_digest_however_often_it_
   let loader = WasmLoader::with_cache(fresh_cache("push")).unwrap();
   let reference = format!("{}/janus-csv:1.0.0", registry.host);
 
-  let first = loader.push(&csv_bytes(), &reference).unwrap();
-  let again = loader.push(&csv_bytes(), &reference).unwrap();
+  let first = loader.push(&csv_bytes(), &reference, None).unwrap();
+  let again = loader.push(&csv_bytes(), &reference, None).unwrap();
 
   // The config is what the component said, not what the publisher typed.
   assert_eq!(first.config, json!({ "name": "csv", "version": "1.0.0" }));
@@ -127,7 +128,7 @@ fn a_component_declared_by_tag_is_resolved_and_answers() {
 
   // And the pull a person would run to find out what to pin says the same digest.
   let (pulled, hello) = loader
-    .pull(&format!("oci://{}/janus-csv:1.0.0", registry.host), None)
+    .pull(&format!("oci://{}/janus-csv:1.0.0", registry.host), None, None)
     .unwrap();
   assert_eq!(pulled.digest, digest);
   assert_eq!(hello["component"]["version"], "1.0.0");
@@ -292,11 +293,12 @@ fn an_artifact_whose_config_disagrees_with_the_handshake_is_refused() {
   let registry = Registry::start();
   let reference = Reference::parse(&format!("{}/janus-csv:9.9.9", registry.host)).unwrap();
   // A publisher who typed the config by hand, and typed it wrong.
-  Oci::new(fresh_cache("lie"), None)
+  Oci::new(fresh_cache("lie"))
     .push(
       &reference,
       &csv_bytes(),
       &json!({ "name": "csv", "version": "9.9.9" }),
+      None,
     )
     .unwrap();
 
@@ -318,6 +320,115 @@ fn a_registry_that_wants_a_token_is_given_one() {
   );
   let log = registry.take_log();
   assert!(log.iter().any(|line| line.starts_with("GET /token?")), "{log:#?}");
+}
+
+/// A declaration with a registry credential, read as a loader hands one to the engine.
+fn declared_with(reference: &str, digest: &str, auth: Value) -> ComponentDeclaration {
+  serde_json::from_value(json!({
+    "name": "csv",
+    "source": { "kind": "oci", "reference": reference, "digest": digest, "auth": auth }
+  }))
+  .expect("a declaration")
+}
+
+/// Push to a registry that wants `bob`'s credentials, as `janus component push` would with them.
+fn push_as_bob(registry: &Registry) -> (String, String) {
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let bob = oci::Credentials::Basic {
+    username: "bob".to_string(),
+    password: "hunter2".to_string(),
+  };
+  let pushed = WasmLoader::with_cache(fresh_cache("push-as-bob"))
+    .unwrap()
+    .push(&csv_bytes(), &reference, Some(&bob))
+    .unwrap_or_else(|err| panic!("{err:?}"));
+  (reference, pushed.digest)
+}
+
+/// ADR 0052: a run's registry credential is its declaration's `source.auth`. A username and
+/// password earn the registry's token from its token service, as ghcr.io and Docker Hub issue one,
+/// and answer a `Basic` challenge, as `registry:2` with htpasswd makes one.
+#[rstest::rstest]
+#[case::token_service(true)]
+#[case::basic_challenge(false)]
+fn a_declared_credential_reaches_the_registry(#[case] token_service: bool) {
+  let registry = Registry::start();
+  if token_service {
+    registry.require_credentials("bob", "hunter2");
+  } else {
+    registry.require_basic("bob", "hunter2");
+  }
+  let (reference, digest) = push_as_bob(&registry);
+  registry.take_log();
+  let loader = WasmLoader::with_cache(fresh_cache("declared")).unwrap();
+  let auth = json!({ "kind": "basic", "username": "bob", "password": "hunter2" });
+  load_and_decode(&loader, &declared_with(&reference, &digest, auth));
+  let log = registry.take_log();
+  assert_eq!(
+    log.iter().any(|line| line.starts_with("GET /token?")),
+    token_service,
+    "{log:#?}"
+  );
+}
+
+/// A registry token is presented as it stands: no token service is asked.
+#[test]
+fn a_declared_registry_token_is_presented_as_it_stands() {
+  let registry = Registry::start();
+  registry.require_token();
+  let digest = push(&registry.host);
+  registry.take_log();
+  let loader = WasmLoader::with_cache(fresh_cache("bearer")).unwrap();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let auth = json!({ "kind": "bearer", "token": support::registry::TOKEN });
+  load_and_decode(&loader, &declared_with(&reference, &digest, auth));
+  let log = registry.take_log();
+  assert!(!log.iter().any(|line| line.starts_with("GET /token")), "{log:#?}");
+}
+
+/// With no credential declared, a registry that wants one is refused, saying where it belongs; and
+/// a wrong one is refused without repeating it, in the message or the details.
+#[test]
+fn a_missing_or_wrong_credential_is_refused_and_never_repeated() {
+  let registry = Registry::start();
+  registry.require_credentials("bob", "hunter2");
+  let (reference, digest) = push_as_bob(&registry);
+  let loader = WasmLoader::with_cache(fresh_cache("refused")).unwrap();
+
+  let missing = refused(&loader, &declaration(&reference, Some(&digest)));
+  assert_eq!(missing.code, "unauthorized", "{missing:?}");
+  assert!(missing.message.contains("source's 'auth'"), "{}", missing.message);
+
+  let auth = json!({ "kind": "basic", "username": "bob", "password": "not-hunter2" });
+  let wrong = refused(&loader, &declared_with(&reference, &digest, auth));
+  assert_eq!(wrong.code, "unauthorized", "{wrong:?}");
+  let everything = format!("{wrong:?} {}", serde_json::to_string(&wrong).unwrap());
+  assert!(!everything.contains("not-hunter2"), "{everything}");
+}
+
+/// A credential kind this loader cannot present, and a credential on a source that is not a
+/// registry, are refused by name before anything is fetched.
+#[test]
+fn a_credential_the_loader_cannot_use_is_refused() {
+  let loader = WasmLoader::with_cache(fresh_cache("unusable")).unwrap();
+  let reference = "127.0.0.1:9/janus-csv:1.0.0";
+  let unknown = refused(
+    &loader,
+    &declared_with(reference, "sha256:00", json!({ "kind": "aws-ecr", "token": "t" })),
+  );
+  assert!(unknown.message.contains("'aws-ecr'"), "{}", unknown.message);
+
+  let file: ComponentDeclaration = serde_json::from_value(json!({
+    "name": "csv",
+    "source": { "kind": "file", "reference": csv_wasm().display().to_string(), "auth": { "kind": "bearer", "token": "t" } }
+  }))
+  .unwrap();
+  let on_a_file = refused(&loader, &file);
+  assert!(
+    on_a_file.message.contains("takes no 'auth'"),
+    "{}",
+    on_a_file.message
+  );
 }
 
 fn send(engine: &mut Engine, op: &str, body: Value) -> Value {
@@ -399,14 +510,14 @@ fn against_a_real_registry() {
   let reference = format!("{host}/janus-csv:1.0.0");
   let pushed = WasmLoader::with_cache(fresh_cache("real"))
     .unwrap()
-    .push(&csv_bytes(), &reference)
+    .push(&csv_bytes(), &reference, None)
     .unwrap_or_else(|err| panic!("{err:?}"));
 
   let cache = fresh_cache("real");
   let loader = WasmLoader::with_cache(&cache).unwrap();
   let decoded = load_and_decode(&loader, &declaration(&reference, Some(&pushed.digest)));
   assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
-  let (by_tag, _) = loader.pull(&reference, None).unwrap();
+  let (by_tag, _) = loader.pull(&reference, None, None).unwrap();
   assert_eq!(
     by_tag.digest, pushed.digest,
     "the registry resolves the tag to what was pushed"

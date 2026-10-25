@@ -40,6 +40,66 @@ pub struct Source {
   pub reference: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub digest: Option<String>,
+  /// The credential for an `oci` source's registry (spec §10.3, ADR 0052), as the loader
+  /// interpolated it: the only one a run's loader presents.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub auth: Option<SourceAuth>,
+}
+
+/// A registry credential, in the broker descriptor's shape (engine-protocol spec §8.7): `basic` takes
+/// `username` and `password`, `bearer` a `token`. `kind` is open, so a loader refuses one it does not
+/// know. The secrets are kept out of everything the engine says: `Debug` shows the kind alone, and a
+/// member that is not a string is refused without quoting it, since serde's own message would.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "Value")]
+pub struct SourceAuth {
+  pub kind: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub username: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub password: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub token: Option<String>,
+}
+
+impl std::fmt::Debug for SourceAuth {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("SourceAuth")
+      .field("kind", &self.kind)
+      .finish_non_exhaustive()
+  }
+}
+
+impl TryFrom<Value> for SourceAuth {
+  type Error = String;
+
+  fn try_from(value: Value) -> Result<SourceAuth, String> {
+    let Value::Object(members) = value else {
+      return Err("'auth' must be an object with a 'kind'".to_string());
+    };
+    let text = |name: &str| -> Result<Option<String>, String> {
+      match members.get(name) {
+        None => Ok(None),
+        Some(Value::String(text)) => Ok(Some(text.clone())),
+        Some(_) => Err(format!("'auth.{name}' must be a string")),
+      }
+    };
+    let auth = SourceAuth {
+      kind: text("kind")?.ok_or("'auth' needs a 'kind'")?,
+      username: text("username")?,
+      password: text("password")?,
+      token: text("token")?,
+    };
+    let missing = match auth.kind.as_str() {
+      "basic" if auth.username.is_none() || auth.password.is_none() => Some("'username' and 'password'"),
+      "bearer" if auth.token.is_none() => Some("a 'token'"),
+      _ => None,
+    };
+    match missing {
+      Some(needs) => Err(format!("a '{}' auth needs {needs}", auth.kind)),
+      None => Ok(auth),
+    }
+  }
 }
 
 /// Deny-by-default sandbox grants (spec §10.4). `Default` is the grant of nothing.
@@ -371,4 +431,52 @@ pub fn check_requirements<'a>(
 
 fn major(version: &str) -> Option<u64> {
   version.split('.').next()?.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn declaration(auth: Value) -> Result<ComponentDeclaration, serde_json::Error> {
+    serde_json::from_value(json!({
+      "name": "csv",
+      "source": { "kind": "oci", "reference": "registry.example/csv:1.0.0", "auth": auth }
+    }))
+  }
+
+  /// ADR 0052: a component source's registry credential is read, and `Debug` names its kind alone.
+  #[test]
+  fn a_source_credential_is_read_and_never_shown() {
+    let read = declaration(json!({ "kind": "basic", "username": "bob", "password": "hunter2" })).unwrap();
+    let auth = read.source.auth.as_ref().expect("the credential is read");
+    assert_eq!(auth.username.as_deref(), Some("bob"));
+    assert_eq!(auth.password.as_deref(), Some("hunter2"));
+    let shown = format!("{read:?}");
+    assert!(!shown.contains("hunter2") && !shown.contains("bob"), "{shown}");
+    assert!(shown.contains(r#"kind: "basic""#), "{shown}");
+  }
+
+  /// A malformed credential is refused, and the refusal never quotes it: serde's own message for a
+  /// string where an object belongs repeats the string, which is an interpolated secret.
+  #[rstest::rstest]
+  #[case::not_an_object(json!("s3cret"), "'auth' must be an object")]
+  #[case::member_not_a_string(json!({ "kind": "bearer", "token": ["s3cret"] }), "'auth.token' must be a string")]
+  #[case::no_kind(json!({ "token": "s3cret" }), "needs a 'kind'")]
+  #[case::basic_without_password(json!({ "kind": "basic", "username": "s3cret" }), "needs 'username' and 'password'")]
+  #[case::bearer_without_token(json!({ "kind": "bearer", "password": "s3cret" }), "needs a 'token'")]
+  fn a_malformed_credential_is_refused_without_repeating_it(#[case] auth: Value, #[case] says: &str) {
+    let message = declaration(auth).expect_err("refused").to_string();
+    assert!(message.contains(says), "{message}");
+    assert!(!message.contains("s3cret"), "{message}");
+  }
+
+  /// A kind this engine does not know is the loader's to refuse, not the reader's: `kind` is open.
+  #[test]
+  fn an_unknown_credential_kind_is_read() {
+    let read = declaration(json!({ "kind": "aws-ecr", "token": "t" })).unwrap();
+    assert_eq!(
+      read.source.auth.map(|auth| auth.kind),
+      Some("aws-ecr".to_string())
+    );
+  }
 }

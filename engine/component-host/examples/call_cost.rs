@@ -24,6 +24,7 @@ fn main() {
         kind: "file".to_string(),
         reference: Some(path),
         digest: None,
+        auth: None,
       },
       grants: Grants::default(),
       limits: Limits::default(),

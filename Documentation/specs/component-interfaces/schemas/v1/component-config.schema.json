@@ -43,7 +43,20 @@
         "digest": {
           "type": "string",
           "description": "Expected manifest digest, e.g. 'sha256:...'. When present it MUST match before any bytes are instantiated. A tag is a name; a digest is the artifact — CI should pin (spec.md §10.3)."
-        }
+        },
+        "auth": { "$ref": "#/$defs/SourceAuth" }
+      }
+    },
+    "SourceAuth": {
+      "title": "SourceAuth",
+      "description": "The credential for an 'oci' source's registry, and the only one a run's loader presents (spec.md §10.3, ADR 0052): written with ${VAR} references, which the host's loader interpolates (lifecycle-hooks spec §7.1), and never repeated in anything the engine reports or logs (§7.3). The broker descriptor's shape: 'basic' takes 'username' and 'password', presented to a Basic challenge or a Bearer challenge's token service; 'bearer' takes a registry 'token', presented as it stands. A loader refuses a kind it cannot present, and a credential on a source that is not a registry.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "x-known-values": ["basic", "bearer"] },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "token": { "type": "string" }
       }
     },
     "Grants": {

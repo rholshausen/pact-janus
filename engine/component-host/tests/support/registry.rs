@@ -1,8 +1,9 @@
 //! An OCI registry small enough to read (plan task 8.2's tests): the distribution-API calls a push
 //! and a pull make, in memory, on a loopback port — and able to misbehave on request, which is what
 //! a real registry cannot be asked to do. It lies about content (`tamper`), demands a token
-//! (`require_token`), and keeps a log of every request, so a test can say "the second run made
-//! none".
+//! (`require_token`), a token only a username and password earn (`require_credentials`) or those
+//! credentials themselves (`require_basic`), and keeps a log of every request, so a test can say
+//! "the second run made none".
 //!
 //! The real registry — `registry:2`, in CI — is the other half: `tests/oci.rs` runs against it when
 //! `JANUS_OCI_REGISTRY` names one, because a test registry that agrees with the client by
@@ -10,6 +11,8 @@
 
 #![allow(dead_code)]
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -36,6 +39,10 @@ struct State {
   log: Vec<String>,
   tamper: Option<Tamper>,
   require_token: bool,
+  /// The `Authorization` the token service wants before it issues a token, when it wants one.
+  token_for: Option<String>,
+  /// The `Authorization` every registry request needs, answering a `Basic` challenge.
+  basic: Option<String>,
 }
 
 pub struct Registry {
@@ -45,7 +52,12 @@ pub struct Registry {
   worker: Option<thread::JoinHandle<()>>,
 }
 
-const TOKEN: &str = "a-token-the-registry-issued";
+/// The token the registry's token service issues, and the only one it accepts.
+pub const TOKEN: &str = "a-token-the-registry-issued";
+
+fn basic(username: &str, password: &str) -> String {
+  format!("Basic {}", BASE64.encode(format!("{username}:{password}")))
+}
 
 fn sha256(bytes: &[u8]) -> String {
   format!("sha256:{:x}", Sha256::digest(bytes))
@@ -83,7 +95,19 @@ impl Registry {
 
         let (path, query) = url.split_once('?').unwrap_or((&url, ""));
         if path == "/token" {
+          if state.token_for.is_some() && authorization != state.token_for {
+            let _ = request.respond(status(401));
+            continue;
+          }
           let _ = request.respond(Response::from_string(format!("{{\"token\":\"{TOKEN}\"}}")));
+          continue;
+        }
+        if state.basic.is_some() && authorization != state.basic {
+          let _ = request.respond(
+            Response::from_string("{\"errors\":[{\"code\":\"UNAUTHORIZED\"}]}")
+              .with_status_code(401)
+              .with_header(header("www-authenticate", "Basic realm=\"test-registry\"")),
+          );
           continue;
         }
         if state.require_token && authorization.as_deref() != Some(&format!("Bearer {TOKEN}")) {
@@ -193,6 +217,19 @@ impl Registry {
 
   pub fn require_token(&self) {
     self.state.lock().unwrap().require_token = true;
+  }
+
+  /// A token, as `require_token`, that the token service issues only for these credentials: how
+  /// most registries (ghcr.io, Docker Hub) take a username and password.
+  pub fn require_credentials(&self, username: &str, password: &str) {
+    let mut state = self.state.lock().unwrap();
+    state.require_token = true;
+    state.token_for = Some(basic(username, password));
+  }
+
+  /// These credentials on every request, answering a `Basic` challenge: `registry:2` with htpasswd.
+  pub fn require_basic(&self, username: &str, password: &str) {
+    self.state.lock().unwrap().basic = Some(basic(username, password));
   }
 
   /// Every request since the last call, as `METHOD /path?query`.

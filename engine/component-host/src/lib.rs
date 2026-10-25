@@ -71,8 +71,8 @@ pub struct Pushed {
 }
 
 impl WasmLoader {
-  /// A loader caching OCI components where [`oci::default_cache`] says, with registry credentials
-  /// from the environment ([`oci::Credentials::from_env`]).
+  /// A loader caching OCI components where [`oci::default_cache`] says. A run's registry credential
+  /// is its component's declaration's `source.auth`, and nothing else (ADR 0052).
   pub fn new() -> Result<WasmLoader, String> {
     WasmLoader::with_cache(oci::default_cache())
   }
@@ -96,18 +96,23 @@ impl WasmLoader {
     Ok(WasmLoader {
       engine,
       ticking,
-      oci: oci::Oci::new(cache, oci::Credentials::from_env()),
+      oci: oci::Oci::new(cache),
     })
   }
 
   /// Publish a component as an OCI artifact (spec §10.3). The config blob is written from the
   /// component's own handshake — not from anything the publisher typed — so what the artifact says
   /// it is and what answers when it is loaded cannot drift apart; the loader checks the two agree.
-  pub fn push(&self, wasm: &[u8], reference: &str) -> Result<Pushed, ComponentError> {
+  pub fn push(
+    &self,
+    wasm: &[u8],
+    reference: &str,
+    auth: Option<&oci::Credentials>,
+  ) -> Result<Pushed, ComponentError> {
     let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
     let hello = self.describe(wasm, reference)?;
     let config = artifact_config(&hello);
-    let digest = self.oci.push(&parsed, wasm, &config)?;
+    let digest = self.oci.push(&parsed, wasm, &config, auth)?;
     Ok(Pushed {
       reference: parsed.to_string(),
       digest,
@@ -118,9 +123,14 @@ impl WasmLoader {
 
   /// Fetch a component into the cache, check it, and say what it is — the digest to pin and the
   /// handshake that will answer — without a project or a run. What `janus component pull` prints.
-  pub fn pull(&self, reference: &str, digest: Option<&str>) -> Result<(oci::Pulled, Value), ComponentError> {
+  pub fn pull(
+    &self,
+    reference: &str,
+    digest: Option<&str>,
+    auth: Option<&oci::Credentials>,
+  ) -> Result<(oci::Pulled, Value), ComponentError> {
     let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
-    let pulled = self.oci.pull(&parsed, digest)?;
+    let pulled = self.oci.pull(&parsed, digest, auth)?;
     let hello = self.describe(&pulled.wasm, reference)?;
     check_artifact_config(&pulled, &hello)?;
     Ok((pulled, hello))
@@ -148,12 +158,37 @@ impl WasmLoader {
     };
     if declaration.source.kind == "oci" {
       let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
-      let mut pulled = self.oci.pull(&parsed, declaration.source.digest.as_deref())?;
+      // ADR 0052: the declaration's credential, and only that. A run reads no environment, so a
+      // registry that wants one it was not given says where it belongs.
+      let auth = declaration
+        .source
+        .auth
+        .as_ref()
+        .map(oci::Credentials::from_declared)
+        .transpose()
+        .map_err(|message| load_error(&message))?;
+      let mut pulled = self
+        .oci
+        .pull(&parsed, declaration.source.digest.as_deref(), auth.as_ref())
+        .map_err(|mut err| {
+          if err.code == "unauthorized" && auth.is_none() {
+            err
+              .message
+              .push_str("; declare them as the component source's 'auth'");
+          }
+          err
+        })?;
       tracing::info!(component = %declaration.name, reference = %parsed, digest = %pulled.digest, "component resolved");
       let bytes = std::mem::take(&mut pulled.wasm);
       return Ok((bytes, format!("{parsed} ({})", pulled.digest), Some(pulled)));
     }
 
+    if declaration.source.auth.is_some() {
+      return Err(load_error(&format!(
+        "a '{}' source takes no 'auth': a credential is for a registry",
+        declaration.source.kind
+      )));
+    }
     let path = reference;
     let bytes = std::fs::read(path).map_err(|err| load_error(&format!("could not read '{path}': {err}")))?;
     // Spec §10.3 step 2: a declared digest is checked before any bytes are instantiated — or even

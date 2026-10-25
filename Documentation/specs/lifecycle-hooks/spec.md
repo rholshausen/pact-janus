@@ -575,6 +575,10 @@ sends them back out.**
   its point and its implementation kind.
 - `run.env` and `run.headers` — where a credential reaches an `exec` or `http` hook — are treated
   identically.
+- A component declaration's `source.auth` — its registry credential (design 2.6 §10.3, [ADR
+  0052](../../decisions/0052-declare-a-components-registry-credential-in-its-source.md)) — is presented
+  to the registry and appears in nothing else. Renderings of it show its `kind`, and a malformed one is
+  refused without being quoted.
 - A hook's `data` is carried to later hooks but is **reported only when its entry sets
   `report-data: true`** (§10.2). This refines design 2.6 §8.2's "opaque hook output surfaced to the host":
   the surfacing is opt-in, because the fetch-a-token hook is precisely the one whose output must not

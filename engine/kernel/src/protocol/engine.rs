@@ -971,8 +971,8 @@ impl Engine {
 }
 
 /// A frame as the trace log shows it, with every credential taken out (spec §8.7: the engine never
-/// repeats one in a log). A host's broker descriptor carries them, so an `auth` member keeps its
-/// `kind` and nothing else, and a `url` loses any user information. The HTTP client options carry
+/// repeats one in a log). A host's broker descriptor and a component declaration's source (ADR
+/// 0052) carry them, so an `auth` member keeps its `kind` and nothing else, and a `url` loses any user information. The HTTP client options carry
 /// a client certificate's private key, whose `key` is hidden, and a transport binding's options
 /// carry headers for every request to the provider, today's `--header`, which is how a token is
 /// usually passed, so their values are hidden (ADR 0035). A hook entry's `config`, and its `run`'s
@@ -1179,6 +1179,32 @@ mod tests {
     );
     assert!(logged.contains("https://broker.example"), "{logged}");
     assert_eq!(loggable(b"token=s3cret"), "<12 bytes that are not JSON>");
+  }
+
+  /// ADR 0052: a component declaration's registry credential is an `auth` member like a broker's,
+  /// so its kind is logged and its secrets are not. The rest of the declaration still is.
+  #[test]
+  fn a_logged_frame_carries_no_registry_credential() {
+    let frame = json!({
+      "type": "request", "id": "r-1", "op": "verification/verify",
+      "body": { "target": { "transports": [], "components": [
+        { "name": "csv", "source": { "kind": "oci", "reference": "ghcr.io/acme/csv:1.0.0",
+            "auth": { "kind": "basic", "username": "bob", "password": "hunter2" } } },
+        { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/xml:1.0.0",
+            "auth": { "kind": "bearer", "token": "s3cret" } } }
+      ] } }
+    });
+    let logged = loggable(&serde_json::to_vec(&frame).unwrap());
+    for secret in ["bob", "hunter2", "s3cret"] {
+      assert!(!logged.contains(secret), "{secret} in {logged}");
+    }
+    for shown in [
+      r#""kind":"basic""#,
+      r#""kind":"bearer""#,
+      "ghcr.io/acme/csv:1.0.0",
+    ] {
+      assert!(logged.contains(shown), "{shown} not in {logged}");
+    }
   }
 
   /// ADR 0035: the HTTP client options carry a private key, and a transport binding's headers are

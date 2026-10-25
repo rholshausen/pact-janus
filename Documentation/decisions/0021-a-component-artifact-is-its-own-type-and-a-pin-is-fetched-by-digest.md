@@ -1,6 +1,6 @@
 # 0021 — Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone
 
-- **Status**: accepted
+- **Status**: accepted; the registry credentials' source amended by [ADR 0052](0052-declare-a-components-registry-credential-in-its-source.md), which closes finding 16
 - **Date**: 2026-09-23
 - **Plan tasks**: 8.2
 - **Evidence**: `engine/component-host/src/oci.rs` and its tests (`tests/oci.rs`, against an in-process

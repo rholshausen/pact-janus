@@ -59,6 +59,7 @@ fn declaration(network: bool, grants: Grants, deadline_ms: Option<u64>) -> Compo
       kind: "file".to_string(),
       reference: Some(fixture(network)),
       digest: None,
+      auth: None,
     },
     grants,
     limits: Limits {
