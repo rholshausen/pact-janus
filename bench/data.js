@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792976786922,
+  "lastUpdate": 1792976788768,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -27576,6 +27576,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 42680,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "cb306b31a728c48b0e2c5078b0c54f2276dc991d",
+          "message": "fix: update the Janus benchmarks' lockfile for rquickjs 0.14\n\n1b339ac moved the kernel to rquickjs 0.14 but left benchmarks/janus/Cargo.lock\nresolving 0.9, so the Benchmarks workflow's `cargo test --locked` refused it.\nOnly the rquickjs tree changes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T11:57:27+11:00",
+          "tree_id": "85c4483d733b49d4cc53c96d4c62ac260182c746",
+          "url": "https://github.com/rholshausen/pact-janus/commit/cb306b31a728c48b0e2c5078b0c54f2276dc991d"
+        },
+        "date": 1792976788236,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 59905,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 45102,
             "unit": "requests per second",
             "extra": "engines 4"
           }
