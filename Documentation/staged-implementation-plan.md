@@ -1306,6 +1306,29 @@ item in 1a is done when S1.1 agrees.
   bindings are regenerated, and every error the HTTP client, broker client and hooks produce
   carries one. `render_error` has no case for a code. The trycmd and snapbox cases show both
   renderings.
+  *Done 2026-10-26.*
+  - **Kernel:** `engine/kernel/src/chain.rs` has `Layer`, `layers_of` over a `source()` chain, and
+    `Context`. `EngineError` and `ComponentError` carry `chain`, and `component_failed` writes its own
+    layer, then the component's.
+  - **Producers:** the HTTP transport, the broker client's unreachable, refused and not-JSON answers,
+    and the hook host's `http` and `exec` failures carry chains. An error with no cause carries none,
+    as the spec allows.
+  - **CLI:** an error leads with its innermost coded layer, and says its root cause on a
+    `caused by:` line beneath. `--error-chain` prints every layer.
+  - **Specs:** engine-protocol §10.1, component-interfaces §11.1 and §11.3, the lifecycle-hooks spec,
+    and both error schemas. The bindings gain `ErrorLayer`.
+  Not foreseen:
+  - **`SendError` says only its own layer**, as Rust's errors conventionally do, with its causes as
+    `source()`. Every caller that printed it now reads the chain or joins it.
+  - **A failing `exec` hook says why.** Its stderr was only in `details`, which text never shows. Its
+    last stderr line is now the root cause, as an `http` hook's reply body already was.
+  - **Wording changes.** A broker's retry-after note moved onto the answer it describes, ahead of the
+    broker's explanation. A configuration that cannot be read no longer says `(os error 2)`.
+  - **`Context` has no caller yet.** None of this item's producers adds a layer above an error it
+    already has, so `.context()` and `.layer()` are tested but unused until one does.
+  - **Out of scope:** the HTTP client's configuration errors stay a position and a sentence. They are
+    problems with what was asked for, not chains of causes. The WASM loader's and OCI registry's
+    errors carry no chain yet.
 
 - **S1.34 Display text is marked with segments** — **M**, after S1.33. Decided by
   [ADR 0054](decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md),

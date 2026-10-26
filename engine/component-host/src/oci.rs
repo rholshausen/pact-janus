@@ -861,6 +861,7 @@ fn failure(code: &str, message: String, details: Value) -> ComponentError {
     message,
     source: Some("engine".into()),
     details: Some(Box::new(details)),
+    chain: None,
   }
 }
 

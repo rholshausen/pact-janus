@@ -43,14 +43,27 @@ fn a_certificate_nothing_trusts_is_refused() {
   let err = client(json!({}))
     .run(get(&format!("{}/orders", provider.base_url)), None)
     .expect_err("the platform does not trust a CA made for this test");
-  let SendError::Connect(message) = &err else {
+  let SendError::Connect(_) = &err else {
     panic!("a handshake failure is a connect failure: {err}");
   };
-  assert!(message.contains("certificate"), "{message}");
+  let said = sentence(&err);
+  assert!(said.contains("certificate"), "{said}");
+}
+
+/// An error and its causes, joined as the kernel's chain joins them.
+fn sentence(err: &dyn std::error::Error) -> String {
+  let mut layers = vec![err.to_string()];
+  let mut cause = err.source();
+  while let Some(error) = cause {
+    layers.push(error.to_string());
+    cause = error.source();
+  }
+  layers.join(": ")
 }
 
 /// A refused connection is said as its cause, without the layers that only name the library in the
-/// way ("error sending request: client error (Connect): tcp connect error").
+/// way ("error sending request: client error (Connect): tcp connect error"). Each layer is its own
+/// error in the `source` chain (ADR 0054).
 #[test]
 fn a_refused_connection_says_only_why() {
   // A port that was listening a moment ago, and is not now.
@@ -62,14 +75,17 @@ fn a_refused_connection_says_only_why() {
   let err = client(json!({}))
     .run(get(&format!("http://127.0.0.1:{port}/orders")), None)
     .expect_err("nothing listens there");
-  let SendError::Connect(message) = &err else {
-    panic!("a refused connection is a connect failure: {err}");
+  let SendError::Connect(Some(cause)) = &err else {
+    panic!("a refused connection is a connect failure with a cause: {err:?}");
   };
-  assert!(!message.contains("error sending request"), "{message}");
-  assert!(!message.contains("client error"), "{message}");
-  assert!(!message.contains("tcp connect error"), "{message}");
-  assert!(!message.is_empty(), "{message}");
-  assert_eq!(err.to_string(), format!("could not connect: {message}"));
+  let said = sentence(&err);
+  assert!(!said.contains("error sending request"), "{said}");
+  assert!(!said.contains("client error"), "{said}");
+  assert!(!said.contains("tcp connect error"), "{said}");
+  assert!(!said.contains("os error"), "{said}");
+  assert!(!cause.to_string().is_empty(), "{said}");
+  assert_eq!(err.to_string(), "could not connect");
+  assert_eq!(said, format!("could not connect: {}", sentence(cause.as_ref())));
 }
 
 #[test]

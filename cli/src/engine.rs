@@ -11,8 +11,16 @@
 //! What the CLI *does* bring is capabilities the kernel deliberately lacks, and it brings exactly
 //! the ones `janus-engine` does: both start from [`crate::register::native_engine`].
 
+use pact_janus_kernel::chain;
 use pact_janus_kernel::protocol::Engine;
 use serde_json::{Value, json};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// An error the CLI met itself, and its causes, as one sentence: each cause said once, without the
+/// platform's `(os error N)`.
+pub fn sentence(err: &dyn std::error::Error) -> String {
+  chain::joined(&chain::layers_of(err, chain::without_os_error))
+}
 
 /// A `janus` engine with everything a native host can offer it, past the handshake.
 pub fn start() -> Result<Engine, String> {
@@ -96,22 +104,60 @@ fn locate<'f>(error: &mut Value, files: &'f [String]) -> Option<&'f str> {
   Some(file)
 }
 
+/// Whether an error is printed with every layer of its chain: the global `--error-chain`.
+static FULL_CHAIN: AtomicBool = AtomicBool::new(false);
+
+/// Print every layer of each error's chain from now on (`--error-chain`).
+pub fn print_full_chains() {
+  FULL_CHAIN.store(true, Ordering::Relaxed);
+}
+
 /// An engine error as a line a user can act on: the code first, because that is the part a user
 /// can look up, then the message, then each problem at its position.
 ///
-/// A component's failure leads with the component's own code and message (protocol spec §10.2:
-/// `component-failed` carries the component's error), since that is what failed; the engine's
-/// wrapper only says that a component did. Other `details` are for programs, and are left to
-/// `--output json`: every message says in words what a person needs from them.
+/// An error with a chain (ADR 0054, protocol spec §10.1) leads with its innermost layer that has a
+/// code, since that is the most specific thing that failed and the part a user can look up, then
+/// says its root cause beneath, when that is another layer. `component-failed`'s own layer only says
+/// that a component did. `--error-chain` prints every layer instead. Other `details` are for
+/// programs, and are left to `--output json`: every message says in words what a person needs from
+/// them.
 pub fn render_error(error: &Value) -> String {
-  let component = &error["details"]["error"];
-  let (code, message) = match (error["code"].as_str(), component["code"].as_str()) {
-    (Some("component-failed"), Some(code)) => (code, component["message"].as_str()),
-    (code, _) => (code.unwrap_or("internal"), error["message"].as_str()),
+  let chain: Vec<(Option<&str>, &str)> = match error["chain"].as_array().filter(|chain| !chain.is_empty()) {
+    Some(chain) => chain
+      .iter()
+      .map(|layer| {
+        (
+          layer["code"].as_str(),
+          layer["message"].as_str().unwrap_or_default(),
+        )
+      })
+      .collect(),
+    None => vec![(
+      error["code"].as_str(),
+      error["message"].as_str().unwrap_or_default(),
+    )],
   };
-  let mut text = match message {
-    Some(message) => format!("{code}: {message}"),
-    None => code.to_string(),
+  let said = |(code, message): (Option<&str>, &str)| match (code, message) {
+    (Some(code), "") => code.to_string(),
+    (Some(code), message) => format!("{code}: {message}"),
+    (None, message) => message.to_string(),
+  };
+  let mut text = if FULL_CHAIN.load(Ordering::Relaxed) {
+    let mut layers = chain.iter().copied().map(said);
+    let mut text = layers.next().unwrap_or_default();
+    for layer in layers {
+      text.push_str(&format!("\n  caused by: {layer}"));
+    }
+    text
+  } else {
+    let lead = chain.iter().rposition(|(code, _)| code.is_some()).unwrap_or(0);
+    let (code, message) = chain[lead];
+    let code = code.or(error["code"].as_str()).unwrap_or("internal");
+    let mut text = said((Some(code), message));
+    if lead + 1 < chain.len() {
+      text.push_str(&format!("\n  caused by: {}", chain[chain.len() - 1].1));
+    }
+    text
   };
   for problem in error["details"]["problems"].as_array().into_iter().flatten() {
     let message = problem["message"].as_str().unwrap_or("");

@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -28,7 +29,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "code",
     "category",
     "message",
-    "details"
+    "details",
+    "chain"
 })
 public class EngineError {
 
@@ -48,12 +50,12 @@ public class EngineError {
     @JsonPropertyDescription("Coarse classification enabling handling of unknown codes. Absent or unknown is treated as 'internal'.")
     private java.lang.String category;
     /**
-     * Human-readable description, not intended for programmatic dispatch.
+     * Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined.
      * (Required)
      * 
      */
     @JsonProperty("message")
-    @JsonPropertyDescription("Human-readable description, not intended for programmatic dispatch.")
+    @JsonPropertyDescription("Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined.")
     private java.lang.String message;
     /**
      * Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).
@@ -62,6 +64,13 @@ public class EngineError {
     @JsonProperty("details")
     @JsonPropertyDescription("Code-specific structure per spec.md \u00a710.2 \u2014 e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*).")
     private Map<String, Object> details;
+    /**
+     * Its layers, outermost first (spec.md §10.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.
+     * 
+     */
+    @JsonProperty("chain")
+    @JsonPropertyDescription("Its layers, outermost first (spec.md \u00a710.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.")
+    private List<ErrorLayer> chain;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -104,7 +113,7 @@ public class EngineError {
     }
 
     /**
-     * Human-readable description, not intended for programmatic dispatch.
+     * Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined.
      * (Required)
      * 
      */
@@ -114,7 +123,7 @@ public class EngineError {
     }
 
     /**
-     * Human-readable description, not intended for programmatic dispatch.
+     * Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined.
      * (Required)
      * 
      */
@@ -139,6 +148,24 @@ public class EngineError {
     @JsonProperty("details")
     public void setDetails(Map<String, Object> details) {
         this.details = details;
+    }
+
+    /**
+     * Its layers, outermost first (spec.md §10.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.
+     * 
+     */
+    @JsonProperty("chain")
+    public List<ErrorLayer> getChain() {
+        return chain;
+    }
+
+    /**
+     * Its layers, outermost first (spec.md §10.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.
+     * 
+     */
+    @JsonProperty("chain")
+    public void setChain(List<ErrorLayer> chain) {
+        this.chain = chain;
     }
 
     @JsonAnyGetter
@@ -171,6 +198,10 @@ public class EngineError {
         sb.append('=');
         sb.append(((this.details == null)?"<null>":this.details));
         sb.append(',');
+        sb.append("chain");
+        sb.append('=');
+        sb.append(((this.chain == null)?"<null>":this.chain));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -186,8 +217,9 @@ public class EngineError {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.details == null)? 0 :this.details.hashCode()));
+        result = ((result* 31)+((this.chain == null)? 0 :this.chain.hashCode()));
         result = ((result* 31)+((this.code == null)? 0 :this.code.hashCode()));
+        result = ((result* 31)+((this.details == null)? 0 :this.details.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.category == null)? 0 :this.category.hashCode()));
         result = ((result* 31)+((this.message == null)? 0 :this.message.hashCode()));
@@ -203,7 +235,7 @@ public class EngineError {
             return false;
         }
         EngineError rhs = ((EngineError) other);
-        return ((((((this.details == rhs.details)||((this.details!= null)&&this.details.equals(rhs.details)))&&((this.code == rhs.code)||((this.code!= null)&&this.code.equals(rhs.code))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.category == rhs.category)||((this.category!= null)&&this.category.equals(rhs.category))))&&((this.message == rhs.message)||((this.message!= null)&&this.message.equals(rhs.message))));
+        return (((((((this.chain == rhs.chain)||((this.chain!= null)&&this.chain.equals(rhs.chain)))&&((this.code == rhs.code)||((this.code!= null)&&this.code.equals(rhs.code))))&&((this.details == rhs.details)||((this.details!= null)&&this.details.equals(rhs.details))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.category == rhs.category)||((this.category!= null)&&this.category.equals(rhs.category))))&&((this.message == rhs.message)||((this.message!= null)&&this.message.equals(rhs.message))));
     }
 
 }

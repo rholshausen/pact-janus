@@ -2,6 +2,7 @@
 //! "Deliberately the same shape as the protocol's `EngineError`, because the kernel passes it
 //! through verbatim... and a second error shape at that boundary would only need translating."
 
+use crate::chain::{Layer, joined};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -22,6 +23,9 @@ pub struct ComponentError {
   /// error is carried by every `Result` that can fail.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub details: Option<Box<Value>>,
+  /// Its layers, outermost first, when it has causes (spec §11.1, ADR 0054): see [`crate::chain`].
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub chain: Option<Vec<Layer>>,
 }
 
 fn internal_category() -> String {
@@ -29,6 +33,37 @@ fn internal_category() -> String {
 }
 
 impl ComponentError {
+  /// This error, caused by `causes`: its chain is its own layer and then theirs, and its message
+  /// says them all (ADR 0054). No causes leaves it as it is.
+  pub fn caused_by(mut self, causes: Vec<Layer>) -> Self {
+    if causes.is_empty() {
+      return self;
+    }
+    let mut chain = self.layers();
+    chain.extend(causes);
+    self.message = joined(&chain);
+    self.chain = Some(chain);
+    self
+  }
+
+  /// This error inside an outer layer: the layer, then its chain, with the message saying them all.
+  /// Its code and category are left to the caller.
+  pub fn within(mut self, outer: Layer) -> Self {
+    let mut chain = vec![outer];
+    chain.extend(self.layers());
+    self.message = joined(&chain);
+    self.chain = Some(chain);
+    self
+  }
+
+  /// Its chain, or, when it has none, itself as the one layer.
+  pub fn layers(&self) -> Vec<Layer> {
+    self
+      .chain
+      .clone()
+      .unwrap_or_else(|| vec![Layer::coded(&self.code, &self.message)])
+  }
+
   /// `operation-unsupported` (spec §11.1): an op or a role/kind this component declared it does
   /// not implement (e.g. the HTTP transport's `drive` role, or `transport/send`, in this task).
   pub fn operation_unsupported(op: &str) -> Self {
@@ -38,6 +73,7 @@ impl ComponentError {
       message: format!("unsupported operation '{op}'"),
       source: None,
       details: Some(Box::new(serde_json::json!({ "op": op }))),
+      chain: None,
     }
   }
 
@@ -49,6 +85,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
+      chain: None,
     }
   }
 
@@ -61,6 +98,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
+      chain: None,
     }
   }
 
@@ -73,6 +111,7 @@ impl ComponentError {
       message: format!("unsupported content type '{content_type}'"),
       source: None,
       details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
+      chain: None,
     }
   }
 
@@ -85,6 +124,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: None,
+      chain: None,
     }
   }
 
@@ -96,6 +136,7 @@ impl ComponentError {
       message: format!("no generator '{name}'"),
       source: None,
       details: Some(Box::new(serde_json::json!({ "generator": name }))),
+      chain: None,
     }
   }
 
@@ -108,6 +149,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: Some(Box::new(serde_json::json!({ "name": name }))),
+      chain: None,
     }
   }
 
@@ -119,6 +161,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: Some(Box::new(serde_json::json!({ "generator": generator }))),
+      chain: None,
     }
   }
 
@@ -130,6 +173,7 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: None,
+      chain: None,
     }
   }
 
@@ -142,6 +186,7 @@ impl ComponentError {
       message: message.into(),
       source: Some("engine".into()),
       details: None,
+      chain: None,
     }
   }
 }

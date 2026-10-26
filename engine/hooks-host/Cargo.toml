@@ -14,6 +14,10 @@ serde_json = "1"
 # the archived serde_yaml; the parsed document is a serde_json::Value either way, so nothing below
 # the loader knows which form the file was in.
 serde_yaml_ng = "0.10"
+# A load error keeps why a file could not be read as its `source`, the error itself rather than its
+# text, so a host can show the cause apart from the headline (ADR 0054, staged plan S1.33). Already
+# in the tree.
+thiserror = "2"
 # The `http` implementation's client: the one the HTTP transport and the broker client send through
 # (ADR 0035), so a state endpoint is reached as the provider is (ADR 0044).
 pact_janus_http_client = { path = "../http-client" }

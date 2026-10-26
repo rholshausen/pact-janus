@@ -860,6 +860,13 @@ hook author's open vocabulary — `state-unreachable`, `handler-rejected` — an
 given. It is the hook's word for what went wrong, and rewriting it into an engine code would lose the only
 thing it was carrying.
 
+A hook's `error` may carry `chain`, its layers outermost first, under engine-protocol spec §10.1's rules
+([ADR 0054](../../decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md)).
+The built-in implementations write one where they know a cause: an `http` hook's request that got no
+answer has the HTTP client's causes, an endpoint's non-2xx answer has its body's excerpt, and an `exec`
+hook that exits non-zero has the last line it wrote to stderr. A hook author's own `chain` is recorded as
+given, as its `code` is.
+
 ## 12. Versioning and compatibility
 
 ### 12.1 Three things that version separately

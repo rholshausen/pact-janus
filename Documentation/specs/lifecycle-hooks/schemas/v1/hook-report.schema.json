@@ -71,7 +71,7 @@
         },
         "error": {
           "type": "object",
-          "description": "Why it failed: the protocol's error shape (code, category, message, details). For a component hook this is the component's own error, passed through verbatim — the kernel does not translate component error interiors (protocol spec §10.2)."
+          "description": "Why it failed: the protocol's error shape (code, category, message, details, chain). For a component hook this is the component's own error, passed through verbatim — the kernel does not translate component error interiors (protocol spec §10.2)."
         }
       }
     },

@@ -100,6 +100,9 @@ where
     Err(err) => return clap_exit(&err),
   };
   init_tracing(cli.log_level, !no_colour);
+  if cli.error_chain {
+    engine::print_full_chains();
+  }
 
   let name = cli.command.name();
   match dispatch(cli.command) {

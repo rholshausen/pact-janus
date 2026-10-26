@@ -40,6 +40,7 @@ use pact_janus_kernel::broker::{
   BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
   PublishRequest,
 };
+use pact_janus_kernel::chain::{self, Layer};
 use pact_janus_kernel::component::ComponentError;
 use serde_json::{Map, Value, json};
 use std::time::Duration;
@@ -458,13 +459,15 @@ impl HalBrokerClient {
         .body(payload.clone().unwrap_or_default())
         .map(|request| client.run(request, None));
       let response = match sent {
-        Err(err) => return Err(unreachable(broker, &format!("building {method} {shown}: {err}"))),
+        Err(err) => {
+          return Err(
+            unreachable(broker, format!("building {method} {shown}")).caused_by(chain::layers_of(&err, Some)),
+          );
+        }
         Ok(Err(err)) => {
-          tracing::debug!(%method, url = %shown, attempt, error = %err, "the broker did not answer");
-          last = Some(unreachable(
-            broker,
-            &format!("{method} {shown}: {}", redacted(broker, &err.to_string())),
-          ));
+          let causes = chain::layers_of(&err, |text| Some(redacted(broker, &text)));
+          tracing::debug!(%method, url = %shown, attempt, error = %chain::joined(&causes), "the broker did not answer");
+          last = Some(unreachable(broker, format!("{method} {shown}")).caused_by(causes));
           wait = Some(backoff);
           continue;
         }
@@ -492,11 +495,11 @@ impl HalBrokerClient {
           None | Some(None) => backoff,
           Some(Some(delay)) if delay <= LONGEST_RETRY_AFTER => delay,
           Some(Some(delay)) => {
-            let mut error = refused(broker, method, &shown, status, &text);
-            error.message.push_str(&format!(
+            let note = format!(
               " (it asked to be tried again in {}s, longer than this client waits)",
               delay.as_secs()
-            ));
+            );
+            let mut error = refused(broker, method, &shown, status, &text, &note);
             if let Some(details) = error.details.as_mut() {
               details["retry-after"] = json!(delay.as_secs());
             }
@@ -504,12 +507,12 @@ impl HalBrokerClient {
           }
         };
         tracing::debug!(%method, url = %shown, attempt, status, ?delay, "the broker is unavailable");
-        last = Some(refused(broker, method, &shown, status, &text));
+        last = Some(refused(broker, method, &shown, status, &text, ""));
         wait = Some(delay);
         continue;
       }
       if !(200..300).contains(&status) {
-        return Err(refused(broker, method, &shown, status, &text));
+        return Err(refused(broker, method, &shown, status, &text, ""));
       }
       if text.trim().is_empty() {
         return Ok(Answer {
@@ -525,11 +528,12 @@ impl HalBrokerClient {
         .map_err(|err| {
           invalid(
             broker,
-            &format!("{method} {shown} answered something that is not JSON: {err}"),
+            &format!("{method} {shown} answered something that is not JSON"),
           )
+          .caused_by(chain::layers_of(&err, Some))
         });
     }
-    Err(last.unwrap_or_else(|| unreachable(broker, &format!("{method} {shown}"))))
+    Err(last.unwrap_or_else(|| unreachable(broker, format!("{method} {shown}"))))
   }
 }
 
@@ -644,16 +648,26 @@ fn error(broker: &BrokerDescriptor, code: &str, message: String, details: Value)
     message,
     source: None,
     details: Some(Box::new(details)),
+    chain: None,
   }
 }
 
 /// The code says the broker could not be reached; the message says which request, and why. A pact
 /// fetched by its URL comes through here too, from wherever it is served.
-fn unreachable(broker: &BrokerDescriptor, message: &str) -> ComponentError {
-  error(broker, "broker-unreachable", message.to_string(), json!({}))
+fn unreachable(broker: &BrokerDescriptor, message: impl Into<String>) -> ComponentError {
+  error(broker, "broker-unreachable", message.into(), json!({}))
 }
 
-fn refused(broker: &BrokerDescriptor, method: &str, url: &str, status: u16, body: &str) -> ComponentError {
+/// The broker's answer, with its own explanation, when it gave one, as the cause (ADR 0054). `note`
+/// is said with the answer: what this client made of it.
+fn refused(
+  broker: &BrokerDescriptor,
+  method: &str,
+  url: &str,
+  status: u16,
+  body: &str,
+  note: &str,
+) -> ComponentError {
   // The broker's own explanation, when it gave one, is the most useful thing to show.
   let said: Option<String> = serde_json::from_str::<Value>(body).ok().and_then(|value| {
     errors(&value["errors"])
@@ -661,14 +675,13 @@ fn refused(broker: &BrokerDescriptor, method: &str, url: &str, status: u16, body
       .or_else(|| value["error"].as_str().map(str::to_string))
       .or_else(|| value["title"].as_str().map(str::to_string))
   });
-  let message = match &said {
-    Some(said) => format!(
-      "the Pact Broker answered {method} {url} with {status}: {}",
-      redacted(broker, said)
-    ),
-    None => format!("the Pact Broker answered {method} {url} with {status}"),
-  };
-  error(broker, "broker-refused", message, json!({ "status": status }))
+  let answered = format!("the Pact Broker answered {method} {url} with {status}{note}");
+  error(broker, "broker-refused", answered, json!({ "status": status })).caused_by(
+    said
+      .map(|said| Layer::new(redacted(broker, &said)))
+      .into_iter()
+      .collect(),
+  )
 }
 
 /// The broker's `errors`, as one line: a list of messages, or, from a request it would not accept,

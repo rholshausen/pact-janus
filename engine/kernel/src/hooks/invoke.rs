@@ -141,6 +141,18 @@ impl HookFailure {
     }
   }
 
+  /// [`HookFailure::errored`], caused by `err`: its causes are the error's chain (ADR 0054).
+  pub fn errored_by(message: impl Into<String>, err: &dyn std::error::Error) -> HookFailure {
+    HookFailure {
+      outcome: Outcome::Errored,
+      error: crate::chain::document(
+        "hook-errored",
+        message,
+        crate::chain::layers_of(err, crate::chain::without_os_error),
+      ),
+    }
+  }
+
   pub fn timed_out(deadline_ms: u64) -> HookFailure {
     HookFailure {
       outcome: Outcome::TimedOut,

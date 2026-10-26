@@ -247,7 +247,7 @@ export interface EngineError {
    */
   category?: string;
   /**
-   * Human-readable description, not intended for programmatic dispatch.
+   * Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined.
    */
   message: string;
   /**
@@ -256,6 +256,27 @@ export interface EngineError {
   details?: {
     [k: string]: unknown;
   };
+  /**
+   * Its layers, outermost first (spec.md §10.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.
+   *
+   * @minItems 1
+   */
+  chain?: [ErrorLayer, ...ErrorLayer[]];
+  [k: string]: unknown;
+}
+
+/**
+ * One layer of an error: what it says, in its own words, and its code when it has one.
+ */
+export interface ErrorLayer {
+  /**
+   * The layer's code, when it has one a host can look up. Open vocabulary: an EngineError's codes, or, in the layers a component's error brought, a ComponentError's.
+   */
+  code?: string;
+  /**
+   * What this layer says, without its causes' words.
+   */
+  message: string;
   [k: string]: unknown;
 }
 

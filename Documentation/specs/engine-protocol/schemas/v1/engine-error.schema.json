@@ -38,11 +38,32 @@
     },
     "message": {
       "type": "string",
-      "description": "Human-readable description, not intended for programmatic dispatch."
+      "description": "Human-readable description, not intended for programmatic dispatch. With a 'chain', the complete sentence: normally its layers' messages joined."
     },
     "details": {
       "type": "object",
       "description": "Code-specific structure per spec.md §10.2 — e.g. 'supported' (protocol-version-unsupported), 'op' (operation-unsupported), 'problems: [{path, message}]' (interaction-invalid/contract-invalid), 'component' and opaque 'error' (component-*)."
+    },
+    "chain": {
+      "type": "array",
+      "description": "Its layers, outermost first (spec.md §10.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.",
+      "minItems": 1,
+      "items": {
+        "title": "ErrorLayer",
+        "description": "One layer of an error: what it says, in its own words, and its code when it has one.",
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The layer's code, when it has one a host can look up. Open vocabulary: an EngineError's codes, or, in the layers a component's error brought, a ComponentError's."
+          },
+          "message": {
+            "type": "string",
+            "description": "What this layer says, without its causes' words."
+          }
+        }
+      }
     }
   }
 }

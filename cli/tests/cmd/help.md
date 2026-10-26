@@ -32,6 +32,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Every command drives the same engine an SDK embeds. --log-level trace shows the protocol frames it
 exchanges.
@@ -170,6 +171,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Exit status: 0 verified, or a filtered run that nothing failed; 1 the provider failed verification,
 or the run was aborted; 2 the command could not run, which includes pacts a broker or URL could not
@@ -204,6 +206,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Exit status: 0 the consumer can deploy, possibly with warnings; 1 something blocked; 2 the command
 could not run. Both severities default to warn.
@@ -243,6 +246,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 To see why a live verification failed, use janus verify --explain-failures instead: it prints the
 executed plan against what the provider actually sent.
@@ -271,6 +275,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 A converted pact has one variant per interaction, because one example is one variant; growing it is
 the consumer test suite's job. Verifying a pact needs no conversion: janus verify reads v1-v4 pacts
@@ -311,6 +316,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Every contract is published as the broker's 'pact' specification, which every Pact Broker accepts.
 Contracts from several consumers are published one consumer at a time, each for the same version.
@@ -338,6 +344,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Loopback registries (localhost, 127.0.0.1) are plain HTTP; everything else is HTTPS. Credentials,
 when a registry wants them: JANUS_OCI_USERNAME and JANUS_OCI_PASSWORD. The cache is
@@ -367,6 +374,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 ```
 
@@ -389,6 +397,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 ```
 
@@ -409,6 +418,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 For example, for bash: janus completions bash > ~/.local/share/bash-completion/completions/janus
 

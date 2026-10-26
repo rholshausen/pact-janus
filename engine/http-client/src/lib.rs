@@ -119,34 +119,90 @@ impl From<OptionsError> for ClientError {
 
 /// Why a request got no answer. An answer of any status is not an error: a 404 or a 500 is what a
 /// verification exists to observe.
+///
+/// As Rust's errors conventionally are, it says only its own layer, and its causes are its
+/// [`source`](std::error::Error::source) chain (ADR 0054): a caller that builds an error chain reads
+/// them one by one, and one that wants a sentence joins them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError {
   /// Nothing answered within the request's timeout.
   Timeout(Duration),
-  /// No connection: refused, unresolvable, or the TLS handshake failed.
-  Connect(String),
-  /// Anything else: a request that could not be built, a connection that broke mid-answer.
-  Other(String),
+  /// No connection: refused, unresolvable, or the TLS handshake failed. Why, beneath it.
+  Connect(Option<Box<Cause>>),
+  /// Anything else: a request that could not be built, a connection that broke mid-answer. Its
+  /// own words are the cause's outermost layer.
+  Other(Box<Cause>),
 }
 
 impl fmt::Display for SendError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       SendError::Timeout(timeout) => write!(f, "no answer within {} ms", timeout.as_millis()),
-      SendError::Connect(message) => write!(f, "could not connect: {message}"),
-      SendError::Other(message) => f.write_str(message),
+      SendError::Connect(_) => f.write_str("could not connect"),
+      SendError::Other(cause) => f.write_str(&cause.message),
     }
   }
 }
 
-impl std::error::Error for SendError {}
+impl std::error::Error for SendError {
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    match self {
+      SendError::Timeout(_) => None,
+      SendError::Connect(cause) => cause.as_deref().map(|cause| cause as _),
+      SendError::Other(cause) => cause.source.as_deref().map(|cause| cause as _),
+    }
+  }
+}
 
-/// An error and every cause beneath it, without the URL reqwest would put in front: the caller
-/// names the request in its own terms, without any user information. The layers that only say
-/// which library was in the way — reqwest's "error sending request", hyper's "client error
+/// One cause beneath a [`SendError`], in its own words, with its own cause beneath it. Only the
+/// layers that say why are kept: the ones that only name the library in the way are not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cause {
+  message: String,
+  source: Option<Box<Cause>>,
+}
+
+impl Cause {
+  /// `layers`, outermost first, as a chain.
+  fn chain(layers: Vec<String>) -> Option<Box<Cause>> {
+    layers
+      .into_iter()
+      .rev()
+      .fold(None, |source, message| Some(Box::new(Cause { message, source })))
+  }
+
+  /// `message`, caused by `layers`.
+  fn of(message: impl Into<String>, layers: Vec<String>) -> Box<Cause> {
+    Box::new(Cause {
+      message: message.into(),
+      source: Cause::chain(layers),
+    })
+  }
+
+  /// `layers` as an error whose own words are the first of them.
+  fn layers(layers: Vec<String>) -> Box<Cause> {
+    Cause::chain(layers).unwrap_or_else(|| Cause::of("the request failed", Vec::new()))
+  }
+}
+
+impl fmt::Display for Cause {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str(&self.message)
+  }
+}
+
+impl std::error::Error for Cause {
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    self.source.as_deref().map(|cause| cause as _)
+  }
+}
+
+/// An error and every cause beneath it, outermost first, without the URL reqwest would put in front:
+/// the caller names the request in its own terms, without any user information. The layers that
+/// only say which library was in the way — reqwest's "error sending request", hyper's "client error
 /// (Connect)", its connector's "tcp connect error" — are left out, so what remains is the cause:
-/// `could not connect: Connection refused (os error 111)`.
-fn describe(err: reqwest::Error) -> String {
+/// `Connection refused`.
+fn describe(err: reqwest::Error) -> Vec<String> {
   let err = err.without_url();
   let mut layers: Vec<String> = Vec::new();
   let mut cause: Option<&dyn std::error::Error> = Some(&err);
@@ -161,15 +217,14 @@ fn describe(err: reqwest::Error) -> String {
   let wrapper = |layer: &String| {
     layer == "error sending request" || layer == "tcp connect error" || layer.starts_with("client error (")
   };
-  let kept: Vec<&String> = layers.iter().filter(|layer| !wrapper(layer)).collect();
-  if kept.is_empty() {
-    return layers.join(": ");
-  }
-  kept
-    .iter()
-    .map(|layer| layer.as_str())
-    .collect::<Vec<_>>()
-    .join(": ")
+  let kept: Vec<String> = layers.iter().filter(|layer| !wrapper(layer)).cloned().collect();
+  if kept.is_empty() { layers } else { kept }
+}
+
+/// [`describe`], as one sentence: what a [`ClientError`] says, since a configuration that cannot be
+/// used is a position and a reason, not a chain of causes.
+fn described(err: reqwest::Error) -> String {
+  describe(err).join(": ")
 }
 
 /// `Connection refused`, without the `(os error 111)` the platform's own number adds.
@@ -250,7 +305,7 @@ impl HttpClient {
       let certificates =
         reqwest::Certificate::from_pem_bundle(pem.as_bytes()).map_err(|err| ClientError {
           pointer: Some(pointer.clone()),
-          message: format!("is not PEM certificates: {}", describe(err)),
+          message: format!("is not PEM certificates: {}", described(err)),
         })?;
       if certificates.is_empty() {
         return Err(ClientError {
@@ -267,7 +322,7 @@ impl HttpClient {
       // The parser's own message is about structure, never the bytes, and the key is not repeated.
       let identity = reqwest::Identity::from_pem(pem.as_bytes()).map_err(|err| ClientError {
         pointer: Some("/tls/client-certificate".to_string()),
-        message: format!("is not a PEM certificate and private key: {}", describe(err)),
+        message: format!("is not a PEM certificate and private key: {}", described(err)),
       })?;
       builder = builder.identity(identity);
     }
@@ -278,7 +333,7 @@ impl HttpClient {
       Proxy::Url { url, no_proxy } => {
         let mut proxy = reqwest::Proxy::all(url).map_err(|err| ClientError {
           pointer: Some("/proxy/url".to_string()),
-          message: format!("is not a proxy URL: {}", describe(err)),
+          message: format!("is not a proxy URL: {}", described(err)),
         })?;
         if !no_proxy.is_empty() {
           proxy = proxy.no_proxy(reqwest::NoProxy::from_string(&no_proxy.join(",")));
@@ -295,7 +350,7 @@ impl HttpClient {
 
     let client = builder.build().map_err(|err| ClientError {
       pointer: None,
-      message: format!("the HTTP client could not be built: {}", describe(err)),
+      message: format!("the HTTP client could not be built: {}", described(err)),
     })?;
     let executor = Executor::new().map_err(|err| ClientError {
       pointer: None,
@@ -328,16 +383,16 @@ impl HttpClient {
   ) -> Result<http::Response<Vec<u8>>, SendError> {
     let deadline = timeout.map_or(self.request_timeout, |timeout| timeout.min(self.request_timeout));
     let mut request = reqwest::Request::try_from(request)
-      .map_err(|err| SendError::Other(format!("the request could not be built: {}", describe(err))))?;
+      .map_err(|err| SendError::Other(Cause::of("the request could not be built", describe(err))))?;
     *request.timeout_mut() = Some(deadline);
 
     let classify = |err: reqwest::Error| {
       if err.is_timeout() {
         SendError::Timeout(deadline)
       } else if err.is_connect() {
-        SendError::Connect(describe(err))
+        SendError::Connect(Cause::chain(describe(err)))
       } else {
-        SendError::Other(describe(err))
+        SendError::Other(Cause::layers(describe(err)))
       }
     };
     let response = self.client.execute(request).await.map_err(classify)?;
@@ -363,9 +418,10 @@ impl HttpClient {
       .executor
       .block_on(self.send(request, timeout))
       .unwrap_or_else(|| {
-        Err(SendError::Other(
-          "the HTTP client was called from inside an async runtime, which it would block".to_string(),
-        ))
+        Err(SendError::Other(Cause::of(
+          "the HTTP client was called from inside an async runtime, which it would block",
+          Vec::new(),
+        )))
       })
   }
 }

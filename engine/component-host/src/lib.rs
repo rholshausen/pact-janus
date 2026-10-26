@@ -202,6 +202,7 @@ impl WasmLoader {
           message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
           source: Some("engine".into()),
           details: Some(Box::new(json!({ "expected": expected, "actual": actual }))),
+          chain: None,
         });
       }
     }
@@ -287,6 +288,7 @@ fn check_artifact_config(pulled: &oci::Pulled, hello: &Value) -> Result<(), Comp
           json!({ "reference": pulled.reference.to_string(), "digest": pulled.digest,
                               "config": pulled.config, "handshake": says }),
         )),
+        chain: None,
       });
     }
   }
@@ -381,6 +383,7 @@ fn check_imports(engine: &Engine, component: &Component, grants: &Grants) -> Res
         message: format!("the component imports {name}, and its declaration does not grant network"),
         source: Some("engine".into()),
         details: Some(Box::new(json!({ "import": name, "grant": "network" }))),
+        chain: None,
       });
     }
     return Err(ComponentError {
@@ -389,6 +392,7 @@ fn check_imports(engine: &Engine, component: &Component, grants: &Grants) -> Res
       message: format!("the component imports {name}, which no grant provides"),
       source: Some("engine".into()),
       details: Some(Box::new(json!({ "import": name }))),
+      chain: None,
     });
   }
   Ok(())
@@ -566,6 +570,7 @@ fn load_error(message: &str) -> ComponentError {
     message: message.to_string(),
     source: Some("engine".into()),
     details: None,
+    chain: None,
   }
 }
 

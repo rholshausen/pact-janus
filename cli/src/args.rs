@@ -42,6 +42,10 @@ pub struct Cli {
   #[arg(long, alias = "no-color", global = true, help_heading = "Global options")]
   pub no_colour: bool,
 
+  /// Print every cause of an error, not only what failed and its root cause
+  #[arg(long, global = true, help_heading = "Global options")]
+  pub error_chain: bool,
+
   #[command(subcommand)]
   pub command: Command,
 }

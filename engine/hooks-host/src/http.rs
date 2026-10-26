@@ -25,6 +25,7 @@
 
 use pact_janus_http_client::{ClientOptions, Defaults, HttpClient, SendError};
 use pact_janus_kernel::broker::without_userinfo;
+use pact_janus_kernel::chain::{self, Layer};
 use pact_janus_kernel::hooks::{HookFailure, HookInvoker, InvokeResult, Outcome};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -181,7 +182,7 @@ impl HookInvoker for HttpHooks {
       }
       request
         .body(payload.clone().unwrap_or_default())
-        .map_err(|err| HookFailure::errored(format!("could not build the request to {shown}: {err}")))
+        .map_err(|err| HookFailure::errored_by(format!("could not build the request to {shown}"), &err))
     };
 
     let deadline = Duration::from_millis(deadline_ms);
@@ -192,7 +193,7 @@ impl HookInvoker for HttpHooks {
         // A timeout and a refused connection are different facts about the endpoint, and a reader
         // chasing one should not be sent to the other.
         SendError::Timeout(_) => HookFailure::timed_out(deadline_ms),
-        other => HookFailure::errored(format!("{shown}: {other}")),
+        other => HookFailure::errored_by(shown.clone(), &other),
       })?;
       let status = response.status().as_u16();
       if attempt <= retries && retryable(status) {
@@ -211,17 +212,16 @@ impl HookInvoker for HttpHooks {
       // The body is usually why: say it in the message, as the oauth2 hook does for its token
       // endpoint, and not only in the details a person reading text never sees.
       let body = excerpt(&text);
-      let message = match text.trim() {
-        "" => format!("{shown} answered {status}"),
-        text => format!("{shown} answered {status}: {}", cut(text, MESSAGE_EXCERPT)),
+      // The body is the cause (ADR 0054): what the endpoint said about its own answer.
+      let said = match text.trim() {
+        "" => Vec::new(),
+        text => vec![Layer::new(cut(text, MESSAGE_EXCERPT))],
       };
+      let mut error = chain::document("hook-http-failed", format!("{shown} answered {status}"), said);
+      error["details"] = json!({ "status": status, "body": body });
       return Ok(InvokeResult {
         outcome: Some(Outcome::Failed),
-        error: Some(json!({
-          "code": "hook-http-failed",
-          "message": message,
-          "details": { "status": status, "body": body },
-        })),
+        error: Some(error),
         ..InvokeResult::default()
       });
     }
@@ -252,15 +252,19 @@ impl HookInvoker for HttpHooks {
       }),
       // A 2xx with a body that is not JSON is a hook that answered something, so it is a result,
       // not the engine concluding on its behalf.
-      Err(err) => Ok(InvokeResult {
-        outcome: Some(Outcome::Failed),
-        error: Some(json!({
-          "code": "hook-result-invalid",
-          "message": format!("{shown} answered 2xx with something that is not JSON: {err}"),
-          "details": { "body": excerpt(&text) },
-        })),
-        ..InvokeResult::default()
-      }),
+      Err(err) => {
+        let mut error = chain::document(
+          "hook-result-invalid",
+          format!("{shown} answered 2xx with something that is not JSON"),
+          chain::layers_of(&err, Some),
+        );
+        error["details"] = json!({ "body": excerpt(&text) });
+        Ok(InvokeResult {
+          outcome: Some(Outcome::Failed),
+          error: Some(error),
+          ..InvokeResult::default()
+        })
+      }
     }
   }
 }

@@ -48,6 +48,7 @@ fn refused(message: &str) -> ComponentError {
     message: message.to_string(),
     source: None,
     details: None,
+    chain: None,
   }
 }
 

@@ -16,6 +16,7 @@
 //! wrong for a hook called on every one of a thousand. That case has an answer and it is not a flag
 //! here: a long-lived process speaking the same frames is a subprocess *component*.
 
+use pact_janus_kernel::chain::{self, Layer};
 use pact_janus_kernel::hooks::{HookFailure, HookInvoker, InvokeResult};
 use serde_json::{Value, json};
 use std::io::{Read, Write};
@@ -27,6 +28,8 @@ use std::time::{Duration, Instant};
 /// How much of a child's stderr is kept for the failure message (spec §8.3: "bounded; the tail is
 /// kept").
 const STDERR_TAIL: usize = 2048;
+/// How much of stderr's last line a failure's message quotes as its cause.
+const STDERR_CAUSE: usize = 200;
 /// How much of an unparseable stdout is quoted back.
 const STDOUT_HEAD: usize = 512;
 
@@ -69,7 +72,7 @@ impl HookInvoker for ExecHooks {
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
-      .map_err(|err| HookFailure::errored(format!("could not spawn '{command}': {err}")))?;
+      .map_err(|err| HookFailure::errored_by(format!("could not spawn '{command}'"), &err))?;
 
     let document = serde_json::to_vec(context).expect("a HookContext always serializes");
     if let Some(mut stdin) = child.stdin.take() {
@@ -98,7 +101,7 @@ impl HookInvoker for ExecHooks {
           }
           thread::sleep(Duration::from_millis(2));
         }
-        Err(err) => return Err(HookFailure::errored(format!("waiting for '{command}': {err}"))),
+        Err(err) => return Err(HookFailure::errored_by(format!("waiting for '{command}'"), &err)),
       }
     };
 
@@ -115,13 +118,23 @@ impl HookInvoker for ExecHooks {
     }
 
     if !status.success() {
+      // The last thing the command said on stderr is usually why it failed: the cause (ADR 0054).
+      let said: Vec<Layer> = err_text
+        .lines()
+        .map(str::trim)
+        .rfind(|line| !line.is_empty())
+        .map(|line| Layer::new(line.chars().take(STDERR_CAUSE).collect::<String>()))
+        .into_iter()
+        .collect();
+      let mut error = chain::document(
+        "hook-exec-failed",
+        format!("'{command}' exited with {}", exit_text(&status)),
+        said,
+      );
+      error["details"] = json!({ "stderr": err_text });
       return Ok(InvokeResult {
         outcome: Some(pact_janus_kernel::hooks::Outcome::Failed),
-        error: Some(json!({
-          "code": "hook-exec-failed",
-          "message": format!("'{command}' exited with {}", exit_text(&status)),
-          "details": { "stderr": err_text },
-        })),
+        error: Some(error),
         ..InvokeResult::default()
       });
     }

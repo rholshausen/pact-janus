@@ -118,8 +118,9 @@ Three sources are the source of truth and take precedence over this file when th
 > writes an absent value as `ABSENT`. S1.31 coloured the rest of the CLI's output on a terminal, from
 > one palette (`cli/src/style.rs`), and stripped it everywhere else. S1.32: `janus explain
 > --description` chooses an interaction by its description, listing the candidates when it names
-> several or none. Next, decided by ADR 0054: errors carry their causes as a chain (S1.33), and
-> display text is marked with segments beside it (S1.34).
+> several or none. S1.33 (ADR 0054): an error carries its causes as `chain`, its layers outermost
+> first; the CLI leads with what failed and its root cause, and `--error-chain` prints every layer.
+> Next, S1.34: display text marked with segments beside it.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -378,7 +379,7 @@ janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url
 janus component push <component.wasm> <reference> [--output text|json]
 janus component pull <reference> [--digest <sha256:...>] [--output text|json]
 janus completions <shell>
-janus version                      # every command also takes --log-level <level>
+janus version                      # every command also takes --log-level <level>, --no-colour, --error-chain
 ```
 
 Exit codes are part of the surface: `0` the command did what it was asked, `1` the *subject* failed
@@ -486,7 +487,9 @@ anything they print.
   no `pact_models` type but the two `engine/kernel/tests/boundary.rs` allows. A new use is either moved
   behind the boundary or added there with its reason.
 - **Errors are values at the engine boundary.** Panics must never cross the protocol; every operation
-  returns structured errors. Sessions are the only resource — no per-object cleanup calls. A plan node
+  returns structured errors. An error's causes are its `chain`, layer by layer (ADR 0054), never
+  joined into a string where it is produced: lift a library's `source()` chain with
+  `chain::layers_of`, and give an error causes with `caused_by`. Sessions are the only resource — no per-object cleanup calls. A plan node
   the engine's own compilers did not build — a component's fragment, a plan document read back — is
   not trusted: the interpreter reads an action's children by position, so every core action has a
   least child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.

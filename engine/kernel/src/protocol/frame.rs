@@ -72,6 +72,10 @@ pub struct EngineError {
   /// error is carried by every `Result` that can fail.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub details: Option<Box<Value>>,
+  /// Its layers, outermost first, when it has causes (spec §10.1, ADR 0054): see [`crate::chain`].
+  /// `message` still says them all.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub chain: Option<Vec<crate::chain::Layer>>,
 }
 
 impl EngineError {
@@ -82,6 +86,7 @@ impl EngineError {
       category: "protocol".to_string(),
       message: "the first request on a pipe must be engine/hello".to_string(),
       details: None,
+      chain: None,
     }
   }
 
@@ -92,6 +97,7 @@ impl EngineError {
       category: "protocol".to_string(),
       message: "the engine has been shut down (engine/shutdown); open a new engine".to_string(),
       details: None,
+      chain: None,
     }
   }
 
@@ -102,6 +108,7 @@ impl EngineError {
       category: "protocol".to_string(),
       message: format!("unknown operation '{op}'"),
       details: Some(Box::new(serde_json::json!({ "op": op }))),
+      chain: None,
     }
   }
 
@@ -112,6 +119,7 @@ impl EngineError {
       category: "protocol".to_string(),
       message: format!("this engine speaks protocol versions {supported:?}"),
       details: Some(Box::new(serde_json::json!({ "supported": supported }))),
+      chain: None,
     }
   }
 
@@ -123,6 +131,7 @@ impl EngineError {
       category: "protocol".to_string(),
       message: message.into(),
       details: None,
+      chain: None,
     }
   }
 
@@ -133,6 +142,7 @@ impl EngineError {
       category: "session".to_string(),
       message: format!("session '{session}' does not exist or has ended"),
       details: Some(Box::new(serde_json::json!({ "session": session }))),
+      chain: None,
     }
   }
 
@@ -144,6 +154,7 @@ impl EngineError {
       category: "document".to_string(),
       message: "interaction specification is not valid".to_string(),
       details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+      chain: None,
     }
   }
 
@@ -157,6 +168,7 @@ impl EngineError {
       category: "session".to_string(),
       message: format!("event stream '{stream}' does not exist or has ended"),
       details: Some(Box::new(serde_json::json!({ "stream": stream }))),
+      chain: None,
     }
   }
 
@@ -176,6 +188,7 @@ impl EngineError {
       details: Some(Box::new(
         serde_json::json!({ "index": index, "found": found, "expected": crate::contract::FORMAT }),
       )),
+      chain: None,
     }
   }
 
@@ -189,6 +202,7 @@ impl EngineError {
       category: "document".to_string(),
       message: "hook configuration is not valid".to_string(),
       details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+      chain: None,
     }
   }
 
@@ -205,6 +219,7 @@ impl EngineError {
       details: Some(Box::new(serde_json::json!({
         "kind": kind, "hook": hook, "implementations": available,
       }))),
+      chain: None,
     }
   }
 
@@ -215,6 +230,7 @@ impl EngineError {
       category: "session".to_string(),
       message: format!("interaction handle '{handle}' does not exist in this session"),
       details: Some(Box::new(serde_json::json!({ "handle": handle }))),
+      chain: None,
     }
   }
 
@@ -228,6 +244,7 @@ impl EngineError {
       details: Some(Box::new(
         serde_json::json!({ "variant": variant, "selection": selection }),
       )),
+      chain: None,
     }
   }
 
@@ -262,6 +279,7 @@ impl EngineError {
         "variant": unknown.first(),
         "recorded": recorded,
       }))),
+      chain: None,
     }
   }
 
@@ -283,6 +301,7 @@ impl EngineError {
         "filter": filter,
         "interactions": interactions,
       }))),
+      chain: None,
     }
   }
 
@@ -298,6 +317,7 @@ impl EngineError {
       details: Some(Box::new(serde_json::json!({
         "space": space, "selected": selected, "budget": budget, "dimensions": dimensions,
       }))),
+      chain: None,
     }
   }
 
@@ -310,6 +330,7 @@ impl EngineError {
       category: "document".to_string(),
       message: "sampling policy is not valid".to_string(),
       details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+      chain: None,
     }
   }
 
@@ -322,6 +343,7 @@ impl EngineError {
       category: "component".to_string(),
       message: format!("no '{component}' component is loaded"),
       details: Some(Box::new(serde_json::json!({ "component": component }))),
+      chain: None,
     }
   }
 
@@ -347,6 +369,7 @@ impl EngineError {
         "plugins": plugins,
         "reason": "pact-plugin",
       }))),
+      chain: None,
     }
   }
 
@@ -366,6 +389,7 @@ impl EngineError {
         "reason": "message-not-produced",
         "part": part,
       }))),
+      chain: None,
     }
   }
 
@@ -377,6 +401,7 @@ impl EngineError {
       category: "component".to_string(),
       message: format!("this engine has no Pact Broker client, so it cannot {what}"),
       details: Some(Box::new(serde_json::json!({ "component": "broker" }))),
+      chain: None,
     }
   }
 
@@ -388,6 +413,7 @@ impl EngineError {
       category: "document".to_string(),
       message: format!("the broker has no pacts for '{provider}' that the consumer version selectors select"),
       details: Some(Box::new(serde_json::json!({ "provider": provider }))),
+      chain: None,
     }
   }
 
@@ -399,20 +425,29 @@ impl EngineError {
       category: "component".to_string(),
       message: unavailable.message.clone(),
       details: Some(Box::new(unavailable.details.clone())),
+      chain: None,
     }
   }
 
   /// `component-failed` (spec §10.2): a loaded component answered with an error, passed through
   /// opaquely (`details.error`) — the kernel does not understand a component error's interior and
   /// MUST NOT translate it (design 2.6).
+  ///
+  /// Its chain (ADR 0054 decision 2) is this error's own layer, then the component's chain, or the
+  /// component error itself as one layer when it has none: the component's layers are copied into
+  /// place, never read for meaning.
   pub fn component_failed(component: &str, error: &crate::component::ComponentError) -> Self {
+    let own = format!("the '{component}' component failed");
+    let mut chain = vec![crate::chain::Layer::coded("component-failed", &own)];
+    chain.extend(error.layers());
     EngineError {
       code: "component-failed".to_string(),
       category: "component".to_string(),
-      message: format!("the '{component}' component failed: {}", error.message),
+      message: format!("{own}: {}", error.message),
       details: Some(Box::new(
         serde_json::json!({ "component": component, "error": error }),
       )),
+      chain: Some(chain),
     }
   }
 
@@ -424,6 +459,7 @@ impl EngineError {
       category: "document".to_string(),
       message: "the document is not a contract or pact this engine can read".to_string(),
       details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+      chain: None,
     }
   }
 
@@ -437,6 +473,7 @@ impl EngineError {
       category: "document".to_string(),
       message: "the session's interactions cannot produce a valid contract".to_string(),
       details: Some(Box::new(serde_json::json!({ "problems": problems }))),
+      chain: None,
     }
   }
 
@@ -463,6 +500,7 @@ impl EngineError {
       category: "document".to_string(),
       message: format!("'{member}': {error}"),
       details: Some(Box::new(details)),
+      chain: None,
     }
   }
 
@@ -478,6 +516,7 @@ impl EngineError {
       details: Some(Box::new(
         serde_json::json!({ "member": "provider", "contract": contract, "provider-shape": shape }),
       )),
+      chain: None,
     }
   }
 
@@ -489,6 +528,7 @@ impl EngineError {
       category: "internal".to_string(),
       message: message.into(),
       details: None,
+      chain: None,
     }
   }
 }

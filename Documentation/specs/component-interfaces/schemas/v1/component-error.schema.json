@@ -39,7 +39,7 @@
     },
     "message": {
       "type": "string",
-      "description": "Human-readable description, never dispatched on."
+      "description": "Human-readable description, never dispatched on. With a 'chain', the complete sentence: normally its layers' messages joined."
     },
     "source": {
       "type": "string",
@@ -50,6 +50,27 @@
     "details": {
       "type": "object",
       "description": "Code-specific structure per spec.md §11.1 — e.g. 'op' (operation-unsupported), 'operator'/'action' (unknown-*), 'content-type' and 'path' (decode-failed), 'grant' (capability-denied)."
+    },
+    "chain": {
+      "type": "array",
+      "description": "Its layers, outermost first (spec.md §11.1, ADR 0054): the first is this error itself and the last its root cause, each in its own words only. A host reading only 'message' loses nothing; one reading the chain can tell what failed from why. Absent when the error has no cause worth a layer.",
+      "minItems": 1,
+      "items": {
+        "title": "ErrorLayer",
+        "description": "One layer of an error: what it says, in its own words, and its code when it has one.",
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The layer's code, when it has one a host can look up. Open vocabulary, as the error's own code is."
+          },
+          "message": {
+            "type": "string",
+            "description": "What this layer says, without its causes' words."
+          }
+        }
+      }
     }
   }
 }

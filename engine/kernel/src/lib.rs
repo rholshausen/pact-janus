@@ -5,6 +5,7 @@
 //! behind the component interfaces (see the component-interface design, plan task 2.6).
 
 pub mod broker;
+pub mod chain;
 mod common;
 pub mod compatibility;
 pub mod component;

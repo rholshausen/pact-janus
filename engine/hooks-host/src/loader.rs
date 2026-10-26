@@ -23,49 +23,40 @@ use std::path::{Path, PathBuf};
 /// is; `Invalid` is `hook-config-invalid`, which the kernel's own validator produces so that a
 /// configuration loaded from a file and one handed straight over the protocol are judged by
 /// exactly the same code.
-#[derive(Debug)]
+///
+/// It says its own layer, and why a file or script could not be read is its `source`: the
+/// `io::Error` or the parser's error itself, not its text (ADR 0054), so a host can show the cause
+/// apart from the headline.
+#[derive(Debug, thiserror::Error)]
 pub enum LoadError {
   /// An unset `${VAR}`.
-  UnsetVariable {
-    variable: String,
-    at: String,
-  },
+  #[error("environment variable '{variable}' is not set (used at {at})")]
+  UnsetVariable { variable: String, at: String },
   /// A script that could not be read, or one this loader has no toolchain for.
+  #[error("hook '{hook}': could not read script '{path}'")]
   UnreadableScript {
     path: String,
     hook: String,
-    message: String,
+    #[source]
+    cause: Box<dyn std::error::Error + Send + Sync>,
   },
   /// The file itself could not be read or parsed.
+  #[error("could not read '{path}'")]
   Unreadable {
     path: String,
-    message: String,
+    #[source]
+    cause: Box<dyn std::error::Error + Send + Sync>,
   },
+  #[error("hook configuration is not valid:{}", problems(.0))]
   Invalid(Vec<Problem>),
 }
 
-impl std::fmt::Display for LoadError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      LoadError::UnsetVariable { variable, at } => {
-        write!(f, "environment variable '{variable}' is not set (used at {at})")
-      }
-      LoadError::UnreadableScript { path, hook, message } => {
-        write!(f, "hook '{hook}': could not read script '{path}': {message}")
-      }
-      LoadError::Unreadable { path, message } => write!(f, "could not read '{path}': {message}"),
-      LoadError::Invalid(problems) => {
-        write!(f, "hook configuration is not valid:")?;
-        for problem in problems {
-          write!(f, "\n  {}: {}", problem.pointer, problem.message)?;
-        }
-        Ok(())
-      }
-    }
-  }
+fn problems(problems: &[Problem]) -> String {
+  problems
+    .iter()
+    .map(|problem| format!("\n  {}: {}", problem.pointer, problem.message))
+    .collect()
 }
-
-impl std::error::Error for LoadError {}
 
 /// Load and resolve a configuration file (YAML or JSON — the schema governs the parsed document,
 /// not the syntax it arrived in). Returns the document to hand the engine.
@@ -73,7 +64,7 @@ pub fn load(path: impl AsRef<Path>) -> Result<Value, LoadError> {
   let path = path.as_ref();
   let text = std::fs::read_to_string(path).map_err(|err| LoadError::Unreadable {
     path: path.display().to_string(),
-    message: err.to_string(),
+    cause: err.into(),
   })?;
   let base = path.parent().unwrap_or(Path::new("."));
   load_document(&text, base, &environment())
@@ -84,7 +75,7 @@ pub fn load(path: impl AsRef<Path>) -> Result<Value, LoadError> {
 pub fn load_document(text: &str, base: &Path, env: &HashMap<String, String>) -> Result<Value, LoadError> {
   let document: Value = serde_yaml_ng::from_str(text).map_err(|err| LoadError::Unreadable {
     path: base.display().to_string(),
-    message: err.to_string(),
+    cause: err.into(),
   })?;
   resolve(&document, base, env)
 }
@@ -177,15 +168,15 @@ fn resolve_entry(entry: &Value, base: &Path) -> Result<Value, LoadError> {
         return Err(LoadError::UnreadableScript {
           path: full.display().to_string(),
           hook,
-          message: "TypeScript hooks need a transpiler this loader does not carry (spec §9.6); \
-                    transpile it to JavaScript and point 'path' at the result"
-            .to_string(),
+          cause: "TypeScript hooks need a transpiler this loader does not carry (spec §9.6); \
+                  transpile it to JavaScript and point 'path' at the result"
+            .into(),
         });
       }
       let source = std::fs::read_to_string(&full).map_err(|err| LoadError::UnreadableScript {
         path: full.display().to_string(),
         hook: hook.clone(),
-        message: err.to_string(),
+        cause: err.into(),
       })?;
       run.remove("path");
       run.insert("source".to_string(), Value::String(source));

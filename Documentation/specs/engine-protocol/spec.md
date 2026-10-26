@@ -1015,6 +1015,19 @@ a bug). An `EngineError` carries:
   the category fallback. Open vocabulary; v1 defines the five below.
 - `message` (string, required): human-readable; never dispatch on it.
 - `details` (object): code-specific structure, specified with each code.
+- `chain` (array): its layers, outermost first, each `{ code?, message }` in that layer's own words
+  only ([ADR 0054](../../decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md)).
+  The first is the error itself and the last its root cause. `message` keeps its meaning, the
+  complete sentence, normally the layers joined with `: `, so a host that reads only `message` loses
+  nothing. A layer that only names a library in the way is left out by whoever writes the chain.
+  Absent when the error has no cause worth a layer.
+
+A host that shows a chain SHOULD lead with its innermost layer that has a `code`, the most
+specific thing that failed and the part a user can look up, then say the root cause when that is
+another layer, and offer every layer on request. `component-failed`'s own layer (§10.2) only says
+that a component failed, so it is rarely the one to lead with. The same member, under the same
+rules, is on every error that has the protocol's shape: a component's (component-interfaces spec
+§11.1) and a hook's (lifecycle-hooks spec).
 
 ### 10.2 Categories and codes (v1)
 

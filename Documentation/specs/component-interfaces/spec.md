@@ -1088,6 +1088,10 @@ second error shape at that boundary would only need translating.
 | `component` | `transport-failed`, `hook-failed`, `capability-denied`, `unavailable` |
 | `internal` | `internal` |
 
+A `ComponentError` may carry `chain`, its layers outermost first, under protocol §10.1's rules: a
+component that knows why it failed, in layers, says so there, and its `message` stays the whole
+sentence ([ADR 0054](../../decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md)).
+
 `details` conventions: `operation-unsupported` carries `op`; `unknown-operator`/`unknown-action`/
 `unknown-generator` carry the name; `generate-failed` (a generator that cannot produce a value from what
 it was given, such as a provider-state expression naming a value nobody provided) carries the generator; `decode-failed` carries `content-type` and, where it has one, a `path`; `capability-denied`
@@ -1115,6 +1119,11 @@ Every component failure surfaces to the host as one of the protocol's two compon
 | a component that declared a contribution it may not (§2.4) | `component-unavailable`, `details.reason` = `component-invalid` |
 | a component that answered with an error | `component-failed`, `details.error` = the `ComponentError` verbatim |
 | a component that trapped, timed out or exited | `component-failed`, `details.error` = the synthesised error (§11.2) |
+
+A `component-failed` error's `chain` is its own layer (`the '<component>' component failed`), then
+the component error's `chain`, or the component error's `{code, message}` as one layer when it has
+none. The engine copies the component's layers into place and reads nothing in them, so this is
+not translating them: `details.error` still carries the component's error verbatim.
 
 A component mismatch — a value the component's own matcher rejected — is **not** an error. It is a plan
 result (§7.2) and travels as a mismatch, exactly as a kernel action's would.

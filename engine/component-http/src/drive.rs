@@ -9,6 +9,7 @@
 use crate::{BASE64, Names, multi_map_slot, query_string, slot_bytes};
 use base64::Engine as _;
 use pact_janus_http_client::{Defaults, HttpClient};
+use pact_janus_kernel::chain;
 use pact_janus_kernel::component::{ComponentError, Part, Parts, SlotValue};
 use serde_json::{Map, Value};
 use std::time::Duration;
@@ -100,8 +101,8 @@ impl DriveInstance {
     let url = pact_janus_kernel::broker::without_userinfo(&request.uri().to_string());
     tracing::debug!(%method, %url, "sending the request to the provider");
     let response = self.client.run(request, timeout).map_err(|err| {
-      tracing::debug!(%method, %url, error = %err, "the provider did not answer");
-      ComponentError::transport_failed(format!("{method} {url}: {err}"))
+      tracing::debug!(%method, %url, error = %chain::sentence(&err), "the provider did not answer");
+      ComponentError::transport_failed(format!("{method} {url}")).caused_by(chain::layers_of(&err, Some))
     })?;
     tracing::debug!(%method, %url, status = response.status().as_u16(), "the provider answered");
     Ok(reply_parts(response))

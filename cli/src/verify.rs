@@ -35,7 +35,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     None => None,
     Some(path) => Some(
       pact_janus_hooks_host::loader::load(path)
-        .map_err(|err| format!("reading {}: {err}", path.display()))?,
+        .map_err(|err| format!("reading {}: {}", path.display(), crate::engine::sentence(&err)))?,
     ),
   };
 

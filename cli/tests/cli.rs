@@ -245,7 +245,7 @@ fn verify_trusts_a_provider_certificate_only_when_told_to() {
   let refused = janus(&args);
   assert_eq!(code(&refused), 1, "{}\n{}", stdout(&refused), stderr(&refused));
   assert!(
-    stdout(&refused).contains("could not connect") && stdout(&refused).contains("certificate"),
+    stdout(&refused).contains("caused by: invalid peer certificate"),
     "{}",
     stdout(&refused)
   );
@@ -256,12 +256,13 @@ fn verify_trusts_a_provider_certificate_only_when_told_to() {
   assert_eq!(code(&accepted), 0, "{}\n{}", stdout(&accepted), stderr(&accepted));
 }
 
-/// A provider that speaks only HTTP/1.1, asked for HTTP/2: each request fails, and says why on
-/// one line, with the component's own code and no JSON, and nothing is logged at the default level
-/// that the result does not already say. (The sample provider never answers HTTP/2's preface, so
-/// the request times out; a provider that answers it with HTTP/1.1 fails on a bad frame instead.)
+/// A provider that speaks only HTTP/1.1, asked for HTTP/2: each request fails, and says what failed,
+/// with the component's own code, and why beneath it (ADR 0054), with no JSON, and nothing is logged
+/// at the default level that the result does not already say. (The sample provider never answers
+/// HTTP/2's preface, so the request times out; a provider that answers it with HTTP/1.1 fails on a
+/// bad frame instead.)
 #[test]
-fn a_request_the_provider_cannot_answer_is_reported_on_one_line() {
+fn a_request_the_provider_cannot_answer_says_what_failed_and_why() {
   let provider = provider();
   let config = state_config(&provider);
   let output = janus(&[
@@ -278,19 +279,66 @@ fn a_request_the_provider_cannot_answer_is_reported_on_one_line() {
   ]);
   assert_eq!(code(&output), 1, "{}\n{}", stdout(&output), stderr(&output));
   let text = stdout(&output);
-  let failures: Vec<&str> = text
-    .lines()
-    .filter(|line| line.trim_start().starts_with("transport-failed: "))
+  let lines: Vec<&str> = text.lines().map(str::trim_start).collect();
+  let failures: Vec<usize> = (0..lines.len())
+    .filter(|&at| lines[at].starts_with("transport-failed: GET "))
     .collect();
   assert_eq!(failures.len(), 2, "{text}");
   assert!(
     failures
       .iter()
-      .all(|line| line.ends_with("no answer within 500 ms")),
+      .all(|&at| lines.get(at + 1) == Some(&"caused by: no answer within 500 ms")),
     "{text}"
   );
   assert!(!text.contains(r#"{"component""#), "{text}");
   assert!(!stderr(&output).contains("WARN"), "{}", stderr(&output));
+}
+
+/// `--error-chain` prints every layer of an error (ADR 0054): the engine's own, the component's,
+/// and each cause beneath, where the default says only what failed and its root cause.
+#[test]
+fn error_chain_prints_every_layer_of_an_error() {
+  // A port that was listening a moment ago, and is not now.
+  let port = std::net::TcpListener::bind("127.0.0.1:0")
+    .expect("a free port")
+    .local_addr()
+    .expect("its address")
+    .port();
+  let url = format!("http://127.0.0.1:{port}");
+  let args = [
+    "verify",
+    &order_pact(),
+    "--provider-url",
+    &url,
+    "--filter-description",
+    "does not exist",
+  ];
+
+  let short = stdout(&janus(&args));
+  let lines: Vec<&str> = short.lines().map(str::trim_start).collect();
+  let at = lines
+    .iter()
+    .position(|line| line.starts_with("transport-failed: GET "))
+    .unwrap_or_else(|| panic!("{short}"));
+  assert!(lines[at + 1].starts_with("caused by: "), "{short}");
+  assert!(!lines[at + 1].contains("could not connect"), "{short}");
+  assert!(!short.contains("component-failed"), "{short}");
+
+  let mut full_args = args.to_vec();
+  full_args.push("--error-chain");
+  let full = stdout(&janus(&full_args));
+  let lines: Vec<&str> = full.lines().map(str::trim_start).collect();
+  let at = lines
+    .iter()
+    .position(|line| *line == "component-failed: the 'transport/http' component failed")
+    .unwrap_or_else(|| panic!("{full}"));
+  assert!(
+    lines[at + 1].starts_with("caused by: transport-failed: GET "),
+    "{full}"
+  );
+  assert_eq!(lines[at + 2], "caused by: could not connect", "{full}");
+  assert!(lines[at + 3].starts_with("caused by: "), "{full}");
+  assert!(!lines[at + 3].contains("os error"), "{full}");
 }
 
 /// Without `--proxy`, the environment's proxy is used, as today's verifier and curl use it.

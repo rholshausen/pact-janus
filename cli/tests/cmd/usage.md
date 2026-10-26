@@ -34,6 +34,7 @@ Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Every command drives the same engine an SDK embeds. --log-level trace shows the protocol frames it
 exchanges.
