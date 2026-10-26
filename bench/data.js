@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792993408519,
+  "lastUpdate": 1792993410239,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -28992,6 +28992,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19397,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "054f40a053a8998f06ee1f05d980c4abd2a264dd",
+          "message": "feat: S1.33 errors carry their causes as a chain\n\nAn EngineError, and a component's error document, may carry `chain`: its\nlayers outermost first, each in its own words, with `message` still the\ncomplete sentence (ADR 0054). The kernel lifts a library's source() chain\ninto layers with chain::layers_of, and component-failed writes its own\nlayer, then the component's.\n\nThe HTTP transport, the broker client and the http and exec hooks build\nchains instead of joining strings; SendError says only its own layer, its\ncauses as source(); a failing exec hook's last stderr line is its root\ncause. LoadError keeps its io::Error as its source, with thiserror.\n\njanus prints an error as its innermost coded layer and a `caused by:`\nline for its root cause; the global --error-chain prints every layer.\nThe specs, both error schemas and the generated bindings (ErrorLayer)\nfollow.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T16:38:09+11:00",
+          "tree_id": "fdac06a38647fecf85791ed83d6d48703e52ae0a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/054f40a053a8998f06ee1f05d980c4abd2a264dd"
+        },
+        "date": 1792993409832,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25575,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19357,
             "unit": "requests per second",
             "extra": "engines 4"
           }
