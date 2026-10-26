@@ -749,6 +749,12 @@ pub struct ExplainArgs {
   #[arg(long, value_name = "N", conflicts_with = "spec", value_parser = position)]
   pub index: Option<usize>,
 
+  /// Which interaction of a contract or pact, by its description: the one it names exactly, or else
+  /// the one whose description contains it, ignoring case. Several matches are listed, with their
+  /// provider states and positions for --index
+  #[arg(long, value_name = "TEXT", conflicts_with_all = ["spec", "index"])]
+  pub description: Option<String>,
+
   /// Compile for this recorded variant of a Janus contract
   #[arg(long, value_name = "ID", conflicts_with = "spec")]
   pub variant: Option<String>,

@@ -1,0 +1,5 @@
+# A description nothing contains is a usage error listing every interaction (staged plan S1.32).
+bin.name = "janus"
+args = ["explain", "samples/order-service/pacts/web-app-order-service.json", "--description", "payment"]
+status.code = 2
+fs.cwd = "../../.."

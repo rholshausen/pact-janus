@@ -12,6 +12,11 @@
 //! for when there is no provider to run at all. The engine runs it too, in the same call that
 //! compiles the plan (staged plan S1.12, ADR 0050), so nothing here steps outside the protocol.
 //!
+//! `--description` picks the interaction by what it is called rather than where it is, which in a
+//! pact of hundreds is the only thing a reader knows about it. The CLI turns it into the `index` the
+//! operation takes, as it checks `--index` itself: which interaction of a file was meant is the
+//! command line's question, answered before the engine is asked.
+//!
 //! `--config` names the verifier configuration whose `components` a run would load, so a plan a
 //! declared component contributes a fragment to is explained as a run compiles it.
 
@@ -26,6 +31,10 @@ use serde_json::{Value, json};
 
 pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   let document = io::read_json(&args.document)?;
+  let index = match &args.description {
+    Some(description) => Some(select(&document, description)?),
+    None => args.index,
+  };
 
   // The document says what it is (ADR 0011, plan task 5.5): an interaction specification is the
   // one that cannot, so it is the one that takes a flag.
@@ -33,7 +42,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
     json!({ "kind": "spec", "spec": document })
   } else {
     let mut subject = json!({ "kind": "contract-interaction", "contract": document });
-    if let Some(index) = args.index {
+    if let Some(index) = index {
       subject["index"] = json!(index);
     }
     if let Some(variant) = &args.variant {
@@ -107,15 +116,104 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   }
 }
 
-/// `--index` past the document's last interaction is the command line asking for something that is
-/// not there: a usage error naming the flag, before the engine is asked. A contract's interactions,
-/// a v4 pact's, and a v3 message pact's messages are each counted where the document keeps them; a
-/// document with neither is left for the engine to refuse by what it is.
-fn check_index(document: &Value, index: usize) -> Result<(), Error> {
-  let Some(count) = ["interactions", "messages"]
+/// A contract's interactions, a v1–v4 pact's, or a v3 message pact's messages: each where the
+/// document keeps them, in the order the engine's `index` counts.
+fn interactions(document: &Value) -> Option<&Vec<Value>> {
+  ["interactions", "messages"]
     .iter()
-    .find_map(|member| document[member].as_array().map(Vec::len))
-  else {
+    .find_map(|member| document[member].as_array())
+}
+
+/// The position of the interaction `--description` names: the one whose description is exactly
+/// `text`, or else the one whose description contains it, ignoring case. An exact match wins over
+/// containing ones, so a description that is a prefix of another's can still be chosen. None, or
+/// more than one, is a usage error listing what there is to choose from, by position.
+fn select(document: &Value, text: &str) -> Result<usize, Error> {
+  let Some(all) = interactions(document) else {
+    return Err(Error::Failed(format!(
+      "--description '{text}': the document holds no interactions to choose from"
+    )));
+  };
+  let described: Vec<(usize, &str)> = all
+    .iter()
+    .enumerate()
+    .map(|(at, interaction)| (at, interaction["description"].as_str().unwrap_or_default()))
+    .collect();
+  let mut matches: Vec<usize> = described
+    .iter()
+    .filter(|(_, description)| *description == text)
+    .map(|(at, _)| *at)
+    .collect();
+  if matches.is_empty() {
+    let lower = text.to_lowercase();
+    matches = described
+      .iter()
+      .filter(|(_, description)| description.to_lowercase().contains(&lower))
+      .map(|(at, _)| *at)
+      .collect();
+  }
+  let problem = match matches.as_slice() {
+    [only] => return Ok(*only),
+    [] => format!(
+      "no interaction's description contains it. The document has:\n{}",
+      listing(all, 0..all.len())
+    ),
+    several => format!(
+      "{} interactions match it; choose one with --index:\n{}",
+      several.len(),
+      listing(all, several.iter().copied())
+    ),
+  };
+  Err(error::usage(
+    &["explain"],
+    ErrorKind::ValueValidation,
+    format!("invalid value '{text}' for '--description <TEXT>': {problem}"),
+  ))
+}
+
+/// `  0  a request for an order (given an order exists)`, one line per interaction at `positions`:
+/// the states are what tells apart two interactions a pact describes alike.
+fn listing(all: &[Value], positions: impl IntoIterator<Item = usize>) -> String {
+  let positions: Vec<usize> = positions.into_iter().collect();
+  let width = positions.iter().max().map_or(1, |last| last.to_string().len());
+  positions
+    .iter()
+    .map(|&at| {
+      let interaction = &all[at];
+      let description = interaction["description"].as_str().unwrap_or("?");
+      let states = states(interaction);
+      let given = if states.is_empty() {
+        String::new()
+      } else {
+        format!(" (given {})", states.join(", "))
+      };
+      format!("  {at:>width$}  {description}{given}")
+    })
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+/// An interaction's provider states, by name: a contract's `states` and a v3 or v4 pact's
+/// `providerStates` are lists of objects with a `name`, and a v1 or v2 pact's `providerState` is one
+/// string (v1 also spelled it `provider_state`).
+fn states(interaction: &Value) -> Vec<&str> {
+  for list in ["states", "providerStates"] {
+    if let Some(states) = interaction[list].as_array() {
+      return states.iter().filter_map(|state| state["name"].as_str()).collect();
+    }
+  }
+  ["providerState", "provider_state"]
+    .iter()
+    .find_map(|single| interaction[single].as_str())
+    .into_iter()
+    .collect()
+}
+
+/// `--index` past the document's last interaction is the command line asking for something that is
+/// not there: a usage error naming the flag, before the engine is asked. A document with no
+/// interactions where [`interactions`] looks is left for the engine to refuse by what it is.
+fn check_index(document: &Value, index: usize) -> Result<(), Error> {
+  let Some(count) = interactions(document).map(Vec::len) else {
     return Ok(());
   };
   if index < count {
@@ -131,4 +229,87 @@ fn check_index(document: &Value, index: usize) -> Result<(), Error> {
     ErrorKind::ValueValidation,
     format!("invalid value '{index}' for '--index <N>': {has}"),
   ))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use pretty_assertions::assert_eq;
+
+  /// What `select` refused with, as clap would print it, or the position it chose.
+  fn chosen(document: &Value, text: &str) -> Result<usize, String> {
+    select(document, text).map_err(|err| match err {
+      Error::Usage(err) => err.to_string(),
+      Error::Failed(message) | Error::Refused(message) => message,
+    })
+  }
+
+  #[test]
+  fn an_exact_description_wins_over_ones_that_contain_it() {
+    let pact = json!({ "interactions": [
+      { "description": "get an order" },
+      { "description": "get an order that does not exist" },
+    ]});
+    assert_eq!(chosen(&pact, "get an order"), Ok(0));
+    assert_eq!(chosen(&pact, "DOES NOT"), Ok(1));
+  }
+
+  /// A pact describes interactions alike when only their states differ, so the list says the states
+  /// and the positions `--index` takes.
+  #[test]
+  fn several_matches_are_listed_with_their_states_and_positions() {
+    let pact = json!({ "interactions": [
+      { "description": "get an order", "providerStates": [{ "name": "an order exists" }, { "name": "it shipped" }] },
+      { "description": "list orders" },
+      { "description": "get an order", "providerStates": [{ "name": "no orders exist" }] },
+    ]});
+    let refused = chosen(&pact, "get an order").unwrap_err();
+    assert!(
+      refused.contains(
+        "2 interactions match it; choose one with --index:\n  \
+         0  get an order (given an order exists, it shipped)\n  \
+         2  get an order (given no orders exist)\n"
+      ),
+      "{refused}"
+    );
+  }
+
+  #[test]
+  fn no_match_lists_every_interaction_aligned_by_position() {
+    let interactions: Vec<Value> = (0..11)
+      .map(|at| json!({ "description": format!("call {at}"), "providerState": "ready" }))
+      .collect();
+    let refused = chosen(&json!({ "interactions": interactions }), "payment").unwrap_err();
+    assert!(
+      refused.contains("no interaction's description contains it. The document has:\n"),
+      "{refused}"
+    );
+    assert!(refused.contains("\n   0  call 0 (given ready)\n"), "{refused}");
+    assert!(refused.contains("\n  10  call 10 (given ready)\n"), "{refused}");
+  }
+
+  /// A v3 message pact keeps its messages under `messages`; a contract its states under `states`.
+  #[test]
+  fn messages_and_contracts_are_chosen_from_where_they_keep_them() {
+    let messages =
+      json!({ "messages": [{ "description": "an order event" }, { "description": "a refund event" }] });
+    assert_eq!(chosen(&messages, "refund"), Ok(1));
+    let contract = json!({ "interactions": [
+      { "description": "get", "states": [{ "name": "one" }] },
+      { "description": "get", "states": [{ "name": "two" }] },
+    ]});
+    assert!(
+      chosen(&contract, "get")
+        .unwrap_err()
+        .contains("  1  get (given two)")
+    );
+  }
+
+  #[test]
+  fn a_document_with_no_interactions_cannot_be_chosen_from() {
+    assert_eq!(
+      chosen(&json!({ "shape": {} }), "get"),
+      Err("--description 'get': the document holds no interactions to choose from".to_string())
+    );
+  }
 }

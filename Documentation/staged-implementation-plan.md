@@ -1260,6 +1260,25 @@ item in 1a is done when S1.1 agrees.
   - clap ends a wrapped line with a space when the wrap falls inside a styled `[env: …]` note, even
     with the colour stripped. Those notes stay plain.
 
+- **S1.32 `explain` chooses an interaction by its description** — **S**. `janus explain` took the
+  interaction only by its position, `--index`. Nobody reading a pact knows where in it an interaction
+  sits, so finding one meant counting, or running the command again with the next index until the
+  right description came up.
+  *Exit:* `--description <TEXT>` chooses the interaction, and a description that names none, or
+  several, lists what there is to choose from.
+  *Done 2026-10-26.*
+  - **Matching:** an exact description wins. Failing one, it is the one whose description contains
+    the text, ignoring case. An exact match taking precedence is what lets a description that is the
+    start of another's be chosen at all (`a request for an order` beside
+    `a request for an order that does not exist`).
+  - **Several or none:** either is a usage error, exit 2, listing the candidates by position with
+    their provider states. A pact describes interactions alike when only their states differ, and
+    the states are what tells them apart; the position is what `--index` takes.
+  - **In the CLI, not the protocol.** `verification/explain` takes an `index`, and the CLI turns the
+    description into one, as it already checks `--index` against the document before the engine
+    is asked. Which interaction of a file was meant is the command line's question. `--description`
+    cannot be combined with `--index` or `--spec`.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.

@@ -224,16 +224,20 @@ Arguments:
   <DOCUMENT>  An interaction specification, a Janus contract, or a v1-v4 pact
 
 Options:
-      --index <N>          Which interaction of a contract or pact, counting from 0
-      --variant <ID>       Compile for this recorded variant of a Janus contract
-      --spec               Read the document as an interaction specification, which cannot identify
-                           itself
-      --plan               Print the structured plan document (JSON) instead of the text form
-      --executed <VALUES>  Run the plan against a JSON object of captured values (path to value) and
-                           print the executed form. Exits 1 if the values do not match
-      --config <FILE>      A verifier configuration (verifier.janus.yaml) whose components to load,
-                           as janus verify loads them, so the plan is the one a run compiles
-  -h, --help               Print help
+      --index <N>           Which interaction of a contract or pact, counting from 0
+      --description <TEXT>  Which interaction of a contract or pact, by its description: the one it
+                            names exactly, or else the one whose description contains it, ignoring
+                            case. Several matches are listed, with their provider states and
+                            positions for --index
+      --variant <ID>        Compile for this recorded variant of a Janus contract
+      --spec                Read the document as an interaction specification, which cannot identify
+                            itself
+      --plan                Print the structured plan document (JSON) instead of the text form
+      --executed <VALUES>   Run the plan against a JSON object of captured values (path to value)
+                            and print the executed form. Exits 1 if the values do not match
+      --config <FILE>       A verifier configuration (verifier.janus.yaml) whose components to load,
+                            as janus verify loads them, so the plan is the one a run compiles
+  -h, --help                Print help
 
 Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the

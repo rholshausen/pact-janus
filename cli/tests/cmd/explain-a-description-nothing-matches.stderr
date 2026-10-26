@@ -1,0 +1,7 @@
+error: invalid value 'payment' for '--description <TEXT>': no interaction's description contains it. The document has:
+  0  a request for an order (given an order exists)
+  1  a request for an order that does not exist (given no orders exist)
+
+Usage: janus explain [OPTIONS] <DOCUMENT>
+
+For more information, try '--help'.

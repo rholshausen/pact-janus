@@ -116,7 +116,9 @@ Three sources are the source of truth and take precedence over this file when th
 > exits 2, and a stopped or aborted run's summary counts `variants.not-run`. So is S1.30: every
 > mismatch path is absolute (an element a `for-each` was on, not `~>.value`), and the executed form
 > writes an absent value as `ABSENT`. S1.31 coloured the rest of the CLI's output on a terminal, from
-> one palette (`cli/src/style.rs`), and stripped it everywhere else.
+> one palette (`cli/src/style.rs`), and stripped it everywhere else. S1.32: `janus explain
+> --description` chooses an interaction by its description, listing the candidates when it names
+> several or none.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -366,7 +368,7 @@ janus verify --url <pact-url>... | --webhook-callback-url <pact-url>   # pacts b
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
             [--as-of <YYYY-MM-DD>] [--output text|json]
-janus explain <document.json> [--index N] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
+janus explain <document.json> [--index N | --description <text>] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
               [--config verifier.janus.yaml]   # the components a run would load (S1.12, ADR 0050)
 janus upgrade <pact.json> [--write <file>] [--quiet] [--exclude-pending] [--output text|json]
 janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>

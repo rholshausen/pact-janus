@@ -1,0 +1,6 @@
+# A description several interactions contain is a usage error listing them, with their provider
+# states and the positions --index takes (staged plan S1.32).
+bin.name = "janus"
+args = ["explain", "samples/order-service/pacts/web-app-order-service.json", "--description", "ORDER"]
+status.code = 2
+fs.cwd = "../../.."

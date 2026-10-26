@@ -1,0 +1,7 @@
+error: invalid value 'ORDER' for '--description <TEXT>': 2 interactions match it; choose one with --index:
+  0  a request for an order (given an order exists)
+  1  a request for an order that does not exist (given no orders exist)
+
+Usage: janus explain [OPTIONS] <DOCUMENT>
+
+For more information, try '--help'.

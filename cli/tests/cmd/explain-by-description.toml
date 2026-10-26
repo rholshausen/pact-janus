@@ -1,0 +1,6 @@
+# --description picks the interaction by what it is called: the exact description wins over one that
+# merely contains it (staged plan S1.32).
+bin.name = "janus"
+args = ["explain", "samples/order-service/pacts/web-app-order-service.json", "--description", "a request for an order"]
+status.code = 0
+fs.cwd = "../../.."
