@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792990699882,
+  "lastUpdate": 1792990702174,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -28638,6 +28638,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19414,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "b77868ca96af06de547d4250493c198ab71aa36d",
+          "message": "docs: ADR 0054 error chains and display segments, and plan items S1.33 and S1.34\n\nAn error carries its causes as a chain of layers, outermost first, beside\nthe complete message; display text may carry segments, pieces whose texts\njoin to the string, each with a kind from one open vocabulary, for a host\nthat asks. S1.33 builds the chain with std's source() and a kernel-owned\nContext trait rather than anyhow; S1.34 builds the segments.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T15:52:47+11:00",
+          "tree_id": "1a19d37e92d5f4b817abd1cbe8f32b847f70214a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/b77868ca96af06de547d4250493c198ab71aa36d"
+        },
+        "date": 1792990701487,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25126,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19397,
             "unit": "requests per second",
             "extra": "engines 4"
           }
