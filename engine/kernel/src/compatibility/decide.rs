@@ -338,10 +338,15 @@ fn decide_pair(
       "verification-missing",
       ReasonAction::Warn,
       if unattributable > 0 {
-        format!(
-          "no verification result names this pair ({unattributable} supplied result(s) name no \
-           consumers at all, and cannot be attributed)"
-        )
+        match unattributable {
+          1 => "no verification result names this pair (1 supplied result names no consumers at \
+                all, and cannot be attributed)"
+            .to_string(),
+          n => format!(
+            "no verification result names this pair ({n} supplied results name no consumers at \
+             all, and cannot be attributed)"
+          ),
+        }
       } else {
         "no verification result was supplied for this pair; a contract nobody replayed is not a \
          passing one"
@@ -391,10 +396,16 @@ fn decide_pair(
       reasons.push(Reason::new(
         "interactions-not-published",
         ReasonAction::Note,
-        format!(
-          "{} of {} interaction(s) have no published provider shape and were not checked",
-          subsumption.not_published, subsumption.interactions
-        ),
+        match subsumption.not_published {
+          1 => format!(
+            "1 of {} has no published provider shape and was not checked",
+            super::count(subsumption.interactions as u64, "interaction", "interactions")
+          ),
+          n => format!(
+            "{n} of {} have no published provider shape and were not checked",
+            super::count(subsumption.interactions as u64, "interaction", "interactions")
+          ),
+        },
       ));
     }
     if subsumption.findings > 0 {
@@ -402,9 +413,8 @@ fn decide_pair(
         "subsumption-findings",
         ReasonAction::of(policy.on_finding),
         format!(
-          "{} decided finding(s): the provider may produce responses this consumer has not \
-           tested",
-          subsumption.findings
+          "{}: the provider may produce responses this consumer has not tested",
+          super::count(subsumption.findings as u64, "decided finding", "decided findings")
         ),
       ));
     }
@@ -413,8 +423,8 @@ fn decide_pair(
         "subsumption-reviews",
         ReasonAction::of(policy.on_review),
         format!(
-          "{} comparison(s) the checker cannot decide either way; a person has to look",
-          subsumption.reviews
+          "{} the checker cannot decide either way; a person has to look",
+          super::count(subsumption.reviews as u64, "comparison", "comparisons")
         ),
       ));
     }
@@ -423,8 +433,8 @@ fn decide_pair(
         "subsumption-exempt",
         ReasonAction::Note,
         format!(
-          "{} finding(s) silenced by an exemption this policy carries",
-          subsumption.exempt
+          "{} silenced by an exemption this policy carries",
+          super::count(subsumption.exempt as u64, "finding", "findings")
         ),
       ));
     }
@@ -432,10 +442,10 @@ fn decide_pair(
       reasons.push(Reason::new(
         "subsumption-advisories",
         ReasonAction::Note,
-        format!(
-          "{} passing field(s) carry an exercised-coverage caveat (design 2.8 §5)",
-          subsumption.advisories
-        ),
+        match subsumption.advisories {
+          1 => "1 passing field carries an exercised-coverage caveat (design 2.8 §5)".to_string(),
+          n => format!("{n} passing fields carry an exercised-coverage caveat (design 2.8 §5)"),
+        },
       ));
     }
   }
@@ -595,10 +605,15 @@ fn dispose(
     reasons.push(Reason::new(
       "exemption-lapsed",
       ReasonAction::Warn,
-      format!(
-        "{lapsed} exemption(s) are past their `expires` date and silenced nothing; whatever they \
-         covered is decided again"
-      ),
+      match lapsed {
+        1 => "1 exemption is past its `expires` date and silenced nothing; whatever it covered is \
+              decided again"
+          .to_string(),
+        n => format!(
+          "{n} exemptions are past their `expires` date and silenced nothing; whatever they \
+           covered is decided again"
+        ),
+      },
     ));
   }
   if no_expiry > 0 {
@@ -607,9 +622,14 @@ fn dispose(
     reasons.push(Reason::new(
       "exemption-no-expiry",
       ReasonAction::Note,
-      format!(
-        "{no_expiry} applied exemption(s) carry no `expires` date and will never be revisited on their own"
-      ),
+      match no_expiry {
+        1 => {
+          "1 applied exemption carries no `expires` date and will never be revisited on its own".to_string()
+        }
+        n => {
+          format!("{n} applied exemptions carry no `expires` date and will never be revisited on their own")
+        }
+      },
     ));
   }
   if unused > 0 {
@@ -617,7 +637,8 @@ fn dispose(
       "exemption-unused",
       ReasonAction::Note,
       format!(
-        "{unused} exemption(s) matched nothing — either the gap closed, or the selectors never fitted it"
+        "{} matched nothing — either the gap closed, or the selectors never fitted it",
+        super::count(unused as u64, "exemption", "exemptions")
       ),
     ));
   }
@@ -625,7 +646,15 @@ fn dispose(
     reasons.push(Reason::new(
       "expiry-not-evaluated",
       ReasonAction::Note,
-      format!("{unevaluated} applied exemption(s) carry an `expires` date that was not evaluated: no date to judge against was supplied"),
+      match unevaluated {
+        1 => "1 applied exemption carries an `expires` date that was not evaluated: no date to judge \
+              against was supplied"
+          .to_string(),
+        n => format!(
+          "{n} applied exemptions carry an `expires` date that was not evaluated: no date to judge \
+           against was supplied"
+        ),
+      },
     ));
   }
 

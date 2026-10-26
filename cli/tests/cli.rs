@@ -1906,12 +1906,12 @@ fn check_combines_a_verification_result_with_the_findings_and_exits_one_when_blo
   let text = stdout(&output);
   assert_eq!(code(&output), 1, "{text}\n{}", stderr(&output));
   assert!(
-    text.contains("verification: verified (2 of 2 variant(s))"),
+    text.contains("verification: verified (2 of 2 variants)"),
     "the verification half of the answer is on the page: {text}"
   );
   assert!(text.contains("=> BLOCK: web-app -> order-service"), "{text}");
   assert!(
-    text.contains("BLOCK: 1 pair(s) blocked"),
+    text.contains("BLOCK: 1 pair blocked"),
     "and the run's own verdict: {text}"
   );
 }

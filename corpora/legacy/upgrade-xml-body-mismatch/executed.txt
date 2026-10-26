@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :body (
         %legacy:body-type (
-          $.response.headers.content-type => NULL,
+          $.response.headers.content-type => ABSENT,
           'application/xml'
         ) => BOOL(true),
         %expect:object (
@@ -56,7 +56,7 @@
           :"$.note.#text" (
             %flow:if (
               %check:exists (
-                $.response.body.note.#text => NULL
+                $.response.body.note.#text => ABSENT
               ) => BOOL(false),
               %match:equality (
                 $.response.body.note.#text,

@@ -9,12 +9,12 @@
           $.response.body => [7, 'north'],
           2
         ) => BOOL(true),
-        :"$.response.body[0]" (
+        :"$[0]" (
           %match:integer (
             $.response.body[0] => 7
           ) => BOOL(true)
         ) => BOOL(true),
-        :"$.response.body[1]" (
+        :"$[1]" (
           %match:string (
             $.response.body[1] => 'north'
           ) => BOOL(true)

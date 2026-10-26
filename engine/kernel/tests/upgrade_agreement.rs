@@ -24,6 +24,9 @@ const KNOWN: &[(&str, &str)] = &[
   // A header with no rule became `equality`, which a parameter the reply adds fails, where v1–v4
   // compare MIME parameters as a set (`legacy:header-value`).
   ("v3-xml-body", "rule-narrowed"),
+  // A size rule on an XML element counts its children of every name, which no shape counts: the
+  // upgrade drops it, saying so.
+  ("v3-xml-min-children-mismatch", "rule-unmapped"),
 ];
 
 fn corpus() -> PathBuf {

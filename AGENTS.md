@@ -113,8 +113,9 @@ Three sources are the source of truth and take precedence over this file when th
 > providers accepting the dropped rows. S1.29, the CLI output review, is done: an engine error's
 > `details` are not printed in text, a component's failure leads with its own code, a hook's failure
 > is printed once under the result it failed, a run the engine ends before it verifies anything
-> exits 2, and a stopped or aborted run's summary counts `variants.not-run`. S1.30 holds what the
-> review found in what the engine reports.
+> exits 2, and a stopped or aborted run's summary counts `variants.not-run`. So is S1.30: every
+> mismatch path is absolute (an element a `for-each` was on, not `~>.value`), and the executed form
+> writes an absent value as `ABSENT`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

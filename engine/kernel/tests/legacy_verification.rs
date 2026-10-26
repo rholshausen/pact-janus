@@ -1220,7 +1220,7 @@ fn a_form_data_pacts_rules_reach_each_part() {
     vec![
       "Expected '3' to equal '2'".to_string(),
       "Expected 'ada' to match '^(?:[A-Z][a-z]+)$'".to_string(),
-      "Expected a integer but got '7'".to_string(),
+      "Expected an integer but got '7'".to_string(),
     ]
   );
   // A file of another type: its header and its type fail, and its body is not compared, as today.

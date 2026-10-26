@@ -14,16 +14,16 @@
           ** (
             $.request.body
           ),
-          :"$.request.body[*]" (
+          :"$[*]" (
             %expect:object (
               ~>
             ),
-            :"$.request.body[*].qty" (
+            :"$[*].qty" (
               %match:integer (
                 ~>.qty
               )
             ),
-            :"$.request.body[*].sku" (
+            :"$[*].sku" (
               %match:string (
                 ~>.sku
               )

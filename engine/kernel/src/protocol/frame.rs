@@ -273,7 +273,11 @@ impl EngineError {
       code: "filter-matches-nothing".to_string(),
       category: "session".to_string(),
       message: format!(
-        "the run's filter matches none of the {interactions} interaction(s) in its documents, so it would verify nothing"
+        "the run's filter matches none of the {} in its documents, so it would verify nothing",
+        match interactions {
+          1 => "1 interaction".to_string(),
+          n => format!("{n} interactions"),
+        }
       ),
       details: Some(Box::new(serde_json::json!({
         "filter": filter,
@@ -335,7 +339,8 @@ impl EngineError {
       code: "component-unavailable".to_string(),
       category: "component".to_string(),
       message: format!(
-        "this interaction needs the pact plugin(s) {named}, and this engine cannot load pact plugins"
+        "this interaction needs the pact {} {named}, and this engine cannot load pact plugins",
+        if plugins.len() == 1 { "plugin" } else { "plugins" }
       ),
       details: Some(Box::new(serde_json::json!({
         "component": format!("pact-plugin/{}", plugins.first().map_or("", String::as_str)),

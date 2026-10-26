@@ -44,7 +44,7 @@
     "status": "mismatched",
     "mismatches": [
       {
-        "path": "~>.phoneNumber",
+        "path": "$.request.body.animals[1].phoneNumber",
         "message": "Expected 'abc' to match '^(?:\\d+)$'",
         "action": "match:regex"
       }

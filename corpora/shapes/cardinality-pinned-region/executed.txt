@@ -14,46 +14,46 @@
           ** (
             $.request.body => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}]
           ) => [{'sku': 'SKU-1', 'qty': 1}, {'sku': 'SKU-2', 'qty': 4}, {'sku': 'SKU-3', 'qty': 2}],
-          :"$.request.body[*]" (
+          :"$[*]" (
             %expect:object (
               ~> => {'sku': 'SKU-1', 'qty': 1}
             ) => BOOL(true),
-            :"$.request.body[*].qty" (
+            :"$[*].qty" (
               %match:integer (
                 ~>.qty => 1
               ) => BOOL(true)
             ) => BOOL(true),
-            :"$.request.body[*].sku" (
+            :"$[*].sku" (
               %match:string (
                 ~>.sku => 'SKU-1'
               ) => BOOL(true)
             ) => BOOL(true)
           ) => BOOL(true),
-          :"$.request.body[*]" (
+          :"$[*]" (
             %expect:object (
               ~> => {'sku': 'SKU-2', 'qty': 4}
             ) => BOOL(true),
-            :"$.request.body[*].qty" (
+            :"$[*].qty" (
               %match:integer (
                 ~>.qty => 4
               ) => BOOL(true)
             ) => BOOL(true),
-            :"$.request.body[*].sku" (
+            :"$[*].sku" (
               %match:string (
                 ~>.sku => 'SKU-2'
               ) => BOOL(true)
             ) => BOOL(true)
           ) => BOOL(true),
-          :"$.request.body[*]" (
+          :"$[*]" (
             %expect:object (
               ~> => {'sku': 'SKU-3', 'qty': 2}
             ) => BOOL(true),
-            :"$.request.body[*].qty" (
+            :"$[*].qty" (
               %match:integer (
                 ~>.qty => 2
               ) => BOOL(true)
             ) => BOOL(true),
-            :"$.request.body[*].sku" (
+            :"$[*].sku" (
               %match:string (
                 ~>.sku => 'SKU-3'
               ) => BOOL(true)

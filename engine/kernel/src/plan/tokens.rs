@@ -26,7 +26,7 @@ pub enum TokenKind {
   String,
   /// `42`, `-1.5`.
   Number,
-  /// `true`, `false`, `NULL`, `BYTES(3, AQID)`.
+  /// `true`, `false`, `NULL`, `ABSENT`, `BYTES(3, AQID)`.
   Literal,
   /// The executed form's `=>`.
   Arrow,
@@ -158,7 +158,7 @@ impl<'a> Scanner<'a> {
           .find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-')))
           .unwrap_or(rest.len() - 1);
       self.push(TokenKind::Number, end);
-    } else if let Some(word) = ["true", "false", "NULL"].into_iter().find(|word| {
+    } else if let Some(word) = ["true", "false", "NULL", "ABSENT"].into_iter().find(|word| {
       rest.starts_with(word) && !rest[word.len()..].starts_with(|c: char| c.is_ascii_alphanumeric())
     }) {
       self.push(TokenKind::Literal, word.len());

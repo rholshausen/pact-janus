@@ -60,7 +60,7 @@
           ) => BOOL(true),
           %flow:if (
             %check:exists (
-              $.response.body.prices.A1 => NULL
+              $.response.body.prices.A1 => ABSENT
             ) => BOOL(false),
             :"$.prices.A1" (
               %match:number (

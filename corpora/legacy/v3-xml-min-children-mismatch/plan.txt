@@ -1,0 +1,124 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/xml'
+          )
+        )
+      ),
+      :body (
+        %expect:object (
+          $.response.body.orders
+        ),
+        :"$.orders" (
+          :"$.orders.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.orders.#text
+              ),
+              %match:equality (
+                $.response.body.orders.#text,
+                ''
+              )
+            )
+          ),
+          %expect:not-empty (
+            $.response.body.orders.order
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.orders.order
+            ),
+            :"$.orders.order[*]" (
+              %expect:size (
+                %legacy:xml-children (
+                  ~>
+                ),
+                2,
+                NULL
+              ),
+              :"$.orders.order[*].@id" (
+                %match:type (
+                  ~>.@id,
+                  '1'
+                )
+              ),
+              :"$.orders.order[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text
+                  ),
+                  %match:type (
+                    ~>.#text,
+                    ''
+                  )
+                )
+              ),
+              %expect:not-empty (
+                ~>.item
+              ),
+              %flow:for-each (
+                ** (
+                  ~>.item
+                ),
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~>
+                  ),
+                  :"$.orders.order[*].item[*].#text" (
+                    %flow:if (
+                      %check:exists (
+                        ~>.#text
+                      ),
+                      %match:type (
+                        ~>.#text,
+                        'apple'
+                      )
+                    )
+                  ),
+                  %legacy:xml-only-children (
+                    ~>
+                  )
+                )
+              ),
+              %legacy:xml-only-children (
+                ~>,
+                'item'
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

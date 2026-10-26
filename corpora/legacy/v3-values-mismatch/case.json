@@ -81,8 +81,8 @@
     "status": "mismatched",
     "mismatches": [
       {
-        "path": "~>.value.id",
-        "message": "Expected a integer but got 'seven'",
+        "path": "$.response.body.tags.green.id",
+        "message": "Expected an integer but got 'seven'",
         "action": "match:integer"
       }
     ]

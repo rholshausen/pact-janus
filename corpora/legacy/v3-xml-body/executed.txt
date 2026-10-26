@@ -44,7 +44,7 @@
           :"$.orders.#text" (
             %flow:if (
               %check:exists (
-                $.response.body.orders.#text => NULL
+                $.response.body.orders.#text => ABSENT
               ) => BOOL(false),
               %match:equality (
                 $.response.body.orders.#text,
@@ -78,7 +78,7 @@
               :"$.orders.order[*].#text" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => NULL
+                    ~>.#text => ABSENT
                   ) => BOOL(false),
                   %match:type (
                     ~>.#text,
@@ -146,7 +146,7 @@
               :"$.orders.order[*].#text" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => NULL
+                    ~>.#text => ABSENT
                   ) => BOOL(false),
                   %match:type (
                     ~>.#text,

@@ -1,10 +1,10 @@
 Verifying 3 interactions in 1 document [pact/4.0] against plugin-provider
 
   FAILED  request for a report
-          component-unavailable: this interaction needs the pact plugin(s) 'csv', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'csv', and this engine cannot load pact plugins
   FAILED  calculate rectangle area request
-          component-unavailable: this interaction needs the pact plugin(s) 'protobuf', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'protobuf', and this engine cannot load pact plugins
   FAILED  an area response for a circle
-          component-unavailable: this interaction needs the pact plugin(s) 'avro', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'avro', and this engine cannot load pact plugins
 
 FAILED: 0 verified, 3 failed (3 interactions)

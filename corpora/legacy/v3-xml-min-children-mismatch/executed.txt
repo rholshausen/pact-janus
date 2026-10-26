@@ -1,0 +1,124 @@
+(
+  :"get /orders" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders',
+          '/orders'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/xml',
+            'application/xml'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %expect:object (
+          $.response.body.orders => {'order': [{'@id': '1', 'item': [{'#text': 'apple'}]}]}
+        ) => BOOL(true),
+        :"$.orders" (
+          :"$.orders.#text" (
+            %flow:if (
+              %check:exists (
+                $.response.body.orders.#text => ABSENT
+              ) => BOOL(false),
+              %match:equality (
+                $.response.body.orders.#text,
+                ''
+              )
+            ) => BOOL(true)
+          ) => BOOL(true),
+          %expect:not-empty (
+            $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple'}]}]
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple'}]}]
+            ) => [{'@id': '1', 'item': [{'#text': 'apple'}]}],
+            :"$.orders.order[*]" (
+              %expect:size (
+                %legacy:xml-children (
+                  ~> => {'@id': '1', 'item': [{'#text': 'apple'}]}
+                ) => ['item'],
+                2,
+                NULL
+              ) => ERROR(Expected at least 2 items but got 1),
+              :"$.orders.order[*].@id" (
+                %match:type (
+                  ~>.@id => '1',
+                  '1'
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.orders.order[*].#text" (
+                %flow:if (
+                  %check:exists (
+                    ~>.#text => ABSENT
+                  ) => BOOL(false),
+                  %match:type (
+                    ~>.#text,
+                    ''
+                  )
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %expect:not-empty (
+                ~>.item => [{'#text': 'apple'}]
+              ) => BOOL(true),
+              %flow:for-each (
+                ** (
+                  ~>.item => [{'#text': 'apple'}]
+                ) => [{'#text': 'apple'}],
+                :"$.orders.order[*].item[*]" (
+                  %expect:object (
+                    ~> => {'#text': 'apple'}
+                  ) => BOOL(true),
+                  :"$.orders.order[*].item[*].#text" (
+                    %flow:if (
+                      %check:exists (
+                        ~>.#text => 'apple'
+                      ) => BOOL(true),
+                      %match:type (
+                        ~>.#text => 'apple',
+                        'apple'
+                      ) => BOOL(true)
+                    ) => BOOL(true)
+                  ) => BOOL(true),
+                  %legacy:xml-only-children (
+                    ~> => {'#text': 'apple'}
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              %legacy:xml-only-children (
+                ~> => {'@id': '1', 'item': [{'#text': 'apple'}]},
+                'item'
+              ) => BOOL(true)
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

@@ -80,7 +80,7 @@
     "status": "mismatched",
     "mismatches": [
       {
-        "path": "~>.value",
+        "path": "$.response.body.prices.plum",
         "message": "Expected a number but got '0.75'",
         "action": "match:type"
       }

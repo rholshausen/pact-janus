@@ -869,7 +869,7 @@ fn the_page_reproduces_the_rfcs_own_sketch() {
     assert!(text.contains(line), "missing line {line:?} in:\n{text}");
   }
   assert!(
-    text.contains("  verification: verified (4 of 4 variant(s))"),
+    text.contains("  verification: verified (4 of 4 variants)"),
     "{text}"
   );
   assert!(
@@ -877,7 +877,7 @@ fn the_page_reproduces_the_rfcs_own_sketch() {
     "{text}"
   );
   assert!(
-    text.contains("BLOCK: 1 pair(s) blocked, 0 warned, 0 passed"),
+    text.contains("BLOCK: 1 pair blocked, 0 warned, 0 passed"),
     "{text}"
   );
 }

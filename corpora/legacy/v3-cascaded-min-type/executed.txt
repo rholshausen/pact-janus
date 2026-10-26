@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :body (
         %legacy:body-type (
-          $.response.headers.content-type => NULL,
+          $.response.headers.content-type => ABSENT,
           'application/json'
         ) => BOOL(true),
         :"$.items" (
@@ -38,7 +38,7 @@
             $.response.body.items => [{'sku': '', 'tags': []}],
             [{'sku': 'sku-0', 'tags': ['gift']}],
             2
-          ) => ERROR(Expected at least 2 item(s) but got 1),
+          ) => ERROR(Expected at least 2 items but got 1),
           %flow:for-each (
             ** (
               $.response.body.items => [{'sku': '', 'tags': []}]

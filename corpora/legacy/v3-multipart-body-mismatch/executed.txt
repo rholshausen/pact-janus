@@ -62,7 +62,7 @@
                 ) => BOOL(true)
               ) => BOOL(true),
               %match:equality (
-                $.request.body.order[0].headers.x-version => NULL,
+                $.request.body.order[0].headers.x-version => ABSENT,
                 '2'
               ) => ERROR(Expected <absent> to equal '2'),
               %flow:if (
@@ -89,7 +89,7 @@
         :"$.note[0]" (
           %flow:if (
             %legacy:mime-part (
-              $.request.body.note[0] => NULL,
+              $.request.body.note[0] => ABSENT,
               'file',
               'note'
             ) => ERROR(Expected a MIME part 'note' but was missing),

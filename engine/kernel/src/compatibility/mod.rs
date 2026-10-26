@@ -28,6 +28,14 @@
 mod decide;
 mod render;
 
+/// `1 pair`, `2 pairs`: a count as the report's prose says it.
+fn count(n: impl Into<u64>, one: &str, many: &str) -> String {
+  match n.into() {
+    1 => format!("1 {one}"),
+    n => format!("{n} {many}"),
+  }
+}
+
 pub use decide::{
   CompatibilityReport, Decision, Disposition, ExemptionRef, ExemptionResult, ExemptionStatus, FORMAT,
   FindingEntry, InteractionId, Pair, PairResult, PolicyView, Reason, ReasonAction, SubsumptionView, Summary,

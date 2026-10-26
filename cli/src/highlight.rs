@@ -50,7 +50,7 @@ mod tests {
   use pretty_assertions::assert_eq;
 
   const EXECUTED: &str = "(\n  :body (\n    %expect:size (\n      $.items => [],\n      'two\nlines'\n    ) \
-                          => ERROR(Expected at least 1 item(s) but got 0)\n  ) => BOOL(false)\n)";
+                          => ERROR(Expected at least 1 item but got 0)\n  ) => BOOL(false)\n)";
 
   #[test]
   fn the_styling_is_only_ever_added() {

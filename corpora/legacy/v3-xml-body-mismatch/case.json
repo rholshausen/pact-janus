@@ -75,7 +75,7 @@
       },
       {
         "path": "$.request.body.order.item",
-        "message": "Expected exactly 2 item(s) but got 1",
+        "message": "Expected exactly 2 items but got 1",
         "action": "expect:count"
       },
       {

@@ -1,0 +1,79 @@
+{
+  "description": "a v3 min rule on an XML element counts its child elements (ADR 0039): an element with fewer than the rule's minimum is a mismatch at the element, though the action that counts them is not a resolve (staged plan S1.30)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /orders",
+          "request": {
+            "method": "GET",
+            "path": "/orders"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/xml"
+            },
+            "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><orders><order id=\"1\"><item>apple</item><item>pear</item></order></orders>",
+            "matchingRules": {
+              "body": {
+                "$.orders.order": {
+                  "matchers": [
+                    {
+                      "match": "type",
+                      "min": 2
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/xml",
+    "$.response.body": {
+      "orders": {
+        "order": [
+          {
+            "@id": "1",
+            "item": [
+              {
+                "#text": "apple"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.orders.order[0]",
+        "message": "Expected at least 2 items but got 1",
+        "action": "expect:size"
+      }
+    ]
+  }
+}

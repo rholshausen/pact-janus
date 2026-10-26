@@ -40,7 +40,7 @@
     "mismatches": [
       {
         "path": "$.response.body.items",
-        "message": "Expected at least 2 item(s) but got 1",
+        "message": "Expected at least 2 items but got 1",
         "action": "legacy:min-type"
       }
     ]

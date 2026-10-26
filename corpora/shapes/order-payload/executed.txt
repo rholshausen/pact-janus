@@ -18,7 +18,7 @@
             $.response.body.items => [],
             1,
             NULL
-          ) => ERROR(Expected at least 1 item(s) but got 0),
+          ) => ERROR(Expected at least 1 item but got 0),
           %flow:for-each (
             ** (
               $.response.body.items => []
@@ -82,7 +82,7 @@
         :"$.shippedAt" (
           %flow:if (
             %check:exists (
-              $.response.body.shippedAt => NULL
+              $.response.body.shippedAt => ABSENT
             ) => BOOL(false),
             %match:datetime (
               $.response.body.shippedAt,

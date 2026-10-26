@@ -27,7 +27,7 @@
           :"$.totals.discount" (
             %flow:if (
               %check:exists (
-                $.response.body.totals.discount => NULL
+                $.response.body.totals.discount => ABSENT
               ) => BOOL(false),
               %match:integer (
                 $.response.body.totals.discount

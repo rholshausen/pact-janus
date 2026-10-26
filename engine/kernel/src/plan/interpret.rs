@@ -59,6 +59,11 @@ pub enum ExecutedKind {
   },
   ResolveCurrent {
     path: String,
+    /// Where the value it resolved is in the interaction, when the item it addressed has a place:
+    /// `$.response.body.items[1].sku` for `~>.sku`. A mismatch at this node is located there, so a
+    /// reader is told which element or entry failed (staged plan S1.30). Not part of either text
+    /// form, which print the plan as written.
+    absolute: Option<String>,
   },
   Pipeline {
     children: Vec<Executed>,
@@ -76,6 +81,21 @@ struct Ctx<'a> {
   content: Option<&'a dyn ContentDetector>,
   actions: Option<&'a dyn ActionApplier>,
   current: Vec<RuntimeValue>,
+  /// Beside each of `current`, where that item is in the interaction, when it is anywhere: the
+  /// element a `flow:for-each` is on is `<array's path>[i]`, an entry `<object's path>.<key>`.
+  current_paths: Vec<Option<String>>,
+}
+
+impl Ctx<'_> {
+  fn push_current(&mut self, value: RuntimeValue, path: Option<String>) {
+    self.current.push(value);
+    self.current_paths.push(path);
+  }
+
+  fn pop_current(&mut self) {
+    self.current.pop();
+    self.current_paths.pop();
+  }
 }
 
 /// What runs a component's own namespaced action when a plan reaches one (plan-grammar spec §4.6,
@@ -120,6 +140,7 @@ pub fn execute_with(
     content,
     actions,
     current: Vec::new(),
+    current_paths: Vec::new(),
   };
   run(&plan.root, &mut ctx)
 }
@@ -210,8 +231,17 @@ fn run(node: &Node, ctx: &mut Ctx) -> Executed {
       let base = ctx.current.last().cloned().unwrap_or(RuntimeValue::Absent);
       let suffix = path.strip_prefix("~>").unwrap_or(path);
       let value = navigate(&base, suffix);
+      let absolute = ctx
+        .current_paths
+        .last()
+        .cloned()
+        .flatten()
+        .map(|item| absolute_path(&item, &base, suffix));
       Executed {
-        kind: ExecutedKind::ResolveCurrent { path: path.clone() },
+        kind: ExecutedKind::ResolveCurrent {
+          path: path.clone(),
+          absolute,
+        },
         result: Some(NodeResult::Value(value)),
       }
     }
@@ -248,7 +278,10 @@ fn skip(node: &Node) -> Executed {
     },
     NodeKind::Value(literal) => ExecutedKind::Value(literal.clone()),
     NodeKind::Resolve { path } => ExecutedKind::Resolve { path: path.clone() },
-    NodeKind::ResolveCurrent { path } => ExecutedKind::ResolveCurrent { path: path.clone() },
+    NodeKind::ResolveCurrent { path } => ExecutedKind::ResolveCurrent {
+      path: path.clone(),
+      absolute: None,
+    },
     NodeKind::Pipeline { children } => ExecutedKind::Pipeline {
       children: children.iter().map(skip).collect(),
     },
@@ -296,14 +329,53 @@ fn iteration_items(value: RuntimeValue) -> Vec<RuntimeValue> {
   }
 }
 
-/// The path a mismatch should be blamed on: the first child, when it is a resolve of some kind —
-/// true of every `match:*`/`expect:*`/`check:*` action this compiler ever emits (plan task 3.3
-/// §5.2's table always resolves the value first).
+/// The path a mismatch should be blamed on: where the value under test, the first child, came
+/// from (plan-grammar spec §2.3). A resolve says so itself, a `resolve-current` by the absolute path
+/// of what it addressed; an action, a pipeline or a splat in that place is a value computed from its
+/// own first child, so the path is that child's: `expect:size(legacy:xml-children($.body.order),
+/// ...)` is about `$.body.order`.
 fn locus(children: &[Executed]) -> Option<String> {
-  children.first().and_then(|c| match &c.kind {
-    ExecutedKind::Resolve { path } | ExecutedKind::ResolveCurrent { path } => Some(path.clone()),
+  children.first().and_then(path_of)
+}
+
+/// Where an executed node's value came from, by the rule [`locus`] states.
+fn path_of(executed: &Executed) -> Option<String> {
+  match &executed.kind {
+    ExecutedKind::Resolve { path } => Some(path.clone()),
+    ExecutedKind::ResolveCurrent { path, absolute } => Some(absolute.clone().unwrap_or_else(|| path.clone())),
+    ExecutedKind::Action { children, .. }
+    | ExecutedKind::Pipeline { children }
+    | ExecutedKind::Splat { children } => locus(children),
     _ => None,
-  })
+  }
+}
+
+/// The absolute path of `~><suffix>` on an item at `item`: the suffix after it, but for an entry's
+/// `.key` and `.value`, which address the entry itself, at its member's path.
+fn absolute_path(item: &str, base: &RuntimeValue, suffix: &str) -> String {
+  let rest = match base {
+    RuntimeValue::Entry { .. } => suffix
+      .strip_prefix(".value")
+      .or_else(|| suffix.strip_prefix(".key"))
+      .unwrap_or(suffix),
+    _ => suffix,
+  };
+  format!("{item}{rest}")
+}
+
+/// Where each of `items` is, given where what they were drawn from is: `[i]` of an array, a member
+/// of an object for an entry.
+fn item_paths(source: Option<&str>, items: &[RuntimeValue]) -> Vec<Option<String>> {
+  items
+    .iter()
+    .enumerate()
+    .map(|(index, item)| {
+      source.map(|source| match item {
+        RuntimeValue::Entry { key, .. } => super::value::member_path(source, key),
+        _ => format!("{source}[{index}]"),
+      })
+    })
+    .collect()
 }
 
 fn run_pipeline(children: &[Node], ctx: &mut Ctx) -> Executed {
@@ -314,13 +386,13 @@ fn run_pipeline(children: &[Node], ctx: &mut Ctx) -> Executed {
     let e = run(child, ctx);
     last_result = e.result.clone().unwrap_or(NodeResult::Ok);
     if let NodeResult::Value(v) = &last_result {
-      ctx.current.push(v.clone());
+      ctx.push_current(v.clone(), path_of(&e));
       pushed += 1;
     }
     executed.push(e);
   }
   for _ in 0..pushed {
-    ctx.current.pop();
+    ctx.pop_current();
   }
   Executed {
     kind: ExecutedKind::Pipeline { children: executed },
@@ -462,7 +534,7 @@ fn run_or(children: &[Node], ctx: &mut Ctx) -> Executed {
 /// (`resolve-current`'s addressee). An empty array is a vacuous success (spec's own note: the
 /// cardinality assertion beside it, not this loop, carries the "0 items" verdict).
 fn run_for_each(children: &[Node], ctx: &mut Ctx) -> Executed {
-  let (splat_executed, items) = match &children[0].kind {
+  let (splat_executed, items, paths) = match &children[0].kind {
     NodeKind::Splat {
       children: splat_children,
     } => {
@@ -475,28 +547,30 @@ fn run_for_each(children: &[Node], ctx: &mut Ctx) -> Executed {
       };
       let inner = run(source, ctx);
       let items = iteration_items(value_of(&inner));
+      let paths = item_paths(path_of(&inner).as_deref(), &items);
       let splat = Executed {
         kind: ExecutedKind::Splat {
           children: vec![inner],
         },
         result: Some(NodeResult::Value(RuntimeValue::Array(items.clone()))),
       };
-      (splat, items)
+      (splat, items, paths)
     }
     _ => {
       let e = run(&children[0], ctx);
       let items = iteration_items(value_of(&e));
-      (e, items)
+      let paths = item_paths(path_of(&e).as_deref(), &items);
+      (e, items, paths)
     }
   };
 
   let template = &children[1];
   let mut any_failed = false;
   let mut item_executions = Vec::with_capacity(items.len());
-  for item in items {
-    ctx.current.push(item);
+  for (item, path) in items.into_iter().zip(paths) {
+    ctx.push_current(item, path);
     let executed_item = run(template, ctx);
-    ctx.current.pop();
+    ctx.pop_current();
     if child_failed(&executed_item) {
       any_failed = true;
     }
@@ -523,6 +597,7 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
     RuntimeValue::Array(items) => items,
     _ => Vec::new(),
   };
+  let paths = item_paths(path_of(&resolve_executed).as_deref(), &array);
   let mut used = vec![false; array.len()];
   let mut executed_entries = Vec::with_capacity(children.len().saturating_sub(1));
   let mut any_failed = false;
@@ -533,9 +608,9 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
       if used[index] {
         continue;
       }
-      ctx.current.push(item.clone());
+      ctx.push_current(item.clone(), paths[index].clone());
       let attempt = run(entry_node, ctx);
-      ctx.current.pop();
+      ctx.pop_current();
       let ok = !child_failed(&attempt);
       matched = Some((index, attempt));
       if ok {
@@ -593,10 +668,11 @@ fn run_array_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
   let (attempt, result) = match &value {
     RuntimeValue::Array(items) => {
       let mut matched = None;
-      for item in items {
-        ctx.current.push(item.clone());
+      let paths = item_paths(path_of(&resolve_executed).as_deref(), items);
+      for (item, path) in items.iter().zip(paths) {
+        ctx.push_current(item.clone(), path);
         let attempt = run(template, ctx);
-        ctx.current.pop();
+        ctx.pop_current();
         if !child_failed(&attempt) {
           matched = Some(attempt);
           break;
@@ -762,7 +838,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       match (length_of_opt(&value), expected) {
         (Some(len), Some(n)) if len == n => NodeResult::Ok,
         (Some(len), _) => NodeResult::Error {
-          message: format!("Expected exactly {} item(s) but got {len}", expected.unwrap_or(0)),
+          message: format!("Expected exactly {} but got {len}", items(expected.unwrap_or(0))),
           path: locus(children),
         },
         (None, _) => NodeResult::Error {
@@ -779,7 +855,8 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         Some(len) if len >= min && max.map(|m| len <= m).unwrap_or(true) => NodeResult::Ok,
         Some(len) => NodeResult::Error {
           message: format!(
-            "Expected at least {min} item(s){} but got {len}",
+            "Expected at least {}{} but got {len}",
+            items(min),
             max.map(|m| format!(" and at most {m}")).unwrap_or_default()
           ),
           path: locus(children),
@@ -850,7 +927,11 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
         NodeResult::Error {
-          message: format!("Expected a {} but got {}", kind_of(&expected), display(&actual)),
+          message: format!(
+            "Expected {} but got {}",
+            a_kind(kind_of(&expected)),
+            display(&actual)
+          ),
           path: locus(children),
         }
       }
@@ -1238,7 +1319,11 @@ fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u
   let (actual, expected) = (value_of(&children[0]), value_of(&children[1]));
   if matches!(actual, RuntimeValue::Absent) || kind_of(&actual) != kind_of(&expected) {
     return NodeResult::Error {
-      message: format!("Expected a {} but got {}", kind_of(&expected), display(&actual)),
+      message: format!(
+        "Expected {} but got {}",
+        a_kind(kind_of(&expected)),
+        display(&actual)
+      ),
       path: locus(children),
     };
   }
@@ -1248,11 +1333,11 @@ fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u
   };
   match len {
     Some(len) if min.is_some_and(|min| len < min) => NodeResult::Error {
-      message: format!("Expected at least {} item(s) but got {len}", min.unwrap_or(0)),
+      message: format!("Expected at least {} but got {len}", items(min.unwrap_or(0))),
       path: locus(children),
     },
     Some(len) if max.is_some_and(|max| len > max) => NodeResult::Error {
-      message: format!("Expected at most {} item(s) but got {len}", max.unwrap_or(0)),
+      message: format!("Expected at most {} but got {len}", items(max.unwrap_or(0))),
       path: locus(children),
     },
     _ => NodeResult::Value(RuntimeValue::Bool(true)),
@@ -1269,7 +1354,7 @@ fn match_kind(
     NodeResult::Value(RuntimeValue::Bool(true))
   } else {
     NodeResult::Error {
-      message: format!("Expected a {kind_name} but got {}", display(&value)),
+      message: format!("Expected {} but got {}", a_kind(kind_name), display(&value)),
       path: locus(children),
     }
   }
@@ -1389,6 +1474,23 @@ fn as_matchable_text(value: &RuntimeValue) -> Option<String> {
   match value {
     RuntimeValue::Number(_) | RuntimeValue::Bool(_) => Some(plain_text(value)),
     other => as_text(other),
+  }
+}
+
+/// A kind as a mismatch message names it: `a string`, `an integer`, `bytes`.
+fn a_kind(kind: &str) -> String {
+  match kind {
+    "bytes" => kind.to_string(),
+    _ if kind.starts_with(['a', 'e', 'i', 'o', 'u']) => format!("an {kind}"),
+    _ => format!("a {kind}"),
+  }
+}
+
+/// `1 item`, `2 items`.
+fn items(n: u64) -> String {
+  match n {
+    1 => "1 item".to_string(),
+    n => format!("{n} items"),
   }
 }
 

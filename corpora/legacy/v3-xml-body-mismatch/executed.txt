@@ -46,7 +46,7 @@
           :"$.order.#text" (
             %flow:if (
               %check:exists (
-                $.request.body.order.#text => NULL
+                $.request.body.order.#text => ABSENT
               ) => BOOL(false),
               %match:equality (
                 $.request.body.order.#text,
@@ -57,7 +57,7 @@
           %expect:count (
             $.request.body.order.item => [{'#text': 'plum'}],
             2
-          ) => ERROR(Expected exactly 2 item(s) but got 1),
+          ) => ERROR(Expected exactly 2 items but got 1),
           :"$.order.item[0]" (
             :"$.order.item[0].#text" (
               %match:equality (
@@ -74,12 +74,12 @@
           :"$.order.item[1]" (
             :"$.order.item[1].#text" (
               %match:equality (
-                $.request.body.order.item[1].#text => NULL,
+                $.request.body.order.item[1].#text => ABSENT,
                 'pear'
               ) => ERROR(Expected <absent> to equal 'pear')
             ) => BOOL(false),
             %legacy:only-entries (
-              $.request.body.order.item[1] => NULL,
+              $.request.body.order.item[1] => ABSENT,
               '#text',
               '#namespace'
             ) => ERROR(Expected an object but got <absent>)

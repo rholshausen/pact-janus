@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :body (
         %legacy:body-type (
-          $.response.headers.content-type => NULL,
+          $.response.headers.content-type => ABSENT,
           'application/json'
         ) => BOOL(true),
         :"$.items" (

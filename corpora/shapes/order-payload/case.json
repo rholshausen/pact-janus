@@ -45,7 +45,7 @@
     "mismatches": [
       {
         "path": "$.response.body.items",
-        "message": "Expected at least 1 item(s) but got 0",
+        "message": "Expected at least 1 item but got 0",
         "action": "expect:size"
       },
       {

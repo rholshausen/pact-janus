@@ -211,12 +211,12 @@ janus check pacts/web-app-order-service.json --provider-shape shapes/
     consumer has only tested exactly 'SHIPPED'
   verification: no result supplied
   ! no verification result was supplied for this pair; a contract nobody replayed is not a passing one
-  - 1 of 2 interaction(s) have no published provider shape and were not checked
-  ! 3 decided finding(s): the provider may produce responses this consumer has not tested
-  ! 1 comparison(s) the checker cannot decide either way; a person has to look
+  - 1 of 2 interactions has no published provider shape and was not checked
+  ! 3 decided findings: the provider may produce responses this consumer has not tested
+  ! 1 comparison the checker cannot decide either way; a person has to look
   => WARN: web-app -> order-service
 
-WARN: 0 pair(s) blocked, 1 warned, 0 passed — policy on-finding warn, on-review warn, exemptions as of 2026-09-22
+WARN: 0 pairs blocked, 1 warned, 0 passed — policy on-finding warn, on-review warn, exemptions as of 2026-09-22
 ```
 
 `$.status` is the RFC's own scenario, reached from a pact nobody migrated: the provider can produce
@@ -232,7 +232,7 @@ janus check  pacts/web-app-order-service.json --provider-shape shapes/ \
              --verification verified.json --on-finding block
 ```
 
-Now the page carries both halves — `verification: verified (2 of 2 variant(s))` beside the findings
+Now the page carries both halves — `verification: verified (2 of 2 variants)` beside the findings
 — and the exit code is 1: the verification passed and the deploy is still a no, which is the entire
 point of a second source of truth. `cli/tests/cli.rs` runs exactly that sequence.
 

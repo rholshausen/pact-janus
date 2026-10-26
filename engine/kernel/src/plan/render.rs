@@ -95,12 +95,13 @@ fn quote_string(s: &str) -> String {
 /// A literal or a resolved value's own text — shared by the `value` node's static rendering and
 /// (for every kind but boolean) a `resolve`/`resolve-current` node's `=> ` result, since both are
 /// "print this value" with no pass/fail framing attached (spec §2.2, §3.1's kind table: `'a
-/// string'`, `42`, `true`, `NULL`). [`RuntimeValue::Absent`] renders the same as `Null` — the plan
-/// document model has no term for it (plan task 3.4's own module docs), and neither does the text
-/// form.
+/// string'`, `42`, `true`, `NULL`). [`RuntimeValue::Absent`] is `ABSENT`: only a resolved value can
+/// be one, since a literal cannot (plan task 3.4's own module docs), and a reader must be able to
+/// tell a member that is not there from one that is `null` (spec §3.2, staged plan S1.30).
 fn render_value(value: &RuntimeValue) -> String {
   match value {
-    RuntimeValue::Absent | RuntimeValue::Null => "NULL".to_string(),
+    RuntimeValue::Absent => "ABSENT".to_string(),
+    RuntimeValue::Null => "NULL".to_string(),
     RuntimeValue::Bool(b) => b.to_string(),
     RuntimeValue::Number(n) => render_number(n),
     RuntimeValue::String(s) => quote_string(s),
@@ -211,12 +212,17 @@ fn shorten_label(label: &str, plain_ancestors: &[String]) -> String {
   for start in 0..=plain_ancestors.len() {
     let joined = plain_ancestors[start..].join(".");
     let candidate = if joined.is_empty() {
-      "$.".to_string()
+      "$".to_string()
     } else {
-      format!("$.{joined}.")
+      format!("$.{joined}")
     };
-    if let Some(rest) = label.strip_prefix(candidate.as_str()) {
-      return format!("$.{rest}");
+    // The ancestors end where a member begins: `.name`, or `['name']` for one no plain segment can
+    // hold (`$['a.b']`).
+    if let Some(rest) = label
+      .strip_prefix(candidate.as_str())
+      .filter(|rest| rest.starts_with('.') || rest.starts_with('['))
+    {
+      return format!("${rest}");
     }
   }
   label.to_string()
@@ -327,7 +333,7 @@ fn render_executed_node(executed: &Executed, depth: usize, plain_ancestors: &[St
     // 'card'`). Only `resolve`/`resolve-current` results are informative enough to print.
     ExecutedKind::Value(literal) => format!("{pad}{}", render_literal(literal)),
     ExecutedKind::Resolve { path } => format!("{pad}{path}{tail}"),
-    ExecutedKind::ResolveCurrent { path } => format!("{pad}{path}{tail}"),
+    ExecutedKind::ResolveCurrent { path, .. } => format!("{pad}{path}{tail}"),
     // Never executed (plan-grammar spec §2.1): no `=> ` suffix, ever — `tail` is always empty here
     // because `interpret::run` never attaches a result to an annotation.
     ExecutedKind::Annotation { text } => format!("{pad}#{{{}}}", quote_string(text)),

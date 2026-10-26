@@ -33,7 +33,7 @@
     "mismatches": [
       {
         "path": "$.response.body['it\\'s']",
-        "message": "Expected a integer but got '3'",
+        "message": "Expected an integer but got '3'",
         "action": "match:integer"
       }
     ]

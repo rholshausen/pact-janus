@@ -73,7 +73,7 @@
                   :"$.tags{*}.id" (
                     %match:integer (
                       ~>.value.id => 'seven'
-                    ) => ERROR(Expected a integer but got 'seven')
+                    ) => ERROR(Expected an integer but got 'seven')
                   ) => BOOL(false)
                 ) => BOOL(false)
               ) => BOOL(false)

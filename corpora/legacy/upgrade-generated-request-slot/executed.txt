@@ -22,7 +22,7 @@
       ) => BOOL(true),
       :body (
         %legacy:body-type (
-          $.request.headers.content-type => NULL,
+          $.request.headers.content-type => ABSENT,
           'application/json'
         ) => BOOL(true),
         :"$.userId" (

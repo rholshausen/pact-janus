@@ -42,6 +42,7 @@ pub fn compile(
       let root = path::root(part_name, slot_name);
       let ctx = Ctx {
         cursor: Cursor::Absolute(format!("$.{root}")),
+        labelled: root.clone(),
         at: root,
         assignment,
       };
@@ -113,6 +114,10 @@ impl Cursor {
 struct Ctx<'a> {
   cursor: Cursor,
   at: String,
+  /// `at`, with each member named as a resolve names it ([`member_path`]): what a container's label
+  /// prints, so a member no plain segment can hold (`''`, `a.b`) is labelled as it is resolved.
+  /// `at` itself cannot change: it is the dimension ids' syntax, and variant ids are recorded.
+  labelled: String,
   assignment: &'a Assignment,
 }
 
@@ -121,6 +126,7 @@ impl<'a> Ctx<'a> {
     Ctx {
       cursor: self.cursor.member(name),
       at: path::member(&self.at, name),
+      labelled: member_path(&self.labelled, name),
       assignment: self.assignment,
     }
   }
@@ -129,16 +135,20 @@ impl<'a> Ctx<'a> {
     Ctx {
       cursor: self.cursor.array_index(index),
       at: path::array_index(&self.at, index),
+      labelled: path::array_index(&self.labelled, index),
       assignment: self.assignment,
     }
   }
 
   /// The item context inside an `each-like`/`contains`: a fresh relative cursor (`~>`), because a
   /// splat's expansion is what makes it current, not anything the enclosing cursor knew.
-  fn iteration_item(&self, at: String) -> Ctx<'a> {
+  /// `step` is the dimension path's own builder for the item (`[*]`, `{*}`, `{key}`, `[i]`), applied
+  /// to both paths.
+  fn iteration_item(&self, step: impl Fn(&str) -> String) -> Ctx<'a> {
     Ctx {
       cursor: Cursor::Relative("~>".to_string()),
-      at,
+      at: step(&self.at),
+      labelled: step(&self.labelled),
       assignment: self.assignment,
     }
   }
@@ -147,6 +157,7 @@ impl<'a> Ctx<'a> {
     Ctx {
       cursor: self.cursor.clone(),
       at: path::alternative(&self.at, name),
+      labelled: path::alternative(&self.labelled, name),
       assignment: self.assignment,
     }
   }
@@ -164,7 +175,7 @@ impl<'a> Ctx<'a> {
   /// worked examples show relative to an ancestor label — that shortening is a rendering nicety
   /// task 3.6 owns; every label here is unambiguous and traceable on its own.
   fn label(&self) -> String {
-    format!("$.{}", self.at)
+    format!("$.{}", self.labelled)
   }
 }
 
@@ -274,7 +285,7 @@ fn compile_array(entries: &[ShapeNode], ctx: &Ctx) -> Vec<Node> {
 /// (narrowed to `expect:count` when the cardinality dimension is pinned), plus `flow:for-each` over a
 /// `splat` of the elements, the item shape compiled once against `resolve-current`.
 fn compile_each_like(items: &ShapeNode, min: u64, max: Option<u64>, ctx: &Ctx) -> Vec<Node> {
-  let item_ctx = ctx.iteration_item(path::each_like_item(&ctx.at));
+  let item_ctx = ctx.iteration_item(path::each_like_item);
   let item_node = Node::container(Some(item_ctx.label()), compile_shape(items, &item_ctx));
   let for_each = Node::action("flow:for-each", vec![Node::splat(vec![ctx.resolve()]), item_node]);
   let size_assertion = cardinality_assertion(ctx, min, max);
@@ -298,7 +309,7 @@ fn compile_each_entry(
 ) -> Vec<Node> {
   let mut item_children = Vec::new();
   if let Some(keys) = keys {
-    let key_ctx = ctx.iteration_item(path::each_entry_key(&ctx.at));
+    let key_ctx = ctx.iteration_item(path::each_entry_key);
     let key_ctx = Ctx {
       cursor: Cursor::Relative("~>.key".to_string()),
       ..key_ctx
@@ -308,7 +319,7 @@ fn compile_each_entry(
       compile_shape(keys, &key_ctx),
     ));
   }
-  let value_ctx = ctx.iteration_item(path::each_entry_value(&ctx.at));
+  let value_ctx = ctx.iteration_item(path::each_entry_value);
   let value_ctx = Ctx {
     cursor: Cursor::Relative("~>.value".to_string()),
     ..value_ctx
@@ -363,7 +374,7 @@ fn cardinality_assertion(ctx: &Ctx, min: u64, max: Option<u64>) -> Node {
 fn compile_contains(entries: &[ShapeNode], ctx: &Ctx) -> Node {
   let mut children = vec![ctx.resolve()];
   for (index, entry) in entries.iter().enumerate() {
-    let entry_ctx = ctx.iteration_item(path::array_index(&ctx.at, index));
+    let entry_ctx = ctx.iteration_item(|at| path::array_index(at, index));
     children.push(Node::container(
       Some(entry_ctx.label()),
       compile_shape(entry, &entry_ctx),

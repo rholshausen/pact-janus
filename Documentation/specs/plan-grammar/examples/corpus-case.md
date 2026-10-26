@@ -86,7 +86,7 @@ guarantee no assertion in the plan can state, only the absence of one.
         :"$.shippedAt" (
           %flow:if (
             %check:exists (
-              $.response.body.shippedAt => NULL
+              $.response.body.shippedAt => ABSENT
             ) => BOOL(false),
             %match:datetime (
               $.response.body.shippedAt,

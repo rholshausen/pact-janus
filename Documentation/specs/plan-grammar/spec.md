@@ -143,6 +143,14 @@ Executing a node produces one of three results:
 | `value` | the node succeeded and produced a value |
 | `error` | the node failed, with a message and the path that located it |
 
+An `error`'s path is **absolute**, and is where the value under test came from: the path of the
+action's first child when it is a `resolve`, and when it is a `resolve-current`, the element or entry
+that one addressed — `$.body.items[1].sku`, not `~>.sku`, and for an entry's `.key` or `.value`, the
+entry's member, `$.body.prices.plum`. When the first child is itself an action, a `pipeline` or a
+`splat`, the value under test was computed from that node's first child, and the path is that one's:
+`expect:size` over `legacy:xml-children($.body.order)` is located at `$.body.order`. A reader is told
+which element failed, and a host can point at it.
+
 A `container`'s result is the conjunction of its children's: `error` if any child errored, otherwise
 `ok`. This is what makes a plan's root result the interaction's verdict, and what makes any subtree's
 result a meaningful sub-verdict — which is what `explain --executed` shows.
@@ -243,6 +251,11 @@ comparing like with like.
   ) => BOOL(false)
 )
 ```
+
+A resolved value that is not there — a member the reply does not have, an index past its end — is
+written `ABSENT`, and a `null` is `NULL`. They are different facts, and `check:exists` tells them
+apart, so the executed form does too. `ABSENT` is a result only: no `value` node can hold it, since no
+document can.
 
 A node with no ` => ` was **not executed**. That is a fact worth reading — it means a lazy branch was
 skipped or an earlier failure left the value unavailable — and it is why §2.4 requires laziness to be

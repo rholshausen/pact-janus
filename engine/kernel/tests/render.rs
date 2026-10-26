@@ -88,7 +88,7 @@ fn executed_form_matches_corpus_case_executed_txt() {
         :"$.shippedAt" (
           %flow:if (
             %check:exists (
-              $.response.body.shippedAt => NULL
+              $.response.body.shippedAt => ABSENT
             ) => BOOL(false),
             %match:datetime (
               $.response.body.shippedAt,
@@ -220,7 +220,7 @@ fn executed_form_matches_order_payload_plan_section_3() {
 
   let items = find_container(&text, ":\"$.items\" (");
   assert!(
-    items.contains("%expect:size (\n            $.response.body.items => [],\n            1,\n            NULL\n          ) => ERROR(Expected at least 1 item(s) but got 0)"),
+    items.contains("%expect:size (\n            $.response.body.items => [],\n            1,\n            NULL\n          ) => ERROR(Expected at least 1 item but got 0)"),
     "items subtree:\n{items}"
   );
 }

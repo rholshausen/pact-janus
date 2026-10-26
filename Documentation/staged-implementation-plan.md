@@ -1217,6 +1217,22 @@ item in 1a is done when S1.1 agrees.
   prints (`0 pair(s) blocked`, `2 of 2 variant(s)`) and the corpora pin.
   *Exit:* every mismatch the corpora record has an absolute path; plan-grammar spec §3 says how an
   absent value prints, and the corpus snapshots follow it.
+  *Done 2026-10-26.*
+  - **Paths:** the interpreter carries, beside each current item, where it is in the interaction. A
+    `resolve-current` records the absolute path it resolved, and a mismatch is located there.
+  - **Path for a computed value:** a mismatch whose value under test is computed takes the path of the
+    computation's own first child. The new corpus case `v3-xml-min-children-mismatch` is the first to
+    record such a path.
+  - **Spec:** plan-grammar spec §2.3 states both rules. §3.2 writes an absent value as `ABSENT`.
+  - **Labels:** they are built from a second path, quoted as resolves are. The dimension path the
+    labels used is also what variant ids are made of, and those are recorded, so it is unchanged.
+  - **Corpus:** four `case.json` files lost a relative path, and five gained "an integer" or "2 items".
+  Not foreseen:
+  - The new case is one the upgrade does not agree with: a size rule on an XML element counts its
+    children of every name, which no shape counts. The upgrade says so (`rule-unmapped`), so the case
+    joins the agreement test's known list.
+  - A label at a slot's root was never shortened (`:"$.response.body[0]"`). It is now `:"$[0]"`.
+  - `janus upgrade`'s own findings still say `position(s)` and `rule(s)`; nothing here changed them.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current

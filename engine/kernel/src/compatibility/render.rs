@@ -109,7 +109,10 @@ fn verification_phrase(pair: &PairResult) -> String {
   if let Some(variants) = &pair.verification.variants {
     let total = variants["total"].as_u64().unwrap_or(0);
     let verified = variants["verified"].as_u64().unwrap_or(0);
-    text.push_str(&format!(" ({verified} of {total} variant(s))"));
+    text.push_str(&format!(
+      " ({verified} of {})",
+      super::count(total, "variant", "variants")
+    ));
   } else if pair.verification.runs > 1 {
     text.push_str(&format!(" (across {} runs)", pair.verification.runs));
   }
@@ -122,9 +125,9 @@ fn verification_phrase(pair: &PairResult) -> String {
 fn verdict_line(report: &CompatibilityReport) -> String {
   let summary = &report.summary;
   let mut text = format!(
-    "{}: {} pair(s) blocked, {} warned, {} passed",
+    "{}: {} blocked, {} warned, {} passed",
     report.decision.as_str().to_uppercase(),
-    summary.blocked,
+    super::count(summary.blocked as u64, "pair", "pairs"),
     summary.warned,
     summary.passed
   );

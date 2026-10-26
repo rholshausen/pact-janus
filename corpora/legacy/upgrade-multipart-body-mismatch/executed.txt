@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :body (
         %legacy:body-type (
-          $.response.headers.content-type => NULL,
+          $.response.headers.content-type => ABSENT,
           'multipart/form-data;boundary=b'
         ) => BOOL(true),
         :"$.name[0]" (

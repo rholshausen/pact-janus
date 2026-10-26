@@ -89,7 +89,7 @@
     "status": "mismatched",
     "mismatches": [
       {
-        "path": "~>.key",
+        "path": "$.response.body.prices.b2",
         "message": "Expected 'b2' to match '^(?:[A-Z][0-9])$'",
         "action": "match:regex"
       },
