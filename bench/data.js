@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792975422366,
+  "lastUpdate": 1792975424245,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -27222,6 +27222,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19516,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ec138e81837c35f15ea6d539cb4b5850f63e7319",
+          "message": "chore: update dependencies within their compatible ranges\n\nRust: cargo update across the workspace (tokio 1.54, hyper 1.12, reqwest\n0.13.5, rustls 0.23.46, serde_json, uuid and others), except pact_models,\nheld at 1.3.15: the kernel's v1-v4 reader moves only as its own change,\nchecked by the differential harness.\n\nnpm: in-range updates in sdks/typescript, cli/tests/janus-engine-node and\ndemo/web-app (vitest 5.0.5, eslint 10.13, typescript-eslint 8.72).\n\nJVM: Jackson BOM 2.22.2 -> 2.22.4.\n\nNo-Changeset: dependency refresh within compatible ranges; no change to what the engine does\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T11:35:09+11:00",
+          "tree_id": "b597596e005e87c0d2dd6d91c2e0d70ed204f969",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ec138e81837c35f15ea6d539cb4b5850f63e7319"
+        },
+        "date": 1792975423705,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 55699,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 42680,
             "unit": "requests per second",
             "extra": "engines 4"
           }
