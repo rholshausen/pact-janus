@@ -70,6 +70,7 @@ superseding ADR instead.
 | [0051](0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md) | Leave pending out of the contract, and let upgrade exclude pending interactions | accepted |
 | [0052](0052-declare-a-components-registry-credential-in-its-source.md) | Declare a component's registry credential in its source | accepted |
 | [0053](0053-take-todays-verifier-options-where-they-mean-what-they-did.md) | Take today's verifier options where they mean what they did | accepted |
+| [0054](0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md) | Carry an error's causes as a chain, and mark display text with segments beside it | accepted |
 
 ## Decision backlog
 

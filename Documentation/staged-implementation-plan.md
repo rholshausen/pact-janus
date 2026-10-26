@@ -1279,6 +1279,52 @@ item in 1a is done when S1.1 agrees.
     is asked. Which interaction of a file was meant is the command line's question. `--description`
     cannot be combined with `--index` or `--spec`.
 
+- **S1.33 Errors carry their causes as a chain** — **S**. Decided by
+  [ADR 0054](decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md),
+  decisions 1–3. An error's causes are flattened into its `message` where it is produced, so a host
+  cannot tell the headline from the root cause. The CLI guesses at the layers: `render_error`
+  leads a `component-failed` error with the component's own code.
+  - An `EngineError`, and a component's error document, may carry `chain`: its layers outermost
+    first, each in its own words.
+  - `message` stays the complete sentence.
+  - `engine/http-client`, the broker client and the hook host produce chains instead of joined
+    strings.
+  - The CLI leads with the innermost coded layer and the root cause, and `--error-chain` prints
+    every layer.
+  - **How it is built:** with the standard library and a small type the kernel owns, not anyhow.
+    - A `Layer` is `{ code, message }`, the shape that crosses the wire.
+    - A helper walks a foreign error's `source()` chain (reqwest, io, serde) into layers. It takes
+      the producer's rule for which layers are only wrappers, so `describe`'s filter moves into it.
+    - A `Context` trait on `Result` adds an outer layer, with `.context(message)` or
+      `.layer(code, message)`. It reads like anyhow's at a call site, but a layer can carry a code
+      and the result is still a plain value.
+    - Where a host crate's errors are typed, thiserror's `#[source]` keeps the cause as an error
+      rather than a string: `LoadError::Unreadable` keeps its `io::Error`. thiserror is already in the
+      tree.
+
+  *Exit:* the engine-protocol and component-interfaces specs and their schemas carry `chain`. The
+  bindings are regenerated, and every error the HTTP client, broker client and hooks produce
+  carries one. `render_error` has no case for a code. The trycmd and snapbox cases show both
+  renderings.
+
+- **S1.34 Display text is marked with segments** — **M**, after S1.33. Decided by
+  [ADR 0054](decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md),
+  decisions 4–8. A host styles the engine's text by recovering structure the engine had. The CLI
+  re-tokenizes plans by linking the kernel, which no SDK can do, and parses the `check` page's
+  markers.
+  - A host that declares the `segments` capability receives `text-segments` and
+    `message-segments` beside the strings: pieces whose texts, joined, are the string, each with a
+    `kind` from one open vocabulary.
+  - The first carriers are the plan text forms, the `subsumption/check` and `subsumption/decide`
+    text, and mismatch messages.
+
+  *Exit:*
+  - The engine-protocol spec defines the capability, the sibling rule and the kinds, and
+    plan-grammar spec §3.3 says segments are how a host styles a plan.
+  - The kernel's renderers write through one builder that produces both, and a corpus test holds
+    every recorded text form to its segments.
+  - `cli/src/highlight.rs` maps kinds to styles, with no tokenizer call or marker parser.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.

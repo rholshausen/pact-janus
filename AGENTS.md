@@ -118,7 +118,8 @@ Three sources are the source of truth and take precedence over this file when th
 > writes an absent value as `ABSENT`. S1.31 coloured the rest of the CLI's output on a terminal, from
 > one palette (`cli/src/style.rs`), and stripped it everywhere else. S1.32: `janus explain
 > --description` chooses an interaction by its description, listing the candidates when it names
-> several or none.
+> several or none. Next, decided by ADR 0054: errors carry their causes as a chain (S1.33), and
+> display text is marked with segments beside it (S1.34).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
