@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792997004430,
+  "lastUpdate": 1792997006584,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -29346,6 +29346,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19357,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "506309b9e4112eb51c6396789d5ff0a41a5d57fc",
+          "message": "feat: S1.34 display text carries segments, and janus colours from them\n\nA host that declares the `segments` capability in engine/hello gets\n`<member>-segments` beside the engine's display text: pieces whose texts\njoin to the string, each with a kind saying what it is (ADR 0054,\nengine-protocol spec §2.7, display.schema.json). The carriers are\nexplain's two text forms, the executed-plan event, decide's page, and\neach mismatch's message, with the values it quotes marked.\n\nThe kernel writes text and segments through one builder, Marked: the\nplan renderer, the subsumption block, the can-i-deploy page and the\ninterpreter's mismatch messages. The corpus runner holds every case's\nrenderer segments to the tokenizer's reading of its text.\n\nThe CLI declares the capability when it prints text, and colours plans,\nthe check page and mismatch values from segments; it no longer calls the\nkernel's tokenizer or parses the page's markers. --output json carries\nno segments. The bindings gain Segment, SegmentsCapability and Mismatch.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T17:36:14+11:00",
+          "tree_id": "ef33a81a6374262b73081daab1d38e703289bb23",
+          "url": "https://github.com/rholshausen/pact-janus/commit/506309b9e4112eb51c6396789d5ff0a41a5d57fc"
+        },
+        "date": 1792997005893,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 57845,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 41970,
             "unit": "requests per second",
             "extra": "engines 4"
           }
