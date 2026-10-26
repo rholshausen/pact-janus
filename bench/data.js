@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792987046275,
+  "lastUpdate": 1792987048593,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -28284,6 +28284,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30767,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "60a680254ed84117cb512faf069e1b8f8616bf2d",
+          "message": "feat: S1.32 explain chooses an interaction by its description\n\njanus explain --description <TEXT> picks the interaction whose description\nis exactly the text, or else the one that contains it, ignoring case. A\ndescription that names several interactions, or none, is a usage error\nlisting the candidates with their positions for --index and their provider\nstates, which tell apart interactions a pact describes alike.\n\nThe CLI turns the description into the index verification/explain already\ntakes, as it checks --index itself; the protocol is unchanged.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T14:37:36+11:00",
+          "tree_id": "89f0add550df018ed4076eb73397a2c423ee62f4",
+          "url": "https://github.com/rholshausen/pact-janus/commit/60a680254ed84117cb512faf069e1b8f8616bf2d"
+        },
+        "date": 1792987047843,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24123,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19414,
             "unit": "requests per second",
             "extra": "engines 4"
           }
