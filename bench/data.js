@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792974043687,
+  "lastUpdate": 1792974045282,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -26868,6 +26868,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 26321,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "593e8e6166694933695a87440cc422b37128347d",
+          "message": "feat: S1.30 mismatches are located at the element that failed, and absent prints as ABSENT\n\nStaged plan S1.30, split from the CLI output review: what the engine itself\nreports.\n\n- Every mismatch path is absolute. The interpreter carries, beside each\n  current item, where it is in the interaction, so a mismatch inside a\n  for-each, contains or array-contains names the element or entry\n  ($.response.body.prices.plum, not ~>.value). A mismatch whose value under\n  test is computed (expect:size over legacy:xml-children) takes the path of\n  what it was computed from, where it had none.\n- The executed text form writes an absent value as ABSENT and a null as\n  NULL; both were NULL.\n- A container for a member no plain segment can hold is labelled as its\n  resolve names it ($[''], $['a.b']), from a label path of its own: the\n  dimension path, which variant ids are made of, is unchanged. A label at a\n  slot's root is now shortened as the others are.\n- \"Expected an integer\", \"2 items\", and plurals in subsumption/decide's\n  report, filter-matches-nothing and the pact plugin refusal.\n\nPlan-grammar spec §2.3 and §3.2 state the rules. The new corpus case\nv3-xml-min-children-mismatch pins a computed value's path; its upgrade drops\nthe rule and says so (rule-unmapped), so it joins the agreement test's known\nlist.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T11:15:22+11:00",
+          "tree_id": "4b00a5e52cc16708468a2875140895402627bdb6",
+          "url": "https://github.com/rholshausen/pact-janus/commit/593e8e6166694933695a87440cc422b37128347d"
+        },
+        "date": 1792974044912,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25412,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19516,
             "unit": "requests per second",
             "extra": "engines 4"
           }
