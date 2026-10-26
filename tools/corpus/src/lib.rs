@@ -16,11 +16,14 @@
 //! drift into checking different things.
 
 use pact_janus_component_json::JsonContent;
+use pact_janus_kernel::display::{Kind, Marked};
 use pact_janus_kernel::error::Problem;
 use pact_janus_kernel::interaction_spec;
 use pact_janus_kernel::legacy::compile::compile_interaction;
 use pact_janus_kernel::legacy::pact as legacy_pact;
-use pact_janus_kernel::plan::{self, Assignment, CapturedValues, Mismatch, Plan, RuntimeValue, Status};
+use pact_janus_kernel::plan::{
+  self, Assignment, CapturedValues, Mismatch, Plan, RuntimeValue, Status, TokenKind,
+};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -198,18 +201,12 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     if let Err(err) = check_result(status, &mismatches, &case.result) {
       problems.push(format!("result: {err}"));
     }
-    check_snapshot(
-      &dir.join("plan.txt"),
-      &plan::render_pretty(plan),
-      accept,
-      &mut problems,
-    );
-    check_snapshot(
-      &dir.join("executed.txt"),
-      &plan::render_executed(&executed),
-      accept,
-      &mut problems,
-    );
+    let pretty = plan::render_pretty_marked(plan);
+    let executed = plan::render_executed_marked(&executed);
+    check_snapshot(&dir.join("plan.txt"), &pretty.text(), accept, &mut problems);
+    check_snapshot(&dir.join("executed.txt"), &executed.text(), accept, &mut problems);
+    check_segments("plan.txt", &pretty, &mut problems);
+    check_segments("executed.txt", &executed, &mut problems);
   }
 
   if let Some(other_input) = &case.also_compiled_from {
@@ -298,6 +295,53 @@ fn check_refused(dir: &Path, case: &CaseFile, problems: &mut Vec<String>) {
         "{snapshot} sits beside a case whose input is refused; there is no plan to snapshot"
       ));
     }
+  }
+}
+
+/// The renderer's segments (ADR 0054 decision 7) are what the tokenizer reads back from its text: one
+/// writer for the text and its segments, checked against the reader every host had before. Plain
+/// text the tokenizer splits is joined first, as the renderer joins it.
+fn check_segments(snapshot: &str, marked: &Marked, problems: &mut Vec<String>) {
+  let text = marked.text();
+  let mut read: Vec<(Option<Kind>, String)> = Vec::new();
+  for token in plan::tokens(&text) {
+    let kind = token_kind(token.kind);
+    match read.last_mut() {
+      Some((last, joined)) if *last == kind => joined.push_str(token.text),
+      _ => read.push((kind, token.text.to_string())),
+    }
+  }
+  let written: Vec<(Option<Kind>, String)> = marked
+    .segments()
+    .iter()
+    .map(|segment| (segment.kind, segment.text.clone()))
+    .collect();
+  if let Some(at) = (0..written.len().max(read.len())).find(|&at| written.get(at) != read.get(at)) {
+    problems.push(format!(
+      "{snapshot}: the renderer's segments are not what the tokenizer reads, from segment {at}: \
+       written {:?}, read {:?}",
+      written.get(at),
+      read.get(at)
+    ));
+  }
+}
+
+/// What the tokenizer's kind is in the protocol's vocabulary: an error and a `false` verdict are
+/// both a failure.
+fn token_kind(kind: TokenKind) -> Option<Kind> {
+  match kind {
+    TokenKind::Container => Some(Kind::Label),
+    TokenKind::Action => Some(Kind::Action),
+    TokenKind::Resolve => Some(Kind::Path),
+    TokenKind::Operator => Some(Kind::Operator),
+    TokenKind::Annotation => Some(Kind::Annotation),
+    TokenKind::String => Some(Kind::String),
+    TokenKind::Number => Some(Kind::Number),
+    TokenKind::Literal => Some(Kind::Literal),
+    TokenKind::Arrow => Some(Kind::Arrow),
+    TokenKind::Pass => Some(Kind::Pass),
+    TokenKind::Fail | TokenKind::Error => Some(Kind::Fail),
+    TokenKind::Plain => None,
   }
 }
 

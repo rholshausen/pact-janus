@@ -120,7 +120,9 @@ Three sources are the source of truth and take precedence over this file when th
 > --description` chooses an interaction by its description, listing the candidates when it names
 > several or none. S1.33 (ADR 0054): an error carries its causes as `chain`, its layers outermost
 > first; the CLI leads with what failed and its root cause, and `--error-chain` prints every layer.
-> Next, S1.34: display text marked with segments beside it.
+> S1.34 (ADR 0054): a host that declares the `segments` capability gets `text-segments` and
+> `message-segments` beside the engine's display text; the CLI colours plans, the `check` page and
+> mismatch messages from them, and parses none of it.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -390,9 +392,10 @@ own tests pin both: `cli/tests/cmd/` holds trycmd cases — every `--help`, the 
 offline commands — and `cli/tests/cli.rs` the runs that need a provider or a registry, compared
 whole with snapbox where the output is the CLI's own. After a deliberate change,
 `TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff. On a terminal, the output
-is coloured (S1.31): from one palette, `cli/src/style.rs`, and for the plans `explain` and
-`--explain-failures` print, by the kernel's `plan::tokens` (plan-grammar spec §3.3,
-`cli/src/highlight.rs`). Style text where it is built and print it with `outln!`/`errln!`, whose
+is coloured (S1.31): from one palette, `cli/src/style.rs`. Text the engine wrote — plans, the
+`check` page, mismatch messages — is coloured from the segments the engine marks it with (S1.34,
+engine-protocol spec §2.7, `cli/src/highlight.rs`), which a command asks for only when it prints
+text: never parse the engine's text to style it. Style text where it is built and print it with `outln!`/`errln!`, whose
 streams strip the colour off a terminal, under `NO_COLOR` and with `--no-colour`; never print
 styled text another way. The tests run without colour whatever `CLICOLOR_FORCE` says, and a test
 that asks for colour also checks that the colour is all that differs.

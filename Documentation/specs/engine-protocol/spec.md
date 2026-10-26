@@ -219,6 +219,35 @@ a bytes member — an encoding with a native byte-string type writes it directly
 document is the same document either way. See
 [ADR 0006](../../decisions/0006-bytes-in-the-document-model-and-negotiated-frame-encoding.md).
 
+### 2.7 Display text and its segments
+
+Some members are text the engine writes for a person: a plan's text forms, the `can-i-deploy` page,
+a mismatch's message. The engine writes them so that every host says the same words. A host that
+styles them needs to know what each piece of the text *is*, and should not have to parse it to
+find out ([ADR 0054](../../decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md)).
+
+- **Asked for.** A host that wants segments declares the `segments` capability in `engine/hello`
+  (§5.3). The engine declares it too, and from then on, for that pipe, every member below has a
+  sibling. Without the host's declaration nothing changes, on the wire or in its size.
+- **The sibling.** A display member `X` has `X-segments` beside it: `text` has `text-segments`,
+  `message` has `message-segments`. It is a list of `{ text, kind? }` whose texts, joined, are
+  exactly `X` ([`display.schema.json`](schemas/v1/display.schema.json)). A host MAY check this, and
+  MUST print `X` as it is when it fails. The segments are flat: no piece is inside another.
+- **The kinds.** `kind` names what a piece is, never how it looks; a piece with none is plain text.
+  The vocabulary is open (`x-known-values`), and a host prints a kind it does not know as plain text.
+  v1 knows outcomes (`pass`, `fail`, `warn`, `review`, `quiet`), references (`path`, `code`,
+  `heading`), values (`string`, `number`, `literal`), and the plan grammar's pieces (`label`,
+  `action`, `operator`, `annotation`, `arrow`). Each host maps them to its own look, so the engine
+  still never styles (plan-grammar spec §3.3).
+- **The members that carry them in v1:** `verification/explain`'s `text` and `executed.text`, the
+  `verification/executed-plan` event's `text`, `subsumption/decide`'s `text`, and the `message` of
+  each mismatch in `verification/explain`'s `executed.mismatches` and in a
+  `verification/interaction-result` event. Other display members gain segments under these same
+  rules when a host needs them.
+- **One writer.** The engine writes a member's text and its segments together, so they cannot
+  disagree. A plan's segments are what plan-grammar spec §3.3's tokens of its text say each piece
+  is, and the corpus runner holds every recorded text form to that.
+
 ## 3. Byte-pipes and framing
 
 One protocol, three pipes (ADR 0002/0003). Each pipe carries the same frames (§4) and is
@@ -962,7 +991,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
 | `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034) | before the result it qualifies; a warning never changes a verdict |
-| `verification/executed-plan` | the executed plan document/text (design 2.4) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
+| `verification/executed-plan` | the executed plan document/text (design 2.4), and `text-segments` for a host that declared `segments` (§2.7) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
 | `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` or `urls` source, before the first interaction (§8.3); a `urls` source's broker is its first URL's origin |
 | `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it; `not-from-a-broker`: a `urls` source's pact no broker served) | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |

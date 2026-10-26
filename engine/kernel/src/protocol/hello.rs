@@ -12,6 +12,16 @@ use serde_json::{Value, json};
 pub struct Hello {
   #[serde(rename = "protocol-versions")]
   pub protocol_versions: Vec<u32>,
+  #[serde(default)]
+  pub capabilities: Value,
+}
+
+impl Hello {
+  /// Whether the host asked for display text's segments (spec §2.7, ADR 0054): it declared the
+  /// `segments` capability.
+  pub fn wants_segments(&self) -> bool {
+    self.capabilities.get("segments").is_some_and(Value::is_object)
+  }
 }
 
 /// Negotiate a protocol version: the first of the host's offered versions this engine also
@@ -44,6 +54,9 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 ///
 /// `broker` is declared only by an engine with a broker client registered (spec §8.7, ADR 0032):
 /// the native embeddings, never the offline WASM artifact.
+///
+/// `segments` is always declared (spec §2.7, ADR 0054): this engine writes display text's segments
+/// for a host that declared the capability too.
 pub fn result(loaders: &[&str], broker: bool) -> Value {
   let mut result = json!({
     "protocol-version": crate::PROTOCOL_VERSION,
@@ -52,6 +65,7 @@ pub fn result(loaders: &[&str], broker: bool) -> Value {
       "provider-shape-recording": {},
       "subsumption-check": {},
       "components": { "loaders": loaders },
+      "segments": {},
     }
   });
   if broker {

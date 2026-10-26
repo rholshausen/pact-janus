@@ -163,7 +163,15 @@ fn handle_inbound(
       tracing::debug!(instance, handle = %armed.handle, variant = %armed.variant_id, "request matched the armed variant")
     }
     Status::Mismatched => {
-      tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, ?mismatches, "request did not match the armed variant")
+      // Where and what, as a person reads them: the marks are for a host's display, not a log.
+      let said: Vec<String> = mismatches
+        .iter()
+        .map(|mismatch| match &mismatch.path {
+          Some(path) => format!("{path}: {}", mismatch.message),
+          None => mismatch.message.clone(),
+        })
+        .collect();
+      tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, mismatches = ?said, "request did not match the armed variant")
     }
   }
 
@@ -198,7 +206,7 @@ fn handle_inbound(
         event: inbound.event,
         disposition: "reject".to_string(),
         details: Some(serde_json::json!({
-          "mismatches": mismatches.iter().map(mismatch_json).collect::<Vec<_>>(),
+          "mismatches": mismatches.iter().map(|mismatch| mismatch_json(mismatch, false)).collect::<Vec<_>>(),
         })),
       })
       .map(|_| ()),
@@ -221,7 +229,10 @@ fn handle_inbound(
     }
     (Status::Mismatched, _) => (
       ExchangeOutcome::Failed,
-      mismatches.iter().map(mismatch_json).collect(),
+      mismatches
+        .iter()
+        .map(|mismatch| mismatch_json(mismatch, false))
+        .collect(),
     ),
   };
   state

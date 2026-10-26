@@ -256,6 +256,7 @@
           "type": "string",
           "description": "The plan's pretty text form (design 2.4)."
         },
+        "text-segments": { "$ref": "display.schema.json#/$defs/Segments" },
         "plan": {
           "type": "object",
           "description": "The structured plan document, when requested via options."
@@ -270,14 +271,27 @@
             "mismatches": {
               "type": "array",
               "description": "Each failure, as a run's result reports one: path, message and action.",
-              "items": { "type": "object" }
+              "items": { "$ref": "#/$defs/Mismatch" }
             },
             "text": {
               "type": "string",
               "description": "The executed plan's text form (design 2.4)."
-            }
+            },
+            "text-segments": { "$ref": "display.schema.json#/$defs/Segments" }
           }
         }
+      }
+    },
+    "Mismatch": {
+      "title": "Mismatch",
+      "description": "One failure: where it is, what it says, and the action that found it — as 'verification/interaction-result' and 'verification/explain' report one.",
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "path": { "type": ["string", "null"], "description": "The absolute path the failure is located at, when it has one (plan-grammar spec §2.3)." },
+        "message": { "type": "string" },
+        "action": { "type": ["string", "null"], "description": "The nearest action the failure came from." },
+        "message-segments": { "$ref": "display.schema.json#/$defs/Segments" }
       }
     }
   }

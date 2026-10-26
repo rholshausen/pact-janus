@@ -87,7 +87,10 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   add_message_producer(&mut hooks, args, &target["transports"][0]["options"])?;
   target["hooks"] = hooks;
 
-  let mut engine = engine::start()?;
+  let mut engine = engine::start(match args.output {
+    Output::Text => engine::Prints::Text,
+    Output::Json => engine::Prints::Documents,
+  })?;
   let started = engine::call_with_files(
     &mut engine,
     "verification/verify",
@@ -686,7 +689,7 @@ impl Reporter {
             )
           )
         );
-        for line in highlight::plan(payload["text"].as_str().unwrap_or("")).lines() {
+        for line in highlight::member(payload, "text").lines() {
           outln!("  {line}");
         }
         outln!();
@@ -753,7 +756,7 @@ impl Reporter {
       outln!(
         "          {}: {}",
         paint(style::PATH, mismatch["path"].as_str().unwrap_or("")),
-        mismatch["message"].as_str().unwrap_or("")
+        highlight::member(mismatch, "message")
       );
     }
     // The hook's error is the result's: said once, after which hook it was.

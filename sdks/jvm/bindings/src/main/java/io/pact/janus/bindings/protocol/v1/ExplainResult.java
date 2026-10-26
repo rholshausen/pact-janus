@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "text",
+    "text-segments",
     "plan",
     "executed"
 })
@@ -39,6 +41,15 @@ public class ExplainResult {
     @JsonProperty("text")
     @JsonPropertyDescription("The plan's pretty text form (design 2.4).")
     private java.lang.String text;
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    @JsonPropertyDescription("A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.")
+    private List<Segment> textSegments;
     /**
      * The structured plan document, when requested via options.
      * 
@@ -76,6 +87,28 @@ public class ExplainResult {
     @JsonProperty("text")
     public void setText(java.lang.String text) {
         this.text = text;
+    }
+
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public List<Segment> getTextSegments() {
+        return textSegments;
+    }
+
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public void setTextSegments(List<Segment> textSegments) {
+        this.textSegments = textSegments;
     }
 
     /**
@@ -136,6 +169,10 @@ public class ExplainResult {
         sb.append('=');
         sb.append(((this.text == null)?"<null>":this.text));
         sb.append(',');
+        sb.append("textSegments");
+        sb.append('=');
+        sb.append(((this.textSegments == null)?"<null>":this.textSegments));
+        sb.append(',');
         sb.append("plan");
         sb.append('=');
         sb.append(((this.plan == null)?"<null>":this.plan));
@@ -163,6 +200,7 @@ public class ExplainResult {
         result = ((result* 31)+((this.text == null)? 0 :this.text.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.plan == null)? 0 :this.plan.hashCode()));
+        result = ((result* 31)+((this.textSegments == null)? 0 :this.textSegments.hashCode()));
         return result;
     }
 
@@ -175,7 +213,7 @@ public class ExplainResult {
             return false;
         }
         ExplainResult rhs = ((ExplainResult) other);
-        return (((((this.executed == rhs.executed)||((this.executed!= null)&&this.executed.equals(rhs.executed)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.plan == rhs.plan)||((this.plan!= null)&&this.plan.equals(rhs.plan))));
+        return ((((((this.executed == rhs.executed)||((this.executed!= null)&&this.executed.equals(rhs.executed)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.plan == rhs.plan)||((this.plan!= null)&&this.plan.equals(rhs.plan))))&&((this.textSegments == rhs.textSegments)||((this.textSegments!= null)&&this.textSegments.equals(rhs.textSegments))));
     }
 
 }

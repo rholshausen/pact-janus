@@ -992,6 +992,8 @@ fn verify_colours_its_report_only_where_it_is_asked_for() {
   for styled in [
     "\u{1b}[1m\u{1b}[31mFAILED\u{1b}[0m  a request for an order",
     "\u{1b}[94m$.response.body.status\u{1b}[0m: ",
+    // A mismatch's values, from the segments the engine marks its message with (S1.34).
+    "Expected \u{1b}[32m'PENDING'\u{1b}[0m to equal \u{1b}[32m'SHIPPED'\u{1b}[0m",
     "\u{1b}[32mok\u{1b}[0m      a request for an order that does not exist",
     "\u{1b}[1m\u{1b}[31mFAILED\u{1b}[0m: \u{1b}[32m1 verified\u{1b}[0m, \u{1b}[1m\u{1b}[31m1 failed\u{1b}[0m",
   ] {
@@ -1003,6 +1005,13 @@ fn verify_colours_its_report_only_where_it_is_asked_for() {
   assert_eq!(without_styling(&coloured_text), plain_text);
   let refused = janus_in(&args, &[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")]);
   assert_eq!(stdout(&refused), plain_text);
+
+  // A document printed for a script is the engine's, without the segments only text needs.
+  let mut json_args = args.to_vec();
+  json_args.extend(["--output", "json"]);
+  let document = stdout(&janus_in(&json_args, &[("CLICOLOR_FORCE", "1")]));
+  assert!(document.contains("\"mismatches\""), "{document}");
+  assert!(!document.contains("-segments"), "{document}");
 }
 
 /// The `can-i-deploy` page's markers are the specification's, and coloured by what they say.

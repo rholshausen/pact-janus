@@ -26,6 +26,7 @@
 use super::interpret::{Executed, ExecutedKind, NodeResult};
 use super::model::{Literal, Node, NodeKind, Plan};
 use super::value::RuntimeValue;
+use crate::display::{Kind, Marked};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::Number;
@@ -34,14 +35,32 @@ use serde_json::Number;
 /// pair of un-prefixed parens — the document envelope both worked examples show around what is
 /// otherwise just `plan.root`'s own `container` rendering.
 pub fn pretty(plan: &Plan) -> String {
-  format!("(\n{}\n)", render_node(&plan.root, 1, &[]))
+  pretty_marked(plan).text()
 }
 
 /// The executed form of an executed plan (spec §3.2): the same envelope, with every node that
 /// carries a [`NodeResult`] annotated `" => <result>"` and an unexecuted (lazy-skipped) subtree
 /// carrying none at all.
 pub fn executed(root: &Executed) -> String {
-  format!("(\n{}\n)", render_executed_node(root, 1, &[]))
+  executed_marked(root).text()
+}
+
+/// [`pretty`], with its segments (ADR 0054): each piece marked as what spec §3.1's table says it
+/// is, which is exactly how [`super::tokens`] reads the text back. The corpus runner holds the two
+/// to each other.
+pub fn pretty_marked(plan: &Plan) -> Marked {
+  envelope(render_node(&plan.root, 1, &[]))
+}
+
+/// [`executed`], with its segments.
+pub fn executed_marked(root: &Executed) -> Marked {
+  envelope(render_executed_node(root, 1, &[]))
+}
+
+fn envelope(root: Marked) -> Marked {
+  let mut out = Marked::plain("(\n");
+  out.append(root).text_plain("\n)");
+  out
 }
 
 // --- shared leaf rendering: labels, quoted strings, literals ---
@@ -98,28 +117,41 @@ fn quote_string(s: &str) -> String {
 /// string'`, `42`, `true`, `NULL`). [`RuntimeValue::Absent`] is `ABSENT`: only a resolved value can
 /// be one, since a literal cannot (plan task 3.4's own module docs), and a reader must be able to
 /// tell a member that is not there from one that is `null` (spec §3.2, staged plan S1.30).
-fn render_value(value: &RuntimeValue) -> String {
+fn render_value(value: &RuntimeValue) -> Marked {
   match value {
-    RuntimeValue::Absent => "ABSENT".to_string(),
-    RuntimeValue::Null => "NULL".to_string(),
-    RuntimeValue::Bool(b) => b.to_string(),
-    RuntimeValue::Number(n) => render_number(n),
-    RuntimeValue::String(s) => quote_string(s),
-    RuntimeValue::Bytes(bytes) => render_bytes(bytes),
-    RuntimeValue::Array(items) => format!(
-      "[{}]",
-      items.iter().map(render_value).collect::<Vec<_>>().join(", ")
-    ),
-    RuntimeValue::Object(members) => format!(
-      "{{{}}}",
-      members
-        .iter()
-        .map(|(k, v)| format!("{}: {}", quote_string(k), render_value(v)))
-        .collect::<Vec<_>>()
-        .join(", ")
-    ),
-    RuntimeValue::Entry { key, value } => format!("{{{}: {}}}", quote_string(key), render_value(value)),
+    RuntimeValue::Absent => Marked::of(Kind::Literal, "ABSENT"),
+    RuntimeValue::Null => Marked::of(Kind::Literal, "NULL"),
+    RuntimeValue::Bool(b) => Marked::of(Kind::Literal, b.to_string()),
+    RuntimeValue::Number(n) => Marked::of(Kind::Number, render_number(n)),
+    RuntimeValue::String(s) => Marked::of(Kind::String, quote_string(s)),
+    RuntimeValue::Bytes(bytes) => Marked::of(Kind::Literal, render_bytes(bytes)),
+    RuntimeValue::Array(items) => {
+      let mut out = Marked::plain("[");
+      out
+        .append(Marked::join(items.iter().map(render_value), ", "))
+        .text_plain("]");
+      out
+    }
+    RuntimeValue::Object(members) => {
+      let mut out = Marked::plain("{");
+      out
+        .append(Marked::join(members.iter().map(|(k, v)| member(k, v)), ", "))
+        .text_plain("}");
+      out
+    }
+    RuntimeValue::Entry { key, value } => {
+      let mut out = Marked::plain("{");
+      out.append(member(key, value)).text_plain("}");
+      out
+    }
   }
+}
+
+/// `'key': value`, a member of an object or an entry.
+fn member(key: &str, value: &RuntimeValue) -> Marked {
+  let mut out = Marked::of(Kind::String, quote_string(key));
+  out.text_plain(": ").append(render_value(value));
+  out
 }
 
 /// How many base64 characters of a bytes value the text forms show: 36 octets, cut on a 4-character
@@ -142,7 +174,7 @@ fn render_number(n: &Number) -> String {
   n.to_string()
 }
 
-fn render_literal(literal: &Literal) -> String {
+fn render_literal(literal: &Literal) -> Marked {
   render_value(&RuntimeValue::from_literal(literal))
 }
 
@@ -150,19 +182,27 @@ fn render_literal(literal: &Literal) -> String {
 /// (module docs); every other `Value` uses [`render_value`]'s plain literal syntax; `Error` prints
 /// its message verbatim — it is already a complete sentence built by the interpreter (plan task
 /// 3.4), not text this renderer escapes or requotes.
-fn render_result(result: &NodeResult) -> String {
+fn render_result(result: &NodeResult) -> Marked {
   match result {
-    NodeResult::Ok => "BOOL(true)".to_string(),
-    NodeResult::Value(RuntimeValue::Bool(b)) => format!("BOOL({b})"),
+    NodeResult::Ok => Marked::of(Kind::Pass, "BOOL(true)"),
+    NodeResult::Value(RuntimeValue::Bool(true)) => Marked::of(Kind::Pass, "BOOL(true)"),
+    NodeResult::Value(RuntimeValue::Bool(false)) => Marked::of(Kind::Fail, "BOOL(false)"),
     NodeResult::Value(v) => render_value(v),
-    NodeResult::Error { message, .. } => format!("ERROR({message})"),
+    NodeResult::Error { message, .. } => Marked::of(Kind::Fail, format!("ERROR({message})")),
   }
 }
 
-fn suffix(result: Option<&NodeResult>) -> String {
+fn suffix(result: Option<&NodeResult>) -> Marked {
   match result {
-    Some(r) => format!(" => {}", render_result(r)),
-    None => String::new(),
+    Some(r) => {
+      let mut out = Marked::plain(" ");
+      out
+        .text_as(Kind::Arrow, "=>")
+        .text_plain(" ")
+        .append(render_result(r));
+      out
+    }
+    None => Marked::new(),
   }
 }
 
@@ -174,18 +214,64 @@ fn indent_str(depth: usize) -> String {
 /// but the last, or the single-line empty form when there are none — no worked example shows an
 /// empty container or action, so this is this renderer's own, minimal choice for a case the
 /// grammar allows but the corpus so far has never produced.
-fn wrap(pad: &str, prefix: &str, children: &[String]) -> String {
+fn wrap(pad: &str, prefix: Marked, children: Vec<Marked>) -> Marked {
+  let mut out = Marked::plain(pad);
+  out.append(prefix);
   if children.is_empty() {
-    return format!("{pad}{prefix}()");
+    out.text_plain("()");
+    return out;
   }
+  out.text_plain("(\n");
   let last = children.len() - 1;
-  let body = children
-    .iter()
-    .enumerate()
-    .map(|(i, c)| if i == last { c.clone() } else { format!("{c},") })
-    .collect::<Vec<_>>()
-    .join("\n");
-  format!("{pad}{prefix}(\n{body}\n{pad})")
+  for (i, child) in children.into_iter().enumerate() {
+    out.append(child);
+    out.text_plain(if i == last { "\n" } else { ",\n" });
+  }
+  out.text_plain(format!("{pad})"));
+  out
+}
+
+/// `:label ` before a container's children, or nothing for an unlabelled one.
+fn container_prefix(label: Option<&String>, plain_ancestors: &[String]) -> Marked {
+  match label {
+    Some(l) => {
+      let mut out = Marked::of(
+        Kind::Label,
+        format!(":{}", quote_label(&shorten_label(l, plain_ancestors))),
+      );
+      out.text_plain(" ");
+      out
+    }
+    None => Marked::new(),
+  }
+}
+
+/// `%name ` before an action's children.
+fn action_prefix(name: &str) -> Marked {
+  let mut out = Marked::of(Kind::Action, format!("%{name}"));
+  out.text_plain(" ");
+  out
+}
+
+/// `-> ` or `** ` before a pipeline's or splat's children.
+fn operator_prefix(operator: &str) -> Marked {
+  let mut out = Marked::of(Kind::Operator, operator);
+  out.text_plain(" ");
+  out
+}
+
+/// `#{'text'}`, an annotation, at `pad`.
+fn annotation(pad: &str, text: &str) -> Marked {
+  let mut out = Marked::plain(pad);
+  out.text_as(Kind::Annotation, format!("#{{{}}}", quote_string(text)));
+  out
+}
+
+/// A value or path leaf at `pad`, then its suffix.
+fn leaf(pad: &str, body: Marked, tail: Marked) -> Marked {
+  let mut out = Marked::plain(pad);
+  out.append(body).append(tail);
+  out
 }
 
 // --- container labels: full dimensional paths, shortened for display ---
@@ -245,97 +331,94 @@ fn extend_ancestors(plain_ancestors: &[String], label: Option<&str>) -> Vec<Stri
 
 // --- the pretty-form walk (Node) ---
 
-fn render_node(node: &Node, depth: usize, plain_ancestors: &[String]) -> String {
+fn render_node(node: &Node, depth: usize, plain_ancestors: &[String]) -> Marked {
   let pad = indent_str(depth);
   match &node.kind {
     NodeKind::Container { label, children } => {
-      let prefix = match label {
-        Some(l) => format!(":{} ", quote_label(&shorten_label(l, plain_ancestors))),
-        None => String::new(),
-      };
       let next_ancestors = extend_ancestors(plain_ancestors, label.as_deref());
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_node(c, depth + 1, &next_ancestors))
         .collect();
-      wrap(&pad, &prefix, &rendered)
+      wrap(&pad, container_prefix(label.as_ref(), plain_ancestors), rendered)
     }
     NodeKind::Action { name, children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_node(c, depth + 1, plain_ancestors))
         .collect();
-      wrap(&pad, &format!("%{name} "), &rendered)
+      wrap(&pad, action_prefix(name), rendered)
     }
     NodeKind::Pipeline { children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_node(c, depth + 1, plain_ancestors))
         .collect();
-      wrap(&pad, "-> ", &rendered)
+      wrap(&pad, operator_prefix("->"), rendered)
     }
     NodeKind::Splat { children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_node(c, depth + 1, plain_ancestors))
         .collect();
-      wrap(&pad, "** ", &rendered)
+      wrap(&pad, operator_prefix("**"), rendered)
     }
-    NodeKind::Value(literal) => format!("{pad}{}", render_literal(literal)),
-    NodeKind::Resolve { path } => format!("{pad}{path}"),
-    NodeKind::ResolveCurrent { path } => format!("{pad}{path}"),
-    NodeKind::Annotation { text } => format!("{pad}#{{{}}}", quote_string(text)),
+    NodeKind::Value(literal) => leaf(&pad, render_literal(literal), Marked::new()),
+    NodeKind::Resolve { path } => leaf(&pad, Marked::of(Kind::Path, path.as_str()), Marked::new()),
+    NodeKind::ResolveCurrent { path } => leaf(&pad, Marked::of(Kind::Path, path.as_str()), Marked::new()),
+    NodeKind::Annotation { text } => annotation(&pad, text),
   }
 }
 
 // --- the executed-form walk (Executed) ---
 
-fn render_executed_node(executed: &Executed, depth: usize, plain_ancestors: &[String]) -> String {
+fn render_executed_node(executed: &Executed, depth: usize, plain_ancestors: &[String]) -> Marked {
   let pad = indent_str(depth);
   let tail = suffix(executed.result.as_ref());
+  let wrapped = |prefix: Marked, rendered: Vec<Marked>| {
+    let mut out = wrap(&pad, prefix, rendered);
+    out.append(tail.clone());
+    out
+  };
   match &executed.kind {
     ExecutedKind::Container { label, children } => {
-      let prefix = match label {
-        Some(l) => format!(":{} ", quote_label(&shorten_label(l, plain_ancestors))),
-        None => String::new(),
-      };
       let next_ancestors = extend_ancestors(plain_ancestors, label.as_deref());
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_executed_node(c, depth + 1, &next_ancestors))
         .collect();
-      format!("{}{tail}", wrap(&pad, &prefix, &rendered))
+      wrapped(container_prefix(label.as_ref(), plain_ancestors), rendered)
     }
     ExecutedKind::Action { name, children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_executed_node(c, depth + 1, plain_ancestors))
         .collect();
-      format!("{}{tail}", wrap(&pad, &format!("%{name} "), &rendered))
+      wrapped(action_prefix(name), rendered)
     }
     ExecutedKind::Pipeline { children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_executed_node(c, depth + 1, plain_ancestors))
         .collect();
-      format!("{}{tail}", wrap(&pad, "-> ", &rendered))
+      wrapped(operator_prefix("->"), rendered)
     }
     ExecutedKind::Splat { children } => {
-      let rendered: Vec<String> = children
+      let rendered = children
         .iter()
         .map(|c| render_executed_node(c, depth + 1, plain_ancestors))
         .collect();
-      format!("{}{tail}", wrap(&pad, "** ", &rendered))
+      wrapped(operator_prefix("**"), rendered)
     }
     // A static value resolves to itself, trivially — `interpret::run` still attaches a result, but
     // printing `=> 'card'` under a literal `'card'` would say nothing a reader doesn't already have
     // (order-payload-plan.md §3: `%check:equals(... => 'invoice', 'card')`, never `'card' =>
     // 'card'`). Only `resolve`/`resolve-current` results are informative enough to print.
-    ExecutedKind::Value(literal) => format!("{pad}{}", render_literal(literal)),
-    ExecutedKind::Resolve { path } => format!("{pad}{path}{tail}"),
-    ExecutedKind::ResolveCurrent { path, .. } => format!("{pad}{path}{tail}"),
+    ExecutedKind::Value(literal) => leaf(&pad, render_literal(literal), Marked::new()),
+    ExecutedKind::Resolve { path } => leaf(&pad, Marked::of(Kind::Path, path.as_str()), tail),
+    ExecutedKind::ResolveCurrent { path, .. } => leaf(&pad, Marked::of(Kind::Path, path.as_str()), tail),
     // Never executed (plan-grammar spec §2.1): no `=> ` suffix, ever — `tail` is always empty here
     // because `interpret::run` never attaches a result to an annotation.
-    ExecutedKind::Annotation { text } => format!("{pad}#{{{}}}", quote_string(text)),
+    ExecutedKind::Annotation { text } => annotation(&pad, text),
   }
 }

@@ -23,7 +23,10 @@ pub use interpret::{
 pub use model::{
   DocumentKind, GRAMMAR_VERSION, Literal, Node, NodeKind, Plan, from_json, to_json as plan_json,
 };
-pub use render::{executed as render_executed, pretty as render_pretty};
+pub use render::{
+  executed as render_executed, executed_marked as render_executed_marked, pretty as render_pretty,
+  pretty_marked as render_pretty_marked,
+};
 pub use resolve::{CapturedValues, ContentDetector, Resolver};
 pub use tokens::{Token, TokenKind, tokens};
 pub use value::{RuntimeValue, member_path, navigate};

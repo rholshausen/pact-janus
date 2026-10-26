@@ -14,9 +14,16 @@
 //! the checker knows nothing about. Composing is all it does; the words are this module's.
 
 use super::report::{Finding, NOT_PUBLISHED, Severity, SubsumptionReport};
+use crate::display::{Kind, Marked};
 
 /// Render a report as the text a person reads.
 pub fn render(report: &SubsumptionReport) -> String {
+  render_marked(report).text()
+}
+
+/// [`render`], with its segments (ADR 0054): the markers by what they say, the header's parties as
+/// its heading, and each finding's address as a path.
+pub fn render_marked(report: &SubsumptionReport) -> Marked {
   let has_findings = report.interactions.iter().any(|interaction| {
     interaction
       .findings
@@ -50,7 +57,7 @@ pub fn render(report: &SubsumptionReport) -> String {
       lines.extend(finding_lines(&interaction.description, finding, None));
     }
   }
-  lines.join("\n")
+  Marked::join(lines, "\n")
 }
 
 /// The header line (§6.4): the verdict, the two parties, and nothing else.
@@ -66,28 +73,47 @@ pub(crate) fn header(
   has_findings: bool,
   has_reviews: bool,
   any_matched: bool,
-) -> String {
-  if has_findings {
-    format!("✗ {consumer} is not compatible with {provider}")
+) -> Marked {
+  let (marker, kind, said) = if has_findings {
+    (
+      "✗ ",
+      Kind::Fail,
+      format!("{consumer} is not compatible with {provider}"),
+    )
   } else if has_reviews {
-    format!("? {consumer} needs review against {provider}")
+    (
+      "? ",
+      Kind::Review,
+      format!("{consumer} needs review against {provider}"),
+    )
   } else if any_matched {
-    format!("✓ {consumer} is compatible with {provider}")
+    (
+      "✓ ",
+      Kind::Pass,
+      format!("{consumer} is compatible with {provider}"),
+    )
   } else {
     // Not "no shapes published": a provider that published shapes nobody's interactions match —
     // a derived shape named by operationId, say (spike 7.3 §2) — lands here too, and that line
     // read like reassurance to exactly the team that most needed to hear nothing was checked.
-    format!("? {consumer} was not checked against {provider}: no published shape matched any interaction")
-  }
+    (
+      "? ",
+      Kind::Review,
+      format!("{consumer} was not checked against {provider}: no published shape matched any interaction"),
+    )
+  };
+  let mut line = Marked::of(kind, marker);
+  line.text_as(Kind::Heading, said);
+  line
 }
 
-pub(crate) fn not_published_line(description: &str, reason: Option<&str>) -> String {
-  match reason {
+pub(crate) fn not_published_line(description: &str, reason: Option<&str>) -> Marked {
+  Marked::plain(match reason {
     Some(reason) => format!("  interaction '{description}': not checked — {reason}"),
     None => {
       format!("  interaction '{description}': no published shape matches it by description or operation")
     }
-  }
+  })
 }
 
 /// One finding, as the two-or-one-line block §6.4 fixes: its header line, then a line per side.
@@ -96,16 +122,23 @@ pub(crate) fn not_published_line(description: &str, reason: Option<&str>) -> Str
 /// exemption has silenced, which is neither a live finding nor a different severity. Everything
 /// else here is the specification's own grammar, read off the `summary` pair (§6.5), which is what
 /// lets this run over a report read back from a file.
-pub(crate) fn finding_lines(description: &str, finding: &Finding, marker: Option<&str>) -> Vec<String> {
-  let marker = marker.unwrap_or(match finding.severity {
-    Severity::Finding => "",
-    Severity::Review => "? ",
-    Severity::Advisory => "! ",
-  });
-  let mut lines = vec![format!(
-    "  {marker}interaction '{description}', {}:",
-    locate(&finding.path)
-  )];
+pub(crate) fn finding_lines(description: &str, finding: &Finding, marker: Option<&str>) -> Vec<Marked> {
+  let (marker, kind) = match marker {
+    Some(marker) => (marker, Kind::Quiet),
+    None => match finding.severity {
+      Severity::Finding => ("", Kind::Fail),
+      Severity::Review => ("? ", Kind::Review),
+      Severity::Advisory => ("! ", Kind::Warn),
+    },
+  };
+  let (part_slot, address) = locate(&finding.path);
+  let mut head = Marked::plain("  ");
+  head
+    .text_as(kind, marker)
+    .text_plain(format!("interaction '{description}', {part_slot} "))
+    .text_as(Kind::Path, address)
+    .text_plain(":");
+  let mut lines = vec![head];
   let provider_summary = finding
     .provider
     .as_ref()
@@ -117,34 +150,34 @@ pub(crate) fn finding_lines(description: &str, finding: &Finding, marker: Option
     .map(|side| side.summary.as_str())
     .unwrap_or_default();
   match finding.kind.as_str() {
-    "unreviewable" => lines.push(format!(
+    "unreviewable" => lines.push(Marked::plain(format!(
       "    {} — review manually",
       uncomparable(provider_summary, consumer_summary)
-    )),
+    ))),
     kind => {
-      lines.push(format!(
+      lines.push(Marked::plain(format!(
         "    provider may produce{}",
         side_phrase(kind, provider_summary)
-      ));
-      lines.push(format!(
+      )));
+      lines.push(Marked::plain(format!(
         "    consumer has only tested{}",
         side_phrase(kind, consumer_summary)
-      ));
+      )));
     }
   }
   for exclusion in &finding.excluded_by {
     if let Some(reason) = exclusion.get("reason").and_then(|reason| reason.as_str()) {
-      lines.push(format!("    not exercised together: {reason}"));
+      lines.push(Marked::plain(format!("    not exercised together: {reason}")));
     }
   }
   lines
 }
 
-/// `response.body.payment@card.last4` -> `response body $.payment.last4 (card)`: the same address
+/// `response.body.payment@card.last4` -> (`response body`, `$.payment.last4 (card)`): the same address
 /// as `path` (§4.4), "rendered with a leading `$.` per part/slot convention rather than shown raw,
 /// because this text is read by people who know JSONPath and not necessarily this project's
 /// dimension-id grammar" (§6.4).
-fn locate(path: &str) -> String {
+fn locate(path: &str) -> (String, String) {
   let mut segments = path.split('.');
   let part = segments.next().unwrap_or_default();
   let slot = segments.next().unwrap_or_default();
@@ -178,7 +211,7 @@ fn locate(path: &str) -> String {
   } else {
     format!(" ({})", alternatives.join(", "))
   };
-  format!("{part} {slot} {address}{suffix}")
+  (format!("{part} {slot}"), format!("{address}{suffix}"))
 }
 
 /// The per-kind half-line that follows "provider may produce" / "consumer has only tested".

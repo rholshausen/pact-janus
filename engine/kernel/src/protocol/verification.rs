@@ -207,13 +207,35 @@ impl ExecutedPlans {
       None => ExecutedPlans::Never,
     }
   }
+}
+
+/// What a run reports beside its results: [`ExecutedPlans`], and whether its display text carries
+/// segments, because the host declared the `segments` capability (spec §2.7, ADR 0054).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Reporting {
+  executed_plans: ExecutedPlans,
+  segments: bool,
+}
+
+impl Reporting {
+  pub(crate) fn from_options(options: Option<&Value>, segments: bool) -> Reporting {
+    Reporting {
+      executed_plans: ExecutedPlans::from_options(options),
+      segments,
+    }
+  }
 
   fn wants(&self, matched: bool) -> bool {
-    match self {
+    match self.executed_plans {
       ExecutedPlans::Never => false,
       ExecutedPlans::OnFailure => !matched,
       ExecutedPlans::Always => true,
     }
+  }
+
+  /// `text` as `member` in `document`, with its segments beside it when the host asked for them.
+  fn display(&self, document: &mut Value, member: &str, text: &crate::display::Marked) {
+    super::display::put(document, member, text, self.segments);
   }
 }
 
@@ -817,8 +839,9 @@ pub(crate) fn start(
   filter: Filter,
   publish: Option<PublishOptions>,
   stream: Arc<Stream>,
+  segments: bool,
 ) -> Run {
-  let executed_plans = ExecutedPlans::from_options(options.as_ref());
+  let executed_plans = Reporting::from_options(options.as_ref(), segments);
   // Today's --exit-on-first-error (ADR 0053): end the run at the first failure that fails it.
   let stop_on_failure = options
     .as_ref()
@@ -992,7 +1015,7 @@ fn run(
   components: RunComponents,
   hooks: Option<HookRunner>,
   filter: Filter,
-  executed_plans: ExecutedPlans,
+  executed_plans: Reporting,
   stop_on_failure: bool,
   stream: Arc<Stream>,
 ) {
@@ -1519,7 +1542,7 @@ struct RunContext<'a> {
   /// Runs a contributed fragment's component actions (plan task 8.4).
   actions: &'a dyn ActionApplier,
   filter: &'a Filter,
-  executed_plans: ExecutedPlans,
+  executed_plans: Reporting,
   stream: &'a Stream,
   hooks: Option<&'a mut HookRunner>,
   /// The interaction is pending — its pact is, or it is itself (a v4 interaction marked so): its
@@ -2538,7 +2561,7 @@ fn drive(
   target: &Target,
   content: Option<&dyn ContentComponent>,
   actions: &dyn ActionApplier,
-  executed_plans: ExecutedPlans,
+  executed_plans: Reporting,
 ) -> Result<Driven, Value> {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
@@ -2623,7 +2646,7 @@ fn score(
   answering: &str,
   content: Option<&dyn ContentComponent>,
   actions: &dyn ActionApplier,
-  executed_plans: ExecutedPlans,
+  executed_plans: Reporting,
 ) -> Driven {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
@@ -2657,7 +2680,10 @@ fn score(
       tracing::debug!(%variant, count = mismatches.len(), "variant failed");
       json!({
         "interaction": reference, "variant": variant, "status": "failed",
-        "mismatches": mismatches.iter().map(mismatch_json).collect::<Vec<_>>(),
+        "mismatches": mismatches
+          .iter()
+          .map(|mismatch| mismatch_json(mismatch, executed_plans.segments))
+          .collect::<Vec<_>>(),
       })
     }
   };
@@ -2667,13 +2693,14 @@ fn score(
   // request failing, when the verdict never looked at it. A v1–v4 plan is the response alone, so
   // this is also what makes the two paths read the same.
   let executed = executed_plans.wants(matched).then(|| {
-    json!({
+    let mut event = json!({
       "interaction": reference,
       "variant": variant,
       "status": if matched { "verified" } else { "failed" },
-      "text": plan::render_executed(response),
       "plan": plan::plan_json(&exchange.ready.plan),
-    })
+    });
+    executed_plans.display(&mut event, "text", &plan::render_executed_marked(response));
+    event
   });
 
   Driven {

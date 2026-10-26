@@ -28,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "status",
     "mismatches",
-    "text"
+    "text",
+    "text-segments"
 })
 public class ExplainExecuted {
 
@@ -38,7 +39,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("status")
-    private java.lang.String status;
+    private String status;
     /**
      * Each failure, as a run's result reports one: path, message and action.
      * (Required)
@@ -46,7 +47,7 @@ public class ExplainExecuted {
      */
     @JsonProperty("mismatches")
     @JsonPropertyDescription("Each failure, as a run's result reports one: path, message and action.")
-    private List<Map<String, Object>> mismatches;
+    private List<Mismatch> mismatches;
     /**
      * The executed plan's text form (design 2.4).
      * (Required)
@@ -54,9 +55,18 @@ public class ExplainExecuted {
      */
     @JsonProperty("text")
     @JsonPropertyDescription("The executed plan's text form (design 2.4).")
-    private java.lang.String text;
+    private String text;
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    @JsonPropertyDescription("A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.")
+    private List<Segment> textSegments;
     @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
      * 
@@ -64,7 +74,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("status")
-    public java.lang.String getStatus() {
+    public String getStatus() {
         return status;
     }
 
@@ -74,7 +84,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("status")
-    public void setStatus(java.lang.String status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 
@@ -84,7 +94,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("mismatches")
-    public List<Map<String, Object>> getMismatches() {
+    public List<Mismatch> getMismatches() {
         return mismatches;
     }
 
@@ -94,7 +104,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("mismatches")
-    public void setMismatches(List<Map<String, Object>> mismatches) {
+    public void setMismatches(List<Mismatch> mismatches) {
         this.mismatches = mismatches;
     }
 
@@ -104,7 +114,7 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("text")
-    public java.lang.String getText() {
+    public String getText() {
         return text;
     }
 
@@ -114,22 +124,44 @@ public class ExplainExecuted {
      * 
      */
     @JsonProperty("text")
-    public void setText(java.lang.String text) {
+    public void setText(String text) {
         this.text = text;
     }
 
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public List<Segment> getTextSegments() {
+        return textSegments;
+    }
+
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public void setTextSegments(List<Segment> textSegments) {
+        this.textSegments = textSegments;
+    }
+
     @JsonAnyGetter
-    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
+    public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
+    public void setAdditionalProperty(String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ExplainExecuted.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("status");
@@ -143,6 +175,10 @@ public class ExplainExecuted {
         sb.append("text");
         sb.append('=');
         sb.append(((this.text == null)?"<null>":this.text));
+        sb.append(',');
+        sb.append("textSegments");
+        sb.append('=');
+        sb.append(((this.textSegments == null)?"<null>":this.textSegments));
         sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
@@ -163,11 +199,12 @@ public class ExplainExecuted {
         result = ((result* 31)+((this.text == null)? 0 :this.text.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.status == null)? 0 :this.status.hashCode()));
+        result = ((result* 31)+((this.textSegments == null)? 0 :this.textSegments.hashCode()));
         return result;
     }
 
     @Override
-    public boolean equals(java.lang.Object other) {
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }
@@ -175,7 +212,7 @@ public class ExplainExecuted {
             return false;
         }
         ExplainExecuted rhs = ((ExplainExecuted) other);
-        return (((((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
+        return ((((((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))))&&((this.textSegments == rhs.textSegments)||((this.textSegments!= null)&&this.textSegments.equals(rhs.textSegments))));
     }
 
 }

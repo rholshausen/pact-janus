@@ -89,7 +89,7 @@ pub fn check(request: &Check) -> Result<(SubsumptionReport, String), Subsumption
 }
 
 /// `subsumption/decide`: the reports, the verification results and the policy, as one answer.
-pub fn decide(request: &Decide) -> Result<(CompatibilityReport, String), SubsumptionError> {
+pub fn decide(request: &Decide) -> Result<(CompatibilityReport, crate::display::Marked), SubsumptionError> {
   let layers: Vec<Option<&Value>> = request.policy.iter().map(Some).collect();
   let policy = SubsumptionPolicy::resolve(&layers).map_err(|problem| SubsumptionError::Invalid {
     problems: vec![problem],
@@ -122,7 +122,7 @@ pub fn decide(request: &Decide) -> Result<(CompatibilityReport, String), Subsump
   }
 
   let report = compatibility::decide(&pairs, &request.verification, &policy, request.as_of.as_deref());
-  let text = compatibility::render(&report);
+  let text = compatibility::render_marked(&report);
   Ok((report, text))
 }
 

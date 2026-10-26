@@ -280,6 +280,30 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(ENGINE_HELLO, ENGINE_SHUTDOWN, CONSUMER_SESSION_CREATE, CONSUMER_SESSION_ADD_INTERACTION, CONSUMER_SESSION_VARIANTS, CONSUMER_SESSION_START_TRANSPORT, CONSUMER_SESSION_SERVE_VARIANT, CONSUMER_SESSION_FINALISE, VERIFICATION_VERIFY, VERIFICATION_EXPLAIN, UPGRADE_PACT, EVENTS_POLL);
   }
 
+  /** Known values of {@code Segment.kind}. */
+  public static final class SegmentKind {
+    private SegmentKind() {}
+
+    public static final String PASS = "pass";
+    public static final String FAIL = "fail";
+    public static final String WARN = "warn";
+    public static final String REVIEW = "review";
+    public static final String QUIET = "quiet";
+    public static final String PATH = "path";
+    public static final String CODE = "code";
+    public static final String HEADING = "heading";
+    public static final String STRING = "string";
+    public static final String NUMBER = "number";
+    public static final String LITERAL = "literal";
+    public static final String LABEL = "label";
+    public static final String ACTION = "action";
+    public static final String OPERATOR = "operator";
+    public static final String ANNOTATION = "annotation";
+    public static final String ARROW = "arrow";
+
+    public static final List<String> KNOWN = List.of(PASS, FAIL, WARN, REVIEW, QUIET, PATH, CODE, HEADING, STRING, NUMBER, LITERAL, LABEL, ACTION, OPERATOR, ANNOTATION, ARROW);
+  }
+
   /** Known values of {@code StartTransport.transport}. */
   public static final class StartTransportTransport {
     private StartTransportTransport() {}

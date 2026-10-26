@@ -1348,6 +1348,32 @@ item in 1a is done when S1.1 agrees.
     every recorded text form to its segments.
   - `cli/src/highlight.rs` maps kinds to styles, with no tokenizer call or marker parser.
 
+  *Done 2026-10-26.*
+  - **Kernel:** `engine/kernel/src/display.rs` has the builder, `Marked`, which keeps text and
+    segments together. The plan renderer, the subsumption block and the `can-i-deploy` page write
+    through it. The interpreter marks the values a mismatch's message quotes. Every message is
+    unchanged, and the corpora pin them.
+  - **The check:** the corpus runner holds each case's renderer segments to the tokenizer's reading
+    of its text, piece by piece. The tokenizer is now a test of the renderer.
+  - **Protocol:** the `segments` capability, `text-segments` and `message-segments`
+    (engine-protocol spec §2.7, `display.schema.json`). The carriers are explain's two text forms,
+    the `executed-plan` event, decide's page, and the mismatches of explain and of
+    `interaction-result` events. The bindings gain `Segment` and a typed `Mismatch`.
+  - **CLI:** it declares the capability, and colours plans, the `check` page and mismatch values
+    from segments. It no longer calls the kernel to style.
+  Not foreseen:
+  - **`subsumption/check` has no text.** Only `decide` sends a page, so the ADR's
+    `subsumption/check` carrier has nothing to carry.
+  - **`--output json` would have carried segments**, since the run summary's failures include
+    mismatches. A command asks for segments only when it prints text.
+  - **The generator mishandles a `$ref` with a sibling `description`.** It names one copy
+    `Segments1` and never declares it. The carriers reference `Segments` bare, and the description
+    lives on the definition.
+  - **A consumer exchange's mismatches stay plain.** They reach SDKs, which style nothing yet. They
+    gain segments under the same rules when an SDK needs them.
+  - **A mismatch log line printed the marks.** It `Debug`-printed whole mismatches, so it now prints
+    only path and message.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.

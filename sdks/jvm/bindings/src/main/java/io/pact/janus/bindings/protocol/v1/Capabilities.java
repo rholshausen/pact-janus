@@ -20,13 +20,14 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * Capabilities
  * <p>
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "encoding",
-    "provider-shape-recording"
+    "provider-shape-recording",
+    "segments"
 })
 public class Capabilities {
 
@@ -48,6 +49,15 @@ public class Capabilities {
     @JsonProperty("provider-shape-recording")
     @JsonPropertyDescription("Declared by an engine that implements the provider-shape-session/* operations (spec.md \u00a78.5). Presence is the whole signal; the object carries nothing.")
     private ProviderShapeRecordingCapability providerShapeRecording;
+    /**
+     * SegmentsCapability
+     * <p>
+     * Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("segments")
+    @JsonPropertyDescription("Display text's segments (spec.md \u00a72.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.")
+    private SegmentsCapability segments;
     @JsonIgnore
     private Map<java.lang.String, Map<String, Object>> additionalProperties = new LinkedHashMap<java.lang.String, Map<String, Object>>();
 
@@ -95,6 +105,28 @@ public class Capabilities {
         this.providerShapeRecording = providerShapeRecording;
     }
 
+    /**
+     * SegmentsCapability
+     * <p>
+     * Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("segments")
+    public SegmentsCapability getSegments() {
+        return segments;
+    }
+
+    /**
+     * SegmentsCapability
+     * <p>
+     * Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("segments")
+    public void setSegments(SegmentsCapability segments) {
+        this.segments = segments;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Map<String, Object>> getAdditionalProperties() {
         return this.additionalProperties;
@@ -117,6 +149,10 @@ public class Capabilities {
         sb.append('=');
         sb.append(((this.providerShapeRecording == null)?"<null>":this.providerShapeRecording));
         sb.append(',');
+        sb.append("segments");
+        sb.append('=');
+        sb.append(((this.segments == null)?"<null>":this.segments));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -135,6 +171,7 @@ public class Capabilities {
         result = ((result* 31)+((this.providerShapeRecording == null)? 0 :this.providerShapeRecording.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.encoding == null)? 0 :this.encoding.hashCode()));
+        result = ((result* 31)+((this.segments == null)? 0 :this.segments.hashCode()));
         return result;
     }
 
@@ -147,7 +184,7 @@ public class Capabilities {
             return false;
         }
         Capabilities rhs = ((Capabilities) other);
-        return ((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))));
+        return (((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))))&&((this.segments == rhs.segments)||((this.segments!= null)&&this.segments.equals(rhs.segments))));
     }
 
 }

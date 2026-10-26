@@ -142,12 +142,23 @@ pub(crate) fn plain_slot(value: &Value) -> SlotValue {
 /// A mismatch as the protocol carries it (spec §9.6's event payloads, and the mock's own
 /// mismatch reply): path and message, never the executed node — `explain --executed` is how a
 /// caller asks for the whole tree (plan task 3.6).
-pub(crate) fn mismatch_json(mismatch: &Mismatch) -> Value {
-  serde_json::json!({
+pub(crate) fn mismatch_json(mismatch: &Mismatch, segments: bool) -> Value {
+  let mut json = serde_json::json!({
     "path": mismatch.path,
     "message": mismatch.message,
     "action": mismatch.action,
-  })
+  });
+  // The values it quotes, marked, for a host that asked (spec §2.7, ADR 0054). A message that quotes
+  // none is one plain segment.
+  if segments {
+    let marked = mismatch
+      .marks
+      .as_deref()
+      .cloned()
+      .unwrap_or_else(|| crate::display::Marked::plain(mismatch.message.clone()));
+    super::display::put(&mut json, "message", &marked, true);
+  }
+  json
 }
 
 #[cfg(test)]

@@ -31,6 +31,7 @@
 mod broker;
 mod consumer_session;
 mod contributions;
+mod display;
 mod engine;
 mod events;
 mod exchange;

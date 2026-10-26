@@ -270,6 +270,14 @@ form above. The form is never styled where it is recorded or read by a program �
 pipe — and a host honours its platform's conventions for turning styling off and on (`NO_COLOR`,
 `CLICOLOR_FORCE`). The engine never styles; it does not know where its text is going.
 
+The engine does say what each piece is, to a host that asks: the `text-segments` beside a text form
+(engine-protocol spec §2.7, [ADR 0054](../../decisions/0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md)).
+Each piece's `kind` is the token kind a reader of the form would give it: `label` for a container,
+`action`, `path` for a `resolve` or `resolve-current`, `operator`, `annotation`, `string`,
+`number`, `literal`, `arrow` for `=>`, `pass` for `BOOL(true)`, and `fail` for `BOOL(false)` and
+`ERROR(...)`. Whitespace and punctuation are plain. A host styles a form from its segments, never by
+parsing it.
+
 ## 4. The action set
 
 ### 4.1 Naming and namespacing

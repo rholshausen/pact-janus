@@ -249,6 +249,29 @@ export const RequestFrameOp = {
 } as const;
 
 /**
+ * Known values of `Segment.kind` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const SegmentKind = {
+  Pass: "pass",
+  Fail: "fail",
+  Warn: "warn",
+  Review: "review",
+  Quiet: "quiet",
+  Path: "path",
+  Code: "code",
+  Heading: "heading",
+  String: "string",
+  Number: "number",
+  Literal: "literal",
+  Label: "label",
+  Action: "action",
+  Operator: "operator",
+  Annotation: "annotation",
+  Arrow: "arrow",
+} as const;
+
+/**
  * Known values of `StartTransport.transport` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */

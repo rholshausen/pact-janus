@@ -35,6 +35,9 @@ use std::time::Duration;
 
 pub struct Engine {
   hello_done: bool,
+  /// Whether the host declared the `segments` capability in its hello (spec §2.7, ADR 0054): display
+  /// text is then sent with its segments beside it.
+  segments: bool,
   /// Set by `engine/shutdown` (spec §6): every later call is `engine-shut-down`, and a subprocess
   /// embedding exits once the shutdown response is written ([`Engine::is_shut_down`]).
   shut_down: bool,
@@ -107,6 +110,7 @@ impl Engine {
   pub fn new() -> Self {
     Engine {
       hello_done: false,
+      segments: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
@@ -149,6 +153,7 @@ impl Engine {
       .fold(ContentRegistry::new(), ContentRegistry::with);
     Engine {
       hello_done: false,
+      segments: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports,
@@ -320,6 +325,7 @@ impl Engine {
     match hello::negotiate(&hello) {
       Some(_version) => {
         self.hello_done = true;
+        self.segments = hello.wants_segments();
         let loaders: Vec<&str> = std::iter::once("in-tree")
           .chain(self.loaders.iter().map(|loader| loader.name()))
           .collect();
@@ -674,6 +680,7 @@ impl Engine {
       filter,
       publish,
       stream,
+      self.segments,
     );
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
@@ -742,7 +749,13 @@ impl Engine {
       .and_then(|options| options.get("plan"))
       .and_then(Value::as_bool)
       .unwrap_or(false);
-    let mut result = json!({ "text": crate::plan::render_pretty(&plan) });
+    let mut result = json!({});
+    super::display::put(
+      &mut result,
+      "text",
+      &crate::plan::render_pretty_marked(&plan),
+      self.segments,
+    );
     if want_plan {
       result["plan"] = crate::plan::plan_json(&plan);
     }
@@ -757,9 +770,17 @@ impl Engine {
           crate::plan::Status::Matched => "matched",
           crate::plan::Status::Mismatched => "mismatched",
         },
-        "mismatches": mismatches.iter().map(super::wire::mismatch_json).collect::<Vec<_>>(),
-        "text": crate::plan::render_executed(&executed),
+        "mismatches": mismatches
+          .iter()
+          .map(|mismatch| super::wire::mismatch_json(mismatch, self.segments))
+          .collect::<Vec<_>>(),
       });
+      super::display::put(
+        &mut result["executed"],
+        "text",
+        &crate::plan::render_executed_marked(&executed),
+        self.segments,
+      );
     }
     ResponseFrame::ok(id, result)
   }
@@ -865,7 +886,9 @@ impl Engine {
     match subsumption_ops::decide(&req) {
       Ok((report, text)) => {
         let report = serde_json::to_value(&report).expect("a report always serializes");
-        ResponseFrame::ok(id, json!({ "report": report, "text": text }))
+        let mut result = json!({ "report": report });
+        super::display::put(&mut result, "text", &text, self.segments);
+        ResponseFrame::ok(id, result)
       }
       Err(err) => ResponseFrame::err(id, subsumption_error(err)),
     }

@@ -60,7 +60,10 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
 
   let as_of = args.as_of.clone().unwrap_or_else(crate::date::today);
 
-  let mut engine = engine::start()?;
+  let mut engine = engine::start(match args.output {
+    Output::Text => engine::Prints::Text,
+    Output::Json => engine::Prints::Documents,
+  })?;
 
   // One `subsumption/check` per pair the host can form, then one `subsumption/decide` over the
   // lot. The pairing is the CLI's own work — which files it was handed is exactly the knowledge
@@ -104,10 +107,7 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
 
   match args.output {
     Output::Json => outln!("{}", crate::output::pretty(&decided["report"])),
-    Output::Text => outln!(
-      "{}",
-      crate::highlight::page(decided["text"].as_str().unwrap_or_default())
-    ),
+    Output::Text => outln!("{}", crate::highlight::member(&decided, "text")),
   }
   // Which shapes were found, and which were not, is the CLI's half of the answer: the engine was
   // never told a shape file existed for a provider it has no document for. On stderr, so it is said

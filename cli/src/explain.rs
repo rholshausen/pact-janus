@@ -74,7 +74,13 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
     check_index(&document, index)?;
   }
 
-  let mut engine = engine::start()?;
+  // `--plan` prints the plan document; every other form is text.
+  let prints = if args.plan {
+    engine::Prints::Documents
+  } else {
+    engine::Prints::Text
+  };
+  let mut engine = engine::start(prints)?;
   let result = engine::call(&mut engine, "verification/explain", request).map_err(|err| {
     // A document with no `$format` that is also not a pact reaches the engine as a
     // contract-interaction and is refused there, as one it cannot identify. Saying which flag reads
@@ -96,10 +102,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   match &args.executed {
     Some(_) => {
       let executed = &result["executed"];
-      outln!(
-        "{}",
-        highlight::plan(executed["text"].as_str().unwrap_or_default())
-      );
+      outln!("{}", highlight::member(executed, "text"));
       Ok(match executed["status"].as_str() {
         Some("matched") => Outcome::Done,
         _ => Outcome::SubjectFailed,
@@ -110,7 +113,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
       Ok(Outcome::Done)
     }
     None => {
-      outln!("{}", highlight::plan(result["text"].as_str().unwrap_or_default()));
+      outln!("{}", highlight::member(&result, "text"));
       Ok(Outcome::Done)
     }
   }

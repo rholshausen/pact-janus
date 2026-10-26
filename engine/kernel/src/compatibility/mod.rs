@@ -41,4 +41,4 @@ pub use decide::{
   FindingEntry, InteractionId, Pair, PairResult, PolicyView, Reason, ReasonAction, SubsumptionView, Summary,
   VerificationView, decide,
 };
-pub use render::render;
+pub use render::{render, render_marked};

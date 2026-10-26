@@ -189,6 +189,7 @@ impl ActionApplier for Contributions {
           contributor.name
         ),
         path: None,
+        marks: None,
       });
     };
     // One application. Its first argument is the value under test, wrapped as a `MatchValue` —
@@ -222,6 +223,7 @@ impl ActionApplier for Contributions {
         None => NodeResult::Error {
           message: format!("'{}' answered '{action}' with no result", contributor.name),
           path: None,
+          marks: None,
         },
       },
       // Spec §11.3 says this is `component-failed` at the engine boundary. A plan node has nowhere
@@ -233,6 +235,7 @@ impl ActionApplier for Contributions {
           contributor.name, error.code, error.message
         ),
         path: None,
+        marks: None,
       },
     })
   }
@@ -252,10 +255,12 @@ fn read_result(result: &Value) -> NodeResult {
         .unwrap_or("the component's action failed")
         .to_string(),
       path: result.get("path").and_then(Value::as_str).map(str::to_string),
+      marks: None,
     },
     _ => NodeResult::Error {
       message: format!("not a plan result document: {result}"),
       path: None,
+      marks: None,
     },
   }
 }

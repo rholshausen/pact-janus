@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/display.schema.json",
+  "title": "Display",
+  "description": "Display text's segments (spec.md §2.7, ADR 0054): sent as '<member>-segments' beside a display string, to a host that declared the 'segments' capability.",
+  "$defs": {
+    "Segments": {
+      "title": "Segments",
+      "description": "A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Segment" }
+    },
+    "Segment": {
+      "title": "Segment",
+      "description": "One piece of a display string, and what it is.",
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "description": "What the piece is, never how it looks: each host maps a kind to its own look. Absent is plain text. Open vocabulary: a host prints a kind it does not know as plain text.",
+          "x-known-values": [
+            "pass",
+            "fail",
+            "warn",
+            "review",
+            "quiet",
+            "path",
+            "code",
+            "heading",
+            "string",
+            "number",
+            "literal",
+            "label",
+            "action",
+            "operator",
+            "annotation",
+            "arrow"
+          ]
+        }
+      }
+    }
+  }
+}

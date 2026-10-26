@@ -127,7 +127,8 @@
         "text": {
           "type": "string",
           "description": "The page a person reads: design 2.8 §6.4's finding block per pair, under a decision. Rendered by the engine so that two hosts printing the same decision print the same words."
-        }
+        },
+        "text-segments": { "$ref": "display.schema.json#/$defs/Segments" }
       }
     },
     "CompatibilityReport": {

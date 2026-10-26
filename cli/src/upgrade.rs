@@ -35,7 +35,10 @@ pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
   }
 
   let pact = io::read_json(&args.pact)?;
-  let mut engine = engine::start()?;
+  let mut engine = engine::start(match args.output {
+    Output::Text => engine::Prints::Text,
+    Output::Json => engine::Prints::Documents,
+  })?;
   let result = engine::call(
     &mut engine,
     "upgrade/pact",

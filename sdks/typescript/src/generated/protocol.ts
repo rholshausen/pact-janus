@@ -235,6 +235,23 @@ export interface Party {
 }
 
 /**
+ * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+ */
+export type Segments = Segment[];
+
+/**
+ * One piece of a display string, and what it is.
+ */
+export interface Segment {
+  text: string;
+  /**
+   * What the piece is, never how it looks: each host maps a kind to its own look. Absent is plain text. Open vocabulary: a host prints a kind it does not know as plain text.
+   */
+  kind?: string;
+  [k: string]: unknown;
+}
+
+/**
  * The structured error value carried in a ResponseFrame's 'error' member. Errors are values: this is the only way an operation fails. Taxonomy and details conventions in spec.md §10.
  */
 export interface EngineError {
@@ -397,17 +414,19 @@ export interface PartyInfo {
 }
 
 /**
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments.
  */
 export interface Capabilities {
   encoding?: EncodingCapability;
   "provider-shape-recording"?: ProviderShapeRecordingCapability;
+  segments?: SegmentsCapability;
   [k: string]:
     | {
         [k: string]: unknown;
       }
     | EncodingCapability
     | ProviderShapeRecordingCapability
+    | SegmentsCapability
     | undefined;
 }
 
@@ -415,6 +434,13 @@ export interface Capabilities {
  * Declared by an engine that implements the provider-shape-session/* operations (spec.md §8.5). Presence is the whole signal; the object carries nothing.
  */
 export interface ProviderShapeRecordingCapability {
+  [k: string]: unknown;
+}
+
+/**
+ * Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.
+ */
+export interface SegmentsCapability {
   [k: string]: unknown;
 }
 
@@ -637,6 +663,7 @@ export interface DecideResult {
    * The page a person reads: design 2.8 §6.4's finding block per pair, under a decision. Rendered by the engine so that two hosts printing the same decision print the same words.
    */
   text: string;
+  "text-segments"?: Segments;
   [k: string]: unknown;
 }
 
@@ -1133,6 +1160,7 @@ export interface ExplainResult {
    * The plan's pretty text form (design 2.4).
    */
   text: string;
+  "text-segments"?: Segments;
   /**
    * The structured plan document, when requested via options.
    */
@@ -1151,12 +1179,28 @@ export interface ExplainExecuted {
   /**
    * Each failure, as a run's result reports one: path, message and action.
    */
-  mismatches: {
-    [k: string]: unknown;
-  }[];
+  mismatches: Mismatch[];
   /**
    * The executed plan's text form (design 2.4).
    */
   text: string;
+  "text-segments"?: Segments;
+  [k: string]: unknown;
+}
+
+/**
+ * One failure: where it is, what it says, and the action that found it — as 'verification/interaction-result' and 'verification/explain' report one.
+ */
+export interface Mismatch {
+  /**
+   * The absolute path the failure is located at, when it has one (plan-grammar spec §2.3).
+   */
+  path?: string | null;
+  message: string;
+  /**
+   * The nearest action the failure came from.
+   */
+  action?: string | null;
+  "message-segments"?: Segments;
   [k: string]: unknown;
 }

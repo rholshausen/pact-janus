@@ -22,8 +22,22 @@ pub fn sentence(err: &dyn std::error::Error) -> String {
   chain::joined(&chain::layers_of(err, chain::without_os_error))
 }
 
-/// A `janus` engine with everything a native host can offer it, past the handshake.
-pub fn start() -> Result<Engine, String> {
+/// How a command prints what the engine sends: as text for a person, which it colours from the
+/// segments the engine marks it with (spec §2.7, ADR 0054), or as the documents themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Prints {
+  Text,
+  Documents,
+}
+
+/// A `janus` engine with everything a native host can offer it, past the handshake. It asks for
+/// display text's segments only when the command prints text: a document printed for a script has
+/// no use for them.
+pub fn start(prints: Prints) -> Result<Engine, String> {
+  let capabilities = match prints {
+    Prints::Text => json!({ "segments": {} }),
+    Prints::Documents => json!({}),
+  };
   let mut engine = crate::register::native_engine();
   let hello = call(
     &mut engine,
@@ -31,7 +45,7 @@ pub fn start() -> Result<Engine, String> {
     json!({
       "protocol-versions": [pact_janus_kernel::PROTOCOL_VERSION],
       "host": { "name": "janus-cli", "version": pact_janus_kernel::ENGINE_VERSION },
-      "capabilities": {},
+      "capabilities": capabilities,
     }),
   )?;
   tracing::debug!(%hello, "handshake complete");

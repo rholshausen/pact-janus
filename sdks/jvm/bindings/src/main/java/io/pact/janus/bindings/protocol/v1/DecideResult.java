@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -26,7 +27,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "report",
-    "text"
+    "text",
+    "text-segments"
 })
 public class DecideResult {
 
@@ -48,6 +50,15 @@ public class DecideResult {
     @JsonProperty("text")
     @JsonPropertyDescription("The page a person reads: design 2.8 \u00a76.4's finding block per pair, under a decision. Rendered by the engine so that two hosts printing the same decision print the same words.")
     private String text;
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    @JsonPropertyDescription("A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.")
+    private List<Segment> textSegments;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -95,6 +106,28 @@ public class DecideResult {
         this.text = text;
     }
 
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public List<Segment> getTextSegments() {
+        return textSegments;
+    }
+
+    /**
+     * Segments
+     * <p>
+     * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
+     * 
+     */
+    @JsonProperty("text-segments")
+    public void setTextSegments(List<Segment> textSegments) {
+        this.textSegments = textSegments;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -117,6 +150,10 @@ public class DecideResult {
         sb.append('=');
         sb.append(((this.text == null)?"<null>":this.text));
         sb.append(',');
+        sb.append("textSegments");
+        sb.append('=');
+        sb.append(((this.textSegments == null)?"<null>":this.textSegments));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -135,6 +172,7 @@ public class DecideResult {
         result = ((result* 31)+((this.report == null)? 0 :this.report.hashCode()));
         result = ((result* 31)+((this.text == null)? 0 :this.text.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.textSegments == null)? 0 :this.textSegments.hashCode()));
         return result;
     }
 
@@ -147,7 +185,7 @@ public class DecideResult {
             return false;
         }
         DecideResult rhs = ((DecideResult) other);
-        return ((((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return (((((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report)))&&((this.text == rhs.text)||((this.text!= null)&&this.text.equals(rhs.text))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.textSegments == rhs.textSegments)||((this.textSegments!= null)&&this.textSegments.equals(rhs.textSegments))));
     }
 
 }

@@ -21,6 +21,7 @@
 use super::model::{Literal, Node, NodeKind, Plan};
 use super::resolve::{ContentDetector, Resolver};
 use super::value::{RuntimeValue, navigate};
+use crate::display::{Kind, Marked};
 use serde_json::Number;
 
 /// What executing one node produced (spec §2.3).
@@ -28,7 +29,13 @@ use serde_json::Number;
 pub enum NodeResult {
   Ok,
   Value(RuntimeValue),
-  Error { message: String, path: Option<String> },
+  /// `marks` is `message` with what it quotes marked (ADR 0054): set where the message quotes a value,
+  /// absent where it is prose throughout.
+  Error {
+    message: String,
+    path: Option<String>,
+    marks: Option<Box<Marked>>,
+  },
 }
 
 /// A plan node together with what executing it produced. `result: None` means this node was
@@ -157,6 +164,8 @@ pub enum Status {
 pub struct Mismatch {
   pub path: Option<String>,
   pub message: String,
+  /// `message` with the values it quotes marked, when it quotes any (ADR 0054).
+  pub marks: Option<Box<Marked>>,
   /// The nearest enclosing action's name, when the error came from one — a `match:*`/`expect:*`
   /// failure always has one; a bare `%flow:error` node may not.
   pub action: Option<String>,
@@ -179,10 +188,11 @@ fn collect_mismatches(executed: &Executed, enclosing_action: Option<&str>, out: 
     ExecutedKind::Action { name, .. } => Some(name.as_str()),
     _ => enclosing_action,
   };
-  if let Some(NodeResult::Error { message, path }) = &executed.result {
+  if let Some(NodeResult::Error { message, path, marks }) = &executed.result {
     out.push(Mismatch {
       path: path.clone(),
       message: message.clone(),
+      marks: marks.clone(),
       action: action_name.map(str::to_string),
     });
   }
@@ -447,16 +457,24 @@ fn apply_component(name: &str, children: &[Executed], actions: Option<&dyn Actio
   let path = locus(children);
   match actions.and_then(|applier| applier.apply(name, &arguments, path.as_deref())) {
     Some(result) => match result {
-      NodeResult::Error { message, path: None } => NodeResult::Error {
+      NodeResult::Error {
+        message,
+        path: None,
+        marks,
+      } => NodeResult::Error {
         message,
         path: locus(children),
+        marks,
       },
       other => other,
     },
-    None => NodeResult::Error {
-      message: format!("no component in scope contributes the action '{name}'"),
-      path: locus(children),
-    },
+    None => failed(
+      vec![
+        Marked::plain("no component in scope contributes the action "),
+        quoted(name),
+      ],
+      locus(children),
+    ),
   }
 }
 
@@ -467,7 +485,11 @@ fn malformed(name: &str, children: &[Node], message: String) -> Executed {
       name: name.to_string(),
       children: children.iter().map(skip).collect(),
     },
-    result: Some(NodeResult::Error { message, path: None }),
+    result: Some(NodeResult::Error {
+      message,
+      path: None,
+      marks: None,
+    }),
   }
 }
 
@@ -639,6 +661,7 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
     NodeResult::Error {
       message: "not every entry found a distinct matching element".to_string(),
       path: None,
+      marks: None,
     }
   } else {
     NodeResult::Value(RuntimeValue::Bool(true))
@@ -682,27 +705,30 @@ fn run_array_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
       let result = if found {
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
-        let message = match (described.first(), described.get(1)) {
-          (Some(index), Some(element)) => format!(
-            "Variant at index {} ({}) was not found in the actual list",
-            display(&value_of(index)),
-            display(&value_of(element))
-          ),
-          _ => format!("No element of {} matched the variant", display(&value)),
+        let pieces = match (described.first(), described.get(1)) {
+          (Some(index), Some(element)) => vec![
+            Marked::plain("Variant at index "),
+            shown(&value_of(index)),
+            Marked::plain(" ("),
+            shown(&value_of(element)),
+            Marked::plain(") was not found in the actual list"),
+          ],
+          _ => vec![
+            Marked::plain("No element of "),
+            shown(&value),
+            Marked::plain(" matched the variant"),
+          ],
         };
-        NodeResult::Error {
-          message,
-          path: locus(std::slice::from_ref(&resolve_executed)),
-        }
+        failed(pieces, locus(std::slice::from_ref(&resolve_executed)))
       };
       (matched.unwrap_or_else(|| skip(template)), result)
     }
     _ => (
       skip(template),
-      NodeResult::Error {
-        message: format!("Expected an array but got {}", display(&value)),
-        path: locus(std::slice::from_ref(&resolve_executed)),
-      },
+      failed(
+        vec![Marked::plain("Expected an array but got "), shown(&value)],
+        locus(std::slice::from_ref(&resolve_executed)),
+      ),
     ),
   };
   Executed {
@@ -738,6 +764,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
     "flow:error" => NodeResult::Error {
       message: plain_text(&value_of(&children[0])),
       path: None,
+      marks: None,
     },
     "flow:apply" | "flow:tee" => {
       // Neither has a worked example anywhere in the specs; this is a documented placeholder
@@ -789,10 +816,10 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if matches!(value, RuntimeValue::Absent) {
         NodeResult::Ok
       } else {
-        NodeResult::Error {
-          message: format!("Expected no value but got {}", display(&value)),
-          path: locus(children),
-        }
+        failed(
+          vec![Marked::plain("Expected no value but got "), shown(&value)],
+          locus(children),
+        )
       }
     }
     "expect:object" | "expect:array" => {
@@ -804,19 +831,27 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if holds {
         NodeResult::Ok
       } else {
-        NodeResult::Error {
-          message: format!("Expected {wanted} but got {}", display(&value)),
-          path: locus(children),
-        }
+        failed(
+          vec![
+            Marked::plain("Expected "),
+            Marked::plain(wanted.to_string()),
+            Marked::plain(" but got "),
+            shown(&value),
+          ],
+          locus(children),
+        )
       }
     }
     "expect:not-empty" => {
       let value = value_of(&children[0]);
       if is_empty(&value) {
-        NodeResult::Error {
-          message: format!("Expected a non-empty value but got {}", display(&value)),
-          path: locus(children),
-        }
+        failed(
+          vec![
+            Marked::plain("Expected a non-empty value but got "),
+            shown(&value),
+          ],
+          locus(children),
+        )
       } else {
         NodeResult::Ok
       }
@@ -826,10 +861,10 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if is_empty(&value) {
         NodeResult::Ok
       } else {
-        NodeResult::Error {
-          message: format!("Expected an empty value but got {}", display(&value)),
-          path: locus(children),
-        }
+        failed(
+          vec![Marked::plain("Expected an empty value but got "), shown(&value)],
+          locus(children),
+        )
       }
     }
     "expect:count" | "expect:entries" => {
@@ -837,14 +872,22 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let expected = as_u64(&value_of(&children[1]));
       match (length_of_opt(&value), expected) {
         (Some(len), Some(n)) if len == n => NodeResult::Ok,
-        (Some(len), _) => NodeResult::Error {
-          message: format!("Expected exactly {} but got {len}", items(expected.unwrap_or(0))),
-          path: locus(children),
-        },
-        (None, _) => NodeResult::Error {
-          message: format!("Expected a countable value but got {}", display(&value)),
-          path: locus(children),
-        },
+        (Some(len), _) => failed(
+          vec![
+            Marked::plain("Expected exactly "),
+            Marked::plain(items(expected.unwrap_or(0)).to_string()),
+            Marked::plain(" but got "),
+            Marked::of(Kind::Number, len.to_string()),
+          ],
+          locus(children),
+        ),
+        (None, _) => failed(
+          vec![
+            Marked::plain("Expected a countable value but got "),
+            shown(&value),
+          ],
+          locus(children),
+        ),
       }
     }
     "expect:size" => {
@@ -853,18 +896,28 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let max = as_u64(&value_of(&children[2]));
       match length_of_opt(&value) {
         Some(len) if len >= min && max.map(|m| len <= m).unwrap_or(true) => NodeResult::Ok,
-        Some(len) => NodeResult::Error {
-          message: format!(
-            "Expected at least {}{} but got {len}",
-            items(min),
-            max.map(|m| format!(" and at most {m}")).unwrap_or_default()
-          ),
-          path: locus(children),
-        },
-        None => NodeResult::Error {
-          message: format!("Expected a countable value but got {}", display(&value)),
-          path: locus(children),
-        },
+        Some(len) => failed(
+          vec![
+            Marked::plain("Expected at least "),
+            Marked::plain(items(min).to_string()),
+            Marked::plain(
+              max
+                .map(|m| format!(" and at most {m}"))
+                .unwrap_or_default()
+                .to_string(),
+            ),
+            Marked::plain(" but got "),
+            Marked::of(Kind::Number, len.to_string()),
+          ],
+          locus(children),
+        ),
+        None => failed(
+          vec![
+            Marked::plain("Expected a countable value but got "),
+            shown(&value),
+          ],
+          locus(children),
+        ),
       }
     }
     "legacy:only-entries" => {
@@ -883,13 +936,14 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
             NodeResult::Error {
               message: format!("Unexpected member(s): {}", extra.join(", ")),
               path: locus(children),
+              marks: None,
             }
           }
         }
-        other => NodeResult::Error {
-          message: format!("Expected an object but got {}", display(&other)),
-          path: locus(children),
-        },
+        other => failed(
+          vec![Marked::plain("Expected an object but got "), shown(&other)],
+          locus(children),
+        ),
       }
     }
 
@@ -897,6 +951,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       RuntimeValue::Absent => NodeResult::Error {
         message: "Expected a value but it was absent".to_string(),
         path: locus(children),
+        marks: None,
       },
       _ => NodeResult::Value(RuntimeValue::Bool(true)),
     },
@@ -905,7 +960,12 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if runtime_eq(&actual, &expected) {
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
-        let mut message = format!("Expected {} to equal {}", display(&actual), display(&expected));
+        let mut pieces = vec![
+          Marked::plain("Expected "),
+          shown(&actual),
+          Marked::plain(" to equal "),
+          shown(&expected),
+        ];
         // Octets display as their length, which says nothing when the lengths are the same.
         if let (RuntimeValue::Bytes(a), RuntimeValue::Bytes(e)) = (&actual, &expected) {
           let at = a
@@ -913,12 +973,10 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
             .zip(e)
             .position(|(a, e)| a != e)
             .unwrap_or(a.len().min(e.len()));
-          message.push_str(&format!(", differing from byte {at}"));
+          pieces.push(Marked::plain(", differing from byte "));
+          pieces.push(Marked::of(Kind::Number, at.to_string()));
         }
-        NodeResult::Error {
-          message,
-          path: locus(children),
-        }
+        failed(pieces, locus(children))
       }
     }
     "match:type" => {
@@ -926,14 +984,15 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if !matches!(actual, RuntimeValue::Absent) && kind_of(&actual) == kind_of(&expected) {
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
-        NodeResult::Error {
-          message: format!(
-            "Expected {} but got {}",
-            a_kind(kind_of(&expected)),
-            display(&actual)
-          ),
-          path: locus(children),
-        }
+        failed(
+          vec![
+            Marked::plain("Expected "),
+            Marked::plain(a_kind(kind_of(&expected)).to_string()),
+            Marked::plain(" but got "),
+            shown(&actual),
+          ],
+          locus(children),
+        )
       }
     }
     "match:string" => match_kind(children, |v| matches!(v, RuntimeValue::String(_)), "string"),
@@ -954,20 +1013,30 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let value = value_of(&children[0]);
       let pattern = plain_text(&value_of(&children[1]));
       match as_matchable_text(&value) {
-        None => NodeResult::Error {
-          message: format!("Expected a string but got {}", display(&value)),
-          path: locus(children),
-        },
+        None => failed(
+          vec![Marked::plain("Expected a string but got "), shown(&value)],
+          locus(children),
+        ),
         Some(text) => match regex::Regex::new(&pattern) {
-          Err(err) => NodeResult::Error {
-            message: format!("Invalid regex '{pattern}': {err}"),
-            path: locus(children),
-          },
+          Err(err) => failed(
+            vec![
+              Marked::plain("Invalid regex "),
+              quoted(&pattern),
+              Marked::plain(": "),
+              Marked::plain(err.to_string()),
+            ],
+            locus(children),
+          ),
           Ok(re) if re.is_match(&text) => NodeResult::Value(RuntimeValue::Bool(true)),
-          Ok(_) => NodeResult::Error {
-            message: format!("Expected '{text}' to match '{pattern}'"),
-            path: locus(children),
-          },
+          Ok(_) => failed(
+            vec![
+              Marked::plain("Expected "),
+              quoted(&text),
+              Marked::plain(" to match "),
+              quoted(&pattern),
+            ],
+            locus(children),
+          ),
         },
       }
     }
@@ -979,14 +1048,19 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let substring = plain_text(&value_of(&children[1]));
       match as_text(&value) {
         Some(text) if text.contains(&substring) => NodeResult::Value(RuntimeValue::Bool(true)),
-        Some(text) => NodeResult::Error {
-          message: format!("Expected '{text}' to include '{substring}'"),
-          path: locus(children),
-        },
-        None => NodeResult::Error {
-          message: format!("Expected a string but got {}", display(&value)),
-          path: locus(children),
-        },
+        Some(text) => failed(
+          vec![
+            Marked::plain("Expected "),
+            quoted(&text),
+            Marked::plain(" to include "),
+            quoted(&substring),
+          ],
+          locus(children),
+        ),
+        None => failed(
+          vec![Marked::plain("Expected a string but got "), shown(&value)],
+          locus(children),
+        ),
       }
     }
     "match:content-type" => {
@@ -996,6 +1070,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         None => NodeResult::Error {
           message: "no content component is loaded to detect content type".to_string(),
           path: locus(children),
+          marks: None,
         },
         Some(content) => match content.detect(&value, locus(children).as_deref()) {
           // By essence, as a media type is compared: case and parameters aside, and `text/*` names
@@ -1003,14 +1078,22 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           Some(detected) if crate::component::media_type_matches(&expected, &detected) => {
             NodeResult::Value(RuntimeValue::Bool(true))
           }
-          Some(detected) => NodeResult::Error {
-            message: format!("Expected content type '{expected}' but detected '{detected}'"),
-            path: locus(children),
-          },
-          None => NodeResult::Error {
-            message: format!("Could not detect a content type for {}", display(&value)),
-            path: locus(children),
-          },
+          Some(detected) => failed(
+            vec![
+              Marked::plain("Expected content type "),
+              quoted(&expected),
+              Marked::plain(" but detected "),
+              quoted(&detected),
+            ],
+            locus(children),
+          ),
+          None => failed(
+            vec![
+              Marked::plain("Could not detect a content type for "),
+              shown(&value),
+            ],
+            locus(children),
+          ),
         },
       }
     }
@@ -1018,14 +1101,18 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let value = value_of(&children[0]);
       match as_text(&value) {
         Some(text) if semver::Version::parse(&text).is_ok() => NodeResult::Value(RuntimeValue::Bool(true)),
-        Some(text) => NodeResult::Error {
-          message: format!("Expected '{text}' to be a semantic version"),
-          path: locus(children),
-        },
-        None => NodeResult::Error {
-          message: format!("Expected a string but got {}", display(&value)),
-          path: locus(children),
-        },
+        Some(text) => failed(
+          vec![
+            Marked::plain("Expected "),
+            quoted(&text),
+            Marked::plain(" to be a semantic version"),
+          ],
+          locus(children),
+        ),
+        None => failed(
+          vec![Marked::plain("Expected a string but got "), shown(&value)],
+          locus(children),
+        ),
       }
     }
     "match:any-of" => {
@@ -1035,10 +1122,15 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         NodeResult::Value(RuntimeValue::Bool(true))
       } else {
         let names = options.iter().map(display).collect::<Vec<_>>().join(", ");
-        NodeResult::Error {
-          message: format!("Expected {} to be one of {names}", display(&value)),
-          path: locus(children),
-        }
+        failed(
+          vec![
+            Marked::plain("Expected "),
+            shown(&value),
+            Marked::plain(" to be one of "),
+            Marked::plain(names.to_string()),
+          ],
+          locus(children),
+        )
       }
     }
     "legacy:min-type" => {
@@ -1057,17 +1149,22 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
       match as_text(&value) {
-        None => NodeResult::Error {
-          message: format!("Expected a string but got {}", display(&value)),
-          path: locus(children),
-        },
+        None => failed(
+          vec![Marked::plain("Expected a string but got "), shown(&value)],
+          locus(children),
+        ),
         Some(actual) if header_values_match(&expected, &actual) => {
           NodeResult::Value(RuntimeValue::Bool(true))
         }
-        Some(actual) => NodeResult::Error {
-          message: format!("Expected '{actual}' to equal '{expected}'"),
-          path: locus(children),
-        },
+        Some(actual) => failed(
+          vec![
+            Marked::plain("Expected "),
+            quoted(&actual),
+            Marked::plain(" to equal "),
+            quoted(&expected),
+          ],
+          locus(children),
+        ),
       }
     }
 
@@ -1089,10 +1186,10 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           })
           .collect(),
       )),
-      other => NodeResult::Error {
-        message: format!("Expected an XML element but got {}", display(&other)),
-        path: locus(children),
-      },
+      other => failed(
+        vec![Marked::plain("Expected an XML element but got "), shown(&other)],
+        locus(children),
+      ),
     },
 
     // An XML element has no child elements but those named (ADR 0039): today's "Unexpected child".
@@ -1112,17 +1209,19 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
             1 => NodeResult::Error {
               message: format!("Unexpected child {}", extra[0]),
               path: locus(children),
+              marks: None,
             },
             _ => NodeResult::Error {
               message: format!("Unexpected children {}", extra.join(", ")),
               path: locus(children),
+              marks: None,
             },
           }
         }
-        other => NodeResult::Error {
-          message: format!("Expected an XML element but got {}", display(&other)),
-          path: locus(children),
-        },
+        other => failed(
+          vec![Marked::plain("Expected an XML element but got "), shown(&other)],
+          locus(children),
+        ),
       }
     }
 
@@ -1133,10 +1232,14 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let kind = plain_text(&value_of(&children[1]));
       let name = plain_text(&value_of(&children[2]));
       let RuntimeValue::Object(members) = &part else {
-        return NodeResult::Error {
-          message: format!("Expected a MIME part '{name}' but was missing"),
-          path: locus(children),
-        };
+        return failed(
+          vec![
+            Marked::plain("Expected a MIME part "),
+            quoted(&name),
+            Marked::plain(" but was missing"),
+          ],
+          locus(children),
+        );
       };
       let disposition = matches!(
         members.get("headers"),
@@ -1153,10 +1256,17 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       if kind == found {
         NodeResult::Ok
       } else {
-        NodeResult::Error {
-          message: format!("Expected a MIME {kind} '{name}' but was {found}"),
-          path: locus(children),
-        }
+        failed(
+          vec![
+            Marked::plain("Expected a MIME "),
+            Marked::plain(kind.to_string()),
+            Marked::plain(" "),
+            quoted(&name),
+            Marked::plain(" but was "),
+            Marked::plain(found.to_string()),
+          ],
+          locus(children),
+        )
       }
     }
 
@@ -1168,29 +1278,37 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       let value = value_of(&children[0]);
       let kind = plain_text(&value_of(&children[1]));
       match as_text(&value) {
-        None => NodeResult::Error {
-          message: format!("Expected a string but got {}", display(&value)),
-          path: locus(children),
-        },
+        None => failed(
+          vec![Marked::plain("Expected a string but got "), shown(&value)],
+          locus(children),
+        ),
         Some(text) => {
           let (parses, described) = match kind.as_str() {
             "number" | "decimal" => (text.parse::<f64>().is_ok(), "a number"),
             "integer" => (text.parse::<u64>().is_ok(), "an integer number"),
             "boolean" => (text == "true" || text == "false", "a boolean"),
             other => {
-              return NodeResult::Error {
-                message: format!("'{other}' is not a kind a string can be read as"),
-                path: locus(children),
-              };
+              return failed(
+                vec![
+                  quoted(other),
+                  Marked::plain(" is not a kind a string can be read as"),
+                ],
+                locus(children),
+              );
             }
           };
           if parses {
             NodeResult::Value(RuntimeValue::Bool(true))
           } else {
-            NodeResult::Error {
-              message: format!("Expected '{text}' to match {described}"),
-              path: locus(children),
-            }
+            failed(
+              vec![
+                Marked::plain("Expected "),
+                quoted(&text),
+                Marked::plain(" to match "),
+                Marked::plain(described.to_string()),
+              ],
+              locus(children),
+            )
           }
         }
       }
@@ -1204,13 +1322,15 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           NodeResult::Value(RuntimeValue::Bool(true))
         }
         Some(actual) if body_types_agree(&expected, &actual) => NodeResult::Value(RuntimeValue::Bool(true)),
-        actual => NodeResult::Error {
-          message: format!(
-            "Expected a body of '{expected}' but the actual content type was '{}'",
-            actual.unwrap_or_else(|| display(&value))
-          ),
-          path: locus(children),
-        },
+        actual => failed(
+          vec![
+            Marked::plain("Expected a body of "),
+            quoted(&expected),
+            Marked::plain(" but the actual content type was "),
+            quoted(&actual.unwrap_or_else(|| display(&value))),
+          ],
+          locus(children),
+        ),
       }
     }
 
@@ -1227,14 +1347,15 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         NodeResult::Error {
           message: format!("Expected message with content type {expected} but was {actual}"),
           path: locus(children),
+          marks: None,
         }
       }
     }
 
-    _ => NodeResult::Error {
-      message: format!("unknown or unavailable action '{name}'"),
-      path: None,
-    },
+    _ => failed(
+      vec![Marked::plain("unknown or unavailable action "), quoted(name)],
+      None,
+    ),
   }
 }
 
@@ -1318,28 +1439,39 @@ fn message_types_equivalent(expected: &str, actual: &str) -> bool {
 fn match_type_with_bounds(children: &[Executed], min: Option<u64>, max: Option<u64>) -> NodeResult {
   let (actual, expected) = (value_of(&children[0]), value_of(&children[1]));
   if matches!(actual, RuntimeValue::Absent) || kind_of(&actual) != kind_of(&expected) {
-    return NodeResult::Error {
-      message: format!(
-        "Expected {} but got {}",
-        a_kind(kind_of(&expected)),
-        display(&actual)
-      ),
-      path: locus(children),
-    };
+    return failed(
+      vec![
+        Marked::plain("Expected "),
+        Marked::plain(a_kind(kind_of(&expected)).to_string()),
+        Marked::plain(" but got "),
+        shown(&actual),
+      ],
+      locus(children),
+    );
   }
   let len = match &actual {
     RuntimeValue::Array(items) => Some(items.len() as u64),
     _ => None,
   };
   match len {
-    Some(len) if min.is_some_and(|min| len < min) => NodeResult::Error {
-      message: format!("Expected at least {} but got {len}", items(min.unwrap_or(0))),
-      path: locus(children),
-    },
-    Some(len) if max.is_some_and(|max| len > max) => NodeResult::Error {
-      message: format!("Expected at most {} but got {len}", items(max.unwrap_or(0))),
-      path: locus(children),
-    },
+    Some(len) if min.is_some_and(|min| len < min) => failed(
+      vec![
+        Marked::plain("Expected at least "),
+        Marked::plain(items(min.unwrap_or(0)).to_string()),
+        Marked::plain(" but got "),
+        Marked::of(Kind::Number, len.to_string()),
+      ],
+      locus(children),
+    ),
+    Some(len) if max.is_some_and(|max| len > max) => failed(
+      vec![
+        Marked::plain("Expected at most "),
+        Marked::plain(items(max.unwrap_or(0)).to_string()),
+        Marked::plain(" but got "),
+        Marked::of(Kind::Number, len.to_string()),
+      ],
+      locus(children),
+    ),
     _ => NodeResult::Value(RuntimeValue::Bool(true)),
   }
 }
@@ -1353,10 +1485,15 @@ fn match_kind(
   if predicate(&value) {
     NodeResult::Value(RuntimeValue::Bool(true))
   } else {
-    NodeResult::Error {
-      message: format!("Expected {} but got {}", a_kind(kind_name), display(&value)),
-      path: locus(children),
-    }
+    failed(
+      vec![
+        Marked::plain("Expected "),
+        Marked::plain(a_kind(kind_name).to_string()),
+        Marked::plain(" but got "),
+        shown(&value),
+      ],
+      locus(children),
+    )
   }
 }
 
@@ -1370,16 +1507,24 @@ fn match_temporal(children: &[Executed], default_format: &str, kind_name: &str) 
     .map(|c| plain_text(&value_of(c)))
     .unwrap_or_else(|| default_format.to_string());
   match as_text(&value) {
-    None => NodeResult::Error {
-      message: format!("Expected a string but got {}", display(&value)),
-      path: locus(children),
-    },
+    None => failed(
+      vec![Marked::plain("Expected a string but got "), shown(&value)],
+      locus(children),
+    ),
     Some(text) => match pact_models::time_utils::validate_datetime(&text, &format) {
       Ok(()) => NodeResult::Value(RuntimeValue::Bool(true)),
-      Err(err) => NodeResult::Error {
-        message: format!("'{text}' is not a {kind_name} in format '{format}': {err}"),
-        path: locus(children),
-      },
+      Err(err) => failed(
+        vec![
+          quoted(&text),
+          Marked::plain(" is not a "),
+          Marked::plain(kind_name.to_string()),
+          Marked::plain(" in format "),
+          quoted(&format),
+          Marked::plain(": "),
+          Marked::plain(err.to_string()),
+        ],
+        locus(children),
+      ),
     },
   }
 }
@@ -1545,6 +1690,36 @@ fn plain_text(value: &RuntimeValue) -> String {
     RuntimeValue::String(s) => s.clone(),
     other => display(other),
   }
+}
+
+/// A failure whose message quotes values: `pieces` in order, with what each quotes marked (ADR
+/// 0054). Its `message` is their text, as it was before it was marked.
+fn failed(pieces: Vec<Marked>, path: Option<String>) -> NodeResult {
+  let mut marked = Marked::new();
+  for piece in pieces {
+    marked.append(piece);
+  }
+  NodeResult::Error {
+    message: marked.text(),
+    path,
+    marks: Some(Box::new(marked)),
+  }
+}
+
+/// A value as a message quotes it ([`display`]), marked as what it is.
+fn shown(value: &RuntimeValue) -> Marked {
+  let text = display(value);
+  match value {
+    RuntimeValue::String(_) => Marked::of(Kind::String, text),
+    RuntimeValue::Number(_) => Marked::of(Kind::Number, text),
+    RuntimeValue::Entry { .. } => Marked::plain(text),
+    _ => Marked::of(Kind::Literal, text),
+  }
+}
+
+/// Text a message quotes, as `'text'`, marked as a string.
+fn quoted(text: &str) -> Marked {
+  Marked::of(Kind::String, format!("'{text}'"))
 }
 
 fn display(value: &RuntimeValue) -> String {

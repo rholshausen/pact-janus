@@ -48,7 +48,10 @@ pub fn run(args: &PublishArgs) -> Result<Outcome, Error> {
   }
 
   let text = args.output == Output::Text;
-  let mut engine = engine::start()?;
+  let mut engine = engine::start(match args.output {
+    Output::Text => engine::Prints::Text,
+    Output::Json => engine::Prints::Documents,
+  })?;
   let mut publications = Vec::with_capacity(consumers.len());
   for (consumer, contracts) in consumers {
     let mut body = json!({

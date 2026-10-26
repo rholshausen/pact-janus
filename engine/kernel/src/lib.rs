@@ -10,6 +10,7 @@ mod common;
 pub mod compatibility;
 pub mod component;
 pub mod contract;
+pub mod display;
 pub mod error;
 pub mod hooks;
 pub mod interaction_spec;
