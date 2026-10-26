@@ -167,7 +167,8 @@ fn check_digest(digest: &str) -> Result<String, String> {
 }
 
 pub fn sha256(bytes: &[u8]) -> String {
-  format!("sha256:{:x}", Sha256::digest(bytes))
+  let hex: String = Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect();
+  format!("sha256:{hex}")
 }
 
 /// What a pull produced: the manifest digest it resolved to — the value to pin — the config blob,

@@ -23,7 +23,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 pretty_assertions = "1"
-rstest = "0.26"
+rstest = "0.28"
 pact_janus_test_servers = { path = "../../tools/test-servers" }
 # An HTTP/2 server for the tests that speak it, on its own runtime. All three already in the tree.
 h2 = "0.4"

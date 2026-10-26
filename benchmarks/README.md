@@ -102,7 +102,7 @@ same workloads byte for byte.
 |---|---|---|
 | `native` | `Engine::dispatch` in the harness's own process, wired as the `janus` CLI wires it | everything |
 | `subprocess` | `janus-engine` over its stdio framing, as both SDKs embed it | everything except the state-hook variant scenario (`janus-engine` registers no hook implementations) |
-| `wasm` | the engine component in `engine/wasm/`, under wasmtime 47 | only what needs no I/O: no transports, since a p2 guest has no threads for the exchange loop |
+| `wasm` | the engine component in `engine/wasm/`, under wasmtime 50 | only what needs no I/O: no transports, since a p2 guest has no threads for the exchange loop |
 
 `engine/wasm/` is ADR 0003's canonical artifact, the engine as a WASM component. Nothing built one
 before 9.1, which kept it here; staged plan S0.4 moved it into `engine/`, and a release ships it. It

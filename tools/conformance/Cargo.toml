@@ -15,7 +15,7 @@ path = "src/main.rs"
 serde_json = "1"
 # The case schema is checked like every other schema this repo ships. No default features: remote
 # $ref resolution (and its reqwest tree) stays off, as engine-protocol spec §2.2 rule 6 requires.
-jsonschema = { version = "0.51", default-features = false }
+jsonschema = { version = "0.60", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1"

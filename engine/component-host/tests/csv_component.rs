@@ -338,7 +338,11 @@ fn a_verification_that_needs_csv_without_the_component_fails_before_it_starts() 
 fn a_digest_is_checked_before_anything_is_instantiated() {
   let mut engine = engine();
   let bytes = std::fs::read(csv_wasm()).unwrap();
-  let pinned = format!("sha256:{:x}", Sha256::digest(&bytes));
+  let hex: String = Sha256::digest(&bytes)
+    .iter()
+    .map(|b| format!("{b:02x}"))
+    .collect();
+  let pinned = format!("sha256:{hex}");
   let mut good = declaration();
   good["source"]["digest"] = json!(pinned);
   let created = send(

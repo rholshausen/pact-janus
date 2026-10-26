@@ -60,7 +60,8 @@ fn basic(username: &str, password: &str) -> String {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-  format!("sha256:{:x}", Sha256::digest(bytes))
+  let hex: String = Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect();
+  format!("sha256:{hex}")
 }
 
 /// One response type for every arm: tiny_http's `empty` and `from_data` are different types.

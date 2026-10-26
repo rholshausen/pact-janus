@@ -41,7 +41,7 @@ serde_path_to_error = "0.1"
 # pact-reference's own matching engine depends on the same three for the same reasons.
 regex = "1"
 semver = "1"
-base64 = "0.22"
+base64 = "0.23"
 # The facade only — pure Rust, wasm-safe. A subscriber (tracing-subscriber) is an application
 # concern, installed by whatever embeds the kernel (the CLI, a host process), never by this crate.
 tracing = "0.1"
@@ -50,10 +50,10 @@ tracing = "0.1"
 # including the WASM component (spike 1.6 §4 built rquickjs for wasm32-wasip2 and interrupted a
 # runaway script inside it). `bindgen` is what reaches the WASI targets, and needs libclang at
 # build time — the one non-Rust build requirement this workspace has.
-rquickjs = { version = "0.9", features = ["bindgen"] }
+rquickjs = { version = "0.14", features = ["bindgen"] }
 
 [dev-dependencies]
-rstest = "0.24"
+rstest = "0.28"
 pretty_assertions = "1"
 # Dev-only: the real transport/content components, for plan task 4.5's live-exchange integration
 # test. A dev-dependency cycle back to this crate is fine (Cargo builds it as a plain dependency
@@ -77,7 +77,7 @@ pact_janus_hooks_host = { path = "../hooks-host" }
 pact_janus_component_oauth2 = { path = "../component-oauth2" }
 # No default features: remote $ref resolution (and its reqwest tree) must stay off,
 # matching tools/schema-compat's config (protocol spec §2.2 rule 6).
-jsonschema = { version = "0.51", default-features = false }
+jsonschema = { version = "0.60", default-features = false }
 # Plan task 7.2's demonstration records what the sample provider answers over real HTTP, the way
 # a provider's own test suite does. Already in the tree via the HTTP component's drive role and
 # the sample's own tests, and deliberately not the thing under test.

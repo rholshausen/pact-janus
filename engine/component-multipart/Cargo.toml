@@ -15,7 +15,7 @@ pact_janus_component_xml = { path = "../component-xml" }
 pact_janus_component_text = { path = "../component-text" }
 pact_janus_component_form = { path = "../component-form" }
 serde_json = "1"
-base64 = "0.22"
+base64 = "0.23"
 indexmap = "2"
 # What today's verifier splits a multipart body with (pact_matching's `multipart` feature), so both
 # accept the same bodies and read the same names. No default features: no tokio.
@@ -26,7 +26,7 @@ mime = "0.3"
 
 [dev-dependencies]
 pretty_assertions = "1"
-rstest = "0.24"
+rstest = "0.28"
 
 [lints]
 workspace = true

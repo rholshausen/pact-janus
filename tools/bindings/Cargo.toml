@@ -22,7 +22,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 [dev-dependencies]
 expectest = "0.12"
 pretty_assertions = "1"
-rstest = "0.26"
+rstest = "0.28"
 
 [lints]
 workspace = true

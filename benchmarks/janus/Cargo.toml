@@ -19,8 +19,8 @@ pact_janus_sample_order_service = { path = "../../samples/order-service" }
 serde_json = "1"
 # The host for the WASM embedding: the same runtime and version the engine's own component loader
 # uses (engine/component-host), and the runtime spike 1.2 found no slower than V8 at document scale.
-wasmtime = "47"
-wasmtime-wasi = "47"
+wasmtime = "50"
+wasmtime-wasi = "50"
 
 [profile.release]
 debug = false

@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 network = []
 
 [dependencies]
-wit-bindgen = "0.60"
+wit-bindgen = "0.63"
 
 [profile.release]
 opt-level = "s"

@@ -40,7 +40,7 @@ use std::thread;
 use std::time::Duration;
 use wasmtime::component::{Component, ComponentExportIndex, InstancePre, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Store, Trap};
-use wasmtime_wasi::{DirPerms, FilePerms, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+use wasmtime_wasi::{FsPerms, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 /// The interface the pipe world exports (`wit/component.wit`). A component built before a rename
 /// exports it under an earlier spelling, and still loads (staged plan S0.5).
@@ -436,12 +436,12 @@ impl WasmComponent {
       }
     }
     for grant in &self.grants.fs {
-      let (dirs, files) = match grant.access.as_deref() {
-        Some("read-write") => (DirPerms::all(), FilePerms::all()),
-        _ => (DirPerms::READ, FilePerms::READ),
+      let perms = match grant.access.as_deref() {
+        Some("read-write") => FsPerms::ReadWrite,
+        _ => FsPerms::ReadOnly,
       };
       builder
-        .preopened_dir(Path::new(&grant.path), &grant.path, dirs, files)
+        .preopened_dir(Path::new(&grant.path), &grant.path, perms)
         .map_err(|err| load_error(&format!("fs grant '{}' cannot be opened: {err:#}", grant.path)))?;
     }
     if self.grants.network {
