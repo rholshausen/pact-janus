@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792973109709,
+  "lastUpdate": 1792973111276,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -26514,6 +26514,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19289,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "485f93d7b8ee55bdbdf806223747c1d073967126",
+          "message": "test: a broker that refuses the credential exits 2, as S1.29 decided\n\nThe broker credential test's last step, a run with the wrong credential,\nexpected exit 1 and the 401 on stdout. Section B of the CLI output review\nmade a run the engine ends before it verifies anything exit 2 with its\nreason on stderr. The test runs only against a broker, so only CI's\nverifier-diff job saw it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T10:53:48+11:00",
+          "tree_id": "db9a14acafe25b2193da04d45a75bc20710b6c2a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/485f93d7b8ee55bdbdf806223747c1d073967126"
+        },
+        "date": 1792973110936,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 34544,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 26321,
             "unit": "requests per second",
             "extra": "engines 4"
           }
