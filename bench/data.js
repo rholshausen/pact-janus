@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792972799351,
+  "lastUpdate": 1792972800956,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -26160,6 +26160,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19496,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "879a798a1801500cccd2f7523816da2a72d1ebb9",
+          "message": "chore: Move the pinned SDK engine to 0.4.0",
+          "timestamp": "2026-10-26T10:41:53+11:00",
+          "tree_id": "b79ddbcd1f6281b4252eb388fe5aa1c99dbc0e7f",
+          "url": "https://github.com/rholshausen/pact-janus/commit/879a798a1801500cccd2f7523816da2a72d1ebb9"
+        },
+        "date": 1792972800563,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25875,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19289,
             "unit": "requests per second",
             "extra": "engines 4"
           }
