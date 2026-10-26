@@ -57,9 +57,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # declaration. clap_complete turns the same declaration into `janus completions <shell>`.
 clap = { version = "4.6", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.6"
-# Colour for the plans `explain` and `--explain-failures` print (src/highlight.rs, plan-grammar
-# spec §3.3). anstream decides where it belongs — a terminal, unless NO_COLOR; anywhere, with
-# CLICOLOR_FORCE — and strips it everywhere else. Both already in the tree behind clap.
+# Colour for everything the CLI prints (src/style.rs, staged plan S1.31) and for the plans `explain`
+# and `--explain-failures` print (src/highlight.rs, plan-grammar spec §3.3). anstream decides where
+# it belongs — a terminal, unless NO_COLOR or --no-colour; anywhere, with CLICOLOR_FORCE — and
+# strips it everywhere else. Both already in the tree behind clap.
 anstream = "1"
 anstyle = "1"
 

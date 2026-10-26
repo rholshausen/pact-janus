@@ -15,6 +15,7 @@ use crate::args::{Output, UpgradeArgs};
 use crate::engine;
 use crate::error::{self, Error};
 use crate::io;
+use crate::style::{self, paint};
 use clap::error::ErrorKind;
 use serde_json::{Value, json};
 
@@ -79,32 +80,46 @@ fn report(findings: &Value) {
   let findings = findings.as_array().cloned().unwrap_or_default();
   if findings.is_empty() {
     errln!();
-    errln!("No findings: this conversion was exact.");
+    errln!(
+      "{}",
+      paint(style::PASS, "No findings: this conversion was exact.")
+    );
     return;
   }
-  for (kind, heading) in [
-    ("lossy", "LOSSY — the contract now says less than the pact did"),
+  // Coloured by how much a reader should worry: what was lost in yellow, what was chosen in cyan.
+  for (kind, word, meaning, look) in [
+    (
+      "lossy",
+      "LOSSY",
+      "the contract now says less than the pact did",
+      style::WARN.bold(),
+    ),
     (
       "judgement",
-      "JUDGEMENT — the converter chose between readings the pact did not distinguish",
+      "JUDGEMENT",
+      "the converter chose between readings the pact did not distinguish",
+      style::NOTE.bold(),
     ),
-    ("note", "NOTE — worth reading"),
+    ("note", "NOTE", "worth reading", style::HEADING),
   ] {
     let group: Vec<&Value> = findings.iter().filter(|f| f["kind"] == json!(kind)).collect();
     if group.is_empty() {
       continue;
     }
     errln!();
-    errln!("{heading}");
+    errln!("{} — {meaning}", paint(look, word));
     for finding in group {
       errln!(
         "  {} at {}",
-        finding["code"].as_str().unwrap_or("?"),
-        finding["path"].as_str().unwrap_or("?")
+        paint(style::HEADING, finding["code"].as_str().unwrap_or("?")),
+        paint(style::PATH, finding["path"].as_str().unwrap_or("?"))
       );
       errln!("      {}", finding["message"].as_str().unwrap_or(""));
       if let Some(target) = finding["target"].as_str() {
-        errln!("      -> {target} in the contract");
+        errln!(
+          "      {}",
+          paint(style::DIM, format!("-> {target} in the contract"))
+        );
       }
     }
   }

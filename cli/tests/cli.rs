@@ -916,6 +916,88 @@ fn explain_colours_the_plan_only_where_it_is_asked_for() {
   assert_eq!(explain(&[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")]), plain);
 }
 
+/// `janus <args>` with colour asked for or not — `CLICOLOR_FORCE`, as a CI log asks, since a test
+/// has no terminal — and `NO_COLOR` unset unless `env` sets it.
+fn janus_in(args: &[&str], env: &[(&str, &str)]) -> Output {
+  let mut command = janus_command();
+  command.args(args).env_remove("NO_COLOR");
+  for (key, value) in env {
+    command.env(key, value);
+  }
+  command.output().expect("the janus binary runs")
+}
+
+/// Staged plan S1.31: a run's report is coloured where colour is wanted — a pass green, a failure
+/// red, its mismatch's path blue — and the colour is all that differs, exit code included.
+#[test]
+fn verify_colours_its_report_only_where_it_is_asked_for() {
+  let provider = provider();
+  let url = provider.base_url();
+  let args = ["verify", &order_pact(), "--provider-url", url];
+  let plain = janus_in(&args, &[]);
+  let coloured = janus_in(&args, &[("CLICOLOR_FORCE", "1")]);
+  let (plain_text, coloured_text) = (stdout(&plain), stdout(&coloured));
+
+  assert_eq!(code(&plain), 1, "{}", stderr(&plain));
+  assert_eq!(code(&coloured), 1, "{}", stderr(&coloured));
+  assert!(!plain_text.contains('\u{1b}'), "{plain_text}");
+  for styled in [
+    "\u{1b}[1m\u{1b}[31mFAILED\u{1b}[0m  a request for an order",
+    "\u{1b}[94m$.response.body.status\u{1b}[0m: ",
+    "\u{1b}[32mok\u{1b}[0m      a request for an order that does not exist",
+    "\u{1b}[1m\u{1b}[31mFAILED\u{1b}[0m: \u{1b}[32m1 verified\u{1b}[0m, \u{1b}[1m\u{1b}[31m1 failed\u{1b}[0m",
+  ] {
+    assert!(
+      coloured_text.contains(styled),
+      "no {styled:?} in {coloured_text:?}"
+    );
+  }
+  assert_eq!(without_styling(&coloured_text), plain_text);
+  let refused = janus_in(&args, &[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")]);
+  assert_eq!(stdout(&refused), plain_text);
+}
+
+/// The `can-i-deploy` page's markers are the specification's, and coloured by what they say.
+#[test]
+fn check_colours_its_page_only_where_it_is_asked_for() {
+  let args = ["check", &order_pact(), "--provider-shape", &order_shapes()];
+  let plain = stdout(&janus_in(&args, &[]));
+  let coloured = stdout(&janus_in(&args, &[("CLICOLOR_FORCE", "1")]));
+  assert!(!plain.contains('\u{1b}'), "{plain}");
+  assert!(
+    coloured.starts_with("\u{1b}[1m\u{1b}[31m✗ \u{1b}[0m\u{1b}[1mweb-app is not compatible"),
+    "{coloured:?}"
+  );
+  assert!(
+    coloured.contains("\u{1b}[1m\u{1b}[33m=> WARN: web-app -> order-service\u{1b}[0m"),
+    "{coloured:?}"
+  );
+  assert_eq!(without_styling(&coloured), plain);
+}
+
+/// `--no-colour` is read before clap is, so it reaches help and usage errors too, which clap prints
+/// while it parses; and the line that says why a command stopped is red, as clap's `error:` is.
+#[test]
+fn no_colour_reaches_help_and_errors_are_red() {
+  let forced = [("CLICOLOR_FORCE", "1")];
+  let help = stdout(&janus_in(&["explain", "--help"], &forced));
+  assert!(help.contains("\u{1b}[1m\u{1b}[32mUsage:\u{1b}[0m"), "{help:?}");
+  let plain_help = stdout(&janus_in(&["explain", "--help", "--no-colour"], &forced));
+  assert!(!plain_help.contains('\u{1b}'), "{plain_help}");
+  assert_eq!(without_styling(&help), plain_help);
+
+  let missing = temp("no-such-pact.json");
+  let failed = janus_in(&["explain", &missing], &forced);
+  assert_eq!(code(&failed), 2);
+  assert!(
+    stderr(&failed).starts_with("\u{1b}[1m\u{1b}[31mjanus explain:\u{1b}[0m "),
+    "{:?}",
+    stderr(&failed)
+  );
+  let plain = janus_in(&["explain", &missing, "--no-color"], &forced);
+  assert!(!stderr(&plain).contains('\u{1b}'), "{}", stderr(&plain));
+}
+
 /// `text` without its ANSI SGR sequences, the only ones the CLI writes.
 fn without_styling(text: &str) -> String {
   let mut out = String::new();

@@ -13,6 +13,7 @@ use crate::args::{Output, PublishArgs};
 use crate::engine;
 use crate::error::Error;
 use crate::io;
+use crate::style::{self, paint};
 use serde_json::{Value, json};
 
 /// How long one `events/poll` may wait. As in `verify`, an empty answer only means nothing happened
@@ -66,12 +67,18 @@ pub fn run(args: &PublishArgs) -> Result<Outcome, Error> {
     }
     if text {
       outln!(
-        "Publishing {} for {consumer} version {}",
-        match contracts.len() {
-          1 => "1 contract".to_string(),
-          n => format!("{n} contracts"),
-        },
-        args.consumer_app_version
+        "{}",
+        paint(
+          style::HEADING,
+          format!(
+            "Publishing {} for {consumer} version {}",
+            match contracts.len() {
+              1 => "1 contract".to_string(),
+              n => format!("{n} contracts"),
+            },
+            args.consumer_app_version
+          )
+        )
       );
     }
     let started = engine::call(&mut engine, "broker/publish-contracts", body)?;
@@ -135,24 +142,24 @@ fn report(event: &Value) {
       let consumer = payload["consumer"].as_str().unwrap_or("?");
       let provider = payload["provider"].as_str().unwrap_or("?");
       match payload["outcome"].as_str() {
-        Some("published") => outln!("  published {consumer} -> {provider}"),
-        _ => outln!("  FAILED    {consumer} -> {provider}"),
+        Some("published") => outln!("  {} {consumer} -> {provider}", paint(style::PASS, "published")),
+        _ => outln!("  {}    {consumer} -> {provider}", paint(style::FAIL, "FAILED")),
       }
     }
     "broker/finished" => {
       let broker = payload["broker"].as_str().unwrap_or("the broker");
       match payload["status"].as_str() {
-        Some("published") => outln!("Published to {broker}"),
-        _ => outln!("Not published to {broker}"),
+        Some("published") => outln!("{} to {broker}", paint(style::PASS.bold(), "Published")),
+        _ => outln!("{} to {broker}", paint(style::FAIL, "Not published")),
       }
       for notice in payload["notices"].as_array().into_iter().flatten() {
-        outln!("  {}", notice.as_str().unwrap_or_default());
+        outln!("  {}", paint(style::DIM, notice.as_str().unwrap_or_default()));
       }
       if let Some(error) = payload.get("error").filter(|error| !error.is_null()) {
         outln!("  {}", engine::render_error(error).replace('\n', "\n  "));
       }
       outln!();
     }
-    other => outln!("  event   {other}: {payload}"),
+    other => outln!("  {}   {other}: {payload}", paint(style::DIM, "event")),
   }
 }

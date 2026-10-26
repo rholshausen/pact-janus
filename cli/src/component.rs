@@ -19,6 +19,7 @@
 use crate::Outcome;
 use crate::args::{ComponentCommand, Output, PullArgs, PushArgs};
 use crate::error::Error;
+use crate::style::{self, paint};
 use pact_janus_component_host::WasmLoader;
 use pact_janus_component_host::oci::Credentials;
 use pact_janus_kernel::component::ComponentError;
@@ -51,8 +52,13 @@ fn push(loader: &WasmLoader, args: &PushArgs, credentials: Option<&Credentials>)
       }))
     ),
     Output::Text => {
-      outln!("pushed {} to {}", describe(&pushed.hello), pushed.reference);
-      outln!("digest: {}", pushed.digest);
+      outln!(
+        "{} {} to {}",
+        paint(style::PASS, "pushed"),
+        describe(&pushed.hello),
+        pushed.reference
+      );
+      outln!("{} {}", paint(style::DIM, "digest:"), pushed.digest);
       declaration(
         &pushed.config,
         &pushed.reference,
@@ -81,8 +87,12 @@ fn pull(loader: &WasmLoader, args: &PullArgs, credentials: Option<&Credentials>)
       }))
     ),
     Output::Text => {
-      outln!("{} — every byte checked", describe(&hello));
-      outln!("digest: {}", pulled.digest);
+      outln!(
+        "{} — {}",
+        describe(&hello),
+        paint(style::PASS, "every byte checked")
+      );
+      outln!("{} {}", paint(style::DIM, "digest:"), pulled.digest);
       if let Some(types) = hello
         .pointer("/contributes/content-types")
         .and_then(Value::as_array)
@@ -91,7 +101,7 @@ fn pull(loader: &WasmLoader, args: &PullArgs, credentials: Option<&Credentials>)
           .iter()
           .filter_map(|entry| entry.get("media-type").and_then(Value::as_str))
           .collect();
-        outln!("content types: {}", types.join(", "));
+        outln!("{} {}", paint(style::DIM, "content types:"), types.join(", "));
       }
       let mut unpinned = pulled.reference.clone();
       unpinned.digest = None;
@@ -126,7 +136,13 @@ fn describe(hello: &Value) -> String {
 /// run that pastes it reaches the registry as this command did (ADR 0052).
 fn declaration(config: &Value, reference: &str, digest: &str, credentials: bool) {
   outln!();
-  outln!("declare it, pinned (verifier.janus.yaml, or an SDK's components option):");
+  outln!(
+    "{}",
+    paint(
+      style::DIM,
+      "declare it, pinned (verifier.janus.yaml, or an SDK's components option):"
+    )
+  );
   outln!("  components:");
   outln!("    - name: {}", config["name"].as_str().unwrap_or("?"));
   let auth = if credentials {

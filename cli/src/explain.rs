@@ -87,7 +87,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   match &args.executed {
     Some(_) => {
       let executed = &result["executed"];
-      outln_styled!(
+      outln!(
         "{}",
         highlight::plan(executed["text"].as_str().unwrap_or_default())
       );
@@ -101,7 +101,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
       Ok(Outcome::Done)
     }
     None => {
-      outln_styled!("{}", highlight::plan(result["text"].as_str().unwrap_or_default()));
+      outln!("{}", highlight::plan(result["text"].as_str().unwrap_or_default()));
       Ok(Outcome::Done)
     }
   }

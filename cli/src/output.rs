@@ -8,6 +8,11 @@
 //! Everything the CLI prints goes through [`outln!`] and [`errln!`] instead. When a stream has gone,
 //! later writes to it are dropped and the command carries on: a verification still runs to its end,
 //! and its exit code still says whether the provider passed, whoever stopped reading.
+//!
+//! Both write through an [`anstream::AutoStream`], so a line may carry [`crate::style`]'s colour:
+//! it is written as it is where the stream shows colour, and stripped of it everywhere else. Bytes
+//! that must leave exactly as they are — a contract, a completion script — go through
+//! [`out_bytes`], which is never stripped.
 
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,14 +30,6 @@ macro_rules! outln {
   };
 }
 
-/// `outln!` for text carrying ANSI styling ([`crate::highlight`]): written as it is where stdout
-/// shows colour, and stripped of it everywhere else.
-macro_rules! outln_styled {
-  ($($arg:tt)*) => {
-    $crate::output::out_styled(format_args!($($arg)*))
-  };
-}
-
 /// `eprintln!`, minus the panic.
 macro_rules! errln {
   () => {
@@ -44,10 +41,6 @@ macro_rules! errln {
 }
 
 pub fn out(line: std::fmt::Arguments) {
-  write_line(&STDOUT_GONE, &mut std::io::stdout().lock(), line);
-}
-
-pub fn out_styled(line: std::fmt::Arguments) {
   write_line(
     &STDOUT_GONE,
     &mut anstream::AutoStream::auto(std::io::stdout().lock()),
@@ -56,7 +49,11 @@ pub fn out_styled(line: std::fmt::Arguments) {
 }
 
 pub fn err(line: std::fmt::Arguments) {
-  write_line(&STDERR_GONE, &mut std::io::stderr().lock(), line);
+  write_line(
+    &STDERR_GONE,
+    &mut anstream::AutoStream::auto(std::io::stderr().lock()),
+    line,
+  );
 }
 
 /// Bytes exactly as given, with no newline added: a canonical contract, a completion script.

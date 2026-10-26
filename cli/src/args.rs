@@ -22,7 +22,8 @@ use std::path::PathBuf;
            and decide whether a consumer can deploy",
   after_help = "Every command drives the same engine an SDK embeds. --log-level trace shows the \
                 protocol frames it exchanges.",
-  arg_required_else_help = true
+  arg_required_else_help = true,
+  styles = crate::style::HELP
 )]
 pub struct Cli {
   /// How much to log on standard error. Without it, RUST_LOG is read; the default is warn

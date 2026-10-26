@@ -1234,6 +1234,32 @@ item in 1a is done when S1.1 agrees.
   - A label at a slot's root was never shortened (`:"$.response.body[0]"`). It is now `:"$[0]"`.
   - `janus upgrade`'s own findings still say `position(s)` and `rule(s)`; nothing here changed them.
 
+- **S1.31 Colour in the CLI's output** — **S**, the first of the user-experience work that follows
+  S1.29's review. Only the plans `explain` and `--explain-failures` print were coloured (plan-grammar
+  spec §3.3). Every other line was plain on a terminal too, so a run's one red `FAILED` among forty
+  `ok`s, or `check`'s `BLOCK`, had to be read for.
+  *Exit:* every command's text output is coloured on a terminal and byte-for-byte unchanged off one,
+  under `NO_COLOR` and under `--no-colour`, with tests that hold both.
+  *Done 2026-10-26.*
+  - **One palette** (`cli/src/style.rs`): green for a pass, red for a failure, yellow for what is
+    worth a look but did not fail, blue for a location, dim for the line that explains the one above.
+    Blue is the colour plans give a `resolve`, so a mismatch's path matches the plan beside it.
+  - **Stripped in one place.** Every line `janus` prints goes through `anstream`'s auto stream, which
+    drops the colour off a terminal. No caller chooses a styled or a plain way to print. Contract
+    bytes and completion scripts are written as they are.
+  - **`verify`, `publish`, `upgrade` and `component`** colour their status tags, the summary's status
+    and its non-zero tallies, mismatch paths, and `upgrade`'s finding groups, by kind.
+  - **`check`** colours the page `subsumption/decide` writes by its markers (`✗ ✓ ? ! ~ -`,
+    `=> BLOCK|WARN|PASS`). The subsumption-check spec §6.4–6.5 and engine-protocol spec §8.6 fix
+    those markers, so the CLI reads a specified grammar, not prose.
+  - **Errors and help.** A command's `janus <command>:` error line is red, as clap's `error:` is.
+    `--help` uses cargo's colours.
+  Not foreseen:
+  - `--no-colour` never reached `--help` or usage errors, since clap prints them while it parses and
+    the flag was read afterwards. It is now read from the command line first.
+  - clap ends a wrapped line with a space when the wrap falls inside a styled `[env: …]` note, even
+    with the colour stripped. Those notes stay plain.
+
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
 verifier on real pacts, from a broker, with identical results for a release cycle.

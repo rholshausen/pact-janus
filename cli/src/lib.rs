@@ -36,6 +36,7 @@ mod io;
 pub mod logging;
 mod publish;
 pub mod register;
+mod style;
 mod upgrade;
 mod verify;
 
@@ -76,6 +77,17 @@ where
   I: IntoIterator<Item = T>,
   T: Into<OsString> + Clone,
 {
+  let argv: Vec<OsString> = argv.into_iter().map(Into::into).collect();
+  // Today's --no-colour (staged plan S1.13), as NO_COLOR is: everything the CLI prints, and the
+  // logs. Read before clap is, since clap prints help and usage errors while it parses.
+  let no_colour = argv
+    .iter()
+    .skip(1)
+    .take_while(|arg| *arg != "--")
+    .any(|arg| arg == "--no-colour" || arg == "--no-color");
+  if no_colour {
+    anstream::ColorChoice::Never.write_global();
+  }
   let matches = match Cli::command()
     .version(VERSION.as_str())
     .try_get_matches_from(argv)
@@ -87,23 +99,27 @@ where
     Ok(cli) => cli,
     Err(err) => return clap_exit(&err),
   };
-  // Today's --no-colour (staged plan S1.13): the plans `explain` and `verify` print, and the logs.
-  if cli.no_colour {
-    anstream::ColorChoice::Never.write_global();
-  }
-  init_tracing(cli.log_level, !cli.no_colour);
+  init_tracing(cli.log_level, !no_colour);
 
   let name = cli.command.name();
   match dispatch(cli.command) {
     Ok(Outcome::Done) => ExitCode::SUCCESS,
     Ok(Outcome::SubjectFailed) => ExitCode::from(SUBJECT_FAILED),
     Err(Error::Usage(err)) => clap_exit(&err),
+    // Red as clap's own `error:` is, so the line that says why a command stopped is the one a
+    // reader finds first.
     Err(Error::Failed(message)) => {
-      errln!("janus {name}: {message}");
+      errln!(
+        "{} {message}",
+        style::paint(style::FAIL, format!("janus {name}:"))
+      );
       ExitCode::from(COMMAND_FAILED)
     }
     Err(Error::Refused(message)) => {
-      errln!("janus {name}: {message}");
+      errln!(
+        "{} {message}",
+        style::paint(style::FAIL, format!("janus {name}:"))
+      );
       ExitCode::from(SUBJECT_FAILED)
     }
   }

@@ -17,6 +17,7 @@ use crate::engine;
 use crate::error::{self, Error};
 use crate::highlight;
 use crate::io;
+use crate::style::{self, paint};
 use clap::error::ErrorKind;
 use serde_json::{Value, json};
 
@@ -573,12 +574,24 @@ impl Reporter {
         let providers = join(&payload["providers"]);
         let formats = join(&payload["formats"]);
         outln!(
-          "Verifying {} in {} [{formats}] against {providers}",
-          count(&payload["interactions"], "interaction", "interactions"),
-          count(&payload["contracts"], "document", "documents"),
+          "{}",
+          paint(
+            style::HEADING,
+            format!(
+              "Verifying {} in {} [{formats}] against {providers}",
+              count(&payload["interactions"], "interaction", "interactions"),
+              count(&payload["contracts"], "document", "documents"),
+            )
+          )
         );
         if payload["filtered"] == json!(true) {
-          outln!("  (filtered run: not every recorded variant will be replayed)");
+          outln!(
+            "  {}",
+            paint(
+              style::WARN,
+              "(filtered run: not every recorded variant will be replayed)"
+            )
+          );
         }
         outln!();
       }
@@ -586,20 +599,26 @@ impl Reporter {
       "verification/fetched" => {
         let pacts = payload["pacts"].as_array().cloned().unwrap_or_default();
         outln!(
-          "Fetched {} from {}",
-          count(&json!(pacts.len()), "pact", "pacts"),
-          payload["broker"].as_str().unwrap_or("the broker")
+          "{}",
+          paint(
+            style::HEADING,
+            format!(
+              "Fetched {} from {}",
+              count(&json!(pacts.len()), "pact", "pacts"),
+              payload["broker"].as_str().unwrap_or("the broker")
+            )
+          )
         );
         for pact in &pacts {
           let consumer = pact["consumer"].as_str().unwrap_or("?");
           let status = match (pact["wip"] == json!(true), pact["pending"] == json!(true)) {
-            (true, _) => " (work in progress, pending)",
-            (false, true) => " (pending)",
-            _ => "",
+            (true, _) => paint(style::WARN, " (work in progress, pending)"),
+            (false, true) => paint(style::WARN, " (pending)"),
+            _ => String::new(),
           };
           outln!("  {consumer}{status}");
           for notice in pact["notices"].as_array().into_iter().flatten() {
-            outln!("    {}", notice.as_str().unwrap_or_default());
+            outln!("    {}", paint(style::DIM, notice.as_str().unwrap_or_default()));
           }
         }
         outln!();
@@ -608,17 +627,32 @@ impl Reporter {
         let consumer = payload["consumer"].as_str().unwrap_or("?");
         let version = payload["provider-version"].as_str().unwrap_or("?");
         match payload["outcome"].as_str() {
-          Some("published") => outln!("  published {consumer}'s result for provider version {version}"),
+          Some("published") => outln!(
+            "  {} {consumer}'s result for provider version {version}",
+            paint(style::PASS, "published")
+          ),
           Some("skipped") => match payload["reason"].as_str() {
             Some("not-from-a-broker") => {
-              outln!("  not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
+              outln!(
+                "  {}",
+                paint(
+                  style::DIM,
+                  format!("not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
+                )
+              )
             }
             _ => {
-              outln!("  not publishing {consumer}'s result: the run's filter left some of its variants out")
+              outln!(
+                "  {} {consumer}'s result: the run's filter left some of its variants out",
+                paint(style::WARN, "not publishing")
+              )
             }
           },
           _ => {
-            outln!("  PUBLISH FAILED for {consumer}'s result");
+            outln!(
+              "  {} for {consumer}'s result",
+              paint(style::FAIL, "PUBLISH FAILED")
+            );
             print_error(&payload["error"]);
           }
         }
@@ -626,9 +660,15 @@ impl Reporter {
       "verification/warning" => {
         let code = payload["code"].as_str().unwrap_or("warning");
         match (payload["target"].as_str(), payload["message"].as_str()) {
-          (Some(target), Some(message)) => outln!("  warn    {code} at {target}: {message}"),
-          (None, Some(message)) => outln!("  warn    {code}: {message}"),
-          _ => outln!("  warn    {code}"),
+          (Some(target), Some(message)) => {
+            outln!(
+              "  {}{code} at {}: {message}",
+              tag(style::WARN, "warn"),
+              paint(style::PATH, target)
+            )
+          }
+          (None, Some(message)) => outln!("  {}{code}: {message}", tag(style::WARN, "warn")),
+          _ => outln!("  {}{code}", tag(style::WARN, "warn")),
         }
       }
       // `--explain-failures` is this event arriving: the executed plan for the variant that just
@@ -636,12 +676,18 @@ impl Reporter {
       "verification/executed-plan" => {
         outln!();
         outln!(
-          "  --- executed plan: {}{} ---",
-          payload["interaction"]["description"].as_str().unwrap_or("?"),
-          variant_label(payload)
+          "  {}",
+          paint(
+            style::DIM,
+            format!(
+              "--- executed plan: {}{} ---",
+              payload["interaction"]["description"].as_str().unwrap_or("?"),
+              variant_label(payload)
+            )
+          )
         );
         for line in highlight::plan(payload["text"].as_str().unwrap_or("")).lines() {
-          outln_styled!("  {line}");
+          outln!("  {line}");
         }
         outln!();
       }
@@ -654,13 +700,14 @@ impl Reporter {
           Some("failed-exchange" | "state-unavailable") => self.held_hook = Some(payload.clone()),
           // Its error is the summary's headline, where the run's end is explained.
           Some("aborted-run") => outln!(
-            "  hook    {} at {}: {}, and aborted the run",
+            "  {}{} at {}: {}, and aborted the run",
+            tag(style::FAIL, "hook"),
             payload["hook"].as_str().unwrap_or("?"),
             payload["point"].as_str().unwrap_or("?"),
             outcome
           ),
           _ => {
-            print_hook(payload, "  hook    ");
+            print_hook(payload, &format!("  {}", tag(style::WARN, "hook")));
             print_error(&payload["error"]);
           }
         }
@@ -668,7 +715,7 @@ impl Reporter {
       // The result line that follows says everything these two carry; printing them as well would
       // double every run's output for no reader's benefit.
       "verification/interaction-started" | "verification/finished" => {}
-      other => outln!("  event   {other}: {payload}"),
+      other => outln!("  {}{other}: {payload}", tag(style::DIM, "event")),
     }
   }
 
@@ -679,21 +726,33 @@ impl Reporter {
       variant_label(payload)
     );
     match payload["status"].as_str().unwrap_or("failed") {
-      "verified" => outln!("  ok      {line}"),
+      "verified" => outln!("  {}{line}", tag(style::PASS, "ok")),
       "state-unavailable" => {
-        outln!("  STATE   {line}");
-        outln!("          the provider cannot reach a state this contract declares");
+        outln!("  {}{line}", tag(style::WARN.bold(), "STATE"));
+        outln!(
+          "          {}",
+          paint(
+            style::DIM,
+            "the provider cannot reach a state this contract declares"
+          )
+        );
       }
       _ if payload["pending"] == json!(true) => {
-        outln!("  PENDING {line}");
-        outln!("          failed, and pending: reported, and not failing the run");
+        outln!("  {}{line}", tag(style::WARN.bold(), "PENDING"));
+        outln!(
+          "          {}",
+          paint(
+            style::DIM,
+            "failed, and pending: reported, and not failing the run"
+          )
+        );
       }
-      _ => outln!("  FAILED  {line}"),
+      _ => outln!("  {}{line}", tag(style::FAIL, "FAILED")),
     }
     for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
       outln!(
         "          {}: {}",
-        mismatch["path"].as_str().unwrap_or(""),
+        paint(style::PATH, mismatch["path"].as_str().unwrap_or("")),
         mismatch["message"].as_str().unwrap_or("")
       );
     }
@@ -703,6 +762,15 @@ impl Reporter {
     }
     print_error(&payload["error"]);
   }
+}
+
+/// `word` in `look`, padded to the result column: the tag every line of a run's report opens with.
+fn tag(look: anstyle::Style, word: &str) -> String {
+  format!(
+    "{}{}",
+    paint(look, word),
+    " ".repeat(8usize.saturating_sub(word.len()))
+  )
 }
 
 /// `hook auth at before-request: failed`, after `indent`.
@@ -752,23 +820,30 @@ fn print_error(error: &Value) {
 /// `FAILED: 0 verified, 2 failed (2 interactions)`: what the run reached, the tallies that are not
 /// zero beside the two that always matter, and how much there was. Variants are named only when
 /// there are more of them than interactions, as there are only in a contract.
+///
+/// The status is coloured by what it says, and so is each tally that is not zero: a reader's eye
+/// goes to the red `2 failed`, not to the `0 failed` of a run that passed.
 fn render_summary(summary: &Value) -> String {
   let status = summary["status"].as_str().unwrap_or("failed").to_uppercase();
   let variants = &summary["variants"];
   let tally = |name: &str| variants[name].as_u64().unwrap_or(0);
+  let counted = |name: &str, label: &str, look: anstyle::Style| match tally(name) {
+    0 => format!("0 {label}"),
+    n => paint(look, format!("{n} {label}")),
+  };
   let mut counts = vec![
-    format!("{} verified", tally("verified")),
-    format!("{} failed", tally("failed")),
+    counted("verified", "verified", style::PASS),
+    counted("failed", "failed", style::FAIL),
   ];
-  for (name, label) in [
-    ("state-unavailable", "state-unavailable"),
-    ("skipped", "skipped"),
+  for (name, label, look) in [
+    ("state-unavailable", "state-unavailable", style::WARN),
+    ("skipped", "skipped", style::DIM),
     // `variants.total` counts what the run reached; an aborted or stopped run reached less than it
     // planned, and the rest is counted beside the tallies, never folded into them.
-    ("not-run", "not run"),
+    ("not-run", "not run", style::WARN),
   ] {
     if tally(name) > 0 {
-      counts.push(format!("{} {label}", tally(name)));
+      counts.push(counted(name, label, look));
     }
   }
   let total = tally("total") + tally("not-run");
@@ -782,20 +857,36 @@ fn render_summary(summary: &Value) -> String {
       count(&json!(interactions), "interaction", "interactions")
     )
   };
-  let mut text = format!("{status}: {} ({scope})", counts.join(", "));
+  let mut text = format!(
+    "{}: {} ({scope})",
+    paint(style::status(&status), &status),
+    counts.join(", ")
+  );
   if summary["filtered"] == json!(true) {
-    text.push_str("\nThis was a filtered run: unreplayed variants are not passing ones.");
+    text.push('\n');
+    text.push_str(&paint(
+      style::WARN,
+      "This was a filtered run: unreplayed variants are not passing ones.",
+    ));
   }
   if summary["stopped"] == json!("first-failure") {
-    text.push_str("\nThe run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run.");
+    text.push('\n');
+    text.push_str(&paint(
+      style::WARN,
+      "The run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run.",
+    ));
   }
   // The abort is the headline of a run that ended this way, so it carries its cause: "the auth
   // hook failed" sends a reader to the logs for what the report already knows.
   if let Some(abort) = summary.get("aborted").filter(|a| !a.is_null()) {
-    text.push_str(&format!(
-      "\nThe run was aborted by the '{}' hook at {}",
-      abort["hook"].as_str().unwrap_or("?"),
-      abort["point"].as_str().unwrap_or("?")
+    text.push('\n');
+    text.push_str(&paint(
+      style::FAIL,
+      format!(
+        "The run was aborted by the '{}' hook at {}",
+        abort["hook"].as_str().unwrap_or("?"),
+        abort["point"].as_str().unwrap_or("?")
+      ),
     ));
     match abort.get("error").filter(|e| !e.is_null()) {
       Some(error) => text.push_str(&format!(
@@ -823,9 +914,32 @@ fn join(value: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
-  use super::{render_summary, variant_label};
+  use super::variant_label;
   use pretty_assertions::assert_eq;
-  use serde_json::json;
+  use serde_json::{Value, json};
+
+  /// The summary as a pipe receives it: [`super::render_summary`] with its colour stripped.
+  fn render_summary(summary: &Value) -> String {
+    anstream::adapter::strip_str(&super::render_summary(summary)).to_string()
+  }
+
+  /// What is coloured is what a reader looks for: the status, and the tallies that are not zero.
+  #[test]
+  fn a_summary_colours_its_status_and_the_tallies_that_are_not_zero() {
+    use crate::style::{self, paint};
+    let summary = json!({
+      "status": "failed", "interactions": 2,
+      "variants": { "total": 2, "verified": 0, "failed": 2, "state-unavailable": 0, "skipped": 0 },
+    });
+    assert_eq!(
+      super::render_summary(&summary),
+      format!(
+        "{}: 0 verified, {} (2 interactions)",
+        paint(style::FAIL, "FAILED"),
+        paint(style::FAIL, "2 failed")
+      )
+    );
+  }
 
   /// The tallies that are zero are left out, but for the two that always matter; variants are named
   /// only when there are more of them than interactions.

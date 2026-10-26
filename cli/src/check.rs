@@ -104,7 +104,10 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
 
   match args.output {
     Output::Json => outln!("{}", crate::output::pretty(&decided["report"])),
-    Output::Text => outln!("{}", decided["text"].as_str().unwrap_or_default()),
+    Output::Text => outln!(
+      "{}",
+      crate::highlight::page(decided["text"].as_str().unwrap_or_default())
+    ),
   }
   // Which shapes were found, and which were not, is the CLI's half of the answer: the engine was
   // never told a shape file existed for a provider it has no document for. On stderr, so it is said
@@ -112,7 +115,10 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
   for (path, contract) in &contracts {
     if shape_for(contract).is_none() {
       let provider = contract["provider"]["name"].as_str().unwrap_or_default();
-      errln!("janus check: no provider shape supplied for '{provider}' ({path})");
+      errln!(
+        "{} no provider shape supplied for '{provider}' ({path})",
+        crate::style::paint(crate::style::WARN, "janus check:")
+      );
     }
   }
 

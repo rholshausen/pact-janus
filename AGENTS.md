@@ -115,7 +115,8 @@ Three sources are the source of truth and take precedence over this file when th
 > is printed once under the result it failed, a run the engine ends before it verifies anything
 > exits 2, and a stopped or aborted run's summary counts `variants.not-run`. So is S1.30: every
 > mismatch path is absolute (an element a `for-each` was on, not `~>.value`), and the executed form
-> writes an absent value as `ABSENT`.
+> writes an absent value as `ABSENT`. S1.31 coloured the rest of the CLI's output on a terminal, from
+> one palette (`cli/src/style.rs`), and stripped it everywhere else.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -384,9 +385,13 @@ verifier options onto them, so renaming one is a breaking change with a change f
 own tests pin both: `cli/tests/cmd/` holds trycmd cases — every `--help`, the usage errors, the
 offline commands — and `cli/tests/cli.rs` the runs that need a provider or a registry, compared
 whole with snapbox where the output is the CLI's own. After a deliberate change,
-`TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff. On a terminal, `explain`
-and `--explain-failures` colour the plan (plan-grammar spec §3.3: `cli/src/highlight.rs`, over the
-kernel's `plan::tokens`); the tests run without colour whatever `CLICOLOR_FORCE` says.
+`TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff. On a terminal, the output
+is coloured (S1.31): from one palette, `cli/src/style.rs`, and for the plans `explain` and
+`--explain-failures` print, by the kernel's `plan::tokens` (plan-grammar spec §3.3,
+`cli/src/highlight.rs`). Style text where it is built and print it with `outln!`/`errln!`, whose
+streams strip the colour off a terminal, under `NO_COLOR` and with `--no-colour`; never print
+styled text another way. The tests run without colour whatever `CLICOLOR_FORCE` says, and a test
+that asks for colour also checks that the colour is all that differs.
 
 `check` (plan task 7.4) decides rather than tests: it reads documents that already exist — the
 consumer contracts or v1–v4 pacts, the shapes a provider published, and the summaries
