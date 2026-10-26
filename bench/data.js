@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792985596590,
+  "lastUpdate": 1792985598452,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -27930,6 +27930,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 45102,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "bf5a859ec049798d8e5fb0cc95a4c2da4238a22e",
+          "message": "feat: S1.31 colour in the CLI's output on a terminal\n\nEvery command's text output is coloured on a terminal from one palette\n(cli/src/style.rs): green for a pass, red for a failure, yellow for what\nis worth a look, blue for a location, dim for an explanation. Every line\ngoes through anstream's auto stream, so off a terminal, under NO_COLOR\nand with --no-colour the output is byte-for-byte unchanged.\n\ncheck colours the page subsumption/decide writes by its specified\nmarkers; --help uses cargo's colours; the janus <command>: error line is\nred. --no-colour is now read before clap parses, so it reaches --help\nand usage errors.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T14:28:22+11:00",
+          "tree_id": "5a0fd2bf1e9abe24dd011974c9d661702a6335d3",
+          "url": "https://github.com/rholshausen/pact-janus/commit/bf5a859ec049798d8e5fb0cc95a4c2da4238a22e"
+        },
+        "date": 1792985597952,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 49813,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30767,
             "unit": "requests per second",
             "extra": "engines 4"
           }
