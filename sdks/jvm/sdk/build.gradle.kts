@@ -15,7 +15,7 @@ java {
 
 dependencies {
   api(project(":bindings"))
-  api(platform("com.fasterxml.jackson:jackson-bom:2.22.2"))
+  api(platform("com.fasterxml.jackson:jackson-bom:2.22.4"))
   // Frames are JSON documents; the bindings carry Jackson 2 annotations, so Jackson reads and
   // writes them. Not part of the SDK's public API.
   implementation("com.fasterxml.jackson.core:jackson-databind")

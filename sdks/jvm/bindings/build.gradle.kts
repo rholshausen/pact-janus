@@ -33,7 +33,7 @@ java {
 dependencies {
   // The POJOs carry Jackson 2 annotations (their additionalProperties map is what keeps a newer
   // engine's members through a round trip — spike 1.1 finding 14), so the annotations are API.
-  api(platform("com.fasterxml.jackson:jackson-bom:2.22.2"))
+  api(platform("com.fasterxml.jackson:jackson-bom:2.22.4"))
   api("com.fasterxml.jackson.core:jackson-annotations")
 
   testImplementation("com.fasterxml.jackson.core:jackson-databind")
