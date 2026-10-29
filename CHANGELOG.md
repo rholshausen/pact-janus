@@ -1,3 +1,194 @@
+## 0.4.1 (2026-10-29)
+
+### Features
+
+#### A mismatch is located at the element that failed, and an absent value prints as `ABSENT`
+
+Staged plan S1.30: what the engine reports, from the review of the CLI's output.
+
+- **Every mismatch path is absolute.**
+  - One inside a `flow:for-each` template, a `match:contains` entry or a `legacy:array-contains`
+    variant is located at the element or entry it was about: `$.response.body.prices.plum`, not
+    `~>.value`, and `$.request.body.animals[1].phoneNumber`, not `~>.phoneNumber`.
+  - An entry's `.key` and `.value` are located at the entry's member.
+  - A mismatch from an action whose value under test is itself computed, such as `expect:size` over
+    `legacy:xml-children(...)` or `match:equality` over `value:upper-case(...)`, is located where that
+    value came from. Until now it had no path.
+  - The plan-grammar spec's §2.3 states the rule. A host that showed relative paths needs no change.
+- **The executed text form writes an absent value as `ABSENT`**, and a `null` as `NULL`; both used to
+  be `NULL` (plan-grammar spec §3.2). The pretty form is unchanged: no value node can be absent.
+- **A container for a member no plain path segment can hold is labelled as its resolve names it**:
+  `:"$['']"` and `:"$['a.b']"`, not `:"$."` and `:"$.a.b"`. A label at a slot's root is shortened as
+  every other is (`:"$[0]"`, not `:"$.response.body[0]"`).
+- **Messages:** "Expected an integer" and "an array", not "a integer" and "a array". A count says
+  "1 item" or "2 items", and `subsumption/decide`'s report text, `filter-matches-nothing` and the pact
+  plugin refusal use plurals instead of `(s)`.
+
+#### `janus` colours its output on a terminal
+
+Staged plan S1.31. Until now, only the plans that `explain` and `--explain-failures` print were coloured.
+
+- **Every command's text output is coloured on a terminal**, in one palette. A pass is green, a
+  failure red, and a warning yellow. A mismatch's path is blue, and a line that explains the one
+  above it is dim. That covers `verify`'s result lines and summary, the page `check` prints, and
+  `upgrade`'s findings. It also covers `publish`, `component push|pull`, and the `janus <command>:`
+  line that says why a command stopped. `--help` uses cargo's colours.
+- **Off a terminal, nothing changes.** Through a pipe, into a file, under `NO_COLOR` or with
+  `--no-colour`, the output is byte-for-byte what it was. `CLICOLOR_FORCE` asks for colour anywhere,
+  as before. `--output json`, contracts and completion scripts are never coloured.
+- **`--no-colour` now reaches `--help` and usage errors**, which it did not before.
+
+#### Display text can carry segments, and `janus` colours from them
+
+Staged plan S1.34, ADR 0054.
+
+- **The `segments` capability.** The engine now declares it in `engine/hello`. A host that declares
+  it too gets each display string with a `<member>-segments` sibling: pieces whose texts, joined,
+  are exactly the string, each with a `kind` such as `pass`, `fail`, `path`, `string` or `action`.
+  A kind says what the piece is, never how it looks. Without the host's declaration, nothing on the
+  wire changes. See engine-protocol spec §2.7 and `display.schema.json`.
+- **Members that carry segments:**
+  - `verification/explain`'s `text` and `executed.text`;
+  - the `verification/executed-plan` event's `text`;
+  - `subsumption/decide`'s `text`;
+  - each mismatch's `message`, in explain's result and in `verification/interaction-result` events,
+    with the values it quotes marked.
+- **The bindings** gain `Segment`, `SegmentsCapability` and a typed `Mismatch` for explain's
+  `executed.mismatches`.
+- **`janus`** colours plans, the `check` page and the values in mismatch messages from segments,
+  where it used to parse the text. Its `--output json` documents carry no segments.
+
+#### An error carries its causes as a chain, and `janus` shows what failed and why
+
+Staged plan S1.33, ADR 0054.
+
+- **`EngineError` may carry `chain`**: its layers, outermost first, each `{ code?, message }` in that
+  layer's own words. The first layer is the error itself and the last is its root cause.
+  - `message` keeps its meaning, the complete sentence, so a host that reads only it loses nothing.
+  - A component's error document may carry the same member.
+  - `component-failed` writes its own layer, then the component's chain.
+  - The generated bindings gain `ErrorLayer`.
+- **Errors that carry a chain:**
+  - a request the HTTP transport could not send;
+  - a broker that could not be reached, refused a request, or answered with something that is not JSON;
+  - an `http` hook that got no answer or a non-2xx one;
+  - an `exec` hook that could not start or exited non-zero.
+
+  A failing `exec` hook's message now ends with the last line it wrote to stderr, which used to
+  appear only in `details`.
+- **`janus` prints an error as what failed and its root cause:** the innermost layer with a code,
+  then a `caused by:` line. Use `--error-chain`, a global option, to print every layer.
+- **Wording.** A broker's retry-after note now comes before the broker's own explanation. A
+  configuration file that cannot be read no longer says `(os error 2)`.
+
+#### `janus explain --description` chooses an interaction by its description
+
+Staged plan S1.32. Until now `explain` took the interaction only by its position, `--index`. In a large
+pact, that meant counting interactions or trying one index after another.
+
+- **`--description <TEXT>`** chooses the interaction whose description is exactly the text, or else the
+  one whose description contains it, ignoring case. An exact match wins, so a description that is the
+  start of another's can still be chosen.
+- **Several matches, or none, is a usage error (exit 2)** that lists the candidates. Each line gives the
+  position `--index` takes, the description and the provider states, which tell apart interactions a
+  pact describes alike.
+- It cannot be combined with `--index` or `--spec`.
+
+#### A run that ended early counts what it did not reach, and errors say why in their message
+
+The second part of staged plan S1.29's review of the CLI's output.
+
+- **`variants.not-run`.** The summary of a run that `stop-on-first-failure` stopped, or that a hook
+  aborted, now counts in `variants.not-run` the recorded variants it did not reach. No other tally
+  counts them, and `total` is unchanged. Until now, a stopped run did not say how much it left, and an
+  aborted run said it only in the hook report, which a run with no hooks does not have.
+- **Messages carry what a person needs, so a host can show the message alone:**
+  - `variant-not-found` from `verification/verify` names the ids the documents do record ("…; they
+    record 'base'").
+  - An `http` hook whose endpoint answers with an error status quotes up to 200 characters of the body
+    in its `hook-http-failed` message. The details still carry the whole excerpt.
+  - The excerpt no longer drops the body's last character.
+- **Shorter error chains:**
+  - The engine's HTTP client leaves out the layers that only name a library ("error sending request",
+    "client error (Connect)", "tcp connect error") and the platform's `(os error N)`, so a refused
+    connection reads `could not connect: Connection refused`.
+  - `broker-unreachable`'s message is the request and its cause, without "the Pact Broker could not be
+    reached", which was wrong for a pact fetched by its URL.
+  - The OCI loader and the oauth2 component say "could not reach the registry" and "could not connect"
+    instead of ureq's `io:`.
+  - A registry that wants credentials nobody declared says so in words.
+
+`janus verify` follows:
+- **Exit status:** a run the engine ends before it verifies anything exits 2, with the reason on
+  standard error. That covers a broker or URL it could not fetch from, no pacts selected, and a variant
+  nothing records. It used to exit 1, as `pact_verifier_cli` does.
+- **Errors:**
+  - An error's `details` are no longer printed as raw JSON.
+  - A component's failure leads with the component's own code (`transport-failed: GET …`).
+  - A hook that fails an exchange is printed once, under the result it failed.
+- **Results and summary:**
+  - A v1–v4 pact's results no longer end in `[base]`.
+  - The summary leaves out tallies that are zero, apart from verified and failed, uses plurals, and
+    counts what a stopped run did not reach: `FAILED: 0 verified, 1 failed, 1 not run (2 interactions)`.
+- **Smaller fixes:**
+  - File errors drop `(os error N)`.
+  - A file that is not JSON says so.
+  - `component pull` puts its code first.
+  - `explain --index first` says it wants a whole number.
+
+### Fixes
+
+#### Documents that are not what they claim are refused, and `janus` says which file
+
+The first fixes of staged plan S1.29's review of the CLI's output.
+
+- **`upgrade/pact` refuses a document that is not a pact.** A document without `consumer` and
+  `provider` objects and an `interactions` or `messages` array used to become an empty contract, reported
+  as an exact conversion. It is now `contract-invalid`, with a problem at the empty pointer. The same
+  check now covers `verification/explain`'s v1–v4 path.
+- **`verification/explain` refuses a variant the interaction does not record**, as `variant-not-found`
+  with the `recorded` ids in its details, as a run does (ADR 0041). For a v1–v4 interaction, which
+  records only `base`, any other id used to be ignored. For a contract it used to be `malformed-frame`.
+- **Messages.** A source document that is not readable is `contract-invalid` with "the document is not a
+  contract or pact this engine can read". It used to say "the session's interactions cannot produce a
+  valid contract", which is `consumer-session/finalise`'s message. A source that is neither a contract nor a pact
+  is now "neither a Janus contract nor a v1–v4 pact". The codes and details are unchanged.
+
+`janus` follows:
+- An error about one of `verify`'s files names that file, and its positions are within it.
+- `--provider-url`, `--broker-url`, `--url`, `--webhook-callback-url`, `--state-change-url` and
+  `publish --broker-base-url` must be URLs with a host, checked as the command line is read.
+- `explain --index` past the last interaction is a usage error, and `--spec` is suggested only for a
+  document the engine could not identify.
+- `publish` no longer says a broker it never reached "did not accept" the contracts.
+- `pact_models`' warnings about a pact with no metadata are no longer logged by default.
+- `--log-level trace` no longer makes loading a WASM component take seconds: the compiler's own
+  `trace` is held back, as the HTTP libraries' is.
+- The help now says `trace`, not `debug`, shows the protocol frames.
+
+#### `janus --help` names pact_verifier_cli, and groups the global options
+
+The last part of staged plan S1.29's review of the CLI's output, all in `--help`.
+
+- Where an option behaves as today's verifier's does, the help names it: `pact_verifier_cli`.
+- `--log-level` and `--no-colour` are listed under "Global options" in every command's help, not
+  among the command's own options.
+- Every option read from the environment is shown as `[env: NAME]`. Its value is never shown: help
+  printed whatever the environment held, credentials aside, so its output depended on the shell.
+
+#### The engine moves to wasmtime 50 and rquickjs 0.14
+
+Dependency updates with nothing for a host to change; what each one could change is below.
+
+- **Scripted hooks run on QuickJS-ng 0.16.2** (rquickjs 0.14), up from 0.8.0. The script API, its
+  interruption at a deadline and its memory and stack bounds are unchanged, and every hook test
+  passes, but a script that leans on an engine quirk may behave differently.
+- **Out-of-tree WASM components load under wasmtime 50**, up from 47. A component's `fs` grant
+  allows what it did: `read-write` is every operation, anything else is read-only. Components built
+  with an older wit-bindgen still load.
+- The WASM engine is built with wit-bindgen 0.63, and the engine's own base64, sha2 and jsonschema
+  move to their current versions. A component digest is still `sha256:` and 64 lowercase hex digits.
+
 ## 0.4.0 (2026-10-25)
 
 ### Breaking Changes
