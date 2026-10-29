@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793249559677,
+  "lastUpdate": 1793249561595,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -29700,6 +29700,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 41970,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ed89d5ef1ec0cfd4ae9ce74f020d6f7bb100179e",
+          "message": "test: a verifier fixture for rules below an eachValue matcher's values\n\npact_verifier_cli 1.3.5 matches the values of a collection with an\neachValue rule by that rule's own rules only, so a rule defined below them\n(`$.chips.*.amount`, `$.items[*].amount`) is never applied, and the legacy\ncompiler does the same (ADR 0042). pact-reference#586 fixes this in the\ndefault engine (1f1c2e61, 2e47687e, 17aa4910, not yet released) and the V2\nengine (e441f98c).\n\nmatching-rules/each-value-nested puts such rules on a map, a list, a\ncollection at the root, items with a rule of their own, and one key. Every\nverdict agrees with 1.3.5 (all pass). Against a verifier built from\npact-reference master, the six replies with a decimal amount fail, so moving\nthe pin turns them into disagreements: a tripwire for #16, which lists what\nthe legacy compiler and janus upgrade must change then.\n\nNo-Changeset: a verifier fixture that agrees with today's behaviour; nothing an engine pin can notice\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T15:42:45+11:00",
+          "tree_id": "d0844ef977e76e13fdde6774878ce683e6a47ef6",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ed89d5ef1ec0cfd4ae9ce74f020d6f7bb100179e"
+        },
+        "date": 1793249561066,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 63079,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 40007,
             "unit": "requests per second",
             "extra": "engines 4"
           }
