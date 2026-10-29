@@ -1,0 +1,217 @@
+{
+  "description": "A v4 `eachValue` rule on an object and on an array, with rules defined below its values (`$.chips.*.amount`, `$.items[*].amount`, at the root, merged with a rule for the items, and for one key). pact_verifier_cli 1.3.5 matches the values by the `eachValue` rule's own rules only, so it passes every reply here; pact-reference#586 fixes that, and a verifier with the fix fails the replies with a decimal amount. A tripwire: when the pin moves to that verifier, these interactions become disagreements, and the legacy compiler is changed to match (rholshausen/pact-janus#16, which lists what changes; ADR 0042 records today's behaviour)",
+  "source": "pact-foundation/pact-reference#586; its default-engine fix, pact-reference 1f1c2e61, 2e47687e and 17aa4910, and the V2 engine's, e441f98c",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/chips"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "chips": {
+                "main": {
+                  "amount": 500
+                },
+                "pair": {
+                  "amount": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/chips/decimal"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "chips": {
+                "main": {
+                  "amount": 500
+                },
+                "pair": {
+                  "amount": 1.5
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/chips/keyed"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "chips": {
+                "main": {
+                  "amount": 1.5
+                },
+                "pair": {
+                  "amount": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "amount": 500
+                },
+                {
+                  "amount": 100
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items/decimal"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "amount": 500
+                },
+                {
+                  "amount": 1.5
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items/merged"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "amount": 500
+                },
+                {
+                  "amount": 1.5
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/root/map"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "main": {
+                "amount": 500
+              },
+              "pair": {
+                "amount": 1.5
+              }
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/root/list"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": [
+              {
+                "amount": 500
+              },
+              {
+                "amount": 1.5
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -123,7 +123,9 @@ interaction of a pact it did not fetch is `absent` there too.
   differences (S1.26, ADR 0043).
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
-  match and that do not, and mutations.
+  match and that do not, and mutations. `each-value-nested` puts rules below an `eachValue` matcher's
+  values (`$.chips.*.amount`), which pact_verifier_cli 1.3.5 ignores and pact-reference#586 makes it
+  apply: a tripwire for moving the pin to a verifier with that fix.
 - `messages/`: message pacts (S1.7, ADR 0046): pact-js's message example, an asynchronous event under
   matchers with its queue in its metadata, answered by the provider's own message factory; pact-jvm's
   v3 message, v4 message with metadata rules, and v4 synchronous message; a v4 pact that mixes an HTTP

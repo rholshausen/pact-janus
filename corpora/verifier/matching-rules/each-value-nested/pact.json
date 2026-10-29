@@ -1,0 +1,451 @@
+{
+  "consumer": {
+    "name": "matching-rules-consumer"
+  },
+  "provider": {
+    "name": "matching-rules-provider"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "key": "chips",
+      "description": "chips by name, every amount an integer",
+      "request": {
+        "method": "GET",
+        "path": "/chips"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "chips": {
+              "main": {
+                "amount": 1000
+              }
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.chips": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "{\"main\":{\"amount\":1000}}"
+                }
+              ]
+            },
+            "$.chips.*.amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "chips-decimal",
+      "description": "chips by name, one amount a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/chips/decimal"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "chips": {
+              "main": {
+                "amount": 1000
+              }
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.chips": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "{\"main\":{\"amount\":1000}}"
+                }
+              ]
+            },
+            "$.chips.*.amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "chips-keyed",
+      "description": "chips by name, a rule for one key's amount, which is a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/chips/keyed"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "chips": {
+              "main": {
+                "amount": 1000
+              }
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.chips": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "{\"main\":{\"amount\":1000}}"
+                }
+              ]
+            },
+            "$.chips.main.amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "items",
+      "description": "items, every amount an integer",
+      "request": {
+        "method": "GET",
+        "path": "/items"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "items": [
+              {
+                "amount": 1000
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "[{\"amount\":1000}]"
+                }
+              ]
+            },
+            "$.items[*].amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "items-decimal",
+      "description": "items, one amount a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/items/decimal"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "items": [
+              {
+                "amount": 1000
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "[{\"amount\":1000}]"
+                }
+              ]
+            },
+            "$.items[*].amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "items-merged",
+      "description": "items with a rule of their own, one amount a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/items/merged"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "items": [
+              {
+                "amount": 1000
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "[{\"amount\":1000}]"
+                }
+              ]
+            },
+            "$.items[*]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "root-map",
+      "description": "chips by name at the root, one amount a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/root/map"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "main": {
+              "amount": 1000
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "{\"main\":{\"amount\":1000}}"
+                }
+              ]
+            },
+            "$.*.amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "key": "root-list",
+      "description": "items at the root, one amount a decimal",
+      "request": {
+        "method": "GET",
+        "path": "/root/list"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": [
+            {
+              "amount": 1000
+            }
+          ],
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "eachValue",
+                  "rules": [
+                    {
+                      "match": "type"
+                    }
+                  ],
+                  "value": "[{\"amount\":1000}]"
+                }
+              ]
+            },
+            "$[*].amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}
