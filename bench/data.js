@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793344245455,
+  "lastUpdate": 1793344247242,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -32532,6 +32532,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 32148,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "cfd5b793a871044e312aa8ea5838bebe5a59e9e7",
+          "message": "feat: the engine writes a verification run's report, and every client prints it\n\nADR 0059. A passing provider test printed nothing through the SDKs,\nwhere pact-js prints the verifier's report; janus verify had one, laid\nout by the CLI from the run's events. Giving each SDK the same report\nthat way would have put the layout in every language.\n\nA run that asks with options.report gets a verification/report event\nafter each event worth a line: { text, text-segments? }, a block of\nwhole lines a host prints as it arrives. report.error-chain says every\nlayer of each error's chain. The layout is janus verify's, moved from\ncli/src/verify.rs into engine/kernel/src/protocol/report.rs: the start,\neach result with its mismatches and the hook that failed it, warnings,\nfetches, publications, executed plans, and the summary's line before\nthe terminal event. A stream takes an observer (events.rs) that follows\neach event with events of its own; the reporter is one. Segments\ndeserialise, so a mismatch message's and a plan's carry into it.\n\nTwo changes to what janus verify prints: each result names its\ninteraction's states under it (given ...), which tells two interactions\nwith one description apart, as today's verifiers do; and the stopped\nrun's note no longer names --exit-on-first-error, which an SDK sets as\nan option. The CLI now asks for the report and prints it coloured from\nits segments; its Reporter, render_summary and style::status are gone.\nIts snapshots differ only by the given lines.\n\nBoth SDKs add report: {} to the options unless the caller gave report,\nprint each report text to standard output as it arrives, and one empty\nline after the run to set it apart from the test runner's output. They\nno longer print warnings themselves (ADR 0058 decision 3, superseded in\npart): the report says them, and they are still on the result.\nBehavioural spec 'verify' (verification.verify.report-printed),\nconformance case provider/report-printed with a 'printed' expectation\nboth drivers check, 68 of 68 in both. The protocol spec, schemas and\nregenerated bindings carry the option and the event.\n\nNo budget moved: the TypeScript idiomatic layer is 849 of 860, and the\nJVM's within its own.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T18:05:20+11:00",
+          "tree_id": "608e47380c9148be56c64cc91b6955fb6bfced26",
+          "url": "https://github.com/rholshausen/pact-janus/commit/cfd5b793a871044e312aa8ea5838bebe5a59e9e7"
+        },
+        "date": 1793344246848,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24822,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18543,
             "unit": "requests per second",
             "extra": "engines 4"
           }
