@@ -1,0 +1,333 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/message-producer-invoked",
+  "category": "provider",
+  "title": "A message producer receives today's request for the message and its answer is the whole message part",
+  "covers": [
+    "verification.message-producer.request-reaches-producer",
+    "verification.message-producer.message-answered",
+    "verification.message-producer.failure-is-failed"
+  ],
+  "why": "behavioural spec 'message-producer': the producer receives 'interaction.pact-message.request', or an empty object; the body is the bytes as given, a string's UTF-8 or any other value's JSON text, base64-encoded, labelled only when a content type was given; the metadata is { contentType } when one was given, with the returned metadata over it; a thrown failure is 'failed' with 'handler-failed'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "messages": [
+          {
+            "description": "an order placed event",
+            "providerStates": [
+              {
+                "name": "an order exists"
+              }
+            ],
+            "contents": {
+              "id": 42
+            },
+            "metadata": {
+              "contentType": "application/json"
+            },
+            "matchingRules": {
+              "body": {
+                "$.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "description": "an order cancelled event",
+            "contents": "cancelled",
+            "metadata": {
+              "contentType": "text/plain"
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "message-producers": [
+      {
+        "description": "an order placed event",
+        "returns": {
+          "json": {
+            "id": 42
+          },
+          "metadata": {
+            "queue": "orders"
+          }
+        }
+      },
+      {
+        "description": "an order cancelled event",
+        "returns": {
+          "text": "cancelled",
+          "content-type": "text/plain",
+          "metadata": {
+            "contentType": "text/plain; charset=utf-8"
+          }
+        }
+      },
+      {
+        "description": "a refund event",
+        "returns": {
+          "bytes": "AAH/",
+          "content-type": "application/octet-stream"
+        }
+      },
+      {
+        "description": "a broken event",
+        "throws": "no queue"
+      }
+    ]
+  },
+  "engine": {
+    "invoke": [
+      {
+        "point": "produce-message",
+        "hook": "message-1",
+        "context": {
+          "point": "produce-message",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "an order placed event",
+            "pact-message": {
+              "request": {
+                "description": "an order placed event",
+                "providerStates": [
+                  {
+                    "name": "an order exists"
+                  }
+                ]
+              },
+              "synchronous": false
+            }
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts"
+          ],
+          "deadline-ms": 5000,
+          "parts": {}
+        }
+      },
+      {
+        "point": "produce-message",
+        "hook": "message-2",
+        "context": {
+          "point": "produce-message",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "an order cancelled event",
+            "pact-message": {
+              "request": {
+                "description": "an order cancelled event",
+                "providerStates": []
+              },
+              "synchronous": false
+            }
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts"
+          ],
+          "deadline-ms": 5000,
+          "parts": {}
+        }
+      },
+      {
+        "point": "produce-message",
+        "hook": "message-3",
+        "context": {
+          "point": "produce-message",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "a refund event"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts"
+          ],
+          "deadline-ms": 5000,
+          "parts": {}
+        }
+      },
+      {
+        "point": "produce-message",
+        "hook": "message-4",
+        "context": {
+          "point": "produce-message",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "a broken event"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts"
+          ],
+          "deadline-ms": 5000,
+          "parts": {}
+        }
+      }
+    ]
+  },
+  "note": "The JSON text of a value is compared as octets, so the case's values have one spelling in every language: no float, no member order that differs from declaration order.",
+  "expect": {
+    "invocations": [
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok",
+          "changes": {
+            "parts": {
+              "message": {
+                "metadata": {
+                  "content": {
+                    "queue": "orders"
+                  }
+                },
+                "body": {
+                  "content": "eyJpZCI6NDJ9",
+                  "encoded": "base64"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok",
+          "changes": {
+            "parts": {
+              "message": {
+                "metadata": {
+                  "content": {
+                    "contentType": "text/plain; charset=utf-8"
+                  }
+                },
+                "body": {
+                  "content": "Y2FuY2VsbGVk",
+                  "encoded": "base64",
+                  "content-type": "text/plain"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok",
+          "changes": {
+            "parts": {
+              "message": {
+                "metadata": {
+                  "content": {
+                    "contentType": "application/octet-stream"
+                  }
+                },
+                "body": {
+                  "content": "AAH/",
+                  "encoded": "base64",
+                  "content-type": "application/octet-stream"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "failed",
+          "error": {
+            "code": "handler-failed",
+            "message": "no queue"
+          }
+        }
+      }
+    ],
+    "handler-calls": [
+      {
+        "handler": "message-1",
+        "request": {
+          "description": "an order placed event",
+          "providerStates": [
+            {
+              "name": "an order exists"
+            }
+          ]
+        }
+      },
+      {
+        "handler": "message-2",
+        "request": {
+          "description": "an order cancelled event",
+          "providerStates": []
+        }
+      },
+      {
+        "handler": "message-3",
+        "request": {}
+      },
+      {
+        "handler": "message-4",
+        "request": {}
+      }
+    ],
+    "outcome": "ok"
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/provider-produces-messages",
+  "category": "live",
+  "title": "The real engine asks the test's message producers for each message and compares what they produce",
+  "covers": [
+    "verification.verify.engine-calls-handlers"
+  ],
+  "why": "behavioural spec 'message-producer' and ADR 0056 decision 1: a producer is an ordinary produce-message hook to the engine, which compares the message part it answers as it compares a provider's reply; an unlabelled JSON body is read from its octets.",
+  "verifier": {
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "messages": [
+          {
+            "description": "an order placed event",
+            "providerStates": [
+              {
+                "name": "an order exists"
+              }
+            ],
+            "contents": {
+              "id": 42
+            },
+            "metadata": {
+              "contentType": "application/json"
+            },
+            "matchingRules": {
+              "body": {
+                "$.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "description": "an order cancelled event",
+            "contents": "cancelled",
+            "metadata": {
+              "contentType": "text/plain"
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {}
+      }
+    ],
+    "message-producers": [
+      {
+        "description": "an order placed event",
+        "returns": {
+          "json": {
+            "id": 7
+          }
+        }
+      },
+      {
+        "description": "an order cancelled event",
+        "returns": {
+          "text": "cancelled",
+          "content-type": "text/plain"
+        }
+      }
+    ]
+  },
+  "provider": {
+    "routes": []
+  },
+  "expect": {
+    "outcome": "ok",
+    "result": {
+      "status": "verified"
+    },
+    "handler-calls": [
+      {
+        "handler": "state-1",
+        "action": "setup"
+      },
+      {
+        "handler": "message-1",
+        "request": {
+          "description": "an order placed event",
+          "providerStates": [
+            {
+              "name": "an order exists"
+            }
+          ]
+        }
+      },
+      {
+        "handler": "message-2"
+      }
+    ]
+  }
+}

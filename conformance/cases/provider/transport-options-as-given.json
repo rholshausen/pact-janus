@@ -1,0 +1,95 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/transport-options-as-given",
+  "category": "provider",
+  "title": "The transport option's members are the HTTP transport's options beside base-url, as given",
+  "covers": [
+    "verification.verify.transport-options-as-given"
+  ],
+  "why": "behavioural spec 'verify': 'target' is { transports: [ { transport: 'http', options: { 'base-url': <the provider URL>, and each member of the 'transport' option beside it, as given } } ] }.",
+  "verifier": {
+    "provider-url": "https://127.0.0.1:8443",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "transport": {
+      "headers": {
+        "X-Api-Key": "k-1"
+      },
+      "client": {
+        "tls": {
+          "insecure": true
+        },
+        "timeouts": {
+          "request-ms": 2000
+        }
+      }
+    }
+  },
+  "expect": {
+    "frames": {
+      "verification/verify": {
+        "target": {
+          "transports": [
+            {
+              "transport": "http",
+              "options": {
+                "base-url": "https://127.0.0.1:8443",
+                "headers": {
+                  "X-Api-Key": "k-1"
+                },
+                "client": {
+                  "tls": {
+                    "insecure": true
+                  },
+                  "timeouts": {
+                    "request-ms": 2000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "outcome": "ok"
+  }
+}

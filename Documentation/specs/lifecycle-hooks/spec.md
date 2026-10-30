@@ -263,7 +263,12 @@ sends to ask for the message (`request`), whether it is `synchronous`, and the `
 names for it, if any. The occurrence's transport, which `when` selects on (§6.3), is that one, else
 `message`. When no hook produces the `message` part, the variant fails as `component-unavailable`
 naming `hook/produce-message`, with `reason: message-not-produced`: the provider was never asked.
-`janus verify` adds a producer of its own when its configuration names none (§8.4).
+`janus verify` adds a producer of its own when its configuration names none (§8.4). A produced
+message whose metadata has no `contentType` member at all is read as carrying its own content type
+there — its body's label, else what its octets are detected as — because a producer in a test has no
+reply to take one from, where the `pact-message` format always writes one
+([ADR 0056](../../decisions/0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md)
+decision 1).
 
 Normative, from spike 1.5 finding 6 and protocol §8.3: **a hook and a wire transport are interchangeable
 sources of the same parts and MUST produce identical results.** The engine matches the parts it was
@@ -700,7 +705,9 @@ side that is an ordinary `http` hook, which is the point — the sugar costs the
 fixes how an SDK does it: one endpoint on the loopback interface per run, a bearer token every entry
 carries, and entries named by kind and position (`state-1`, `request-filter-1`) after the
 configuration's own. An SDK reads the configuration through `config/load` (engine-protocol spec §8.8),
-so the loader is the one `janus verify --config` runs.
+so the loader is the one `janus verify --config` runs. A test's message producers are
+`produce-message` entries the same way (`message-1`, …), each selected by its interaction's
+description (ADR 0056).
 
 ### 8.5 What an embedding can run
 

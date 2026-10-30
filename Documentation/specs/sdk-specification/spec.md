@@ -213,9 +213,10 @@ The provider side is the same idea one run long ([ADR 0055](../../decisions/0055
 staged plan S1.14):
 
 ```
-verifier({ providerUrl, pacts | broker | urls, options, config })   -- no protocol call yet
+verifier({ providerUrl, pacts | broker | urls, options, transport, config })   -- no protocol call yet
   .state('an order exists', setup, teardown)   -- a state-setup and a state-teardown hook entry
   .requestFilter(filter)                       -- a before-request hook entry
+  .message('an order placed event', produce)   -- a produce-message hook entry (ADR 0056)
 
 verify()
   -> engine/hello
@@ -225,7 +226,11 @@ verify()
 ```
 
 [`engine-protocol/examples/provider-in-a-test.md`](../engine-protocol/examples/provider-in-a-test.md)
-is the same path as frames.
+is the same path as frames. A test framework's integration reports that one run, and today's provider
+APIs are spelled over it ([ADR 0056](../../decisions/0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md),
+staged plan S1.15): JUnit 5 as one dynamic test per interaction result as it arrives, and pact-js's
+`Verifier` as a facade whose options become the documents above. Each primitive's `facade` entries
+classify today's spellings.
 
 ## 5. The per-language style-guide skeleton
 
@@ -331,8 +336,8 @@ Task 6.4's suite MUST cover, at minimum, the four categories the plan already co
 
 A fifth category covers the provider side (staged plan S1.14, ADR 0055): what a verifier sends — one
 `verify`, its source and options as given, a configuration loaded through the engine, its handlers as
-loopback hook entries named by kind and position — what its endpoint answers the engine, and what a
-run's status makes of the test.
+loopback hook entries named by kind and position, message producers among them (ADR 0056) — what
+its endpoint answers the engine, and what a run's status makes of the test.
 
 Conformance says nothing about idiomatic quality — a conformant SDK can still have an awkward, unpleasant
 API — and nothing about thinness by itself: a suite that only samples scenarios cannot, by construction,

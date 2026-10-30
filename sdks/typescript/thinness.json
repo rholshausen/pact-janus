@@ -31,6 +31,9 @@
     "loopback": [
       "src/loopback.ts"
     ],
+    "facade": [
+      "src/facade"
+    ],
     "integration": [
       "src/vitest.ts"
     ],
@@ -42,6 +45,7 @@
     "idiomatic": 850,
     "embedding": 250,
     "loopback": 80,
+    "facade": 300,
     "integration": 60
   }
 }

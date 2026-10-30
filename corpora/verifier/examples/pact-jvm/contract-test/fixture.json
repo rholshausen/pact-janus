@@ -1,0 +1,45 @@
+{
+  "description": "pact-jvm's ContractTest: three pacts for one provider, v2 with and without a state, and v3 with two parameterised states whose values feed a ProviderState generator on the query. The provider answers GET /data for any of the ticket ids the test's states return, as its WireMock stub does",
+  "source": "pact-jvm provider/junit5/src/test (Apache-2.0) at 88477ee: resources/pacts/contract.json, contract2.json and contract-v3.json, verified there by ContractTest's @State methods and its WireMock stub. Staged plan S1.15; ADR 0056 decision 5; the JVM SDK's examples verify the same pacts through JanusProviderExtension",
+  "pacts": [
+    "contract.json",
+    "contract2.json",
+    "contract-v3.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "ticketId": "99987"
+      }
+    },
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/data",
+          "query": {
+            "ticketId": [
+              "0000"
+            ]
+          },
+          "patterns": {
+            "query.ticketId": "0000|1234|99987"
+          }
+        },
+        "response": {
+          "status": 204,
+          "headers": {
+            "Location": [
+              "http://localhost/ticket/1234"
+            ],
+            "X-Ticket-ID": [
+              "1234"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

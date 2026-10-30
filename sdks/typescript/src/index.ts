@@ -50,6 +50,8 @@ export {
   type StateHandler,
   type StateSetup,
   type RequestFilter,
+  type Message,
+  type MessageProducer,
 } from "./verifier.js";
 export {
   JanusError,

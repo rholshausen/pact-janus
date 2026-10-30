@@ -127,7 +127,13 @@ Three sources are the source of truth and take precedence over this file when th
 > (ADR 0055): an SDK verifies a provider in a test through one `verification/verify`, with state
 > handlers and request filters as loopback `http` hooks it serves for the run behind a bearer token,
 > and reads `verifier.janus.yaml` through the engine's host (`config/load`, behind `config-loading`).
-> Both SDKs have a `Verifier`, and the conformance suite has a `provider` category.
+> Both SDKs have a `Verifier`, and the conformance suite has a `provider` category. S1.15 (ADR 0056):
+> message producers are loopback `produce-message` hooks; the JVM SDK has `JanusProviderExtension`
+> (`@State`, `@ProvidesMessage`, one dynamic test per interaction result of one run), and the
+> TypeScript SDK `pact-janus/verifier`, pact-js's provider API over its own (the thinness audit's
+> `facade` layer). pact-js's and pact-jvm's provider examples run on them, their pacts S1.1 fixtures
+> under `corpora/verifier/examples/`; `Documentation/provider-test-migration.md` is the migration
+> note. They found S1.35, the v4 `statusCode` matcher, which reopens stage 1a's list.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

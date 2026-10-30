@@ -468,6 +468,12 @@ pub fn message_types(message: &LegacyMessage) -> ContentTypes {
 /// contents, which is the reply's `Content-Type`, else its metadata's `contentType`, else one
 /// detected from the contents. Captured at `$.message.content-type`, where `legacy:message-type`
 /// reads it; absent when none is found.
+///
+/// A message whose metadata has no `contentType` member at all is read as carrying that type there
+/// too (ADR 0056 decision 1). Today's verifier never sees one: it reads a message from a reply, and
+/// writes the reply's `Content-Type`, or an empty string, into the metadata. A producer in a test
+/// has no reply, and pact-jvm, whose producers those are, does not hold a message to a `contentType`
+/// it was never given.
 pub fn message_captures(resolver: CapturedValues, parts: &Parts) -> CapturedValues {
   let Some(message) = parts.get(MESSAGE_PART) else {
     return resolver;
@@ -482,20 +488,27 @@ pub fn message_captures(resolver: CapturedValues, parts: &Parts) -> CapturedValu
   let labelled = body
     .and_then(|slot| slot.content_type.as_deref())
     .and_then(|label| ContentType::parse(label).ok());
-  let from_metadata = message
+  let in_metadata = message
     .get("metadata")
-    .and_then(|slot| slot.content.get("contentType"))
-    .and_then(|value| ContentType::parse(header_text(value).as_str()).ok());
+    .and_then(|slot| slot.content.get("contentType"));
+  let from_metadata = in_metadata.and_then(|value| ContentType::parse(header_text(value).as_str()).ok());
   let detected = bytes
     .filter(|bytes| !bytes.is_empty())
     .and_then(|bytes| pact_models::content_types::detect_content_type_from_bytes(&bytes));
-  match labelled.or(from_metadata).or(detected) {
-    Some(content_type) => resolver.capture(
-      format!("$.{MESSAGE_PART}.content-type"),
-      RuntimeValue::String(content_type.to_string()),
-    ),
-    None => resolver,
+  let Some(content_type) = labelled.or(from_metadata).or(detected) else {
+    return resolver;
+  };
+  let resolver = resolver.capture(
+    format!("$.{MESSAGE_PART}.content-type"),
+    RuntimeValue::String(content_type.to_string()),
+  );
+  if in_metadata.is_some() {
+    return resolver;
   }
+  resolver.capture(
+    format!("$.{MESSAGE_PART}.metadata.contentType"),
+    RuntimeValue::String(content_type.to_string()),
+  )
 }
 
 /// How today's verifier compares a body of a content type (`pact_matching::compare_bodies`'

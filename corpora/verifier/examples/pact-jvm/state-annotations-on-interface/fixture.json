@@ -1,0 +1,38 @@
+{
+  "description": "pact-jvm's StateAnnotationsOnInterfaceTest: a v1 pact whose two states are set up by @State methods the test class inherits from interfaces",
+  "source": "pact-jvm provider/junit5/src/test (Apache-2.0) at 88477ee: resources/pacts/contract-with-multiple-interactions.json, verified there by @State default methods on StateInterface1 and StateInterface2, which stub each path. Staged plan S1.15; ADR 0056 decision 5; the JVM SDK's examples verify the same pacts through JanusProviderExtension",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "state1"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/data"
+        },
+        "response": {
+          "status": 204
+        }
+      },
+      {
+        "states": [
+          "state2"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/moreData"
+        },
+        "response": {
+          "status": 204
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

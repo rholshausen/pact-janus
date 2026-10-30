@@ -105,10 +105,14 @@ names. A closure's `exchange` is the request the consumer sends to the mock, onc
 **A provider verification** (`provider`, and a `live` case with a `verifier`): `verifier` is the
 verifier as data. The driver writes each of its `pacts` to a file and names the files, writes
 `config` to a file and names it by a path relative to the working directory, and declares each
-state handler and request filter in order, recording every call. A state handler's `setup` and
-`teardown` say what it does — `returns` an object, `throws` a failure with that message, or says
-it cannot reach the state with an `unsupported` reason — and a request filter returns the request it
-was given with the slots in `set` replaced, or `throws`. `verify: false` stops before `verify`.
+state handler, request filter and message producer in order, recording every call. A state
+handler's `setup` and `teardown` say what it does — `returns` an object, `throws` a failure with that
+message, or says it cannot reach the state with an `unsupported` reason — and a request filter returns
+the request it was given with the slots in `set` replaced, or `throws`. A message producer (ADR 0056)
+`returns` a message, whose body is one of `json` (a value the language holds as its own), `text` (a
+string) or `bytes` (the language's bytes, written in the case as base64), with a `content-type` and
+`metadata` when given, or `throws`. `transport` is the verifier's option of that name, as given.
+`verify: false` stops before `verify`.
 Against the scripted engine, unset members are answered the default way: `engine/hello` declares
 `config-loading`, `config/load` returns `{ "version": 1, "hooks": {} }`, `verification/verify` returns
 session `vs-1` and stream `s-1`, and the first `events/poll` returns every event at once: one verified
@@ -117,7 +121,8 @@ result for `get an order`, then `verification/finished` with a verified summary.
 real engine would during the run: it finds the entry by point and name in the `verify` frame's
 `target.hooks` and POSTs the `context` to its url with its headers — with no `authorization` when
 `authorised` is false. A live provider case has a `provider` instead, which the driver serves on the
-loopback interface, and the verifier's `provider-url` is the driver's.
+loopback interface, and the verifier's `provider-url` is the driver's. Its `routes` may be empty: a case that verifies only
+messages has no request for a provider to answer.
 
 ## 4. What a case can expect
 

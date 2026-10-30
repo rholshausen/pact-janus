@@ -1,0 +1,171 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/message-producer-entries",
+  "category": "provider",
+  "title": "Each message producer is a produce-message entry selected by its interaction's description, after the configuration's",
+  "covers": [
+    "verification.message-producer.entry"
+  ],
+  "why": "behavioural spec 'message-producer': the n-th producer is named 'message-<n>', its entry is { name, when: { interaction }, changes: [ 'parts' ], run }; 'verify': at each point the configuration's entries, then the handlers' in declaration order.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "messages": [
+          {
+            "description": "an order placed event",
+            "providerStates": [
+              {
+                "name": "an order exists"
+              }
+            ],
+            "contents": {
+              "id": 42
+            },
+            "metadata": {
+              "contentType": "application/json"
+            },
+            "matchingRules": {
+              "body": {
+                "$.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "description": "an order cancelled event",
+            "contents": "cancelled",
+            "metadata": {
+              "contentType": "text/plain"
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "config": "version: 1\nhooks:\n  produce-message:\n    - name: from-config\n      changes: [parts]\n      run: { kind: http, url: http://messages.example/messages }\n",
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {}
+      }
+    ],
+    "message-producers": [
+      {
+        "description": "an order placed event",
+        "returns": {
+          "json": {
+            "id": 42
+          }
+        }
+      },
+      {
+        "description": "an order cancelled event",
+        "returns": {
+          "text": "cancelled"
+        }
+      }
+    ]
+  },
+  "engine": {
+    "config": {
+      "version": 1,
+      "hooks": {
+        "produce-message": [
+          {
+            "name": "from-config",
+            "changes": [
+              "parts"
+            ],
+            "run": {
+              "kind": "http",
+              "url": "http://messages.example/messages"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expect": {
+    "hooks": {
+      "version": 1,
+      "hooks": {
+        "produce-message": [
+          {
+            "name": "from-config",
+            "changes": [
+              "parts"
+            ],
+            "run": {
+              "kind": "http",
+              "url": "http://messages.example/messages"
+            }
+          },
+          {
+            "name": "message-1",
+            "when": {
+              "interaction": "an order placed event"
+            },
+            "changes": [
+              "parts"
+            ],
+            "run": {
+              "kind": "http",
+              "url": "loopback:/produce-message/message-1",
+              "headers": {
+                "authorization": "Bearer <token>"
+              }
+            }
+          },
+          {
+            "name": "message-2",
+            "when": {
+              "interaction": "an order cancelled event"
+            },
+            "changes": [
+              "parts"
+            ],
+            "run": {
+              "kind": "http",
+              "url": "loopback:/produce-message/message-2",
+              "headers": {
+                "authorization": "Bearer <token>"
+              }
+            }
+          }
+        ],
+        "state-setup": [
+          {
+            "name": "state-1",
+            "when": {
+              "state": "an order exists"
+            },
+            "run": {
+              "kind": "http",
+              "url": "loopback:/state-setup/state-1",
+              "headers": {
+                "authorization": "Bearer <token>"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "outcome": "ok"
+  }
+}

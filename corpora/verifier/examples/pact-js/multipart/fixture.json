@@ -1,0 +1,44 @@
+{
+  "description": "pact-js examples/multipart: a multipart file upload. The provider answers as the example's own provider does, as recorded from it",
+  "source": "pact-js examples/multipart (MIT) at 8a8f27a: the pact consumer.test.ts writes, and provider.ts's answers to it. Staged plan S1.15; ADR 0056 decision 5; the TypeScript SDK's test/examples verify the same pact through pact-janus/verifier",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "the upload service is ready"
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/upload",
+          "headers": {
+            "Content-Type": [
+              "multipart/form-data; boundary=U9iXwlWODmM9xpRU"
+            ]
+          },
+          "body": {
+            "text": "--U9iXwlWODmM9xpRU\r\nContent-Disposition: form-data; name=\"file\"; filename=\"sample.txt\"\r\nContent-Type: text/plain\r\n\r\nSample file for multipart upload testing.\nThis file is a test fixture.\n\r\n--U9iXwlWODmM9xpRU--\r\n"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": {
+              "success": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

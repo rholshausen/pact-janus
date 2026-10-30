@@ -72,6 +72,7 @@ superseding ADR instead.
 | [0053](0053-take-todays-verifier-options-where-they-mean-what-they-did.md) | Take today's verifier options where they mean what they did | accepted |
 | [0054](0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md) | Carry an error's causes as a chain, and mark display text with segments beside it | accepted |
 | [0055](0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md) | Verify a provider inside a test through the protocol's run, with handlers as loopback hooks and the configuration loaded by the engine's host | accepted |
+| [0056](0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md) | Provider test integrations: message producers as loopback hooks, a JUnit 5 extension that reports each interaction, and a pact-js-shaped `Verifier` | accepted |
 
 ## Decision backlog
 

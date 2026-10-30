@@ -94,9 +94,11 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 
 ## Provider verification
 
-- `new Verifier({ providerUrl, pacts | broker | urls, options?, config?, components?, engine? })`,
-  then `.state(name, setup | { setup, teardown })` and `.requestFilter(filter, { changes? })`, each
-  returning the verifier, then `await verifier.verify()` (ADR 0055). Nothing is sent before `verify`.
+- `new Verifier({ providerUrl, pacts | broker | urls, options?, transport?, config?, components?, engine? })`,
+  then `.state(name, setup | { setup, teardown })`, `.requestFilter(filter, { changes? })` and
+  `.message(description, produce)`, each returning the verifier, then `await verifier.verify()`
+  (ADR 0055, ADR 0056). Nothing is sent before `verify`. `transport` is the HTTP transport's options
+  beside `base-url` (`headers`, `client`), passed as given.
 - The SDK's own options are camelCase; the documents it passes through — `broker`, `urls`,
   `options` — are spelled as the protocol spells them (`"consumer-version-selectors"`,
   `"provider-version"`), because they are the protocol's documents and the SDK translates none of
@@ -106,8 +108,24 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   failed setup.
 - A request filter receives `{ method, path, query, headers, … }`, each slot's content as the engine
   sent it (headers as lists of values), and returns the request; returning nothing changes nothing.
+- A message producer receives today's request for the message (`{ description, providerStates,
+  request? }`) and returns `{ body, contentType?, metadata? }`. The body is a `Uint8Array`, a string,
+  or any other value, written as JSON. With no `contentType` it is unlabelled, and the engine reads
+  its type from the metadata, else its octets.
 - `verify` resolves with the result for `verified` and `filtered` runs: a test that must not pass a
   filtered run checks `result.status`. It rejects with `VerificationFailedError` for `failed`.
+
+## pact-js's provider API (`pact-janus/verifier`)
+
+- `Verifier`, `MessageProviderPact` and `providerWithMetadata`, taking pact-js's options by pact-js's
+  names (ADR 0056 decision 4). Each option becomes the protocol member S1.13 maps today's CLI option
+  to; [`provider-test-migration.md`](../../Documentation/provider-test-migration.md) has the table.
+- It is `src/facade/`, the thinness audit's `facade` layer, with a budget of its own: the one place
+  in this SDK that spells someone else's API, so the one most likely to grow logic.
+- An option with no Janus meaning that would change a run is refused by name with a `TypeError`
+  before an engine starts (`beforeEach`, `providerStatesSetupUrl`, …). One that only tuned pact-js's
+  proxy or logs is accepted and does nothing.
+- It imports no test framework, so it runs under Jest and Vitest alike.
 
 ## Packaging and distribution
 

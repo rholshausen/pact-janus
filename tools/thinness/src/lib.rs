@@ -27,12 +27,15 @@ pub mod cli;
 /// The layers, in the order they are reported. `generated` and `tests` carry no budget: generated
 /// code is not a cost an SDK maintainer pays, and tests are not part of the surface a user installs.
 /// `loopback` is the endpoint a provider verification's handlers are served from (ADR 0055
-/// decision 4): the one kind of code the provider side adds, so it is counted apart.
-pub const LAYERS: [&str; 6] = [
+/// decision 4): the one kind of code the provider side adds, so it is counted apart. `facade` is
+/// today's DSL spelled over the SDK's own (ADR 0056 decision 4, staged plan S2.5): the layer most
+/// likely to grow logic, so it has a budget of its own.
+pub const LAYERS: [&str; 7] = [
   "generated",
   "idiomatic",
   "embedding",
   "loopback",
+  "facade",
   "integration",
   "tests",
 ];

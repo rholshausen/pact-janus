@@ -14,7 +14,7 @@ import java.util.Objects;
 
 /**
  * The provider primitives (behavioural spec {@code verifier}, {@code state-handler},
- * {@code request-filter}, {@code verify}; ADR 0055). A verification is one protocol run: this class
+ * {@code request-filter}, {@code message-producer}, {@code verify}; ADR 0055, ADR 0056). A verification is one protocol run: this class
  * reads the pact files the test names, writes the handlers as loopback {@code http} hook entries,
  * sends one {@code verification/verify} and polls its stream. It decides no verdict: the run's status
  * is the engine's, and a failed run fails here.
@@ -44,7 +44,15 @@ public final class Verifier {
     Map<String, Object> filter(Map<String, Object> request) throws Exception;
   }
 
+  /** Receives today's request for the message (its description, provider states and any request), and returns it. */
+  @FunctionalInterface
+  public interface MessageProducer {
+    Message produce(Map<String, Object> request) throws Exception;
+  }
+
   private record State(String state, StateSetup setup, StateTeardown teardown) {}
+
+  private record Producer(String description, MessageProducer producer) {}
 
   private record Filter(RequestFilter filter, List<String> changes) {}
 
@@ -53,11 +61,13 @@ public final class Verifier {
   private Map<String, Object> broker;
   private Map<String, Object> urls;
   private Map<String, Object> options;
+  private Map<String, Object> transport;
   private Path config;
   private List<Map<String, Object>> components;
   private Embedding embedding;
   private final List<State> states = new ArrayList<>();
   private final List<Filter> filters = new ArrayList<>();
+  private final List<Producer> producers = new ArrayList<>();
 
   private Verifier(String providerUrl) {
     this.providerUrl = Objects.requireNonNull(providerUrl, "provider URL");
@@ -89,6 +99,12 @@ public final class Verifier {
   /** The run's options, as {@code verification/verify} spells them: publish, filter, variants, … */
   public Verifier withOptions(Map<String, ?> options) {
     this.options = json(options, "options");
+    return this;
+  }
+
+  /** The HTTP transport's drive options beside {@code base-url}: {@code headers}, {@code client}. Passed as given. */
+  public Verifier withTransport(Map<String, ?> transport) {
+    this.transport = json(transport, "transport");
     return this;
   }
 
@@ -133,8 +149,31 @@ public final class Verifier {
     return this;
   }
 
+  /** Declares the producer of the message interaction with this description. */
+  public Verifier message(String description, MessageProducer producer) {
+    producers.add(new Producer(Objects.requireNonNull(description, "description"), Objects.requireNonNull(producer, "producer")));
+    return this;
+  }
+
   /** Runs the verification. Throws {@link VerificationFailedException} when the run failed. */
   public VerificationResult verify() {
+    try (VerificationRun run = start()) {
+      while (run.next() != null) {
+        // Each result is collected by the run.
+      }
+      VerificationResult result = run.result();
+      if ("failed".equals(result.status())) {
+        throw new VerificationFailedException(result);
+      }
+      return result;
+    }
+  }
+
+  /**
+   * Starts the verification, as {@link #verify()} does, and returns the run, whose results are read
+   * as the engine reports them. Close it, however it ends: that stops the handlers and the engine.
+   */
+  public VerificationRun start() {
     Map<String, Object> source = source();
     FramePipe pipe;
     try {
@@ -142,8 +181,10 @@ public final class Verifier {
     } catch (IOException e) {
       throw new JanusEmbeddingException(e.getMessage(), e);
     }
-    try (EngineClient engine = new EngineClient(pipe);
-        Loopback loopback = states.isEmpty() && filters.isEmpty() ? null : new Loopback()) {
+    EngineClient engine = new EngineClient(pipe);
+    Loopback loopback = null;
+    try {
+      loopback = states.isEmpty() && filters.isEmpty() && producers.isEmpty() ? null : new Loopback();
       engine.hello(Janus.SDK_NAME, Janus.SDK_VERSION);
       Map<String, Object> loaded = null;
       if (config != null) {
@@ -153,7 +194,9 @@ public final class Verifier {
         loaded = map(engine.send(RequestFrameOp.CONFIG_LOAD, Map.of("path", path)).ok().get("config"));
       }
       Map<String, Object> target = new LinkedHashMap<>();
-      target.put("transports", List.of(Map.of("transport", "http", "options", Map.of("base-url", providerUrl))));
+      Map<String, Object> http = new LinkedHashMap<>(transport == null ? Map.of() : transport);
+      http.put("base-url", providerUrl);
+      target.put("transports", List.of(Map.of("transport", "http", "options", http)));
       List<Object> declared = new ArrayList<>(loaded != null && loaded.get("components") instanceof List<?> l ? l : List.of());
       if (components != null) {
         components.stream().map(Janus::resolved).forEach(declared::add);
@@ -171,13 +214,84 @@ public final class Verifier {
         request.put("options", options);
       }
       String stream = (String) engine.send(RequestFrameOp.VERIFICATION_VERIFY, request).ok().get("stream");
-      VerificationResult result = poll(engine, stream);
-      if ("failed".equals(result.status())) {
-        throw new VerificationFailedException(result);
+      return new VerificationRun(engine, loopback, stream);
+    } catch (IOException e) {
+      close(loopback, engine);
+      throw new JanusEmbeddingException("could not serve the verification's handlers: " + e.getMessage(), e);
+    } catch (RuntimeException e) {
+      close(loopback, engine);
+      throw e;
+    }
+  }
+
+  private static void close(Loopback loopback, EngineClient engine) {
+    try {
+      if (loopback != null) {
+        loopback.close();
+      }
+    } finally {
+      engine.close();
+    }
+  }
+
+  /**
+   * A started verification (ADR 0056 decision 3): one {@code verification/verify}, whose stream is
+   * polled as results are asked for. Each {@code verification/interaction-result} is returned as the
+   * engine sent it; the terminal event's summary is the {@link #result()}.
+   */
+  public static final class VerificationRun implements AutoCloseable {
+    private final EngineClient engine;
+    private final Loopback loopback;
+    private final String stream;
+    private final List<Map<String, Object>> results = new ArrayList<>();
+    private final java.util.ArrayDeque<Map<String, Object>> pending = new java.util.ArrayDeque<>();
+    private VerificationResult result;
+    private boolean closed;
+
+    private VerificationRun(EngineClient engine, Loopback loopback, String stream) {
+      this.engine = engine;
+      this.loopback = loopback;
+      this.stream = stream;
+    }
+
+    /** The next interaction result, polling for it when none has arrived; null once the run has ended. */
+    public Map<String, Object> next() {
+      while (pending.isEmpty() && result == null) {
+        poll();
+      }
+      return pending.poll();
+    }
+
+    /** The run's result. Reads the rest of the stream first, when it has not ended. */
+    public VerificationResult result() {
+      while (result == null) {
+        poll();
       }
       return result;
-    } catch (IOException e) {
-      throw new JanusEmbeddingException("could not serve the verification's handlers: " + e.getMessage(), e);
+    }
+
+    private void poll() {
+      Map<String, Object> polled = engine.send(RequestFrameOp.EVENTS_POLL, Map.of("streams", List.of(stream), "wait-ms", POLL_WAIT_MS)).ok();
+      for (Object item : (List<?>) polled.getOrDefault("events", List.of())) {
+        Map<String, Object> event = map(item);
+        if ("verification/interaction-result".equals(event.get("kind"))) {
+          results.add(map(event.get("payload")));
+          pending.add(map(event.get("payload")));
+        }
+        if (Boolean.TRUE.equals(event.get("last"))) {
+          Map<String, Object> summary = map(event.get("payload"));
+          result = new VerificationResult(String.valueOf(summary.get("status")), summary, results);
+        }
+      }
+    }
+
+    /** Stops the handlers and ends the engine. */
+    @Override
+    public void close() {
+      if (!closed) {
+        closed = true;
+        Verifier.close(loopback, engine);
+      }
     }
   }
 
@@ -230,6 +344,12 @@ public final class Verifier {
       add(points, loopback, "before-request", entry(loopback, "before-request", "request-filter-" + (i + 1), null, declared),
           context -> answerFilter(filter, context));
     }
+    for (int i = 0; i < producers.size(); i++) {
+      Producer producer = producers.get(i);
+      String name = "message-" + (i + 1);
+      Map<String, Object> entry = entry(loopback, "produce-message", name, Map.of("interaction", producer.description()), List.of("parts"));
+      add(points, loopback, "produce-message", entry, context -> answerMessage(producer.producer(), context));
+    }
     Map<String, Object> hooks = new LinkedHashMap<>();
     hooks.put("version", loaded != null && loaded.get("version") != null ? loaded.get("version") : 1);
     hooks.put("hooks", points);
@@ -255,24 +375,6 @@ public final class Verifier {
     entry.put("run", Map.of("kind", "http", "url", loopback.url("/" + point + "/" + name),
         "headers", Map.of("authorization", loopback.authorization())));
     return entry;
-  }
-
-  /** Polls the run's stream to its terminal event, collecting every interaction result. */
-  private static VerificationResult poll(EngineClient engine, String stream) {
-    List<Map<String, Object>> results = new ArrayList<>();
-    for (;;) {
-      Map<String, Object> polled = engine.send(RequestFrameOp.EVENTS_POLL, Map.of("streams", List.of(stream), "wait-ms", POLL_WAIT_MS)).ok();
-      for (Object item : (List<?>) polled.getOrDefault("events", List.of())) {
-        Map<String, Object> event = map(item);
-        if ("verification/interaction-result".equals(event.get("kind"))) {
-          results.add(map(event.get("payload")));
-        }
-        if (Boolean.TRUE.equals(event.get("last"))) {
-          Map<String, Object> summary = map(event.get("payload"));
-          return new VerificationResult(String.valueOf(summary.get("status")), summary, results);
-        }
-      }
-    }
   }
 
   private interface Call {
@@ -309,6 +411,26 @@ public final class Verifier {
         }
       }
       return Map.of("outcome", "ok", "changes", changes);
+    } catch (Exception e) {
+      return failed(e);
+    }
+  }
+
+  private static Map<String, Object> answerMessage(MessageProducer producer, Map<String, Object> context) {
+    Map<String, Object> pactMessage = map(map(context.get("interaction")).get("pact-message"));
+    try {
+      Message message = producer.produce(map(pactMessage.get("request")));
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("content", java.util.Base64.getEncoder().encodeToString(message.octets()));
+      body.put("encoded", "base64");
+      Map<String, Object> metadata = new LinkedHashMap<>();
+      if (message.contentType() != null) {
+        body.put("content-type", message.contentType());
+        metadata.put("contentType", message.contentType());
+      }
+      metadata.putAll(message.metadata());
+      return Map.of("outcome", "ok", "changes", Map.of("parts", Map.of("message",
+          Map.of("metadata", Map.of("content", Json.value(metadata, "metadata")), "body", body))));
     } catch (Exception e) {
       return failed(e);
     }

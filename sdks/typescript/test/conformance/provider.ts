@@ -13,9 +13,10 @@ import {
   StateUnsupportedError,
   VerificationFailedError,
   Verifier,
+  type Message,
   type VerificationResult,
 } from "../../src/index.js";
-import type { Behaviour, Case, HandlerCall, LiveProvider, Outcome } from "./cases.js";
+import type { Behaviour, Case, HandlerCall, LiveProvider, MessageScript, Outcome } from "./cases.js";
 import { equal, show, subset } from "./compare.js";
 import { ScriptedPipe } from "./scripted-engine.js";
 
@@ -45,6 +46,7 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
       ...(script.broker ? { broker: script.broker } : {}),
       ...(script.urls ? { urls: script.urls } : {}),
       ...(script.options ? { options: script.options } : {}),
+      ...(script.transport ? { transport: script.transport } : {}),
       // Relative to the working directory, as a test would write it (`config-loaded`).
       ...(script.config !== undefined ? { config: relative(process.cwd(), configFile) } : {}),
       ...(script.components ? { components: script.components } : {}),
@@ -69,6 +71,16 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
         },
         filter.changes ? { changes: filter.changes } : {},
       );
+    });
+    (script["message-producers"] ?? []).forEach(({ description, returns, throws }, i) => {
+      const handler = `message-${i + 1}`;
+      verifier.message(description, (request) => {
+        calls.push({ handler, request });
+        if (throws !== undefined) {
+          throw new Error(throws);
+        }
+        return message(returns ?? { json: null });
+      });
     });
 
     if (testCase.verify !== false) {
@@ -139,6 +151,16 @@ function act(behaviour: Behaviour, calls: HandlerCall[], call: HandlerCall): unk
     throw new StateUnsupportedError(behaviour.unsupported);
   }
   return behaviour.returns;
+}
+
+/** The case's message as this SDK's: bytes as a Uint8Array, a string as itself, JSON as a value. */
+function message(script: MessageScript): Message {
+  const body = script.bytes !== undefined ? new Uint8Array(Buffer.from(script.bytes, "base64")) : (script.text ?? script.json);
+  return {
+    body,
+    ...(script["content-type"] !== undefined ? { contentType: script["content-type"] } : {}),
+    ...(script.metadata !== undefined ? { metadata: script.metadata } : {}),
+  };
 }
 
 /** This SDK's ways of ending `verify`, as the case's outcomes (README §4). */

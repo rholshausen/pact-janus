@@ -11,6 +11,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./vitest": "./dist/vitest.js",
+    "./verifier": "./dist/facade/verifier.js",
     "./bindings": "./dist/generated/index.js"
   },
   "scripts": {

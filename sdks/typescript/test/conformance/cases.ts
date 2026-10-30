@@ -99,6 +99,17 @@ export interface VerifierScript {
   components?: ComponentDeclaration[];
   "state-handlers"?: { state: string; setup: Behaviour; teardown?: Behaviour }[];
   "request-filters"?: { changes?: string[]; set?: Record<string, unknown>; throws?: string }[];
+  transport?: Record<string, unknown>;
+  "message-producers"?: { description: string; returns?: MessageScript; throws?: string }[];
+}
+
+/** The message a producer returns (README §3): one of json, text or bytes (base64). */
+export interface MessageScript {
+  json?: unknown;
+  text?: string;
+  bytes?: string;
+  "content-type"?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /** A hook the scripted engine calls during the run. */

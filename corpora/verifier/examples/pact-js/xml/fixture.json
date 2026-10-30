@@ -1,0 +1,39 @@
+{
+  "description": "pact-js examples/xml: an XML catalogue, as the provider writes it. The provider answers as the example's own provider does, as recorded from it",
+  "source": "pact-js examples/xml (MIT) at 8a8f27a: the pact consumer.test.ts writes, and provider.ts's answers to it. Staged plan S1.15; ADR 0056 decision 5; the TypeScript SDK's test/examples verify the same pact through pact-janus/verifier",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "the catalogue has books"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/catalogue",
+          "headers": {
+            "Accept": [
+              "application/xml"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/xml; charset=utf-8"
+            ]
+          },
+          "body": {
+            "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<catalogue>\n  <book id=\"101\"><title>Clean Code</title><author>Robert Martin</author></book>\n  <book id=\"102\"><title>Refactoring</title><author>Martin Fowler</author></book>\n</catalogue>"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

@@ -100,6 +100,10 @@ interaction of a pact it did not fetch is `absent` there too.
 ## What is here
 
 - `order-service/`: the sample provider's own v3 pact against the sample provider, and its mutations.
+- `examples/`: the pacts of pact-js's provider examples and of pact-jvm's JUnit 5 provider tests, each
+  with a provider answering as the example's own does (staged plan S1.15, ADR 0056 decision 5). The
+  SDKs' ported example suites verify the same pacts, so a verdict here is the one their tests
+  expect. Their message pacts that S1.7 already had are in `messages/`.
 - `broker/`: pacts fetched from a broker: the sample provider's own pact; pending, and not pending
   because the provider's main branch verified it before; work in progress; a pact the selectors do
   not fetch; and pending asked for with no selectors, where today's verifier uses the broker's older

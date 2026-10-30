@@ -957,6 +957,75 @@ fn a_v3_message_pact_verifies_through_a_pact_message_hook() {
   );
 }
 
+/// A producer in a test, a script here, answers a message with no `contentType` in its metadata and
+/// no label on its body (ADR 0056 decision 1). The metadata's expected `contentType` is compared with
+/// the type read from the octets, as pact-jvm reads a producer's message, so a JSON message verifies
+/// and a text one fails on its type; a `contentType` the producer did write is compared as written.
+#[test]
+fn a_message_with_no_content_type_in_its_metadata_is_read_from_its_octets() {
+  let (base_url, _requests) = stub_provider(vec![]);
+  let mut engine = engine_with_everything();
+  let mut pact = fixture("test_consumer_v3-MessageProvider.json");
+  pact["messages"].as_array_mut().unwrap().truncate(1);
+  let expected_type = pact["messages"][0]["metaData"]["contentType"].clone();
+  assert_eq!(
+    expected_type,
+    json!("application/json"),
+    "the fixture expects a contentType"
+  );
+  let producing = |body: &str, metadata: &str| {
+    use base64::Engine as _;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(body);
+    json!({
+      "version": 1,
+      "hooks": { "produce-message": [{
+        "name": "in-test",
+        "changes": ["parts"],
+        "run": { "kind": "script", "source": format!(
+          "function hook(ctx) {{ return {{ outcome: 'ok', changes: {{ parts: {{ message: {{ \
+             metadata: {{ content: {metadata} }}, body: {{ content: '{encoded}', encoded: 'base64' }} }} }} }} }}; }}"
+        ) },
+      }] },
+    })
+  };
+
+  let json_body = r#"{"testParam1": "value3", "testParam2": "value4"}"#;
+  let events = verify(
+    &mut engine,
+    vec![pact.clone()],
+    &base_url,
+    Some(producing(json_body, "{}")),
+  );
+  assert_eq!(
+    summary(&events)["status"],
+    json!("verified"),
+    "{:?}",
+    mismatch_messages(&events)
+  );
+
+  let events = verify(
+    &mut engine,
+    vec![pact.clone()],
+    &base_url,
+    Some(producing("testParam1=value1", "{}")),
+  );
+  assert_eq!(summary(&events)["status"], json!("failed"));
+
+  let events = verify(
+    &mut engine,
+    vec![pact],
+    &base_url,
+    Some(producing(json_body, "{ contentType: 'text/plain' }")),
+  );
+  assert!(
+    mismatch_messages(&events)
+      .iter()
+      .any(|m| m.contains("text/plain")),
+    "a written contentType is compared as written: {:?}",
+    mismatch_messages(&events)
+  );
+}
+
 /// A message whose contents differ fails on them, and one of another content type fails on its type,
 /// as today's verifier fails it before it compares contents.
 #[test]

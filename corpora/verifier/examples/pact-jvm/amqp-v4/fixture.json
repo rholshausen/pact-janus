@@ -1,0 +1,44 @@
+{
+  "description": "pact-jvm's AmqpContractTest's v4 asynchronous message (its v3 one is messages/pact-jvm-v3): the provider answers with the message its @PactVerifyProvider method returns",
+  "source": "pact-jvm provider/junit5/src/test (Apache-2.0) at 88477ee: resources/amqp_pacts/message_test_consumer-test_provider_v4.json, verified there by AmqpContractTest's @PactVerifyProvider method. Staged plan S1.15; ADR 0056 decision 5; the JVM SDK's examples verify the same pacts through JanusProviderExtension",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "a V4 test message",
+              "providerStates": [
+                {
+                  "name": "SomeProviderState"
+                }
+              ]
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "testParam1": "value1",
+              "testParam2": "value2"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

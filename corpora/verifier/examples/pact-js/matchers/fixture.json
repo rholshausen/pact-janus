@@ -1,0 +1,165 @@
+{
+  "description": "pact-js examples/matchers: a provider that answers with other values than the consumer's examples, which the matchers allow. The provider answers as the example's own provider does, as recorded from it",
+  "source": "pact-js examples/matchers (MIT) at 8a8f27a: the pact consumer.test.ts writes, and provider.ts's answers to it. Staged plan S1.15; ADR 0056 decision 5; the TypeScript SDK's test/examples verify the same pact through pact-janus/verifier",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "states": [
+          "a product exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/products/1",
+          "headers": {
+            "Accept": [
+              "application/json"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 99,
+              "name": "Gadget Pro",
+              "price": 14.5,
+              "category": "gadgets",
+              "createdAt": "2025-06-15T12:00:00.000Z",
+              "tags": [
+                "featured",
+                "sale"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "states": [
+          "products exist"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/products",
+          "headers": {
+            "Accept": [
+              "application/json"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": [
+              {
+                "id": 10,
+                "name": "Alpha",
+                "price": 1.5
+              },
+              {
+                "id": 11,
+                "name": "Beta",
+                "price": 2.5
+              },
+              {
+                "id": 12,
+                "name": "Gamma",
+                "price": 3.5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "states": [
+          "products exist"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/products",
+          "headers": {
+            "Accept": [
+              "application/json"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": [
+              {
+                "id": 10,
+                "name": "Alpha",
+                "price": 1.5
+              },
+              {
+                "id": 11,
+                "name": "Beta",
+                "price": 2.5
+              },
+              {
+                "id": 12,
+                "name": "Gamma",
+                "price": 3.5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "states": [
+          "the catalog is populated"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/catalog",
+          "headers": {
+            "Accept": [
+              "application/json"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": {
+              "ALPHA-001": {
+                "name": "Alpha Device",
+                "price": 99.99
+              },
+              "BETA-002": {
+                "name": "Beta Gadget",
+                "price": 149.99
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

@@ -1,0 +1,36 @@
+{
+  "description": "pact-jvm's ProviderStateParametersInjectedTest: a request path generated from the state's own parameter",
+  "source": "pact-jvm provider/junit5/src/test (Apache-2.0) at 88477ee: resources/pacts/provider-state-parameter-injected.json, verified there by ProviderStateParametersInjectedTest's @State method and its WireMock stub. Staged plan S1.15; ADR 0056 decision 5; the JVM SDK's examples verify the same pacts through JanusProviderExtension",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "ok",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/api/hello/James",
+          "patterns": {
+            "path": "/api/hello/John"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "name": "John"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

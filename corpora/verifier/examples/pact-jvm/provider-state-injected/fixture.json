@@ -1,0 +1,53 @@
+{
+  "description": "pact-jvm's ProviderStateInjectedTest: a state whose handler returns the user id that the request's body and the response's LOCATION header are generated from. pact-jvm passes it, generating the expected LOCATION from the state's value; today's pact_verifier_cli applies no generator to the expected response and fails it on that header, and janus verify agrees with today's. No 'expected': its two sources disagree",
+  "source": "pact-jvm provider/junit5/src/test (Apache-2.0) at 88477ee: resources/pacts/V3Consumer-ProviderStateService.json, verified there by ProviderStateInjectedTest's @State method and its WireMock stub. Staged plan S1.15; ADR 0056 decision 5; the JVM SDK's examples verify the same pacts through JanusProviderExtension",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "userId": 666554433
+      }
+    },
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/values",
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=UTF-8"
+            ]
+          },
+          "body": {
+            "json": {
+              "userId": 100
+            }
+          },
+          "patterns": {
+            "body/userId": "666554433"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Location": [
+              "http://server/users/666554433"
+            ]
+          },
+          "body": {
+            "json": {
+              "userId": 666554433,
+              "userName": "Test"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

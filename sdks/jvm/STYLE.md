@@ -149,9 +149,11 @@ Interaction getOrder = janus.interaction("get an order")
 ## Provider verification
 
 - `Verifier.forProvider(url)`, then `withPacts(paths)`, `withBroker(map)` or `withUrls(map)`, and
-  optionally `withOptions(map)`, `withConfig(path)`, `withComponents(list)` and
-  `withEmbedding(embedding)`; then `state(name, setup)` or `state(name, setup, teardown)` and
-  `requestFilter(filter)` or `requestFilter(filter, slots)`; then `verify()` (ADR 0055). The
+  optionally `withOptions(map)`, `withTransport(map)`, `withConfig(path)`, `withComponents(list)` and
+  `withEmbedding(embedding)`; then `state(name, setup)` or `state(name, setup, teardown)`,
+  `requestFilter(filter)` or `requestFilter(filter, slots)`, and `message(description, producer)`;
+  then `verify()` (ADR 0055, ADR 0056). `withTransport` is the HTTP transport's options beside
+  `base-url` (`headers`, `client`), passed as given. The
   verifier is mutable and each method returns it, so a test configures it in one chain. Nothing is
   sent before `verify()`.
 - The maps passed through — `withBroker`, `withUrls`, `withOptions` — are the protocol's documents,
@@ -161,10 +163,40 @@ Interaction getOrder = janus.interaction("get an order")
   is a failed setup. The handlers are functional interfaces that may throw checked exceptions.
 - A `RequestFilter` receives a `Map` with a member per request slot, each slot's content as the
   engine sent it, and returns the request; `null` changes nothing.
+- A `MessageProducer` receives today's request for the message as a `Map` and returns a `Message`:
+  `Message.of(body)`, then `withContentType` and `withMetadata`. The body is a `byte[]`, a `String`,
+  or any other value, written as JSON by Jackson. With no content type it is unlabelled, and the
+  engine reads its type from the metadata, else its octets.
 - `verify()` returns the `VerificationResult` for `verified` and `filtered` runs; a test that must
   not pass a filtered run checks `status()`. Handlers are called on the endpoint's own threads, not
   the test's.
-- The JUnit 5 provider runner is S1.15's.
+- `start()` starts the same run and returns a `Verifier.VerificationRun`, whose `next()` returns each
+  interaction result as the engine reports it, and `null` once the run has ended; `result()` is the
+  run's result. Close it, however it ends: that stops the handlers and the engine. `verify()` is
+  `start()`, read to the end.
+
+## Provider test-framework integration
+
+- **`JanusProviderExtension`** (ADR 0056 decision 3), registered in a static field with
+  `JanusProviderExtension.of(verifier)` or `of(() -> verifier)`, the supplier called when the factory
+  runs, so a provider URL chosen in `@BeforeAll` is known. A `@TestFactory` returns
+  `janus.interactions(this)`.
+- `interactions(this)` declares the instance's `@State` and `@ProvidesMessage` methods on the
+  verifier: those of its class, its superclasses and its interfaces' default methods, the most
+  specific declaration of a signature winning. A `@State` names states (`value`, several allowed) and
+  an `action`, `SETUP` by default. A method takes no parameter or one `Map`, and a setup returns a
+  `Map` of values or nothing. A `@ProvidesMessage` method returns a `Message`, bytes, a string, or a
+  value written as JSON. Methods may be private and package-private; they are called reflectively, on
+  the endpoint's threads, and an exception they throw is the handler's.
+- The stream it returns is one run. Each interaction result is a dynamic test named
+  `<consumer>: <description>`, with ` [<variant>]` when the variant is not `base`, made when the
+  engine reports the result. `verified` passes. A pending failure, or a `skipped` result, is aborted
+  (`Assumptions.abort`): reported, failing nothing. Anything else fails, with the result's mismatches
+  or error. After the last result, a test named `verification` fails when the run failed with no
+  failed result to show it, and is aborted when the run was filtered.
+- Closing the stream, which JUnit does, closes the run, and `afterAll` closes any run still open.
+- pact-jvm's annotations map to these as
+  [`provider-test-migration.md`](../../Documentation/provider-test-migration.md) records.
 
 ## Packaging and distribution
 

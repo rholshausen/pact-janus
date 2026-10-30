@@ -1384,6 +1384,14 @@ item in 1a is done when S1.1 agrees.
     gain segments under the same rules when an SDK needs them.
   - **A mismatch log line printed the marks.** It `Debug`-printed whole mismatches, so it now prints
     only path and message.
+- **S1.35 The v4 `statusCode` matcher** — **S**, found by S1.15's examples. pact-js's `matchers`
+  example checks a response's status by class (`success`). The legacy compiler refuses the rule, so
+  `janus verify` fails an interaction today's verifier passes, and `janus upgrade` writes it as
+  `http:status-class`, an operator no component contributes yet. The built-in HTTP component
+  contributes the operator, and the legacy compiler uses it for a pact's rule, so the kernel still
+  knows nothing of HTTP statuses.
+  *Exit:* `examples/pact-js/matchers` has no entry in `corpora/verifier/disagreements.json`, and an
+  upgraded contract with a status class verifies.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current
@@ -1424,6 +1432,35 @@ SDK implements it, and the SDK specification covers only the consumer side.
   thinness audit. Each ships with a migration note from today's annotations and options.
   *Exit:* pact-jvm's and pact-js's provider example suites run on the new integrations with
   identical results in S1.1.
+  *Done 2026-10-30*, as [ADR 0056](decisions/0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md)
+  decides. The behavioural specification gains `message-producer`: a test's message producers are
+  loopback `produce-message` hooks, as S1.14's handlers are, and a verifier takes the HTTP
+  transport's other options as `transport`. Both SDKs pass all 66 conformance cases, including a
+  live one in which the real engine asks a test's producers for two messages.
+  - The JVM SDK has `JanusProviderExtension`, with `@State` and `@ProvidesMessage` methods. A
+    `@TestFactory` returns one dynamic test per interaction result, as the one run reports it
+    (`Verifier.start()`).
+  - The TypeScript SDK has `pact-janus/verifier`: pact-js's `Verifier`, `MessageProviderPact` and
+    `providerWithMetadata`, mapping each option as S1.13 maps the CLI's. It is the thinness audit's
+    new `facade` layer.
+  - [`provider-test-migration.md`](provider-test-migration.md) is the migration note for both.
+  - pact-js's seven runnable provider examples are ported to `sdks/typescript/test/examples`;
+    `plugins` is left out, since ADR 0045 refuses a pact plugin. Seven of pact-jvm's JUnit 5 provider
+    tests are ported to `PactJvmExamplesTest`. Their pacts are S1.1 fixtures
+    (`corpora/verifier/examples/`, and S1.7's `messages/` ones), and every interaction reaches the
+    verdict S1.1 records there.
+  - Not foreseen:
+    - An in-test producer has no reply to take a `contentType` from, and every pact-jvm message pact
+      expects one in its metadata. The engine now reads a missing one as the message's own type.
+    - pact-js's `matchers` example uses the v4 `statusCode` matcher, which the legacy compiler
+      refuses. It is ledgered against the new S1.35.
+    - pact-jvm passes `ProviderStateInjectedTest` by generating the expected `LOCATION` header from
+      provider-state values, which today's `pact_verifier_cli` does not do. Janus agrees with today's,
+      so that fixture records no `expected`.
+    - Express adds `charset=utf-8` to every JSON reply, which an upgraded contract's `Content-Type`
+      equality fails. These are ten more S3.4 entries in the upgrade ledger.
+  - Budgets: the JVM idiomatic layer moved from 2,000 to 2,100 lines and its integration layer from
+    140 to 280. The TypeScript facade's is 300.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 

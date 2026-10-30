@@ -1,5 +1,5 @@
-// The provider primitives (behavioural spec 'verifier', 'state-handler', 'request-filter', 'verify';
-// ADR 0055). A verification is one protocol run: this file reads the pact files the test names,
+// The provider primitives (behavioural spec 'verifier', 'state-handler', 'request-filter',
+// 'message-producer', 'verify'; ADR 0055, ADR 0056). A verification is one protocol run: this file reads the pact files the test names,
 // writes the handlers as loopback `http` hook entries, sends one `verification/verify` and polls
 // its stream. It decides no verdict: the run's status is the engine's, and a failed run fails here.
 
@@ -37,6 +37,8 @@ export interface VerifierConfig {
   urls?: SourceOptions;
   /** The run's options, as `verification/verify` spells them: publish, filter, variants, … */
   options?: protocol.VerifyOptions;
+  /** The HTTP transport's drive options beside `base-url`: `headers`, `client`. Passed as given. */
+  transport?: Record<string, unknown>;
   /** A project configuration file (`verifier.janus.yaml`), loaded through the engine. */
   config?: string;
   /** Declared components, as for `Janus`. */
@@ -59,10 +61,22 @@ export interface StateHandler {
  */
 export type RequestFilter = (request: Record<string, unknown>) => unknown;
 
+/** A message a producer returns: bytes, a string or any value written as JSON, and what labels it. */
+export interface Message {
+  body: unknown;
+  /** Labels the body. Absent: the engine reads the type from the metadata, else the octets. */
+  contentType?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Receives today's request for the message: its description, provider states and any request. */
+export type MessageProducer = (request: Record<string, unknown>) => Message | Promise<Message>;
+
 export class Verifier {
   readonly #config: VerifierConfig;
   readonly #states: { state: string; handler: StateHandler }[] = [];
   readonly #filters: { filter: RequestFilter; changes: readonly string[] }[] = [];
+  readonly #messages: { description: string; produce: MessageProducer }[] = [];
 
   constructor(config: VerifierConfig) {
     this.#config = config;
@@ -80,12 +94,19 @@ export class Verifier {
     return this;
   }
 
+  /** Declares the producer of the message interaction with this description. */
+  message(description: string, produce: MessageProducer): this {
+    this.#messages.push({ description, produce });
+    return this;
+  }
+
   /** Runs the verification. Throws `VerificationFailedError` when the run failed. */
   async verify(): Promise<VerificationResult> {
     const source = await this.#source();
     const option = this.#config.engine;
     const engine = await Engine.start(typeof option === "function" ? option() : new SubprocessPipe(option));
-    const loopback = this.#states.length + this.#filters.length > 0 ? new Loopback() : undefined;
+    const handlers = this.#states.length + this.#filters.length + this.#messages.length;
+    const loopback = handlers > 0 ? new Loopback() : undefined;
     try {
       const config = this.#config.config
         ? (await engine.call(Op.ConfigLoad, { path: resolve(this.#config.config) })).config
@@ -93,7 +114,7 @@ export class Verifier {
       await loopback?.start();
       const components = [...(config?.components ?? []), ...(this.#config.components ?? []).map(resolved)];
       const target: protocol.VerificationTarget = {
-        transports: [{ transport: "http", options: { "base-url": this.#config.providerUrl } }],
+        transports: [{ transport: "http", options: { ...this.#config.transport, "base-url": this.#config.providerUrl } }],
         ...(components.length > 0 ? { components } : {}),
         ...(config || loopback ? { hooks: this.#hooks(config, loopback) } : {}),
       };
@@ -161,6 +182,11 @@ export class Verifier {
         answerFilter(filter, changes, context),
       );
     });
+    this.#messages.forEach(({ description, produce }, i) => {
+      const name = `message-${i + 1}`;
+      const entry = { name, when: { interaction: description }, changes: ["parts"], run: run("produce-message", name) };
+      add("produce-message", entry, (context) => answerMessage(produce, context));
+    });
     return { version: (config?.version as number | undefined) ?? 1, hooks: points };
   }
 }
@@ -214,6 +240,23 @@ async function answerFilter(filter: RequestFilter, changes: readonly string[], c
       outcome: "ok",
       changes: Object.fromEntries(answered.map((slot) => [`parts.request.${slot}`, { content: returned[slot] }])),
     };
+  } catch (error) {
+    return failed(error);
+  }
+}
+
+async function answerMessage(produce: MessageProducer, context: Context): Promise<Answer> {
+  const interaction = (context.interaction ?? {}) as { "pact-message"?: { request?: Record<string, unknown> } };
+  try {
+    const { body, contentType, metadata } = await produce(interaction["pact-message"]?.request ?? {});
+    const octets =
+      body instanceof Uint8Array ? body : new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body));
+    const slot: Answer = { content: Buffer.from(octets).toString("base64"), encoded: "base64" };
+    if (contentType !== undefined) {
+      slot["content-type"] = contentType;
+    }
+    const meta = { ...(contentType === undefined ? {} : { contentType }), ...metadata };
+    return { outcome: "ok", changes: { parts: { message: { metadata: { content: meta }, body: slot } } } };
   } catch (error) {
     return failed(error);
   }

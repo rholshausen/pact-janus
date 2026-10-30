@@ -1,0 +1,48 @@
+{
+  "description": "pact-js examples/provider-state: a parameterised state whose handler returns the new account's id. The provider answers as the example's own provider does, as recorded from it",
+  "source": "pact-js examples/provider-state (MIT) at 8a8f27a: the pact consumer.test.ts writes, and provider.ts's answers to it. Staged plan S1.15; ADR 0056 decision 5; the TypeScript SDK's test/examples verify the same pact through pact-janus/verifier",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": {
+      "values": {
+        "accountId": 1
+      }
+    },
+    "routes": [
+      {
+        "states": [
+          "an account with number {accountNumber} exists"
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/accounts/ACC-001",
+          "headers": {
+            "Accept": [
+              "application/json"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json; charset=utf-8"
+            ]
+          },
+          "body": {
+            "json": {
+              "id": 1,
+              "accountNumber": "ACC-001",
+              "ownerName": "Jane Smith",
+              "balance": 1000
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

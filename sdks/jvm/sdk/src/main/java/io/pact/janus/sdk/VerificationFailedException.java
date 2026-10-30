@@ -34,15 +34,24 @@ public class VerificationFailedException extends RuntimeException {
   private static String describe(List<Map<String, Object>> failures) {
     StringBuilder text = new StringBuilder("The provider verification failed");
     for (Map<String, Object> failure : failures) {
-      Object interaction = failure.get("interaction");
-      Object description = interaction instanceof Map<?, ?> ref ? ref.get("description") : interaction;
-      text.append("\n  ✗ ").append(description).append(" (").append(failure.get("variant")).append(')');
-      if (failure.get("mismatches") instanceof List<?> mismatches) {
-        for (Object mismatch : mismatches) {
-          Map<?, ?> m = mismatch instanceof Map<?, ?> map ? map : Map.of();
-          text.append("\n      ").append(m.get("path")).append(' ').append(m.get("message"));
-        }
+      text.append("\n  ✗ ").append(explain(failure).replace("\n", "\n  "));
+    }
+    return text.toString();
+  }
+
+  /** One result as text: its interaction and variant, then each mismatch, or its error. */
+  static String explain(Map<String, Object> result) {
+    Object interaction = result.get("interaction");
+    Object description = interaction instanceof Map<?, ?> ref ? ref.get("description") : interaction;
+    StringBuilder text = new StringBuilder().append(description).append(" (").append(result.get("variant")).append(')');
+    if (result.get("mismatches") instanceof List<?> mismatches) {
+      for (Object mismatch : mismatches) {
+        Map<?, ?> m = mismatch instanceof Map<?, ?> map ? map : Map.of();
+        text.append("\n    ").append(m.get("path")).append(' ').append(m.get("message"));
       }
+    }
+    if (result.get("error") instanceof Map<?, ?> error) {
+      text.append("\n    ").append(error.get("code")).append(": ").append(error.get("message"));
     }
     return text.toString();
   }

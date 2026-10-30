@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
 import io.pact.janus.sdk.JanusEngineException;
+import io.pact.janus.sdk.Message;
 import io.pact.janus.sdk.StateUnsupportedException;
 import io.pact.janus.sdk.VerificationFailedException;
 import io.pact.janus.sdk.VerificationResult;
@@ -82,6 +83,9 @@ final class ProviderRunner {
       if (script.has("options")) {
         verifier.withOptions(Suite.MAPPER.convertValue(script.get("options"), MAP));
       }
+      if (script.has("transport")) {
+        verifier.withTransport(Suite.MAPPER.convertValue(script.get("transport"), MAP));
+      }
       Path configFile = dir.resolve("verifier.janus.yaml").toAbsolutePath();
       if (script.has("config")) {
         Files.writeString(configFile, script.get("config").asText());
@@ -120,6 +124,18 @@ final class ProviderRunner {
         } else {
           verifier.requestFilter(spelled);
         }
+      }
+      n = 0;
+      for (JsonNode producer : script.path("message-producers")) {
+        String name = "message-" + ++n;
+        verifier.message(producer.path("description").asText(), request -> {
+          ObjectNode call = calls.addObject().put("handler", name);
+          call.set("request", Suite.MAPPER.valueToTree(request));
+          if (producer.has("throws")) {
+            throw new IllegalStateException(producer.get("throws").asText());
+          }
+          return message(producer.path("returns"));
+        });
       }
 
       if (testCase.path("verify").asBoolean(true)) {
@@ -316,5 +332,20 @@ final class ProviderRunner {
     });
     server.start();
     return server;
+  }
+
+  /** The case's message as this SDK's: bytes as a byte[], a string as itself, JSON as a Java value. */
+  private static Message message(JsonNode script) {
+    Object body = script.has("bytes") ? java.util.Base64.getDecoder().decode(script.get("bytes").asText())
+        : script.has("text") ? script.get("text").asText()
+        : Suite.MAPPER.convertValue(script.path("json"), Object.class);
+    Message message = Message.of(body);
+    if (script.has("content-type")) {
+      message = message.withContentType(script.get("content-type").asText());
+    }
+    if (script.has("metadata")) {
+      message = message.withMetadata(Suite.MAPPER.convertValue(script.get("metadata"), MAP));
+    }
+    return message;
   }
 }

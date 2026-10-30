@@ -272,8 +272,10 @@
           "description": "A configuration file's text, which the driver writes to a file and names as 'config' by a path relative to the working directory."
         },
         "components": { "type": "array", "items": { "type": "object" }, "description": "The 'components' option, as given." },
+        "transport": { "type": "object", "description": "The 'transport' option, as given: the HTTP transport's drive options beside 'base-url'." },
         "state-handlers": { "type": "array", "items": { "$ref": "#/$defs/StateHandler" } },
-        "request-filters": { "type": "array", "items": { "$ref": "#/$defs/RequestFilter" } }
+        "request-filters": { "type": "array", "items": { "$ref": "#/$defs/RequestFilter" } },
+        "message-producers": { "type": "array", "items": { "$ref": "#/$defs/MessageProducer" } }
       },
       "additionalProperties": false
     },
@@ -308,6 +310,30 @@
       },
       "additionalProperties": false
     },
+    "MessageProducer": {
+      "type": "object",
+      "description": "A message producer (behavioural spec 'message-producer'): it returns the message 'returns' describes, or throws a failure with the message 'throws'.",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string" },
+        "returns": { "$ref": "#/$defs/Message" },
+        "throws": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Message": {
+      "type": "object",
+      "description": "The message a producer returns. Its body is exactly one of 'json' (a value the language holds as its own object, list, number or boolean), 'text' (a string) and 'bytes' (the language's bytes, written here as base64); 'content-type' and 'metadata' are given only when present.",
+      "properties": {
+        "json": {},
+        "text": { "type": "string" },
+        "bytes": { "type": "string", "contentEncoding": "base64" },
+        "content-type": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "oneOf": [{ "required": ["json"] }, { "required": ["text"] }, { "required": ["bytes"] }],
+      "additionalProperties": false
+    },
     "Invoke": {
       "type": "object",
       "required": ["point", "hook", "context"],
@@ -322,7 +348,7 @@
     "HandlerCall": {
       "type": "object",
       "required": ["handler"],
-      "description": "One call of a declared handler, by its entry name: a state handler's 'action' ('setup' or 'teardown') and 'params', or a request filter's 'request'.",
+      "description": "One call of a declared handler, by its entry name: a state handler's 'action' ('setup' or 'teardown') and 'params', or the 'request' a request filter or a message producer received.",
       "properties": {
         "handler": { "type": "string" },
         "action": { "enum": ["setup", "teardown"] },
