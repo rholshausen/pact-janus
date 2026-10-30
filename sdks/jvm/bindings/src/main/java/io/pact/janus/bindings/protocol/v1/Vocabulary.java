@@ -126,13 +126,14 @@ public final class Vocabulary {
     public static final String VERIFICATION_HOOK = "verification/hook";
     public static final String VERIFICATION_WARNING = "verification/warning";
     public static final String VERIFICATION_EXECUTED_PLAN = "verification/executed-plan";
+    public static final String VERIFICATION_REPORT = "verification/report";
     public static final String VERIFICATION_FETCHED = "verification/fetched";
     public static final String VERIFICATION_PUBLISHED = "verification/published";
     public static final String VERIFICATION_FINISHED = "verification/finished";
     public static final String BROKER_PUBLISHED = "broker/published";
     public static final String BROKER_FINISHED = "broker/finished";
 
-    public static final List<String> KNOWN = List.of(VERIFICATION_STARTED, VERIFICATION_INTERACTION_STARTED, VERIFICATION_INTERACTION_RESULT, VERIFICATION_HOOK, VERIFICATION_WARNING, VERIFICATION_EXECUTED_PLAN, VERIFICATION_FETCHED, VERIFICATION_PUBLISHED, VERIFICATION_FINISHED, BROKER_PUBLISHED, BROKER_FINISHED);
+    public static final List<String> KNOWN = List.of(VERIFICATION_STARTED, VERIFICATION_INTERACTION_STARTED, VERIFICATION_INTERACTION_RESULT, VERIFICATION_HOOK, VERIFICATION_WARNING, VERIFICATION_EXECUTED_PLAN, VERIFICATION_REPORT, VERIFICATION_FETCHED, VERIFICATION_PUBLISHED, VERIFICATION_FINISHED, BROKER_PUBLISHED, BROKER_FINISHED);
   }
 
   /** Known values of {@code ExemptionResult.status}. */

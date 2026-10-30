@@ -108,6 +108,7 @@ export const EventKind = {
   VerificationHook: "verification/hook",
   VerificationWarning: "verification/warning",
   VerificationExecutedPlan: "verification/executed-plan",
+  VerificationReport: "verification/report",
   VerificationFetched: "verification/fetched",
   VerificationPublished: "verification/published",
   VerificationFinished: "verification/finished",

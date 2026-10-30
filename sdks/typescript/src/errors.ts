@@ -122,7 +122,7 @@ export interface VerificationResult {
   results: VerificationResultEntry[];
   /**
    * Every `verification/warning` payload, in order: what the run noticed and did not fail on, such as
-   * a provider state no handler sets up (ADR 0058). Each is also written to standard error.
+   * a provider state no handler sets up (ADR 0058). The run's report, printed as it ran, says them too.
    */
   warnings: Array<Record<string, unknown>>;
 }

@@ -33,6 +33,17 @@
               "default": false,
               "description": "End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'."
             },
+            "report": {
+              "type": "object",
+              "description": "Ask for the run's report (spec.md §9.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.",
+              "properties": {
+                "error-chain": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Say every layer of an error's chain, rather than what failed and its root cause (ADR 0054)."
+                }
+              }
+            },
             "unhandled-states": {
               "type": "string",
               "x-known-values": ["warn", "fail"],

@@ -169,8 +169,10 @@ Interaction getOrder = janus.interaction("get an order")
   engine reads its type from the metadata, else its octets.
 - `verify()` returns the `VerificationResult` for `verified` and `filtered` runs; a test that must
   not pass a filtered run checks `status()`. Its `warnings()` are the run's `verification/warning`
-  payloads, such as a provider state no handler sets up (ADR 0058), and each is also written to
-  standard error as it arrives, as the TypeScript SDK writes it. Handlers are called on the endpoint's own threads, not
+  payloads, such as a provider state no handler sets up (ADR 0058). The run's report, which the engine
+  writes, is printed to standard output as it arrives, as `janus verify` prints it: each interaction,
+  its states and its outcome, then the summary (ADR 0059). `withOptions` may give its own `report`,
+  such as `Map.of("error-chain", true)`; the SDK lays nothing out itself. Handlers are called on the endpoint's own threads, not
   the test's.
 - `start()` starts the same run and returns a `Verifier.VerificationRun`, whose `next()` returns each
   interaction result as the engine reports it, and `null` once the run has ended; `result()` is the

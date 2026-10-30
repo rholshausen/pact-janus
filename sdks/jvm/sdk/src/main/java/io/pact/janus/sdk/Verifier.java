@@ -96,7 +96,10 @@ public final class Verifier {
     return this;
   }
 
-  /** The run's options, as {@code verification/verify} spells them: publish, filter, variants, … */
+  /**
+   * The run's options, as {@code verification/verify} spells them: publish, filter, variants, … The
+   * run's report is asked for unless they give {@code report} themselves (ADR 0059).
+   */
   public Verifier withOptions(Map<String, ?> options) {
     this.options = json(options, "options");
     return this;
@@ -210,9 +213,12 @@ public final class Verifier {
       Map<String, Object> request = new LinkedHashMap<>();
       request.put("source", source);
       request.put("target", target);
+      Map<String, Object> sent = new LinkedHashMap<>();
+      sent.put("report", Map.of());
       if (options != null) {
-        request.put("options", options);
+        sent.putAll(options);
       }
+      request.put("options", sent);
       String stream = (String) engine.send(RequestFrameOp.VERIFICATION_VERIFY, request).ok().get("stream");
       return new VerificationRun(engine, loopback, stream);
     } catch (IOException e) {
@@ -245,6 +251,7 @@ public final class Verifier {
     private final String stream;
     private final List<Map<String, Object>> results = new ArrayList<>();
     private final List<Map<String, Object>> warnings = new ArrayList<>();
+    private boolean reported;
     private final java.util.ArrayDeque<Map<String, Object>> pending = new java.util.ArrayDeque<>();
     private VerificationResult result;
     private boolean closed;
@@ -280,23 +287,20 @@ public final class Verifier {
           pending.add(map(event.get("payload")));
         }
         if ("verification/warning".equals(event.get("kind"))) {
-          Map<String, Object> warning = map(event.get("payload"));
-          warnings.add(warning);
-          warn(warning);
+          warnings.add(map(event.get("payload")));
+        }
+        if ("verification/report".equals(event.get("kind"))) {
+          System.out.println(java.util.Objects.toString(map(event.get("payload")).get("text"), ""));
+          reported = true;
         }
         if (Boolean.TRUE.equals(event.get("last"))) {
+          if (reported) {
+            System.out.println(); // sets the report apart from what the test runner prints next
+          }
           Map<String, Object> summary = map(event.get("payload"));
           result = new VerificationResult(String.valueOf(summary.get("status")), summary, results, warnings);
         }
       }
-    }
-
-    /** A warning, on standard error as it arrives: a test shows what it prints (ADR 0058). */
-    private static void warn(Map<String, Object> warning) {
-      Object description = warning.get("interaction") instanceof Map<?, ?> interaction ? interaction.get("description") : null;
-      String where = description instanceof String named ? " in \"" + named + "\"" : "";
-      System.err.println("pact-janus warning (" + warning.get("code") + ")" + where + ": "
-          + java.util.Objects.toString(warning.get("message"), ""));
     }
 
     /** Stops the handlers and ends the engine. */

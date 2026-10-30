@@ -141,6 +141,9 @@ final class ProviderRunner {
       if (testCase.path("verify").asBoolean(true)) {
         JsonNode outcome;
         VerificationResult result = null;
+        java.io.PrintStream out = System.out;
+        java.io.ByteArrayOutputStream printed = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(printed, true, java.nio.charset.StandardCharsets.UTF_8));
         try {
           result = verifier.verify();
           outcome = Suite.MAPPER.getNodeFactory().textNode("ok");
@@ -159,6 +162,13 @@ final class ProviderRunner {
             throw e;
           }
           outcome = Suite.MAPPER.createObjectNode().put("error", "refused");
+        } finally {
+          System.setOut(out);
+        }
+        // What verify printed: the run's report, line by line (ADR 0059).
+        List<String> lines = printed.toString(java.nio.charset.StandardCharsets.UTF_8).lines().toList();
+        if (expect.has("printed") && !Suite.equal(expect.get("printed"), Suite.MAPPER.valueToTree(lines))) {
+          failures.add("what verify printed differs\n  expected: " + Suite.show(expect.get("printed")) + "\n  actual:   " + lines);
         }
         if (expect.has("outcome") && !Suite.subset(expect.get("outcome"), outcome)) {
           failures.add("the outcome differs\n  expected: " + Suite.show(expect.get("outcome")) + "\n  actual:   " + Suite.show(outcome));

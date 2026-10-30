@@ -74,7 +74,8 @@ superseding ADR instead.
 | [0055](0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md) | Verify a provider inside a test through the protocol's run, with handlers as loopback hooks and the configuration loaded by the engine's host | accepted |
 | [0056](0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md) | Provider test integrations: message producers as loopback hooks, a JUnit 5 extension that reports each interaction, and a pact-js-shaped `Verifier` | accepted |
 | [0057](0057-the-http-component-runs-http-status-class-as-an-in-tree-matcher.md) | The HTTP component runs `http:status-class`, as a matcher compiled into the embedding | accepted |
-| [0058](0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md) | A provider state no hook sets up is a warning, or a failure when the run asks | accepted |
+| [0058](0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md) | A provider state no hook sets up is a warning, or a failure when the run asks | accepted; decision 3 in part superseded by 0059 |
+| [0059](0059-the-engine-writes-a-verification-runs-report.md) | The engine writes a verification run's report, and every client prints it | accepted |
 
 ## Decision backlog
 

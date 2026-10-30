@@ -1,6 +1,6 @@
 # 0058 — A provider state no hook sets up is a warning, or a failure when the run asks
 
-- **Status**: accepted
+- **Status**: accepted; decision 3's printing superseded by [ADR 0059](0059-the-engine-writes-a-verification-runs-report.md), whose report says the warnings
 - **Date**: 2026-10-30
 - **Plan tasks**: none; found verifying PactFlow's `example-provider` through `pact-janus/verifier`.
   [ADR 0056](0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md)

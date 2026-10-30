@@ -41,17 +41,6 @@ pub fn paint(style: Style, text: impl std::fmt::Display) -> String {
   format!("{style}{text}{style:#}")
 }
 
-/// A run's or a decision's status word, by what it means: `verified`, `published` and `pass` are
-/// green, `failed` and `block` red, and anything else — `filtered`, `warn`, a word a newer engine
-/// added — yellow, since it is neither.
-pub fn status(word: &str) -> Style {
-  match word.to_ascii_lowercase().as_str() {
-    "verified" | "published" | "pass" | "passed" => PASS.bold(),
-    "failed" | "block" | "blocked" => FAIL,
-    _ => WARN.bold(),
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -62,13 +51,5 @@ mod tests {
     let painted = paint(FAIL, "FAILED");
     assert_eq!(painted, "\u{1b}[1m\u{1b}[31mFAILED\u{1b}[0m");
     assert_eq!(anstream::adapter::strip_str(&painted).to_string(), "FAILED");
-  }
-
-  #[test]
-  fn a_status_is_coloured_by_what_it_means() {
-    assert_eq!(status("VERIFIED"), PASS.bold());
-    assert_eq!(status("failed"), FAIL);
-    assert_eq!(status("BLOCK"), FAIL);
-    assert_eq!(status("filtered"), WARN.bold());
   }
 }

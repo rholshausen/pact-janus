@@ -11,11 +11,11 @@
 //! going (plan-grammar spec §3.3). The host maps each kind to its own look, and prints a kind it does
 //! not know as plain text.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// What a piece of display text is. The protocol's vocabulary is open (`x-known-values`); these are
 /// the kinds this engine writes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
   /// Something passed: a verdict of `true`, a compatible pair, a pass decision.
@@ -53,7 +53,7 @@ pub enum Kind {
 }
 
 /// One piece of display text, and what it is. No kind is plain text.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Segment {
   pub text: String,
   #[serde(skip_serializing_if = "Option::is_none")]

@@ -3,9 +3,13 @@
 //! **Everything this command knows about a run, it learns from events.** It starts the run with
 //! one `verification/verify` frame and then polls the stream until the terminal event (spec §9.2:
 //! termination is structural, so this loop reads `last` and never a kind vocabulary). There is no
-//! second channel and no Rust callback — which is what makes the rendering below something an SDK
-//! could reproduce exactly, and why the RFC insists hook activity and per-variant results are
-//! events rather than log lines.
+//! second channel and no Rust callback, which is why the RFC insists hook activity and per-variant
+//! results are events rather than log lines.
+//!
+//! What it prints as the run goes is the engine's report (ADR 0059): `options.report` asks for it,
+//! and each `verification/report` event's text is printed as it arrives, coloured from its
+//! segments. Every SDK prints the same report, and none of them, this command included, lays one
+//! out.
 //!
 //! Sources are read as *documents*, never sniffed: a Janus contract identifies itself (ADR 0011)
 //! and a v1–v4 pact is read as one (plan task 5.4). Both are handed to the engine untouched, which
@@ -17,7 +21,6 @@ use crate::engine;
 use crate::error::{self, Error};
 use crate::highlight;
 use crate::io;
-use crate::style::{self, paint};
 use clap::error::ErrorKind;
 use serde_json::{Value, json};
 
@@ -54,6 +57,9 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   }
   if args.unhandled_states == UnhandledStates::Fail {
     options["unhandled-states"] = json!("fail");
+  }
+  if args.output == Output::Text {
+    options["report"] = json!({ "error-chain": engine::full_chain() });
   }
   if args.publish {
     // `requires_all` guarantees the version; the branch and tags are the provider version's.
@@ -107,7 +113,6 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   let stream = started["stream"].as_str().unwrap_or_default().to_string();
 
   let text = args.output == Output::Text;
-  let mut reporter = Reporter::default();
   let summary = loop {
     let polled = engine::call(
       &mut engine,
@@ -121,8 +126,8 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
     }
     let mut last = None;
     for event in events {
-      if text {
-        reporter.report(&event);
+      if text && event["kind"] == json!("verification/report") {
+        outln!("{}", highlight::member(&event["payload"], "text"));
       }
       if event["last"] == json!(true) {
         last = Some(event["payload"].clone());
@@ -137,10 +142,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   // no pacts selected, a variant nothing records — did not run, and says why as any command that
   // could not run does: exit 2, not an answer about the provider (staged plan S1.29).
   let tallied = summary["variants"].is_object();
-  if text && tallied {
-    outln!();
-    outln!("{}", render_summary(&summary));
-  } else if !text {
+  if !text {
     outln!("{}", crate::output::pretty(&summary));
   }
   if !tallied {
@@ -556,428 +558,6 @@ fn broker_source(args: &VerifyArgs, url: &str) -> Result<Value, Error> {
     source["require-pacts"] = json!(false);
   }
   Ok(source)
-}
-
-/// What `janus verify` prints as a run's events arrive.
-///
-/// A hook that fails an exchange, or finds its state unreachable, is reported by the result that
-/// follows it too, so its event is held and printed under that result's line, once, where a reader
-/// looks for why the interaction failed. A hook that aborts the run is the summary's headline, and
-/// is printed there.
-#[derive(Default)]
-struct Reporter {
-  held_hook: Option<Value>,
-}
-
-impl Reporter {
-  /// One event, rendered. The vocabulary is open (spec §9.6), so an unrecognised kind is *printed*
-  /// rather than dropped: a host that silently ignored an event kind it did not know would hide
-  /// exactly the information a newer engine added to tell it something.
-  fn report(&mut self, event: &Value) {
-    let payload = &event["payload"];
-    match event["kind"].as_str().unwrap_or_default() {
-      "verification/started" => {
-        let providers = join(&payload["providers"]);
-        let formats = join(&payload["formats"]);
-        outln!(
-          "{}",
-          paint(
-            style::HEADING,
-            format!(
-              "Verifying {} in {} [{formats}] against {providers}",
-              count(&payload["interactions"], "interaction", "interactions"),
-              count(&payload["contracts"], "document", "documents"),
-            )
-          )
-        );
-        if payload["filtered"] == json!(true) {
-          outln!(
-            "  {}",
-            paint(
-              style::WARN,
-              "(filtered run: not every recorded variant will be replayed)"
-            )
-          );
-        }
-        outln!();
-      }
-      "verification/interaction-result" => self.result(payload),
-      "verification/fetched" => {
-        let pacts = payload["pacts"].as_array().cloned().unwrap_or_default();
-        outln!(
-          "{}",
-          paint(
-            style::HEADING,
-            format!(
-              "Fetched {} from {}",
-              count(&json!(pacts.len()), "pact", "pacts"),
-              payload["broker"].as_str().unwrap_or("the broker")
-            )
-          )
-        );
-        for pact in &pacts {
-          let consumer = pact["consumer"].as_str().unwrap_or("?");
-          let status = match (pact["wip"] == json!(true), pact["pending"] == json!(true)) {
-            (true, _) => paint(style::WARN, " (work in progress, pending)"),
-            (false, true) => paint(style::WARN, " (pending)"),
-            _ => String::new(),
-          };
-          outln!("  {consumer}{status}");
-          for notice in pact["notices"].as_array().into_iter().flatten() {
-            outln!("    {}", paint(style::DIM, notice.as_str().unwrap_or_default()));
-          }
-        }
-        outln!();
-      }
-      "verification/published" => {
-        let consumer = payload["consumer"].as_str().unwrap_or("?");
-        let version = payload["provider-version"].as_str().unwrap_or("?");
-        match payload["outcome"].as_str() {
-          Some("published") => outln!(
-            "  {} {consumer}'s result for provider version {version}",
-            paint(style::PASS, "published")
-          ),
-          Some("skipped") => match payload["reason"].as_str() {
-            Some("not-from-a-broker") => {
-              outln!(
-                "  {}",
-                paint(
-                  style::DIM,
-                  format!("not publishing {consumer}'s result: its pact was not fetched from a Pact Broker")
-                )
-              )
-            }
-            _ => {
-              outln!(
-                "  {} {consumer}'s result: the run's filter left some of its variants out",
-                paint(style::WARN, "not publishing")
-              )
-            }
-          },
-          _ => {
-            outln!(
-              "  {} for {consumer}'s result",
-              paint(style::FAIL, "PUBLISH FAILED")
-            );
-            print_error(&payload["error"]);
-          }
-        }
-      }
-      "verification/warning" => {
-        let code = payload["code"].as_str().unwrap_or("warning");
-        match (payload["target"].as_str(), payload["message"].as_str()) {
-          (Some(target), Some(message)) => {
-            outln!(
-              "  {}{code} at {}: {message}",
-              tag(style::WARN, "warn"),
-              paint(style::PATH, target)
-            )
-          }
-          (None, Some(message)) => outln!("  {}{code}: {message}", tag(style::WARN, "warn")),
-          _ => outln!("  {}{code}", tag(style::WARN, "warn")),
-        }
-      }
-      // `--explain-failures` is this event arriving: the executed plan for the variant that just
-      // failed, printed where the failure is, rather than left for a second command to re-derive.
-      "verification/executed-plan" => {
-        outln!();
-        outln!(
-          "  {}",
-          paint(
-            style::DIM,
-            format!(
-              "--- executed plan: {}{} ---",
-              payload["interaction"]["description"].as_str().unwrap_or("?"),
-              variant_label(payload)
-            )
-          )
-        );
-        for line in highlight::member(payload, "text").lines() {
-          outln!("  {line}");
-        }
-        outln!();
-      }
-      "verification/hook" => {
-        let outcome = payload["outcome"].as_str().unwrap_or("ok");
-        if outcome == "continue" || outcome == "ok" {
-          return;
-        }
-        match payload["effect"].as_str() {
-          Some("failed-exchange" | "state-unavailable") => self.held_hook = Some(payload.clone()),
-          // Its error is the summary's headline, where the run's end is explained.
-          Some("aborted-run") => outln!(
-            "  {}{} at {}: {}, and aborted the run",
-            tag(style::FAIL, "hook"),
-            payload["hook"].as_str().unwrap_or("?"),
-            payload["point"].as_str().unwrap_or("?"),
-            outcome
-          ),
-          _ => {
-            print_hook(payload, &format!("  {}", tag(style::WARN, "hook")));
-            print_error(&payload["error"]);
-          }
-        }
-      }
-      // The result line that follows says everything these two carry; printing them as well would
-      // double every run's output for no reader's benefit.
-      "verification/interaction-started" | "verification/finished" => {}
-      other => outln!("  {}{other}: {payload}", tag(style::DIM, "event")),
-    }
-  }
-
-  fn result(&mut self, payload: &Value) {
-    let line = format!(
-      "{}{}",
-      payload["interaction"]["description"].as_str().unwrap_or("?"),
-      variant_label(payload)
-    );
-    match payload["status"].as_str().unwrap_or("failed") {
-      "verified" => outln!("  {}{line}", tag(style::PASS, "ok")),
-      "state-unavailable" => {
-        outln!("  {}{line}", tag(style::WARN.bold(), "STATE"));
-        outln!(
-          "          {}",
-          paint(
-            style::DIM,
-            "the provider cannot reach a state this contract declares"
-          )
-        );
-      }
-      _ if payload["pending"] == json!(true) => {
-        outln!("  {}{line}", tag(style::WARN.bold(), "PENDING"));
-        outln!(
-          "          {}",
-          paint(
-            style::DIM,
-            "failed, and pending: reported, and not failing the run"
-          )
-        );
-      }
-      _ => outln!("  {}{line}", tag(style::FAIL, "FAILED")),
-    }
-    for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
-      outln!(
-        "          {}: {}",
-        paint(style::PATH, mismatch["path"].as_str().unwrap_or("")),
-        highlight::member(mismatch, "message")
-      );
-    }
-    // The hook's error is the result's: said once, after which hook it was.
-    if let Some(hook) = self.held_hook.take() {
-      print_hook(&hook, "          ");
-    }
-    print_error(&payload["error"]);
-  }
-}
-
-/// `word` in `look`, padded to the result column: the tag every line of a run's report opens with.
-fn tag(look: anstyle::Style, word: &str) -> String {
-  format!(
-    "{}{}",
-    paint(look, word),
-    " ".repeat(8usize.saturating_sub(word.len()))
-  )
-}
-
-/// `hook auth at before-request: failed`, after `indent`.
-fn print_hook(payload: &Value, indent: &str) {
-  outln!(
-    "{indent}{} at {}: {}",
-    payload["hook"].as_str().unwrap_or("?"),
-    payload["point"].as_str().unwrap_or("?"),
-    payload["outcome"].as_str().unwrap_or("?")
-  );
-}
-
-/// ` [shipped]`, the variant a result is about, or nothing for a v1–v4 pact's: one example is one
-/// variant, always `base`, and naming it on every line says nothing.
-fn variant_label(payload: &Value) -> String {
-  let pact = payload["interaction"]["format"]
-    .as_str()
-    .is_some_and(|format| format.starts_with("pact/"));
-  match payload["variant"].as_str() {
-    Some(_) if pact => String::new(),
-    Some(variant) => format!(" [{variant}]"),
-    None => String::new(),
-  }
-}
-
-/// `1 interaction`, `2 interactions`.
-fn count(n: &Value, one: &str, many: &str) -> String {
-  match n.as_u64() {
-    Some(1) => format!("1 {one}"),
-    Some(n) => format!("{n} {many}"),
-    None => format!("? {many}"),
-  }
-}
-
-/// An error under the result or hook line it belongs to: every line of it at the same indent.
-fn print_error(error: &Value) {
-  if error.is_null() {
-    return;
-  }
-  const INDENT: &str = "          ";
-  outln!(
-    "{INDENT}{}",
-    engine::render_error(error).replace('\n', &format!("\n{INDENT}"))
-  );
-}
-
-/// `FAILED: 0 verified, 2 failed (2 interactions)`: what the run reached, the tallies that are not
-/// zero beside the two that always matter, and how much there was. Variants are named only when
-/// there are more of them than interactions, as there are only in a contract.
-///
-/// The status is coloured by what it says, and so is each tally that is not zero: a reader's eye
-/// goes to the red `2 failed`, not to the `0 failed` of a run that passed.
-fn render_summary(summary: &Value) -> String {
-  let status = summary["status"].as_str().unwrap_or("failed").to_uppercase();
-  let variants = &summary["variants"];
-  let tally = |name: &str| variants[name].as_u64().unwrap_or(0);
-  let counted = |name: &str, label: &str, look: anstyle::Style| match tally(name) {
-    0 => format!("0 {label}"),
-    n => paint(look, format!("{n} {label}")),
-  };
-  let mut counts = vec![
-    counted("verified", "verified", style::PASS),
-    counted("failed", "failed", style::FAIL),
-  ];
-  for (name, label, look) in [
-    ("state-unavailable", "state-unavailable", style::WARN),
-    ("skipped", "skipped", style::DIM),
-    // `variants.total` counts what the run reached; an aborted or stopped run reached less than it
-    // planned, and the rest is counted beside the tallies, never folded into them.
-    ("not-run", "not run", style::WARN),
-  ] {
-    if tally(name) > 0 {
-      counts.push(counted(name, label, look));
-    }
-  }
-  let total = tally("total") + tally("not-run");
-  let interactions = summary["interactions"].as_u64().unwrap_or(0);
-  let scope = if total == interactions {
-    count(&json!(interactions), "interaction", "interactions")
-  } else {
-    format!(
-      "{} across {}",
-      count(&json!(total), "variant", "variants"),
-      count(&json!(interactions), "interaction", "interactions")
-    )
-  };
-  let mut text = format!(
-    "{}: {} ({scope})",
-    paint(style::status(&status), &status),
-    counts.join(", ")
-  );
-  if summary["filtered"] == json!(true) {
-    text.push('\n');
-    text.push_str(&paint(
-      style::WARN,
-      "This was a filtered run: unreplayed variants are not passing ones.",
-    ));
-  }
-  if summary["stopped"] == json!("first-failure") {
-    text.push('\n');
-    text.push_str(&paint(
-      style::WARN,
-      "The run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run.",
-    ));
-  }
-  // The abort is the headline of a run that ended this way, so it carries its cause: "the auth
-  // hook failed" sends a reader to the logs for what the report already knows.
-  if let Some(abort) = summary.get("aborted").filter(|a| !a.is_null()) {
-    text.push('\n');
-    text.push_str(&paint(
-      style::FAIL,
-      format!(
-        "The run was aborted by the '{}' hook at {}",
-        abort["hook"].as_str().unwrap_or("?"),
-        abort["point"].as_str().unwrap_or("?")
-      ),
-    ));
-    match abort.get("error").filter(|e| !e.is_null()) {
-      Some(error) => text.push_str(&format!(
-        ":\n  {}",
-        engine::render_error(error).replace('\n', "\n  ")
-      )),
-      None => text.push('.'),
-    }
-  }
-  text
-}
-
-fn join(value: &Value) -> String {
-  value
-    .as_array()
-    .map(|items| {
-      items
-        .iter()
-        .map(|item| item.as_str().unwrap_or_default().to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
-    })
-    .unwrap_or_default()
-}
-
-#[cfg(test)]
-mod tests {
-  use super::variant_label;
-  use pretty_assertions::assert_eq;
-  use serde_json::{Value, json};
-
-  /// The summary as a pipe receives it: [`super::render_summary`] with its colour stripped.
-  fn render_summary(summary: &Value) -> String {
-    anstream::adapter::strip_str(&super::render_summary(summary)).to_string()
-  }
-
-  /// What is coloured is what a reader looks for: the status, and the tallies that are not zero.
-  #[test]
-  fn a_summary_colours_its_status_and_the_tallies_that_are_not_zero() {
-    use crate::style::{self, paint};
-    let summary = json!({
-      "status": "failed", "interactions": 2,
-      "variants": { "total": 2, "verified": 0, "failed": 2, "state-unavailable": 0, "skipped": 0 },
-    });
-    assert_eq!(
-      super::render_summary(&summary),
-      format!(
-        "{}: 0 verified, {} (2 interactions)",
-        paint(style::FAIL, "FAILED"),
-        paint(style::FAIL, "2 failed")
-      )
-    );
-  }
-
-  /// The tallies that are zero are left out, but for the two that always matter; variants are named
-  /// only when there are more of them than interactions.
-  #[test]
-  fn a_summary_says_what_the_run_reached_and_how_much_there_was() {
-    let pact_run = json!({
-      "status": "failed", "interactions": 2,
-      "variants": { "total": 2, "verified": 0, "failed": 2, "state-unavailable": 0, "skipped": 0 },
-    });
-    assert_eq!(
-      render_summary(&pact_run),
-      "FAILED: 0 verified, 2 failed (2 interactions)"
-    );
-
-    let contract_run = json!({
-      "status": "failed", "interactions": 1, "stopped": "first-failure",
-      "variants": { "total": 2, "verified": 1, "failed": 1, "state-unavailable": 1, "skipped": 0, "not-run": 3 },
-    });
-    assert_eq!(
-      render_summary(&contract_run),
-      "FAILED: 1 verified, 1 failed, 1 state-unavailable, 3 not run (5 variants across 1 interaction)\n\
-       The run stopped at its first failure, as --exit-on-first-error asked: what it did not reach was not run."
-    );
-  }
-
-  #[test]
-  fn a_pacts_one_variant_goes_unnamed() {
-    let pact = json!({ "interaction": { "format": "pact/3.0.0" }, "variant": "base" });
-    let contract = json!({ "interaction": { "format": "janus-contract/1" }, "variant": "shipped" });
-    assert_eq!(variant_label(&pact), "");
-    assert_eq!(variant_label(&contract), " [shipped]");
-  }
 }
 
 /// Today's options, as the engine receives them (staged plan S1.13, ADR 0053): each command line is

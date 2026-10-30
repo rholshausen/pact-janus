@@ -25,6 +25,7 @@
             "verification/hook",
             "verification/warning",
             "verification/executed-plan",
+            "verification/report",
             "verification/fetched",
             "verification/published",
             "verification/finished",

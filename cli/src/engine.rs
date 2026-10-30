@@ -126,6 +126,11 @@ pub fn print_full_chains() {
   FULL_CHAIN.store(true, Ordering::Relaxed);
 }
 
+/// Whether `--error-chain` was given: what a run's report is asked to say of its errors too.
+pub fn full_chain() -> bool {
+  FULL_CHAIN.load(Ordering::Relaxed)
+}
+
 /// An engine error as a line a user can act on: the code first, because that is the part a user
 /// can look up, then the message, then each problem at its position.
 ///

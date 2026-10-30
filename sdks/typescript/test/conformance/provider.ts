@@ -84,7 +84,11 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
     });
 
     if (testCase.verify !== false) {
-      const { outcome, result } = await capture(() => verifier.verify(), pipe);
+      const printed: string[] = [];
+      const { outcome, result } = await printing(printed, () => capture(() => verifier.verify(), pipe));
+      if (expected.printed !== undefined && !equal(expected.printed, printed)) {
+        failures.push(`what verify printed differs\n  expected: ${show(expected.printed)}\n  actual:   ${show(printed)}`);
+      }
       if (expected.outcome !== undefined && !(equal(expected.outcome, outcome) || subset(expected.outcome, outcome))) {
         failures.push(`the outcome differs\n  expected: ${show(expected.outcome)}\n  actual:   ${show(outcome)}`);
       }
@@ -249,4 +253,20 @@ async function serve(provider: LiveProvider): Promise<{ url: string; close: () =
         server.close(() => resolve());
       }),
   };
+}
+
+/** Runs `run`, keeping what it writes to standard output as `printed`, line by line (ADR 0059). */
+async function printing<T>(printed: string[], run: () => Promise<T>): Promise<T> {
+  const write = process.stdout.write.bind(process.stdout);
+  let text = "";
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    text += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    return await run();
+  } finally {
+    process.stdout.write = write;
+    printed.push(...(text === "" ? [] : text.replace(/\n$/, "").split("\n")));
+  }
 }

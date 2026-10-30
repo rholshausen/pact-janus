@@ -137,7 +137,9 @@ Three sources are the source of truth and take precedence over this file when th
 > runs `http:status-class` as a matcher the embedding registers (`Engine::register_matcher`), and the
 > legacy compiler compiles a pact's rule to it. ADR 0058: a provider state no `state-setup` hook
 > admits is a `state-unhandled` warning, or fails the interaction with `options.unhandled-states:
-> fail` (`janus verify --unhandled-states fail`); the SDKs carry warnings on the result and print them.
+> fail` (`janus verify --unhandled-states fail`); the SDKs carry warnings on the result. ADR 0059: the
+> engine writes a run's report (`options.report`, `verification/report` events); `janus verify` and
+> both SDKs print it, so a passing provider test says what it verified, as pact-js's does.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -408,7 +410,8 @@ offline commands — and `cli/tests/cli.rs` the runs that need a provider or a r
 whole with snapbox where the output is the CLI's own. After a deliberate change,
 `TRYCMD=overwrite` and `SNAPSHOTS=overwrite` refresh them; read the diff. On a terminal, the output
 is coloured (S1.31): from one palette, `cli/src/style.rs`. Text the engine wrote — plans, the
-`check` page, mismatch messages — is coloured from the segments the engine marks it with (S1.34,
+`check` page, mismatch messages, and `verify`'s whole report, which the engine lays out
+(`engine/kernel/src/protocol/report.rs`, ADR 0059) so every SDK prints the same one — is coloured from the segments the engine marks it with (S1.34,
 engine-protocol spec §2.7, `cli/src/highlight.rs`), which a command asks for only when it prints
 text: never parse the engine's text to style it. Style text where it is built and print it with `outln!`/`errln!`, whose
 streams strip the colour off a terminal, under `NO_COLOR` and with `--no-colour`; never print

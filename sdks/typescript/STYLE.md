@@ -129,6 +129,10 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   proxy or logs is accepted and does nothing.
 - It imports no test framework, so it runs under Jest and Vitest alike, and `require()` loads it as
   `import` does (below), as a pact-js test suite in CommonJS needs.
+- `verify` prints the run's report to standard output as it arrives, as pact-js prints the verifier's:
+  each interaction, its states and its outcome, then the summary. The engine writes it
+  (`options.report`, ADR 0059), so this SDK, like `janus verify`, lays nothing out; `options` may give
+  its own `report`, such as `{ "error-chain": true }`.
 
 ## Packaging and distribution
 

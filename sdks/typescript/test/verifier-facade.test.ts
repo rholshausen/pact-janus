@@ -62,6 +62,7 @@ describe("pact-js's options", () => {
       "include-wip-since": "2026-01-01",
     });
     expect(frame?.options).toEqual({
+      report: {},
       filter: { consumers: ["web-app"] },
       publish: { "provider-version": "1.2.3", branch: "main", "build-url": "https://ci.example/1" },
     });

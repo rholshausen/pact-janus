@@ -45,12 +45,20 @@ pub struct Event {
   pub last: bool,
 }
 
+/// What follows a stream's events with events of its own, as they are appended.
+pub(crate) trait Observer: Send {
+  /// The events to append after `kind`'s, in order, as `(kind, payload)`.
+  fn observe(&mut self, kind: &str, payload: &Value) -> Vec<(String, Value)>;
+}
+
 /// An ordered event buffer for one unit of work (spec §9.1). Shared between the thread producing
 /// the events and the dispatch thread draining them, hence the interior mutability: both sides
 /// hold the same `Arc<Stream>` and neither owns it.
 pub(crate) struct Stream {
   id: String,
   inner: Mutex<Inner>,
+  /// What follows each event with events of its own: a run's report (ADR 0059). None on most streams.
+  observer: Mutex<Option<Box<dyn Observer>>>,
   /// Signalled on both edges — a poller waits for events to arrive, a blocked producer waits for
   /// room — so both waits share one condvar and every notification is a `notify_all`.
   change: Condvar,
@@ -71,6 +79,7 @@ impl Stream {
     Stream {
       id: id.into(),
       inner: Mutex::new(Inner::default()),
+      observer: Mutex::new(None),
       change: Condvar::new(),
     }
   }
@@ -92,7 +101,35 @@ impl Stream {
     self.append(kind.into(), payload, true);
   }
 
+  /// Follow each event appended from here with what `observer` says of it (ADR 0059).
+  pub fn observe(&self, observer: Box<dyn Observer>) {
+    *self.observer.lock().expect("observer mutex poisoned") = Some(observer);
+  }
+
+  /// An event, and then what the observer says of it. The terminal event comes last of all, so what
+  /// is said of it comes before it: nothing follows the terminal event (spec §9.2).
   fn append(&self, kind: String, payload: Value, last: bool) {
+    let follow = self
+      .observer
+      .lock()
+      .expect("observer mutex poisoned")
+      .as_mut()
+      .map(|observer| observer.observe(&kind, &payload))
+      .unwrap_or_default();
+    if last {
+      for (kind, payload) in follow {
+        self.push(kind, payload, false);
+      }
+      self.push(kind, payload, true);
+    } else {
+      self.push(kind, payload, false);
+      for (kind, payload) in follow {
+        self.push(kind, payload, false);
+      }
+    }
+  }
+
+  fn push(&self, kind: String, payload: Value, last: bool) {
     let mut inner = self.inner.lock().expect("stream mutex poisoned");
     if inner.produced_last {
       tracing::warn!(

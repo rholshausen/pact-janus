@@ -652,6 +652,9 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   message the pact expects; it needs no transport. When no hook produces it, its result is `failed`
   with `component-unavailable`, `details.component` `hook/produce-message` and `details.reason`
   `message-not-produced`.
+  With `options.report`, the run's stream also carries its report, `verification/report` events whose
+  text a host prints as they arrive (§9.6, ADR 0059); `report.error-chain` says every layer of each
+  error's chain in it.
   A provider state no `state-setup` hook of `target.hooks` admits is a `state-unhandled` warning, and
   the exchange runs without it; with `options.unhandled-states: "fail"` the variant fails instead,
   with `component-unavailable`, `details.component` `hook/state-setup`, `details.reason`
@@ -1027,6 +1030,7 @@ All on the verification stream; the vocabulary is open and grows without a versi
 | `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
 | `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034), `state-unhandled` (`state`, `message`; ADR 0058) | before the result it qualifies; a warning never changes a verdict |
+| `verification/report` | `text`, a block of whole lines a host prints as it arrives followed by a line break, and `text-segments` for a host that declared `segments` (§2.7) | when `options.report` asks (ADR 0059): after each event worth a line of the run's report (the start, each result with its states, mismatches and the hook that failed it, warnings, fetches, publications, executed plans), and the summary's line before the terminal event. The layout is the engine's, so every host prints the same report |
 | `verification/executed-plan` | the executed plan document/text (design 2.4), and `text-segments` for a host that declared `segments` (§2.7) | emitted when `verify` options request it — this is how `explain --executed` gets its input |
 | `verification/fetched` | the broker (its URL, without credentials), and per pact its consumer, `pending`, `wip` and notices | a `broker` or `urls` source, before the first interaction (§8.3); a `urls` source's broker is its first URL's origin |
 | `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it; `not-from-a-broker`: a `urls` source's pact no broker served) | one per pact, when `options.publish` asks (§8.3) |

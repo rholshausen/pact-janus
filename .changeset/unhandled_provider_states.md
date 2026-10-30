@@ -18,6 +18,6 @@ its exchange, with `component-unavailable`, `details.component: hook/state-setup
 `janus verify --unhandled-states fail` sets it.
 
 For an SDK maintainer: the behavioural specification's `verify` result gains `warnings`, every
-`verification/warning` payload in order, each also written to standard error as it arrives
+`verification/warning` payload in order, which the run's report says too (ADR 0059)
 (`verification.verify.warnings-collected`, conformance case `provider/warnings-collected`). The
 bindings' `VerifyOptions` gain `unhandled-states`.

@@ -1,0 +1,61 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/report-printed",
+  "category": "provider",
+  "title": "verify asks for the run's report and prints it as it arrives",
+  "covers": [
+    "verification.verify.report-printed"
+  ],
+  "why": "behavioural spec 'verify': 'report' is added to the options, and each 'verification/report' event's text is written to standard output as it arrives, then one empty line when the run has ended, and nothing else is (ADR 0059). The layout is the engine's: an SDK prints what it is sent.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": { "name": "web-app" },
+        "provider": { "name": "orders-api" },
+        "interactions": [
+          {
+            "description": "get an order",
+            "request": { "method": "GET", "path": "/orders/42" },
+            "response": { "status": 200 }
+          }
+        ],
+        "metadata": { "pactSpecification": { "version": "3.0.0" } }
+      }
+    ]
+  },
+  "engine": {
+    "events": [
+      { "kind": "verification/report", "payload": { "text": "Verifying 1 interaction in 1 document [pact/3.0.0] against orders-api\n" } },
+      {
+        "kind": "verification/interaction-result",
+        "payload": {
+          "interaction": {
+            "contract": { "consumer": "web-app", "provider": "orders-api" },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "status": "verified"
+        }
+      },
+      { "kind": "verification/report", "payload": { "text": "  ok      get an order" } },
+      { "kind": "verification/report", "payload": { "text": "\nVERIFIED: 1 verified, 0 failed (1 interaction)" } }
+    ]
+  },
+  "expect": {
+    "outcome": "ok",
+    "frames": {
+      "verification/verify": { "options": { "report": {} } }
+    },
+    "printed": [
+      "Verifying 1 interaction in 1 document [pact/3.0.0] against orders-api",
+      "",
+      "  ok      get an order",
+      "",
+      "VERIFIED: 1 verified, 0 failed (1 interaction)",
+      ""
+    ],
+    "result": { "status": "verified" }
+  }
+}

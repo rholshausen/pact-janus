@@ -35,7 +35,10 @@ export interface VerifierConfig {
   broker?: SourceOptions;
   /** A urls source: pacts by URL. */
   urls?: SourceOptions;
-  /** The run's options, as `verification/verify` spells them: publish, filter, variants, … */
+  /**
+   * The run's options, as `verification/verify` spells them: publish, filter, variants, … The run's
+   * report is asked for unless they give `report` themselves (ADR 0059).
+   */
   options?: protocol.VerifyOptions;
   /** The HTTP transport's drive options beside `base-url`: `headers`, `client`. Passed as given. */
   transport?: Record<string, unknown>;
@@ -121,7 +124,7 @@ export class Verifier {
       const { stream } = await engine.call(Op.VerificationVerify, {
         source,
         target,
-        ...(this.#config.options === undefined ? {} : { options: this.#config.options }),
+        options: { report: {}, ...this.#config.options },
       });
       const result = await poll(engine, stream);
       if (result.status === "failed") {
@@ -198,6 +201,7 @@ type Answer = Record<string, unknown>;
 async function poll(engine: Engine, stream: string): Promise<VerificationResult> {
   const results: VerificationResultEntry[] = [];
   const warnings: Array<Record<string, unknown>> = [];
+  let reported = false;
   for (;;) {
     const { events } = await engine.call(Op.EventsPoll, { streams: [stream], "wait-ms": POLL_WAIT_MS });
     for (const event of events) {
@@ -205,21 +209,20 @@ async function poll(engine: Engine, stream: string): Promise<VerificationResult>
         results.push(event.payload as VerificationResultEntry);
       }
       if (event.kind === "verification/warning") {
-        warnings.push(warn(event.payload));
+        warnings.push(event.payload);
+      }
+      if (event.kind === "verification/report") {
+        process.stdout.write(`${String(event.payload.text ?? "")}\n`);
+        reported = true;
       }
       if (event.last) {
+        if (reported) {
+          process.stdout.write("\n"); // sets the report apart from what the test runner prints next
+        }
         return { status: String(event.payload.status), summary: event.payload, results, warnings };
       }
     }
   }
-}
-
-/** Writes a warning to standard error as it arrives, and returns it: a test shows what it prints (ADR 0058). */
-function warn(warning: Record<string, unknown>): Record<string, unknown> {
-  const description = (warning.interaction as { description?: unknown } | undefined)?.description;
-  const where = typeof description === "string" ? ` in "${description}"` : "";
-  process.stderr.write(`pact-janus warning (${String(warning.code)})${where}: ${String(warning.message ?? "")}\n`);
-  return warning;
 }
 
 function paramsOf(context: Context): Record<string, unknown> {

@@ -392,7 +392,9 @@ fn verify_replays_a_v3_pact_at_a_running_provider_and_exits_zero() {
 Verifying 2 interactions in 1 document [pact/3.0.0] against order-service
 
   ok      a request for an order
+          given an order exists
   ok      a request for an order that does not exist
+          given no orders exist
 
 VERIFIED: 2 verified, 0 failed (2 interactions)
 
@@ -424,8 +426,10 @@ fn verify_exits_one_and_names_the_position_when_the_provider_disagrees() {
 Verifying 2 interactions in 1 document [pact/3.0.0] against order-service
 
   FAILED  a request for an order
+          given an order exists
           $.response.body.status: Expected 'SHIPPED' to equal 'CANCELLED'
   ok      a request for an order that does not exist
+          given no orders exist
 
 FAILED: 1 verified, 1 failed (2 interactions)
 

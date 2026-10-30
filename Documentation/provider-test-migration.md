@@ -36,7 +36,10 @@ await new Verifier({
 }).verifyProvider();
 ```
 
-It runs under Jest and Vitest alike: it is a promise, and imports neither. `require("pact-janus/verifier")`
+It runs under Jest and Vitest alike: it is a promise, and imports neither. As it runs, it prints the
+run's report to standard output, as pact-js prints the verifier's: each interaction, its states and
+whether it verified, then a summary. The engine writes it, so it reads as `janus verify`'s does
+([ADR 0059](decisions/0059-the-engine-writes-a-verification-runs-report.md)). `require("pact-janus/verifier")`
 works as `import` does, so a test suite written in CommonJS changes its `require` the same way. The
 engine is the `janus-engine` executable that `JANUS_ENGINE` names, else `janus-engine` on the `PATH`;
 the [releases](https://github.com/rholshausen/pact-janus/releases) have one for each platform.

@@ -718,6 +718,10 @@ impl Engine {
       })),
       _ => verification::Sources::Read(contracts),
     };
+    // The run's report (ADR 0059), when its options ask: written as the events arrive.
+    if let Some(report) = super::report::ReportOptions::from_options(req.options.as_ref()) {
+      stream.observe(Box::new(super::report::Reporter::new(report, self.segments)));
+    }
     let run = verification::start(
       sources,
       targets,

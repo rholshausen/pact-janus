@@ -472,6 +472,11 @@
           },
           "additionalProperties": false
         },
+        "printed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "'provider' cases: what 'verify' wrote to standard output, line by line: each 'verification/report' event's text, in order (ADR 0059)."
+        },
         "hooks": {
           "description": "'provider' cases: the 'verification/verify' frame's target.hooks, compared by value, with each url on the loopback interface written 'loopback:<path>' and each authorization header carrying a bearer token of at least 32 hex digits written 'Bearer <token>' (README §4). null: the frame has no target.hooks.",
           "anyOf": [{ "type": "object" }, { "type": "null" }]

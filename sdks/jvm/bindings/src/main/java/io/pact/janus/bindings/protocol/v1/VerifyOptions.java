@@ -31,6 +31,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "variant",
     "filter",
     "stop-on-first-failure",
+    "report",
     "unhandled-states"
 })
 public class VerifyOptions {
@@ -74,6 +75,13 @@ public class VerifyOptions {
     @JsonProperty("stop-on-first-failure")
     @JsonPropertyDescription("End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.")
     private Boolean stopOnFirstFailure;
+    /**
+     * Ask for the run's report (spec.md §9.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.
+     * 
+     */
+    @JsonProperty("report")
+    @JsonPropertyDescription("Ask for the run's report (spec.md \u00a79.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.")
+    private Report report;
     /**
      * A provider state no state-setup hook admits (lifecycle-hooks spec §3.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.
      * 
@@ -183,6 +191,24 @@ public class VerifyOptions {
     }
 
     /**
+     * Ask for the run's report (spec.md §9.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.
+     * 
+     */
+    @JsonProperty("report")
+    public Report getReport() {
+        return report;
+    }
+
+    /**
+     * Ask for the run's report (spec.md §9.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.
+     * 
+     */
+    @JsonProperty("report")
+    public void setReport(Report report) {
+        this.report = report;
+    }
+
+    /**
      * A provider state no state-setup hook admits (lifecycle-hooks spec §3.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.
      * 
      */
@@ -234,6 +260,10 @@ public class VerifyOptions {
         sb.append('=');
         sb.append(((this.stopOnFirstFailure == null)?"<null>":this.stopOnFirstFailure));
         sb.append(',');
+        sb.append("report");
+        sb.append('=');
+        sb.append(((this.report == null)?"<null>":this.report));
+        sb.append(',');
         sb.append("unhandledStates");
         sb.append('=');
         sb.append(((this.unhandledStates == null)?"<null>":this.unhandledStates));
@@ -257,6 +287,7 @@ public class VerifyOptions {
         result = ((result* 31)+((this.publish == null)? 0 :this.publish.hashCode()));
         result = ((result* 31)+((this.stopOnFirstFailure == null)? 0 :this.stopOnFirstFailure.hashCode()));
         result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
+        result = ((result* 31)+((this.report == null)? 0 :this.report.hashCode()));
         result = ((result* 31)+((this.variants == null)? 0 :this.variants.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.unhandledStates == null)? 0 :this.unhandledStates.hashCode()));
@@ -272,7 +303,7 @@ public class VerifyOptions {
             return false;
         }
         VerifyOptions rhs = ((VerifyOptions) other);
-        return ((((((((this.filter == rhs.filter)||((this.filter!= null)&&this.filter.equals(rhs.filter)))&&((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish))))&&((this.stopOnFirstFailure == rhs.stopOnFirstFailure)||((this.stopOnFirstFailure!= null)&&this.stopOnFirstFailure.equals(rhs.stopOnFirstFailure))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.variants == rhs.variants)||((this.variants!= null)&&this.variants.equals(rhs.variants))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.unhandledStates == rhs.unhandledStates)||((this.unhandledStates!= null)&&this.unhandledStates.equals(rhs.unhandledStates))));
+        return (((((((((this.filter == rhs.filter)||((this.filter!= null)&&this.filter.equals(rhs.filter)))&&((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish))))&&((this.stopOnFirstFailure == rhs.stopOnFirstFailure)||((this.stopOnFirstFailure!= null)&&this.stopOnFirstFailure.equals(rhs.stopOnFirstFailure))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report))))&&((this.variants == rhs.variants)||((this.variants!= null)&&this.variants.equals(rhs.variants))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.unhandledStates == rhs.unhandledStates)||((this.unhandledStates!= null)&&this.unhandledStates.equals(rhs.unhandledStates))));
     }
 
 }

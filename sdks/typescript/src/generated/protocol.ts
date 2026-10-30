@@ -1000,6 +1000,16 @@ export interface VerifyOptions {
    */
   "stop-on-first-failure"?: boolean;
   /**
+   * Ask for the run's report (spec.md §9.6, ADR 0059): a 'verification/report' event after each event worth a line, carrying the text a host prints as the run goes. Absent: no report.
+   */
+  report?: {
+    /**
+     * Say every layer of an error's chain, rather than what failed and its root cause (ADR 0054).
+     */
+    "error-chain"?: boolean;
+    [k: string]: unknown;
+  };
+  /**
    * A provider state no state-setup hook admits (lifecycle-hooks spec §3.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.
    */
   "unhandled-states"?: string;
