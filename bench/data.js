@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793339973696,
+  "lastUpdate": 1793339975431,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -31824,6 +31824,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 17724,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "95ec016e82389ace4e5cf391a9bb1d5b5ffd2d14",
+          "message": "fix: say why the SDKs could not start janus-engine, and where to get one\n\nThe error assumed a pact-janus checkout to build the engine in, which\nsomeone moving a pact-js or pact-jvm suite onto the SDKs does not have.\nBoth SDKs now say why the engine could not start (nothing on the PATH\nand JANUS_ENGINE unset, a path that does not exist, naming what pointed\nat it, or a file that is not executable) and name this platform's\nrelease asset and where it is released, with the build command as the\nalternative. A platform with no release is told to build one.\n\nThe TypeScript SDK now runs janus-engine from the PATH when JANUS_ENGINE\nis unset, as the JVM SDK already did, where it failed before starting.\n\nThe platform-to-asset mapping moves from each SDK's test resolver into\nits embedding layer (src/engine/release.ts; SubprocessEmbedding), and\nthe resolvers reuse it. Tests: test/engine-not-started.test.ts and\nSubprocessEmbeddingTest, each starting a missing and a non-executable\nengine. The style guides and the migration note say how the engine is\nfound.\n\nNo-Changeset: the SDKs are not part of what a release ships.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T16:54:06+11:00",
+          "tree_id": "bc1026f03b19288b3d44e4c6d561af4a40a5fa3d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/95ec016e82389ace4e5cf391a9bb1d5b5ffd2d14"
+        },
+        "date": 1793339975011,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25320,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18547,
             "unit": "requests per second",
             "extra": "engines 4"
           }
