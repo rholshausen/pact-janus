@@ -216,6 +216,13 @@ fn absolute_url(text: &str) -> Result<String, String> {
   }
 }
 
+/// What `verify` does with a provider state no state-setup hook handles (ADR 0058).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum UnhandledStates {
+  Warn,
+  Fail,
+}
+
 /// How a command prints its result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Output {
@@ -327,6 +334,11 @@ pub struct VerifyArgs {
   /// Stop at the first failure that fails the run; what it did not reach is not run
   #[arg(long)]
   pub exit_on_first_error: bool,
+
+  /// A provider state no state-setup hook handles: warn and run the exchange without it, or fail
+  /// the interaction without running it
+  #[arg(long, value_enum, value_name = "MODE", default_value = "warn")]
+  pub unhandled_states: UnhandledStates,
 
   // Today's state-change options, written as the hooks they become (staged plan S1.13, ADR 0053).
   // A configuration with state-setup hooks of its own says it once, there.

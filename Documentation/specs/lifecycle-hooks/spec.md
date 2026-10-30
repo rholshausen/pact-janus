@@ -221,6 +221,15 @@ are every state's resolved `params`, in the interaction's state order, then ever
 is today's verifiers' precedence. Like `data` (§4.4), `values` is cleared when the exchange ends.
 `values` returned at any other point is ignored.
 
+A state **no `state-setup` hook admits** — none is configured, or every one's `when` selects other
+states — is one the run cannot set up ([ADR 0058](../../decisions/0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md)).
+By default the verifier emits a `state-unhandled` warning naming it (engine-protocol spec §9.6) and the
+exchange runs without it, as pact-js runs it: a state whose setup the provider never needed verifies as
+before. A run whose options say `unhandled-states: fail` instead fails the variant before the exchange,
+as `component-unavailable` with `details.component` `hook/state-setup`, `details.reason`
+`state-unhandled` and `details.state` the state's name, as pact-jvm fails one. Teardown still runs for
+each state, as after any failure.
+
 ### 3.3 `before-request`
 
 Runs after state setup, immediately before the outbound parts leave the engine, for every exchange whose

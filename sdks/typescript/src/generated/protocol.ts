@@ -999,6 +999,10 @@ export interface VerifyOptions {
    * End the run at the first failure that fails it, as today's verifier's --exit-on-first-error (ADR 0053). A pending failure does not. What the run did not reach is not run, and the summary says 'stopped'.
    */
   "stop-on-first-failure"?: boolean;
+  /**
+   * A provider state no state-setup hook admits (lifecycle-hooks spec §3.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.
+   */
+  "unhandled-states"?: string;
   [k: string]: unknown;
 }
 

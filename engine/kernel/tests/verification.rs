@@ -1026,7 +1026,8 @@ fn the_verifier_resolves_the_states_each_variant_needs() {
     "the verifier resolved the binding itself, per variant: {shipped:?}"
   );
   assert!(
-    events.iter().all(|e| e["kind"] != json!("verification/warning")),
+    events.iter().all(|e| e["kind"] != json!("verification/warning")
+      || e["payload"]["code"] != json!("state-resolution-disagreement")),
     "both ends resolved the same binding the same way, so nothing to warn about"
   );
   for result in results(&events) {
@@ -1053,10 +1054,12 @@ fn a_recorded_resolution_that_disagrees_with_this_engines_is_reported() {
   let stream = started["ok"]["stream"].as_str().unwrap().to_string();
   let events = drain_run(&mut engine, &stream);
 
+  // No hook sets the state up here, which is a warning of its own (ADR 0058) and not this test's.
   let warnings: Vec<&Value> = events
     .iter()
     .filter(|e| e["kind"] == json!("verification/warning"))
     .map(|e| &e["payload"])
+    .filter(|warning| warning["code"] != json!("state-unhandled"))
     .collect();
   assert_eq!(warnings.len(), 1, "one variant disagrees: {events:?}");
   assert_eq!(warnings[0]["code"], json!("state-resolution-disagreement"));

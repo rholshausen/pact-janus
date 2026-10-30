@@ -460,10 +460,15 @@
         "outcome": { "$ref": "#/$defs/Outcome", "description": "'provider' and live provider cases: how 'verify' ended." },
         "result": {
           "type": "object",
-          "description": "'provider' and live provider cases: the result 'verify' returned, or the one its failure carries. 'status' compared, and 'results' by value when given.",
+          "description": "'provider' and live provider cases: the result 'verify' returned, or the one its failure carries. 'status' compared, and 'results' and 'warnings' by value when given.",
           "properties": {
             "status": { "type": "string" },
-            "results": { "type": "array", "items": { "type": "object" } }
+            "results": { "type": "array", "items": { "type": "object" } },
+            "warnings": {
+              "type": "array",
+              "items": { "type": "object" },
+              "description": "Every 'verification/warning' payload the run's stream carried, in order (ADR 0058)."
+            }
           },
           "additionalProperties": false
         },

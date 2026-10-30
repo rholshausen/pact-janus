@@ -63,7 +63,7 @@ own `Verifier` (`import { Verifier } from "pact-janus"`), which takes the protoc
 | `customProviderHeaders` | The HTTP transport's `headers`, as a map or as `"Name: value"` lines | kept |
 | `disableSslVerification`, `validateSSL: false` | The HTTP transport's `client.tls.insecure` | kept |
 | `stateHandlers` | A state handler per name, a function or `{ setup, teardown }`. What a setup returns is the provider-state values a `ProviderState` generator reads | kept |
-| A state with no handler | The exchange runs with no setup, as pact-js runs it with a warning | kept |
+| A state with no handler | The exchange runs with no setup, with a `state-unhandled` warning on standard error and on the result's `warnings`, as pact-js warns ([ADR 0058](decisions/0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md)). The SDK's own `Verifier` with `options: { "unhandled-states": "fail" }` fails it instead | kept |
 | `requestFilter` | An Express-style middleware `(req, res, next)`, called with the request's method, path, URL, headers, query and body. Only the headers it leaves on `req` reach the provider, because a filter must say what it changes before the run (lifecycle-hooks spec §4.3). A middleware that answers the request itself fails the exchange | adapted |
 | `messageProviders` | A message producer per description. It receives today's request for the message: its description, provider states, and a synchronous message's request | kept |
 | `providerWithMetadata(fn, metadata)` | The message's metadata. A `contentType` in it labels the body. A body with none is JSON, as pact-js's proxy writes it | kept |
@@ -140,7 +140,7 @@ class ContractTest {
 | `MessageTestTarget` | Not needed: a message is asked of the `@ProvidesMessage` methods. The verifier still takes a provider URL, which a messages-only run never reaches | adapted |
 | `@State(value, action)` | `io.pact.janus.sdk.State`, on the test class, its superclasses or its interfaces' default methods. A method takes no parameter or the state's parameters as a `Map`, and a setup may return a `Map` of provider-state values. `action = TEARDOWN` is the teardown | kept |
 | `context.withStateHandlers(...)`, state classes | `Verifier.state(name, setup, teardown)` on the verifier the extension runs | adapted |
-| A state with no `@State` method | The exchange runs with no setup, where pact-jvm fails the interaction. Usually the exchange fails on its own | adapted |
+| A state with no `@State` method | The exchange runs with no setup and a `state-unhandled` warning, where pact-jvm fails the interaction ([ADR 0058](decisions/0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md)). `withOptions(Map.of("unhandled-states", "fail"))` fails it as pact-jvm does | adapted |
 | `@PactVerifyProvider(description)` | `@ProvidesMessage(description)`. A method takes no parameter or today's request for the message as a `Map`, which carries a synchronous message's request | kept |
 | A `String`, `byte[]` or `MessageAndMetadata` returned | A `String`, `byte[]`, or `Message.of(bytes).withMetadata(map)`. Any other value is written as JSON | adapted |
 | A message body with no content type | Read by the engine from its metadata's `contentType`, else from its octets. pact-jvm labels it with the type the pact expects. A JSON body reads as JSON either way | adapted |

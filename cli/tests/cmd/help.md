@@ -50,22 +50,26 @@ Arguments:
                          --broker-url or --url
 
 Options:
-  -u, --provider-url <URL>   The base URL of the provider under test. Or --hostname and --port, as
-                             pact_verifier_cli takes it
-      --config <FILE>        A verifier configuration (verifier.janus.yaml): the hooks that set up
-                             provider states or authenticate, and the components the contracts need
-      --variant <ID>         Replay only this variant; repeatable. An id no document records is
-                             refused, and a run that left a variant out is reported as filtered,
-                             never as verified, and is not published
-      --transport <KIND>     The transport to bind to the provider. `https`, pact_verifier_cli's
-                             spelling, is the `http` transport over TLS [env:
-                             PACT_PROVIDER_TRANSPORT] [default: http]
-      --exit-on-first-error  Stop at the first failure that fails the run; what it did not reach is
-                             not run
-      --explain-failures     Print the executed plan for every variant that fails
-  -o, --output <FORMAT>      text prints progress and a summary; json prints only the run summary
-                             document [default: text] [possible values: text, json]
-  -h, --help                 Print help
+  -u, --provider-url <URL>       The base URL of the provider under test. Or --hostname and --port,
+                                 as pact_verifier_cli takes it
+      --config <FILE>            A verifier configuration (verifier.janus.yaml): the hooks that set
+                                 up provider states or authenticate, and the components the
+                                 contracts need
+      --variant <ID>             Replay only this variant; repeatable. An id no document records is
+                                 refused, and a run that left a variant out is reported as filtered,
+                                 never as verified, and is not published
+      --transport <KIND>         The transport to bind to the provider. `https`, pact_verifier_cli's
+                                 spelling, is the `http` transport over TLS [env:
+                                 PACT_PROVIDER_TRANSPORT] [default: http]
+      --exit-on-first-error      Stop at the first failure that fails the run; what it did not reach
+                                 is not run
+      --unhandled-states <MODE>  A provider state no state-setup hook handles: warn and run the
+                                 exchange without it, or fail the interaction without running it
+                                 [default: warn] [possible values: warn, fail]
+      --explain-failures         Print the executed plan for every variant that fails
+  -o, --output <FORMAT>          text prints progress and a summary; json prints only the run
+                                 summary document [default: text] [possible values: text, json]
+  -h, --help                     Print help
 
 Provider connection:
       --hostname <HOST>                The provider's host, when there is no --provider-url

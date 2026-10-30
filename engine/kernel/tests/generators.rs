@@ -95,6 +95,15 @@ fn verify(engine: &mut Engine, pact: Value, base_url: &str, states: Option<&str>
   panic!("the run never finished: {events:?}");
 }
 
+/// The run's `generator-failed` warnings: what these tests are about. A state no hook sets up is
+/// warned of too (ADR 0058), and is not.
+fn generator_warnings(events: &[Value]) -> Vec<&Value> {
+  of_kind(events, "verification/warning")
+    .into_iter()
+    .filter(|warning| warning["code"] == json!("generator-failed"))
+    .collect()
+}
+
 fn of_kind<'a>(events: &'a [Value], kind: &str) -> Vec<&'a Value> {
   events
     .iter()
@@ -244,7 +253,7 @@ fn a_state_change_reply_feeds_a_provider_state_generator() {
     of_kind(&events, "verification/interaction-result")[0]["status"],
     json!("verified")
   );
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   let requests = provider_requests(&received);
   assert_eq!(requests[0].line, "GET /orders/1234 HTTP/1.1");
 }
@@ -316,7 +325,7 @@ fn generators_reach_a_form_body() {
     of_kind(&events, "verification/interaction-result")[0]["status"],
     json!("verified")
   );
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   let requests = provider_requests(&received);
   assert_eq!(requests[0].body, "a=1&b=7&b=8&id=1234&note=as+is");
 }
@@ -342,7 +351,7 @@ fn generators_reach_an_xml_body() {
 
   let events = verify(&mut engine(), pact, &base_url, None);
 
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   let requests = provider_requests(&received);
   assert_eq!(
     requests[0].body,
@@ -368,7 +377,7 @@ fn a_generator_on_a_body_it_cannot_read_warns() {
 
   let events = verify(&mut engine(), pact, &base_url, None);
 
-  let warnings = of_kind(&events, "verification/warning");
+  let warnings = generator_warnings(&events);
   assert_eq!(warnings.len(), 1, "{events:?}");
   assert_eq!(warnings[0]["code"], json!("generator-failed"));
   assert_eq!(warnings[0]["target"], json!("$.request.body.a"));
@@ -401,7 +410,7 @@ fn a_generator_that_produces_nothing_sends_the_recorded_value_and_warns() {
     json!("verified"),
     "a warning never changes a verdict"
   );
-  let warnings = of_kind(&events, "verification/warning");
+  let warnings = generator_warnings(&events);
   assert_eq!(warnings.len(), 1, "{events:?}");
   assert_eq!(warnings[0]["code"], json!("generator-failed"));
   assert_eq!(warnings[0]["target"], json!("$.request.path"));
@@ -430,7 +439,7 @@ fn a_consumer_side_generator_is_left_alone() {
 
   let events = verify(&mut engine(), pact, &base_url, None);
 
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   let requests = provider_requests(&received);
   assert_eq!(
     requests[0].headers.get("location"),
@@ -481,7 +490,7 @@ fn a_contracts_request_generators_are_fed_by_the_state_change_reply() {
     of_kind(&events, "verification/interaction-result")[0]["status"],
     json!("verified")
   );
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   assert_eq!(requests[0].line, "GET /orders/1234 HTTP/1.1");
 }
 
@@ -508,7 +517,7 @@ fn a_contracts_value_generators_reach_the_header_the_query_and_the_body() {
     }),
   );
   let (events, requests) = verify_upgraded(&pact, "{}", false);
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   assert_eq!(requests[0].line, "POST /things?v1=200 HTTP/1.1");
   assert_eq!(requests[0].headers.get("x-test"), Some(&"100".to_string()));
   let body: Value = serde_json::from_str(&requests[0].body).expect("a JSON body");
@@ -535,7 +544,7 @@ fn a_contracts_form_and_xml_bodies_are_generated() {
     }),
   );
   let (events, requests) = verify_upgraded(&form, r#"{"id": 1234}"#, true);
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   assert_eq!(requests[0].body, "a=1&b=7&b=8&id=1234&note=as+is");
 
   let xml = pact(
@@ -552,7 +561,7 @@ fn a_contracts_form_and_xml_bodies_are_generated() {
     }),
   );
   let (events, requests) = verify_upgraded(&xml, "{}", false);
-  assert!(of_kind(&events, "verification/warning").is_empty(), "{events:?}");
+  assert!(generator_warnings(&events).is_empty(), "{events:?}");
   // Written back by the XML component, which keeps what a verdict reads (ADR 0039 decision 2).
   let document = pact_janus_kernel::legacy::xml::document(requests[0].body.as_bytes()).expect("XML");
   assert_eq!(
@@ -572,7 +581,7 @@ fn a_contracts_generator_that_produces_nothing_sends_the_recorded_value_and_warn
     }),
   );
   let (events, requests) = verify_upgraded(&pact, "{}", true);
-  let warnings = of_kind(&events, "verification/warning");
+  let warnings = generator_warnings(&events);
   assert_eq!(warnings.len(), 1, "{events:?}");
   assert_eq!(warnings[0]["code"], json!("generator-failed"));
   assert_eq!(warnings[0]["target"], json!("$.request.path"));

@@ -174,6 +174,12 @@ final class ProviderRunner {
             failures.add("the results differ\n  expected: " + Suite.show(expectedResult.get("results")) + "\n  actual:   " + Suite.show(actual));
           }
         }
+        if (expectedResult.has("warnings")) {
+          JsonNode actual = result == null ? null : Suite.MAPPER.valueToTree(result.warnings());
+          if (!Suite.equal(expectedResult.get("warnings"), actual)) {
+            failures.add("the warnings differ\n  expected: " + Suite.show(expectedResult.get("warnings")) + "\n  actual:   " + Suite.show(actual));
+          }
+        }
       }
 
       JsonNode verify = pipe == null ? null : pipe.bodyOf("verification/verify");

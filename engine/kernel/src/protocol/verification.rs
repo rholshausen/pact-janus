@@ -842,12 +842,7 @@ pub(crate) fn start(
   segments: bool,
 ) -> Run {
   let executed_plans = Reporting::from_options(options.as_ref(), segments);
-  // Today's --exit-on-first-error (ADR 0053): end the run at the first failure that fails it.
-  let stop_on_failure = options
-    .as_ref()
-    .and_then(|options| options.get("stop-on-first-failure"))
-    .and_then(Value::as_bool)
-    .unwrap_or(false);
+  let policy = RunPolicy::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
   let crashed = match &sources {
     Sources::Read(sources) => crashed_summary(sources, &filter),
@@ -883,7 +878,7 @@ pub(crate) fn start(
         hooks,
         filter,
         executed_plans,
-        stop_on_failure,
+        policy,
         thread_stream,
       )
     })
@@ -1016,7 +1011,7 @@ fn run(
   hooks: Option<HookRunner>,
   filter: Filter,
   executed_plans: Reporting,
-  stop_on_failure: bool,
+  policy: RunPolicy,
   stream: Arc<Stream>,
 ) {
   let RunComponents {
@@ -1094,7 +1089,7 @@ fn run(
             stream: &stream,
             hooks: hooks.as_mut(),
             pending: source_pending || source.interaction_pending(index),
-            stop_on_failure,
+            policy,
           },
           &mut tally,
         );
@@ -1548,8 +1543,30 @@ struct RunContext<'a> {
   /// The interaction is pending — its pact is, or it is itself (a v4 interaction marked so): its
   /// results say `pending: true`, and its failures do not fail the run (spec §8.3).
   pending: bool,
-  /// End the run at the first failure that fails it (ADR 0053). A pending failure does not.
+  policy: RunPolicy,
+}
+
+/// How strict a run is, from its options.
+#[derive(Debug, Clone, Copy, Default)]
+struct RunPolicy {
+  /// End the run at the first failure that fails it, as today's `--exit-on-first-error` (ADR 0053).
+  /// A pending failure does not.
   stop_on_failure: bool,
+  /// Fail an interaction with a provider state no `state-setup` hook handles, rather than warn and
+  /// run it without setup (ADR 0058).
+  fail_unhandled_states: bool,
+}
+
+impl RunPolicy {
+  fn from_options(options: Option<&Value>) -> RunPolicy {
+    let option = |name: &str| options.and_then(|options| options.get(name));
+    RunPolicy {
+      stop_on_failure: option("stop-on-first-failure")
+        .and_then(Value::as_bool)
+        .unwrap_or(false),
+      fail_unhandled_states: option("unhandled-states").and_then(Value::as_str) == Some("fail"),
+    }
+  }
 }
 
 impl RunContext<'_> {
@@ -2009,7 +2026,7 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
   for replay in prepared.replays {
     // A failure that fails the run, since the last replay, ends it when asked (ADR 0053).
     let failing = tally.failed + tally.state_unavailable - tally.pending_failed;
-    if ctx.stop_on_failure && failing > 0 {
+    if ctx.policy.stop_on_failure && failing > 0 {
       return Flow::Stop;
     }
     if !ctx.filter.admits(replay.variant()) {
@@ -2067,7 +2084,7 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
     }
   }
   let failing = tally.failed + tally.state_unavailable - tally.pending_failed;
-  if ctx.stop_on_failure && failing > 0 {
+  if ctx.policy.stop_on_failure && failing > 0 {
     return Flow::Stop;
   }
   Flow::Continue
@@ -2130,6 +2147,17 @@ fn verify_exchange(
       state: Some(serde_json::to_value(state).unwrap_or(Value::Null)),
       ..base.clone()
     };
+    if let Some(name) = unhandled_state(ctx, &occurrence) {
+      if ctx.policy.fail_unhandled_states {
+        let error = serde_json::to_value(EngineError::state_unhandled(&name)).unwrap_or(Value::Null);
+        result = Some(json!({
+          "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed",
+          "error": error,
+        }));
+        break;
+      }
+      warn_unhandled_state(exchange, &name, ctx);
+    }
     let (status, aborted) = hook_point(ctx, "state-setup", &occurrence, None, &mut scratch);
     if let Some(abort) = aborted {
       flow = Flow::Abort(abort.clone());
@@ -2480,6 +2508,29 @@ fn fill_slot(
     encoded.content_type = slot.content_type.clone();
   }
   *slot = encoded;
+}
+
+/// The name of the state `occurrence` is about, when no `state-setup` hook admits it (ADR 0058).
+fn unhandled_state(ctx: &RunContext<'_>, occurrence: &Occurrence) -> Option<String> {
+  let handled = ctx
+    .hooks
+    .as_ref()
+    .is_some_and(|hooks| hooks.admits_any("state-setup", occurrence));
+  (!handled).then(|| occurrence.state_name().unwrap_or_default().to_string())
+}
+
+/// A state no hook sets up, as a `state-unhandled` warning before the result it qualifies: the
+/// exchange runs without setup, as pact-js runs it (ADR 0058).
+fn warn_unhandled_state(exchange: &Exchange<'_>, state: &str, ctx: &RunContext<'_>) {
+  tracing::debug!(%state, "no state-setup hook handles this provider state; the exchange runs without setup");
+  ctx.stream.emit(
+    "verification/warning",
+    json!({
+      "code": "state-unhandled",
+      "interaction": exchange.reference, "variant": exchange.ready.variant, "state": state,
+      "message": format!("no state-setup hook handles the provider state '{state}', so the exchange runs without setting it up"),
+    }),
+  );
 }
 
 /// Each generator that produced nothing, as a `generator-failed` warning before the result it

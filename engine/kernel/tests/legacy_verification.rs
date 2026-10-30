@@ -1514,3 +1514,117 @@ fn a_run_asked_to_stop_on_its_first_failure_replays_nothing_after_it() {
     "a stop is not a hook's abort: {summary}"
   );
 }
+
+/// Two interactions, each with a provider state; a script hook sets up only the first's.
+fn two_states_and_one_handler() -> (Vec<Value>, Value) {
+  let interaction = |description: &str, state: &str, path: &str| {
+    json!({ "description": description, "providerStates": [ { "name": state } ],
+            "request": { "method": "GET", "path": path }, "response": { "status": 200 } })
+  };
+  let pact = json!({
+    "consumer": { "name": "consumer" }, "provider": { "name": "provider" },
+    "interactions": [
+      interaction("get an order", "an order exists", "/orders/1"),
+      interaction("get a customer", "a customer exists", "/customers/1"),
+    ],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  });
+  let hooks = json!({ "hooks": { "state-setup": [
+    { "name": "orders", "when": { "state": "an order exists" },
+      "run": { "kind": "script", "source": "function hook(ctx) { return { outcome: 'ok' }; }" } } ] } });
+  (vec![pact], hooks)
+}
+
+fn verify_with_options(
+  engine: &mut Engine,
+  documents: Vec<Value>,
+  base_url: &str,
+  hooks: Value,
+  options: Value,
+) -> Vec<Value> {
+  let target =
+    json!({ "transports": [ { "transport": "http", "options": { "base-url": base_url } } ], "hooks": hooks });
+  let started = send(
+    engine,
+    "v-1",
+    "verification/verify",
+    json!({ "source": { "kind": "inline", "contracts": documents }, "target": target, "options": options }),
+  );
+  let stream = started["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify failed: {started}"))
+    .to_string();
+  drain_run(engine, &stream)
+}
+
+/// ADR 0058: a state no state-setup hook admits is a warning before its result, and the exchange runs
+/// without setup, as pact-js runs it. The verdict is the provider's.
+#[test]
+fn a_state_no_hook_sets_up_is_a_warning_and_the_exchange_still_runs() {
+  let mut engine = engine_with_everything();
+  let (base_url, requests) = stub_provider(vec![canned(200, "{}"), canned(200, "{}")]);
+  let (pacts, hooks) = two_states_and_one_handler();
+  let events = verify(&mut engine, pacts, &base_url, Some(hooks));
+
+  assert_all_verified(&events, 2);
+  assert_eq!(requests.try_iter().count(), 2, "both exchanges ran");
+  let warnings = payloads(&events, "verification/warning");
+  assert_eq!(warnings.len(), 1, "{warnings:?}");
+  assert_eq!(warnings[0]["code"], json!("state-unhandled"));
+  assert_eq!(warnings[0]["state"], json!("a customer exists"));
+  assert_eq!(warnings[0]["interaction"]["description"], json!("get a customer"));
+  assert_eq!(
+    warnings[0]["message"],
+    json!(
+      "no state-setup hook handles the provider state 'a customer exists', so the exchange runs without setting it up"
+    )
+  );
+  let kinds: Vec<&str> = events.iter().filter_map(|e| e["kind"].as_str()).collect();
+  let warned = kinds.iter().position(|k| *k == "verification/warning").unwrap();
+  let second_result = kinds
+    .iter()
+    .enumerate()
+    .filter(|(_, k)| **k == "verification/interaction-result")
+    .nth(1)
+    .unwrap()
+    .0;
+  assert!(
+    warned < second_result,
+    "the warning comes before the result it qualifies: {kinds:?}"
+  );
+}
+
+/// ADR 0058: with `unhandled-states: fail`, the interaction fails by name, as a message no hook
+/// produces does, and its exchange is not run.
+#[test]
+fn a_run_asked_to_fail_unhandled_states_fails_the_interaction_without_running_it() {
+  let mut engine = engine_with_everything();
+  let (base_url, requests) = stub_provider(vec![canned(200, "{}"), canned(200, "{}")]);
+  let (pacts, hooks) = two_states_and_one_handler();
+  let events = verify_with_options(
+    &mut engine,
+    pacts,
+    &base_url,
+    hooks,
+    json!({ "unhandled-states": "fail" }),
+  );
+
+  let results = results(&events);
+  assert_eq!(results[0]["status"], json!("verified"));
+  assert_eq!(results[1]["status"], json!("failed"));
+  assert_eq!(results[1]["error"]["code"], json!("component-unavailable"));
+  assert_eq!(
+    results[1]["error"]["details"],
+    json!({ "component": "hook/state-setup", "reason": "state-unhandled", "state": "a customer exists" })
+  );
+  assert_eq!(
+    requests.try_iter().count(),
+    1,
+    "the unhandled interaction's exchange did not run"
+  );
+  assert!(
+    payloads(&events, "verification/warning").is_empty(),
+    "the failure says it; no warning repeats it"
+  );
+  assert_eq!(summary(&events)["status"], json!("failed"));
+}

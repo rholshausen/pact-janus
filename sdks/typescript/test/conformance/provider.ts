@@ -94,6 +94,9 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
       if (expected.result?.results !== undefined && !equal(expected.result.results, result?.results)) {
         failures.push(`the results differ\n  expected: ${show(expected.result.results)}\n  actual:   ${show(result?.results)}`);
       }
+      if (expected.result?.warnings !== undefined && !equal(expected.result.warnings, result?.warnings)) {
+        failures.push(`the warnings differ\n  expected: ${show(expected.result.warnings)}\n  actual:   ${show(result?.warnings)}`);
+      }
     }
 
     const verify = pipe?.bodyOf("verification/verify");

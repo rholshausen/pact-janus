@@ -397,6 +397,24 @@ impl EngineError {
   /// `component-unavailable` naming `hook/produce-message` (staged plan S1.7): a message interaction
   /// whose message no `produce-message` hook produced, so the provider was never asked for it.
   /// `reason` is `message-not-produced` and `part` names the part the plan scores.
+  /// A provider state no `state-setup` hook handles, when the run's `unhandled-states` option says
+  /// to fail it (ADR 0058): the exchange is not run, since the provider was never put in the state.
+  pub fn state_unhandled(state: &str) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!(
+        "no state-setup hook handles the provider state '{state}', so the exchange was not run"
+      ),
+      details: Some(Box::new(serde_json::json!({
+        "component": "hook/state-setup",
+        "reason": "state-unhandled",
+        "state": state,
+      }))),
+      chain: None,
+    }
+  }
+
   pub fn message_not_produced(part: &str) -> Self {
     EngineError {
       code: "component-unavailable".to_string(),

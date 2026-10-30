@@ -120,6 +120,11 @@ export interface VerificationResult {
   /** The terminal event's summary document, as the engine sent it. */
   summary: Record<string, unknown>;
   results: VerificationResultEntry[];
+  /**
+   * Every `verification/warning` payload, in order: what the run noticed and did not fail on, such as
+   * a provider state no handler sets up (ADR 0058). Each is also written to standard error.
+   */
+  warnings: Array<Record<string, unknown>>;
 }
 
 /** The run's status was `failed`. Names each failed result that is not pending. */

@@ -73,12 +73,23 @@ pub struct Occurrence {
   pub transport: Option<String>,
 }
 
+/// Whether `entry`'s `when` selector admits `occurrence` (spec §4.2); one with none admits all.
+fn admits(entry: &HookEntry, occurrence: &Occurrence) -> bool {
+  entry.when.as_ref().is_none_or(|when| {
+    when.admits(
+      occurrence.interaction_description(),
+      occurrence.state_name(),
+      occurrence.transport.as_deref(),
+    )
+  })
+}
+
 impl Occurrence {
   fn interaction_description(&self) -> Option<&str> {
     self.interaction.as_ref()?.get("description")?.as_str()
   }
 
-  fn state_name(&self) -> Option<&str> {
+  pub(crate) fn state_name(&self) -> Option<&str> {
     self.state.as_ref()?.get("name")?.as_str()
   }
 
@@ -183,14 +194,7 @@ impl HookRunner {
     let parts = parts.unwrap_or(&mut scratch_parts);
 
     for entry in &entries {
-      let admitted = entry.when.as_ref().is_none_or(|when| {
-        when.admits(
-          occurrence.interaction_description(),
-          occurrence.state_name(),
-          occurrence.transport.as_deref(),
-        )
-      });
-      if !admitted {
+      if !admits(entry, occurrence) {
         // Not recorded: a hook that did not run is absent from the report, and that difference from
         // "ran and changed nothing" is exactly how a wrong selector is spotted (spec §10.2).
         tracing::debug!(point = point_name, hook = %entry.name, "selector did not admit this occurrence");
@@ -205,6 +209,14 @@ impl HookRunner {
       }
     }
     PointOutcome::Continue
+  }
+
+  /// Whether any hook at `point_name` would run for `occurrence`: a provider state no `state-setup`
+  /// hook admits is one the run cannot set up (ADR 0058).
+  pub fn admits_any(&self, point_name: &str, occurrence: &Occurrence) -> bool {
+    entries_at(&self.config, point_name)
+      .iter()
+      .any(|entry| admits(entry, occurrence))
   }
 
   #[allow(clippy::too_many_arguments)]

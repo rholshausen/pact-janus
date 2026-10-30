@@ -353,3 +353,12 @@ export const VerificationViewStatus = {
   Incomplete: "incomplete",
   Unknown: "unknown",
 } as const;
+
+/**
+ * Known values of `VerifyOptions.unhandled-states` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const VerifyOptionsUnhandledStates = {
+  Warn: "warn",
+  Fail: "fail",
+} as const;

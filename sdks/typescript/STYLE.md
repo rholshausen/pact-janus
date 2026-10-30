@@ -49,7 +49,7 @@ specification disagree, the behavioural specification wins and this file has a b
 | one or more closures threw | `VariantsFailedError` | `failures[]`: each variant descriptor and its cause; the message names each by label and id |
 | no contract written | `ContractWithheldError` | the engine's `results`, and `failedTests` — interactions whose `execute` failed |
 | the embedding itself (no engine to start, the process died) | `Error` | what the pipe saw; these are not engine outcomes. One that could not start says why, and names this platform's release asset |
-| a provider run whose status is `failed` | `VerificationFailedError` | `result` (status, summary, results) and `failures`: the failed results that are not pending |
+| a provider run whose status is `failed` | `VerificationFailedError` | `result` (status, summary, results, warnings) and `failures`: the failed results that are not pending |
 | a verifier naming no source, or two | `TypeError` | thrown by `verify` before anything is sent |
 
 One `JanusError` class, not one per code: codes are an open vocabulary (engine-protocol spec §2.2), so

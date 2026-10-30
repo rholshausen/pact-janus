@@ -197,17 +197,29 @@ type Answer = Record<string, unknown>;
 /** Polls the run's stream to its terminal event, collecting every interaction result. */
 async function poll(engine: Engine, stream: string): Promise<VerificationResult> {
   const results: VerificationResultEntry[] = [];
+  const warnings: Array<Record<string, unknown>> = [];
   for (;;) {
     const { events } = await engine.call(Op.EventsPoll, { streams: [stream], "wait-ms": POLL_WAIT_MS });
     for (const event of events) {
       if (event.kind === "verification/interaction-result") {
         results.push(event.payload as VerificationResultEntry);
       }
+      if (event.kind === "verification/warning") {
+        warnings.push(warn(event.payload));
+      }
       if (event.last) {
-        return { status: String(event.payload.status), summary: event.payload, results };
+        return { status: String(event.payload.status), summary: event.payload, results, warnings };
       }
     }
   }
+}
+
+/** Writes a warning to standard error as it arrives, and returns it: a test shows what it prints (ADR 0058). */
+function warn(warning: Record<string, unknown>): Record<string, unknown> {
+  const description = (warning.interaction as { description?: unknown } | undefined)?.description;
+  const where = typeof description === "string" ? ` in "${description}"` : "";
+  process.stderr.write(`pact-janus warning (${String(warning.code)})${where}: ${String(warning.message ?? "")}\n`);
+  return warning;
 }
 
 function paramsOf(context: Context): Record<string, unknown> {

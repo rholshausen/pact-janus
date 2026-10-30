@@ -135,7 +135,9 @@ Three sources are the source of truth and take precedence over this file when th
 > under `corpora/verifier/examples/`; `Documentation/provider-test-migration.md` is the migration
 > note. They found S1.35, the v4 `statusCode` matcher, now done (ADR 0057): the built-in HTTP component
 > runs `http:status-class` as a matcher the embedding registers (`Engine::register_matcher`), and the
-> legacy compiler compiles a pact's rule to it.
+> legacy compiler compiles a pact's rule to it. ADR 0058: a provider state no `state-setup` hook
+> admits is a `state-unhandled` warning, or fails the interaction with `options.unhandled-states:
+> fail` (`janus verify --unhandled-states fail`); the SDKs carry warnings on the result and print them.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

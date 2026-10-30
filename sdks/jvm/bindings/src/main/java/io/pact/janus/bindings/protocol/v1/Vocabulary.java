@@ -393,4 +393,14 @@ public final class Vocabulary {
 
     public static final List<String> KNOWN = List.of(VERIFIED, FAILED, INCOMPLETE, UNKNOWN);
   }
+
+  /** Known values of {@code VerifyOptions.unhandled-states}. */
+  public static final class VerifyOptionsUnhandledStates {
+    private VerifyOptionsUnhandledStates() {}
+
+    public static final String WARN = "warn";
+    public static final String FAIL = "fail";
+
+    public static final List<String> KNOWN = List.of(WARN, FAIL);
+  }
 }

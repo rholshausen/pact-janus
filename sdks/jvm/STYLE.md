@@ -168,7 +168,9 @@ Interaction getOrder = janus.interaction("get an order")
   or any other value, written as JSON by Jackson. With no content type it is unlabelled, and the
   engine reads its type from the metadata, else its octets.
 - `verify()` returns the `VerificationResult` for `verified` and `filtered` runs; a test that must
-  not pass a filtered run checks `status()`. Handlers are called on the endpoint's own threads, not
+  not pass a filtered run checks `status()`. Its `warnings()` are the run's `verification/warning`
+  payloads, such as a provider state no handler sets up (ADR 0058), and each is also written to
+  standard error as it arrives, as the TypeScript SDK writes it. Handlers are called on the endpoint's own threads, not
   the test's.
 - `start()` starts the same run and returns a `Verifier.VerificationRun`, whose `next()` returns each
   interaction result as the engine reports it, and `null` once the run has ended; `result()` is the

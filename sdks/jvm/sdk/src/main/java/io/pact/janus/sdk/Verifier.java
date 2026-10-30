@@ -244,6 +244,7 @@ public final class Verifier {
     private final Loopback loopback;
     private final String stream;
     private final List<Map<String, Object>> results = new ArrayList<>();
+    private final List<Map<String, Object>> warnings = new ArrayList<>();
     private final java.util.ArrayDeque<Map<String, Object>> pending = new java.util.ArrayDeque<>();
     private VerificationResult result;
     private boolean closed;
@@ -278,11 +279,24 @@ public final class Verifier {
           results.add(map(event.get("payload")));
           pending.add(map(event.get("payload")));
         }
+        if ("verification/warning".equals(event.get("kind"))) {
+          Map<String, Object> warning = map(event.get("payload"));
+          warnings.add(warning);
+          warn(warning);
+        }
         if (Boolean.TRUE.equals(event.get("last"))) {
           Map<String, Object> summary = map(event.get("payload"));
-          result = new VerificationResult(String.valueOf(summary.get("status")), summary, results);
+          result = new VerificationResult(String.valueOf(summary.get("status")), summary, results, warnings);
         }
       }
+    }
+
+    /** A warning, on standard error as it arrives: a test shows what it prints (ADR 0058). */
+    private static void warn(Map<String, Object> warning) {
+      Object description = warning.get("interaction") instanceof Map<?, ?> interaction ? interaction.get("description") : null;
+      String where = description instanceof String named ? " in \"" + named + "\"" : "";
+      System.err.println("pact-janus warning (" + warning.get("code") + ")" + where + ": "
+          + java.util.Objects.toString(warning.get("message"), ""));
     }
 
     /** Stops the handlers and ends the engine. */

@@ -12,7 +12,7 @@
 //! is why `janus verify` needs no flag saying which kind of file it was given.
 
 use crate::Outcome;
-use crate::args::{Output, TransportEntry, VerifyArgs};
+use crate::args::{Output, TransportEntry, UnhandledStates, VerifyArgs};
 use crate::engine;
 use crate::error::{self, Error};
 use crate::highlight;
@@ -51,6 +51,9 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   }
   if args.exit_on_first_error {
     options["stop-on-first-failure"] = json!(true);
+  }
+  if args.unhandled_states == UnhandledStates::Fail {
+    options["unhandled-states"] = json!("fail");
   }
   if args.publish {
     // `requires_all` guarantees the version; the branch and tags are the provider version's.

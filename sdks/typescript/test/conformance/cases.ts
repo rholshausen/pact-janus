@@ -166,7 +166,7 @@ export interface Case {
     dimensions?: string[];
     "variant-count"?: number;
     outcome?: "ok" | Outcome;
-    result?: { status?: string; results?: Record<string, unknown>[] };
+    result?: { status?: string; results?: Record<string, unknown>[]; warnings?: Record<string, unknown>[] };
     hooks?: Record<string, unknown> | null;
     "config-loaded"?: boolean;
     invocations?: { status: number; result?: unknown }[];

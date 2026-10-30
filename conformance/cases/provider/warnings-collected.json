@@ -1,0 +1,77 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/warnings-collected",
+  "category": "provider",
+  "title": "The run's warnings are on its result, and change no verdict",
+  "covers": [
+    "verification.verify.warnings-collected"
+  ],
+  "why": "behavioural spec 'verify': every 'verification/warning' payload is collected as the run's warnings, in order, and a warning never changes a verdict (ADR 0058). Here a provider state no handler sets up.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": { "name": "web-app" },
+        "provider": { "name": "orders-api" },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [{ "name": "an order exists" }],
+            "request": { "method": "GET", "path": "/orders/42" },
+            "response": { "status": 200 }
+          }
+        ],
+        "metadata": { "pactSpecification": { "version": "3.0.0" } }
+      }
+    ]
+  },
+  "engine": {
+    "events": [
+      {
+        "kind": "verification/warning",
+        "payload": {
+          "code": "state-unhandled",
+          "interaction": {
+            "contract": { "consumer": "web-app", "provider": "orders-api" },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "state": "an order exists",
+          "message": "no state-setup hook handles the provider state 'an order exists', so the exchange runs without setting it up"
+        }
+      },
+      {
+        "kind": "verification/interaction-result",
+        "payload": {
+          "interaction": {
+            "contract": { "consumer": "web-app", "provider": "orders-api" },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "status": "verified"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "outcome": "ok",
+    "result": {
+      "status": "verified",
+      "warnings": [
+        {
+          "code": "state-unhandled",
+          "interaction": {
+            "contract": { "consumer": "web-app", "provider": "orders-api" },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "state": "an order exists",
+          "message": "no state-setup hook handles the provider state 'an order exists', so the exchange runs without setting it up"
+        }
+      ]
+    }
+  }
+}
