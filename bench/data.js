@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793342774872,
+  "lastUpdate": 1793342776772,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -32178,6 +32178,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18547,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8dbe8cd28b077944fbfce1257261855ec3d05d82",
+          "message": "feat: warn of a provider state no hook sets up, or fail it when asked\n\nADR 0058. A provider state no state-setup hook admitted (none\nconfigured, or every one's when selecting other states) ran its\nexchange without setup and said nothing, so a missing or misspelled\nstate handler went unnoticed. Found verifying PactFlow's\nexample-provider through pact-janus/verifier with a handler removed.\n\nThe engine now emits a verification/warning, code state-unhandled,\nnaming the state, before the result; the exchange still runs and the\nverdict is the provider's, as pact-js treats it. The hook runner says\nwhether any hook at a point admits an occurrence (admits_any).\noptions.unhandled-states: \"fail\" fails the variant before its exchange\ninstead, as component-unavailable naming hook/state-setup with reason\nstate-unhandled, as pact-jvm treats it and as a message no hook\nproduces fails. janus verify --unhandled-states warn|fail sets it. The\noption and stop-on-first-failure are read into one RunPolicy.\n\nBoth SDKs collect the run's warnings on the verify result and write\neach to standard error as it arrives (behavioural spec 'verify',\nverification.verify.warnings-collected; conformance case\nprovider/warnings-collected, 67 of 67 in both). The engine-protocol\nand lifecycle-hooks specs, the verification schema (regenerated\nbindings), both migration notes and the style guides say so. The whole\ndifferential harness's verdicts are unchanged.\n\nKernel tests that asserted no warning at all now ignore this one: they\nrun states with no hooks on purpose, and are about generator and\nstate-resolution warnings.\n\nThinness: the TypeScript idiomatic budget moves from 850 to 860 (now\n851) for the verify result's warnings, a member of the specified\nresult surface, and the function that prints them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T17:30:59+11:00",
+          "tree_id": "f64a3c50a7214e5763e717b94509297d7706854c",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8dbe8cd28b077944fbfce1257261855ec3d05d82"
+        },
+        "date": 1793342776209,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 41393,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 32148,
             "unit": "requests per second",
             "extra": "engines 4"
           }
