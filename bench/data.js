@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793339582667,
+  "lastUpdate": 1793339584826,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -31470,6 +31470,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 16048,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "4276167c4765e0d6a9d66786131769865f57ddda",
+          "message": "fix: the TypeScript SDK can be required from CommonJS\n\nA pact-js provider suite written in CommonJS and run by Jest failed to\nload pact-janus/verifier: the SDK was ES modules only, and Jest's\nruntime cannot require() an ES module before Node 24.9. pact-js ships\nCommonJS, so every such suite moving to the facade hit it (found\nrunning PactFlow's example-provider on it).\n\nnpm run build now also writes a CommonJS build to dist/cjs\n(tsconfig.cjs.json), marked by its own package.json, and the exports\ngive it to require for pact-janus, pact-janus/verifier and\npact-janus/bindings. pact-janus/vitest stays ES modules only, as Vitest\nis. test/commonjs.test.ts compiles the build into a scratch package and\nrequires each export through the package's own exports.\n\nSTYLE.md and the provider-test migration note say so, and the note\nnames JANUS_ENGINE, the next thing such a suite needs.\n\nNo-Changeset: the TypeScript SDK is not part of what a release ships.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T16:47:37+11:00",
+          "tree_id": "798fc68d9b83b27d2e0b8e8c2b1d0a6de999d40a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/4276167c4765e0d6a9d66786131769865f57ddda"
+        },
+        "date": 1793339584268,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25424,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 17724,
             "unit": "requests per second",
             "extra": "engines 4"
           }
