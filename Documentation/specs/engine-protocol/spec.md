@@ -457,6 +457,7 @@ Capabilities defined in v1:
 | `subsumption-check` | engine | The `subsumption/*` operations (§8.6) are available. Value `{}` — presence is the whole signal. |
 | `broker` | engine | The engine has a Pact Broker client: a `broker` source for `verification/verify`, its `publish` option, and the `broker/*` operations (§8.7, ADR 0032). Value `{}`. Only native embeddings register one; without it those answer `component-unavailable` naming `broker`. |
 | `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
+| `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -540,7 +541,7 @@ binding, not in the protocol envelope.
 
 Operation names are namespaced `<area>/<verb>`, kebab-case. v1 defines the areas `engine`
 (§5–6), `consumer-session`, `verification`, `provider-shape-session`, `subsumption`, `upgrade`,
-`broker` and `events` (§9). The vocabulary is
+`broker`, `config` and `events` (§9). The vocabulary is
 open: new operations may be added within a protocol version, gated by capability when a host
 must know in advance (§5.3); unknown operations are answered with `operation-unsupported`.
 
@@ -916,6 +917,37 @@ client — the offline WASM artifact — knows these operations and answers each
   provider shape, which no broker resource accepts ([broker notes](../../prototype/broker-integration-notes.md)
   §2; staged plan S4.3), and fetching contracts or shapes for a decision over a broker's matrix.
   `can-i-deploy` stays the broker's own.
+
+### 8.8 Project configuration — `config/*`
+
+Schema: [`schemas/v1/config.schema.json`](schemas/v1/config.schema.json). Decided by
+[ADR 0055](../../decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md):
+a host that verifies inside a test reads the project's configuration file (lifecycle-hooks spec §6.1)
+through the engine's host, so every SDK resolves it exactly as `janus verify --config` does. Behind
+the `config-loading` capability (§5.3). An engine without a loader, the offline WASM artifact, knows
+the operation and answers it with `component-unavailable` naming `config-loader`.
+
+| Operation | Body → Result |
+|---|---|
+| `config/load` | `{ path }` → `{ config }` |
+
+- **`load`** runs the loader (lifecycle-hooks spec §7.1) on the file at `path`, in YAML or JSON, and
+  answers the resolved document: `version`, `hooks` (`hook-config.schema.json`) and `components`
+  (design 2.6 §10.2), with every `${VAR}` interpolated, every script inlined and every path made
+  absolute. A host puts `components` in `target.components` and `hooks` in `target.hooks`, and may
+  add entries of its own after them, before it sends `verification/verify`.
+- **`path` is absolute.** The engine resolves no path against a directory of its own; a relative
+  one is `malformed-frame`.
+- **The variables are the engine process's environment.** A subprocess engine has the environment
+  its host started it with, which is the host's own unless the host chose otherwise.
+- **Errors** are the loader's (lifecycle-hooks spec §11): `hook-unresolved` for a file or script
+  that cannot be read or an unset variable, with `path` or `variable` in `details`;
+  `hook-config-invalid` for a document that does not validate, with its `problems`.
+- **The answer carries secrets** back to the host whose environment they came from. The engine
+  MUST NOT repeat them in a log: a hook entry's `config` and its `run`'s `headers` and `env` are
+  hidden there, as in any frame.
+- **Not a run.** A verification run still reads no file and no variable; `verify` receives a
+  closed document (ADR 0014). `config/load` is an operation a host chooses to make before it.
 
 ## 9. Events and streams
 

@@ -696,6 +696,11 @@ The same implementation is how an SDK can offer callback-shaped ergonomics witho
 call it does not have: the test process serves a loopback endpoint and the configuration names it
 ([ADR 0014](../../decisions/0014-hooks-are-resolved-configuration-not-callbacks.md)). From the engine's
 side that is an ordinary `http` hook, which is the point — the sugar costs the protocol nothing.
+[ADR 0055](../../decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md)
+fixes how an SDK does it: one endpoint on the loopback interface per run, a bearer token every entry
+carries, and entries named by kind and position (`state-1`, `request-filter-1`) after the
+configuration's own. An SDK reads the configuration through `config/load` (engine-protocol spec §8.8),
+so the loader is the one `janus verify --config` runs.
 
 ### 8.5 What an embedding can run
 

@@ -80,6 +80,45 @@ export interface PublishContractsResult {
   [k: string]: unknown;
 }
 
+/**
+ * Load a project configuration file (lifecycle-hooks spec §6.1), YAML or JSON, through the loader janus verify --config runs (lifecycle-hooks spec §7.1).
+ */
+export interface Load {
+  /**
+   * The file, as an absolute path. The engine resolves no path against a directory of its own: a relative one is malformed-frame.
+   */
+  path: string;
+  [k: string]: unknown;
+}
+
+export interface LoadResult {
+  config: ResolvedConfig;
+  [k: string]: unknown;
+}
+
+/**
+ * The resolved configuration: every ${VAR} interpolated from the engine process's environment, every script inlined, every path absolute. A host puts 'components' in target.components and 'hooks' in target.hooks. It carries secrets, which the engine never repeats in a log.
+ */
+export interface ResolvedConfig {
+  /**
+   * The configuration's version, as the file gave it.
+   */
+  version?: number;
+  /**
+   * Point -> hook entries, the lifecycle-hooks spec's hook-config.schema.json document.
+   */
+  hooks: {
+    [k: string]: unknown;
+  };
+  /**
+   * The project's declared components, with a file source's path made absolute (component-interfaces spec §10.2).
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
+  [k: string]: unknown;
+}
+
 export interface Create {
   config: SessionConfig;
   [k: string]: unknown;

@@ -47,11 +47,12 @@ export interface Exchange {
 }
 
 export interface Outcome {
-  error: "execute-failed" | "contract-withheld" | "engine-error";
+  error: "execute-failed" | "contract-withheld" | "engine-error" | "verification-failed" | "refused";
   code?: string;
   variants?: string[];
   interactions?: string[];
   "engine-withheld"?: boolean;
+  failed?: { interaction: unknown; variant: string }[];
 }
 
 export interface StepExpectation {
@@ -73,12 +74,65 @@ export interface ScriptedEngine {
   "withhold-contract"?: boolean;
   results?: Record<string, unknown>[];
   errors?: Record<string, { code: string; message?: string; after?: number; details?: Record<string, unknown> }>;
+  capabilities?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  events?: { kind: string; payload: Record<string, unknown> }[];
+  summary?: Record<string, unknown>;
+  invoke?: Invoke[];
+}
+
+/** What a state handler's setup or teardown does when called (README §3). */
+export interface Behaviour {
+  returns?: Record<string, unknown>;
+  throws?: string;
+  unsupported?: string;
+}
+
+/** A provider case's verifier, as data. */
+export interface VerifierScript {
+  "provider-url"?: string;
+  pacts?: Record<string, unknown>[];
+  broker?: Record<string, unknown>;
+  urls?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+  config?: string;
+  components?: ComponentDeclaration[];
+  "state-handlers"?: { state: string; setup: Behaviour; teardown?: Behaviour }[];
+  "request-filters"?: { changes?: string[]; set?: Record<string, unknown>; throws?: string }[];
+}
+
+/** A hook the scripted engine calls during the run. */
+export interface Invoke {
+  point: string;
+  hook: string;
+  context: Record<string, unknown>;
+  authorised?: boolean;
+}
+
+/** One call of a declared handler, as a driver records it. */
+export interface HandlerCall {
+  handler: string;
+  action?: "setup" | "teardown";
+  params?: Record<string, unknown>;
+  request?: Record<string, unknown>;
+}
+
+/** The provider a live provider case's driver serves. */
+export interface LiveProvider {
+  routes: {
+    method: string;
+    path: string;
+    "require-headers"?: Record<string, string>;
+    status: number;
+    headers?: Record<string, string>;
+    body?: unknown;
+  }[];
 }
 
 export interface Case {
   $format: string;
   id: string;
-  category: "translation" | "lifecycle" | "variants" | "live";
+  category: "translation" | "lifecycle" | "variants" | "live" | "provider";
   title: string;
   covers: string[];
   why?: string;
@@ -87,6 +141,9 @@ export interface Case {
   /** The 'janus' options beyond consumer and provider. */
   janus?: { components?: ComponentDeclaration[] };
   engine?: ScriptedEngine;
+  verifier?: VerifierScript;
+  verify?: boolean;
+  provider?: LiveProvider;
   steps?: Step[];
   expect?: {
     spec?: Record<string, unknown>;
@@ -97,6 +154,13 @@ export interface Case {
     "engine-closed"?: boolean;
     dimensions?: string[];
     "variant-count"?: number;
+    outcome?: "ok" | Outcome;
+    result?: { status?: string; results?: Record<string, unknown>[] };
+    hooks?: Record<string, unknown> | null;
+    "config-loaded"?: boolean;
+    invocations?: { status: number; result?: unknown }[];
+    "handler-calls"?: HandlerCall[];
+    "endpoint-closed"?: boolean;
   };
 }
 

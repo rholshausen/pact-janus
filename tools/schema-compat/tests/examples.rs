@@ -167,6 +167,13 @@ fn example_transcripts_validate_against_the_schemas() {
       ),
     ),
     (
+      "config/load",
+      (
+        Some("config.schema.json#/$defs/Load"),
+        Some("config.schema.json#/$defs/LoadResult"),
+      ),
+    ),
+    (
       "events/poll",
       (
         Some("events.schema.json#/$defs/Poll"),

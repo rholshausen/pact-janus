@@ -186,7 +186,7 @@ export class Janus {
  * engine resolves none against a directory of its own). A reference with a root is passed as written,
  * and Node's `isAbsolute` is that rule: a leading separator counts on Windows too, drive or no drive.
  */
-function resolved(declaration: ComponentDeclaration): ComponentDeclaration {
+export function resolved(declaration: ComponentDeclaration): ComponentDeclaration {
   const reference = declaration.source.reference;
   if (declaration.source.kind !== "file" || reference === undefined || isAbsolute(reference)) {
     return declaration;

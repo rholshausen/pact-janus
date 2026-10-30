@@ -49,6 +49,8 @@ specification disagree, the behavioural specification wins and this file has a b
 | one or more closures threw | `VariantsFailedError` | `failures[]`: each variant descriptor and its cause; the message names each by label and id |
 | no contract written | `ContractWithheldError` | the engine's `results`, and `failedTests` — interactions whose `execute` failed |
 | the embedding itself (no `JANUS_ENGINE`, the process died) | `Error` | what the pipe saw; these are not engine outcomes |
+| a provider run whose status is `failed` | `VerificationFailedError` | `result` (status, summary, results) and `failures`: the failed results that are not pending |
+| a verifier naming no source, or two | `TypeError` | thrown by `verify` before anything is sent |
 
 One `JanusError` class, not one per code: codes are an open vocabulary (engine-protocol spec §2.2), so
 a subclass per code would be a closed set pretending to be open. `details` stays a plain record for
@@ -89,6 +91,23 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - `JANUS_ENGINE` names the `janus-engine` executable (or pass `engine: { command }`); the engine's
   stderr is inherited, with `RUST_LOG` defaulting to `warn` so a request the mock could not match
   is logged and start-up chatter is not.
+
+## Provider verification
+
+- `new Verifier({ providerUrl, pacts | broker | urls, options?, config?, components?, engine? })`,
+  then `.state(name, setup | { setup, teardown })` and `.requestFilter(filter, { changes? })`, each
+  returning the verifier, then `await verifier.verify()` (ADR 0055). Nothing is sent before `verify`.
+- The SDK's own options are camelCase; the documents it passes through — `broker`, `urls`,
+  `options` — are spelled as the protocol spells them (`"consumer-version-selectors"`,
+  `"provider-version"`), because they are the protocol's documents and the SDK translates none of
+  them.
+- A state's `setup` returns an object of provider-state values, or nothing. A handler that cannot
+  reach its state throws `StateUnsupportedError` with the reason; anything else it throws is a
+  failed setup.
+- A request filter receives `{ method, path, query, headers, … }`, each slot's content as the engine
+  sent it (headers as lists of values), and returns the request; returning nothing changes nothing.
+- `verify` resolves with the result for `verified` and `filtered` runs: a test that must not pass a
+  filtered run checks `result.status`. It rejects with `VerificationFailedError` for `failed`.
 
 ## Packaging and distribution
 

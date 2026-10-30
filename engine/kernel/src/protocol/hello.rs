@@ -57,7 +57,7 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 ///
 /// `segments` is always declared (spec §2.7, ADR 0054): this engine writes display text's segments
 /// for a host that declared the capability too.
-pub fn result(loaders: &[&str], broker: bool) -> Value {
+pub fn result(loaders: &[&str], broker: bool, config_loading: bool) -> Value {
   let mut result = json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
@@ -70,6 +70,9 @@ pub fn result(loaders: &[&str], broker: bool) -> Value {
   });
   if broker {
     result["capabilities"]["broker"] = json!({});
+  }
+  if config_loading {
+    result["capabilities"]["config-loading"] = json!({});
   }
   result
 }

@@ -22,6 +22,7 @@ use crate::broker::BrokerClient;
 use crate::component::{
   ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, Start, Stop, TransportComponent,
 };
+use crate::hooks::ConfigLoader;
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
 use crate::legacy::upgrade;
 use crate::subsumption::CheckError;
@@ -86,6 +87,10 @@ pub struct Engine {
   /// capability, as the hook implementations are. With none, every broker-facing request is
   /// `component-unavailable` naming `broker`, and `engine/hello` declares no `broker` capability.
   broker: Option<Arc<dyn BrokerClient>>,
+  /// The configuration loader, when this embedding registered one (ADR 0055): a native host
+  /// capability, as the broker client is. With none, `config/load` is `component-unavailable` naming
+  /// `config-loader`, and `engine/hello` declares no `config-loading` capability.
+  config_loader: Option<Arc<dyn ConfigLoader>>,
   /// Broker sessions by id (spec §7.3's fourth kind): one publication each, ended at its terminal
   /// event as a verification session is, and pruned by [`Engine::handle_poll`] on the same edge.
   publications: HashMap<String, Run>,
@@ -127,6 +132,7 @@ impl Engine {
       recordings: HashMap::new(),
       next_recording: 0,
       broker: None,
+      config_loader: None,
       publications: HashMap::new(),
       next_publication: 0,
     }
@@ -170,6 +176,7 @@ impl Engine {
       recordings: HashMap::new(),
       next_recording: 0,
       broker: None,
+      config_loader: None,
       publications: HashMap::new(),
       next_publication: 0,
     }
@@ -218,6 +225,12 @@ impl Engine {
   /// artifact cannot, and says so by not declaring the `broker` capability.
   pub fn register_broker_client(&mut self, client: Arc<dyn BrokerClient>) {
     self.broker = Some(client);
+  }
+
+  /// Register the configuration loader (spec §8.8, ADR 0055): what `config/load` resolves a
+  /// project's configuration file with. The native embeddings register one; the WASM artifact cannot.
+  pub fn register_config_loader(&mut self, loader: Arc<dyn ConfigLoader>) {
+    self.config_loader = Some(loader);
   }
 
   /// Register a hook component, answering `run: { kind: component, component: <name> }`.
@@ -312,6 +325,7 @@ impl Engine {
       "subsumption/check" => self.handle_subsumption_check(id, body),
       "subsumption/decide" => self.handle_subsumption_decide(id, body),
       "upgrade/pact" => self.handle_upgrade(id, body),
+      "config/load" => self.handle_config_load(id, body),
       "events/poll" => self.handle_poll(id, body),
       other => ResponseFrame::err(id, EngineError::operation_unsupported(other)),
     }
@@ -329,7 +343,10 @@ impl Engine {
         let loaders: Vec<&str> = std::iter::once("in-tree")
           .chain(self.loaders.iter().map(|loader| loader.name()))
           .collect();
-        ResponseFrame::ok(id, hello::result(&loaders, self.broker.is_some()))
+        ResponseFrame::ok(
+          id,
+          hello::result(&loaders, self.broker.is_some(), self.config_loader.is_some()),
+        )
       }
       None => ResponseFrame::err(
         id,
@@ -912,6 +929,26 @@ impl Engine {
     }
   }
 
+  /// `config/load` (spec §8.8, ADR 0055): the registered loader resolves the file, or there is none
+  /// to, and the answer says so by name. Whether `path` is absolute is the loader's to judge, since
+  /// what makes a path absolute is the platform's, and the kernel reads no path.
+  fn handle_config_load(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: ConfigLoad = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(loader) = &self.config_loader else {
+      return ResponseFrame::err(
+        id,
+        EngineError::component_unavailable(crate::hooks::loading::LOADER),
+      );
+    };
+    match loader.load(&req.path) {
+      Ok(config) => ResponseFrame::ok(id, json!({ "config": config })),
+      Err(err) => ResponseFrame::err(id, err),
+    }
+  }
+
   /// `events/poll` (spec §9.4). Every named stream must be live: an unknown or ended id fails the
   /// whole call with `stream-not-found` rather than being skipped, because a host that mixed a
   /// stale id into its list would otherwise read "no events" as "not yet".
@@ -1067,6 +1104,12 @@ fn loggable(bytes: &[u8]) -> String {
 /// doesn't match it is `malformed-frame`, same as an envelope violation (§4.4).
 fn parse_body<T: DeserializeOwned>(body: Value) -> Result<T, EngineError> {
   serde_path_to_error::deserialize(body).map_err(|err| EngineError::malformed_frame(err.to_string()))
+}
+
+/// `config/load`'s request body (spec §8.8, `schemas/v1/config.schema.json`).
+#[derive(serde::Deserialize)]
+struct ConfigLoad {
+  path: String,
 }
 
 /// `upgrade/pact`'s request body (spec §8.4, `schemas/v1/upgrade.schema.json`).

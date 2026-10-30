@@ -4,7 +4,7 @@
 
 import type { protocol } from "../../src/generated/index.js";
 import type { FramePipe } from "../../src/index.js";
-import type { ScriptedEngine } from "./cases.js";
+import type { Invoke, ScriptedEngine } from "./cases.js";
 
 export const CONSUMER = "web-app";
 export const PROVIDER = "orders-api";
@@ -22,8 +22,11 @@ export class ScriptedPipe implements FramePipe {
   /** Every request frame body, alongside `ops`. */
   readonly bodies: Record<string, unknown>[] = [];
   closed = false;
+  /** What the SDK's endpoint answered each of the script's `invoke` calls (provider cases). */
+  readonly invocations: { status: number; result?: unknown }[] = [];
   readonly #script: ScriptedEngine;
   #handles = 0;
+  #polled = false;
 
   constructor(script: ScriptedEngine = {}) {
     this.#script = script;
@@ -54,7 +57,62 @@ export class ScriptedPipe implements FramePipe {
         } as protocol.EngineError,
       };
     }
+    if (frame.op === "events/poll") {
+      return { type: "response", id: frame.id, ok: await this.#poll() };
+    }
     return { type: "response", id: frame.id, ok: this.#reply(frame.op) };
+  }
+
+  /**
+   * The run's stream, all at once: the script's hooks are called first, as the engine would call
+   * them during the run, then its events and the terminal one (README §3).
+   */
+  async #poll(): Promise<Record<string, unknown>> {
+    if (this.#polled) {
+      return { events: [] };
+    }
+    this.#polled = true;
+    for (const invoke of this.#script.invoke ?? []) {
+      this.invocations.push(await this.#invoke(invoke));
+    }
+    const events = [
+      ...(this.#script.events ?? [
+        {
+          kind: "verification/interaction-result",
+          payload: {
+            interaction: { contract: { consumer: CONSUMER, provider: PROVIDER }, index: 0, description: "get an order" },
+            variant: "base",
+            status: "verified",
+          },
+        },
+      ]),
+      { kind: "verification/finished", payload: this.#script.summary ?? { status: "verified", variants: { verified: 1, failed: 0 } } },
+    ];
+    return {
+      events: events.map((event, i) => ({
+        stream: "s-1",
+        seq: i + 1,
+        ...event,
+        ...(i === events.length - 1 ? { last: true } : {}),
+      })),
+    };
+  }
+
+  /** POSTs the context to the hook entry the `verify` frame names, with its headers. */
+  async #invoke(invoke: Invoke): Promise<{ status: number; result?: unknown }> {
+    const target = this.bodyOf("verification/verify")?.target as { hooks?: { hooks?: Record<string, unknown[]> } } | undefined;
+    const entries = (target?.hooks?.hooks?.[invoke.point] ?? []) as { name: string; run: { url: string; headers?: Record<string, string> } }[];
+    const entry = entries.find((e) => e.name === invoke.hook);
+    if (!entry) {
+      throw new Error(`the verify frame has no '${invoke.hook}' hook at '${invoke.point}'`);
+    }
+    const headers: Record<string, string> = { "content-type": "application/json", ...(entry.run.headers ?? {}) };
+    if (invoke.authorised === false) {
+      delete headers.authorization;
+    }
+    const response = await fetch(entry.run.url, { method: "POST", headers, body: JSON.stringify(invoke.context) });
+    const text = await response.text();
+    return { status: response.status, ...(text === "" ? {} : { result: JSON.parse(text) as unknown }) };
   }
 
   async close(): Promise<void> {
@@ -64,7 +122,15 @@ export class ScriptedPipe implements FramePipe {
   #reply(op: string): Record<string, unknown> {
     switch (op) {
       case "engine/hello":
-        return { "protocol-version": 1, engine: { name: "scripted", version: "0.0.0" }, capabilities: {} };
+        return {
+          "protocol-version": 1,
+          engine: { name: "scripted", version: "0.0.0" },
+          capabilities: this.#script.capabilities ?? { "config-loading": {} },
+        };
+      case "config/load":
+        return { config: this.#script.config ?? { version: 1, hooks: {} } };
+      case "verification/verify":
+        return { session: "vs-1", stream: "s-1" };
       case "consumer-session/create":
         return { session: "s-1" };
       case "consumer-session/add-interaction":

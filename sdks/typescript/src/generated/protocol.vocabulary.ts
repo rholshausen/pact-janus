@@ -245,6 +245,7 @@ export const RequestFrameOp = {
   VerificationVerify: "verification/verify",
   VerificationExplain: "verification/explain",
   UpgradePact: "upgrade/pact",
+  ConfigLoad: "config/load",
   EventsPoll: "events/poll",
 } as const;
 

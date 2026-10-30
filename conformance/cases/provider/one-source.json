@@ -1,0 +1,65 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/one-source",
+  "category": "provider",
+  "title": "A verifier naming two sources is refused before anything is sent",
+  "covers": [
+    "verification.verifier.one-source"
+  ],
+  "why": "behavioural spec 'verifier': 'more than one of pacts, broker and urls, are refused at the call that would send them, before an engine is started, with no frame sent'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "urls": {
+      "urls": [
+        "https://broker.example/pacts/1"
+      ]
+    }
+  },
+  "expect": {
+    "ops": [],
+    "outcome": {
+      "error": "refused"
+    }
+  }
+}

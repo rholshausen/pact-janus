@@ -76,6 +76,10 @@ SDK (plan task 6.3); what that turned up is in
   `ExecuteFailedException` names every failed variant by label and id, and chains each cause (first
   as cause, the rest suppressed). `ContractWithheldException` names every interaction and variant that
   did not verify, with the engine's mismatches, and every interaction whose `execute` failed.
+- **A failed provider run** is `VerificationFailedException`, unchecked and not an
+  `AssertionError`, carrying `result()` and `failures()`: the failed results that are not pending.
+  A verifier naming no source, or two, is `IllegalArgumentException` from `verify()`, before
+  anything is sent.
 - **DSL misuse caught at the call** is `IllegalArgumentException`: a value with no JSON reading, a
   `Pattern` with out-of-band flags, a header declared twice. This is only about Java values the
   SDK cannot turn into a document at all. Shape validity is the engine's (`interaction-invalid`).
@@ -141,6 +145,26 @@ Interaction getOrder = janus.interaction("get an order")
   same order.
 - The **engine** is started lazily by the first `execute`, and ended by `finalise`. After `finalise`
   the same `Janus` may be used again; the next `execute` starts a fresh engine and session.
+
+## Provider verification
+
+- `Verifier.forProvider(url)`, then `withPacts(paths)`, `withBroker(map)` or `withUrls(map)`, and
+  optionally `withOptions(map)`, `withConfig(path)`, `withComponents(list)` and
+  `withEmbedding(embedding)`; then `state(name, setup)` or `state(name, setup, teardown)` and
+  `requestFilter(filter)` or `requestFilter(filter, slots)`; then `verify()` (ADR 0055). The
+  verifier is mutable and each method returns it, so a test configures it in one chain. Nothing is
+  sent before `verify()`.
+- The maps passed through — `withBroker`, `withUrls`, `withOptions` — are the protocol's documents,
+  keyed as it spells them (`"consumer-version-selectors"`, `"provider-version"`).
+- `StateSetup` returns a `Map` of provider-state values, or `null` for none. A handler that cannot
+  reach its state throws `StateUnsupportedException` with the reason; any other exception it throws
+  is a failed setup. The handlers are functional interfaces that may throw checked exceptions.
+- A `RequestFilter` receives a `Map` with a member per request slot, each slot's content as the
+  engine sent it, and returns the request; `null` changes nothing.
+- `verify()` returns the `VerificationResult` for `verified` and `filtered` runs; a test that must
+  not pass a filtered run checks `status()`. Handlers are called on the endpoint's own threads, not
+  the test's.
+- The JUnit 5 provider runner is S1.15's.
 
 ## Packaging and distribution
 

@@ -287,6 +287,49 @@ pub fn environment() -> HashMap<String, String> {
   std::env::vars().collect()
 }
 
+/// `config/load`'s loader (engine-protocol spec §8.8, ADR 0055): this module's [`load`], registered
+/// into the engine so a host that is not the CLI resolves a configuration exactly as the CLI does.
+/// The environment is this process's own, which is the host's when the host started it.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FileLoader;
+
+impl pact_janus_kernel::hooks::ConfigLoader for FileLoader {
+  fn load(&self, path: &str) -> Result<Value, pact_janus_kernel::protocol::EngineError> {
+    use pact_janus_kernel::protocol::EngineError;
+    if !Path::new(path).is_absolute() {
+      return Err(EngineError::malformed_frame(format!(
+        "config/load's 'path' must be absolute, and '{path}' is not"
+      )));
+    }
+    load(path).map_err(|err| engine_error(&err))
+  }
+}
+
+/// A load error as the protocol carries it (lifecycle-hooks spec §11): `hook-config-invalid` with
+/// its problems, or `hook-unresolved` naming what could not be resolved, its causes as the chain.
+pub fn engine_error(err: &LoadError) -> pact_janus_kernel::protocol::EngineError {
+  use pact_janus_kernel::chain::{layers_of, without_os_error};
+  use pact_janus_kernel::protocol::EngineError;
+  use serde_json::json;
+  let causes = |cause: &(dyn std::error::Error + Send + Sync)| layers_of(cause, without_os_error);
+  match err {
+    LoadError::Invalid(problems) => EngineError::hook_config_invalid(problems),
+    LoadError::UnsetVariable { variable, at } => EngineError::hook_unresolved(
+      err.to_string(),
+      json!({ "variable": variable, "at": at }),
+      Vec::new(),
+    ),
+    LoadError::UnreadableScript { path, hook, cause } => EngineError::hook_unresolved(
+      err.to_string(),
+      json!({ "path": path, "hook": hook }),
+      causes(cause.as_ref()),
+    ),
+    LoadError::Unreadable { path, cause } => {
+      EngineError::hook_unresolved(err.to_string(), json!({ "path": path }), causes(cause.as_ref()))
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -534,5 +577,59 @@ hooks:
       }
       other => panic!("expected an invalid document, got {other:?}"),
     }
+  }
+
+  #[test]
+  fn the_file_loader_refuses_a_relative_path() {
+    use pact_janus_kernel::hooks::ConfigLoader;
+    let err = FileLoader
+      .load("verifier.janus.yaml")
+      .expect_err("a relative path");
+    assert_eq!(err.code, "malformed-frame");
+  }
+
+  #[test]
+  fn an_unset_variable_is_hook_unresolved_naming_it() {
+    let err = load_document(
+      "version: 1\nhooks:\n  state-setup:\n    - name: s\n      run: { kind: http, url: \"${STATE_URL}\" }\n",
+      Path::new("/project"),
+      &env(&[]),
+    )
+    .expect_err("STATE_URL is unset");
+    let error = engine_error(&err);
+    assert_eq!(error.code, "hook-unresolved");
+    assert_eq!(error.category, "document");
+    assert_eq!(
+      error.details.as_deref().and_then(|d| d.get("variable")),
+      Some(&json!("STATE_URL"))
+    );
+  }
+
+  #[test]
+  fn a_file_that_cannot_be_read_is_hook_unresolved_with_its_cause() {
+    use pact_janus_kernel::hooks::ConfigLoader;
+    let missing = std::env::temp_dir()
+      .join("janus-no-such-dir")
+      .join("verifier.janus.yaml");
+    let err = FileLoader
+      .load(&missing.display().to_string())
+      .expect_err("no such file");
+    assert_eq!(err.code, "hook-unresolved");
+    assert_eq!(
+      err.details.as_deref().and_then(|d| d.get("path")),
+      Some(&json!(missing.display().to_string()))
+    );
+    assert!(err.chain.as_ref().is_some_and(|chain| chain.len() > 1), "{err:?}");
+  }
+
+  #[test]
+  fn an_invalid_document_is_hook_config_invalid() {
+    let err = load_document(
+      "version: 1\nhooks:\n  no-such-point: []\n",
+      Path::new("/project"),
+      &env(&[]),
+    )
+    .expect_err("no such point");
+    assert_eq!(engine_error(&err).code, "hook-config-invalid");
   }
 }

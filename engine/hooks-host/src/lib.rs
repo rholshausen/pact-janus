@@ -26,4 +26,4 @@ pub mod loader;
 
 pub use exec::ExecHooks;
 pub use http::HttpHooks;
-pub use loader::{LoadError, load, load_document, resolve};
+pub use loader::{FileLoader, LoadError, load, load_document, resolve};

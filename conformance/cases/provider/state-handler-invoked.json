@@ -1,0 +1,206 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/state-handler-invoked",
+  "category": "provider",
+  "title": "A state handler receives the state's parameters, and what setup returns is the result's values",
+  "covers": [
+    "verification.state-handler.params-reach-handler",
+    "verification.state-handler.values-returned"
+  ],
+  "why": "behavioural spec 'state-handler': setup or teardown is called with the context's 'state.params', or an empty object; 'a returned object is { outcome: ok, values: <the object> }; nothing returned is { outcome: ok }'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {
+          "returns": {
+            "orderId": "A-1"
+          }
+        },
+        "teardown": {}
+      },
+      {
+        "state": "no orders exist",
+        "setup": {}
+      }
+    ]
+  },
+  "engine": {
+    "invoke": [
+      {
+        "point": "state-setup",
+        "hook": "state-1",
+        "context": {
+          "point": "state-setup",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "an order exists",
+            "params": {
+              "id": 42
+            }
+          }
+        }
+      },
+      {
+        "point": "state-teardown",
+        "hook": "state-1",
+        "context": {
+          "point": "state-teardown",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1",
+            "outcome": "verified"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "an order exists",
+            "params": {
+              "id": 42
+            }
+          }
+        }
+      },
+      {
+        "point": "state-setup",
+        "hook": "state-2",
+        "context": {
+          "point": "state-setup",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "no orders exist"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "invocations": [
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok",
+          "values": {
+            "orderId": "A-1"
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok"
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok"
+        }
+      }
+    ],
+    "handler-calls": [
+      {
+        "handler": "state-1",
+        "action": "setup",
+        "params": {
+          "id": 42
+        }
+      },
+      {
+        "handler": "state-1",
+        "action": "teardown",
+        "params": {
+          "id": 42
+        }
+      },
+      {
+        "handler": "state-2",
+        "action": "setup",
+        "params": {}
+      }
+    ],
+    "outcome": "ok"
+  }
+}

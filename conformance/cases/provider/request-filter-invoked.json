@@ -1,0 +1,221 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/request-filter-invoked",
+  "category": "provider",
+  "title": "A request filter receives each slot's content and its answer changes exactly the declared slots",
+  "covers": [
+    "verification.request-filter.declared-slots-answered",
+    "verification.request-filter.failure-is-failed"
+  ],
+  "why": "behavioural spec 'request-filter': the filter receives 'a member per slot of the context's parts.request, each that slot's content'; the SDK answers 'changes' 'for each declared slot the returned request has', and 'compares nothing'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "request-filters": [
+      {
+        "set": {
+          "headers": {
+            "accept": [
+              "application/json"
+            ],
+            "authorization": [
+              "Bearer t"
+            ]
+          },
+          "path": "/elsewhere"
+        }
+      },
+      {
+        "throws": "no token"
+      }
+    ]
+  },
+  "engine": {
+    "invoke": [
+      {
+        "point": "before-request",
+        "hook": "request-filter-1",
+        "context": {
+          "point": "before-request",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts.request.headers"
+          ],
+          "deadline-ms": 5000,
+          "parts": {
+            "request": {
+              "method": {
+                "content": "GET"
+              },
+              "path": {
+                "content": "/orders/42"
+              },
+              "headers": {
+                "content": {
+                  "accept": [
+                    "application/json"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "point": "before-request",
+        "hook": "request-filter-2",
+        "context": {
+          "point": "before-request",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [
+            "parts.request.headers"
+          ],
+          "deadline-ms": 5000,
+          "parts": {
+            "request": {
+              "method": {
+                "content": "GET"
+              },
+              "path": {
+                "content": "/orders/42"
+              },
+              "headers": {
+                "content": {
+                  "accept": [
+                    "application/json"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "note": "The first filter also returns a changed path, which it did not declare: the answer carries only headers. Whether the engine would refuse an undeclared change is the engine's (lifecycle-hooks spec §4.3), and is not what this case pins.",
+  "expect": {
+    "invocations": [
+      {
+        "status": 200,
+        "result": {
+          "outcome": "ok",
+          "changes": {
+            "parts.request.headers": {
+              "content": {
+                "accept": [
+                  "application/json"
+                ],
+                "authorization": [
+                  "Bearer t"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "failed",
+          "error": {
+            "code": "handler-failed",
+            "message": "no token"
+          }
+        }
+      }
+    ],
+    "handler-calls": [
+      {
+        "handler": "request-filter-1",
+        "request": {
+          "method": "GET",
+          "path": "/orders/42",
+          "headers": {
+            "accept": [
+              "application/json"
+            ]
+          }
+        }
+      },
+      {
+        "handler": "request-filter-2",
+        "request": {
+          "method": "GET",
+          "path": "/orders/42",
+          "headers": {
+            "accept": [
+              "application/json"
+            ]
+          }
+        }
+      }
+    ],
+    "outcome": "ok"
+  }
+}

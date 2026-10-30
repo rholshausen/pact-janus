@@ -206,6 +206,27 @@ impl EngineError {
     }
   }
 
+  /// `hook-unresolved` (lifecycle-hooks spec §11): the loader could not resolve the configuration —
+  /// an unset variable, a file or script it could not read. Raised by the loader, which is where
+  /// the file system is; `details` names the `variable` or the `path`, and `causes` are why.
+  pub fn hook_unresolved(own: impl Into<String>, details: Value, causes: Vec<crate::chain::Layer>) -> Self {
+    let own = own.into();
+    let (message, chain) = if causes.is_empty() {
+      (own, None)
+    } else {
+      let mut chain = vec![crate::chain::Layer::coded("hook-unresolved", &own)];
+      chain.extend(causes);
+      (crate::chain::joined(&chain), Some(chain))
+    };
+    EngineError {
+      code: "hook-unresolved".to_string(),
+      category: "document".to_string(),
+      message,
+      details: Some(Box::new(details)),
+      chain,
+    }
+  }
+
   /// `hook-unavailable` (lifecycle-hooks spec §11): an implementation kind this embedding cannot
   /// run, or a `component` hook naming a component nobody registered. In the `component` category
   /// because "this embedding cannot run that" is the same fact as an unsatisfiable component

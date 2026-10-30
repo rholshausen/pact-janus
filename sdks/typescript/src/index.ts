@@ -43,6 +43,24 @@ export {
   forbidden,
   eachLike,
 } from "./shapes.js";
-export { JanusError, VariantsFailedError, ContractWithheldError, type Problem, type VariantFailure } from "./errors.js";
+export {
+  Verifier,
+  type VerifierConfig,
+  type SourceOptions,
+  type StateHandler,
+  type StateSetup,
+  type RequestFilter,
+} from "./verifier.js";
+export {
+  JanusError,
+  VariantsFailedError,
+  ContractWithheldError,
+  VerificationFailedError,
+  StateUnsupportedError,
+  type Problem,
+  type VariantFailure,
+  type VerificationResult,
+  type VerificationResultEntry,
+} from "./errors.js";
 export type { FramePipe } from "./engine/pipe.js";
 export type { SubprocessOptions } from "./engine/subprocess.js";

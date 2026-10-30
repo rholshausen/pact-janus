@@ -35,7 +35,14 @@
       "sdk/src/main/java/io/pact/janus/sdk/ContractWithheldException.java",
       "sdk/src/main/java/io/pact/janus/sdk/ExecuteFailedException.java",
       "sdk/src/main/java/io/pact/janus/sdk/JanusEngineException.java",
-      "sdk/src/main/java/io/pact/janus/sdk/JanusEmbeddingException.java"
+      "sdk/src/main/java/io/pact/janus/sdk/JanusEmbeddingException.java",
+      "sdk/src/main/java/io/pact/janus/sdk/Verifier.java",
+      "sdk/src/main/java/io/pact/janus/sdk/VerificationResult.java",
+      "sdk/src/main/java/io/pact/janus/sdk/VerificationFailedException.java",
+      "sdk/src/main/java/io/pact/janus/sdk/StateUnsupportedException.java"
+    ],
+    "loopback": [
+      "sdk/src/main/java/io/pact/janus/sdk/Loopback.java"
     ],
     "embedding": [
       "sdk/src/main/java/io/pact/janus/sdk/engine"
@@ -52,6 +59,7 @@
   "budgets": {
     "idiomatic": 2000,
     "embedding": 300,
+    "loopback": 100,
     "integration": 140
   }
 }

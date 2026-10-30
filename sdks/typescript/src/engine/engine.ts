@@ -17,6 +17,9 @@ interface Operations {
   [Op.ConsumerSessionVariants]: [protocol.Variants, protocol.VariantsResult];
   [Op.ConsumerSessionServeVariant]: [protocol.ServeVariant, protocol.ServeVariantResult];
   [Op.ConsumerSessionFinalise]: [protocol.Finalise, protocol.FinaliseResult];
+  [Op.ConfigLoad]: [protocol.Load, protocol.LoadResult];
+  [Op.VerificationVerify]: [protocol.Verify, protocol.VerifyResult];
+  [Op.EventsPoll]: [protocol.Poll, protocol.PollResult];
 }
 
 /** The only protocol version this SDK speaks (engine-protocol spec §5). */

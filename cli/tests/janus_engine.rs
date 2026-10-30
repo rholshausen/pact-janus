@@ -188,3 +188,49 @@ fn assert_hook_kind_accepted(kind: &str, run: Value) {
   drop(stdin);
   let _ = child.wait();
 }
+
+/// `config/load` (ADR 0055): the subprocess engine resolves a configuration file with its own
+/// environment, which is the one its host started it with, and says it can in the handshake.
+#[test]
+fn config_load_resolves_a_file_with_the_engines_environment() {
+  let dir = std::env::temp_dir().join(format!("janus-config-load-{}", std::process::id()));
+  std::fs::create_dir_all(&dir).expect("temp dir");
+  let file = dir.join("verifier.janus.yaml");
+  std::fs::write(
+    &file,
+    "version: 1\nhooks:\n  state-setup:\n    - name: fixtures\n      run: { kind: http, url: \"${STATE_URL}/state\" }\n",
+  )
+  .expect("write the configuration");
+
+  let mut child = Command::new(env!("CARGO_BIN_EXE_janus-engine"))
+    .env("RUST_LOG", "warn")
+    .env("STATE_URL", "http://127.0.0.1:9999")
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .spawn()
+    .expect("janus-engine starts");
+  let mut stdin = child.stdin.take().expect("stdin");
+  let mut stdout = BufReader::new(child.stdout.take().expect("stdout"));
+
+  let hello =
+    json!({ "type": "request", "id": "r-1", "op": "engine/hello", "body": { "protocol-versions": [1] } });
+  stdin.write_all(&frame(&hello)).expect("write hello");
+  assert_eq!(
+    read_frame(&mut stdout)["ok"]["capabilities"]["config-loading"],
+    json!({})
+  );
+
+  let load = json!({ "type": "request", "id": "r-2", "op": "config/load",
+    "body": { "path": file.display().to_string() } });
+  stdin.write_all(&frame(&load)).expect("write config/load");
+  let response = read_frame(&mut stdout);
+  assert_eq!(
+    response["ok"]["config"]["hooks"]["state-setup"][0]["run"]["url"],
+    json!("http://127.0.0.1:9999/state"),
+    "{response}"
+  );
+  drop(stdin);
+  let _ = child.wait();
+  let _ = std::fs::remove_dir_all(&dir);
+}

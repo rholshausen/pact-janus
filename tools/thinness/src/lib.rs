@@ -26,7 +26,16 @@ pub mod cli;
 
 /// The layers, in the order they are reported. `generated` and `tests` carry no budget: generated
 /// code is not a cost an SDK maintainer pays, and tests are not part of the surface a user installs.
-pub const LAYERS: [&str; 5] = ["generated", "idiomatic", "embedding", "integration", "tests"];
+/// `loopback` is the endpoint a provider verification's handlers are served from (ADR 0055
+/// decision 4): the one kind of code the provider side adds, so it is counted apart.
+pub const LAYERS: [&str; 6] = [
+  "generated",
+  "idiomatic",
+  "embedding",
+  "loopback",
+  "integration",
+  "tests",
+];
 
 /// What one file, or one layer, or one SDK amounts to.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

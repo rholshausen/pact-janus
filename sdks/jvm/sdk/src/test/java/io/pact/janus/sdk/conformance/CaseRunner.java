@@ -42,6 +42,8 @@ final class CaseRunner {
     try {
       if ("translation".equals(testCase.path("category").asText())) {
         runner.translation();
+      } else if (testCase.has("verifier")) {
+        ProviderRunner.run(testCase, runner.failures);
       } else {
         runner.session();
       }

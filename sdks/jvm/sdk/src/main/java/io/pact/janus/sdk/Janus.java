@@ -439,7 +439,7 @@ public final class Janus implements AutoCloseable {
    * rule is on the text: on Windows {@code /components/x} names no drive, which {@link Path#isAbsolute}
    * calls relative and other languages' libraries call absolute.
    */
-  private static boolean hasRoot(String reference) {
+  static boolean hasRoot(String reference) {
     return Path.of(reference).isAbsolute() || reference.startsWith("/") || reference.startsWith(File.separator);
   }
 
@@ -448,7 +448,7 @@ public final class Janus implements AutoCloseable {
    * engine resolves none against a directory of its own). Everything else is passed as written.
    */
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> resolved(Map<String, Object> declaration) {
+  static Map<String, Object> resolved(Map<String, Object> declaration) {
     if (!(declaration.get("source") instanceof Map<?, ?> source)
         || !"file".equals(source.get("kind"))
         || !(source.get("reference") instanceof String reference)

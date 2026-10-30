@@ -1,5 +1,5 @@
 {
-  "$comment": "The spec schema sets every Janus SDK's generated bindings are built from (plan task 6.1; SDK specification spec §2 layer 1). An SDK speaks the engine protocol, builds interaction specifications out of shapes, reads variant selections and receives contracts — so it gets exactly those four designs' schemas. Component interfaces, hooks, plans and subsumption are the engine's and the CLI's business, not an SDK's; add a set here only when an SDK primitive's 'produces' names a document it governs. Regenerate with `cargo run -p pact_janus_bindings -- generate`.",
+  "$comment": "The spec schema sets every Janus SDK's generated bindings are built from (plan task 6.1; SDK specification spec \u00a72 layer 1). An SDK speaks the engine protocol, builds interaction specifications out of shapes, reads variant selections and receives contracts \u2014 so it gets exactly those four designs' schemas. Component interfaces, plans and subsumption are the engine's and the CLI's business, not an SDK's; add a set here only when an SDK primitive's 'produces' names a document it governs. Hooks are here because a provider's state handlers and request filters are hook entries the SDK writes and serves (ADR 0055, staged plan S1.14). Regenerate with `cargo run -p pact_janus_bindings -- generate`.",
   "sets": [
     {
       "name": "protocol",
@@ -24,6 +24,12 @@
       "schemas": "Documentation/specs/contract-file/schemas/v1",
       "typescript": "contract",
       "jvm": "io.pact.janus.bindings.contract.v1"
+    },
+    {
+      "name": "hooks",
+      "schemas": "Documentation/specs/lifecycle-hooks/schemas/v1",
+      "typescript": "hooks",
+      "jvm": "io.pact.janus.bindings.hooks.v1"
     }
   ]
 }

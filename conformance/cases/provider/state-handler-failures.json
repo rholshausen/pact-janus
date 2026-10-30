@@ -1,0 +1,153 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/state-handler-failures",
+  "category": "provider",
+  "title": "A handler that throws answers failed, and one that cannot reach its state answers unsupported",
+  "covers": [
+    "verification.state-handler.failure-is-failed",
+    "verification.state-handler.unsupported"
+  ],
+  "why": "behavioural spec 'state-handler': 'a thrown failure is { outcome: failed, error: { code: handler-failed, message } }'; saying it cannot reach the state is '{ outcome: unsupported, error: { code: state-unsupported, message: <its reason> } }'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {
+          "throws": "the database is down"
+        }
+      },
+      {
+        "state": "a deleted order",
+        "setup": {
+          "unsupported": "orders are never deleted"
+        }
+      }
+    ]
+  },
+  "engine": {
+    "invoke": [
+      {
+        "point": "state-setup",
+        "hook": "state-1",
+        "context": {
+          "point": "state-setup",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "an order exists",
+            "params": {
+              "id": 42
+            }
+          }
+        }
+      },
+      {
+        "point": "state-setup",
+        "hook": "state-2",
+        "context": {
+          "point": "state-setup",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "a deleted order"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "invocations": [
+      {
+        "status": 200,
+        "result": {
+          "outcome": "failed",
+          "error": {
+            "code": "handler-failed",
+            "message": "the database is down"
+          }
+        }
+      },
+      {
+        "status": 200,
+        "result": {
+          "outcome": "unsupported",
+          "error": {
+            "code": "state-unsupported",
+            "message": "orders are never deleted"
+          }
+        }
+      }
+    ],
+    "outcome": "ok"
+  }
+}

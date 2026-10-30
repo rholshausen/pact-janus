@@ -15,6 +15,7 @@ import {
 import type { Case, Exchange, InteractionScript, Outcome, StepExpectation } from "./cases.js";
 import { equal, pointer, show, subset } from "./compare.js";
 import { buildInteraction } from "./dsl.js";
+import { runProvider } from "./provider.js";
 import { CONSUMER, PROVIDER, ScriptedPipe } from "./scripted-engine.js";
 
 export interface CaseResult {
@@ -29,6 +30,8 @@ export async function runCase(testCase: Case): Promise<CaseResult> {
   try {
     if (testCase.category === "translation") {
       await runTranslation(testCase, failures);
+    } else if (testCase.verifier) {
+      await runProvider(testCase, failures);
     } else {
       await runSession(testCase, failures);
     }

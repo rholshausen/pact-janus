@@ -10,11 +10,11 @@
     "id": {
       "type": "string",
       "description": "Unique case id, '<category>/<name>', matching the file's path under cases/.",
-      "pattern": "^(translation|lifecycle|variants|live)/[a-z0-9-]+$"
+      "pattern": "^(translation|lifecycle|variants|live|provider)/[a-z0-9-]+$"
     },
     "category": {
-      "enum": ["translation", "lifecycle", "variants", "live"],
-      "description": "translation: what a DSL chain builds, no engine. lifecycle and variants: what the SDK sends and does, against the case's own scripted engine. live: against the real pinned engine."
+      "enum": ["translation", "lifecycle", "variants", "live", "provider"],
+      "description": "translation: what a DSL chain builds, no engine. lifecycle and variants: what the SDK sends and does, against the case's own scripted engine. provider: a provider verification ('verifier', 'verify'), against the case's own scripted engine. live: against the real pinned engine, a consumer's steps or a provider's verification."
     },
     "title": { "type": "string", "description": "One line, in the present tense: what the SDK must do." },
     "covers": {
@@ -46,6 +46,13 @@
       "additionalProperties": false
     },
     "engine": { "$ref": "#/$defs/ScriptedEngine" },
+    "verifier": { "$ref": "#/$defs/Verifier" },
+    "verify": {
+      "type": "boolean",
+      "default": true,
+      "description": "'provider' cases: whether the test calls 'verify' once the verifier is configured. false: it configures the verifier and its handlers and stops."
+    },
+    "provider": { "$ref": "#/$defs/LiveProvider" },
     "steps": {
       "type": "array",
       "minItems": 1,
@@ -65,7 +72,11 @@
     },
     {
       "if": { "properties": { "category": { "const": "live" } }, "required": ["category"] },
-      "then": { "required": ["steps"] }
+      "then": { "anyOf": [{ "required": ["steps"] }, { "required": ["verifier", "provider", "expect"] }] }
+    },
+    {
+      "if": { "properties": { "category": { "const": "provider" } }, "required": ["category"] },
+      "then": { "required": ["verifier", "expect"] }
     }
   ],
   "$defs": {
@@ -176,6 +187,33 @@
             },
             "additionalProperties": true
           }
+        },
+        "capabilities": {
+          "type": "object",
+          "description": "'provider' cases: the capabilities 'engine/hello' answers with. Default: { \"config-loading\": {} }."
+        },
+        "config": {
+          "type": "object",
+          "description": "'provider' cases: the resolved configuration 'config/load' answers with. Default: { \"version\": 1, \"hooks\": {} }."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "payload"],
+            "properties": { "kind": { "type": "string" }, "payload": { "type": "object" } },
+            "additionalProperties": false
+          },
+          "description": "'provider' cases: the events the run's stream carries before its terminal one, in order; the driver numbers them. Default: one 'verification/interaction-result', { interaction: { contract: { consumer: 'web-app', provider: 'orders-api' }, index: 0, description: 'get an order' }, variant: 'base', status: 'verified' }."
+        },
+        "summary": {
+          "type": "object",
+          "description": "'provider' cases: the payload of the terminal 'verification/finished' event, which carries 'last: true'. Default: { status: 'verified', variants: { verified: 1, failed: 0 } }."
+        },
+        "invoke": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Invoke" },
+          "description": "'provider' cases: the hooks the engine calls during the run, in order, before it answers the first 'events/poll' — each found by point and name in the 'verification/verify' frame's target.hooks, and POSTed its context at its url with its headers."
         }
       },
       "additionalProperties": false
@@ -212,6 +250,107 @@
         "exchange": {
           "$ref": "#/$defs/Exchange",
           "description": "'live' cases: the request the consumer sends to the mock, once per variant."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Verifier": {
+      "type": "object",
+      "description": "The 'verifier' a provider case configures (behavioural spec 'verifier', 'state-handler', 'request-filter'), as data.",
+      "properties": {
+        "provider-url": { "type": "string", "description": "The provider URL. Absent in a live case: the driver's own provider's." },
+        "pacts": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Documents the driver writes to files, one each, and names as the 'pacts' option, in order."
+        },
+        "broker": { "type": "object", "description": "The 'broker' option, as given." },
+        "urls": { "type": "object", "description": "The 'urls' option, as given." },
+        "options": { "type": "object", "description": "The run's 'options', as given." },
+        "config": {
+          "type": "string",
+          "description": "A configuration file's text, which the driver writes to a file and names as 'config' by a path relative to the working directory."
+        },
+        "components": { "type": "array", "items": { "type": "object" }, "description": "The 'components' option, as given." },
+        "state-handlers": { "type": "array", "items": { "$ref": "#/$defs/StateHandler" } },
+        "request-filters": { "type": "array", "items": { "$ref": "#/$defs/RequestFilter" } }
+      },
+      "additionalProperties": false
+    },
+    "StateHandler": {
+      "type": "object",
+      "required": ["state", "setup"],
+      "properties": {
+        "state": { "type": "string" },
+        "setup": { "$ref": "#/$defs/Behaviour" },
+        "teardown": { "$ref": "#/$defs/Behaviour" }
+      },
+      "additionalProperties": false
+    },
+    "Behaviour": {
+      "type": "object",
+      "description": "What a state handler's setup or teardown does when called, besides being recorded: return an object, throw a failure with a message, or say it cannot reach the state with a reason. Empty: return nothing.",
+      "properties": {
+        "returns": { "type": "object" },
+        "throws": { "type": "string" },
+        "unsupported": { "type": "string" }
+      },
+      "maxProperties": 1,
+      "additionalProperties": false
+    },
+    "RequestFilter": {
+      "type": "object",
+      "description": "A request filter: it returns the request it received with each slot in 'set' replaced by the content given, or throws a failure with the message 'throws'.",
+      "properties": {
+        "changes": { "type": "array", "items": { "type": "string" }, "description": "The 'changes' option. Absent: the default." },
+        "set": { "type": "object", "description": "Slot name -> the content the returned request has there." },
+        "throws": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Invoke": {
+      "type": "object",
+      "required": ["point", "hook", "context"],
+      "properties": {
+        "point": { "type": "string" },
+        "hook": { "type": "string", "description": "The entry's name." },
+        "context": { "type": "object", "description": "The hook context POSTed." },
+        "authorised": { "type": "boolean", "default": true, "description": "false: the call carries no authorization header." }
+      },
+      "additionalProperties": false
+    },
+    "HandlerCall": {
+      "type": "object",
+      "required": ["handler"],
+      "description": "One call of a declared handler, by its entry name: a state handler's 'action' ('setup' or 'teardown') and 'params', or a request filter's 'request'.",
+      "properties": {
+        "handler": { "type": "string" },
+        "action": { "enum": ["setup", "teardown"] },
+        "params": { "type": "object" },
+        "request": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "LiveProvider": {
+      "type": "object",
+      "description": "The provider a live provider case's driver serves on the loopback interface. A request is answered by the first route whose method and path it has: 401 when it lacks a header 'require-headers' names, with that value, else the route's status, headers and JSON body. No route: 404.",
+      "required": ["routes"],
+      "properties": {
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["method", "path", "status"],
+            "properties": {
+              "method": { "type": "string" },
+              "path": { "type": "string" },
+              "require-headers": { "type": "object", "additionalProperties": { "type": "string" } },
+              "status": { "type": "integer" },
+              "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+              "body": {}
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -291,6 +430,46 @@
         "variant-count": {
           "type": "integer",
           "description": "'live' cases: how many variants the engine must select."
+        },
+        "outcome": { "$ref": "#/$defs/Outcome", "description": "'provider' and live provider cases: how 'verify' ended." },
+        "result": {
+          "type": "object",
+          "description": "'provider' and live provider cases: the result 'verify' returned, or the one its failure carries. 'status' compared, and 'results' by value when given.",
+          "properties": {
+            "status": { "type": "string" },
+            "results": { "type": "array", "items": { "type": "object" } }
+          },
+          "additionalProperties": false
+        },
+        "hooks": {
+          "description": "'provider' cases: the 'verification/verify' frame's target.hooks, compared by value, with each url on the loopback interface written 'loopback:<path>' and each authorization header carrying a bearer token of at least 32 hex digits written 'Bearer <token>' (README §4). null: the frame has no target.hooks.",
+          "anyOf": [{ "type": "object" }, { "type": "null" }]
+        },
+        "config-loaded": {
+          "type": "boolean",
+          "description": "'provider' cases: the driver handed 'config' a path relative to the working directory, and 'config/load' carried the configuration file's absolute path."
+        },
+        "invocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": { "type": "integer" },
+              "result": { "description": "The invoke result the endpoint answered, by value; absent or null when the body was empty." }
+            },
+            "additionalProperties": false
+          },
+          "description": "'provider' cases: what the SDK's endpoint answered each of the engine's 'invoke' calls, in order."
+        },
+        "handler-calls": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HandlerCall" },
+          "description": "'provider' and live provider cases: every call of a handler the case declared, in order."
+        },
+        "endpoint-closed": {
+          "type": "boolean",
+          "description": "'provider' cases: whether the SDK's loopback endpoint refuses connections once 'verify' has ended."
         }
       },
       "additionalProperties": false
@@ -304,8 +483,8 @@
           "required": ["error"],
           "properties": {
             "error": {
-              "enum": ["execute-failed", "contract-withheld", "engine-error"],
-              "description": "execute-failed: the closure failed on one or more variants. contract-withheld: finalise wrote no contract. engine-error: the engine answered an operation with an error document."
+              "enum": ["execute-failed", "contract-withheld", "engine-error", "verification-failed", "refused"],
+              "description": "execute-failed: the closure failed on one or more variants. contract-withheld: finalise wrote no contract. engine-error: the engine answered an operation with an error document. verification-failed: 'verify' failed because the run's status was 'failed'. refused: the SDK refused the call itself, before any frame was sent."
             },
             "code": { "type": "string", "description": "engine-error: the error document's code." },
             "variants": {
@@ -321,6 +500,16 @@
             "engine-withheld": {
               "type": "boolean",
               "description": "contract-withheld: whether the engine returned no contract (true) or the SDK withheld one it returned (false)."
+            },
+            "failed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["interaction", "variant"],
+                "properties": { "interaction": { "description": "The result's interaction reference, by value, as the engine sent it." }, "variant": { "type": "string" } },
+                "additionalProperties": false
+              },
+              "description": "verification-failed: the failed, not pending, results the failure must name, in order."
             }
           },
           "additionalProperties": false

@@ -10,3 +10,5 @@ export * as variant from "./variant.js";
 export * as variantVocabulary from "./variant.vocabulary.js";
 export * as contract from "./contract.js";
 export * as contractVocabulary from "./contract.vocabulary.js";
+export * as hooks from "./hooks.js";
+export * as hooksVocabulary from "./hooks.vocabulary.js";

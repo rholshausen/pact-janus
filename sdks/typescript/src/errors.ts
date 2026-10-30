@@ -102,6 +102,57 @@ export class ContractWithheldError extends Error {
   }
 }
 
+/** One interaction × variant result of a provider verification, as `verification/interaction-result` carried it. */
+export interface VerificationResultEntry {
+  /** The engine's reference to the interaction, as it sent it: its `description` names it. */
+  interaction: unknown;
+  variant: string;
+  status: string;
+  pending?: boolean;
+  mismatches?: Array<Record<string, unknown>>;
+  [k: string]: unknown;
+}
+
+/** What `verify` returns, and what its failure carries (behavioural spec 'verify'). */
+export interface VerificationResult {
+  /** The summary's status: `verified`, `filtered` (not a pass: not every variant was replayed) or `failed`. */
+  status: string;
+  /** The terminal event's summary document, as the engine sent it. */
+  summary: Record<string, unknown>;
+  results: VerificationResultEntry[];
+}
+
+/** The run's status was `failed`. Names each failed result that is not pending. */
+export class VerificationFailedError extends Error {
+  readonly result: VerificationResult;
+  readonly failures: VerificationResultEntry[];
+
+  constructor(result: VerificationResult) {
+    const failures = result.results.filter((r) => r.status === "failed" && r.pending !== true);
+    const lines = failures.flatMap((r) => [
+      `  ✗ ${describe(r.interaction)} (${r.variant})`,
+      ...(r.mismatches ?? []).map((m) => `      ${String(m.path ?? "")} ${String(m.message ?? JSON.stringify(m))}`),
+    ]);
+    super(`The provider verification failed${failures.length > 0 ? `:\n${lines.join("\n")}` : ""}`);
+    this.name = "VerificationFailedError";
+    this.result = result;
+    this.failures = failures;
+  }
+}
+
+function describe(interaction: unknown): string {
+  const description = (interaction as { description?: unknown } | null)?.description;
+  return typeof description === "string" ? description : JSON.stringify(interaction);
+}
+
+/** Thrown by a state handler that cannot put the provider in its state: the variant is state-unavailable. */
+export class StateUnsupportedError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "StateUnsupportedError";
+  }
+}
+
 /** `label (id)`, or just the id when the engine gave no separate label. */
 export function label(variant: protocol.VariantDescriptor): string {
   const name = typeof variant.label === "string" ? variant.label : undefined;

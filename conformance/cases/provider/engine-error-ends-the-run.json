@@ -1,0 +1,89 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/engine-error-ends-the-run",
+  "category": "provider",
+  "title": "An engine error fails verify, and the endpoint and the engine are still ended",
+  "covers": [
+    "verification.verify.engine-error-surfaces",
+    "verification.verify.endpoint-and-engine-closed"
+  ],
+  "why": "behavioural spec 'verify': 'Any operation answered with an error fails verify with that error'; the endpoint and the engine 'are stopped and ended however verify ends'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "options": {
+      "variant": "no-such-variant"
+    },
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {}
+      }
+    ]
+  },
+  "engine": {
+    "errors": {
+      "verification/verify": {
+        "code": "variant-not-found",
+        "details": {
+          "variant": "no-such-variant",
+          "recorded": [
+            "base"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "verification/verify"
+    ],
+    "outcome": {
+      "error": "engine-error",
+      "code": "variant-not-found"
+    },
+    "engine-closed": true,
+    "endpoint-closed": true
+  }
+}

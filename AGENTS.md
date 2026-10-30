@@ -123,6 +123,11 @@ Three sources are the source of truth and take precedence over this file when th
 > S1.34 (ADR 0054): a host that declares the `segments` capability gets `text-segments` and
 > `message-segments` beside the engine's display text; the CLI colours plans, the `check` page and
 > mismatch messages from them, and parses none of it.
+> Stage 1a's items are all built; its exit waits on pilot providers. Stage 1b has started: S1.14
+> (ADR 0055): an SDK verifies a provider in a test through one `verification/verify`, with state
+> handlers and request filters as loopback `http` hooks it serves for the run behind a bearer token,
+> and reads `verifier.janus.yaml` through the engine's host (`config/load`, behind `config-loading`).
+> Both SDKs have a `Verifier`, and the conformance suite has a `provider` category.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

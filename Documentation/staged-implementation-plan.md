@@ -433,6 +433,15 @@ item in 1a is done when S1.1 agrees.
   pilot provider's. It is the test for principle 1, and it is what "exactly as today" means from here on.
   *Exit:* the harness runs in CI over the corpus and reports zero disagreements, or names each one with
   a reason (a known gap in §5, or a deliberate difference recorded as an ADR).
+  *Done 2026-10-18* (`30e7234`, `feae5e0`). `tools/verifier-diff` runs `pact_verifier_cli`, pinned at
+  1.3.5 in `tools/verifier-diff/pact-verifier.json`, and `janus verify` against a freshly started
+  provider each, and CI's `verifier-diff` job runs it. Every disagreement is in
+  `corpora/verifier/disagreements.json` with the item or ADR that accounts for it, and the run fails on
+  one it does not list and on a listed one that has gone. The corpus started with the order-service's
+  v3 pact and the pact-compatibility-suite's HTTP provider scenarios, which stood in for the example
+  repositories' pacts, each with deterministic mutations of its responses; every later item in 1a added
+  fixtures, 101 by the end of the stage. What the first run found became S1.18, and moved plain-text
+  bodies into S1.6. Not yet in it: a pilot provider's pacts, which are the stage's exit.
 - **S1.2 Where the broker client lives** — decision, ADR. The kernel knows no HTTP, so the broker
   client is not kernel code; but if it is CLI code, every provider integration in 1b and every SDK in
   stage 6 re-implements it, which the thinness audit measures. This plan recommends **protocol
@@ -446,6 +455,8 @@ item in 1a is done when S1.1 agrees.
   and §8.7, `broker.schema.json`, and the `broker-verification.md` transcript; until S1.3 every
   engine answers them with `component-unavailable` naming `broker`.
   *Exit:* the ADR, and the operations in the engine-protocol spec with schemas and examples.
+  *Done 2026-10-18* (`dbf92de`). The SDK bindings were regenerated for the new types, and the
+  example checker validates `broker-verification.md`. S1.3 built the client on 2026-10-19.
 - **S1.3 Broker integration** — **L**. Fetching pacts by consumer version selectors; pending and
   work-in-progress pacts; publishing verification results keyed per consumer/provider pair (finding
   10, option A: `pairs` in the run summary); `can-i-deploy` unchanged; a `janus publish` verb (broker
@@ -1392,6 +1403,22 @@ SDK implements it, and the SDK specification covers only the consumer side.
   result surface, including a filter naming no recorded variant and a filtered run (S1.17, whose
   cases are protocol-level tests until then). The thinness layers for it in each SDK's `thinness.json`.
   *Exit:* the conformance lint passes with provider ids; both drivers run the provider cases.
+  *Done 2026-10-30*, as [ADR 0055](decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md)
+  decides. The behavioural specification has a `verification` category: `verifier`, `state-handler`,
+  `request-filter` and `verify`, with 23 conformance ids. The conformance suite has a `provider`
+  category, 14 cases against the scripted engine, which now calls the SDK's hooks during the run as a
+  real engine would, and one `live` case, in which the real engine calls a test's state handler and
+  request filter against a provider the driver serves. Both SDKs pass all 62 cases. Each has a
+  provider API of its own: `Verifier` in TypeScript, `Verifier.forProvider` on the JVM. A verify is
+  one run, with the handlers served on a loopback endpoint behind a bearer token for that run. Not
+  foreseen: an SDK had no way to read `verifier.janus.yaml` without writing a loader of its own, so
+  the engine's host loads it (`config/load`, engine-protocol spec §8.8, behind `config-loading`).
+  The thinness audit has a `loopback` layer, and the TypeScript idiomatic budget moved from 700 to
+  850 for the four primitives. A result's interaction is the engine's reference to it, an object,
+  not its description, and the spec's own example had it as a string. The JVM SDK resolved a
+  relative path without normalising it, which the `config-loaded` case found. Left for S1.15:
+  message producers (pact-js's `messageProviders`, a `produce-message` hook whose answer is a whole
+  `parts` document), and every test-framework integration.
 - **S1.15 JVM and JavaScript provider integrations** — **L**. A JUnit 5 provider runner and a
   `Verifier`-shaped API for Jest and Vitest, over the subprocess, from generated bindings, under the
   thinness audit. Each ships with a migration note from today's annotations and options.

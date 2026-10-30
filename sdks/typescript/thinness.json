@@ -22,10 +22,14 @@
       "src/janus.ts",
       "src/interaction.ts",
       "src/shapes.ts",
-      "src/errors.ts"
+      "src/errors.ts",
+      "src/verifier.ts"
     ],
     "embedding": [
       "src/engine"
+    ],
+    "loopback": [
+      "src/loopback.ts"
     ],
     "integration": [
       "src/vitest.ts"
@@ -35,8 +39,9 @@
     ]
   },
   "budgets": {
-    "idiomatic": 700,
+    "idiomatic": 850,
     "embedding": 250,
+    "loopback": 80,
     "integration": 60
   }
 }

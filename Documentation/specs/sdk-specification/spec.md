@@ -209,6 +209,24 @@ Every arrow is engine-protocol spec §8.2's own operation table; this design add
 attaches DSL call sites to it so an implementer has one place that shows the whole path from keystroke to
 wire call.
 
+The provider side is the same idea one run long ([ADR 0055](../../decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md),
+staged plan S1.14):
+
+```
+verifier({ providerUrl, pacts | broker | urls, options, config })   -- no protocol call yet
+  .state('an order exists', setup, teardown)   -- a state-setup and a state-teardown hook entry
+  .requestFilter(filter)                       -- a before-request hook entry
+
+verify()
+  -> engine/hello
+  -> config/load                    (when 'config' is given)
+  -> verification/verify            (the handlers served on a loopback endpoint for the run)
+  -> events/poll ...                (until the terminal event; the engine calls the handlers meanwhile)
+```
+
+[`engine-protocol/examples/provider-in-a-test.md`](../engine-protocol/examples/provider-in-a-test.md)
+is the same path as frames.
+
 ## 5. The per-language style-guide skeleton
 
 The behavioural specification deliberately does not fix: naming case, module layout, the async
@@ -310,6 +328,11 @@ Task 6.4's suite MUST cover, at minimum, the four categories the plan already co
    byte-identical files — `metadata.writer` legitimately differs by SDK name and version (contract spec
    §3.2 puts exactly this kind of fact in `metadata`, outside content identity) — and a suite that
    demanded byte-identical output would be grading a fact this design never asked any SDK to agree on.
+
+A fifth category covers the provider side (staged plan S1.14, ADR 0055): what a verifier sends — one
+`verify`, its source and options as given, a configuration loaded through the engine, its handlers as
+loopback hook entries named by kind and position — what its endpoint answers the engine, and what a
+run's status makes of the test.
 
 Conformance says nothing about idiomatic quality — a conformant SDK can still have an awkward, unpleasant
 API — and nothing about thinness by itself: a suite that only samples scenarios cannot, by construction,

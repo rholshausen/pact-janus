@@ -1,0 +1,184 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/failed-run-fails",
+  "category": "provider",
+  "title": "A failed run fails verify, naming the failures that are not pending",
+  "covers": [
+    "verification.verify.failed-run-fails"
+  ],
+  "why": "behavioural spec 'verify': 'A status failed fails verify, carrying that result, and naming each result whose status is failed and which is not pending'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ]
+  },
+  "engine": {
+    "events": [
+      {
+        "kind": "verification/interaction-result",
+        "payload": {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "status": "failed",
+          "mismatches": [
+            {
+              "path": "$.body.id",
+              "message": "expected 42 but got 7"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "verification/interaction-result",
+        "payload": {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 1,
+            "description": "get a pending order"
+          },
+          "variant": "base",
+          "status": "failed",
+          "pending": true
+        }
+      },
+      {
+        "kind": "verification/interaction-result",
+        "payload": {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 2,
+            "description": "list orders"
+          },
+          "variant": "base",
+          "status": "verified"
+        }
+      }
+    ],
+    "summary": {
+      "status": "failed",
+      "variants": {
+        "verified": 1,
+        "failed": 2
+      }
+    }
+  },
+  "expect": {
+    "outcome": {
+      "error": "verification-failed",
+      "failed": [
+        {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base"
+        }
+      ]
+    },
+    "result": {
+      "status": "failed",
+      "results": [
+        {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 0,
+            "description": "get an order"
+          },
+          "variant": "base",
+          "status": "failed",
+          "mismatches": [
+            {
+              "path": "$.body.id",
+              "message": "expected 42 but got 7"
+            }
+          ]
+        },
+        {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 1,
+            "description": "get a pending order"
+          },
+          "variant": "base",
+          "status": "failed",
+          "pending": true
+        },
+        {
+          "interaction": {
+            "contract": {
+              "consumer": "web-app",
+              "provider": "orders-api"
+            },
+            "index": 2,
+            "description": "list orders"
+          },
+          "variant": "base",
+          "status": "verified"
+        }
+      ]
+    },
+    "engine-closed": true
+  }
+}

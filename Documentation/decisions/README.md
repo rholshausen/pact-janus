@@ -71,6 +71,7 @@ superseding ADR instead.
 | [0052](0052-declare-a-components-registry-credential-in-its-source.md) | Declare a component's registry credential in its source | accepted |
 | [0053](0053-take-todays-verifier-options-where-they-mean-what-they-did.md) | Take today's verifier options where they mean what they did | accepted |
 | [0054](0054-carry-an-errors-causes-as-a-chain-and-mark-display-text-with-segments.md) | Carry an error's causes as a chain, and mark display text with segments beside it | accepted |
+| [0055](0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md) | Verify a provider inside a test through the protocol's run, with handlers as loopback hooks and the configuration loaded by the engine's host | accepted |
 
 ## Decision backlog
 

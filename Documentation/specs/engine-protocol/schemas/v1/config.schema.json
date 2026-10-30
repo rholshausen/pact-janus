@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pact.io/janus/protocol/v1/config.schema.json",
+  "title": "ConfigOps",
+  "description": "Request/result bodies for the config/* operations (spec.md §8.8, ADR 0055). Behind the 'config-loading' capability: an engine with no loader answers component-unavailable naming 'config-loader'.",
+  "$defs": {
+    "Load": {
+      "title": "Load",
+      "description": "Load a project configuration file (lifecycle-hooks spec §6.1), YAML or JSON, through the loader janus verify --config runs (lifecycle-hooks spec §7.1).",
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file, as an absolute path. The engine resolves no path against a directory of its own: a relative one is malformed-frame."
+        }
+      }
+    },
+    "LoadResult": {
+      "title": "LoadResult",
+      "type": "object",
+      "required": ["config"],
+      "properties": {
+        "config": {
+          "title": "ResolvedConfig",
+          "description": "The resolved configuration: every ${VAR} interpolated from the engine process's environment, every script inlined, every path absolute. A host puts 'components' in target.components and 'hooks' in target.hooks. It carries secrets, which the engine never repeats in a log.",
+          "type": "object",
+          "required": ["hooks"],
+          "properties": {
+            "version": {
+              "type": "integer",
+              "description": "The configuration's version, as the file gave it."
+            },
+            "hooks": {
+              "type": "object",
+              "description": "Point -> hook entries, the lifecycle-hooks spec's hook-config.schema.json document."
+            },
+            "components": {
+              "type": "array",
+              "description": "The project's declared components, with a file source's path made absolute (component-interfaces spec §10.2).",
+              "items": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@
         "category": {
           "type": "string",
           "description": "What kind of primitive this is (spec.md §3.1).",
-          "x-known-values": ["shape", "interaction", "session", "lifecycle"]
+          "x-known-values": ["shape", "interaction", "session", "lifecycle", "verification"]
         },
         "summary": {
           "type": "string",
@@ -80,7 +80,7 @@
       "properties": {
         "kind": {
           "type": "string",
-          "x-known-values": ["shape-operator", "protocol-operation", "spec-member"]
+          "x-known-values": ["shape-operator", "protocol-operation", "spec-member", "hook-entry"]
         },
         "operator": {
           "type": "string",
@@ -93,6 +93,10 @@
         "path": {
           "type": "string",
           "description": "kind 'spec-member': the member path within the interaction-spec document this primitive populates, e.g. 'parts.response.body'."
+        },
+        "point": {
+          "type": "string",
+          "description": "kind 'hook-entry': the lifecycle point (design 2.7 §3) of the hook entry this primitive writes into a verification's target.hooks, e.g. 'state-setup' (ADR 0055)."
         }
       },
       "allOf": [
@@ -107,6 +111,10 @@
         {
           "if": { "required": ["kind"], "properties": { "kind": { "const": "spec-member" } } },
           "then": { "required": ["kind", "path"] }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "hook-entry" } } },
+          "then": { "required": ["kind", "point"] }
         }
       ]
     },

@@ -1,0 +1,78 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/source-and-options-as-given",
+  "category": "provider",
+  "title": "A broker source and the run's options are sent as the test gave them",
+  "covers": [
+    "verification.verify.source-and-options-as-given"
+  ],
+  "why": "behavioural spec 'verify': the 'broker' option 'with its kind added, members as given', and 'options' 'the run's options exactly as given'.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "broker": {
+      "broker": {
+        "url": "https://broker.example",
+        "auth": {
+          "kind": "bearer",
+          "token": "t0k3n"
+        }
+      },
+      "provider": "orders-api",
+      "consumer-version-selectors": [
+        {
+          "mainBranch": true
+        },
+        {
+          "deployedOrReleased": true
+        }
+      ],
+      "include-pending": true
+    },
+    "options": {
+      "publish": {
+        "provider-version": "1.2.3",
+        "branch": "main"
+      },
+      "stop-on-first-failure": true
+    }
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "verification/verify",
+      "events/poll"
+    ],
+    "frames": {
+      "verification/verify": {
+        "source": {
+          "kind": "broker",
+          "broker": {
+            "url": "https://broker.example",
+            "auth": {
+              "kind": "bearer",
+              "token": "t0k3n"
+            }
+          },
+          "provider": "orders-api",
+          "consumer-version-selectors": [
+            {
+              "mainBranch": true
+            },
+            {
+              "deployedOrReleased": true
+            }
+          ],
+          "include-pending": true
+        },
+        "options": {
+          "publish": {
+            "provider-version": "1.2.3",
+            "branch": "main"
+          },
+          "stop-on-first-failure": true
+        }
+      }
+    },
+    "outcome": "ok"
+  }
+}

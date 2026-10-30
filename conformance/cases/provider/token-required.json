@@ -1,0 +1,103 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/token-required",
+  "category": "provider",
+  "title": "A call without the run's token is refused and runs no handler",
+  "covers": [
+    "verification.state-handler.token-required"
+  ],
+  "why": "behavioural spec 'state-handler': 'A request without the run's token is answered 401 with an empty body and calls nothing' (ADR 0055 decision 2).",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "state-handlers": [
+      {
+        "state": "an order exists",
+        "setup": {}
+      }
+    ]
+  },
+  "engine": {
+    "invoke": [
+      {
+        "point": "state-setup",
+        "hook": "state-1",
+        "context": {
+          "point": "state-setup",
+          "role": "provider",
+          "run": {
+            "id": "vs-1"
+          },
+          "interaction": {
+            "description": "get an order"
+          },
+          "variant": {
+            "id": "base"
+          },
+          "exchange": {
+            "id": "x-1"
+          },
+          "config": {},
+          "mutable": [],
+          "deadline-ms": 5000,
+          "state": {
+            "name": "an order exists",
+            "params": {
+              "id": 42
+            }
+          }
+        },
+        "authorised": false
+      }
+    ]
+  },
+  "expect": {
+    "invocations": [
+      {
+        "status": 401
+      }
+    ],
+    "handler-calls": [],
+    "outcome": "ok"
+  }
+}

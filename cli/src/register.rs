@@ -8,10 +8,11 @@
 //! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport, the
 //! JSON and text content components (ADR 0036), the `exec` and `http` hook implementations, the
 //! built-in `oauth2` hook component, the WASM loader for out-of-tree components (plan task 8.1),
-//! and the Pact Broker client (ADR 0032, staged plan S1.3). An engine handed none of those refuses
+//! the Pact Broker client (ADR 0032, staged plan S1.3), and the configuration loader `config/load`
+//! answers with (ADR 0055, staged plan S1.14). An engine handed none of those refuses
 //! a configuration naming them — by name, before a run starts.
 
-use pact_janus_hooks_host::{ExecHooks, HttpHooks};
+use pact_janus_hooks_host::{ExecHooks, FileLoader, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
 use pact_janus_kernel::hooks::HookInvoker;
 use pact_janus_kernel::protocol::Engine;
@@ -50,5 +51,8 @@ pub fn native_engine() -> Engine {
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));
   engine.register_broker_client(Arc::new(pact_janus_broker_client::HalBrokerClient::new()));
+  // `config/load` (ADR 0055): an SDK reads a project's configuration through the loader
+  // `janus verify --config` runs, so a file means the same in every language.
+  engine.register_config_loader(Arc::new(FileLoader));
   engine
 }

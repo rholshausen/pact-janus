@@ -21,12 +21,14 @@ schemas/v1/conformance-case.schema.json   what a case is (the case's own schema)
 cases/translation/                        what a DSL chain builds — no engine anywhere
 cases/lifecycle/                          what the SDK sends, and what it does with the answers
 cases/variants/                           which variants the closure runs on, and what a failure does
-cases/live/                               the real engine: derived dimensions, and contract content
+cases/live/                               the real engine: derived dimensions, contract content, and a provider run
+cases/provider/                           a provider verification: what the SDK sends, and what its handlers answer
 ```
 
-The four groups are SDK spec §7's four categories, which ADR 0017 fixes as the minimum coverage:
-DSL→interaction-spec translation, session lifecycle, variant iteration, and contract-output
-equivalence.
+The first four groups are SDK spec §7's four categories, which ADR 0017 fixes as the minimum
+coverage: DSL→interaction-spec translation, session lifecycle, variant iteration, and
+contract-output equivalence. `provider` is the provider side (staged plan S1.14, ADR 0055): a
+verifier, its state handlers and request filters, and one `verify`.
 
 Every case names, in `covers`, the conformance ids from
 [`behavioural-spec.json`](../Documentation/specs/sdk-specification/behavioural-spec.json) it is the
@@ -100,6 +102,23 @@ runs as consumer `web-app` and provider `orders-api`, so the contract file is al
 **Against the real engine** (`live`): no `engine` member; the driver starts the engine `JANUS_ENGINE`
 names. A closure's `exchange` is the request the consumer sends to the mock, once per variant.
 
+**A provider verification** (`provider`, and a `live` case with a `verifier`): `verifier` is the
+verifier as data. The driver writes each of its `pacts` to a file and names the files, writes
+`config` to a file and names it by a path relative to the working directory, and declares each
+state handler and request filter in order, recording every call. A state handler's `setup` and
+`teardown` say what it does — `returns` an object, `throws` a failure with that message, or says
+it cannot reach the state with an `unsupported` reason — and a request filter returns the request it
+was given with the slots in `set` replaced, or `throws`. `verify: false` stops before `verify`.
+Against the scripted engine, unset members are answered the default way: `engine/hello` declares
+`config-loading`, `config/load` returns `{ "version": 1, "hooks": {} }`, `verification/verify` returns
+session `vs-1` and stream `s-1`, and the first `events/poll` returns every event at once: one verified
+result for `get an order`, then `verification/finished` with a verified summary. `events` and
+`summary` replace those. Before it answers that poll, the engine calls each hook `invoke` lists, as a
+real engine would during the run: it finds the entry by point and name in the `verify` frame's
+`target.hooks` and POSTs the `context` to its url with its headers — with no `authorization` when
+`authorised` is false. A live provider case has a `provider` instead, which the driver serves on the
+loopback interface, and the verifier's `provider-url` is the driver's.
+
 ## 4. What a case can expect
 
 Per step (`expect` inside a step):
@@ -115,6 +134,17 @@ or `refused` (the chain never becomes a document, because the DSL refuses it at 
 for translation; `ops` (every operation sent, in order), `frames` (operation → members its request
 body must carry), `engine-closed`, `dimensions` (dimension ids the engine's variants must assign)
 and `variant-count`.
+
+For a provider case, also: `outcome` (how `verify` ended: `"ok"`, `verification-failed` with the
+results it names as `failed`, `engine-error` with its `code`, or `refused`, the SDK refusing the call
+before any frame), `result` (its `status`, and its `results` by value), `hooks` (the `verify` frame's
+`target.hooks`, or `null` for none), `config-loaded` (`config/load` carried the file's absolute
+path), `invocations` (what the SDK's endpoint answered each `invoke`: the status, and the result by
+value), `handler-calls` (each handler call, compared on the members the case names), and
+`endpoint-closed` (the endpoint refuses connections once `verify` has ended). In `hooks`, a url on
+the loopback interface is written `loopback:<path>` and an `authorization` header carrying a bearer
+token of at least 32 hex digits is written `Bearer <token>`: the port and the token differ on every
+run, and what a case pins is that they are there.
 
 `refused` checks only that no document was produced. *How* a language refuses — a thrown error, a
 failed build, a compile-time type error backed by a runtime check — is the style guide's business.
