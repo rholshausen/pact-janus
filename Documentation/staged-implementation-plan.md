@@ -1392,6 +1392,20 @@ item in 1a is done when S1.1 agrees.
   knows nothing of HTTP statuses.
   *Exit:* `examples/pact-js/matchers` has no entry in `corpora/verifier/disagreements.json`, and an
   upgraded contract with a status class verifies.
+  *Done 2026-10-30* ([ADR 0057](decisions/0057-the-http-component-runs-http-status-class-as-an-in-tree-matcher.md)):
+  - `engine/component-http` implements the matcher interface's `apply` for `http:status-class`: a
+    `class` (`success`, `client-error`, …, the ranges today's verifier checks) or a list of `codes`.
+  - An embedding registers a matcher compiled into it with `Engine::register_matcher`, and every scope
+    runs its actions through `matcher/apply` as it runs a declared component's. `janus` and
+    `janus-engine` register the HTTP one; the WASM engine, which has no HTTP component, fails the node
+    by name.
+  - The legacy compiler compiles a pact's `statusCode` rule to the same action, with the members
+    `janus upgrade` writes. The upgrade now writes a code list as `codes`.
+  - Evidence: `corpora/verifier/matching-rules/status-code`, every class and a code list, with
+    mutations past each class's edge, where both verifiers and the upgraded contracts agree on all
+    46 verdicts; `corpora/legacy/v4-status-class` and its `-mismatch` twin, compiled from the pact and
+    from its upgraded contract. pact-js's `matchers` example verifies in full, and its upgraded
+    contract's interaction joins the other three in the upgrade ledger, on S3.4's charset difference.
 
 **Stage 1a is done when** S1.1 reports zero unexplained disagreements over the fixture corpus, the
 pact-specification cases pass in full, and pilot providers have run `janus verify` beside their current

@@ -1,0 +1,33 @@
+(
+  :"create an order" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'POST'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %http:status-class (
+          $.response.status,
+          {'class': 'success'}
+        )
+      )
+    )
+  )
+)

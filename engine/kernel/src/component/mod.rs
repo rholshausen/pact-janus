@@ -35,7 +35,7 @@ pub use loader::{
   ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
   SourceAuth, Unavailable, check_requirements, resolve,
 };
-pub use matcher::{Apply, ApplyResult, MatcherComponent};
+pub use matcher::{Apply, ApplyResult, InTreeMatcher, MatcherComponent};
 pub use parts::{Part, Parts, SlotValue};
 pub use registry::{ContentRegistry, media_type_matches};
 pub use transport::{

@@ -133,7 +133,9 @@ Three sources are the source of truth and take precedence over this file when th
 > TypeScript SDK `pact-janus/verifier`, pact-js's provider API over its own (the thinness audit's
 > `facade` layer). pact-js's and pact-jvm's provider examples run on them, their pacts S1.1 fixtures
 > under `corpora/verifier/examples/`; `Documentation/provider-test-migration.md` is the migration
-> note. They found S1.35, the v4 `statusCode` matcher, which reopens stage 1a's list.
+> note. They found S1.35, the v4 `statusCode` matcher, now done (ADR 0057): the built-in HTTP component
+> runs `http:status-class` as a matcher the embedding registers (`Engine::register_matcher`), and the
+> legacy compiler compiles a pact's rule to it.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

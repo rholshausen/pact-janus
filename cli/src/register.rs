@@ -5,13 +5,15 @@
 //! the CLI and through no SDK.
 //!
 //! What a native embedding brings is what the kernel deliberately lacks (lifecycle-hooks spec §8.5,
-//! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport, the
-//! JSON and text content components (ADR 0036), the `exec` and `http` hook implementations, the
+//! ADR 0013): a filesystem, processes and sockets. So it registers the real HTTP transport and the
+//! HTTP component's `http:status-class` matcher (ADR 0057), the JSON and text content components
+//! (ADR 0036), the `exec` and `http` hook implementations, the
 //! built-in `oauth2` hook component, the WASM loader for out-of-tree components (plan task 8.1),
 //! the Pact Broker client (ADR 0032, staged plan S1.3), and the configuration loader `config/load`
 //! answers with (ADR 0055, staged plan S1.14). An engine handed none of those refuses
 //! a configuration naming them — by name, before a run starts.
 
+use pact_janus_component_http::status;
 use pact_janus_hooks_host::{ExecHooks, FileLoader, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
 use pact_janus_kernel::hooks::HookInvoker;
@@ -33,6 +35,13 @@ pub fn native_engine() -> Engine {
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
   engine.declare_in_tree("content", "json", "1.0.0");
+  // The HTTP component is a matcher too (ADR 0057): a v4 `statusCode` rule runs here.
+  engine.register_matcher(
+    status::NAME,
+    "1.0.0",
+    status::ACTIONS,
+    Arc::new(status::HttpMatcher::new()),
+  );
   // XML before text, which claims all of `text/*`, so `text/xml` reaches it (ADR 0039).
   engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
   engine.declare_in_tree("content", "xml", "1.0.0");

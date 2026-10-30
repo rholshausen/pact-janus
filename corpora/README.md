@@ -48,6 +48,9 @@ readability:
   messages, compared as today's verifier compares one: metadata key by key, the contents' content type,
   then the contents (ADR 0046). A message's plan is rooted at the `message` part a `produce-message`
   hook produces, and its case names the interaction by its position in the pact, as every case does.
+  `v4-status-class/` and its `-mismatch` twin are a v4 `statusCode` rule, compiled from the pact and
+  from its upgraded contract to the built-in HTTP component's `http:status-class`, which the corpus
+  runner registers as the native engine does (ADR 0057).
 
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with

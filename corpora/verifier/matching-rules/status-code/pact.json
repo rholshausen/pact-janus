@@ -1,0 +1,234 @@
+{
+  "consumer": {
+    "name": "status-consumer"
+  },
+  "provider": {
+    "name": "status-provider"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "create an order",
+      "request": {
+        "method": "POST",
+        "path": "/orders"
+      },
+      "response": {
+        "status": 201,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "success"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "an order at the top of success",
+      "request": {
+        "method": "GET",
+        "path": "/orders/edge"
+      },
+      "response": {
+        "status": 200,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "success"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a missing order",
+      "request": {
+        "method": "GET",
+        "path": "/orders/missing"
+      },
+      "response": {
+        "status": 404,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "clientError"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a moved order",
+      "request": {
+        "method": "GET",
+        "path": "/orders/moved"
+      },
+      "response": {
+        "status": 301,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "redirect"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "an order that is not an error",
+      "request": {
+        "method": "GET",
+        "path": "/orders/fine"
+      },
+      "response": {
+        "status": 200,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "nonError"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a broken order",
+      "request": {
+        "method": "GET",
+        "path": "/orders/broken"
+      },
+      "response": {
+        "status": 500,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "error"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "an order service that is down",
+      "request": {
+        "method": "GET",
+        "path": "/orders/down"
+      },
+      "response": {
+        "status": 500,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "serverError"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "delete an order",
+      "request": {
+        "method": "DELETE",
+        "path": "/orders/1"
+      },
+      "response": {
+        "status": 204,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": [
+                    200,
+                    204
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "an order the provider refuses",
+      "request": {
+        "method": "GET",
+        "path": "/orders/refused"
+      },
+      "response": {
+        "status": 200,
+        "matchingRules": {
+          "status": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "statusCode",
+                  "status": "success"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}

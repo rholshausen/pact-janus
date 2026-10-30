@@ -534,6 +534,12 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, 
     MatchingRule::Boolean => Node::action("match:boolean", vec![resolve]),
     MatchingRule::NotEmpty => Node::action("expect:not-empty", vec![resolve]),
     MatchingRule::Semver => Node::action("match:semver", vec![resolve]),
+    // v4's status-class matcher, run by the built-in HTTP component (ADR 0057): the kernel knows
+    // nothing of statuses, and an engine without that component fails the node by name.
+    MatchingRule::StatusCode(status) => Node::action(
+      STATUS_CLASS,
+      vec![resolve, Node::value(Literal::from_json(&status_class(status)))],
+    ),
     other => Node::action(
       "flow:error",
       vec![Node::value(Literal::string(format!(
@@ -542,6 +548,28 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, 
       )))],
     ),
   }
+}
+
+/// The component operator a v4 `statusCode` matcher becomes (contract-file spec §8.2): the
+/// built-in HTTP component's, which this layer may name because a v1–v4 pact is HTTP.
+pub(crate) const STATUS_CLASS: &str = "http:status-class";
+
+/// What `http:status-class` reads, as the compiled plan and an upgraded contract both write it
+/// (ADR 0057): `class`, one of the seven classes by its lower-case name, or `codes`, the statuses
+/// allowed.
+pub(crate) fn status_class(status: &pact_models::HttpStatus) -> Value {
+  use pact_models::HttpStatus;
+  let class = match status {
+    HttpStatus::StatusCodes(codes) => return serde_json::json!({ "codes": codes }),
+    HttpStatus::Information => "information",
+    HttpStatus::Success => "success",
+    HttpStatus::Redirect => "redirect",
+    HttpStatus::ClientError => "client-error",
+    HttpStatus::ServerError => "server-error",
+    HttpStatus::NonError => "non-error",
+    HttpStatus::Error => "error",
+  };
+  serde_json::json!({ "class": class })
 }
 
 /// A [`RuleList`] to one node: the single rule's node, or every rule's node combined by

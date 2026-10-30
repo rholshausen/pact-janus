@@ -195,8 +195,9 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   };
   let json_content = JsonContent::new();
   let detection = pact_janus_kernel::component::ContentDetection::of(&json_content);
+  let actions = component_actions();
   if let Some(plan) = &plan {
-    let executed = plan::execute_with_content(plan, &resolver, Some(&detection));
+    let executed = plan::execute_with(plan, &resolver, Some(&detection), Some(&actions));
     let (status, mismatches) = plan::outcome(&executed);
     if let Err(err) = check_result(status, &mismatches, &case.result) {
       problems.push(format!("result: {err}"));
@@ -212,7 +213,7 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
   if let Some(other_input) = &case.also_compiled_from {
     match compile_input(other_input) {
       Ok((other_plan, _)) => {
-        let other_executed = plan::execute_with_content(&other_plan, &resolver, Some(&detection));
+        let other_executed = plan::execute_with(&other_plan, &resolver, Some(&detection), Some(&actions));
         let (other_status, other_mismatches) = plan::outcome(&other_executed);
         if let Err(err) = check_result(other_status, &other_mismatches, &case.result) {
           problems.push(format!("also-compiled-from result: {err}"));
@@ -228,6 +229,17 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     ok: problems.is_empty(),
     problems,
   }
+}
+
+/// The component actions a case can reach: the built-in HTTP component's `http:status-class`, as the
+/// native engine registers it (ADR 0057).
+fn component_actions() -> impl plan::ActionApplier {
+  use pact_janus_component_http::status;
+  pact_janus_kernel::protocol::in_tree_actions(&[pact_janus_kernel::component::InTreeMatcher {
+    name: status::NAME.to_string(),
+    actions: status::ACTIONS.iter().map(|action| action.to_string()).collect(),
+    matcher: std::sync::Arc::new(status::HttpMatcher::new()),
+  }])
 }
 
 /// A case's `values` as a resolver, each in the representation `encoded` names for its path: JSON by

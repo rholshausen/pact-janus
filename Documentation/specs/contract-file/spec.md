@@ -502,7 +502,7 @@ slot, this position, this constraint", which is where a shape node goes.
 | `values` | `each-entry` over values | |
 | `eachKey`, `eachValue` | `each-entry` over keys / values | each by the rule's own matchers. `eachKey` leaves the values open, since v1–v4 compare a member the pact names only when the reply has it (`rule-unmapped`). `eachValue` on a list is `each-like` with `min: 0` (ADR 0048) |
 | `arrayContains` | `contains` | |
-| `statusCode` | `http:status-class` | a component operator, not a core one — the kernel does not know what a status class is (shape spec §3.5) |
+| `statusCode` | `http:status-class` | a component operator, not a core one — the kernel does not know what a status class is (shape spec §3.5). Its members are `class` (`information`, `success`, `redirect`, `client-error`, `server-error`, `non-error`, `error`) or `codes`, a list of statuses; the built-in HTTP component runs it ([ADR 0057](../../decisions/0057-the-http-component-runs-http-status-class-as-an-in-tree-matcher.md)) |
 
 **Bodies** are converted by their type, as the legacy compiler compares them ([ADR
 0047](../../decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)).

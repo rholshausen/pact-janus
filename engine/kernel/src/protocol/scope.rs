@@ -9,8 +9,8 @@
 use super::contributions::Contributions;
 use crate::common::{ContentTypes, Requirement};
 use crate::component::{
-  self, Compile, ComponentLoader, ContentComponent, ContentRegistry, InTree, Resolved, TransportComponent,
-  Unavailable, check_requirements,
+  self, Compile, ComponentLoader, ContentComponent, ContentRegistry, InTree, InTreeMatcher, Resolved,
+  TransportComponent, Unavailable, check_requirements,
 };
 use crate::contract::ShapePart;
 use serde_json::{Value, json};
@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub(crate) struct Scope {
   resolved: Vec<Resolved>,
   /// What the declared components contribute to plans: fragments and the actions they use (plan
-  /// task 8.4). Shared, because a verification run and an exchange loop outlive the call that
+  /// task 8.4), and the actions the embedding's own matchers run (ADR 0057). Shared, because a verification run and an exchange loop outlive the call that
   /// built the scope.
   contributions: Arc<Contributions>,
   in_tree: Vec<InTree>,
@@ -42,11 +42,13 @@ impl Scope {
   }
 
   /// Load `declarations` through `loaders` and put their content components ahead of `in_tree`'s.
+  /// The embedding's own matchers run their actions beside the declared components' (ADR 0057).
   pub fn resolve(
     declarations: &[Value],
     loaders: &[Arc<dyn ComponentLoader>],
     in_tree: &[InTree],
     in_tree_content: &ContentRegistry,
+    in_tree_matchers: &[InTreeMatcher],
   ) -> Result<Scope, Unavailable> {
     let resolved = component::resolve(declarations, loaders, in_tree)?;
     for component in &resolved {
@@ -58,7 +60,7 @@ impl Scope {
       .fold(ContentRegistry::new(), ContentRegistry::with)
       .then(in_tree_content);
     Ok(Scope {
-      contributions: Arc::new(Contributions::from_resolved(&resolved)),
+      contributions: Arc::new(Contributions::from_resolved(&resolved, in_tree_matchers)),
       resolved,
       in_tree: in_tree.to_vec(),
       loaders: loaders.to_vec(),

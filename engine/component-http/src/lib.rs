@@ -1,7 +1,8 @@
 //! The built-in HTTP transport component (component-interfaces spec §5): the native binding for a
 //! real mock HTTP server in the **serve** role (plan task 4.2) and a real HTTP client in the
 //! **drive** role (plan task 5.1), in-tree but through the same interface a third-party transport
-//! would use (ADR 0012).
+//! would use (ADR 0012). It is a matcher too ([`status`], ADR 0057): knowing what a status class is
+//! and speaking HTTP are the same knowledge (spec §2.1).
 //!
 //! One component, two roles, five role-neutral primitives (spec §5.1): a served instance answers
 //! `poll-inbound`/`reply`/`dispose`, a driven one answers `send`, and each answers
@@ -15,6 +16,7 @@
 //! maps directly onto `poll-inbound`'s `timeout-ms`, until S2.1 rewrites it on the same executor.
 
 mod drive;
+pub mod status;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;

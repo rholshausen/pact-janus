@@ -182,6 +182,20 @@
       "pact": "pass",
       "contract": "fail",
       "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "examples/pact-js/matchers",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "examples/pact-js/matchers",
+      "key": "0/2",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
     }
   ]
 }

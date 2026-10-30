@@ -150,6 +150,3 @@ class ContractTest {
   generator from `${userId}` verifies against `/users/666554433`. Today's `pact_verifier_cli`, which
   pact-js uses, compares the recorded value and fails it, and Janus agrees with today's
   (`corpora/verifier/examples/pact-jvm/provider-state-injected`).
-- **The v4 `statusCode` matcher.** Janus fails an interaction that uses it, where today's verifiers
-  check the status's class. It is recorded against staged plan S1.35, which closes it
-  (`corpora/verifier/disagreements.json`, `examples/pact-js/matchers`).

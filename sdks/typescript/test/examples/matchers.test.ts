@@ -2,7 +2,6 @@
 // provider answers with other values than the consumer's examples, which the matchers allow.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { VerificationFailedError } from "../../src/index.js";
 import { Verifier } from "../../src/facade/verifier.js";
 import { corpusPact, json, serve, type Provider } from "./support.js";
 
@@ -38,10 +37,10 @@ describe("MatchersProvider", () => {
 
   afterAll(() => server.close());
 
-  // Today's verifier passes all four. Janus fails the third: its v4 statusCode matcher is not
-  // compiled yet, which corpora/verifier/disagreements.json records against S1.35.
-  it("satisfies all MatchersConsumer expectations but the status class one, until S1.35", async () => {
-    const run = new Verifier({
+  // The third interaction checks the status by its class, v4's statusCode matcher, which the
+  // built-in HTTP component runs (staged plan S1.35, ADR 0057).
+  it("satisfies all MatchersConsumer expectations", async () => {
+    const result = await new Verifier({
       providerBaseUrl: server.url,
       pactUrls: [corpusPact("examples/pact-js/matchers/pact.json")],
       stateHandlers: {
@@ -51,13 +50,6 @@ describe("MatchersProvider", () => {
       },
       logLevel: "warn",
     }).verifyProvider();
-    const error = await run.then(
-      () => undefined,
-      (e: unknown) => e,
-    );
-    expect(error).toBeInstanceOf(VerificationFailedError);
-    const { result } = error as VerificationFailedError;
-    expect(result.results.map((r) => r.status)).toEqual(["verified", "verified", "failed", "verified"]);
-    expect(JSON.stringify(result.results[2])).toContain("legacy matching rule 'status-code' is not yet supported");
+    expect(result.results.map((r) => r.status)).toEqual(["verified", "verified", "verified", "verified"]);
   }, 30_000);
 });

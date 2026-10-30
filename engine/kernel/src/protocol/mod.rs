@@ -45,6 +45,7 @@ mod subsumption;
 mod verification;
 mod wire;
 
+pub use contributions::in_tree_actions;
 pub use engine::Engine;
 pub use events::Event;
 pub use frame::{EngineError, RequestFrame, ResponseFrame};

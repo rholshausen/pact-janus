@@ -7,12 +7,16 @@
 //! this engine cannot read fails the interaction by name, not the fortieth variant of a run. Plans are
 //! then spliced wherever they are compiled ([`Contributions::compile`]).
 //!
-//! Only declared components are asked. The in-tree JSON component contributes no fragment, so
-//! asking it would change nothing; a built-in that did contribute one would need asking too, and
-//! would be the first time "no privileged path" (spec §9.1) cut the other way.
+//! Only declared components are asked for fragments. The in-tree JSON component contributes no
+//! fragment, so asking it would change nothing; a built-in that did contribute one would need asking
+//! too, and would be the first time "no privileged path" (spec §9.1) cut the other way. An in-tree
+//! matcher's actions are run as a declared one's are (ADR 0057): the built-in HTTP component's
+//! `http:status-class` is one.
 
 use crate::common::ContentTypes;
-use crate::component::{Apply, Compile, ContentComponent, MatcherComponent, Resolved, Unavailable};
+use crate::component::{
+  Apply, Compile, ContentComponent, InTreeMatcher, MatcherComponent, Resolved, Unavailable,
+};
 use crate::contract::ShapePart;
 use crate::interaction_spec::InteractionSpec;
 use crate::plan::fragment::{self, FragmentError, READABLE_GRAMMAR_VERSIONS};
@@ -41,17 +45,23 @@ struct Fragment {
 }
 
 impl Contributions {
-  pub fn from_resolved(resolved: &[Resolved]) -> Contributions {
+  /// The declared components, then the embedding's own matchers. A name is unique across both
+  /// (spec §2.4), so the order decides nothing.
+  pub fn from_resolved(resolved: &[Resolved], in_tree: &[InTreeMatcher]) -> Contributions {
+    let declared = resolved.iter().map(|component| Contributor {
+      name: component.name.clone(),
+      content: component.content.clone(),
+      matcher: component.matcher.clone(),
+      actions: component.actions.clone(),
+    });
+    let in_tree = in_tree.iter().map(|component| Contributor {
+      name: component.name.clone(),
+      content: None,
+      matcher: Some(Arc::clone(&component.matcher)),
+      actions: component.actions.clone(),
+    });
     Contributions {
-      contributors: resolved
-        .iter()
-        .map(|component| Contributor {
-          name: component.name.clone(),
-          content: component.content.clone(),
-          matcher: component.matcher.clone(),
-          actions: component.actions.clone(),
-        })
-        .collect(),
+      contributors: declared.chain(in_tree).collect(),
     }
   }
 
@@ -172,6 +182,12 @@ fn refused(component: &str, part: &str, slot: &str, error: FragmentError) -> Una
     details: json!({ "component": component, "reason": reason, "slot": format!("{part}.{slot}"),
                      "declared": declared, "readable": READABLE_GRAMMAR_VERSIONS }),
   }
+}
+
+/// What runs `matchers`' actions when a plan reaches one, as a run's scope does (ADR 0057): for a
+/// caller that executes plans outside a session, such as the golden corpus.
+pub fn in_tree_actions(matchers: &[InTreeMatcher]) -> impl ActionApplier + use<> {
+  Contributions::from_resolved(&[], matchers)
 }
 
 /// `matcher/apply` for a fragment's component actions (spec §7.1).

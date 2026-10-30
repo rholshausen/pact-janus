@@ -20,7 +20,8 @@ use super::subsumption::{
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::broker::BrokerClient;
 use crate::component::{
-  ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, Start, Stop, TransportComponent,
+  ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, InTreeMatcher, MatcherComponent,
+  Start, Stop, TransportComponent,
 };
 use crate::hooks::ConfigLoader;
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
@@ -57,6 +58,8 @@ pub struct Engine {
   /// The components compiled in, by interface and name: what a requirement can be satisfied by
   /// without a declaration, and what a declaration may not reuse the name of (spec §2.4).
   in_tree: Vec<InTree>,
+  /// Matchers compiled into this embedding (ADR 0057), whose actions every scope can run.
+  matchers: Vec<InTreeMatcher>,
   next_transport: u64,
   /// Live event streams by id (spec §9.1), each belonging to the session whose work produces it.
   /// Registered when that work starts and removed when its terminal event is *delivered* —
@@ -122,6 +125,7 @@ impl Engine {
       content: ContentRegistry::new(),
       loaders: Vec::new(),
       in_tree: Vec::new(),
+      matchers: Vec::new(),
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
@@ -166,6 +170,7 @@ impl Engine {
       content,
       loaders: Vec::new(),
       in_tree,
+      matchers: Vec::new(),
       next_transport: 0,
       streams: HashMap::new(),
       next_stream: 0,
@@ -207,10 +212,35 @@ impl Engine {
     });
   }
 
+  /// Add a matcher compiled into this embedding (ADR 0057): what runs `actions` when a plan reaches
+  /// one, in every scope, as a declared component's matcher runs its own. It is declared in-tree
+  /// under `name`, so a requirement naming it is satisfied and a declaration cannot take the name.
+  /// The built-in HTTP component registers `http:status-class` this way.
+  pub fn register_matcher(
+    &mut self,
+    name: &str,
+    version: &str,
+    actions: &[&str],
+    matcher: Arc<dyn MatcherComponent>,
+  ) {
+    self.declare_in_tree("matcher", name, version);
+    self.matchers.push(InTreeMatcher {
+      name: name.to_string(),
+      actions: actions.iter().map(|action| action.to_string()).collect(),
+      matcher,
+    });
+  }
+
   /// Load a scope's declared components (spec §10.3 steps 4–5).
   fn scope(&self, declarations: &[Value]) -> Result<Scope, EngineError> {
-    Scope::resolve(declarations, &self.loaders, &self.in_tree, &self.content)
-      .map_err(|unavailable| EngineError::component_unresolved(&unavailable))
+    Scope::resolve(
+      declarations,
+      &self.loaders,
+      &self.in_tree,
+      &self.content,
+      &self.matchers,
+    )
+    .map_err(|unavailable| EngineError::component_unresolved(&unavailable))
   }
 
   /// Register a hook implementation this embedding can run (lifecycle-hooks spec §8.5). `exec` and

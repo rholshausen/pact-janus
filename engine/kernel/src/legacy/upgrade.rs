@@ -26,9 +26,9 @@
 //! `kernel-boundary-review.md`'s findings 3 and 6 asked that the module tree say so (S1.11).
 
 use super::compile::{
-  LegacyBody, LegacyPart, OPTIONAL_PART_HEADERS, accepts_empty_text, anchored_pattern, best_rule,
-  definition_rules, each_value_category, form_parameters, is_whole_equality, namespace_of, only_element,
-  rerooted, rules_for, type_rule_names, type_rule_reaches,
+  LegacyBody, LegacyPart, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text, anchored_pattern,
+  best_rule, definition_rules, each_value_category, form_parameters, is_whole_equality, namespace_of,
+  only_element, rerooted, rules_for, status_class, type_rule_names, type_rule_reaches,
 };
 use super::multipart as legacy_multipart;
 use super::pact::{self as legacy_pact, BodyKind, LegacyInteraction, Unsupported};
@@ -579,9 +579,9 @@ impl Conversion {
 
   /// `status`, with the one component operator contract-file spec §8.2's table names: a v4
   /// `statusCode` matcher becomes `http:status-class`, which the kernel does not understand and
-  /// must not pretend to (shape spec §3.5). The interaction records the requirement, so a verifier
-  /// without that component says `component-unavailable` naming it rather than quietly matching
-  /// less.
+  /// must not pretend to (shape spec §3.5). The built-in HTTP component runs it (ADR 0057). The
+  /// interaction records the requirement, so a verifier without that component says
+  /// `component-unavailable` naming it rather than quietly matching less.
   fn status_slot(&mut self, response: &HttpResponse, at: &str, decl: &mut Declarations) -> Value {
     let at = Where::slot(at, "response", "status");
     let example = Value::from(response.status);
@@ -601,11 +601,12 @@ impl Conversion {
          not loaded"
           .to_string(),
       ));
-      return json!({
-        "shape": "http:status-class",
-        "class": status_class(status),
-        "example": example,
-      });
+      let mut shape = json!({ "shape": STATUS_CLASS });
+      if let (Some(shape), Value::Object(config)) = (shape.as_object_mut(), status_class(status)) {
+        shape.extend(config);
+      }
+      shape["example"] = example;
+      return shape;
     }
     self.shape_for(Some(list), &example, &at, Text::No)
   }
@@ -2007,22 +2008,6 @@ fn slot_of(pointer: &str) -> String {
     "/{}",
     segments.into_iter().take(keep).collect::<Vec<_>>().join("/")
   )
-}
-
-/// The status class as the shape language names it: lower-case words, never a Rust enum's
-/// `Debug` rendering.
-fn status_class(status: &pact_models::HttpStatus) -> String {
-  use pact_models::HttpStatus;
-  match status {
-    HttpStatus::Information => "information".to_string(),
-    HttpStatus::Success => "success".to_string(),
-    HttpStatus::Redirect => "redirect".to_string(),
-    HttpStatus::ClientError => "client-error".to_string(),
-    HttpStatus::ServerError => "server-error".to_string(),
-    HttpStatus::NonError => "non-error".to_string(),
-    HttpStatus::Error => "error".to_string(),
-    HttpStatus::StatusCodes(codes) => codes.iter().map(u16::to_string).collect::<Vec<_>>().join(","),
-  }
 }
 
 /// The count a collapsed finding's message starts with.

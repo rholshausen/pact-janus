@@ -1,0 +1,96 @@
+{
+  "description": "A v4 `statusCode` rule on the response's status: each class, and a list of codes, admits a status other than the recorded one, the last interaction's provider answers outside its class, and the mutations step each status past its class's edge",
+  "source": "staged plan S1.35; ADR 0057; pact_matching::matchingrules::match_status_code",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/orders"
+        },
+        "response": {
+          "status": 202
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/edge"
+        },
+        "response": {
+          "status": 299
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/missing"
+        },
+        "response": {
+          "status": 410
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/moved"
+        },
+        "response": {
+          "status": 308
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/fine"
+        },
+        "response": {
+          "status": 302
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/broken"
+        },
+        "response": {
+          "status": 422
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/down"
+        },
+        "response": {
+          "status": 503
+        }
+      },
+      {
+        "request": {
+          "method": "DELETE",
+          "path": "/orders/1"
+        },
+        "response": {
+          "status": 200
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders/refused"
+        },
+        "response": {
+          "status": 403
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

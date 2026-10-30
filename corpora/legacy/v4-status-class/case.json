@@ -1,0 +1,80 @@
+{
+  "description": "a v4 statusCode matcher admits any status in its class (staged plan S1.35, ADR 0057): the pact compiles it to the built-in HTTP component's `http:status-class`, and the contract `janus upgrade` converts it into reaches the same verdict on a 204 the pact recorded as 201",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "create an order",
+          "request": {
+            "method": "POST",
+            "path": "/orders"
+          },
+          "response": {
+            "status": 201,
+            "matchingRules": {
+              "status": {
+                "$": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "statusCode",
+                      "status": "success"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "create an order",
+      "parts": {
+        "request": {
+          "method": {
+            "shape": "equality",
+            "example": "POST"
+          },
+          "path": {
+            "shape": "equality",
+            "example": "/orders"
+          }
+        },
+        "response": {
+          "status": {
+            "shape": "http:status-class",
+            "class": "success",
+            "example": 201
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "POST",
+    "$.request.path": "/orders",
+    "$.request.query": {},
+    "$.response.status": 204
+  },
+  "result": {
+    "status": "matched"
+  }
+}
