@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793320342988,
+  "lastUpdate": 1793320344711,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -30408,6 +30408,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18911,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9eeba0def5910abdb4f71baf6e095045f21b0d6b",
+          "message": "feat: S1.14 verify a provider in a test from both SDKs\n\nADR 0055. An SDK's Verifier sends one verification/verify and polls the\nrun's events until it ends. Pacts are read by the SDK and sent inline;\nbroker and urls sources and the options are passed as the protocol\nspells them, and no environment is read. A failed run fails the test; a\nfiltered one returns its result and is never verified.\n\nState handlers and request filters are served for the run as loopback\nhttp hooks on 127.0.0.1, behind a per-run bearer token, named state-<n>\nand request-filter-<n> after the configuration's own entries.\n\nverifier.janus.yaml is read through the engine's host: config/load,\nbehind the config-loading capability, is hooks-host's loader\nregistered by janus-engine. The WASM engine answers\ncomponent-unavailable naming config-loader.\n\nThe behavioural spec gains the verifier, state-handler, request-filter\nand verify primitives (23 conformance ids), and the conformance suite a\nprovider category: 14 scripted cases and a live one. Both SDKs pass all\n62 cases. The bindings gain the lifecycle-hooks schemas and config/load.\n\nThe thinness audit gains a loopback layer for the handler endpoint\n(budget 80 in TypeScript, 100 in the JVM SDK). The TypeScript idiomatic\nbudget is raised from 700 to 850: the four new primitives' spelling,\nthe Verifier's options, run polling and its error types, take it to\n804 lines. None of it is matching or orchestration beyond the protocol's\noperations; the loopback server, the part that is not a spelling, is\nheld to its own layer.\n\nMessage producers and the JUnit 5 and Jest/Vitest integrations are\nS1.15.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T11:26:12+11:00",
+          "tree_id": "804ec4d056ae6a59b9cab479f1311955003de532",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9eeba0def5910abdb4f71baf6e095045f21b0d6b"
+        },
+        "date": 1793320344351,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 35681,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 25407,
             "unit": "requests per second",
             "extra": "engines 4"
           }
