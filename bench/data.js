@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793336669396,
+  "lastUpdate": 1793336671223,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -31116,6 +31116,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18637,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9733d611da1d6e0b7edcf0b032a7228fd42bd4d7",
+          "message": "feat: S1.35 the v4 statusCode matcher, run by the HTTP component\n\nADR 0057. The built-in HTTP component implements the matcher\ninterface's apply for http:status-class: a class (information,\nsuccess, redirect, client-error, server-error, non-error, error), each\nthe range today's verifier checks, or a list of codes.\n\nAn embedding registers a matcher compiled into it with\nEngine::register_matcher, declared in-tree under the matcher interface,\nand every scope runs its actions through matcher/apply as it runs a\ndeclared component's. janus and janus-engine register the HTTP one; the\nWASM engine has none and fails the node by name. Only declared\ncomponents are still asked for plan fragments.\n\nThe legacy compiler compiles a pact's statusCode rule to the same\naction, with the members janus upgrade writes; the upgrade now writes a\ncode list as codes, where it wrote a comma-joined class nothing read.\nThe corpus runner registers the matcher as the native engine does.\n\nEvidence: corpora/verifier/matching-rules/status-code (every class and\na code list, mutations past each class's edge; 46 verdicts agree, pact\nand upgraded contract), corpora/legacy/v4-status-class and its\n-mismatch twin, compiled both ways. pact-js's matchers example verifies\nin full, so its two S1.35 entries leave disagreements.json; its\nupgraded contract's 0/2 and run join the upgrade ledger on S3.4's\ncharset difference, as its other interactions already had.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T15:58:57+11:00",
+          "tree_id": "9c4b85830b7e2e79baa3b1d9b36e8d219bf4e1fa",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9733d611da1d6e0b7edcf0b032a7228fd42bd4d7"
+        },
+        "date": 1793336670822,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25174,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 16048,
             "unit": "requests per second",
             "extra": "engines 4"
           }
