@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793334557935,
+  "lastUpdate": 1793334559700,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -30762,6 +30762,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 25407,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ebe5f3cfa3f7783d0b893f6ecaee55289ead4728",
+          "message": "feat: S1.15 provider test integrations for JUnit 5 and pact-js\n\nADR 0056. Message producers are loopback produce-message hooks, served\nbeside S1.14's state handlers: named message-<n>, selected by\nwhen.interaction, answering the whole message part with a base64 body,\nlabelled only when the producer gives a content type. A verifier's\ntransport option is the HTTP transport's options beside base-url.\n\nThe JVM SDK gains JanusProviderExtension: @State and @ProvidesMessage\nmethods on the test class, its superclasses or its interfaces, and a\n@TestFactory returning one dynamic test per interaction result of one\nrun. A pending failure is aborted; a filtered run ends with an aborted\n\"verification\" test, and a failed run with no failed result with a\nfailed one.\n\nThe TypeScript SDK gains pact-janus/verifier: pact-js's Verifier,\nMessageProviderPact and providerWithMetadata over the SDK's own\nVerifier, taking pact-js's option names. beforeEach, afterEach,\nproviderStatesSetupUrl and transports are refused by name.\n\nOne engine change: a v1-v4 message whose produced metadata has no\ncontentType member is read as carrying the message's own content type\nthere, where it failed before. pact-message always writes one, so\nnothing janus verify produces changes. A kernel test covers it.\n\npact-js's 7 runnable provider examples and 7 of pact-jvm's JUnit 5\nprovider tests are ported into each SDK's suite; their pacts are S1.1\nfixtures under corpora/verifier/examples/. They found S1.35, the v4\nstatusCode matcher (recorded in disagreements.json against it), and\ncontent-type charset differences on upgrade (upgrade-disagreements.json,\nagainst S3.4). Documentation/provider-test-migration.md is the\nmigration note. Both SDKs pass all 66 conformance cases.\n\nThinness budgets:\n- JVM idiomatic 2000 -> 2100 (now 2023): Message and the\n  VerificationRun that lets a run be drained result by result.\n- JVM integration 140 -> 280 (now 252): JanusProviderExtension and the\n  @State and @ProvidesMessage annotations, which are reflection over the\n  test class and the mapping of results onto dynamic tests.\n- TypeScript gains a facade layer, src/facade, budget 300 (now 268):\n  pact-js's option names mapped onto the protocol's, held apart from\n  the idiomatic layer so a compatibility facade is counted as one.\nNone of it is matching or orchestration beyond the protocol's\noperations.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T15:13:14+11:00",
+          "tree_id": "9c3dc5da1d2d2b326044d0290f4a741b0d5effab",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ebe5f3cfa3f7783d0b893f6ecaee55289ead4728"
+        },
+        "date": 1793334559308,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24964,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18637,
             "unit": "requests per second",
             "extra": "engines 4"
           }
