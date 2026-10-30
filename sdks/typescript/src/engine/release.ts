@@ -25,7 +25,22 @@ export function releasedEngine(
 /** What pointed the SDK at the executable it tried, as the error names it. */
 export type EngineSource = "engine.command" | "JANUS_ENGINE" | "PATH";
 
-const BUILD = "In a pact-janus checkout, `cargo build -p pact_janus_cli --bin janus-engine` builds target/debug/janus-engine.";
+const BUILD = "in a pact-janus checkout, build it with `cargo build -p pact_janus_cli --bin janus-engine` " +
+  "and set JANUS_ENGINE to target/debug/janus-engine";
+
+/**
+ * The SDK could not start `janus-engine`. Its message is the reason, then what to do, wrapped to the
+ * terminal when there is one. It has no stack: where the SDK noticed is no help to a reader, and a
+ * test runner would print that code as if it were the test's.
+ */
+export class EngineNotStartedError extends Error {
+  override readonly name = "EngineNotStartedError";
+
+  constructor(message: string) {
+    super(message);
+    this.stack = `${this.name}: ${this.message}`;
+  }
+}
 
 /** The engine could not be started: why, and how to get one. */
 export function engineNotStarted(
@@ -34,7 +49,8 @@ export function engineNotStarted(
   error: { code?: string; message: string },
   platform: string = process.platform,
   arch: string = process.arch,
-): Error {
+  width: number | undefined = terminalWidth(),
+): EngineNotStartedError {
   let reason: string;
   if (error.code === "ENOENT") {
     reason = source === "PATH"
@@ -43,13 +59,44 @@ export function engineNotStarted(
   } else if (error.code === "EACCES") {
     reason = `${command} is not executable${platform === "win32" ? "" : " (chmod +x it)"}`;
   } else {
-    reason = `${command}: ${error.message}`;
+    reason = `${command} could not be run: ${error.message}`;
   }
   const asset = releasedEngine(platform, arch);
-  const help = asset
-    ? `The SDK runs the engine as its own executable, janus-engine, and does not ship it. Download ${asset} ` +
-      `from ${RELEASES}, make it executable, and put it on the PATH as janus-engine or set JANUS_ENGINE to ` +
-      `its path. ${BUILD}`
-    : `No janus-engine is released for ${platform}/${arch}. ${BUILD} Set JANUS_ENGINE to its path.`;
-  return new Error(`The Janus engine could not be started: ${reason}.\n${help}`, { cause: error });
+  const fixes = asset
+    ? [`download ${asset} from ${RELEASES}, make it executable, and put it on the PATH as janus-engine or ` +
+        "set JANUS_ENGINE to its path; or", `${BUILD}.`]
+    : [`${BUILD}. No janus-engine is released for ${platform}/${arch}.`];
+  const lines = [
+    ...wrap(`${reason}.`, width, "", ""),
+    "",
+    ...wrap(`The SDK runs the Janus engine as its own executable, and does not ship it. ${asset ? "Either" : "To get one"}:`, width, "", ""),
+    ...fixes.flatMap((fix) => wrap(fix, width, "  - ", "    ")),
+  ];
+  return new EngineNotStartedError(lines.join("\n"));
+}
+
+/** The terminal's width less a test runner's indent, or `undefined` when output is not a terminal. */
+function terminalWidth(): number | undefined {
+  const columns = process.stderr.columns || process.stdout.columns || Number(process.env.COLUMNS);
+  return columns ? Math.min(columns, 120) - 8 : undefined;
+}
+
+/**
+ * Wraps at spaces only, and never inside a `quoted` command, so a URL or a command is never broken;
+ * `undefined` width leaves it whole.
+ */
+function wrap(text: string, width: number | undefined, first: string, rest: string): string[] {
+  const lines: string[] = [];
+  let line = first;
+  let words = 0;
+  for (const word of text.match(/`[^`]*`\S*|\S+/g) ?? []) {
+    if (width && words > 0 && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = rest;
+      words = 0;
+    }
+    line += (words > 0 ? " " : "") + word;
+    words += 1;
+  }
+  return [...lines, line];
 }

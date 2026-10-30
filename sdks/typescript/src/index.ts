@@ -66,3 +66,4 @@ export {
 } from "./errors.js";
 export type { FramePipe } from "./engine/pipe.js";
 export type { SubprocessOptions } from "./engine/subprocess.js";
+export { EngineNotStartedError } from "./engine/release.js";

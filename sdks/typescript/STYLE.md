@@ -48,7 +48,8 @@ specification disagree, the behavioural specification wins and this file has a b
 | any engine error frame (engine-protocol spec §10) | `JanusError` | `code`, `category` (absent → `internal`), `details` and `problems` verbatim; the message leads with the interaction's description and lists each problem's `pointer` |
 | one or more closures threw | `VariantsFailedError` | `failures[]`: each variant descriptor and its cause; the message names each by label and id |
 | no contract written | `ContractWithheldError` | the engine's `results`, and `failedTests` — interactions whose `execute` failed |
-| the embedding itself (no engine to start, the process died) | `Error` | what the pipe saw; these are not engine outcomes. One that could not start says why, and names this platform's release asset |
+| no engine to start | `EngineNotStartedError` | why, then each way to get one: this platform's release asset, or a build. Wrapped to the terminal when there is one, never inside a URL or a command, and with no stack or cause, so a test runner prints the message alone |
+| the engine process died | `Error` | what the pipe saw; this is not an engine outcome |
 | a provider run whose status is `failed` | `VerificationFailedError` | `result` (status, summary, results, warnings) and `failures`: the failed results that are not pending |
 | a verifier naming no source, or two | `TypeError` | thrown by `verify` before anything is sent |
 
@@ -139,9 +140,9 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   `pact-janus/verifier` needs it. `pact-janus/vitest` is ES modules only, as Vitest is. A process that
   loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
 - The engine is not bundled: the subprocess embedding needs the `janus-engine` binary, located by
-  `JANUS_ENGINE` or the `PATH`. When it cannot start one, the error says why (nothing on the `PATH`,
-  a path that does not exist, a file that is not executable) and names the release asset for this
-  platform and where it is released (`src/engine/release.ts`). A published SDK would pin an engine version and ship or fetch the matching binary
+  `JANUS_ENGINE` or the `PATH`. When it cannot start one, an `EngineNotStartedError` says why (nothing
+  on the `PATH`, a path that does not exist, a file that is not executable) and names the release asset
+  for this platform and where it is released (`src/engine/release.ts`). A published SDK would pin an engine version and ship or fetch the matching binary
   (or, once Phase 9 finding 3 is resolved, a WASM component).
 - The protocol version this SDK speaks is fixed at 1 (`engine/engine.ts`) and offered in `engine/hello`.
 

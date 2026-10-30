@@ -39,8 +39,8 @@ public final class SubprocessEmbedding implements Embedding {
       "darwin/arm64", "aarch64-apple-darwin",
       "win32/x64", "x86_64-pc-windows-msvc");
 
-  private static final String BUILD = "In a pact-janus checkout, `cargo build -p pact_janus_cli --bin "
-      + "janus-engine` builds target/debug/janus-engine.";
+  private static final String BUILD = "in a pact-janus checkout, build it with `cargo build -p pact_janus_cli --bin "
+      + "janus-engine` and set " + ENGINE_VARIABLE + " to target/debug/janus-engine";
 
   private final List<String> command;
   /** What pointed at the executable, as an error names it: {@code PATH} when nothing did. */
@@ -99,10 +99,12 @@ public final class SubprocessEmbedding implements Embedding {
   }
 
   /**
-   * Why {@code executable} could not be started, and how to get an engine: the SDK runs it as its
-   * own executable and does not ship it, so the message names this platform's release asset.
+   * Why {@code executable} could not be started, then each way to get an engine: the SDK runs it as its
+   * own executable and does not ship it, so the message names this platform's release asset. Wrapped
+   * at spaces, never inside a URL or a `quoted` command, to {@code width} columns when it is given.
    */
-  static String notStarted(String executable, String source, IOException cause, String platform, String arch) {
+  static String notStarted(
+      String executable, String source, IOException cause, String platform, String arch, Integer width) {
     String reason;
     Path path = asPath(executable);
     if (source.equals("PATH")) {
@@ -112,16 +114,47 @@ public final class SubprocessEmbedding implements Embedding {
     } else if (path != null && !Files.isExecutable(path)) {
       reason = executable + " is not executable" + (platform.equals("win32") ? "" : " (chmod +x it)");
     } else {
-      reason = executable + ": " + cause.getMessage();
+      reason = executable + " could not be run: " + cause.getMessage();
     }
     String asset = releasedEngine(platform, arch);
-    String help = asset != null
-        ? "The SDK runs the engine as its own executable, janus-engine, and does not ship it. Download "
-            + asset + " from " + RELEASES + ", make it executable, and put it on the PATH as janus-engine or set "
-            + ENGINE_VARIABLE + " to its path. " + BUILD
-        : "No janus-engine is released for " + platform + "/" + arch + ". " + BUILD + " Set "
-            + ENGINE_VARIABLE + " to its path.";
-    return "The Janus engine could not be started: " + reason + ".\n" + help;
+    List<String> fixes = asset != null
+        ? List.of("download " + asset + " from " + RELEASES + ", make it executable, and put it on the PATH as "
+            + "janus-engine or set " + ENGINE_VARIABLE + " to its path; or", BUILD + ".")
+        : List.of(BUILD + ". No janus-engine is released for " + platform + "/" + arch + ".");
+    List<String> lines = new java.util.ArrayList<>(wrap(reason + ".", width, "", ""));
+    lines.add("");
+    lines.addAll(wrap("The SDK runs the Janus engine as its own executable, and does not ship it. "
+        + (asset != null ? "Either" : "To get one") + ":", width, "", ""));
+    fixes.forEach(fix -> lines.addAll(wrap(fix, width, "  - ", "    ")));
+    return String.join("\n", lines);
+  }
+
+  /** The terminal's width, less a test report's indent, when {@code COLUMNS} says it; else null. */
+  static Integer terminalWidth() {
+    try {
+      int columns = Integer.parseInt(Objects.requireNonNullElse(System.getenv("COLUMNS"), ""));
+      return Math.min(columns, 120) - 8;
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static List<String> wrap(String text, Integer width, String first, String rest) {
+    List<String> lines = new java.util.ArrayList<>();
+    StringBuilder line = new StringBuilder(first);
+    int words = 0;
+    java.util.regex.Matcher word = java.util.regex.Pattern.compile("`[^`]*`\\S*|\\S+").matcher(text);
+    while (word.find()) {
+      if (width != null && words > 0 && line.length() + 1 + word.group().length() > width) {
+        lines.add(line.toString());
+        line = new StringBuilder(rest);
+        words = 0;
+      }
+      line.append(words > 0 ? " " : "").append(word.group());
+      words++;
+    }
+    lines.add(line.toString());
+    return lines;
   }
 
   private static Path asPath(String executable) {
@@ -144,7 +177,7 @@ public final class SubprocessEmbedding implements Embedding {
     try {
       process = builder.start();
     } catch (IOException e) {
-      throw new IOException(notStarted(command.get(0), source, e, platform(), arch()), e);
+      throw new EngineNotStartedException(notStarted(command.get(0), source, e, platform(), arch(), terminalWidth()));
     }
     return new Pipe(process);
   }
