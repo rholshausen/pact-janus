@@ -15,7 +15,6 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -57,35 +56,14 @@ public final class EngineRelease {
     }
   }
 
-  private static final Map<String, String> TRIPLES = Map.of(
-      "linux/x64", "x86_64-unknown-linux-musl",
-      "linux/arm64", "aarch64-unknown-linux-musl",
-      "darwin/x64", "x86_64-apple-darwin",
-      "darwin/arm64", "aarch64-apple-darwin",
-      "win32/x64", "x86_64-pc-windows-msvc");
-
   private EngineRelease() {}
 
-  /** This JVM's platform, spelled as Node spells it: {@code linux}, {@code darwin}, {@code win32}. */
   static String platform() {
-    String name = System.getProperty("os.name").toLowerCase(Locale.ROOT);
-    if (name.startsWith("windows")) {
-      return "win32";
-    }
-    if (name.startsWith("mac")) {
-      return "darwin";
-    }
-    return name;
+    return SubprocessEmbedding.platform();
   }
 
-  /** This JVM's architecture, spelled as Node spells it: {@code x64}, {@code arm64}. */
   static String arch() {
-    String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);
-    return switch (arch) {
-      case "amd64", "x86_64" -> "x64";
-      case "aarch64", "arm64" -> "arm64";
-      default -> arch;
-    };
+    return SubprocessEmbedding.arch();
   }
 
   /** What a release calls the engine for this platform (ADR 0028 decision 9). */
@@ -95,12 +73,12 @@ public final class EngineRelease {
 
   /** What a release calls the engine for a platform (ADR 0028 decision 9). */
   public static String engineAsset(String platform, String arch) {
-    String triple = TRIPLES.get(platform + "/" + arch);
-    if (triple == null) {
+    String asset = SubprocessEmbedding.releasedEngine(platform, arch);
+    if (asset == null) {
       throw new IllegalStateException("No janus-engine is released for " + platform + "/" + arch
           + ". Build one and name it in JANUS_ENGINE.");
     }
-    return "janus-engine-" + triple + (platform.equals("win32") ? ".exe" : "");
+    return asset;
   }
 
   /** {@code JANUS_ENGINE_CACHE}, or {@code pact-janus/engines} in the user's cache directory. */

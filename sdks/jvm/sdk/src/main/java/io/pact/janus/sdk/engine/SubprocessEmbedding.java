@@ -9,9 +9,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -26,15 +29,31 @@ public final class SubprocessEmbedding implements Embedding {
   /** The environment variable the whole project uses to name the engine executable. */
   public static final String ENGINE_VARIABLE = "JANUS_ENGINE";
 
-  private final List<String> command;
+  /** Where the engine is released. */
+  public static final String RELEASES = "https://github.com/rholshausen/pact-janus/releases";
 
-  private SubprocessEmbedding(List<String> command) {
+  private static final Map<String, String> TRIPLES = Map.of(
+      "linux/x64", "x86_64-unknown-linux-musl",
+      "linux/arm64", "aarch64-unknown-linux-musl",
+      "darwin/x64", "x86_64-apple-darwin",
+      "darwin/arm64", "aarch64-apple-darwin",
+      "win32/x64", "x86_64-pc-windows-msvc");
+
+  private static final String BUILD = "In a pact-janus checkout, `cargo build -p pact_janus_cli --bin "
+      + "janus-engine` builds target/debug/janus-engine.";
+
+  private final List<String> command;
+  /** What pointed at the executable, as an error names it: {@code PATH} when nothing did. */
+  private final String source;
+
+  private SubprocessEmbedding(List<String> command, String source) {
     this.command = List.copyOf(command);
+    this.source = source;
   }
 
   /** Runs exactly this executable. */
   public static SubprocessEmbedding of(Path executable) {
-    return new SubprocessEmbedding(List.of(executable.toString()));
+    return new SubprocessEmbedding(List.of(executable.toString()), "SubprocessEmbedding.of");
   }
 
   /**
@@ -43,7 +62,74 @@ public final class SubprocessEmbedding implements Embedding {
    */
   public static SubprocessEmbedding fromEnvironment() {
     String named = System.getenv(ENGINE_VARIABLE);
-    return new SubprocessEmbedding(List.of(named == null || named.isBlank() ? "janus-engine" : named));
+    return named == null || named.isBlank()
+        ? new SubprocessEmbedding(List.of("janus-engine"), "PATH")
+        : new SubprocessEmbedding(List.of(named), ENGINE_VARIABLE);
+  }
+
+  /** This JVM's platform, spelled as Node spells it: {@code linux}, {@code darwin}, {@code win32}. */
+  static String platform() {
+    String name = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+    if (name.startsWith("windows")) {
+      return "win32";
+    }
+    if (name.startsWith("mac")) {
+      return "darwin";
+    }
+    return name;
+  }
+
+  /** This JVM's architecture, spelled as Node spells it: {@code x64}, {@code arm64}. */
+  static String arch() {
+    String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);
+    return switch (arch) {
+      case "amd64", "x86_64" -> "x64";
+      case "aarch64", "arm64" -> "arm64";
+      default -> arch;
+    };
+  }
+
+  /**
+   * What a release calls the engine for a platform (ADR 0028 decision 9), or null when none is
+   * released for it.
+   */
+  public static String releasedEngine(String platform, String arch) {
+    String triple = TRIPLES.get(platform + "/" + arch);
+    return triple == null ? null : "janus-engine-" + triple + (platform.equals("win32") ? ".exe" : "");
+  }
+
+  /**
+   * Why {@code executable} could not be started, and how to get an engine: the SDK runs it as its
+   * own executable and does not ship it, so the message names this platform's release asset.
+   */
+  static String notStarted(String executable, String source, IOException cause, String platform, String arch) {
+    String reason;
+    Path path = asPath(executable);
+    if (source.equals("PATH")) {
+      reason = "there is no janus-engine on the PATH, and " + ENGINE_VARIABLE + " is not set";
+    } else if (path != null && !Files.exists(path)) {
+      reason = source + " names " + executable + ", which does not exist";
+    } else if (path != null && !Files.isExecutable(path)) {
+      reason = executable + " is not executable" + (platform.equals("win32") ? "" : " (chmod +x it)");
+    } else {
+      reason = executable + ": " + cause.getMessage();
+    }
+    String asset = releasedEngine(platform, arch);
+    String help = asset != null
+        ? "The SDK runs the engine as its own executable, janus-engine, and does not ship it. Download "
+            + asset + " from " + RELEASES + ", make it executable, and put it on the PATH as janus-engine or set "
+            + ENGINE_VARIABLE + " to its path. " + BUILD
+        : "No janus-engine is released for " + platform + "/" + arch + ". " + BUILD + " Set "
+            + ENGINE_VARIABLE + " to its path.";
+    return "The Janus engine could not be started: " + reason + ".\n" + help;
+  }
+
+  private static Path asPath(String executable) {
+    try {
+      return Path.of(executable);
+    } catch (InvalidPathException e) {
+      return null;
+    }
   }
 
   /** The command line this embedding starts. */
@@ -58,10 +144,7 @@ public final class SubprocessEmbedding implements Embedding {
     try {
       process = builder.start();
     } catch (IOException e) {
-      throw new IOException(
-          "could not start the Janus engine " + command + " — set " + ENGINE_VARIABLE
-              + " to the janus-engine executable (cargo build -p pact_janus_cli --bin janus-engine)",
-          e);
+      throw new IOException(notStarted(command.get(0), source, e, platform(), arch()), e);
     }
     return new Pipe(process);
   }

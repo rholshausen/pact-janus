@@ -205,7 +205,9 @@ Interaction getOrder = janus.interaction("get an order")
   annotations) and, `compileOnly`, `junit-jupiter-api` for the extension. Nothing else.
 - **The engine is not bundled.** The subprocess embedding runs the executable `JANUS_ENGINE` names,
   or `janus-engine` from `PATH`. `JanusOptions.withEmbedding(SubprocessEmbedding.of(path))` names one
-  explicitly. The SDK's own build runs `cargo build -p pact_janus_cli --bin janus-engine` before its
+  explicitly. When it cannot start one, the error says why (nothing on the `PATH`, a path that does
+  not exist, a file that is not executable) and names the release asset for this platform and where it
+  is released. The SDK's own build runs `cargo build -p pact_janus_cli --bin janus-engine` before its
   tests (Gradle task `:sdk:buildEngine`) and points `JANUS_ENGINE` at the result, so tests never run
   against a stale engine.
 - **Embedding.** Subprocess only, which ADR 0023 makes every SDK's primary: a WASM guest cannot host

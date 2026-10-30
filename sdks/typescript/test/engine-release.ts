@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { releasedEngine } from "../src/engine/release.js";
 
 export interface EnginePin {
   /** `owner/name` of the repository whose releases hold the engine. */
@@ -33,23 +34,15 @@ export function pinnedEngine(): EnginePin {
   return JSON.parse(readFileSync(file, "utf8")) as EnginePin;
 }
 
-const TRIPLES: Partial<Record<string, string>> = {
-  "linux/x64": "x86_64-unknown-linux-musl",
-  "linux/arm64": "aarch64-unknown-linux-musl",
-  "darwin/x64": "x86_64-apple-darwin",
-  "darwin/arm64": "aarch64-apple-darwin",
-  "win32/x64": "x86_64-pc-windows-msvc",
-};
-
 /** What a release calls the engine for a platform (ADR 0028 decision 9). */
 export function engineAsset(platform: string = process.platform, arch: string = process.arch): string {
-  const triple = TRIPLES[`${platform}/${arch}`];
-  if (!triple) {
+  const asset = releasedEngine(platform, arch);
+  if (!asset) {
     throw new Error(
       `No janus-engine is released for ${platform}/${arch}. Build one and name it in JANUS_ENGINE.`,
     );
   }
-  return `janus-engine-${triple}${platform === "win32" ? ".exe" : ""}`;
+  return asset;
 }
 
 /** `JANUS_ENGINE_CACHE`, or `pact-janus/engines` in the user's cache directory. */

@@ -6,9 +6,13 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import type { protocol } from "../generated/index.js";
 import type { FramePipe } from "./pipe.js";
+import { engineNotStarted, type EngineSource } from "./release.js";
 
 export interface SubprocessOptions {
-  /** The `janus-engine` executable. Defaults to the `JANUS_ENGINE` environment variable. */
+  /**
+   * The `janus-engine` executable. Defaults to the `JANUS_ENGINE` environment variable, then to
+   * `janus-engine` on the `PATH`.
+   */
   command?: string;
   /**
    * Environment for the engine. `RUST_LOG` defaults to `warn`, so a request the mock could not
@@ -30,21 +34,19 @@ export class SubprocessPipe implements FramePipe {
   private readonly exited: Promise<void>;
 
   constructor(options: SubprocessOptions = {}) {
-    const command = options.command ?? process.env.JANUS_ENGINE;
-    if (!command) {
-      throw new Error(
-        "No janus-engine to run: set JANUS_ENGINE to the janus-engine executable " +
-          "(`cargo build -p pact_janus_cli --bin janus-engine` builds target/debug/janus-engine), " +
-          "or pass engine.command.",
-      );
-    }
+    const named = process.env.JANUS_ENGINE || undefined;
+    const [command, source]: [string, EngineSource] = options.command
+      ? [options.command, "engine.command"]
+      : named
+        ? [named, "JANUS_ENGINE"]
+        : ["janus-engine", "PATH"];
     const env = { ...process.env, ...options.env };
     env.RUST_LOG ??= "warn";
     this.child = spawn(command, [], { stdio: ["pipe", "pipe", "inherit"], env });
     this.child.stdout.on("data", (chunk: Buffer) => this.onData(chunk));
     this.exited = new Promise((resolve) => {
-      this.child.on("error", (error) => {
-        this.fail(new Error(`janus-engine (${command}) could not be started: ${error.message}`));
+      this.child.on("error", (error: NodeJS.ErrnoException) => {
+        this.fail(engineNotStarted(command, source, error));
         resolve();
       });
       this.child.on("exit", (code, signal) => {
