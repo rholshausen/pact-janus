@@ -125,12 +125,18 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - An option with no Janus meaning that would change a run is refused by name with a `TypeError`
   before an engine starts (`beforeEach`, `providerStatesSetupUrl`, …). One that only tuned pact-js's
   proxy or logs is accepted and does nothing.
-- It imports no test framework, so it runs under Jest and Vitest alike.
+- It imports no test framework, so it runs under Jest and Vitest alike, and `require()` loads it as
+  `import` does (below), as a pact-js test suite in CommonJS needs.
 
 ## Packaging and distribution
 
-- npm, ESM only, Node ≥ 22.6 (the generator script uses type stripping). Not published: this is the
+- npm, Node ≥ 22.6 (the generator script uses type stripping). Not published: this is the
   prototype's `pact-janus` package, `private: true`.
+- ES modules, and a CommonJS build beside them: `npm run build` writes `dist/` and `dist/cjs/`
+  (`tsconfig.cjs.json`), and each export gives `require` the second. pact-js is CommonJS, and Jest's
+  runtime cannot `require()` an ES module before Node 24.9, so a pact-js suite moving to
+  `pact-janus/verifier` needs it. `pact-janus/vitest` is ES modules only, as Vitest is. A process that
+  loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
 - The engine is not bundled: the subprocess embedding needs the `janus-engine` binary, located by
   `JANUS_ENGINE`. A published SDK would pin an engine version and ship or fetch the matching binary
   (or, once Phase 9 finding 3 is resolved, a WASM component).

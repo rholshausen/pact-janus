@@ -1,0 +1,11 @@
+{
+  "$comment": "The CommonJS build, for a project whose tests `require()` the SDK: pact-js users on Jest, whose runtime cannot load an ES module before Node 24.9. `npm run build` writes it to dist/cjs, beside the ES module build in dist, and package.json's exports give it to `require`. pact-janus/vitest is ES modules only, as Vitest is.",
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "verbatimModuleSyntax": false,
+    "outDir": "dist/cjs"
+  },
+  "exclude": ["src/vitest.ts"]
+}

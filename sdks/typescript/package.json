@@ -9,13 +9,45 @@
     "node": ">=22.6"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./vitest": "./dist/vitest.js",
-    "./verifier": "./dist/facade/verifier.js",
-    "./bindings": "./dist/generated/index.js"
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./vitest": {
+      "import": {
+        "types": "./dist/vitest.d.ts",
+        "default": "./dist/vitest.js"
+      }
+    },
+    "./verifier": {
+      "import": {
+        "types": "./dist/facade/verifier.d.ts",
+        "default": "./dist/facade/verifier.js"
+      },
+      "require": {
+        "types": "./dist/cjs/facade/verifier.d.ts",
+        "default": "./dist/cjs/facade/verifier.js"
+      }
+    },
+    "./bindings": {
+      "import": {
+        "types": "./dist/generated/index.d.ts",
+        "default": "./dist/generated/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/generated/index.d.ts",
+        "default": "./dist/cjs/generated/index.js"
+      }
+    }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/commonjs-package.ts",
     "test": "tsc -p tsconfig.json && vitest run",
     "lint": "node --experimental-strip-types --disable-warning=ExperimentalWarning node_modules/eslint/bin/eslint.js --flag unstable_native_nodejs_ts_config .",
     "generate:bindings": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/generate-bindings.ts"

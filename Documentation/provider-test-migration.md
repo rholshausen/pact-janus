@@ -36,7 +36,9 @@ await new Verifier({
 }).verifyProvider();
 ```
 
-It runs under Jest and Vitest alike: it is a promise, and imports neither. Underneath it is the SDK's
+It runs under Jest and Vitest alike: it is a promise, and imports neither. `require("pact-janus/verifier")`
+works as `import` does, so a test suite written in CommonJS changes its `require` the same way. The
+engine is the `janus-engine` executable that `JANUS_ENGINE` names. Underneath it is the SDK's
 own `Verifier` (`import { Verifier } from "pact-janus"`), which takes the protocol's spellings directly.
 
 | pact-js | Janus | Verdict |
