@@ -7,6 +7,48 @@ orchestration beyond the engine-protocol operations. The
 here — each SDK's own `STYLE.md` is a copy of that design's style-guide skeleton, filled in once per
 language.
 
+## Installing a release
+
+Until they graduate into pact-js and pact-jvm (staged plan S2.9), each SDK is released from this
+repository as files on a GitHub release of its own, tagged `typescript-sdk/v<version>` or
+`jvm-sdk/v<version>`, and published to no registry
+([ADR 0060](../Documentation/decisions/0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md)).
+Each release's notes say how to install it, with its version filled in:
+
+```bash
+npm install --save-dev https://github.com/rholshausen/pact-janus/releases/download/typescript-sdk/v<version>/pact-janus-<version>.tgz
+```
+
+```kotlin
+repositories {
+  mavenCentral()
+  ivy {
+    url = uri("https://github.com/rholshausen/pact-janus/releases/download")
+    patternLayout {
+      artifact("jvm-sdk/v[revision]/[module]-[revision](-[classifier]).[ext]")
+      ivy("jvm-sdk/v[revision]/[module]-[revision].ivy.xml")
+    }
+    content { includeGroup("io.pact.janus") }
+  }
+}
+
+dependencies {
+  testImplementation("io.pact.janus:janus-sdk:<version>")
+}
+```
+
+Neither carries the engine. Told no other one to run (`JANUS_ENGINE`), an SDK runs the
+`janus-engine` release its pin names, which it fetches on first use into `JANUS_ENGINE_CACHE` (by
+default `pact-janus/engines` in the user's cache directory), and refuses any file whose SHA-256 is not
+the pinned one. A network that cannot reach GitHub names a server holding the same files as
+`JANUS_ENGINE_MIRROR`, laid out as `<mirror>/v<version>/janus-engine-<triple>`. Node's `fetch` uses
+`HTTPS_PROXY` only when `NODE_USE_ENV_PROXY=1` is set; the JVM uses its own proxy properties
+(`https.proxyHost`).
+
+`release-check/` in each SDK is a project outside it that installs a release and uses it as a user
+would, with nothing naming an engine. `release-sdks.yml` runs it before publishing, on each operating
+system an engine is released for.
+
 ## TypeScript (task 6.2)
 
 [`typescript/`](typescript/) runs the RFC's consumer example near-verbatim against the real engine —

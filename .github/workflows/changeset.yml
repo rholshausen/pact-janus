@@ -1,7 +1,9 @@
 name: Change file
 
 # Staged plan S0.4, ADR 0028: a release's version and changelog come from change files, so a pull
-# request that changes what a release ships has to carry one — or say why it needs none. The same
+# request that changes what a release ships has to carry one — or say why it needs none. Since S1.36
+# (ADR 0060) there are three packages, the engine and the two SDKs, and the change file has to name
+# the one whose release the change is in. The same
 # shape as the corpora rule: a claim somebody would otherwise have to remember, made into a check.
 #
 # In a workflow of its own because it has to run again when the description is edited, and nothing
@@ -25,12 +27,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # What a release ships: the engine and CLI sources and what they are built from; the corpora
-      # and the conformance suite, which say what the engine does; and, since S0.11, the gates an
-      # SDK's CI runs (janus-sdk-gates and the three tools it is) and the rest of janus-spec.tar.gz —
-      # the spec schemas, the behavioural specification and the binding manifest. Any other test,
-      # tool, document or workflow is not in it.
-      - name: A change to what ships carries a change file
+      # What each package's release ships (ADR 0028, ADR 0060 decision 5), and so which package a change
+      # file has to name. The engine: its and the CLI's sources and what they are built from; the
+      # corpora and the conformance suite, which say what the engine does; and, since S0.11, the
+      # gates an SDK's CI runs (janus-sdk-gates and the three tools it is) and the rest of
+      # janus-spec.tar.gz — the spec schemas, the behavioural specification and the binding manifest.
+      # An SDK: its sources, generated bindings included, what it is built from, and the engine pin
+      # it carries. Any other test, tool, document or workflow is in none of them.
+      - name: A change to what ships carries a change file naming what it ships in
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           # Read from the environment, never spliced into the script: it is whatever the author typed.
@@ -38,19 +42,34 @@ jobs:
         run: |
           changed="$(git diff --name-only "$BASE"...HEAD)"
           added="$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')"
-          shipped="$(grep -E '^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/|tools/(sdk-gates|conformance|thinness|bindings)/(src/|Cargo\.toml$)|Documentation/specs/[^/]+/schemas/|Documentation/specs/sdk-specification/behavioural-spec\.json$|sdks/bindings\.json$)' <<<"$changed" || true)"
+          declare -A ships=(
+            [engine]='^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/|tools/(sdk-gates|conformance|thinness|bindings)/(src/|Cargo\.toml$)|Documentation/specs/[^/]+/schemas/|Documentation/specs/sdk-specification/behavioural-spec\.json$|sdks/bindings\.json$)'
+            [typescript-sdk]='^(sdks/typescript/(src/|package(-lock)?\.json$|tsconfig(\.build|\.cjs)?\.json$|scripts/commonjs-package\.ts$)|sdks/engine-release\.json$)'
+            [jvm-sdk]='^(sdks/jvm/((sdk|bindings)/(src/main/|build\.gradle\.kts$)|build\.gradle\.kts$|settings\.gradle\.kts$|gradle\.properties$|gradle/)|sdks/engine-release\.json$)'
+          )
+          declare -A changelog=([engine]=CHANGELOG.md [typescript-sdk]=sdks/typescript/CHANGELOG.md [jvm-sdk]=sdks/jvm/CHANGELOG.md)
+          # The packages the added change files name, one per line of their front matter.
+          named="$(for file in $added; do awk 'NR == 1 && $0 == "---" { on = 1; next } on && $0 == "---" { exit } on { sub(/:.*/, ""); print }' "$file"; done | sort -u)"
+          reason="$(grep -iE '^No-Changeset:[[:space:]]*[^[:space:]]' <<<"$DESCRIPTION" || true)"
 
-          if [ -z "$shipped" ]; then
-            echo "Nothing a release ships changed."
-          elif [ -n "$added" ]; then
-            echo "Change files:"; echo "$added"
-          elif grep -qx 'CHANGELOG.md' <<<"$changed"; then
-            echo "A release: the change files were consumed into CHANGELOG.md."
-          elif reason="$(grep -iE '^No-Changeset:[[:space:]]*[^[:space:]]' <<<"$DESCRIPTION")"; then
-            echo "$reason"
-          else
-            echo "$shipped"
-            echo "::error::This changes what a release ships and adds no change file. Run 'knope document-change' (or write .changeset/<name>.md by hand — CONTRIBUTING.md), or, if nobody who pins the engine could notice the change, add a line 'No-Changeset: <why>' to the pull request's description."
+          missing=()
+          for package in engine typescript-sdk jvm-sdk; do
+            shipped="$(grep -E "${ships[$package]}" <<<"$changed" || true)"
+            if [ -z "$shipped" ]; then
+              continue
+            elif grep -qx "$package" <<<"$named"; then
+              echo "$package: a change file names it."
+            elif grep -qx "${changelog[$package]}" <<<"$changed"; then
+              echo "$package: a release; its change files were consumed into ${changelog[$package]}."
+            elif [ -n "$reason" ]; then
+              echo "$package: $reason"
+            else
+              echo "$package ships:"; echo "$shipped"
+              missing+=("$package")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::This changes what a release of ${missing[*]} ships and adds no change file naming it. Run 'knope document-change' (or write .changeset/<name>.md by hand — CONTRIBUTING.md), or, if nobody who depends on it could notice the change, add a line 'No-Changeset: <why>' to the pull request's description."
             exit 1
           fi
       # A change file knope cannot read would otherwise be found when somebody tries to release.

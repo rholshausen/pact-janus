@@ -149,7 +149,7 @@ export class Janus {
   #start(): Promise<Engine> {
     this.#engine ??= (async () => {
       const option = this.#config.engine;
-      return Engine.start(typeof option === "function" ? option() : new SubprocessPipe(option));
+      return Engine.start(typeof option === "function" ? option() : await SubprocessPipe.start(option));
     })();
     // A failed start is not cached: the next execute tries again, and reports its own failure.
     this.#engine.catch(() => {

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
-import { enginePath, pinnedEngine } from "./test/engine-release.js";
+import { enginePath } from "./src/engine/release.js";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 // What `cargo build` calls the engine on this platform.
@@ -13,7 +13,7 @@ function engineUnderTest(): string {
     return process.env.JANUS_ENGINE;
   }
   if (process.env.JANUS_ENGINE_RELEASE) {
-    return enginePath(pinnedEngine());
+    return enginePath();
   }
   return resolve(repoRoot, "target/debug", engine);
 }

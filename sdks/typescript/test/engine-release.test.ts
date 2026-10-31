@@ -1,5 +1,5 @@
-// Resolving a released engine (staged plan S0.4, X.1; ADR 0029 decision 3), against a release this
-// test serves itself: what matters is that the pinned digest decides, whatever the server sends.
+// Resolving a released engine (staged plan S0.4, X.1, S1.36; ADR 0029 decision 3, ADR 0060 decision 6),
+// against a release this test serves itself: what matters is that the pinned digest decides, whatever the server sends.
 
 import { createHash } from "node:crypto";
 import { access, constants, mkdtemp, readFile, readdir } from "node:fs/promises";
@@ -8,7 +8,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { engineAsset, enginePath, resolveEngine, type EnginePin } from "./engine-release.js";
+import { engineAsset, enginePath, resolveEngine, type EnginePin } from "../src/engine/release.js";
 
 const ENGINE = Buffer.from("#!/bin/sh\n# not an engine, but these are the bytes that were pinned\n");
 const digest = createHash("sha256").update(ENGINE).digest("hex");

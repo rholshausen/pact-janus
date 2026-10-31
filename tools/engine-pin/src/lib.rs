@@ -57,7 +57,35 @@ impl Pin {
     text.push('\n');
     text
   }
+
+  /// The TypeScript SDK's copy, `sdks/typescript/src/engine/pin.ts` (ADR 0060 decision 6): the same
+  /// pin as a module, since the SDK's CommonJS build cannot find a JSON file shipped beside it. The
+  /// JVM SDK copies `sdks/engine-release.json` into its jar as it builds.
+  pub fn render_typescript(&self) -> String {
+    #[derive(Serialize)]
+    struct Body<'a> {
+      repository: &'a str,
+      version: &'a str,
+      sha256: &'a BTreeMap<String, String>,
+    }
+    let body = serde_json::to_string_pretty(&Body {
+      repository: &self.repository,
+      version: &self.version,
+      sha256: &self.sha256,
+    })
+    .expect("a pin is plain JSON");
+    format!("{TYPESCRIPT_HEADER}\nexport const PIN: EnginePin = {body};\n")
+  }
 }
+
+/// What the TypeScript SDK's copy of the pin says about itself, and what it imports.
+const TYPESCRIPT_HEADER: &str =
+  "// The janus-engine this SDK runs when it is not told which (staged plan S1.36; ADR 0029 decision 3,
+// ADR 0060 decision 6): sdks/engine-release.json, repeated as a module. Written with it by
+// `cargo run -p pact_janus_engine_pin -- <version>`; never edited by hand.
+
+import type { EnginePin } from \"./release.js\";
+";
 
 /// A version as a tag spells it or not: `0.1.0` and `v0.1.0` are both `0.1.0`.
 pub fn version(given: &str) -> &str {
@@ -147,6 +175,16 @@ mod tests {
       pin.render(),
       text,
       "sdks/engine-release.json is not as engine-pin writes it"
+    );
+  }
+
+  #[test]
+  fn the_typescript_sdks_copy_is_the_checked_in_pin() {
+    let pin: Pin = serde_json::from_str(include_str!("../../../sdks/engine-release.json")).unwrap();
+    assert_eq!(
+      pin.render_typescript(),
+      include_str!("../../../sdks/typescript/src/engine/pin.ts"),
+      "sdks/typescript/src/engine/pin.ts is not as engine-pin writes it from sdks/engine-release.json"
     );
   }
 

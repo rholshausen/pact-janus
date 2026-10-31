@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,7 +31,7 @@ public final class SubprocessEmbedding implements Embedding {
   public static final String ENGINE_VARIABLE = "JANUS_ENGINE";
 
   /** Where the engine is released. */
-  public static final String RELEASES = "https://github.com/rholshausen/pact-janus/releases";
+  public static final String RELEASES = "https://github.com/" + EngineRelease.PIN.repository() + "/releases";
 
   private static final Map<String, String> TRIPLES = Map.of(
       "linux/x64", "x86_64-unknown-linux-musl",
@@ -42,29 +43,37 @@ public final class SubprocessEmbedding implements Embedding {
   private static final String BUILD = "in a pact-janus checkout, build it with `cargo build -p pact_janus_cli --bin "
       + "janus-engine` and set " + ENGINE_VARIABLE + " to target/debug/janus-engine";
 
+  /** Empty for the pinned release, which is resolved when the engine is started. */
   private final List<String> command;
-  /** What pointed at the executable, as an error names it: {@code PATH} when nothing did. */
+  /** What pointed at the executable, as an error names it: {@code release} when nothing did. */
   private final String source;
+  /** Where the pinned release is cached and fetched from: {@code JANUS_ENGINE_CACHE}, {@code JANUS_ENGINE_MIRROR}. */
+  private final Map<String, String> env;
 
-  private SubprocessEmbedding(List<String> command, String source) {
+  private SubprocessEmbedding(List<String> command, String source, Map<String, String> env) {
     this.command = List.copyOf(command);
     this.source = source;
+    this.env = env;
   }
 
   /** Runs exactly this executable. */
   public static SubprocessEmbedding of(Path executable) {
-    return new SubprocessEmbedding(List.of(executable.toString()), "SubprocessEmbedding.of");
+    return new SubprocessEmbedding(List.of(executable.toString()), "SubprocessEmbedding.of", Map.of());
   }
 
   /**
-   * Runs the executable {@value #ENGINE_VARIABLE} names, or {@code janus-engine} from the
-   * {@code PATH} when it is unset.
+   * Runs the executable {@value #ENGINE_VARIABLE} names, or, when it is unset, the engine this SDK
+   * was released with, fetched on first use ({@link EngineRelease}; ADR 0060 decision 6).
    */
   public static SubprocessEmbedding fromEnvironment() {
-    String named = System.getenv(ENGINE_VARIABLE);
+    return fromEnvironment(System.getenv());
+  }
+
+  static SubprocessEmbedding fromEnvironment(Map<String, String> env) {
+    String named = env.get(ENGINE_VARIABLE);
     return named == null || named.isBlank()
-        ? new SubprocessEmbedding(List.of("janus-engine"), "PATH")
-        : new SubprocessEmbedding(List.of(named), ENGINE_VARIABLE);
+        ? new SubprocessEmbedding(List.of(), "release", Map.copyOf(env))
+        : new SubprocessEmbedding(List.of(named), ENGINE_VARIABLE, Map.of());
   }
 
   /** This JVM's platform, spelled as Node spells it: {@code linux}, {@code darwin}, {@code win32}. */
@@ -99,33 +108,55 @@ public final class SubprocessEmbedding implements Embedding {
   }
 
   /**
-   * Why {@code executable} could not be started, then each way to get an engine: the SDK runs it as its
-   * own executable and does not ship it, so the message names this platform's release asset. Wrapped
-   * at spaces, never inside a URL or a `quoted` command, to {@code width} columns when it is given.
+   * Why {@code executable} could not be started, then each way to get an engine, naming this
+   * platform's release asset. Wrapped at spaces, never inside a URL or a `quoted` command, to
+   * {@code width} columns when it is given.
    */
   static String notStarted(
       String executable, String source, IOException cause, String platform, String arch, Integer width) {
     String reason;
     Path path = asPath(executable);
-    if (source.equals("PATH")) {
-      reason = "there is no janus-engine on the PATH, and " + ENGINE_VARIABLE + " is not set";
-    } else if (path != null && !Files.exists(path)) {
-      reason = source + " names " + executable + ", which does not exist";
+    if (path != null && !Files.exists(path)) {
+      reason = source.equals("release")
+          ? executable + " does not exist"
+          : source + " names " + executable + ", which does not exist";
     } else if (path != null && !Files.isExecutable(path)) {
       reason = executable + " is not executable" + (platform.equals("win32") ? "" : " (chmod +x it)");
     } else {
       reason = executable + " could not be run: " + cause.getMessage();
     }
+    List<String> fixes = source.equals("release")
+        ? List.of()
+        : List.of((source.equals(ENGINE_VARIABLE) ? "unset " : "leave out ") + source
+            + ", and the SDK fetches the janus-engine it was released with; or");
+    return laidOut(reason, "The SDK runs the Janus engine as its own executable.", fixes, platform, arch, width);
+  }
+
+  /** The pinned engine could not be fetched ({@code reason}, from {@link EngineRelease}): why, and how to get one. */
+  static String notFetched(String reason, String platform, String arch, Integer width) {
+    List<String> fixes = releasedEngine(platform, arch) != null
+        ? List.of("set JANUS_ENGINE_MIRROR to a server holding janus-engine's release files, as "
+            + "`<mirror>/v<version>/<file>`; or")
+        : List.of();
+    return laidOut(reason, "The SDK fetches the Janus engine it was released with when it first runs.", fixes,
+        platform, arch, width);
+  }
+
+  private static String laidOut(
+      String reason, String intro, List<String> fixes, String platform, String arch, Integer width) {
     String asset = releasedEngine(platform, arch);
-    List<String> fixes = asset != null
-        ? List.of("download " + asset + " from " + RELEASES + ", make it executable, and put it on the PATH as "
-            + "janus-engine or set " + ENGINE_VARIABLE + " to its path; or", BUILD + ".")
-        : List.of(BUILD + ". No janus-engine is released for " + platform + "/" + arch + ".");
+    List<String> all = new java.util.ArrayList<>(fixes);
+    if (asset != null) {
+      all.add("download " + asset + " from " + RELEASES + "/tag/v" + EngineRelease.PIN.version()
+          + ", make it executable, and set " + ENGINE_VARIABLE + " to its path; or");
+      all.add(BUILD + ".");
+    } else {
+      all.add(BUILD + ". No janus-engine is released for " + platform + "/" + arch + ".");
+    }
     List<String> lines = new java.util.ArrayList<>(wrap(reason + ".", width, "", ""));
     lines.add("");
-    lines.addAll(wrap("The SDK runs the Janus engine as its own executable, and does not ship it. "
-        + (asset != null ? "Either" : "To get one") + ":", width, "", ""));
-    fixes.forEach(fix -> lines.addAll(wrap(fix, width, "  - ", "    ")));
+    lines.addAll(wrap(intro + " " + (all.size() > 1 ? "Either" : "To get one") + ":", width, "", ""));
+    all.forEach(fix -> lines.addAll(wrap(fix, width, "  - ", "    ")));
     return String.join("\n", lines);
   }
 
@@ -165,21 +196,35 @@ public final class SubprocessEmbedding implements Embedding {
     }
   }
 
-  /** The command line this embedding starts. */
+  /** The command line this embedding starts: empty for the pinned release, resolved as it starts. */
   public List<String> command() {
     return command;
   }
 
   @Override
   public FramePipe open() throws IOException {
-    ProcessBuilder builder = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT);
+    List<String> started = command.isEmpty() ? List.of(resolveRelease().toString()) : command;
+    ProcessBuilder builder = new ProcessBuilder(started).redirectError(ProcessBuilder.Redirect.INHERIT);
     Process process;
     try {
       process = builder.start();
     } catch (IOException e) {
-      throw new EngineNotStartedException(notStarted(command.get(0), source, e, platform(), arch(), terminalWidth()));
+      throw new EngineNotStartedException(notStarted(started.get(0), source, e, platform(), arch(), terminalWidth()));
     }
     return new Pipe(process);
+  }
+
+  /** The engine this SDK was released with, from the cache or fetched into it. */
+  private Path resolveRelease() throws IOException {
+    EngineRelease.Pin pin = EngineRelease.PIN;
+    try {
+      return EngineRelease.resolve(pin, EngineRelease.engineCache(env), EngineRelease.engineMirror(pin, env));
+    } catch (IOException | IllegalStateException e) {
+      throw new EngineNotStartedException(notFetched(e.getMessage(), platform(), arch(), terminalWidth()));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new InterruptedIOException("interrupted fetching janus-engine " + pin.version());
+    }
   }
 
   /** The pipe to one running engine process. Serial: one request in flight at a time. */
@@ -314,16 +359,16 @@ public final class SubprocessEmbedding implements Embedding {
 
   @Override
   public String toString() {
-    return "SubprocessEmbedding" + command;
+    return "SubprocessEmbedding" + (command.isEmpty() ? "[janus-engine " + EngineRelease.PIN.version() + "]" : command);
   }
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof SubprocessEmbedding other && other.command.equals(command);
+    return o instanceof SubprocessEmbedding other && other.command.equals(command) && other.env.equals(env);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(command);
+    return Objects.hash(command, env);
   }
 }

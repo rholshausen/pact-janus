@@ -2,7 +2,7 @@
   "name": "pact-janus",
   "private": true,
   "version": "0.0.0",
-  "description": "Pact Janus TypeScript SDK prototype (plan Phase 6): generated protocol bindings, the idiomatic DSL layer, and the conformance run.",
+  "description": "Pact Janus TypeScript SDK: the consumer DSL, the provider verifier and pact-js's verifier API over the Janus engine. Released as a file on this repository's GitHub releases, not to npm (ADR 0060).",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -46,11 +46,15 @@
       }
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/commonjs-package.ts",
     "test": "tsc -p tsconfig.json && vitest run",
     "lint": "node --experimental-strip-types --disable-warning=ExperimentalWarning node_modules/eslint/bin/eslint.js --flag unstable_native_nodejs_ts_config .",
-    "generate:bindings": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/generate-bindings.ts"
+    "generate:bindings": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/generate-bindings.ts",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

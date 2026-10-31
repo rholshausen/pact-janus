@@ -2,7 +2,9 @@
 //!
 //! `engine-pin <version> [--repo <owner/name>] [--out <file>]` fetches that release's `SHA256SUMS`,
 //! has `gh attestation verify` check it was made by this repository's release workflow, and writes
-//! the engine's digest for each target triple into `sdks/engine-release.json` (or `--out`). The
+//! the engine's digest for each target triple into `sdks/engine-release.json` (or `--out`), and the
+//! TypeScript SDK's copy of it, `sdks/typescript/src/engine/pin.ts`, unless `--out` names another
+//! file (ADR 0060 decision 6). The
 //! repository defaults to the one the current pin names. Nothing is written unless the attestation
 //! verifies: the attested `SHA256SUMS` is what makes the digests in it trustworthy, and the pin is
 //! what every resolver then trusts.
@@ -41,6 +43,9 @@ fn run() -> Result<(), String> {
     }
   }
   let version = version(given_version.as_deref().ok_or(USAGE)?).to_string();
+  let typescript = out
+    .is_none()
+    .then(|| repo_root().join("sdks/typescript/src/engine/pin.ts"));
   let out = out.unwrap_or_else(|| repo_root().join("sdks").join("engine-release.json"));
   let repository = match repository {
     Some(repository) => repository,
@@ -55,6 +60,10 @@ fn run() -> Result<(), String> {
   let pin = result?;
 
   std::fs::write(&out, pin.render()).map_err(|e| format!("{}: {e}", out.display()))?;
+  if let Some(typescript) = typescript {
+    std::fs::write(&typescript, pin.render_typescript())
+      .map_err(|e| format!("{}: {e}", typescript.display()))?;
+  }
   println!(
     "✓ {}: janus-engine {version} from {repository}, {} triples",
     out.display(),
