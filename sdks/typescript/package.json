@@ -1,7 +1,7 @@
 {
   "name": "pact-janus",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Pact Janus TypeScript SDK: the consumer DSL, the provider verifier and pact-js's verifier API over the Janus engine. Released as a file on this repository's GitHub releases, not to npm (ADR 0060).",
   "license": "Apache-2.0",
   "type": "module",
