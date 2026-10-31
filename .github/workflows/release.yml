@@ -18,7 +18,8 @@ name: Release
 #
 # After publishing, the SDKs' pin for the new release is written by the tool that verifies it, both
 # SDK suites resolve the release through it with no Rust toolchain, and it is pushed as a branch to
-# open a pull request from (staged plan S0.10). A change to that tool, or to the pin, rehearses
+# open a pull request from (staged plan S0.10), with a change file for each SDK, since a new pin is a
+# change to what each SDK's next release runs (ADR 0060 decision 5). A change to that tool, or to the pin, rehearses
 # here too: the tool must reproduce the checked-in pin from the release it names.
 
 on:
@@ -33,6 +34,7 @@ on:
       - engine/wasm/**
       - tools/engine-pin/**
       - sdks/engine-release.json
+      - sdks/typescript/src/engine/pin.ts
       - .github/scripts/without-rust.sh
       # What S0.11 ships, and the SDK side of the gates that run from it.
       - .github/scripts/janus-spec.sh
@@ -466,8 +468,8 @@ jobs:
           else
             pinned="$(jq -r .version sdks/engine-release.json)"
             cargo run --locked --package pact_janus_engine_pin -- "$pinned"
-            if ! git diff --exit-code -- sdks/engine-release.json; then
-              echo "::error::engine-pin does not reproduce sdks/engine-release.json from release $pinned."
+            if ! git diff --exit-code -- sdks/engine-release.json sdks/typescript/src/engine/pin.ts; then
+              echo "::error::engine-pin does not reproduce sdks/engine-release.json and the TypeScript SDK's copy from release $pinned."
               exit 1
             fi
           fi
@@ -482,6 +484,7 @@ jobs:
           name: engine-pin
           path: |
             sdks/engine-release.json
+            sdks/typescript/src/engine/pin.ts
             third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm
           if-no-files-found: error
 
@@ -510,7 +513,8 @@ jobs:
       - name: The pin just written
         run: |
           cp "$RUNNER_TEMP/pin/sdks/engine-release.json" sdks/engine-release.json
-          git diff -- sdks/engine-release.json
+          cp "$RUNNER_TEMP/pin/sdks/typescript/src/engine/pin.ts" sdks/typescript/src/engine/pin.ts
+          git diff -- sdks/engine-release.json sdks/typescript/src/engine/pin.ts
           echo "JANUS_CSV_COMPONENT=$RUNNER_TEMP/pin/third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
@@ -550,10 +554,27 @@ jobs:
       - name: Push the engine-pin branch
         run: |
           git switch -c engine-pin
+          pinned="$(jq -r .version sdks/engine-release.json)"
           cp "$RUNNER_TEMP/pin/sdks/engine-release.json" sdks/engine-release.json
+          cp "$RUNNER_TEMP/pin/sdks/typescript/src/engine/pin.ts" sdks/typescript/src/engine/pin.ts
+          # Each SDK's next release runs the new engine (ADR 0060 decision 5). A patch unless the
+          # maintainer opening the pull request says otherwise: the engine's changelog says what moved.
+          mkdir -p .changeset
+          cat > ".changeset/janus_engine_${VERSION//[^0-9A-Za-z]/_}.md" <<EOF
+          ---
+          typescript-sdk: patch
+          jvm-sdk: patch
+          ---
+
+          # The SDK runs janus-engine $VERSION
+
+          Told no other engine to run, the SDK fetches janus-engine $VERSION, where it fetched $pinned.
+          [Its release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION) says what changed.
+          EOF
+          git add .changeset sdks/engine-release.json sdks/typescript/src/engine/pin.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: the SDKs pin janus-engine $VERSION" -- sdks/engine-release.json
+          git commit -m "chore: the SDKs pin janus-engine $VERSION"
           # Forced: an unmerged `engine-pin` branch from an earlier release is replaced.
           git push --force origin engine-pin
           {

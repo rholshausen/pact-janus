@@ -33,13 +33,17 @@ repository that prototyped it. Start with:
 
 A release's version and its changelog come from **change files**, not from commit subjects
 ([ADR 0028](Documentation/decisions/0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md)).
-If your pull request changes what a release ships — the engine's or the CLI's sources or manifests,
-`Cargo.lock`, `corpora/` or `conformance/` — add one. [knope](https://knope.tech) writes
-it for you (`knope document-change`), or write `.changeset/<any_name>.md` by hand:
+There are three packages, each released on its own
+([ADR 0060](Documentation/decisions/0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md)):
+`engine` (the engine and the CLI, `corpora/`, `conformance/`, the spec schemas and the SDK gates),
+`typescript-sdk` (`sdks/typescript/`'s sources and manifests) and `jvm-sdk` (`sdks/jvm/`'s). A change to
+`sdks/engine-release.json`, the engine the SDKs run, ships in both SDKs. If your pull request changes
+what a release ships, add a change file naming each package it ships in. [knope](https://knope.tech)
+writes it for you (`knope document-change`), or write `.changeset/<any_name>.md` by hand:
 
 ```markdown
 ---
-default: minor
+engine: minor
 ---
 
 # `janus check` reads provider shapes from a directory
@@ -63,22 +67,27 @@ the change files gathered so far add up to.
 **Releasing** is two steps, for anyone with write access, and needs no secret:
 
 1. Run the **Prepare release** workflow (give it a version only when the version is a decision, as
-   `0.1.0` and `1.0.0` are). It pushes a `release` branch with the new version, `CHANGELOG.md` and
+   `0.1.0` and `1.0.0` are, as `<package>=<version>`). It pushes a `release` branch with each package's
+   new version and changelog (`CHANGELOG.md` for the engine, `sdks/<sdk>/CHANGELOG.md` for an SDK) and
    the consumed change files. Open the pull request it links to. CI runs on it, and so does a full
    rehearsal of the release build.
   ```
   gh workflow run prepare-release.yml
   # to set the version if required
-  gh workflow run prepare-release.yml -f version=0.1.0
+  gh workflow run prepare-release.yml -f versions="typescript-sdk=0.1.0 jvm-sdk=0.1.0"
   ```
-2. Merge it. The **Release** workflow builds `janus-engine`, `janus` and `janus-sdk-gates` for five
+2. Merge it. Each SDK whose version moved is released by the **Release SDKs** workflow: its suite runs
+   against its pinned engine with no Rust toolchain, what it is about to publish is installed into a
+   project outside the repository (`sdks/<sdk>/release-check`) on every operating system, and then it
+   is tagged `<package>/v<version>` and published with every file attested. If the engine's version
+   moved, the **Release** workflow builds `janus-engine`, `janus` and `janus-sdk-gates` for five
    target triples, the engine as a WASM component and `janus-spec.tar.gz` (ADR 0030), runs each SDK's
    gates from those files alone, attests every file, and then creates the `v<version>` tag and the
-   GitHub release together. Do not push the tag yourself.
+   GitHub release together. Do not push a tag yourself.
 3. Open the pull request that moves the SDKs' pin. After publishing, the same workflow writes
-   `sdks/engine-release.json` for the new release (`engine-pin`, below), runs both SDK suites against
-   the release on every operating system with no Rust toolchain reachable, and pushes the result as
-   the `engine-pin` branch. Its summary links to the pull request. To write a pin by hand, with `gh`
+   `sdks/engine-release.json` and the TypeScript SDK's copy of it for the new release (`engine-pin`,
+   below), runs both SDK suites against the release on every operating system with no Rust toolchain
+   reachable, and pushes the result as the `engine-pin` branch, with a change file for each SDK. Its summary links to the pull request. To write a pin by hand, with `gh`
    signed in:
   ```
   cargo run -p pact_janus_engine_pin -- 0.1.0

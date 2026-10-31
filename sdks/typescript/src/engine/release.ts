@@ -1,9 +1,28 @@
-// Where a user gets a `janus-engine` when the SDK cannot start one. The SDK runs the engine as its own
-// executable and does not ship it, so the error says which release asset fits this platform (ADR 0028
-// decision 9) and how to point the SDK at it.
+// The engine this SDK runs, and where a user gets one when it cannot be started (staged plan S1.36;
+// ADR 0029 decision 3, ADR 0060 decision 6). Unless it is told which executable to run, the SDK runs
+// the janus-engine it was released with: `PIN` names it by version and by digest, and resolving it
+// is a download and a hash — the file for this platform, from that version's release, kept in a
+// cache. A file whose digest is not the pinned one is never run and never kept.
+
+import { createHash } from "node:crypto";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { PIN } from "./pin.js";
+
+export interface EnginePin {
+  /** `owner/name` of the repository whose releases hold the engine. */
+  repository: string;
+  /** The pinned release, or null while there is none to pin. */
+  version: string | null;
+  /** Release asset name → the SHA-256 it must have, in hex. */
+  sha256: Record<string, string>;
+}
+
+export { PIN };
 
 /** Where the engine is released. */
-export const RELEASES = "https://github.com/rholshausen/pact-janus/releases";
+export const RELEASES = `https://github.com/${PIN.repository}/releases`;
 
 const TRIPLES: Partial<Record<string, string>> = {
   "linux/x64": "x86_64-unknown-linux-musl",
@@ -22,8 +41,108 @@ export function releasedEngine(
   return triple && `janus-engine-${triple}${platform === "win32" ? ".exe" : ""}`;
 }
 
+/** What a release calls the engine for a platform (ADR 0028 decision 9). */
+export function engineAsset(platform: string = process.platform, arch: string = process.arch): string {
+  const asset = releasedEngine(platform, arch);
+  if (!asset) {
+    throw new Error(`No janus-engine is released for ${platform}/${arch}`);
+  }
+  return asset;
+}
+
+export interface ResolveOptions {
+  /** Where resolved engines are kept. Defaults to `engineCache()`. */
+  cacheDir?: string;
+  /** What a release's tag and asset name are appended to. Defaults to `engineMirror()`. */
+  baseUrl?: string;
+}
+
+/** `JANUS_ENGINE_CACHE`, or `pact-janus/engines` in the user's cache directory. */
+export function engineCache(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.JANUS_ENGINE_CACHE) {
+    return env.JANUS_ENGINE_CACHE;
+  }
+  const caches =
+    process.platform === "win32"
+      ? (env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"))
+      : process.platform === "darwin"
+        ? join(homedir(), "Library", "Caches")
+        : (env.XDG_CACHE_HOME ?? join(homedir(), ".cache"));
+  return join(caches, "pact-janus", "engines");
+}
+
+/**
+ * `JANUS_ENGINE_MIRROR`, or the pinned repository's releases: a base URL under which
+ * `v<version>/<asset>` is the engine, as GitHub serves a release's files.
+ */
+export function engineMirror(pin: EnginePin = PIN, env: NodeJS.ProcessEnv = process.env): string {
+  return (env.JANUS_ENGINE_MIRROR || `https://github.com/${pin.repository}/releases/download`).replace(/\/+$/, "");
+}
+
+function pinnedVersion(pin: EnginePin): string {
+  if (!pin.version) {
+    throw new Error("No janus-engine release is pinned yet");
+  }
+  return pin.version;
+}
+
+/** Where the pinned engine for this platform is, once resolved. Reads nothing and fetches nothing. */
+export function enginePath(pin: EnginePin = PIN, cacheDir: string = engineCache()): string {
+  return join(cacheDir, pinnedVersion(pin), engineAsset());
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * The pinned engine for this platform, as an executable on disk: from the cache if it is there with
+ * the pinned digest, from the release otherwise. Rejects — and leaves nothing behind — if what the
+ * release serves is not what was pinned.
+ */
+export async function resolveEngine(pin: EnginePin = PIN, options: ResolveOptions = {}): Promise<string> {
+  const version = pinnedVersion(pin);
+  const asset = engineAsset();
+  const expected = pin.sha256[asset];
+  if (!expected) {
+    throw new Error(`janus-engine ${version} is pinned with no digest for ${asset}`);
+  }
+  const path = enginePath(pin, options.cacheDir);
+  const cached = await readFile(path).catch(() => undefined);
+  if (cached && sha256(cached) === expected) {
+    return path;
+  }
+
+  const url = `${options.baseUrl ?? engineMirror(pin)}/v${version}/${asset}`;
+  // Once per machine and version, and long enough to look like a hang if it said nothing.
+  process.stderr.write(`pact-janus: fetching janus-engine ${version} from ${url}\n`);
+  const response = await fetch(url).catch((error: unknown) => {
+    const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : String(error);
+    throw new Error(`janus-engine ${version} could not be fetched from ${url}: ${cause}`);
+  });
+  if (!response.ok) {
+    throw new Error(`janus-engine ${version} could not be fetched from ${url}: HTTP ${response.status}`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const actual = sha256(bytes);
+  if (actual !== expected) {
+    throw new Error(
+      `${url} is not the janus-engine that was pinned: its SHA-256 is ${actual}, and the pin says ${expected}`,
+    );
+  }
+  // Written beside its final name and moved into place, so a run that is interrupted, or two that
+  // overlap, never leave half an engine where the next one will look.
+  await mkdir(dirname(path), { recursive: true });
+  const partial = `${path}.${process.pid}.partial`;
+  await writeFile(partial, bytes);
+  await chmod(partial, 0o755);
+  await rm(path, { force: true });
+  await rename(partial, path);
+  return path;
+}
+
 /** What pointed the SDK at the executable it tried, as the error names it. */
-export type EngineSource = "engine.command" | "JANUS_ENGINE" | "PATH";
+export type EngineSource = "engine.command" | "JANUS_ENGINE" | "release";
 
 const BUILD = "in a pact-janus checkout, build it with `cargo build -p pact_janus_cli --bin janus-engine` " +
   "and set JANUS_ENGINE to target/debug/janus-engine";
@@ -53,24 +172,60 @@ export function engineNotStarted(
 ): EngineNotStartedError {
   let reason: string;
   if (error.code === "ENOENT") {
-    reason = source === "PATH"
-      ? "there is no janus-engine on the PATH, and JANUS_ENGINE is not set"
-      : `${source} names ${command}, which does not exist`;
+    reason = source === "release" ? `${command} does not exist` : `${source} names ${command}, which does not exist`;
   } else if (error.code === "EACCES") {
     reason = `${command} is not executable${platform === "win32" ? "" : " (chmod +x it)"}`;
   } else {
     reason = `${command} could not be run: ${error.message}`;
   }
+  const fixes =
+    source === "release"
+      ? []
+      : [`${source === "JANUS_ENGINE" ? "unset" : "leave out"} ${source}, and the SDK fetches the janus-engine it was released with; or`];
+  return laidOut(reason, "The SDK runs the Janus engine as its own executable.", fixes, platform, arch, width);
+}
+
+/** The pinned engine could not be fetched (`reason`, from `resolveEngine`): why, and how to get one. */
+export function engineNotFetched(
+  reason: string,
+  platform: string = process.platform,
+  arch: string = process.arch,
+  width: number | undefined = terminalWidth(),
+): EngineNotStartedError {
+  const fixes = releasedEngine(platform, arch)
+    ? ["set JANUS_ENGINE_MIRROR to a server holding janus-engine's release files, as `<mirror>/v<version>/<file>`; or"]
+    : [];
+  return laidOut(
+    reason,
+    "The SDK fetches the Janus engine it was released with when it first runs.",
+    fixes,
+    platform,
+    arch,
+    width,
+  );
+}
+
+function laidOut(
+  reason: string,
+  intro: string,
+  fixes: string[],
+  platform: string,
+  arch: string,
+  width: number | undefined,
+): EngineNotStartedError {
   const asset = releasedEngine(platform, arch);
-  const fixes = asset
-    ? [`download ${asset} from ${RELEASES}, make it executable, and put it on the PATH as janus-engine or ` +
-        "set JANUS_ENGINE to its path; or", `${BUILD}.`]
-    : [`${BUILD}. No janus-engine is released for ${platform}/${arch}.`];
+  const all = asset
+    ? [
+        ...fixes,
+        `download ${asset} from ${RELEASES}/tag/v${PIN.version}, make it executable, and set JANUS_ENGINE to its path; or`,
+        `${BUILD}.`,
+      ]
+    : [...fixes, `${BUILD}. No janus-engine is released for ${platform}/${arch}.`];
   const lines = [
     ...wrap(`${reason}.`, width, "", ""),
     "",
-    ...wrap(`The SDK runs the Janus engine as its own executable, and does not ship it. ${asset ? "Either" : "To get one"}:`, width, "", ""),
-    ...fixes.flatMap((fix) => wrap(fix, width, "  - ", "    ")),
+    ...wrap(`${intro} ${all.length > 1 ? "Either" : "To get one"}:`, width, "", ""),
+    ...all.flatMap((fix) => wrap(fix, width, "  - ", "    ")),
   ];
   return new EngineNotStartedError(lines.join("\n"));
 }

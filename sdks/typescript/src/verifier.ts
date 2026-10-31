@@ -107,7 +107,7 @@ export class Verifier {
   async verify(): Promise<VerificationResult> {
     const source = await this.#source();
     const option = this.#config.engine;
-    const engine = await Engine.start(typeof option === "function" ? option() : new SubprocessPipe(option));
+    const engine = await Engine.start(typeof option === "function" ? option() : await SubprocessPipe.start(option));
     const handlers = this.#states.length + this.#filters.length + this.#messages.length;
     const loopback = handlers > 0 ? new Loopback() : undefined;
     try {

@@ -204,14 +204,22 @@ Interaction getOrder = janus.interaction("get an order")
 
 ## Packaging and distribution
 
-- Maven coordinates `io.pact.janus:sdk` and `io.pact.janus:bindings`, version `0.0.0` (a prototype,
-  unpublished). Dependencies: `jackson-databind` (frames are JSON, and the bindings carry Jackson 2
+- Coordinates `io.pact.janus:janus-sdk` and `io.pact.janus:janus-bindings`, at the version in
+  `gradle.properties`. Released as files on a GitHub release tagged `jvm-sdk/v<version>` (ADR 0060):
+  each module's jar, sources jar, Ivy descriptor and POM (`./gradlew releaseFiles`). Gradle reads
+  them in place through an `ivy` repository; Maven installs them with `install:install-file`.
+  `release-check/` is a project outside the SDK that resolves them as a user would, which
+  `release-sdks.yml` runs before publishing. Dependencies: `jackson-databind` (frames are JSON, and the bindings carry Jackson 2
   annotations) and, `compileOnly`, `junit-jupiter-api` for the extension. Nothing else.
-- **The engine is not bundled.** The subprocess embedding runs the executable `JANUS_ENGINE` names,
-  or `janus-engine` from `PATH`. `JanusOptions.withEmbedding(SubprocessEmbedding.of(path))` names one
-  explicitly. When it cannot start one, an `EngineNotStartedException` (an `IOException`) says why
-  (nothing on the `PATH`, a path that does not exist, a file that is not executable), then each way to
-  get one: this platform's release asset, or a build. It carries no stack trace or cause, so a report
+- **The engine is not bundled; it is pinned** (ADR 0060 decision 6). The build copies
+  `sdks/engine-release.json` into the jar beside `EngineRelease`, which reads it. The subprocess
+  embedding runs the executable `JANUS_ENGINE` names, else that release's engine, from the cache
+  (`JANUS_ENGINE_CACHE`, else `pact-janus/engines` in the user's cache directory) or fetched into it
+  from the release, or from `JANUS_ENGINE_MIRROR`, and never a file with another digest. It never
+  looks on the `PATH`. `JanusOptions.withEmbedding(SubprocessEmbedding.of(path))` names one
+  explicitly. When it cannot fetch or start one, an `EngineNotStartedException` (an `IOException`)
+  says why (the fetch failed, a path that does not exist, a file that is not executable), then each
+  way to get one: a mirror, this platform's release asset, or a build. It carries no stack trace or cause, so a report
   shows the message alone, wrapped to `COLUMNS` when that is set. The SDK's own build runs `cargo build -p pact_janus_cli --bin janus-engine` before its
   tests (Gradle task `:sdk:buildEngine`) and points `JANUS_ENGINE` at the result, so tests never run
   against a stale engine.

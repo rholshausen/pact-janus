@@ -6,13 +6,27 @@
 #
 # knope is pinned where CI runs it (.github/workflows/); use the same version here.
 
-# One package: the Rust workspace. Its one version is `[workspace.package]`'s in the root
-# Cargo.toml — what `engine/hello` and `janus version` report, and what every artifact of a release
-# carries. A change file names it `default`. The SDKs have versions of their own and are not
-# released from here yet; when one is, it becomes a package beside this one.
-[package]
+# Three packages, each released on its own (ADR 0060 decision 2); a change file names the ones it
+# moves, and one change may move several.
+#
+# `engine`: the Rust workspace. Its one version is `[workspace.package]`'s in the root Cargo.toml —
+# what `engine/hello` and `janus version` report, and what every artifact of its release carries.
+# Tagged `v<version>` by release.yml.
+[packages.engine]
 versioned_files = ["Cargo.toml"]
 changelog = "CHANGELOG.md"
+
+# `typescript-sdk` and `jvm-sdk`: the SDKs, released as files on GitHub releases of their own until
+# they graduate (S2.9). Tagged `<package>/v<version>` by release-sdks.yml. Neither version says
+# anything about the engine's: the engine an SDK runs is its pin, sdks/engine-release.json.
+[packages.typescript-sdk]
+versioned_files = ["sdks/typescript/package.json", "sdks/typescript/package-lock.json"]
+changelog = "sdks/typescript/CHANGELOG.md"
+
+# knope has no reader for gradle.properties, so the version is the line that names it.
+[packages.jvm-sdk]
+versioned_files = [{ path = "sdks/jvm/gradle.properties", regex = "(?m)^version=(?<version>\\S+)$" }]
+changelog = "sdks/jvm/CHANGELOG.md"
 
 # Commit subjects here name plan items for maintainers (`feat: S0.1 plan grammar v1`). They are not
 # read for a bump or for a changelog line.
@@ -26,9 +40,9 @@ name = "document-change"
 [[workflows.steps]]
 type = "CreateChangeFile"
 
-# `knope prepare-release`: the version, the changelog and the consumed change files, staged and not
-# committed. The first release, and any other whose number is a decision rather than a sum, takes
-# `--override-version`.
+# `knope prepare-release`: each package's version, its changelog and the consumed change files,
+# staged and not committed. The first release of a package, and any other whose number is a decision
+# rather than a sum, takes `--override-version <package>=<version>`.
 [[workflows]]
 name = "prepare-release"
 

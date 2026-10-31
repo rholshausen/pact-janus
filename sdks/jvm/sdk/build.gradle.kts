@@ -58,14 +58,22 @@ val buildEngine = tasks.register<Exec>("buildEngine") {
 val enginePin: File = repoRoot.resolve("sdks/engine-release.json")
 val resolvedEngine = layout.buildDirectory.file("janus-engine/path")
 
-// The resolver is test code (src/test/.../engine/EngineRelease.java), so it is tested like the rest;
-// it is never part of the SDK a user installs. Asked every time: a cached engine whose digest still
-// matches costs a hash, and a cache emptied since is noticed.
+// The SDK runs the engine it was built with when it is told nothing (ADR 0060 decision 6), so the pin
+// goes into the jar beside EngineRelease, which reads it. A checkout holding only this directory has
+// none to copy (release.yml's sdk-gates job), and names its engine.
+tasks.processResources {
+  from(enginePin) {
+    into("io/pact/janus/sdk/engine")
+  }
+}
+
+// The SDK's own resolver (EngineRelease), run as the SDK runs it. Asked every time: a cached engine
+// whose digest still matches costs a hash, and a cache emptied since is noticed.
 val resolveEngine = tasks.register<JavaExec>("resolveEngine") {
   group = "build"
   description = "Resolves the pinned, released janus-engine (sdks/engine-release.json) for the tests."
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass = "io.pact.janus.sdk.engine.EngineRelease"
+  mainClass = "io.pact.janus.sdk.engine.ResolveEngine"
   args(enginePin.path, resolvedEngine.get().asFile.path)
   inputs.file(enginePin).withPropertyName("enginePin")
   outputs.file(resolvedEngine)
@@ -98,6 +106,8 @@ tasks.test {
   environment("RUST_LOG", System.getenv("RUST_LOG") ?: "warn")
   // Contracts the end-to-end tests write land under the build directory, never in the source tree.
   systemProperty("janus.test.contracts", layout.buildDirectory.dir("contracts").get().asFile.path)
+  // The pin the jar is built with, for the test that checks the jar has it.
+  systemProperty("janus.engine.pin", enginePin.path)
   // The shared conformance suite (plan task 6.4): the corpus both SDKs run — from JANUS_SPEC, an
   // unpacked janus-spec.tar.gz, when it names one (staged plan S0.11) — and where this run's report
   // goes for `janus-sdk-gates conformance check` to read.

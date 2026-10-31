@@ -140,6 +140,9 @@ Three sources are the source of truth and take precedence over this file when th
 > fail` (`janus verify --unhandled-states fail`); the SDKs carry warnings on the result. ADR 0059: the
 > engine writes a run's report (`options.report`, `verification/report` events); `janus verify` and
 > both SDKs print it, so a passing provider test says what it verified, as pact-js's does.
+> S1.36 (ADR 0060): each SDK is released from here as files on a GitHub release of its own, tagged
+> `typescript-sdk/v<version>` or `jvm-sdk/v<version>` by `release-sdks.yml`, with its own change files,
+> version and changelog; an installed SDK told no engine fetches the one its pin names.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -167,12 +170,13 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
 cli/             `janus` CLI (verify, explain, upgrade, check)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
-                 its protocol bindings (task 6.1)
+                 its protocol bindings (task 6.1), src/engine/pin.ts its copy of the engine pin;
+                 release-check/ installs a release outside the repository and uses it (S1.36)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bindings` project
-                 holds its protocol bindings (task 6.1)
+                 holds its protocol bindings (task 6.1); release-check/ as for TypeScript
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
-sdks/engine-release.json  The released janus-engine an SDK resolves when it is not building one:
-                 a version and a SHA-256 per target triple (ADR 0029)
+sdks/engine-release.json  The released janus-engine an SDK runs when it is told no other: a
+                 version and a SHA-256 per target triple (ADR 0029, ADR 0060)
 corpora/         Golden corpora: (spec or pact, expected plan, expected result); and verifier/,
                  S1.1's fixture corpus — pacts with the providers that answer them — and its
                  disagreement ledger, disagreements.json
@@ -316,9 +320,11 @@ offline — links with a scheme are not fetched — and as part of `cargo test`:
 cargo run -p pact_janus_doc_links             # every relative link, as an exit code (CI runs this)
 ```
 
-Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects. A
-pull request that changes what a release ships — the engine's or the CLI's sources or manifests,
-`Cargo.lock`, `corpora/`, `conformance/` — adds a file under `.changeset/`, or carries a line
+Releases (S0.4, ADR 0028 and ADR 0029) are decided by **change files**, never by commit subjects.
+There are three packages (ADR 0060): `engine`, `typescript-sdk` and `jvm-sdk`. A pull request that
+changes what a release ships — the engine's or the CLI's sources or manifests, `Cargo.lock`,
+`corpora/`, `conformance/`; an SDK's sources or manifests; the engine pin, which ships in both SDKs —
+adds a file under `.changeset/` naming each package it ships in, or carries a line
 `No-Changeset: <why>` in its description; CI's `Change file` workflow fails it otherwise:
 
 ```bash
@@ -334,18 +340,25 @@ maintainer deciding whether to move a pin. A release is prepared as a pull reque
 builds `janus-engine`, `janus` and `janus-sdk-gates` for five target triples, `janus-engine.wasm` and
 `janus-spec.tar.gz`, runs each SDK's gates from those files alone, checks that each
 binary is statically linked and runs, attests every file, and only then tags `v<version>` and
-publishes. It rehearses everything but the publishing on any pull request that touches it. Never push
-a `v*` tag by hand, and never hand-edit `CHANGELOG.md`. An SDK resolves a released engine from
-`sdks/engine-release.json` — a version and a SHA-256 per target triple — and refuses a download with
-any other digest. Both SDK suites do so with `JANUS_ENGINE_RELEASE=1` (S0.10;
-`sdks/typescript/test/engine-release.ts`, and `EngineRelease.java` in the JVM SDK's tests, which
-Gradle's `resolveEngine` runs), so a contributor needs no Rust toolchain, and build from the tree
+publishes. It rehearses everything but the publishing on any pull request that touches it. An SDK
+whose version (`sdks/typescript/package.json`, `sdks/jvm/gradle.properties`) has no tag is released by
+`release-sdks.yml` the same way (S1.36, ADR 0060): its suite against its pinned engine with no Rust,
+its files (`npm pack`'s tarball; `./gradlew releaseFiles`'s jars, Ivy descriptors and POMs) installed
+by `sdks/<sdk>/release-check` outside the repository on every operating system, then tagged
+`<package>/v<version>` and published. Never push a tag by hand, and never hand-edit a `CHANGELOG.md`.
+An SDK runs the engine `sdks/engine-release.json` names — a version and a SHA-256 per target triple —
+unless `JANUS_ENGINE` names another, fetching it on first use (`JANUS_ENGINE_CACHE`,
+`JANUS_ENGINE_MIRROR`) and refusing a download with any other digest
+(`sdks/typescript/src/engine/release.ts`, whose pin is the generated `pin.ts`; the JVM SDK's
+`EngineRelease`, whose pin the build copies into the jar). Both SDK suites resolve it with
+`JANUS_ENGINE_RELEASE=1` (S0.10), so a contributor needs no Rust toolchain, and build from the tree
 otherwise; `JANUS_ENGINE` overrides both. The pin is never edited by hand: after publishing,
-`release.yml` writes it, runs both suites against the release with no Rust toolchain reachable, and
-pushes it as the `engine-pin` branch to open a pull request from. By hand:
+`release.yml` writes it and the TypeScript copy, runs both suites against the release with no Rust
+toolchain reachable, and pushes it as the `engine-pin` branch, with a change file for each SDK, to open
+a pull request from. By hand:
 
 ```bash
-cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin
+cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin and pin.ts
 ```
 
 The one test that still builds Rust is the TypeScript CSV consumer's (`third-party/janus-csv`);

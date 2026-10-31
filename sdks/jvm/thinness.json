@@ -57,12 +57,13 @@
     ],
     "tests": [
       "sdk/src/test",
-      "bindings/src/test"
+      "bindings/src/test",
+      "release-check"
     ]
   },
   "budgets": {
     "idiomatic": 2100,
-    "embedding": 300,
+    "embedding": 480,
     "loopback": 100,
     "integration": 280
   }

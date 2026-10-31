@@ -41,8 +41,10 @@ run's report to standard output, as pact-js prints the verifier's: each interact
 whether it verified, then a summary. The engine writes it, so it reads as `janus verify`'s does
 ([ADR 0059](decisions/0059-the-engine-writes-a-verification-runs-report.md)). `require("pact-janus/verifier")`
 works as `import` does, so a test suite written in CommonJS changes its `require` the same way. The
-engine is the `janus-engine` executable that `JANUS_ENGINE` names, else `janus-engine` on the `PATH`;
-the [releases](https://github.com/rholshausen/pact-janus/releases) have one for each platform.
+engine is the `janus-engine` executable that `JANUS_ENGINE` names, else the one the SDK was released
+with, which it fetches on first use ([ADR 0060](decisions/0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md)).
+The SDK itself is installed from its [release](https://github.com/rholshausen/pact-janus/releases),
+as [`sdks/README.md`](../sdks/README.md#installing-a-release) says.
 Underneath it is the SDK's
 own `Verifier` (`import { Verifier } from "pact-janus"`), which takes the protocol's spellings directly.
 

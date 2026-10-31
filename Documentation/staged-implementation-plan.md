@@ -1475,6 +1475,32 @@ SDK implements it, and the SDK specification covers only the consumer side.
       equality fails. These are ten more S3.4 entries in the upgrade ledger.
   - Budgets: the JVM idiomatic layer moved from 2,000 to 2,100 lines and its integration layer from
     140 to 280. The TypeScript facade's is 300.
+- **S1.36 Releases of the SDKs** — **M**. Stage 1b's exit needs pilot providers verifying from
+  their own test suites, and neither SDK is released: each is at `0.0.0`, a pilot builds it from a
+  checkout, and an installed one finds no engine unless it is named or on the `PATH`. The pinned
+  resolver S0.10 wrote is test code. Decided by
+  [ADR 0060](decisions/0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md):
+  each SDK is a knope package of its own, released as files on a GitHub release tagged
+  `<package>/v<version>` (an `npm pack` tarball; jars, POMs and Ivy descriptors), and fetches the
+  engine its pin names on first use. Registries wait for graduation (S2.9), or for a pilot who
+  cannot use a release this way.
+  *Exit:* `typescript-sdk/v0.1.0` and `jvm-sdk/v0.1.0` are released. A project outside the repository
+  installs each from its release with no Rust toolchain and no `JANUS_ENGINE`, and runs a consumer and
+  a provider test against the engine the SDK fetched.
+  *Built 2026-10-31*; the exit waits on the first release of each:
+  - `knope.toml` has three packages, `engine`, `typescript-sdk` and `jvm-sdk`. The `Change file`
+    workflow asks for a change file naming each package a pull request ships in, and
+    `prepare-release.yml` takes `<package>=<version>` overrides.
+  - `release-sdks.yml` releases an SDK whose version has no tag. It runs the suite against the pinned
+    engine with no Rust, then installs the packed files into `sdks/<sdk>/release-check`, copied out of
+    the repository, on Linux (x86_64 and aarch64), macOS and Windows. It tags and publishes only then,
+    and installs the published release by its URL.
+  - The TypeScript SDK's pin is `src/engine/pin.ts`, which `engine-pin` writes beside
+    `sdks/engine-release.json`, since its CommonJS build cannot find a JSON file shipped beside it. The
+    JVM SDK's build copies the JSON into its jar. `release.yml`'s `engine-pin` branch now carries both,
+    and a change file for each SDK.
+  - The resolvers moved from each SDK's tests into its `embedding` layer. Its budget went from 250 to
+    370 lines in TypeScript, and from 300 to 480 in the JVM SDK.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
@@ -1775,6 +1801,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.26 | A rule on the pact's `Content-Type` header passes a reply that today's body check fails, when its regex expects a space before a parameter | found landing S1.23; ADR 0036 decision 4 |
 | S1.29 | The CLI's output, grown an item at a time: errors that are wrong, duplicated or carry raw `details`, summaries, help text, and exit 1 for a broker run that never started | collected through S1.1–S1.28; ADR 0041 |
 | S1.30 | Relative and missing mismatch paths; an absent value printed as `NULL`; unnamed members' labels; "a integer" | S1.22, S1.24, S1.25; ADR 0042 |
+| S1.36 | Neither SDK is released, so a pilot builds one from source, and an installed one finds no engine | stage 1b's exit; ADR 0028's tripwire |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |

@@ -1,0 +1,12 @@
+{
+  "name": "pact-janus-release-check",
+  "private": true,
+  "description": "A project outside the SDK that installs a TypeScript SDK release and uses it as a user would (ADR 0060 decision 7): release-sdks.yml copies it out of the repository and installs the packed tarball into it. Nothing here is the SDK's.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test test/release.test.ts"
+  }
+}

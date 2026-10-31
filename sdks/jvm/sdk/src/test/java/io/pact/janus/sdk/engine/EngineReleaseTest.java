@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Resolving a released engine (staged plan S0.4 and S0.10, X.1; ADR 0029 decision 3), against a
- * release this test serves itself: what matters is that the pinned digest decides, whatever the
+ * Resolving a released engine (staged plan S0.4, S0.10 and S1.36, X.1; ADR 0029 decision 3, ADR 0060
+ * decision 6), against a release this test serves itself: what matters is that the pinned digest decides, whatever the
  * server sends. The same cases as the TypeScript suite's {@code test/engine-release.test.ts}.
  */
 class EngineReleaseTest {
@@ -163,6 +163,22 @@ class EngineReleaseTest {
         () -> EngineRelease.resolve(pin("9.9.9", Map.of(ASSET, DIGEST)), cacheDir, baseUrl));
     assertTrue(missing.getMessage().contains("could not be fetched from " + baseUrl + "/v9.9.9/"), missing.getMessage());
     assertTrue(missing.getMessage().contains("HTTP 404"), missing.getMessage());
+  }
+
+  @Test
+  @DisplayName("is built with the pin every SDK in this repository shares")
+  void builtWithTheSharedPin() throws Exception {
+    Path shared = Path.of(System.getProperty("janus.engine.pin"));
+    if (Files.exists(shared)) {
+      assertEquals(EngineRelease.Pin.read(shared), EngineRelease.PIN);
+    }
+  }
+
+  @Test
+  @DisplayName("takes a mirror from JANUS_ENGINE_MIRROR, and the release otherwise")
+  void mirror() {
+    assertEquals("https://example.com/janus", EngineRelease.engineMirror(pin(), Map.of("JANUS_ENGINE_MIRROR", "https://example.com/janus/")));
+    assertEquals("https://github.com/example/janus/releases/download", EngineRelease.engineMirror(pin(), Map.of()));
   }
 
   @Test

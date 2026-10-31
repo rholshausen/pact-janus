@@ -6,12 +6,12 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import type { protocol } from "../generated/index.js";
 import type { FramePipe } from "./pipe.js";
-import { engineNotStarted, type EngineSource } from "./release.js";
+import { engineNotFetched, engineNotStarted, resolveEngine, type EngineSource } from "./release.js";
 
 export interface SubprocessOptions {
   /**
-   * The `janus-engine` executable. Defaults to the `JANUS_ENGINE` environment variable, then to
-   * `janus-engine` on the `PATH`.
+   * The `janus-engine` executable. Defaults to the `JANUS_ENGINE` environment variable, then to the
+   * engine this SDK was released with, fetched on first use (ADR 0060 decision 6).
    */
   command?: string;
   /**
@@ -33,13 +33,22 @@ export class SubprocessPipe implements FramePipe {
   private failure: Error | undefined;
   private readonly exited: Promise<void>;
 
-  constructor(options: SubprocessOptions = {}) {
+  /** Starts the engine `options` name, or the one this SDK was released with. */
+  static async start(options: SubprocessOptions = {}): Promise<SubprocessPipe> {
     const named = process.env.JANUS_ENGINE || undefined;
-    const [command, source]: [string, EngineSource] = options.command
-      ? [options.command, "engine.command"]
-      : named
-        ? [named, "JANUS_ENGINE"]
-        : ["janus-engine", "PATH"];
+    if (options.command) {
+      return new SubprocessPipe(options.command, "engine.command", options);
+    }
+    if (named) {
+      return new SubprocessPipe(named, "JANUS_ENGINE", options);
+    }
+    const command = await resolveEngine().catch((error: unknown) => {
+      throw engineNotFetched(error instanceof Error ? error.message : String(error));
+    });
+    return new SubprocessPipe(command, "release", options);
+  }
+
+  private constructor(command: string, source: EngineSource, options: SubprocessOptions) {
     const env = { ...process.env, ...options.env };
     env.RUST_LOG ??= "warn";
     this.child = spawn(command, [], { stdio: ["pipe", "pipe", "inherit"], env });

@@ -44,7 +44,7 @@ superseding ADR instead.
 | [0025](0025-a-provider-shape-entry-may-select-interactions-by-operation.md) | Let a provider-shape entry select the interactions it is about by operation | accepted |
 | [0026](0026-every-plan-action-is-namespaced-and-core-namespaces-are-reserved.md) | Namespace every plan action, and reserve the core families as namespaces | accepted (implemented as plan grammar v1, staged plan S0.1) |
 | [0027](0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md) | Build in the prototype's repository, and graduate SDKs into their existing repositories | accepted |
-| [0028](0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md) | Decide a release's version with change files, and release by merging the pull request that consumes them | accepted (decision 9 extended by 0030) |
+| [0028](0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md) | Decide a release's version with change files, and release by merging the pull request that consumes them | accepted (decision 9 extended by 0030; decision 1 amended by 0060) |
 | [0029](0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md) | Attest what a release built, and let an SDK verify the digest it pins | accepted |
 | [0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md) | A release carries the SDK gates and the executable specification they run against | accepted |
 | [0031](0031-rename-by-a-rehearsed-rewrite-and-read-persisted-identifiers-under-every-spelling.md) | Rename by a rehearsed rewrite, and read persisted identifiers under every spelling | accepted |
@@ -76,6 +76,7 @@ superseding ADR instead.
 | [0057](0057-the-http-component-runs-http-status-class-as-an-in-tree-matcher.md) | The HTTP component runs `http:status-class`, as a matcher compiled into the embedding | accepted |
 | [0058](0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md) | A provider state no hook sets up is a warning, or a failure when the run asks | accepted; decision 3 in part superseded by 0059 |
 | [0059](0059-the-engine-writes-a-verification-runs-report.md) | The engine writes a verification run's report, and every client prints it | accepted |
+| [0060](0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md) | Release each SDK as files on a GitHub release of its own, and fetch its pinned engine on first use | accepted |
 
 ## Decision backlog
 

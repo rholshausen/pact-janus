@@ -1,8 +1,9 @@
 name: Prepare release
 
 # Staged plan S0.4, ADR 0028: the first half of a release, run by hand. knope turns the change files
-# gathered in .changeset/ into the next version and its CHANGELOG.md entry, and this pushes the
-# result as the `release` branch. A maintainer opens the pull request from it — so that CI runs on
+# gathered in .changeset/ into the next version of each package they name — the engine, and since
+# S1.36 each SDK (ADR 0060) — and its changelog entry, and this pushes the result as the `release`
+# branch. A maintainer opens the pull request from it — so that CI runs on
 # it, which it would not for a pull request a workflow's own token opened — and merging that pull
 # request is what releases (release.yml).
 #
@@ -11,10 +12,11 @@ name: Prepare release
 on:
   workflow_dispatch:
     inputs:
-      version:
+      versions:
         description: >-
-          The version to release, when it is a decision rather than the sum of the change files
-          (the first release is 0.1.0). Empty: what the change files add up to.
+          The versions to release, where one is a decision rather than the sum of the change files,
+          as `<package>=<version>` separated by spaces (an SDK's first release is
+          `typescript-sdk=0.1.0`). Empty: what the change files add up to.
         required: false
         type: string
 
@@ -48,24 +50,33 @@ jobs:
           version: 0.23.0
       - name: Version, changelog and lockfile
         env:
-          VERSION: ${{ inputs.version }}
+          VERSIONS: ${{ inputs.versions }}
         run: |
+          versions() {
+            echo "engine=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pact_janus_kernel") | .version')"
+            echo "typescript-sdk=$(jq -r .version sdks/typescript/package.json)"
+            echo "jvm-sdk=$(sed -n 's/^version=//p' sdks/jvm/gradle.properties)"
+          }
+          versions > "$RUNNER_TEMP/before"
           git switch -c release
-          if [ -n "$VERSION" ]; then
-            knope prepare-release --override-version "$VERSION"
-          else
-            knope prepare-release
-          fi
+          overrides=()
+          for version in $VERSIONS; do
+            overrides+=(--override-version "$version")
+          done
+          knope prepare-release "${overrides[@]}"
+          # What moved, as `engine 0.5.0, typescript-sdk 0.1.0`: the commit's subject and the summary's.
+          versions | grep -vxFf "$RUNNER_TEMP/before" | sed 's/=/ /' | paste -sd, - | sed 's/,/, /g' > "$RUNNER_TEMP/released"
       - name: Push the release branch
         run: |
-          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pact_janus_kernel") | .version')"
+          released="$(cat "$RUNNER_TEMP/released")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: release $version"
+          git commit -m "chore: release $released"
           # Forced: an unmerged `release` branch from an earlier run is replaced, not built upon.
           git push --force origin release
+          title="$(jq -rn --arg t "chore: release $released" '$t | @uri')"
           {
-            echo "### Release $version is prepared"
+            echo "### Release $released is prepared"
             echo
-            echo "[Open the pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...release?expand=1&title=chore:%20release%20$version). Merging it publishes the release."
+            echo "[Open the pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...release?expand=1&title=$title). Merging it publishes each release: release.yml the engine's, release-sdks.yml each SDK's."
           } >> "$GITHUB_STEP_SUMMARY"

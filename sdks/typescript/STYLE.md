@@ -89,8 +89,8 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   written after the last test, pass or fail — and a withheld contract fails the suite.
 - Without Vitest, use `new Janus(config)` and call `await janus.finalise()` yourself, in whatever
   after-all hook the framework has.
-- `JANUS_ENGINE` names the `janus-engine` executable, else `janus-engine` on the `PATH` is run, as the
-  JVM SDK does (or pass `engine: { command }`); the engine's
+- `engine: { command }` names the `janus-engine` executable, else `JANUS_ENGINE` does, else the SDK
+  runs the engine it was released with, fetched on first use, as the JVM SDK does; the engine's
   stderr is inherited, with `RUST_LOG` defaulting to `warn` so a request the mock could not match
   is logged and start-up chatter is not.
 
@@ -143,11 +143,18 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   runtime cannot `require()` an ES module before Node 24.9, so a pact-js suite moving to
   `pact-janus/verifier` needs it. `pact-janus/vitest` is ES modules only, as Vitest is. A process that
   loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
-- The engine is not bundled: the subprocess embedding needs the `janus-engine` binary, located by
-  `JANUS_ENGINE` or the `PATH`. When it cannot start one, an `EngineNotStartedError` says why (nothing
-  on the `PATH`, a path that does not exist, a file that is not executable) and names the release asset
-  for this platform and where it is released (`src/engine/release.ts`). A published SDK would pin an engine version and ship or fetch the matching binary
-  (or, once Phase 9 finding 3 is resolved, a WASM component).
+- The engine is not bundled; it is pinned (ADR 0060 decision 6). `src/engine/pin.ts` names a
+  `janus-engine` release by version and by digest per platform: `sdks/engine-release.json`, which
+  `engine-pin` writes there too. Told no executable, the SDK runs that release's engine, from the
+  cache (`JANUS_ENGINE_CACHE`, else `pact-janus/engines` in the user's cache directory) or fetched
+  into it from the release, or from `JANUS_ENGINE_MIRROR`, and never runs a file with another digest
+  (`src/engine/release.ts`). It never looks on the `PATH`. When it cannot fetch or start one, an
+  `EngineNotStartedError` says why (the fetch failed, a path that does not exist, a file that is not
+  executable) and each way to get one: a mirror, this platform's release asset, or a build.
+- Released as `pact-janus-<version>.tgz` on a GitHub release tagged `typescript-sdk/v<version>`, and
+  installed by its URL (ADR 0060); `package.json` stays `private`, so it is never published to npm by
+  mistake. `release-check/` is a project outside the SDK that installs the packed tarball and uses
+  it, which `release-sdks.yml` runs before publishing.
 - The protocol version this SDK speaks is fixed at 1 (`engine/engine.ts`) and offered in `engine/hello`.
 
 ## Deviations from the behavioural specification
