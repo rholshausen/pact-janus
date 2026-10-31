@@ -79,7 +79,9 @@ the change files gathered so far add up to.
 2. Merge it. Each SDK whose version moved is released by the **Release SDKs** workflow: its suite runs
    against its pinned engine with no Rust toolchain, what it is about to publish is installed into a
    project outside the repository (`sdks/<sdk>/release-check`) on every operating system, and then it
-   is tagged `<package>/v<version>` and published with every file attested. If the engine's version
+   is tagged `<package>/v<version>` and published with every file attested, each SDK on its own. An
+   SDK is released against the engine the tree is at: when the same pull request releases the
+   engine, the SDKs wait for step 3. If the engine's version
    moved, the **Release** workflow builds `janus-engine`, `janus` and `janus-sdk-gates` for five
    target triples, the engine as a WASM component and `janus-spec.tar.gz` (ADR 0030), runs each SDK's
    gates from those files alone, attests every file, and then creates the `v<version>` tag and the
@@ -87,7 +89,9 @@ the change files gathered so far add up to.
 3. Open the pull request that moves the SDKs' pin. After publishing, the same workflow writes
    `sdks/engine-release.json` and the TypeScript SDK's copy of it for the new release (`engine-pin`,
    below), runs both SDK suites against the release on every operating system with no Rust toolchain
-   reachable, and pushes the result as the `engine-pin` branch, with a change file for each SDK. Its summary links to the pull request. To write a pin by hand, with `gh`
+   reachable, and pushes the result as the `engine-pin` branch, with a change file for each SDK, or,
+   for an SDK whose release is waiting for this pin, a line in that release's changelog entry.
+   Merging it releases any SDK that was waiting. Its summary links to the pull request. To write a pin by hand, with `gh`
    signed in:
   ```
   cargo run -p pact_janus_engine_pin -- 0.1.0

@@ -211,8 +211,8 @@ Interaction getOrder = janus.interaction("get an order")
   logger entry. A `RUST_LOG` in the environment is passed as it is, and the events it lets through are
   still logged at their own levels.
 - The SDK starts the engine with `JANUS_LOG_FORMAT=json` and reads its stderr on a daemon thread,
-  reading each event's members, never its text. A line that is not an event, such as a crash, is
-  logged whole as an error.
+  reading each event's members, never its text. A line that is not an event (a crash, or the text of
+  an engine older than `JANUS_LOG_FORMAT`) goes to the test's stderr as it is.
 - With no SLF4J provider on the class path, the engine's stderr is inherited, at `warn` unless
   `RUST_LOG` says otherwise.
 

@@ -50,8 +50,9 @@ outlive a run, and ADR 0028 decision 8 forbids that until S0.7 names owners to h
 5. **A change that ships in an SDK carries a change file naming that SDK**: its sources, its manifest
    and lockfile, its generated bindings and its engine pin. CI's `Change file` workflow holds pull
    requests to it, as it does for the engine. The pull request that moves `sdks/engine-release.json`
-   to a new engine is one, so `release.yml` writes a change file for each SDK onto the `engine-pin`
-   branch with the pin.
+   to a new engine is one, so `release.yml` writes onto the `engine-pin` branch, with the pin, a
+   change file for each SDK. For an SDK whose release is waiting for that pin (decision 7), it writes
+   a line in that release's changelog entry instead.
 6. **An SDK fetches its pinned engine on first use.** The pin it was built with
    (`sdks/engine-release.json`) ships inside it. Unless it is told which executable to run, by its
    own option or `JANUS_ENGINE`, it runs the pinned engine for its platform. It takes the engine from
@@ -69,6 +70,13 @@ outlive a run, and ADR 0028 decision 8 forbids that until S0.7 names owners to h
    `JANUS_ENGINE`, and runs a consumer test and a provider test. Only then does the workflow tag and
    publish. It rehearses all of this, short of publishing, on any pull request that touches it, an
    SDK's manifest or the engine pin.
+   *Amended 2026-10-31*, by what S1.37's first rehearsal showed:
+   - **An SDK is released against the engine the tree is at.** When a release pull request also
+     releases the engine, Cargo.toml's version is ahead of the pin, and the SDK waits. Building it
+     against the old pin fails any change that needs the new engine. Merging the pull request that
+     pins the new engine is the push that releases it.
+   - **Each SDK is released on its own** (`release-sdk.yml`, called once for each), so one that
+     fails stops only its own release.
 8. **ADR 0028 decision 8 stands.** A GitHub release needs nothing but the run's own token.
 
 ## Alternatives considered

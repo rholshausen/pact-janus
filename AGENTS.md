@@ -349,7 +349,10 @@ whose version (`sdks/typescript/package.json`, `sdks/jvm/gradle.properties`) has
 `release-sdks.yml` the same way (S1.36, ADR 0060): its suite against its pinned engine with no Rust,
 its files (`npm pack`'s tarball; `./gradlew releaseFiles`'s jars, Ivy descriptors and POMs) installed
 by `sdks/<sdk>/release-check` outside the repository on every operating system, then tagged
-`<package>/v<version>` and published. Never push a tag by hand, and never hand-edit a `CHANGELOG.md`.
+`<package>/v<version>` and published, each SDK on its own (`release-sdk.yml`). An SDK is released
+against the engine the tree is at: when a release pull request also releases the engine, the SDKs
+wait for the pull request that pins it, and merging that releases them. Never push a tag by hand,
+and never hand-edit a `CHANGELOG.md`.
 An SDK runs the engine `sdks/engine-release.json` names — a version and a SHA-256 per target triple —
 unless `JANUS_ENGINE` names another, fetching it on first use (`JANUS_ENGINE_CACHE`,
 `JANUS_ENGINE_MIRROR`) and refusing a download with any other digest
@@ -358,8 +361,8 @@ unless `JANUS_ENGINE` names another, fetching it on first use (`JANUS_ENGINE_CAC
 `JANUS_ENGINE_RELEASE=1` (S0.10), so a contributor needs no Rust toolchain, and build from the tree
 otherwise; `JANUS_ENGINE` overrides both. The pin is never edited by hand: after publishing,
 `release.yml` writes it and the TypeScript copy, runs both suites against the release with no Rust
-toolchain reachable, and pushes it as the `engine-pin` branch, with a change file for each SDK, to open
-a pull request from. By hand:
+toolchain reachable, and pushes it as the `engine-pin` branch, with a change file for each SDK (or a
+line in the changelog entry of an SDK release waiting for it), to open a pull request from. By hand:
 
 ```bash
 cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin and pin.ts

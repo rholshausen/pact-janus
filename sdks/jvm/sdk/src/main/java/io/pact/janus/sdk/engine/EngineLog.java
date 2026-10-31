@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
@@ -74,7 +75,7 @@ final class EngineLog {
     Thread thread = new Thread(() -> {
       try (BufferedReader lines = new BufferedReader(new InputStreamReader(stderr, StandardCharsets.UTF_8))) {
         for (String line = lines.readLine(); line != null; line = lines.readLine()) {
-          log(line, logger);
+          log(line, logger, System.err);
         }
       } catch (IOException ended) {
         // The engine is gone; so is anything it had left to say.
@@ -87,10 +88,12 @@ final class EngineLog {
 
   /**
    * Logs one line of the engine's stderr: an event at its own level, as
-   * {@code target: message key=value …}. A line that is not one is something the engine wrote
-   * outside its logs, a crash or a framing error, and is logged whole as an error.
+   * {@code target: message key=value …}. A line that is not one goes to {@code stderr} as it is,
+   * where an inherited stderr would have shown it: something the engine wrote outside its logs, a
+   * crash or a framing error, or the text of an engine older than {@code JANUS_LOG_FORMAT}, whose
+   * level is in that text and nowhere this could read it without parsing it.
    */
-  static void log(String line, Logger logger) {
+  static void log(String line, Logger logger, PrintStream stderr) {
     if (line.isBlank()) {
       return;
     }
@@ -101,7 +104,7 @@ final class EngineLog {
       // Not an event: logged whole, below.
     }
     if (event == null || !event.isObject() || !event.path("level").isTextual()) {
-      logger.error(line);
+      stderr.println(line);
       return;
     }
     Level level;

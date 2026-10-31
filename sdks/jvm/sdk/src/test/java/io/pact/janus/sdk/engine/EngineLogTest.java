@@ -11,10 +11,13 @@ import ch.qos.logback.core.read.ListAppender;
 import io.pact.janus.sdk.ContractWithheldException;
 import io.pact.janus.sdk.Janus;
 import io.pact.janus.sdk.JanusOptions;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -88,22 +91,27 @@ class EngineLogTest {
   }
 
   @Test
-  @DisplayName("an event is logged at its level as target, message and fields; anything else as an error")
+  @DisplayName("an event is logged at its level as target, message and fields; anything else goes to stderr as it is")
   void events() {
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    PrintStream err = new PrintStream(stderr, true, StandardCharsets.UTF_8);
     logger.setLevel(Level.DEBUG);
     EngineLog.log("{\"timestamp\":\"2026-10-31T03:56:25Z\",\"level\":\"DEBUG\",\"fields\":{\"message\":\"the provider "
-        + "answered\",\"method\":\"GET\",\"status\":200},\"target\":\"pact_janus_component_http::drive\"}", logger);
+        + "answered\",\"method\":\"GET\",\"status\":200},\"target\":\"pact_janus_component_http::drive\"}", logger, err);
     EngineLog.log("{\"level\":\"DEBUG\",\"fields\":{\"message\":\"starting new connection\",\"log.target\":\"reqwest::connect\","
-        + "\"log.module_path\":\"reqwest::connect\",\"log.line\":5},\"target\":\"reqwest::connect\"}", logger);
-    EngineLog.log("{\"level\":\"TRACE\",\"fields\":{\"message\":\"held back\"},\"target\":\"x\"}", logger);
-    EngineLog.log("{\"level\":\"WARN\",\"fields\":{\"message\":\"no target\"}}", logger);
-    EngineLog.log("thread 'main' panicked at cli/src/bin/janus_engine.rs:1:1", logger);
-    EngineLog.log("", logger);
+        + "\"log.module_path\":\"reqwest::connect\",\"log.line\":5},\"target\":\"reqwest::connect\"}", logger, err);
+    EngineLog.log("{\"level\":\"TRACE\",\"fields\":{\"message\":\"held back\"},\"target\":\"x\"}", logger, err);
+    EngineLog.log("{\"level\":\"WARN\",\"fields\":{\"message\":\"no target\"}}", logger, err);
+    EngineLog.log("thread 'main' panicked at cli/src/bin/janus_engine.rs:1:1", logger, err);
+    EngineLog.log("2026-10-31T04:22:31Z  WARN pact_janus_kernel: an engine older than JANUS_LOG_FORMAT", logger, err);
+    EngineLog.log("", logger, err);
     assertEquals(List.of(
         "DEBUG pact_janus_component_http::drive: the provider answered method=GET status=200",
         "DEBUG reqwest::connect: starting new connection",
-        "WARN no target",
-        "ERROR thread 'main' panicked at cli/src/bin/janus_engine.rs:1:1"), messages());
+        "WARN no target"), messages());
+    assertEquals("thread 'main' panicked at cli/src/bin/janus_engine.rs:1:1\n"
+        + "2026-10-31T04:22:31Z  WARN pact_janus_kernel: an engine older than JANUS_LOG_FORMAT\n",
+        stderr.toString(StandardCharsets.UTF_8).replace("\r\n", "\n"));
   }
 
   @Test

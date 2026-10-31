@@ -47,7 +47,10 @@ the only way to set how much it logs. Neither is how anyone configures logging i
    - The SDK pipes the engine's stderr and logs each event at its own level, as
      `target: message key=value …`. It leaves out the `log.*` fields a library logging through the
      `log` crate adds, as the text format does.
-   - A line that is not an event, such as a crash or a framing error, is logged whole as an error.
+   - A line that is not an event goes to the test's stderr as it is, where an inherited stderr
+     showed it. That is a crash or a framing error, or the text of an engine older than
+     `JANUS_LOG_FORMAT` that `JANUS_ENGINE` names. Logged at one level, an old engine's every line
+     would wear that level whatever its own was, and its own is only in the text.
    - `slf4j-api` becomes a dependency of the SDK.
    - With no SLF4J provider bound, there is nowhere to forward to. The engine's stderr is then
      inherited, at `warn` unless `RUST_LOG` says otherwise.

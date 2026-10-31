@@ -1517,6 +1517,12 @@ SDK implements it, and the SDK specification covers only the consumer side.
   - A `RUST_LOG` that is set is passed as it is, in both SDKs.
   - Budgets: the embedding layer moved from 480 to 600 code lines in the JVM SDK, and from 370 to 390
     in TypeScript.
+  - Not foreseen: its first `Release SDKs` rehearsal ran the JVM SDK against the pinned 0.4.2, which
+    predates `JANUS_LOG_FORMAT`, and failed, as it should, since an SDK release pinning 0.4.2 would
+    ship this broken. Two things changed with it. The JVM SDK writes a line that is not an event to
+    the test's stderr as it is, so an older engine's text is not logged at a level it never had. And
+    an SDK whose release comes with an engine release waits for the pin, each SDK released on its own
+    (ADR 0060 decision 7, amended).
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
