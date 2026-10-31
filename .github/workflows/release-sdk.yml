@@ -44,6 +44,9 @@ jobs:
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
+          # Saved from main only: a pull request restores main's, and its own would push
+          # main's out of the repository's 10 GB.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           key: release-sdks-csv
           workspaces: third-party/janus-csv
       - name: Build the CSV component

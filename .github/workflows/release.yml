@@ -146,6 +146,9 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
+          # Saved from main only: a pull request restores main's, and its own would push
+          # main's out of the repository's 10 GB.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           key: release-${{ matrix.target }}
       # libclang for `rquickjs`'s bindgen build, as in CI; musl-tools for the C the engine links —
       # QuickJS, ring, Oniguruma — which has to be compiled against musl too.
@@ -233,6 +236,7 @@ jobs:
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           key: release-wasm
       - name: Build prerequisites
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
@@ -457,6 +461,7 @@ jobs:
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           key: release-pin
           workspaces: |
             .
