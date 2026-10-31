@@ -1,12 +1,12 @@
 {
   "$comment": "The released janus-engine the SDKs resolve when they are not building one from this tree (staged plan S0.4 and S0.10, X.1; ADR 0029 decision 3): a version, and the SHA-256 of the engine binary for each target triple, keyed by the release's asset name. Written by `cargo run -p pact_janus_engine_pin -- <version>`, which reads the digests from that release's SHA256SUMS once `gh attestation verify` has passed on it; never edited by hand. A resolver refuses any download whose digest is not here.",
   "repository": "rholshausen/pact-janus",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "sha256": {
-    "janus-engine-aarch64-apple-darwin": "a597f3e519ff2c778d6da4f38701a98cafee4b25542808a2b78fe943aec7d8cc",
-    "janus-engine-aarch64-unknown-linux-musl": "89cca6c74fb695574611ea88327b618f894cc2d8f564ba126efe3dd255298121",
-    "janus-engine-x86_64-apple-darwin": "d782fc3c4ee734c330d94c71dc3627803fe8f1c68bee3f5231d0f4258ec48708",
-    "janus-engine-x86_64-pc-windows-msvc.exe": "264953f84c92d8c5628ed4f2d914aa02907954fe542c48004969d4662871c228",
-    "janus-engine-x86_64-unknown-linux-musl": "9b1f06d2c437c6497f3c34369f44100f3cdeb1071a8bf696d706cf8bbefe2a74"
+    "janus-engine-aarch64-apple-darwin": "224cd268eea210610c1e59c710cd3b5e0e2402b3d83a058fbd704b32a4f09a53",
+    "janus-engine-aarch64-unknown-linux-musl": "ed839744fc9aa41314c8ca74d4aaccb1e4634f41a853506cf4d2dfe4aee6b1b2",
+    "janus-engine-x86_64-apple-darwin": "b0f501c711b281336b827eb054f9a6567216dab919354a589eddf50ea1d366f4",
+    "janus-engine-x86_64-pc-windows-msvc.exe": "95c13c38adb2ca57f7977f6151cd4da392397b588d0a926d294b96baa449f970",
+    "janus-engine-x86_64-unknown-linux-musl": "c5402e4c9b888b3452c831138e39dc7dfd3574247bfb7b6d807bd9c5779b3c8f"
   }
 }
