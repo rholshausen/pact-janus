@@ -179,6 +179,10 @@ jobs:
     # repository as a user installs it, with nothing naming an engine and an empty engine cache, on
     # each operating system an engine is released for. The SDK fetches the engine its pin names.
     needs: build
+    # Explicit, as each job after a skipped one must be: the default, success(), counts every job
+    # upstream, and for the JVM SDK the skipped csv job is one (the reason its release was not
+    # published the first time).
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -232,7 +236,7 @@ jobs:
     # The only job that can write, and it runs only for a release: attest what was built, then tag
     # the commit it was built from and publish, in one step. Not before every check above passed.
     needs: check
-    if: inputs.publish
+    if: ${{ !cancelled() && inputs.publish && needs.check.result == 'success' }}
     name: publish
     runs-on: ubuntu-latest
     permissions:
