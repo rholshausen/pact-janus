@@ -17,6 +17,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # No debug information in a debug build: most of a Windows target directory is its PDBs, so the
+  # rust-cache entries fit the repository's 10 GB together, and Windows links faster. A panic still
+  # says where it happened; only a backtrace loses its line numbers.
+  CARGO_PROFILE_DEV_DEBUG: "0"
   LATEST: pactfoundation/pact-broker:latest
 
 jobs:
@@ -27,6 +31,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Saved from main only: a pull request restores main's, and its own would push
+          # main's out of the repository's 10 GB.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build prerequisites
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
       - name: Today's verifier, at the pinned version
