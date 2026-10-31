@@ -2252,7 +2252,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_bindings"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "expectest",
  "pretty_assertions",
@@ -2263,7 +2263,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_broker_client"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "flate2",
@@ -2283,7 +2283,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_cli"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anstream",
  "anstyle",
@@ -2319,7 +2319,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_form"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "indexmap",
@@ -2332,7 +2332,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_host"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "pact_janus_component_http",
@@ -2352,7 +2352,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_http"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "form_urlencoded",
@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_json"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "pact_janus_kernel",
@@ -2378,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_multipart"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -2397,7 +2397,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_oauth2"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pact_janus_kernel",
  "pact_janus_sample_order_service",
@@ -2408,7 +2408,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_text"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "pact_janus_kernel",
@@ -2419,7 +2419,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_component_xml"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "indexmap",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_conformance"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "jsonschema",
  "pretty_assertions",
@@ -2441,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_corpus"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "pact_janus_component_http",
@@ -2453,7 +2453,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_doc_links"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pretty_assertions",
  "rstest",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_engine_pin"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -2470,7 +2470,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_engine_wasm"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pact_janus_component_form",
  "pact_janus_component_json",
@@ -2484,7 +2484,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_hooks_host"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "http",
@@ -2502,7 +2502,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_http_client"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "bytes",
  "h2",
@@ -2519,7 +2519,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_kernel"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -2555,7 +2555,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_sample_order_service"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "serde_json",
  "tiny_http",
@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_schema_compat"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "jsonschema",
  "pretty_assertions",
@@ -2573,7 +2573,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_sdk_gates"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pact_janus_bindings",
  "pact_janus_conformance",
@@ -2582,7 +2582,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_test_servers"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "rcgen",
  "rustls",
@@ -2591,7 +2591,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_thinness"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pretty_assertions",
  "serde_json",
@@ -2599,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "pact_janus_verifier_diff"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
  "bytes",
