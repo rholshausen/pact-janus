@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793426895578,
+  "lastUpdate": 1793426897537,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -34656,6 +34656,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 16797,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "5a0329ef2eeba103cc9baeda4bfe4391c44cc3cd",
+          "message": "ci: save Rust caches from main only, and build CI's debug builds without debug info\n\nThe repository's Actions caches had reached 10.2 GB, over the 10 GB limit,\nso GitHub was evicting the least recently used. On main, CI's\nrust (windows-latest) job found no cache at all and spent 7 minutes\nbuilding, 10 testing and 3.5 on clippy, then 3 more saving a 3.1 GB cache.\nThat cache was saved twice, for main and for the release pull request.\n\n- Every Swatinem/rust-cache step has save-if: main. A pull request\n  restores main's caches, and no longer saves copies of its own.\n- ci.yml and broker-latest.yml set CARGO_PROFILE_DEV_DEBUG=0. Debug info\n  is most of a Windows target directory and most of its link time. A\n  panic still says where it happened; only a backtrace loses its line\n  numbers. Release and benchmark builds use the release profile and are\n  unchanged.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-31T16:53:18+11:00",
+          "tree_id": "de52b95fb39ecfa7ed42047e795327b982422f98",
+          "url": "https://github.com/rholshausen/pact-janus/commit/5a0329ef2eeba103cc9baeda4bfe4391c44cc3cd"
+        },
+        "date": 1793426896985,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 38188,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29669,
             "unit": "requests per second",
             "extra": "engines 4"
           }
