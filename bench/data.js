@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793418853895,
+  "lastUpdate": 1793418856150,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -33240,6 +33240,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18435,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "eaed59b7bfa746fa7adf6290b7231b7179f30a53",
+          "message": "chore: the SDKs pin janus-engine 0.4.2\n\nRelease SDKs' first rehearsal ran each suite against the pinned engine, as\nan installed SDK now runs it, and 0.4.0 failed six tests: the SDKs on main\nalready need the v4 `statusCode` matcher (S1.35, 0.4.1) and message\nproducers served from the test (S1.15, 0.4.2). Written by\n`cargo run -p pact_janus_engine_pin -- 0.4.2`, with the TypeScript copy;\nboth suites pass against the release. Supersedes the engine-pin branch.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-31T14:38:49+11:00",
+          "tree_id": "6c6d40a31deba9d51d530a722ca6d0230e06b330",
+          "url": "https://github.com/rholshausen/pact-janus/commit/eaed59b7bfa746fa7adf6290b7231b7179f30a53"
+        },
+        "date": 1793418855468,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24010,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18588,
             "unit": "requests per second",
             "extra": "engines 4"
           }
