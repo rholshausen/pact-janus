@@ -1,3 +1,102 @@
+## 0.4.2 (2026-10-31)
+
+### Features
+
+#### A test can produce a provider's messages, and a produced message is held only to a content type it has
+
+A provider test's message producers are `produce-message` hooks it serves on its loopback endpoint,
+as its state handlers are (ADR 0056). Each is named `message-<n>` and selected by its interaction's
+description: `{ name, when: { interaction }, changes: ["parts"], run }`. It answers the whole
+`message` part, with the body base64-encoded and labelled only when the producer gave a content type.
+
+The engine changed in one place. A v1–v4 message whose produced metadata has no `contentType` member
+at all is now read as carrying the message's own content type there: its body's label, else what its
+octets are detected as. Before, it failed on the metadata's expected `contentType`. The `pact-message`
+format always writes one, so nothing `janus verify` produces changes. A script or component that
+produces a message with no `contentType` in its metadata now verifies where it failed.
+
+For an SDK maintainer: the behavioural specification gains `message-producer`, with four conformance
+ids, and `verify.transport-options-as-given`. A verifier's `transport` option is the HTTP transport's
+options beside `base-url`. The conformance suite has three provider cases and one live case for them.
+
+#### An SDK can verify a provider inside a test, and the engine loads a project's configuration for it
+
+Staged plan S1.14, ADR 0055.
+
+- **`config/load`** (engine-protocol spec §8.8): `{ path }` → `{ config }`, the project
+  configuration file resolved by the loader `janus verify --config` runs. `${VAR}`s come from the
+  engine process's environment, scripts are inlined and paths are made absolute. `path` must be
+  absolute, or the call is `malformed-frame`.
+  - It is behind a new `config-loading` capability, which `janus-engine` and `janus` declare.
+  - The errors are the loader's: `hook-unresolved`, which names the `variable` or `path`, and
+    `hook-config-invalid`.
+  - An engine without a loader, such as the offline WASM artifact, answers `component-unavailable`
+    naming `config-loader`.
+  - The generated bindings gain `Load`, `LoadResult` and `ResolvedConfig`, and `config/load` joins
+    the known operations. They also gain the lifecycle-hooks schemas as a new set, `hooks`
+    (`HookContext`, `HookConfig`, `HookEntry`, …), which a provider SDK serves and writes.
+- **The behavioural specification has a provider side:** `verifier`, `state-handler`,
+  `request-filter` and `verify`, in a new `verification` category. Its schema adds a `hook-entry`
+  kind to `produces`.
+- **The conformance suite has a `provider` category**, and its scripted engine calls an SDK's hooks
+  during a run. An SDK that implements the provider primitives must pass its 14 cases and the new
+  live case.
+
+#### A provider state no hook sets up is a warning, or a failure when the run asks
+
+Before, a provider state that no `state-setup` hook admitted (none configured, or every one's `when`
+selecting other states) ran its exchange without setup and said nothing, so a missing or misspelled
+state handler went unnoticed (ADR 0058).
+
+Now the run emits a `verification/warning` with `code: state-unhandled`, the interaction, the variant
+and the `state`, before the result. The exchange still runs without setup and the verdict is
+unchanged, as pact-js treats it. `janus verify` prints the warning.
+
+`verification/verify` takes `options.unhandled-states: "fail"` to fail such a variant instead, before
+its exchange, with `component-unavailable`, `details.component: hook/state-setup`,
+`details.reason: state-unhandled` and `details.state`, as pact-jvm treats it.
+`janus verify --unhandled-states fail` sets it.
+
+For an SDK maintainer: the behavioural specification's `verify` result gains `warnings`, every
+`verification/warning` payload in order, which the run's report says too (ADR 0059)
+(`verification.verify.warnings-collected`, conformance case `provider/warnings-collected`). The
+bindings' `VerifyOptions` gain `unhandled-states`.
+
+#### The engine writes a verification run's report
+
+A run that asks with `options.report` (ADR 0059) gets its report on its stream: a
+`verification/report` event after each event worth a line, carrying `text` to print as it arrives,
+and `text-segments` for a host that declared `segments`. It is the report `janus verify` printed,
+laid out by the engine instead of the CLI: the start, each result with its mismatches and the hook
+that failed it, warnings, broker fetches and publications, executed plans, and the summary's line.
+`options.report.error-chain` says every layer of each error's chain.
+
+Two changes to what `janus verify` prints: each result names its interaction's provider states under
+it (`given …`), and a run stopped at its first failure no longer names `--exit-on-first-error`.
+
+For an SDK maintainer: the behavioural specification's `verify` adds `report: {}` to the options
+unless the caller gave `report`, and writes each report event's text to standard output, as pact-js
+prints the verifier's report (`verification.verify.report-printed`, conformance case
+`provider/report-printed`). An SDK no longer prints warnings itself: the report says them. The
+bindings gain `Report` and the `verification/report` event kind.
+
+### Fixes
+
+#### A v4 `statusCode` matcher verifies, through the HTTP component's `http:status-class`
+
+A v1–v4 pact whose response status has a `statusCode` rule failed `janus verify`, which refused the
+rule. It now compiles to `http:status-class`, which the built-in HTTP component runs (ADR 0057): a
+`class` (`information`, `success`, `redirect`, `client-error`, `server-error`, `non-error`, `error`)
+or a list of `codes`, each as today's verifier checks it. A contract `janus upgrade` wrote with the
+operator verifies too.
+
+`janus upgrade` now writes a list of codes as `codes: [200, 204]`, where it wrote a comma-separated
+`class` that nothing read.
+
+For an SDK maintainer: `janus-engine` registers the matcher, so nothing changes for an SDK. An
+embedding built on the kernel registers a matcher compiled into it with `Engine::register_matcher`;
+the WASM engine has no HTTP component, and fails a plan that reaches `http:status-class` by name.
+
 ## 0.4.1 (2026-10-29)
 
 ### Features
