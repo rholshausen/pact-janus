@@ -1,9 +1,8 @@
----
-typescript-sdk: minor
-jvm-sdk: minor
----
+## 0.1.0 (2026-10-31)
 
-# The SDK is released, and fetches the engine it was released with
+### Features
+
+#### The SDK is released, and fetches the engine it was released with
 
 The SDK is released as files on a GitHub release of its own: `pact-janus-<version>.tgz`, installed by
 its URL, or the JVM SDK's `io.pact.janus:janus-sdk` and `janus-bindings` jars, read by Gradle through
