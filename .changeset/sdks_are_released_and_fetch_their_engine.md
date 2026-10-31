@@ -14,3 +14,6 @@ first use into `JANUS_ENGINE_CACHE`, or by default `pact-janus/engines` in the u
 It fetches from `JANUS_ENGINE_MIRROR` when that is set, and refuses any file whose SHA-256 is not the
 pinned one. `JANUS_ENGINE` still names another engine. The SDK no longer runs a `janus-engine` from
 the `PATH`; name it in `JANUS_ENGINE` instead.
+
+The engine it pins is janus-engine 0.4.2, the first release with everything the SDK asks of it: the
+v4 `statusCode` matcher, and message producers served from the test.
