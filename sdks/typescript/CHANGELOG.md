@@ -1,5 +1,7 @@
 ## 0.1.1 (2026-10-31)
 
+The SDK runs janus-engine 0.4.3, where it ran 0.4.2: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.3) says what changed.
+
 ### Features
 
 #### The engine's logs are set and shown as the test's own
