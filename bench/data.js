@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793429119308,
+  "lastUpdate": 1793429121024,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -35364,6 +35364,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18397,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "bbaa11eaf410496b3b1bd8167264e8cc29503d24",
+          "message": "fix: an SDK's release checks and publishes after a skipped job upstream\n\nrelease-sdk.yml's check and publish jobs had no condition of their own,\nand the default, success(), counts every job upstream. For the JVM SDK,\nthe csv job, which only the TypeScript suite needs, is skipped, so after\njvm-sdk 0.1.1 built, its check and publish jobs were skipped too, and it\nwas not published. Each now says what it waits for, as build does.\n\nMerging this releases jvm-sdk 0.1.1: its version still has no tag, and\nthe engine is at the version it pins.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-31T17:39:29+11:00",
+          "tree_id": "907f949c1aa199a568010fc99aa73c291c824c3b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/bbaa11eaf410496b3b1bd8167264e8cc29503d24"
+        },
+        "date": 1793429120621,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24685,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18403,
             "unit": "requests per second",
             "extra": "engines 4"
           }
