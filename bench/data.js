@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793423397164,
+  "lastUpdate": 1793423399101,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -33948,6 +33948,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18873,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4b81a8d62575faa905c7ed75e507c4f053f72afb",
+          "message": "feat: S1.37 the engine's logs are set and shown as the runtime's own (#21)\n\n* feat: S1.37 the engine's logs are set and shown as the runtime's own\n\nADR 0061. Found verifying PactFlow's example-provider-springboot through\nthe JVM SDK: with the engine's stderr inherited, its logs reached no\nlogging framework, test report or IDE, and only RUST_LOG set them.\n\n- janus-engine and janus write each event as a JSON line with\n  JANUS_LOG_FORMAT=json: level, target, and fields, whose message is the\n  event's message. The same filter holds credentials back.\n- The JVM SDK logs the engine's events through SLF4J, to the logger\n  io.pact.janus.engine, at their own levels, reading each JSON line's\n  members, never its text. The engine logs at the most detailed level\n  that logger shows, so Spring Boot's\n  logging.level.io.pact.janus.engine=debug, or a Logback or Log4j2 entry,\n  sets it. With no SLF4J provider bound, the engine's stderr is\n  inherited, at warn. The SDK now depends on slf4j-api.\n- The TypeScript SDK takes the level as pact-js does: the logLevel\n  option of Janus and Verifier, which the pact-js facade now passes\n  through, else LOG_LEVEL, else warn.\n- In both SDKs, a RUST_LOG that is set is passed as it is.\n\nBudgets: the embedding layer moved from 480 to 600 code lines in the JVM\nSDK and from 370 to 390 in TypeScript. The budget was wrong now, not the\nlayer: handing the subprocess's stderr to the runtime's logger is the\nembedding's job, and the engine does the formatting; the SDK maps\nlevels.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* fix: an SDK release waits for its pin, each SDK is released on its own, and an old engine's text is not mislabelled\n\nFound by S1.37's first Release SDKs rehearsal: the JVM SDK, which now needs\nJANUS_LOG_FORMAT, ran against the pinned 0.4.2, logged every line of its\ntext as an error, and failed. The rehearsal was right to fail. These\nchange what follows from it.\n\n- The JVM SDK writes a line of the engine's stderr that is not an event to\n  the test's stderr as it is, where an inherited stderr showed it: a\n  crash, or the text of an engine older than JANUS_LOG_FORMAT, whose level\n  is only in that text.\n- release-sdks.yml releases an SDK against the engine the tree is at.\n  When a release pull request also releases the engine, Cargo.toml is\n  ahead of the pin and the SDKs wait, on main and in the rehearsal;\n  merging the pull request that pins the engine releases them.\n- Each SDK is released by release-sdk.yml, called once for each, so one\n  that fails stops only its own release.\n- release.yml's engine-pin branch writes, for an SDK whose release waits\n  for that pin, a line in that release's changelog entry instead of a\n  change file for the next one.\n\nADR 0060 decisions 5 and 7 are amended to say so.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-31T15:53:50+11:00",
+          "tree_id": "9de22486c747fbd6f2046111097ccf3dcede5965",
+          "url": "https://github.com/rholshausen/pact-janus/commit/4b81a8d62575faa905c7ed75e507c4f053f72afb"
+        },
+        "date": 1793423398613,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25176,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18533,
             "unit": "requests per second",
             "extra": "engines 4"
           }
