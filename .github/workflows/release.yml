@@ -557,21 +557,45 @@ jobs:
           pinned="$(jq -r .version sdks/engine-release.json)"
           cp "$RUNNER_TEMP/pin/sdks/engine-release.json" sdks/engine-release.json
           cp "$RUNNER_TEMP/pin/sdks/typescript/src/engine/pin.ts" sdks/typescript/src/engine/pin.ts
-          # Each SDK's next release runs the new engine (ADR 0060 decision 5). A patch unless the
-          # maintainer opening the pull request says otherwise: the engine's changelog says what moved.
-          mkdir -p .changeset
-          cat > ".changeset/janus_engine_${VERSION//[^0-9A-Za-z]/_}.md" <<EOF
-          ---
-          typescript-sdk: patch
-          jvm-sdk: patch
-          ---
-
-          # The SDK runs janus-engine $VERSION
-
-          Told no other engine to run, the SDK fetches janus-engine $VERSION, where it fetched $pinned.
-          [Its release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION) says what changed.
-          EOF
-          git add .changeset sdks/engine-release.json sdks/typescript/src/engine/pin.ts
+          # Each SDK's next release runs the new engine (ADR 0060 decision 5). An SDK whose release is
+          # waiting for this pin — its version has no tag, because the release pull request that
+          # released this engine released it too (release-sdks.yml) — is released by merging this,
+          # so the pin is a line in that release's own changelog entry. Any other SDK's next release
+          # gets a change file. A patch unless the maintainer opening the pull request says otherwise:
+          # the engine's changelog says what moved.
+          note="The SDK runs janus-engine $VERSION, where it ran $pinned: [its release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION) says what changed."
+          later=()
+          for sdk in typescript jvm; do
+            if [ "$sdk" = typescript ]; then
+              version="$(jq -r .version sdks/typescript/package.json)"
+            else
+              version="$(sed -n 's/^version=//p' sdks/jvm/gradle.properties)"
+            fi
+            if [ "$version" != 0.0.0 ] && ! git ls-remote --exit-code --tags origin "refs/tags/$sdk-sdk/v$version" >/dev/null; then
+              # After the entry's heading line and the blank line below it.
+              awk -v heading="## $version " -v note="$note" '
+                index($0, heading) == 1 && !done { print; getline; print; print note; print ""; done = 1; next }
+                { print }' "sdks/$sdk/CHANGELOG.md" > "$RUNNER_TEMP/CHANGELOG.md"
+              mv "$RUNNER_TEMP/CHANGELOG.md" "sdks/$sdk/CHANGELOG.md"
+              git add "sdks/$sdk/CHANGELOG.md"
+            else
+              later+=("$sdk-sdk")
+            fi
+          done
+          if [ "${#later[@]}" -gt 0 ]; then
+            mkdir -p .changeset
+            {
+              echo "---"
+              for package in "${later[@]}"; do echo "$package: patch"; done
+              echo "---"
+              echo
+              echo "# The SDK runs janus-engine $VERSION"
+              echo
+              echo "$note"
+            } > ".changeset/janus_engine_${VERSION//[^0-9A-Za-z]/_}.md"
+            git add .changeset
+          fi
+          git add sdks/engine-release.json sdks/typescript/src/engine/pin.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: the SDKs pin janus-engine $VERSION"

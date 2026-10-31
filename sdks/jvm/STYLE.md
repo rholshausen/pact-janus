@@ -202,6 +202,20 @@ Interaction getOrder = janus.interaction("get an order")
 - pact-jvm's annotations map to these as
   [`provider-test-migration.md`](../../Documentation/provider-test-migration.md) records.
 
+## Logging
+
+- The engine's logs are the JVM's own (ADR 0061): its events go to the SLF4J logger
+  `io.pact.janus.engine`, each at its own level, as `target: message key=value …` (`EngineLog`). The
+  engine logs at the most detailed level that logger has enabled, so a project sets it where it sets
+  any logger: `logging.level.io.pact.janus.engine=debug` under Spring Boot, or a Logback or Log4j2
+  logger entry. A `RUST_LOG` in the environment is passed as it is, and the events it lets through are
+  still logged at their own levels.
+- The SDK starts the engine with `JANUS_LOG_FORMAT=json` and reads its stderr on a daemon thread,
+  reading each event's members, never its text. A line that is not an event (a crash, or the text of
+  an engine older than `JANUS_LOG_FORMAT`) goes to the test's stderr as it is.
+- With no SLF4J provider on the class path, the engine's stderr is inherited, at `warn` unless
+  `RUST_LOG` says otherwise.
+
 ## Packaging and distribution
 
 - Coordinates `io.pact.janus:janus-sdk` and `io.pact.janus:janus-bindings`, at the version in
@@ -209,7 +223,7 @@ Interaction getOrder = janus.interaction("get an order")
   each module's jar, sources jar, Ivy descriptor and POM (`./gradlew releaseFiles`). Gradle reads
   them in place through an `ivy` repository; Maven installs them with `install:install-file`.
   `release-check/` is a project outside the SDK that resolves them as a user would, which
-  `release-sdks.yml` runs before publishing. Dependencies: `jackson-databind` (frames are JSON, and the bindings carry Jackson 2
+  `release-sdks.yml` runs before publishing. Dependencies: `slf4j-api` (the engine's logs, ADR 0061), `jackson-databind` (frames are JSON, and the bindings carry Jackson 2
   annotations) and, `compileOnly`, `junit-jupiter-api` for the extension. Nothing else.
 - **The engine is not bundled; it is pinned** (ADR 0060 decision 6). The build copies
   `sdks/engine-release.json` into the jar beside `EngineRelease`, which reads it. The subprocess

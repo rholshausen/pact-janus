@@ -6,7 +6,7 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import type { protocol } from "../generated/index.js";
 import type { FramePipe } from "./pipe.js";
-import { engineNotFetched, engineNotStarted, resolveEngine, type EngineSource } from "./release.js";
+import { engineEnvironment, engineNotFetched, engineNotStarted, resolveEngine, type EngineSource } from "./release.js";
 
 export interface SubprocessOptions {
   /**
@@ -15,8 +15,8 @@ export interface SubprocessOptions {
    */
   command?: string;
   /**
-   * Environment for the engine. `RUST_LOG` defaults to `warn`, so a request the mock could not
-   * match is reported on stderr but the engine's start-up chatter is not.
+   * Environment for the engine. A `RUST_LOG` here or in the process's environment is passed as given;
+   * otherwise the engine logs at the configured `logLevel` (ADR 0061).
    */
   env?: NodeJS.ProcessEnv;
 }
@@ -33,24 +33,26 @@ export class SubprocessPipe implements FramePipe {
   private failure: Error | undefined;
   private readonly exited: Promise<void>;
 
-  /** Starts the engine `options` name, or the one this SDK was released with. */
-  static async start(options: SubprocessOptions = {}): Promise<SubprocessPipe> {
+  /**
+   * Starts the engine `options` name, or the one this SDK was released with, logging at `logLevel`
+   * (a test's `logLevel` option, else `LOG_LEVEL`, else `warn`) unless `RUST_LOG` is given.
+   */
+  static async start(options: SubprocessOptions = {}, logLevel?: string): Promise<SubprocessPipe> {
+    const env = engineEnvironment({ ...process.env, ...options.env }, logLevel);
     const named = process.env.JANUS_ENGINE || undefined;
     if (options.command) {
-      return new SubprocessPipe(options.command, "engine.command", options);
+      return new SubprocessPipe(options.command, "engine.command", env);
     }
     if (named) {
-      return new SubprocessPipe(named, "JANUS_ENGINE", options);
+      return new SubprocessPipe(named, "JANUS_ENGINE", env);
     }
     const command = await resolveEngine().catch((error: unknown) => {
       throw engineNotFetched(error instanceof Error ? error.message : String(error));
     });
-    return new SubprocessPipe(command, "release", options);
+    return new SubprocessPipe(command, "release", env);
   }
 
-  private constructor(command: string, source: EngineSource, options: SubprocessOptions) {
-    const env = { ...process.env, ...options.env };
-    env.RUST_LOG ??= "warn";
+  private constructor(command: string, source: EngineSource, env: NodeJS.ProcessEnv) {
     this.child = spawn(command, [], { stdio: ["pipe", "pipe", "inherit"], env });
     this.child.stdout.on("data", (chunk: Buffer) => this.onData(chunk));
     this.exited = new Promise((resolve) => {

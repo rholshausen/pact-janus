@@ -141,6 +141,39 @@ export async function resolveEngine(pin: EnginePin = PIN, options: ResolveOption
   return path;
 }
 
+const LOG_LEVELS: Record<string, string> = {
+  trace: "trace",
+  debug: "debug",
+  info: "info",
+  warn: "warn",
+  error: "error",
+  // pact-js's, and pino's: nothing the engine logs is fatal, so its errors are as close as it gets.
+  fatal: "error",
+  silent: "off",
+  // As `janus verify --log-level` takes it.
+  none: "off",
+  off: "off",
+};
+
+/**
+ * The engine's environment (ADR 0061): `env` with `RUST_LOG` as given, or else the level a test asked
+ * for as pact-js spells it, in any case — its `logLevel` option, else `LOG_LEVEL` — or else `warn`.
+ */
+export function engineEnvironment(env: NodeJS.ProcessEnv, logLevel: string | undefined): NodeJS.ProcessEnv {
+  if (env.RUST_LOG) {
+    return env;
+  }
+  const [level, source] = logLevel?.trim() ? [logLevel, "logLevel"] : [env.LOG_LEVEL, "LOG_LEVEL"];
+  if (!level?.trim()) {
+    return { ...env, RUST_LOG: "warn" };
+  }
+  const known = LOG_LEVELS[level.trim().toLowerCase()];
+  if (!known) {
+    throw new TypeError(`${source} '${level}' is not one of ${Object.keys(LOG_LEVELS).join(", ")}`);
+  }
+  return { ...env, RUST_LOG: known };
+}
+
 /** What pointed the SDK at the executable it tried, as the error names it. */
 export type EngineSource = "engine.command" | "JANUS_ENGINE" | "release";
 

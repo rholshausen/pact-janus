@@ -1,0 +1,299 @@
+name: Release an SDK
+
+# One SDK's release (staged plan S1.36, ADR 0060), called by release-sdks.yml once for each SDK it
+# builds, so that each is built, checked and published on its own: one SDK that fails stops its own
+# release and not the other's. What each job does is said there.
+
+on:
+  workflow_call:
+    inputs:
+      sdk:
+        description: "typescript or jvm: the directory under sdks/"
+        type: string
+        required: true
+      title:
+        description: "What a release's title calls it: TypeScript SDK, JVM SDK"
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      tag:
+        description: "<package>/v<version>"
+        type: string
+        required: true
+      publish:
+        description: "Whether this is a release; anything else is a rehearsal"
+        type: boolean
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  csv:
+    # The third-party CSV component one TypeScript test loads: the one fixture the suite cannot build
+    # without Rust, built here and handed over as a file, as CI does.
+    if: inputs.sdk == 'typescript'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-sdks-csv
+          workspaces: third-party/janus-csv
+      - name: Build the CSV component
+        working-directory: third-party/janus-csv
+        run: cargo build --locked --release --target wasm32-wasip2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: janus-csv
+          path: third-party/janus-csv/target/wasm32-wasip2/release/janus_csv.wasm
+          if-no-files-found: error
+
+  build:
+    # The SDK's suite, against the engine its pin names and with no Rust toolchain reachable (S0.10);
+    # then the files its release carries, their checksums and its notes.
+    needs: csv
+    if: ${{ !cancelled() && needs.csv.result != 'failure' }}
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SDK: ${{ inputs.sdk }}
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ inputs.tag }}
+      PUBLISH: ${{ inputs.publish }}
+      JANUS_ENGINE_RELEASE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: inputs.sdk == 'typescript'
+        with:
+          name: janus-csv
+          path: ${{ runner.temp }}/janus-csv
+      - uses: actions/setup-node@v4
+        if: inputs.sdk == 'typescript'
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+      - uses: actions/setup-java@v4
+        if: inputs.sdk == 'jvm'
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        if: inputs.sdk == 'jvm'
+      - name: The suite, against the pinned engine
+        working-directory: sdks/${{ inputs.sdk }}
+        run: |
+          if [ "$SDK" = typescript ]; then
+            export JANUS_CSV_COMPONENT="$RUNNER_TEMP/janus-csv/janus_csv.wasm"
+            ../../.github/scripts/without-rust.sh bash -c 'npm ci && npm run lint && npm test'
+          else
+            ../../.github/scripts/without-rust.sh ./gradlew build
+          fi
+      - name: The release's files
+        working-directory: sdks/${{ inputs.sdk }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/release/dist"
+          if [ "$SDK" = typescript ]; then
+            npm pack --pack-destination "$GITHUB_WORKSPACE/release/dist"
+          else
+            ./gradlew releaseFiles
+            cp build/release/files/* "$GITHUB_WORKSPACE/release/dist/"
+          fi
+          cd "$GITHUB_WORKSPACE/release/dist"
+          ls -l
+          for file in *; do
+            case "$file" in
+              *"-$VERSION"*) ;;
+              *) echo "::error::$file does not carry the version $VERSION."; exit 1 ;;
+            esac
+          done
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Release notes
+        run: |
+          awk -v version="$VERSION" '$1 == "##" { on = ($2 == version); next } on' "sdks/$SDK/CHANGELOG.md" > release/notes.md 2>/dev/null || true
+          if [ "$PUBLISH" = true ] && ! grep -q '[^[:space:]]' release/notes.md; then
+            echo "::error::sdks/$SDK/CHANGELOG.md has no entry for $VERSION. A release is prepared with 'knope prepare-release'."
+            exit 1
+          fi
+          download="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download"
+          engine="$(jq -r .version sdks/engine-release.json)"
+          {
+            echo
+            echo "## Installing it"
+            echo
+            if [ "$SDK" = typescript ]; then
+              echo '```bash'
+              echo "npm install --save-dev $download/$TAG/pact-janus-$VERSION.tgz"
+              echo '```'
+            else
+              echo 'Gradle reads the release in place:'
+              echo
+              echo '```kotlin'
+              echo 'repositories {'
+              echo '  mavenCentral()'
+              echo '  ivy {'
+              echo "    url = uri(\"$download\")"
+              echo '    patternLayout {'
+              echo '      artifact("jvm-sdk/v[revision]/[module]-[revision](-[classifier]).[ext]")'
+              echo '      ivy("jvm-sdk/v[revision]/[module]-[revision].ivy.xml")'
+              echo '    }'
+              echo '    content { includeGroup("io.pact.janus") }'
+              echo '  }'
+              echo '}'
+              echo
+              echo 'dependencies {'
+              echo "  testImplementation(\"io.pact.janus:janus-sdk:$VERSION\")"
+              echo '}'
+              echo '```'
+              echo
+              echo "Maven installs \`janus-bindings-$VERSION.jar\` and then \`janus-sdk-$VERSION.jar\`, each with its POM:"
+              echo "\`mvn install:install-file -Dfile=janus-sdk-$VERSION.jar -DpomFile=janus-sdk-$VERSION.pom\`."
+            fi
+            echo
+            echo "The SDK runs janus-engine [$engine]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$engine), which it fetches on first use and checks against the digest it was built with. \`JANUS_ENGINE\` names another; \`JANUS_ENGINE_MIRROR\` a server to fetch it from instead (ADR 0060)."
+            echo
+            echo "Every file is listed in \`SHA256SUMS\` and has a build provenance attestation: \`gh attestation verify <file> --repo $GITHUB_REPOSITORY\`."
+          } >> release/notes.md
+          cat release/notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ inputs.sdk }}
+          path: release/
+          if-no-files-found: error
+
+  check:
+    # ADR 0060 decision 7: what is about to be published, installed into a project outside the
+    # repository as a user installs it, with nothing naming an engine and an empty engine cache, on
+    # each operating system an engine is released for. The SDK fetches the engine its pin names.
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      SDK: ${{ inputs.sdk }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /sdks/${{ inputs.sdk }}/release-check/
+            /sdks/jvm/gradlew
+            /sdks/jvm/gradlew.bat
+            /sdks/jvm/gradle/
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ inputs.sdk }}
+          path: ${{ runner.temp }}/release
+      - uses: actions/setup-node@v4
+        if: inputs.sdk == 'typescript'
+        with:
+          node-version: lts/*
+      - uses: actions/setup-java@v4
+        if: inputs.sdk == 'jvm'
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install the release outside the repository, and use it
+        run: |
+          unset JANUS_ENGINE
+          export JANUS_ENGINE_CACHE="$RUNNER_TEMP/engine-cache"
+          cp -R "sdks/$SDK/release-check" "$RUNNER_TEMP/release-check"
+          if [ "$SDK" = typescript ]; then
+            cd "$RUNNER_TEMP/release-check"
+            npm install --no-save --no-audit --no-fund "$RUNNER_TEMP/release/dist/pact-janus-$VERSION.tgz"
+            npm test
+          else
+            # Laid out as the release serves it: <base>/jvm-sdk/v<version>/<file>.
+            mkdir -p "$RUNNER_TEMP/download/jvm-sdk/v$VERSION"
+            cp "$RUNNER_TEMP/release/dist/"* "$RUNNER_TEMP/download/jvm-sdk/v$VERSION/"
+            sdks/jvm/gradlew -p "$RUNNER_TEMP/release-check" test --no-daemon \
+              -PjanusVersion="$VERSION" -PjanusRelease="$RUNNER_TEMP/download"
+          fi
+
+  publish:
+    # The only job that can write, and it runs only for a release: attest what was built, then tag
+    # the commit it was built from and publish, in one step. Not before every check above passed.
+    needs: check
+    if: inputs.publish
+    name: publish
+    runs-on: ubuntu-latest
+    permissions:
+      # The tag and the release.
+      contents: write
+      # The attestation: signed with this run's own identity (ADR 0029). No key, anywhere.
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SDK: ${{ inputs.sdk }}
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ inputs.tag }}
+      TITLE: ${{ inputs.title }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ inputs.sdk }}
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*
+      # The engine's release stays the repository's latest: an SDK's is not what someone looking
+      # for janus-engine wants.
+      - name: Tag and publish
+        run: |
+          prerelease=()
+          case "$VERSION" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$TITLE $VERSION" --notes-file notes.md --latest=false "${prerelease[@]}"
+      # What a user would do, done to what a user would get.
+      - name: The published release verifies
+        run: |
+          mkdir published
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published
+          cd published
+          sha256sum --check SHA256SUMS
+          for file in *; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY"
+          done
+      - uses: actions/checkout@v4
+        with:
+          path: repository
+          sparse-checkout: |
+            /sdks/${{ inputs.sdk }}/release-check/
+            /sdks/jvm/gradlew
+            /sdks/jvm/gradlew.bat
+            /sdks/jvm/gradle/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        if: inputs.sdk == 'typescript'
+        with:
+          node-version: lts/*
+      - uses: actions/setup-java@v4
+        if: inputs.sdk == 'jvm'
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: The published release installs by its URL
+        working-directory: repository/sdks/${{ inputs.sdk }}/release-check
+        run: |
+          download="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download"
+          if [ "$SDK" = typescript ]; then
+            npm install --no-save --no-audit --no-fund "$download/$TAG/pact-janus-$VERSION.tgz"
+            npm test
+          else
+            ../../jvm/gradlew -p . test --no-daemon -PjanusVersion="$VERSION" -PjanusRelease="$download"
+          fi

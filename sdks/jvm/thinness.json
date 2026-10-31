@@ -63,7 +63,7 @@
   },
   "budgets": {
     "idiomatic": 2100,
-    "embedding": 480,
+    "embedding": 600,
     "loopback": 100,
     "integration": 280
   }

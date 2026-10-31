@@ -20,6 +20,10 @@ dependencies {
   // writes them. Not part of the SDK's public API.
   implementation("com.fasterxml.jackson.core:jackson-databind")
 
+  // The engine's logs go to SLF4J, as pact-jvm's own do, so a project's Logback, Log4j or Spring Boot
+  // configuration decides what it logs (ADR 0061). Not part of the SDK's public API.
+  implementation("org.slf4j:slf4j-api:2.0.17")
+
   // The JUnit integration (JanusExtension) compiles against Jupiter's API; a user of it has
   // Jupiter already, and a user who drives `Janus` by hand does not need it.
   compileOnly(platform("org.junit:junit-bom:6.1.3"))
@@ -27,6 +31,8 @@ dependencies {
 
   testImplementation(platform("org.junit:junit-bom:6.1.3"))
   testImplementation("org.junit.jupiter:junit-jupiter")
+  // An SLF4J provider whose appenders a test can read: the engine's logs, as a project sees them.
+  testImplementation("ch.qos.logback:logback-classic:1.5.18")
   // The integration's own tests launch small JUnit classes and inspect the outcome.
   testImplementation("org.junit.platform:junit-platform-launcher")
 }

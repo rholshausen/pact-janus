@@ -143,6 +143,10 @@ Three sources are the source of truth and take precedence over this file when th
 > S1.36 (ADR 0060): each SDK is released from here as files on a GitHub release of its own, tagged
 > `typescript-sdk/v<version>` or `jvm-sdk/v<version>` by `release-sdks.yml`, with its own change files,
 > version and changelog; an installed SDK told no engine fetches the one its pin names.
+> S1.37 (ADR 0061): the engine's logs are the runtime's own. `JANUS_LOG_FORMAT=json` writes each event
+> as a JSON line; the JVM SDK logs them through SLF4J to `io.pact.janus.engine`, whose level becomes
+> `RUST_LOG`, and the TypeScript SDK takes pact-js's `logLevel` or `LOG_LEVEL`. A `RUST_LOG` that is
+> set wins.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -345,7 +349,10 @@ whose version (`sdks/typescript/package.json`, `sdks/jvm/gradle.properties`) has
 `release-sdks.yml` the same way (S1.36, ADR 0060): its suite against its pinned engine with no Rust,
 its files (`npm pack`'s tarball; `./gradlew releaseFiles`'s jars, Ivy descriptors and POMs) installed
 by `sdks/<sdk>/release-check` outside the repository on every operating system, then tagged
-`<package>/v<version>` and published. Never push a tag by hand, and never hand-edit a `CHANGELOG.md`.
+`<package>/v<version>` and published, each SDK on its own (`release-sdk.yml`). An SDK is released
+against the engine the tree is at: when a release pull request also releases the engine, the SDKs
+wait for the pull request that pins it, and merging that releases them. Never push a tag by hand,
+and never hand-edit a `CHANGELOG.md`.
 An SDK runs the engine `sdks/engine-release.json` names — a version and a SHA-256 per target triple —
 unless `JANUS_ENGINE` names another, fetching it on first use (`JANUS_ENGINE_CACHE`,
 `JANUS_ENGINE_MIRROR`) and refusing a download with any other digest
@@ -354,8 +361,8 @@ unless `JANUS_ENGINE` names another, fetching it on first use (`JANUS_ENGINE_CAC
 `JANUS_ENGINE_RELEASE=1` (S0.10), so a contributor needs no Rust toolchain, and build from the tree
 otherwise; `JANUS_ENGINE` overrides both. The pin is never edited by hand: after publishing,
 `release.yml` writes it and the TypeScript copy, runs both suites against the release with no Rust
-toolchain reachable, and pushes it as the `engine-pin` branch, with a change file for each SDK, to open
-a pull request from. By hand:
+toolchain reachable, and pushes it as the `engine-pin` branch, with a change file for each SDK (or a
+line in the changelog entry of an SDK release waiting for it), to open a pull request from. By hand:
 
 ```bash
 cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin and pin.ts
@@ -504,7 +511,9 @@ via `cargo build` in a `beforeAll`, so it never runs against a stale one). It in
 `tracing-subscriber` the kernel's own `tracing` facade needs (this file's Rust conventions below);
 `RUST_LOG=trace janus-engine` logs every frame `Engine::dispatch` sees in both directions to
 stderr (stdout stays frames-only), with every broker credential redacted: an `auth` member keeps
-only its `kind` and a `url` loses its user information. Both binaries also cap the HTTP library's
+only its `kind` and a `url` loses its user information. With `JANUS_LOG_FORMAT=json`, each event is
+a JSON line instead (`level`, `target`, `fields`), which the JVM SDK reads to log the engine's events
+through SLF4J (ADR 0061). Both binaries also cap the HTTP library's
 own logging at `debug` however much is asked for (`cli/src/logging.rs`), because at `trace` it dumps
 request bytes, `Authorization` headers included. `cli/tests/cli.rs` runs both commands at `trace`
 behind an authenticating door in front of the pinned broker and fails if a credential appears in

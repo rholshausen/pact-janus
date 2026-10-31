@@ -77,6 +77,7 @@ superseding ADR instead.
 | [0058](0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md) | A provider state no hook sets up is a warning, or a failure when the run asks | accepted; decision 3 in part superseded by 0059 |
 | [0059](0059-the-engine-writes-a-verification-runs-report.md) | The engine writes a verification run's report, and every client prints it | accepted |
 | [0060](0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md) | Release each SDK as files on a GitHub release of its own, and fetch its pinned engine on first use | accepted |
+| [0061](0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md) | The engine's logs are the runtime's own, set and shown by its logging configuration | accepted |
 
 ## Decision backlog
 
