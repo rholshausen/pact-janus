@@ -21,6 +21,11 @@ export interface JanusConfig {
   /** How the engine is reached: subprocess options, or any frame pipe (a test double, or a later embedding). */
   engine?: SubprocessOptions | (() => FramePipe);
   /**
+   * How much the engine logs on standard error: `trace`, `debug`, `info`, `warn` or `error`, as
+   * pact-js's `logLevel` (ADR 0061). Default: `LOG_LEVEL`, else `warn`. `RUST_LOG` overrides it.
+   */
+  logLevel?: string;
+  /**
    * The project's declared components (component-interfaces spec §10.2) — a content handler for a
    * type the engine does not have built in, say. Handed to the engine as they are, with a `file`
    * source's relative path made absolute against the working directory; whether one loads is the
@@ -149,7 +154,9 @@ export class Janus {
   #start(): Promise<Engine> {
     this.#engine ??= (async () => {
       const option = this.#config.engine;
-      return Engine.start(typeof option === "function" ? option() : await SubprocessPipe.start(option));
+      return Engine.start(
+        typeof option === "function" ? option() : await SubprocessPipe.start(option, this.#config.logLevel),
+      );
     })();
     // A failed start is not cached: the next execute tries again, and reports its own failure.
     this.#engine.catch(() => {

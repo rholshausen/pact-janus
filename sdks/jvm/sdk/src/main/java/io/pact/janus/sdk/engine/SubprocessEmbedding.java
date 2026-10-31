@@ -21,9 +21,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The {@code janus-engine} subprocess embedding (engine-protocol spec §3.2): frames over the
- * child's stdin/stdout with LSP-style {@code Content-Length} headers, the engine's logs on stderr
- * (inherited, so they appear with the test run's own output), and stdin EOF as the shutdown
- * signal.
+ * child's stdin/stdout with LSP-style {@code Content-Length} headers, the engine's logs on stderr,
+ * handed to SLF4J ({@link EngineLog}), and stdin EOF as the shutdown signal.
  */
 public final class SubprocessEmbedding implements Embedding {
 
@@ -204,14 +203,18 @@ public final class SubprocessEmbedding implements Embedding {
   @Override
   public FramePipe open() throws IOException {
     List<String> started = command.isEmpty() ? List.of(resolveRelease().toString()) : command;
-    ProcessBuilder builder = new ProcessBuilder(started).redirectError(ProcessBuilder.Redirect.INHERIT);
+    boolean forwarding = EngineLog.forwarding();
+    org.slf4j.Logger logger = EngineLog.logger();
+    ProcessBuilder builder = new ProcessBuilder(started)
+        .redirectError(forwarding ? ProcessBuilder.Redirect.PIPE : ProcessBuilder.Redirect.INHERIT);
+    EngineLog.configure(builder.environment(), forwarding, logger);
     Process process;
     try {
       process = builder.start();
     } catch (IOException e) {
       throw new EngineNotStartedException(notStarted(started.get(0), source, e, platform(), arch(), terminalWidth()));
     }
-    return new Pipe(process);
+    return new Pipe(process, forwarding ? EngineLog.forward(process.getErrorStream(), logger) : null);
   }
 
   /** The engine this SDK was released with, from the cache or fetched into it. */
@@ -233,9 +236,12 @@ public final class SubprocessEmbedding implements Embedding {
     private final Process process;
     private final OutputStream toEngine;
     private final InputStream fromEngine;
+    /** What hands the engine's logs to SLF4J, or null when they go to the test's stderr. */
+    private final Thread log;
 
-    Pipe(Process process) {
+    Pipe(Process process, Thread log) {
       this.process = process;
+      this.log = log;
       this.toEngine = process.getOutputStream();
       this.fromEngine = new BufferedInputStream(process.getInputStream());
     }
@@ -280,6 +286,10 @@ public final class SubprocessEmbedding implements Embedding {
           if (!process.waitFor(2, TimeUnit.SECONDS)) {
             process.destroyForcibly();
           }
+        }
+        if (log != null) {
+          // What the engine said as it exited is logged before close returns.
+          log.join(1000);
         }
       } catch (InterruptedException e) {
         process.destroyForcibly();

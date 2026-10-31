@@ -48,6 +48,8 @@ export interface VerifierConfig {
   components?: readonly ComponentDeclaration[];
   /** How the engine is reached, as for `Janus`. */
   engine?: SubprocessOptions | (() => FramePipe);
+  /** How much the engine logs, as for `Janus`. */
+  logLevel?: string;
 }
 
 /** A state's setup: receives its parameters, and may return provider-state values. */
@@ -107,7 +109,9 @@ export class Verifier {
   async verify(): Promise<VerificationResult> {
     const source = await this.#source();
     const option = this.#config.engine;
-    const engine = await Engine.start(typeof option === "function" ? option() : await SubprocessPipe.start(option));
+    const engine = await Engine.start(
+      typeof option === "function" ? option() : await SubprocessPipe.start(option, this.#config.logLevel),
+    );
     const handlers = this.#states.length + this.#filters.length + this.#messages.length;
     const loopback = handlers > 0 ? new Loopback() : undefined;
     try {

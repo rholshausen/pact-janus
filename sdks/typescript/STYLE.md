@@ -90,9 +90,18 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - Without Vitest, use `new Janus(config)` and call `await janus.finalise()` yourself, in whatever
   after-all hook the framework has.
 - `engine: { command }` names the `janus-engine` executable, else `JANUS_ENGINE` does, else the SDK
-  runs the engine it was released with, fetched on first use, as the JVM SDK does; the engine's
-  stderr is inherited, with `RUST_LOG` defaulting to `warn` so a request the mock could not match
-  is logged and start-up chatter is not.
+  runs the engine it was released with, fetched on first use, as the JVM SDK does.
+
+## Logging
+
+- As pact-js: the `logLevel` option of `Janus` and `Verifier` (and of `pact-janus/verifier`), else
+  `LOG_LEVEL`, else `warn`, so a request the mock could not match is logged and start-up chatter is
+  not (ADR 0061). Spelled as pact-js spells it, in any case: `trace`, `debug`, `info`, `warn`,
+  `error`; `fatal` is `error`, and `silent` and `none` are `off`. An unknown level fails the call
+  that would start the engine, naming where it came from. It becomes the engine's `RUST_LOG`
+  (`src/engine/release.ts`'s `engineEnvironment`), unless `RUST_LOG` is set, which is passed as it
+  is.
+- The engine's stderr is inherited, so its logs are printed where Node prints a child's output.
 
 ## Provider verification
 

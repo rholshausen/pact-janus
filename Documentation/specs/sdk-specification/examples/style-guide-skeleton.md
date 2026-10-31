@@ -49,6 +49,13 @@ records how that semantics is *expressed*, never a different one.
 - Fixture/lifecycle hooks this language's framework expects (`beforeAll`/`afterAll` or equivalents) and
   how they align with session creation and `finalise` (spec.md §3, the `execute` primitive).
 
+## Logging
+
+- Where this language's tests set how much is logged (an option, an environment variable, a logging
+  framework's configuration), and how that becomes the engine's `RUST_LOG`; and where the engine's
+  events are shown: forwarded to the language's logging framework from its JSON lines, or its stderr
+  inherited (ADR 0061).
+
 ## Packaging and distribution
 
 - Package registry, versioning scheme, and how the pinned engine version (task 6.1's binding pipeline

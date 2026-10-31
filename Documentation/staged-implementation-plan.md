@@ -1501,6 +1501,22 @@ SDK implements it, and the SDK specification covers only the consumer side.
     and a change file for each SDK.
   - The resolvers moved from each SDK's tests into its `embedding` layer. Its budget went from 250 to
     370 lines in TypeScript, and from 300 to 480 in the JVM SDK.
+- **S1.37 The engine's logs, where each runtime's are** — **S**, found verifying PactFlow's
+  `example-provider-springboot` through the JVM SDK. Both SDKs inherit the engine's stderr, and only
+  `RUST_LOG` sets how much it logs. On the JVM the logs reach no logging framework, no test report
+  and no IDE, and Spring's `logging.level` cannot reach them. The pact-js facade ignores `logLevel`.
+  Decided by
+  [ADR 0061](decisions/0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md).
+  *Done 2026-10-31*:
+  - `janus-engine` and `janus` write each event as a JSON line with `JANUS_LOG_FORMAT=json`.
+  - The JVM SDK logs the engine's events through SLF4J, to `io.pact.janus.engine`, whose level
+    becomes `RUST_LOG`. `example-provider-springboot` shows them, in Spring's log format and in its
+    test report, from `logging.level.io.pact.janus.engine=DEBUG` in `application.properties`.
+  - The TypeScript SDK takes `logLevel` on `Janus` and `Verifier`, which the facade passes through,
+    else `LOG_LEVEL`, else `warn`.
+  - A `RUST_LOG` that is set is passed as it is, in both SDKs.
+  - Budgets: the embedding layer moved from 480 to 600 code lines in the JVM SDK, and from 370 to 390
+    in TypeScript.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
@@ -1802,6 +1818,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.29 | The CLI's output, grown an item at a time: errors that are wrong, duplicated or carry raw `details`, summaries, help text, and exit 1 for a broker run that never started | collected through S1.1–S1.28; ADR 0041 |
 | S1.30 | Relative and missing mismatch paths; an absent value printed as `NULL`; unnamed members' labels; "a integer" | S1.22, S1.24, S1.25; ADR 0042 |
 | S1.36 | Neither SDK is released, so a pilot builds one from source, and an installed one finds no engine | stage 1b's exit; ADR 0028's tripwire |
+| S1.37 | The engine's logs reach no JVM logging framework, and the pact-js facade's `logLevel` does nothing | found verifying `example-provider-springboot` |
 | S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |

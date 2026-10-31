@@ -45,6 +45,12 @@ the pinned one. A network that cannot reach GitHub names a server holding the sa
 `HTTPS_PROXY` only when `NODE_USE_ENV_PROXY=1` is set; the JVM uses its own proxy properties
 (`https.proxyHost`).
 
+How much the engine logs is set as the language sets any logging
+([ADR 0061](../Documentation/decisions/0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md)):
+in TypeScript, the `logLevel` option or `LOG_LEVEL`, as in pact-js; on the JVM, the SLF4J logger
+`io.pact.janus.engine` (`logging.level.io.pact.janus.engine=debug` under Spring Boot), to which the
+engine's events are logged. `RUST_LOG`, when it is set, overrides either.
+
 `release-check/` in each SDK is a project outside it that installs a release and uses it as a user
 would, with nothing naming an engine. `release-sdks.yml` runs it before publishing, on each operating
 system an engine is released for.

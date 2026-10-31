@@ -65,8 +65,9 @@ export interface VerifierOptions {
   stateHandlers?: Record<string, StateHandler>;
   requestFilter?: RequestFilter;
   messageProviders?: Record<string, MessageProvider>;
-  /** Accepted; no effect. They tuned pact-js's proxy or its logs, which Janus has no part like. */
+  /** How much the engine logs, as pact-js's own did: the SDK's `logLevel` (ADR 0061). */
   logLevel?: string;
+  /** Accepted; no effect. They tuned pact-js's proxy or its log file, which Janus has no part like. */
   logFile?: string;
   timeout?: number;
   changeOrigin?: boolean;
@@ -155,6 +156,7 @@ function verifier(options: VerifierOptions): JanusVerifier {
     ...(options.config ? { config: options.config } : {}),
     ...(options.components ? { components: options.components } : {}),
     ...(options.engine ? { engine: options.engine } : {}),
+    ...(options.logLevel ? { logLevel: options.logLevel } : {}),
   });
   for (const [state, handler] of Object.entries(options.stateHandlers ?? {})) {
     const { setup, teardown } = typeof handler === "function" ? { setup: handler, teardown: undefined } : handler;

@@ -1,30 +1,65 @@
 //! Where `janus` and `janus-engine` send their logs: stderr, so stdout stays the command's answer
 //! (or, for `janus-engine`, frames only). Both binaries share one subscriber and differ only in the
 //! filter they start from.
+//!
+//! Each event is a line of text, or, with `JANUS_LOG_FORMAT=json`, one JSON object per line: what
+//! an SDK sets to hand the engine's events to its own runtime's logger, reading their level, target
+//! and fields rather than parsing text written for a person (ADR 0061).
 
 use tracing::Subscriber;
+use tracing_subscriber::Registry;
 use tracing_subscriber::filter::{EnvFilter, FilterExt, LevelFilter, Targets};
 use tracing_subscriber::fmt::MakeWriter;
-use tracing_subscriber::layer::{Filter, Layer as _, SubscriberExt};
+use tracing_subscriber::layer::{Filter, Layer, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// Installs the subscriber for this process: `filter`'s events on stderr, without credentials, and
-/// in colour only where stderr shows it and `colour` allows it (`--no-colour` does not).
-pub fn to_stderr(filter: EnvFilter, colour: bool) {
-  subscriber(filter, std::io::stderr, colour && stderr_supports_colour()).init();
+/// The variable that chooses how events are written: `json`, or anything else for text.
+pub const FORMAT_VARIABLE: &str = "JANUS_LOG_FORMAT";
+
+/// How each event is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Format {
+  /// A line for a person, in colour when `ansi`.
+  Text { ansi: bool },
+  /// One JSON object per line: `timestamp`, `level` (`TRACE` to `ERROR`), `target`, and `fields`,
+  /// whose `message` is the event's message and whose other members are its fields. A library that
+  /// logs through the `log` crate adds `log.target`, `log.module_path`, `log.file` and `log.line`,
+  /// which say where it did, and which the text leaves out. Spans are left out.
+  Json,
 }
 
-fn subscriber<W>(filter: EnvFilter, writer: W, ansi: bool) -> impl Subscriber + Send + Sync
+/// Installs the subscriber for this process: `filter`'s events on stderr, without credentials, as
+/// `JANUS_LOG_FORMAT` asks, and as text in colour only where stderr shows it and `colour` allows it
+/// (`--no-colour` does not).
+pub fn to_stderr(filter: EnvFilter, colour: bool) {
+  let format = if std::env::var(FORMAT_VARIABLE).is_ok_and(|format| format.eq_ignore_ascii_case("json")) {
+    Format::Json
+  } else {
+    Format::Text {
+      ansi: colour && stderr_supports_colour(),
+    }
+  };
+  subscriber(filter, std::io::stderr, format).init();
+}
+
+fn subscriber<W>(filter: EnvFilter, writer: W, format: Format) -> impl Subscriber + Send + Sync
 where
   W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
 {
-  tracing_subscriber::registry().with(
-    tracing_subscriber::fmt::layer()
+  let layer: Box<dyn Layer<Registry> + Send + Sync> = match format {
+    Format::Text { ansi } => tracing_subscriber::fmt::layer()
       .with_writer(writer)
       .with_ansi(ansi)
-      .with_filter(without_credentials(filter)),
-  )
+      .boxed(),
+    Format::Json => tracing_subscriber::fmt::layer()
+      .json()
+      .with_current_span(false)
+      .with_span_list(false)
+      .with_writer(writer)
+      .boxed(),
+  };
+  tracing_subscriber::registry().with(layer.with_filter(without_credentials(filter)))
 }
 
 /// `filter`, with what would log a credential held back however much was asked for: at `trace`,
@@ -94,19 +129,18 @@ mod tests {
     }
   }
 
+  const TEXT: Format = Format::Text { ansi: false };
+
   /// Which of a fixed set of events `filter` lets through.
   fn logged(filter: &str) -> Vec<&'static str> {
     let captured = Captured::default();
-    tracing::subscriber::with_default(
-      subscriber(EnvFilter::new(filter), captured.clone(), false),
-      || {
-        tracing::trace!(target: "ureq_proto::client", "http-trace");
-        tracing::debug!(target: "ureq_proto::client", "http-debug");
-        tracing::warn!(target: "ureq_proto::client", "http-warn");
-        tracing::debug!(target: "pact_janus_kernel", "engine-debug");
-        tracing::warn!(target: "pact_janus_kernel", "engine-warn");
-      },
-    );
+    tracing::subscriber::with_default(subscriber(EnvFilter::new(filter), captured.clone(), TEXT), || {
+      tracing::trace!(target: "ureq_proto::client", "http-trace");
+      tracing::debug!(target: "ureq_proto::client", "http-debug");
+      tracing::warn!(target: "ureq_proto::client", "http-warn");
+      tracing::debug!(target: "pact_janus_kernel", "engine-debug");
+      tracing::warn!(target: "pact_janus_kernel", "engine-warn");
+    });
     let text = String::from_utf8(captured.0.lock().expect("the buffer").clone()).expect("utf-8");
     [
       "http-trace",
@@ -132,12 +166,43 @@ mod tests {
     assert_eq!(logged(filter), expected);
   }
 
+  /// `JANUS_LOG_FORMAT=json`: one object per event and per line, its level, target, message and
+  /// fields each a member an SDK reads, and the same events held back as in text.
+  #[test]
+  fn json_is_one_object_per_event_with_its_level_target_and_fields() {
+    let captured = Captured::default();
+    tracing::subscriber::with_default(
+      subscriber(EnvFilter::new("debug"), captured.clone(), Format::Json),
+      || {
+        tracing::debug!(target: "pact_janus_component_http::drive", method = "GET", status = 200, "the provider answered");
+        tracing::warn!(target: "pact_janus_kernel", "engine-warn");
+        tracing::trace!(target: "pact_janus_kernel", "engine-trace");
+        tracing::trace!(target: "reqwest::connect", "client-trace");
+      },
+    );
+    let text = String::from_utf8(captured.0.lock().expect("the buffer").clone()).expect("utf-8");
+    let events: Vec<serde_json::Value> = text
+      .lines()
+      .map(|line| serde_json::from_str(line).expect("each line is a JSON object"))
+      .collect();
+    assert_eq!(events.len(), 2, "{text}");
+    assert_eq!(events[0]["level"], "DEBUG");
+    assert_eq!(events[0]["target"], "pact_janus_component_http::drive");
+    assert_eq!(
+      events[0]["fields"],
+      serde_json::json!({"message": "the provider answered", "method": "GET", "status": 200})
+    );
+    assert!(events[0]["timestamp"].is_string());
+    assert_eq!(events[1]["level"], "WARN");
+    assert_eq!(events[1]["fields"]["message"], "engine-warn");
+  }
+
   /// The WASM loader's compiler is held to `debug`: at `trace` it logs every instruction it compiles.
   #[test]
   fn the_wasm_compiler_never_logs_at_trace() {
     let captured = Captured::default();
     tracing::subscriber::with_default(
-      subscriber(EnvFilter::new("trace"), captured.clone(), false),
+      subscriber(EnvFilter::new("trace"), captured.clone(), TEXT),
       || {
         tracing::trace!(target: "cranelift_codegen::machinst::lower", "compiler-trace");
         tracing::trace!(target: "regalloc2::ion", "compiler-trace");
@@ -164,7 +229,7 @@ mod tests {
     ] {
       let captured = Captured::default();
       tracing::subscriber::with_default(
-        subscriber(EnvFilter::new("trace"), captured.clone(), false),
+        subscriber(EnvFilter::new("trace"), captured.clone(), TEXT),
         || {
           // A target is a literal to `tracing`, so each is spelled out.
           match target {

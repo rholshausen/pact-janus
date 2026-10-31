@@ -27,7 +27,8 @@ fn main() {
     .version(pact_janus_cli::VERSION.as_str())
     .about(
       "The Janus engine as a subprocess: protocol frames on standard input and output, logs on \
-       standard error. SDKs start it; RUST_LOG sets what it logs (default: info).",
+       standard error. SDKs start it; RUST_LOG sets what it logs (default: info), and \
+       JANUS_LOG_FORMAT=json writes each event as a JSON object on a line of its own.",
     )
     .get_matches();
 

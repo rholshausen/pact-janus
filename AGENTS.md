@@ -143,6 +143,10 @@ Three sources are the source of truth and take precedence over this file when th
 > S1.36 (ADR 0060): each SDK is released from here as files on a GitHub release of its own, tagged
 > `typescript-sdk/v<version>` or `jvm-sdk/v<version>` by `release-sdks.yml`, with its own change files,
 > version and changelog; an installed SDK told no engine fetches the one its pin names.
+> S1.37 (ADR 0061): the engine's logs are the runtime's own. `JANUS_LOG_FORMAT=json` writes each event
+> as a JSON line; the JVM SDK logs them through SLF4J to `io.pact.janus.engine`, whose level becomes
+> `RUST_LOG`, and the TypeScript SDK takes pact-js's `logLevel` or `LOG_LEVEL`. A `RUST_LOG` that is
+> set wins.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -504,7 +508,9 @@ via `cargo build` in a `beforeAll`, so it never runs against a stale one). It in
 `tracing-subscriber` the kernel's own `tracing` facade needs (this file's Rust conventions below);
 `RUST_LOG=trace janus-engine` logs every frame `Engine::dispatch` sees in both directions to
 stderr (stdout stays frames-only), with every broker credential redacted: an `auth` member keeps
-only its `kind` and a `url` loses its user information. Both binaries also cap the HTTP library's
+only its `kind` and a `url` loses its user information. With `JANUS_LOG_FORMAT=json`, each event is
+a JSON line instead (`level`, `target`, `fields`), which the JVM SDK reads to log the engine's events
+through SLF4J (ADR 0061). Both binaries also cap the HTTP library's
 own logging at `debug` however much is asked for (`cli/src/logging.rs`), because at `trace` it dumps
 request bytes, `Authorization` headers included. `cli/tests/cli.rs` runs both commands at `trace`
 behind an authenticating door in front of the pinned broker and fails if a credential appears in

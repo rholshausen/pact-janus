@@ -76,7 +76,8 @@ own `Verifier` (`import { Verifier } from "pact-janus"`), which takes the protoc
 | `providerStatesSetupUrl`, `providerStatesSetupTeardown`, `providerStatesSetupBody` | Refused. Use `stateHandlers`, or a `state-setup` hook in `verifier.janus.yaml` (the `config` option), written as [`janus verify -s`](verifier-migration.md) writes one | dropped |
 | `transports` | Refused. A message transport is a `produce-message` hook in `verifier.janus.yaml` | dropped |
 | `tlsClientOptions` | Not taken. Use the SDK's own `Verifier` with `transport: { client: { tls: { "client-certificate": … } } }` | dropped |
-| `logLevel`, `logFile` | Accepted, no effect. The engine logs to its standard error, by `RUST_LOG` | dropped |
+| `logLevel` | How much the engine logs on its standard error, as `LOG_LEVEL` sets it too; `RUST_LOG` overrides both ([ADR 0061](decisions/0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md)) | kept |
+| `logFile` | Accepted, no effect. The engine logs to its standard error | dropped |
 | `timeout` | Accepted, no effect. The test framework's own timeout bounds the test | dropped |
 | `changeOrigin`, `proxyHost` | Accepted, no effect. They configured pact-js's proxy, and Janus has none: requests go to the provider directly | dropped |
 | `config`, `components`, `engine` | Janus's own: a `verifier.janus.yaml`, declared components, and how the engine is reached | — |
@@ -151,6 +152,7 @@ class ContractTest {
 | A message body with no content type | Read by the engine from its metadata's `contentType`, else from its octets. pact-jvm labels it with the type the pact expects. A JSON body reads as JSON either way | adapted |
 | A request changed in the template (`request.addHeader`), `@TargetRequestFilter` | A request filter on the verifier: `requestFilter(request -> …)` receives the request's slots and returns the ones it changes, the headers by default | adapted |
 | `@IgnoreNoPactsToVerify` | A broker source's `require-pacts: false` | adapted |
+| pact-jvm's logs, through SLF4J | The engine's, through SLF4J too, to the logger `io.pact.janus.engine`, whose level is how much the engine logs: `logging.level.io.pact.janus.engine=debug` under Spring Boot ([ADR 0061](decisions/0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md)) | kept |
 
 ## Differences from today's verdicts
 
