@@ -71,9 +71,9 @@ first draft of something that will be rewritten against the final specification.
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
 | **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
-| **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); make the exchange loop single-threaded and async-ready (§4, gate W; S2.1); cache per-variant plans (finding 28; S2.3) |
+| **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); start its background work through its embedding, never `thread::spawn` itself (ADR 0062; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
-| **Built-in HTTP transport** (`engine/component-http`) | **Rewrite, in two halves** | It is threaded (`tiny_http`, one thread per server), was never built for WASM, and has no media-type or list-header semantics (finding 1). The **client** half (verification: TLS, proxies, timeouts) is stage 1 (S1.5); the **server** half (mocks: async, thread-free, which serves gate W) is stage 2 (S2.1); the `http:media-type` operator is stage 3 (S3.3) |
+| **Built-in HTTP transport** (`engine/component-http`) | **Rewrite, in two halves** | It is threaded (`tiny_http`, one thread per server), was never built for WASM, and has no media-type or list-header semantics (finding 1). The **client** half (verification: TLS, proxies, timeouts) is stage 1 (S1.5); the **server** half (mocks: hyper on a thread of its own, ADR 0062) is stage 2 (S2.1); the `http:media-type` operator is stage 3 (S3.3) |
 | **WASM component host and OCI distribution** (`engine/component-host`, `janus component push/pull`) | **Graduates** | It already does digest pinning, content-addressed caching and a tamper-testing registry. Needs findings 15–17 decided, and signing (S5.1) |
 | **Out-of-process component loader** (spike 8.3) | **Rewrite, if kept** | Spike code. It proved the boundary exists, and findings 18–20 say what a real one must do differently (S5.5) |
 | **CLI** (`janus explain`, `upgrade`, `check`, `component`) | **Graduates** | `verify` graduates too, but it has no broker integration, no TLS options, no generator support and no flag parity with today's verifier CLI (stage 1a) |
@@ -1501,6 +1501,11 @@ SDK implements it, and the SDK specification covers only the consumer side.
     and a change file for each SDK.
   - The resolvers moved from each SDK's tests into its `embedding` layer. Its budget went from 250 to
     370 lines in TypeScript, and from 300 to 480 in the JVM SDK.
+
+  *Done 2026-10-31*: `typescript-sdk/v0.1.0` and `jvm-sdk/v0.1.0` were released that day, and
+  `v0.1.1` of each after them, pinning engine 0.4.3 for S1.37. Each release's `release-check`
+  installed the packed files outside the repository on every operating system, with no Rust toolchain
+  and no `JANUS_ENGINE`, and ran a consumer and a provider test against the engine the SDK fetched.
 - **S1.37 The engine's logs, where each runtime's are** — **S**, found verifying PactFlow's
   `example-provider-springboot` through the JVM SDK. Both SDKs inherit the engine's stderr, and only
   `RUST_LOG` sets how much it logs. On the JVM the logs reach no logging framework, no test report
@@ -1534,12 +1539,18 @@ inside its test suite for a release cycle.
 The RFC's second migration step: SDKs ship MkII as a new major version.
 
 - **S2.1 The consumer side of the engine, production-hardened** — **L**. Sessions; the HTTP
-  component's **server** half rewritten async and thread-free, behind an executor seam so that native
-  runs on `tokio` and a `wasm32-wasip3` build runs on WASI async with the same loop (gate W then costs
-  a build target, not a redesign; ADR 0023 decision 5); and the engine, not the SDK, writes the
-  contract's canonical bytes (finding 6).
-  *Exit:* 9.1's consumer scenarios run on the new transport with no thread created by the engine, and
-  both SDKs' conformance contracts are byte-identical because neither wrote them.
+  component's **server** half rewritten on hyper, serving HTTP/1.1 and HTTP/2 as today's mock server
+  does; and the engine, not the SDK, writes the contract's canonical bytes (finding 6). The engine
+  keeps its threads, but the kernel starts none itself. It runs its background work (the exchange
+  loop, a verification run, a broker publication) through the `background` capability its embedding
+  provides, and handling one arrival is a synchronous step a thread-free driver could call. This is
+  decided by [ADR 0062](decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md),
+  which withdrew the plan's first requirement, an async, thread-free loop, because nothing that runs
+  a test uses the WASM embedding it was for.
+  *Exit:* 9.1's consumer scenarios run on the new transport. No kernel code but `Threads` calls
+  `thread::spawn`, which a test checks, and an embedding without `background` refuses the three
+  operations that need it by name. Both SDKs' conformance contracts are byte-identical because
+  neither wrote them.
 - **S2.2 The consumer's test verdict reaches the engine** — **M**. `report-variant` (ADR backlog;
   findings 4, 5): the engine, not each SDK, withholds a dishonest contract, and per-interaction
   results arrive before the suite ends, so an engine-side failure surfaces in the test that caused it.
@@ -1780,7 +1791,7 @@ ADRs.
 
 | Gate | Trigger | What to do | What it can change |
 |---|---|---|---|
-| **W: the WASM embedding** (ADR 0023) | `wasm32-wasip3` becomes a supported Rust target (it is being promoted to tier 2), and wasmtime plus one SDK-relevant host (jco for Node, or a JVM runtime) run p3 components | Re-run task 9.1's WASM scenarios, including a served mock and a driven verification. The exchange loop runs as an async task over `wasi:sockets`, with no thread; whether p3 brings threads does not matter if the loop needs none. Check `wasi:http`'s p3 server story too | If it works, WASM becomes a candidate primary embedding again, and S0.4's per-OS binary distribution becomes the fallback. S1.5 and S2.1 are async and thread-free behind an executor seam, so that passing this gate costs a build target, not a redesign |
+| **W: the WASM embedding** (ADR 0023) | `wasm32-wasip3` becomes a supported Rust target (it is being promoted to tier 2), and wasmtime plus one SDK-relevant host (jco for Node, or a JVM runtime) run p3 components | Re-run task 9.1's WASM scenarios, including a served mock and a driven verification. A served mock needs an embedding that provides `background` there: WASI threads if they have arrived, else a driver that runs the exchange step from async tasks (ADR 0062 decision 7). Check `wasi:http`'s p3 server story too | If it works, WASM becomes a candidate primary embedding again, and S0.4's per-OS binary distribution becomes the fallback. S1.5's client is async behind an executor seam. S2.1's engine keeps its threads behind the `background` capability, so passing this gate costs that driver and a serve half for the target, not a redesign of the kernel (ADR 0062) |
 | **F: plan fragments** (ADR 0022) | A second content component needs a fragment, or finding 21 (a fragment compiled without the variant, which widened a pinned variant) bites a real user | Adopt operator-level substitution: the engine compiles the slot, and a component says only what one value operator means | S5.4, stage 5's component interface |
 | **E: frame encoding** (ADR 0006) | S0.3's trend shows base64 or frame size on a hot path | Negotiate CBOR, which the protocol already allows for | The protocol's second encoding |
 | **C: contract packaging** (ADR 0011) | A realistic contract passes 5 MB, or base64 bodies pass 25% of its bytes | The exploded projection, or a container form | The contract file |
@@ -1825,7 +1836,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.30 | Relative and missing mismatch paths; an absent value printed as `NULL`; unnamed members' labels; "a integer" | S1.22, S1.24, S1.25; ADR 0042 |
 | S1.36 | Neither SDK is released, so a pilot builds one from source, and an installed one finds no engine | stage 1b's exit; ADR 0028's tripwire |
 | S1.37 | The engine's logs reach no JVM logging framework, and the pact-js facade's `logLevel` does nothing | found verifying `example-provider-springboot` |
-| S2.1 | An async, thread-free exchange loop and HTTP server; the engine writes contract bytes | ADR 0023 decision 5; gate W; finding 6 |
+| S2.1 | The kernel starts threads itself, and the mock's server is `tiny_http`; the engine writes contract bytes | ADR 0062; gate W; finding 6 |
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |

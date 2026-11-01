@@ -1,6 +1,6 @@
 # 0023 — Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations
 
-- **Status**: accepted; context corrected 2026-09-24 (task 9.4), decision unchanged
+- **Status**: accepted; context corrected 2026-09-24 (task 9.4), decision unchanged; decision 5 gains a third route, WASI threads, in [ADR 0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)
 - **Date**: 2026-09-24
 - **Plan tasks**: 9.2 (supersedes [ADR 0003](0003-embedding-priority-per-language.md); feeds 9.4)
 - **Evidence**: [performance report](../prototype/performance-report.md) §3–§5.5 (task 9.1),

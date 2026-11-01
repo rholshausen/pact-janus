@@ -1,6 +1,6 @@
 # 0035 — Reach providers and brokers through one async HTTP client, configured by one document
 
-- **Status**: accepted
+- **Status**: accepted; decision 2's server half amended by [ADR 0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md): the mock's server is hyper on a runtime of its own, and the engine keeps its threads
 - **Date**: 2026-10-21
 - **Plan tasks**: S1.5 (the build); S2.1 (the server half, which shares the executor); S1.13 (the
   flag table this fills the transport rows of); S1.9 (the `http` hook, which this leaves on its own

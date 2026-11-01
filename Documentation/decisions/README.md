@@ -39,7 +39,7 @@ superseding ADR instead.
 | [0020](0020-a-content-slots-type-is-declared-on-the-interaction.md) | Declare a content slot's type on the interaction, beside its parts, not inside them | accepted |
 | [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted; amended by 0052 |
 | [0022](0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md) | A plan fragment replaces its slot's plan, declares a grammar the engine says it reads, and is checked before anything runs | accepted |
-| [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md) | Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations | accepted |
+| [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md) | Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations | accepted (decision 5 extended by 0062) |
 | [0024](0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) | Keep request dimensions pinned, and match a cardinality point as a region | accepted |
 | [0025](0025-a-provider-shape-entry-may-select-interactions-by-operation.md) | Let a provider-shape entry select the interactions it is about by operation | accepted |
 | [0026](0026-every-plan-action-is-namespaced-and-core-namespaces-are-reserved.md) | Namespace every plan action, and reserve the core families as namespaces | accepted (implemented as plan grammar v1, staged plan S0.1) |
@@ -51,7 +51,7 @@ superseding ADR instead.
 | [0032](0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md) | Speak to the Pact Broker through protocol operations backed by a native host capability | accepted |
 | [0033](0033-count-a-runs-variants-per-source-document-in-its-summary.md) | Count a run's variants per source document in its summary | accepted |
 | [0034](0034-apply-a-pacts-request-generators-through-a-generator-component-fed-by-state-values.md) | Apply a pact's request generators through a generator component, fed by provider-state values | accepted |
-| [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted |
+| [0035](0035-reach-providers-and-brokers-through-one-async-http-client-configured-by-one-document.md) | Reach providers and brokers through one async HTTP client, configured by one document | accepted (decision 2 amended by 0062) |
 | [0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md) | Read text bodies through a text component, and bodies no component claims as bytes | accepted |
 | [0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md) | Carry member order through the engine, and decide nothing by it | accepted |
 | [0038](0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md) | Read form bodies as a query string, through a built-in form component | accepted |
@@ -78,6 +78,7 @@ superseding ADR instead.
 | [0059](0059-the-engine-writes-a-verification-runs-report.md) | The engine writes a verification run's report, and every client prints it | accepted |
 | [0060](0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md) | Release each SDK as files on a GitHub release of its own, and fetch its pinned engine on first use | accepted |
 | [0061](0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md) | The engine's logs are the runtime's own, set and shown by its logging configuration | accepted |
+| [0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md) | Run the engine's background work on threads its embedding provides, and serve mocks with hyper | accepted |
 
 ## Decision backlog
 
