@@ -323,7 +323,10 @@ boundary that coincides with the base or a pin costs nothing. Seeds are fixed: l
 for coverage and never modify them.
 
 **Step 1 — targets.** `T :=` every reachable target (§3.3) at strength `t`, minus those removed by
-exclusions, minus those already covered by `S`.
+exclusions, minus those already covered by `S`. `T` is ordered: the `t`-combinations of dimensions in
+variant-space order (lexicographic over their positions), and within a combination the points of each
+dimension in point order, the last dimension's varying fastest. Removing a target keeps the order of
+the rest.
 
 **Step 2 — dimension order.** Order `D` by descending point count, ties broken by variant-space order,
 subject to a dimension never preceding one that gates it. Ties are broken by declaration order and
@@ -342,8 +345,8 @@ covering array to the front, and everything after it grows horizontally into tha
   `d` that covers the most targets in `T` involving `d` and dimensions already assigned in `τ`,
   skipping points that would make `τ` match an exclusion. Ties go to the earlier point in the
   dimension's point order. Extend `τ`, and remove the targets it now covers.
-- *Vertical.* For each still-uncovered target involving `d`: extend an existing `τ` that is compatible
-  with it (the first such, in order) if one exists; otherwise append a new partial assignment holding
+- *Vertical.* For each still-uncovered target involving `d`, in `T`'s order: extend an existing `τ`
+  that is compatible with it (the first such, in order) if one exists; otherwise append a new partial assignment holding
   the target's pairs and their gates. Remove what is now covered.
 
 **Step 5 — completion.** Complete each partial assignment with `complete` (§2.1) and append it to `S`,

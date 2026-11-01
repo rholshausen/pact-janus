@@ -1578,6 +1578,10 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
       withheld contract. `finalise` now fails, saying the engine predates `contract-text`.
     - A Janus SDK overwrites the contract, so of several test files recording one pair, the last
       wins. That is S2.11.
+    - The cross-SDK check failed on its first CI run: `janus-ipog-v1`'s vertical step took
+      uncovered targets in a hashed set's order, so a space could select its covering variants in
+      another order on another run, breaking variant-semantics spec §3.7. The targets keep step 1's
+      order now, which §3.4 states, and a test selects one space fifty times.
     - "Sessions" had no exit of its own. What hardening they needed came with the background work:
       a task that cannot start stops the transports it would have driven, and stopping a mock frees
       its port before `finalise` answers.

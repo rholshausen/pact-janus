@@ -247,3 +247,40 @@ fn base_only_strategy_selects_the_base_and_pins_alone() {
   assert_eq!(selected.report.strategy, "base-only");
   assert_eq!(selected.variants[0].id, "base");
 }
+
+/// Spec §3.7: "no hash seed, no iteration order of an unordered map". The vertical pass of step 4
+/// took uncovered targets in a hashed set's order, which every new set seeds afresh, so the same
+/// space could select its covering variants in another order on another run, and a contract
+/// recorded from it was other bytes (found by the conformance suite's cross-SDK check, ADR 0063).
+/// This is the space of `conformance/cases/live/shape-dimensions.json`, which showed it.
+#[test]
+fn the_same_space_selects_the_same_variants_in_the_same_order_every_time() {
+  let body = json!({ "shape": "object",
+    "members": {
+      "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" },
+      "shippedAt": { "shape": "optional",
+                     "of": { "shape": "datetime", "format": "yyyy-MM-dd'T'HH:mm:ssX",
+                             "example": "2026-07-30T10:00:00Z" } },
+      "payment": { "shape": "one-of", "discriminator": "type", "default": "card",
+                   "alternatives": {
+                     "card": { "shape": "object", "members": { "type": { "shape": "equality", "example": "card" } } },
+                     "invoice": { "shape": "object", "members": { "type": { "shape": "equality", "example": "invoice" } } } } },
+      "items": { "shape": "each-like", "min": 1, "items": { "shape": "string", "example": "SKU-1" } } } });
+  let space = variant_space(&interaction_with(body));
+  let policy = SamplingPolicy::default();
+  let first = select(&space, &policy).expect("well-formed policy");
+  let first: Vec<(String, Vec<(String, String)>)> = first
+    .variants
+    .iter()
+    .map(|v| (v.id.clone(), v.assignment.clone().into_iter().collect()))
+    .collect();
+  for run in 1..50 {
+    let again = select(&space, &policy).expect("well-formed policy");
+    let again: Vec<(String, Vec<(String, String)>)> = again
+      .variants
+      .iter()
+      .map(|v| (v.id.clone(), v.assignment.clone().into_iter().collect()))
+      .collect();
+    pretty_assertions::assert_eq!(first, again, "selection {run} differs from the first");
+  }
+}

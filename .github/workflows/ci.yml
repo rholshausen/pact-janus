@@ -329,11 +329,14 @@ jobs:
           pattern: conformance-*
           path: reports
       - name: SDKs are conformant
+        # Every system is checked, so one that fails does not hide another.
         run: |
+          failed=0
           for os in Linux macOS Windows; do
             echo "== $os"
-            cargo run --package pact_janus_conformance -- check "reports/conformance-$os/typescript.json" "reports/conformance-$os/jvm.json"
+            cargo run --package pact_janus_conformance -- check "reports/conformance-$os/typescript.json" "reports/conformance-$os/jvm.json" || failed=1
           done
+          exit $failed
 
   sdk-tooling:
     # What around the SDKs still needs the workspace: the binding pipeline, the protocol-level

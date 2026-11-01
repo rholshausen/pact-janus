@@ -685,10 +685,13 @@ fn target_requirements(space: &VariantSpace, target: &Target) -> Option<BTreeMap
 }
 
 /// Every reachable target at strength `t` (spec §3.3), split into those excluded (counted
-/// against `coverage.removed`) and those genuinely in play.
-fn enumerate_targets(space: &VariantSpace, t: usize, exclusions: &mut [ResolvedExclusion]) -> Vec<Target> {
+/// against `coverage.removed`) and those genuinely in play. In play, they are in the order they are
+/// enumerated: dimension combinations in variant-space order, each dimension's points in point
+/// order. Step 4's vertical pass takes them in that order (spec §3.4, §3.7): a hashed set's order
+/// differed between processes, and so did the selection.
+fn enumerate_targets(space: &VariantSpace, t: usize, exclusions: &mut [ResolvedExclusion]) -> Targets {
   let dims = &space.dimensions;
-  let mut targets: HashSet<Target> = HashSet::new();
+  let mut targets = Targets::new();
   let mut combo = vec![0usize; t];
   choose_combinations(dims.len(), t, &mut combo, 0, 0, &mut |indices| {
     cartesian_points(dims, indices, &mut |target| {
@@ -708,8 +711,11 @@ fn enumerate_targets(space: &VariantSpace, t: usize, exclusions: &mut [ResolvedE
       targets.insert(target.clone());
     });
   });
-  targets.into_iter().collect()
+  targets
 }
+
+/// Targets in a fixed order, the order [`enumerate_targets`] made them in.
+type Targets = indexmap::IndexSet<Target>;
 
 /// Every `t`-combination of dimension indices, in increasing order.
 fn choose_combinations(
@@ -817,7 +823,7 @@ fn ipog(
   space: &VariantSpace,
   t: usize,
   seeds: &[Assignment],
-  mut targets: HashSet<Target>,
+  mut targets: Targets,
   exclusions: &[ResolvedExclusion],
 ) -> (Vec<Assignment>, usize) {
   // Targets already covered by a seed cost nothing.
@@ -1103,7 +1109,7 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
     }
     _ => {
       let t = policy.strength.max(1) as usize;
-      let targets: HashSet<Target> = enumerate_targets(space, t, &mut exclusions).into_iter().collect();
+      let targets = enumerate_targets(space, t, &mut exclusions);
       total_targets = targets.len();
       let seeds: Vec<Assignment> = variants.iter().map(|v| v.assignment.clone()).collect();
       let (covering, drop_count) = ipog(space, t, &seeds, targets, &exclusions);
