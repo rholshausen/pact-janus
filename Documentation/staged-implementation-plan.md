@@ -1553,6 +1553,34 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   `thread::spawn`, which a test checks, and an embedding without `background` refuses the three
   operations that need it by name. Both SDKs' conformance contracts are byte-identical because
   neither wrote them.
+  *Done 2026-11-01*, as ADR 0062 and ADR 0063 decide:
+  - The kernel's three threads (a transport's exchange loop, a verification run, a broker
+    publication) go through `Background`. `janus` and `janus-engine` register `Threads`, the only
+    kernel code that starts one, and `tests/boundary.rs` checks it. `engine/hello` declares
+    `background`, and an engine without it refuses `start-transport`, `verify` and
+    `publish-contracts` naming `background`, after their documents are checked. Handling an arrival
+    is `exchange::handle_arrival`, which waits on nothing.
+  - The mock is hyper, on a thread and runtime of its own per served instance, serving HTTP/1.1 and
+    HTTP/2 with prior knowledge. The transport interface did not change, and no crate was added.
+  - A contract crosses the boundary as its text (`contract-text`, engine-protocol spec §8.9). Both
+    SDKs write the engine's text and send pacts unparsed. Each live conformance case's report
+    carries the SHA-256 of the contract its SDK wrote, and `check` fails when two differ: all five
+    are byte-identical across the TypeScript and JVM SDKs.
+  - 9.1's consumer scenarios ran on the new transport, in-process and over the subprocess. Against
+    the 2026-10-11 run, a small request costs 37 µs where it cost 33, throughput is 89,000
+    requests a second where it was 97,000, and starting a mock costs 240 µs where it cost 150, for
+    its thread and runtime.
+  - Not foreseen:
+    - §2.4 named no spelling for a number or a string. It now does, as the engine already wrote
+      them, and `corpora/contracts/` (`numbers/`, `strings/`) pins every byte. Strings went beyond
+      the ADR's numbers, for the same reason.
+    - A JVM or TypeScript SDK given an older engine through `JANUS_ENGINE` would have reported a
+      withheld contract. `finalise` now fails, saying the engine predates `contract-text`.
+    - A Janus SDK overwrites the contract, so of several test files recording one pair, the last
+      wins. That is S2.11.
+    - "Sessions" had no exit of its own. What hardening they needed came with the background work:
+      a task that cannot start stops the transports it would have driven, and stopping a mock frees
+      its port before `finalise` answers.
 - **S2.2 The consumer's test verdict reaches the engine** — **M**. `report-variant` (ADR backlog;
   findings 4, 5): the engine, not each SDK, withholds a dishonest contract, and per-interaction
   results arrive before the suite ends, so an engine-side failure surfaces in the test that caused it.

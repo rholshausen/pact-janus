@@ -147,6 +147,13 @@ Three sources are the source of truth and take precedence over this file when th
 > as a JSON line; the JVM SDK logs them through SLF4J to `io.pact.janus.engine`, whose level becomes
 > `RUST_LOG`, and the TypeScript SDK takes pact-js's `logLevel` or `LOG_LEVEL`. A `RUST_LOG` that is
 > set wins.
+> Stage 2 has started. S2.1 (ADR 0062, ADR 0063): the kernel starts no thread itself, running its
+> background work through the `background` capability its embedding provides (`Threads` natively,
+> checked by `engine/kernel/tests/boundary.rs`); the mock is hyper, serving HTTP/1.1 and HTTP/2; and
+> a contract crosses the boundary as its text (`contract-text`, engine-protocol spec §8.9), so both
+> SDKs write the engine's bytes, contract-file spec §2.4 says how numbers and strings are written
+> (`corpora/contracts/`), and the conformance checker fails when two SDKs' live contracts differ by a
+> byte. S2.11, merging several test files' contracts, is new.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
