@@ -430,3 +430,117 @@ fn an_upgrade_offer_is_answered_over_http_1_1_without_waiting_for_the_client_to_
 
   assert!(client.join().unwrap().starts_with("HTTP/1.1 200"));
 }
+
+/// ADR 0062 decision 5: the mock serves HTTP/2 with prior knowledge, as today's mock server does.
+/// The client is this component's own drive role, told to speak HTTP/2 only.
+#[test]
+fn serves_http_2_with_prior_knowledge() {
+  let transport = std::sync::Arc::new(HttpTransport::new());
+  let (host, port) = start_serve(&transport, "t-h2-serve");
+  transport
+    .start(Start {
+      instance: "t-h2-drive".to_string(),
+      kind: "http".to_string(),
+      role: "drive".to_string(),
+      options: Some(json!({
+        "base-url": format!("http://{host}:{port}"),
+        "client": { "http-version": "2" },
+      })),
+    })
+    .expect("the drive options are valid");
+
+  let client = {
+    let transport = std::sync::Arc::clone(&transport);
+    std::thread::spawn(move || {
+      let mut request = pact_janus_kernel::component::Part::new();
+      for (name, value) in [("method", "GET"), ("path", "/orders/2")] {
+        request.insert(
+          name.to_string(),
+          SlotValue {
+            content: json!(value),
+            encoded: None,
+            content_type: None,
+          },
+        );
+      }
+      let mut parts = Parts::new();
+      parts.insert("request".to_string(), request);
+      transport.send(pact_janus_kernel::component::Send {
+        instance: "t-h2-drive".to_string(),
+        parts,
+        await_reply: true,
+        timeout_ms: Some(5_000),
+      })
+    })
+  };
+
+  let polled = transport
+    .poll_inbound(PollInbound {
+      instance: "t-h2-serve".to_string(),
+      timeout_ms: 5_000,
+    })
+    .unwrap()
+    .inbound
+    .expect("the HTTP/2 request arrives");
+  assert_eq!(polled.parts["request"]["path"].content, json!("/orders/2"));
+  transport
+    .reply(Reply {
+      instance: "t-h2-serve".to_string(),
+      event: polled.event,
+      parts: response_parts(200, "application/json", br#"{"id":2}"#),
+    })
+    .expect("the reply is delivered");
+
+  let reply = client
+    .join()
+    .unwrap()
+    .expect("the mock answered over HTTP/2")
+    .reply
+    .expect("a reply");
+  assert_eq!(reply["response"]["status"].content, json!(200));
+  assert_eq!(
+    BASE64
+      .decode(reply["response"]["body"].content.as_str().unwrap())
+      .unwrap(),
+    br#"{"id":2}"#
+  );
+}
+
+/// A recorded `Content-Length` belongs to the recorded body. The body served decides the framing,
+/// so a declared one is not repeated.
+#[test]
+fn a_declared_content_length_does_not_frame_the_reply() {
+  let transport = HttpTransport::new();
+  let (host, port) = start_serve(&transport, "t-length");
+  let client = std::thread::spawn(move || raw_http_request(&host, port, "GET", "/", &[], b""));
+  let polled = transport
+    .poll_inbound(PollInbound {
+      instance: "t-length".to_string(),
+      timeout_ms: 2000,
+    })
+    .unwrap()
+    .inbound
+    .expect("the request arrives");
+  let mut parts = response_parts(200, "text/plain", b"four");
+  parts.get_mut("response").unwrap().insert(
+    "headers".to_string(),
+    SlotValue {
+      content: json!({ "content-type": ["text/plain"], "content-length": ["99"] }),
+      encoded: None,
+      content_type: None,
+    },
+  );
+  transport
+    .reply(Reply {
+      instance: "t-length".to_string(),
+      event: polled.event,
+      parts,
+    })
+    .unwrap();
+  let response = client.join().unwrap();
+  assert_eq!(
+    response.headers.get("content-length").map(String::as_str),
+    Some("4")
+  );
+  assert_eq!(response.body, b"four");
+}

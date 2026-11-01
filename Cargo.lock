@@ -2355,13 +2355,17 @@ name = "pact_janus_component_http"
 version = "0.4.3"
 dependencies = [
  "base64 0.23.1",
+ "bytes",
  "form_urlencoded",
  "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "pact_janus_http_client",
  "pact_janus_kernel",
  "pretty_assertions",
  "serde_json",
- "tiny_http",
+ "tokio",
  "tracing",
 ]
 

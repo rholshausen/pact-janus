@@ -12,23 +12,23 @@
 //!
 //! The two halves are rewritten separately (staged plan §3). The drive half ([`drive`], S1.5) sends
 //! through the engine's one HTTP client, which is async behind an executor seam and starts no
-//! thread (ADR 0035). The serve half is still [`tiny_http`]'s blocking server, whose `recv_timeout`
-//! maps directly onto `poll-inbound`'s `timeout-ms`, until S2.1 rewrites it on the same executor.
+//! thread (ADR 0035). The serve half ([`serve`], S2.1) is hyper on a thread and runtime of its own
+//! per served instance (ADR 0062 decision 5), serving HTTP/1.1 and HTTP/2.
 
 mod drive;
+mod serve;
 pub mod status;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use drive::DriveInstance;
 use pact_janus_kernel::component::{
-  ComponentError, ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, Part, Parts, PollInbound,
+  ComponentError, ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, PollInbound,
   PollInboundResult, Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult,
   TransportComponent,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
-use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -43,10 +43,11 @@ enum Instance {
 }
 
 struct ServeInstance {
-  /// Shared so that `poll-inbound` can wait on it without holding the lock over every instance
-  /// (phase-9 finding 27): a waiter clones this and lets go, and `stop` wakes it with `unblock`.
-  server: Arc<tiny_http::Server>,
-  pending: HashMap<String, tiny_http::Request>,
+  /// Its arrivals are shared so that `poll-inbound` can wait on them without holding the lock over
+  /// every instance (phase-9 finding 27): a waiter clones them and lets go, and `stop` ends the
+  /// server, which wakes it.
+  server: serve::Server,
+  pending: serve::Pending,
   next_event: u64,
 }
 
@@ -135,73 +136,6 @@ pub(crate) fn multi_map_slot<'a>(
   }
 }
 
-fn request_parts(request: &mut tiny_http::Request) -> Parts {
-  let (path, query) = match request.url().split_once('?') {
-    Some((path, query)) => (path.to_string(), query.to_string()),
-    None => (request.url().to_string(), String::new()),
-  };
-
-  let headers: Vec<(String, String)> = request
-    .headers()
-    .iter()
-    .map(|h| {
-      (
-        h.field.as_str().as_str().to_string(),
-        h.value.as_str().to_string(),
-      )
-    })
-    .collect();
-  let headers_slot = multi_map_slot(
-    headers.iter().map(|(n, v)| (n.as_str(), v.as_str())),
-    Names::FoldCase,
-  );
-
-  // Decoded, as a pact records them and as `query_string` encodes them on the way out.
-  let query_pairs: Vec<(String, String)> = form_urlencoded::parse(query.as_bytes())
-    .map(|(name, value)| (name.into_owned(), value.into_owned()))
-    .collect();
-  let query_slot = multi_map_slot(
-    query_pairs.iter().map(|(n, v)| (n.as_str(), v.as_str())),
-    Names::AsSent,
-  );
-
-  // A client offering a protocol upgrade (`Connection: Upgrade` — curl's `--http2`, the JDK's
-  // default HttpClient) gets tiny_http's raw socket as its body reader, so reading "to the end"
-  // would wait for the client to hang up while the client waits for the response. The mock never
-  // accepts an upgrade — answering HTTP/1.1 and ignoring the offer is what RFC 9110 §7.8 allows —
-  // so only the body the request declared is read.
-  let upgrade_offered = headers.iter().any(|(name, value)| {
-    name.eq_ignore_ascii_case("connection") && value.to_ascii_lowercase().contains("upgrade")
-  });
-  let mut body = Vec::new();
-  if upgrade_offered {
-    let declared = request.body_length().unwrap_or(0) as u64;
-    let _ = request.as_reader().take(declared).read_to_end(&mut body);
-  } else {
-    let _ = request.as_reader().read_to_end(&mut body);
-  }
-  let content_type = headers
-    .iter()
-    .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
-    .map(|(_, value)| value.clone());
-  let body_slot = SlotValue {
-    content: Value::String(BASE64.encode(&body)),
-    encoded: Some("base64".to_string()),
-    content_type,
-  };
-
-  let mut request_part: Part = Part::new();
-  request_part.insert("method".to_string(), text_slot(request.method().as_str()));
-  request_part.insert("path".to_string(), text_slot(path));
-  request_part.insert("query".to_string(), query_slot);
-  request_part.insert("headers".to_string(), headers_slot);
-  request_part.insert("body".to_string(), body_slot);
-
-  let mut parts: Parts = Parts::new();
-  parts.insert("request".to_string(), request_part);
-  parts
-}
-
 /// The serve-role instance behind `instance`, or the reason it is not one. Two different
 /// failures, deliberately distinct: an unknown instance is a host bookkeeping error, while a
 /// driven instance asked to serve is a role confusion, and `operation-unsupported` naming the
@@ -272,11 +206,11 @@ impl TransportComponent for HttpTransport {
       .lock()
       .expect("instance lock poisoned")
       .remove(&req.instance);
-    // A `poll-inbound` may be waiting on this server right now; wake it rather than let `stop`
-    // (and the `finalise` behind it) sit out the rest of its timeout. The server closes when the
-    // waiter drops its clone.
-    if let Some(Instance::Serve(instance)) = removed {
-      instance.server.unblock();
+    // A `poll-inbound` may be waiting on this server right now. Stopping it closes its arrivals,
+    // which wakes the waiter rather than let `stop` (and the `finalise` behind it) sit out the rest
+    // of its timeout. An arrival still waiting for an answer is answered 503 as its sender drops.
+    if let Some(Instance::Serve(mut instance)) = removed {
+      instance.server.stop();
     }
     Ok(StopResult {})
   }
@@ -316,36 +250,41 @@ impl TransportComponent for HttpTransport {
 
   fn poll_inbound(&self, req: PollInbound) -> Result<PollInboundResult, ComponentError> {
     // Wait with the lock released: every other instance's `reply`, and this one's `stop`, need it.
-    let server = {
+    let arrivals = {
       let mut instances = self.instances.lock().expect("instance lock poisoned");
-      serve_instance(&mut instances, &req.instance, "transport/poll-inbound")?
-        .server
-        .clone()
+      Arc::clone(
+        &serve_instance(&mut instances, &req.instance, "transport/poll-inbound")?
+          .server
+          .arrivals,
+      )
     };
-    let received = server
-      .recv_timeout(Duration::from_millis(req.timeout_ms))
-      .map_err(|err| ComponentError::transport_failed(err.to_string()))?;
-
-    let Some(mut request) = received else {
-      return Ok(PollInboundResult { inbound: None });
-    };
-
-    let parts = request_parts(&mut request);
+    let arrival = serve::next_arrival(&arrivals, Duration::from_millis(req.timeout_ms));
     let mut instances = self.instances.lock().expect("instance lock poisoned");
+    let arrival = match arrival {
+      Ok(Some(arrival)) => arrival,
+      Ok(None) => return Ok(PollInboundResult { inbound: None }),
+      // Woken by `stop`, this poll saw nothing arrive; the next one finds no instance.
+      Err(serve::Stopped) if !instances.contains_key(&req.instance) => {
+        return Ok(PollInboundResult { inbound: None });
+      }
+      Err(serve::Stopped) => {
+        return Err(ComponentError::transport_failed("the server stopped on its own"));
+      }
+    };
     let Ok(instance) = serve_instance(&mut instances, &req.instance, "transport/poll-inbound") else {
       // Stopped while this request was arriving: nothing will ever reply to it, so answer it now
       // rather than leave the client's connection hanging.
-      let _ = request.respond(tiny_http::Response::from_data(Vec::new()).with_status_code(503));
+      let _ = arrival.answer.send(serve::status_only(503));
       return Ok(PollInboundResult { inbound: None });
     };
     let event = format!("e-{}", instance.next_event);
     instance.next_event += 1;
-    instance.pending.insert(event.clone(), request);
+    instance.pending.insert(event.clone(), arrival.answer);
 
     Ok(PollInboundResult {
       inbound: Some(Inbound {
         event,
-        parts,
+        parts: arrival.parts,
         expects_reply: true,
       }),
     })
@@ -354,79 +293,32 @@ impl TransportComponent for HttpTransport {
   fn reply(&self, req: Reply) -> Result<ReplyResult, ComponentError> {
     let mut instances = self.instances.lock().expect("instance lock poisoned");
     let instance = serve_instance(&mut instances, &req.instance, "transport/reply")?;
-    let request = instance.pending.remove(&req.event).ok_or_else(|| {
+    let answer = instance.pending.remove(&req.event).ok_or_else(|| {
       ComponentError::transport_failed(format!("no pending arrival for event '{}'", req.event))
     })?;
-
     let response_part = req.parts.get("response").ok_or_else(|| {
       ComponentError::transport_failed("reply parts must carry a 'response' part for an HTTP arrival")
     })?;
-
-    let status = response_part
-      .get("status")
-      .and_then(|slot| slot.content.as_u64())
-      .unwrap_or(200) as u16;
-    let body_slot = response_part.get("body");
-    let body = match body_slot {
-      Some(slot) => slot_bytes(slot)?,
-      None => Vec::new(),
-    };
-    let mut response = tiny_http::Response::from_data(body).with_status_code(status);
-    let mut declared_content_type = false;
-
-    if let Some(headers_slot) = response_part.get("headers")
-      && let Value::Object(headers) = &headers_slot.content
-    {
-      for (name, values) in headers {
-        declared_content_type |= name.eq_ignore_ascii_case("content-type");
-        for value in values.as_array().into_iter().flatten().filter_map(Value::as_str) {
-          if let Ok(header) = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes()) {
-            response = response.with_header(header);
-          }
-        }
+    let response = match serve::response(response_part) {
+      Ok(response) => response,
+      Err(err) => {
+        // The arrival is still answered, so its connection does not hang on a reply that failed.
+        let _ = answer.send(serve::status_only(500));
+        return Err(err);
       }
-    }
-    // The body's own media type labels it unless the interaction declared a Content-Type itself —
-    // the same rule the drive side applies to a request body.
-    if !declared_content_type
-      && let Some(content_type) = body_slot.and_then(|slot| slot.content_type.as_deref())
-      && let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes())
-    {
-      response = response.with_header(header);
-    }
-
-    request
-      .respond(response)
-      .map_err(|err| ComponentError::transport_failed(err.to_string()))?;
+    };
+    answer
+      .send(response)
+      .map_err(|_| ComponentError::transport_failed("the client went away before its reply"))?;
     Ok(ReplyResult {})
   }
 
   fn dispose(&self, req: Dispose) -> Result<DisposeResult, ComponentError> {
     let mut instances = self.instances.lock().expect("instance lock poisoned");
-    if let Some(Instance::Serve(instance)) = instances.get_mut(&req.instance) {
-      // HTTP has no disposition concept (spec §5.3: "a transport whose kind has no such concept
-      // ignores it"), but an arrival disposed without a reply would otherwise hang its connection,
-      // so it is answered before it is dropped. A request the engine rejected because it did not
-      // match is answered with a 500 naming every mismatch, so the consumer's own HTTP client sees
-      // a clear failure rather than a response it did not earn (kernel-boundary review finding 9).
-      if let Some(request) = instance.pending.remove(&req.event) {
-        let mismatches = (req.disposition == "reject")
-          .then(|| req.details.as_ref().and_then(|details| details.get("mismatches")))
-          .flatten();
-        let response = match mismatches {
-          Some(mismatches) => {
-            let body = serde_json::to_vec(mismatches).unwrap_or_default();
-            let mut response = tiny_http::Response::from_data(body).with_status_code(500);
-            if let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-            {
-              response = response.with_header(header);
-            }
-            response
-          }
-          None => tiny_http::Response::from_data(Vec::new()).with_status_code(500),
-        };
-        let _ = request.respond(response);
-      }
+    if let Some(Instance::Serve(instance)) = instances.get_mut(&req.instance)
+      && let Some(answer) = instance.pending.remove(&req.event)
+    {
+      let _ = answer.send(serve::disposed(&req.disposition, req.details.as_ref()));
     }
     Ok(DisposeResult {})
   }
@@ -441,14 +333,10 @@ impl HttpTransport {
     let host = options.get("host").and_then(Value::as_str).unwrap_or("127.0.0.1");
     let port = options.get("port").and_then(Value::as_u64).unwrap_or(0);
 
-    let server = tiny_http::Server::http((host, port as u16))
-      .map_err(|err| ComponentError::transport_failed(format!("could not bind {host}:{port}: {err}")))?;
-    // `ListenAddr` has a Unix-socket variant on Unix only, so this is not a `match`: it has to
-    // mean the same thing on Windows.
-    let bound_port = server
-      .server_addr()
-      .to_ip()
-      .map_or(port as u16, |addr| addr.port());
+    let port = u16::try_from(port)
+      .map_err(|_| ComponentError::invalid_config("http", format!("{port} is not a port")))?;
+    let server = serve::Server::start(&req.instance, host, port)?;
+    let bound_port = server.address.port();
 
     let endpoint = serde_json::json!({
       "kind": "http",
@@ -460,8 +348,8 @@ impl HttpTransport {
     self.instances.lock().expect("instance lock poisoned").insert(
       req.instance,
       Instance::Serve(ServeInstance {
-        server: Arc::new(server),
-        pending: HashMap::new(),
+        server,
+        pending: serve::Pending::new(),
         next_event: 1,
       }),
     );

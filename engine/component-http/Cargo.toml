@@ -9,9 +9,13 @@ authors.workspace = true
 
 [dependencies]
 pact_janus_kernel = { path = "../kernel" }
-# The serve role's server, blocking (recv_timeout maps directly onto poll-inbound's timeout-ms),
-# until S2.1 rewrites it on the drive role's executor.
-tiny_http = "0.12"
+# The serve role's server (ADR 0062 decision 5): hyper serving HTTP/1.1 and HTTP/2, on a
+# current-thread runtime of its own per served instance. All already in the tree through reqwest.
+hyper = { version = "1", features = ["server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["server-auto", "tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+tokio = { version = "1", default-features = false, features = ["rt", "net", "time", "sync", "macros"] }
 # The drive role's client: the engine's one HTTP client, async behind an executor seam
 # (ADR 0035), and the request and response types it takes.
 pact_janus_http_client = { path = "../http-client" }
