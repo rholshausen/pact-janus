@@ -1540,7 +1540,9 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 
 - **S2.1 The consumer side of the engine, production-hardened** — **L**. Sessions; the HTTP
   component's **server** half rewritten on hyper, serving HTTP/1.1 and HTTP/2 as today's mock server
-  does; and the engine, not the SDK, writes the contract's canonical bytes (finding 6). The engine
+  does; and the engine, not the SDK, writes the contract's canonical bytes (finding 6): a contract
+  crosses the boundary as its text, both ways, and §2.4 says how a number is written
+  ([ADR 0063](decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)). The engine
   keeps its threads, but the kernel starts none itself. It runs its background work (the exchange
   loop, a verification run, a broker publication) through the `background` capability its embedding
   provides, and handling one arrival is a synchronous step a thread-free driver could call. This is
@@ -1606,6 +1608,18 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* corpus cases in which a contract's XML text with surrounding whitespace, and a CDATA section
   with it, matches only text written the same way; the legacy harness and S1.1's verdicts unchanged;
   S1.25's XML cases still reach their pact's verdict.
+- **S2.11 Contracts from several test files, merged** — **M**, split from S2.1 by ADR 0063. pact-js
+  and pact-jvm merge every test file's interactions into one pact file, under a file lock, unless told
+  to overwrite. A Janus SDK writes one contract per session and overwrites, so when several test files
+  record one consumer and provider, which Jest, Vitest and Gradle run in separate workers or processes,
+  the last one written wins and the others' interactions are lost. Merging decides which interactions
+  are the same and what a conflict is, which is logic an SDK must not own. So the engine's host writes
+  the file and merges into it, behind a capability as `config-loading` is, and the SDK names the path.
+  An ADR decides the identity of an interaction, the conflict rule, the lock, and whether overwriting
+  stays an option. It lands before S2.5, whose example suites have several test files.
+  *Exit:* two Vitest files in separate workers, and two JUnit classes in separate forks, write one
+  contract holding both files' interactions, byte-identical to recording them in one file; an
+  interaction recorded differently by two files fails, naming it.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
 of pact-js and pact-jvm run on the compatibility facade, both SDKs have graduated (S2.9), and early
@@ -1843,6 +1857,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |
+| S2.11 | A Janus SDK overwrites the contract, so of several test files recording one pair, the last wins | ADR 0063 decision 7 |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |

@@ -79,6 +79,7 @@ superseding ADR instead.
 | [0060](0060-release-each-sdk-as-files-on-a-github-release-of-its-own-and-fetch-its-pinned-engine.md) | Release each SDK as files on a GitHub release of its own, and fetch its pinned engine on first use | accepted |
 | [0061](0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md) | The engine's logs are the runtime's own, set and shown by its logging configuration | accepted |
 | [0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md) | Run the engine's background work on threads its embedding provides, and serve mocks with hyper | accepted |
+| [0063](0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md) | Carry a contract across the engine boundary as its text, and pin how numbers are written | accepted |
 
 ## Decision backlog
 
