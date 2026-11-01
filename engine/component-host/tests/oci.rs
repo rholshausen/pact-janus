@@ -446,6 +446,7 @@ fn a_consumer_session_resolves_an_oci_component_through_the_protocol() {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   engine.declare_in_tree("content", "json", "1.0.0");
   engine.register_component_loader(Arc::new(WasmLoader::with_cache(fresh_cache("engine")).unwrap()));
   send(

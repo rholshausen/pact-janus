@@ -78,6 +78,7 @@ fn main() {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
 
   send(
     &mut engine,

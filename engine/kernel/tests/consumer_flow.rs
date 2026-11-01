@@ -29,7 +29,9 @@ fn send(engine: &mut Engine, id: &str, op: &str, body: Value) -> Value {
 fn engine_with_real_components() -> Engine {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
-  Engine::with_components(transports, Some(Arc::new(JsonContent::new())))
+  let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
+  engine
 }
 
 fn hello(engine: &mut Engine) {
@@ -551,6 +553,7 @@ fn a_matched_request_whose_response_never_reached_the_consumer_is_not_verified()
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), transport.clone());
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   hello(&mut engine);
 
   let created = send(

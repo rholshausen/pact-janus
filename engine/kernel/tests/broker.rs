@@ -124,6 +124,7 @@ fn engine(broker: Option<Arc<FakeBroker>>) -> Engine {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   if let Some(broker) = broker {
     engine.register_broker_client(broker);
   }
@@ -258,6 +259,26 @@ fn an_engine_with_a_broker_client_says_so_in_the_handshake() {
     answered["ok"]["capabilities"].get("broker").is_none(),
     "{answered}"
   );
+}
+
+/// ADR 0062: a publication runs in the background, so a broker client alone is not enough.
+#[test]
+fn publishing_without_background_is_refused_and_reaches_no_broker() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = Engine::new();
+  engine.register_broker_client(Arc::clone(&broker) as Arc<dyn BrokerClient>);
+  let hello =
+    json!({ "protocol-versions": [1], "host": { "name": "t", "version": "0" }, "capabilities": {} });
+  send(&mut engine, "r-1", "engine/hello", hello);
+  let (started, events) = publish_contracts(&mut engine, vec![janus_contract()]);
+  assert_eq!(started["error"]["code"], "component-unavailable", "{started}");
+  assert_eq!(
+    started["error"]["details"],
+    json!({ "component": "background" }),
+    "{started}"
+  );
+  assert!(events.is_empty());
+  assert!(broker.publications.lock().unwrap().is_empty());
 }
 
 /// The run verifies what the broker selected, says what it fetched before anything else, and a
@@ -518,7 +539,7 @@ fn a_filter_naming_a_variant_no_fetched_pact_records_ends_the_run_before_anythin
   assert_eq!(summary["error"]["code"], "variant-not-found");
   assert_eq!(summary["error"]["details"]["variant"], "nothing-is-called-this");
   assert_eq!(summary["error"]["details"]["recorded"], json!(["base"]));
-  assert!(broker.published.lock().unwrap().is_empty());
+  assert!(broker.publications.lock().unwrap().is_empty());
 }
 
 #[test]

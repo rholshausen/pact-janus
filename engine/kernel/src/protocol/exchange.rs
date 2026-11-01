@@ -1,8 +1,10 @@
 //! The live passive exchange (plan task 4.5, variant-semantics spec §4.1–§4.2): what actually
-//! drives a transport once `start-transport` binds one to a session. Runs on its own thread per
-//! transport instance — `poll-inbound` blocks up to its own timeout, and the whole point is that
-//! this loop is what a real inbound request waits on, so it cannot be the same thread that answers
-//! `consumer-session/*` frames.
+//! drives a transport once `start-transport` binds one to a session. It is two parts (ADR 0062
+//! decision 4). [`run`] waits for the next arrival, `poll-inbound` with its timeout, and runs as
+//! background work the embedding provides, one task per transport instance: it is what a real
+//! inbound request waits on, so it cannot be the dispatcher that answers `consumer-session/*`
+//! frames. [`handle_arrival`] handles one arrival and waits on nothing, so a driver that waits for
+//! arrivals some other way calls the same step.
 //!
 //! What this closes: `serve-variant` (plan task 4.3) already computed the concrete payload a
 //! variant should produce; nothing before this task ever put it on the wire, or looked at what
@@ -11,13 +13,9 @@
 //! armed exchange at a time, which is exactly what the sequential `serve-variant` loop a consumer
 //! test runs actually needs; broader routing is for whoever exercises that concurrency for real.
 //!
-//! **A WASM-component caveat for whoever builds that embedding next** (ADR 0003, ADR 0013): this
-//! module builds cleanly for `wasm32-wasip2` (`std::thread`/`Mutex`/`AtomicBool` all compile
-//! there), but `thread::spawn` has nothing to schedule onto without the threads proposal, so
-//! `start-transport` would fail at run time on a plain wasip2 host. Every embedding this task
-//! actually wires up (the CLI, the subprocess binary, the Rust/TS integration tests) is native, so
-//! this is a documented gap, not a silent one: the WASM-component embedding will need either
-//! wasi-threads or a single-threaded poll model here, not this one unmodified.
+//! An embedding with no background work to offer, the WASM component, refuses `start-transport` by
+//! name before this module is reached. Gate W's driver would call [`handle_arrival`] from whatever
+//! that target waits on (ADR 0062 decision 7).
 
 use super::contributions::Contributions;
 use super::session::{ExchangeOutcome, Exercised};
@@ -95,7 +93,7 @@ pub(crate) fn run(
       },
       Err(_) => break, // the instance is gone (stopped) or the transport itself failed
     };
-    handle_inbound(
+    handle_arrival(
       transport.as_ref(),
       content.as_deref(),
       &contributions,
@@ -106,10 +104,11 @@ pub(crate) fn run(
   }
 }
 
-/// One arrival: match it against whatever is currently armed, reply, and record the outcome.
+/// One arrival: match it against whatever is currently armed, reply, and record the outcome. It
+/// waits on nothing but the transport's `reply` or `dispose` (ADR 0062 decision 4).
 /// Nothing is armed → this exchange proves nothing about any variant, so it is refused rather than
 /// guessed at (variant-semantics spec §4.2's honesty applies here too, not only to recording).
-fn handle_inbound(
+pub(crate) fn handle_arrival(
   transport: &dyn TransportComponent,
   content: Option<&dyn ContentComponent>,
   contributions: &Contributions,

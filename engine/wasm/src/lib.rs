@@ -2,11 +2,11 @@
 //! decision 2), for a host that wants Janus's answers without a native binary.
 //!
 //! It is `Engine::dispatch` behind the frozen pipe, with the in-tree JSON content component, and it
-//! has no transports: a `wasm32-wasip2` guest has sockets, but no threads for the exchange loop or
-//! the HTTP transport's server, and that transport was not built for the target (Phase 9 finding 3).
-//! So it does what the kernel does without I/O (handshake, compile, variant enumeration, upgrade,
-//! subsumption), and `start-transport` and `verification/verify` fail by name, as
-//! `component-unavailable`.
+//! has no transports and registers no background work: a `wasm32-wasip2` guest has sockets, but no
+//! threads for the exchange loop or a run, and the HTTP transport was not built for the target
+//! (Phase 9 finding 3, ADR 0062). So it does what the kernel does without I/O (handshake, compile,
+//! variant enumeration, upgrade, subsumption), and `start-transport` and `verification/verify` fail
+//! by name, as `component-unavailable` naming `background`.
 //!
 //! Plan task 9.1 built it to measure it, in `benchmarks/janus/`; staged plan S0.4 moved it here and
 //! ships it. The harness still measures it, through the `bench` feature's second world.

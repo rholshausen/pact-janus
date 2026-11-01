@@ -2,6 +2,7 @@
 //! Everything a session allocates — here, its interactions — is released when the session ends;
 //! there is no per-object cleanup call (spec §7.1).
 
+use super::background::{Background, SpawnError, Task};
 use super::exchange::{self, ArmedExchange, ExchangeState};
 use super::scope::Scope;
 use crate::common::{ContentTypes, declared_type};
@@ -15,7 +16,6 @@ use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
 
 /// The variant a `serve-variant` call has most recently armed for one interaction (variant-
 /// semantics spec §4.1): its id, and the concrete payload the generator produced for it, ready
@@ -84,7 +84,7 @@ pub(crate) struct TransportRun {
   component: Arc<dyn TransportComponent>,
   stop: Arc<AtomicBool>,
   state: Arc<Mutex<ExchangeState>>,
-  handle: Option<JoinHandle<()>>,
+  task: Option<Task>,
 }
 
 /// `consumer-session/variants` (variant-semantics spec §3.9): a malformed policy vs. an unknown
@@ -93,6 +93,14 @@ pub(crate) struct TransportRun {
 pub enum VariantsError {
   HandleNotFound,
   Variant(VariantError),
+}
+
+/// `consumer-session/start-transport` (spec §8.2): the component refused to start, or it started and
+/// the embedding could not start the exchange loop that drives it (ADR 0062).
+#[derive(Debug)]
+pub enum StartTransportError {
+  Component(ComponentError),
+  Spawn(SpawnError),
 }
 
 pub enum ServeVariantError {
@@ -205,22 +213,25 @@ impl ConsumerSession {
   }
 
   /// `consumer-session/start-transport` (spec §8.2): starts `component` under engine-assigned
-  /// `instance`, then spawns the background exchange loop (plan task 4.5, [`exchange::run`]) that
-  /// actually drives it — `poll-inbound` blocks, so nothing on the dispatch thread can pump it.
-  /// Returns the transport's endpoint descriptor.
+  /// `instance`, then asks `background` to run the exchange loop (plan task 4.5, [`exchange::run`])
+  /// that drives it — `poll-inbound` waits, so nothing on the dispatch thread can pump it
+  /// (ADR 0062). Returns the transport's endpoint descriptor.
   pub fn start_transport(
     &mut self,
     kind: &str,
     component: Arc<dyn TransportComponent>,
     instance: String,
     options: Option<Value>,
-  ) -> Result<Value, ComponentError> {
-    let result = component.start(Start {
-      instance: instance.clone(),
-      kind: kind.to_string(),
-      role: "serve".to_string(),
-      options,
-    })?;
+    background: &dyn Background,
+  ) -> Result<Value, StartTransportError> {
+    let result = component
+      .start(Start {
+        instance: instance.clone(),
+        kind: kind.to_string(),
+        role: "serve".to_string(),
+        options,
+      })
+      .map_err(StartTransportError::Component)?;
 
     let stop = Arc::new(AtomicBool::new(false));
     let state = Arc::new(Mutex::new(ExchangeState::default()));
@@ -230,16 +241,29 @@ impl ConsumerSession {
     let thread_instance = instance.clone();
     let content = self.scope.content();
     let contributions = self.scope.contributions();
-    let handle = thread::spawn(move || {
-      exchange::run(
-        thread_component,
-        content,
-        contributions,
-        thread_instance,
-        thread_stop,
-        thread_state,
-      );
-    });
+    let spawned = background.spawn(
+      &format!("janus exchange {instance}"),
+      Box::new(move || {
+        exchange::run(
+          thread_component,
+          content,
+          contributions,
+          thread_instance,
+          thread_stop,
+          thread_state,
+        );
+      }),
+    );
+    let task = match spawned {
+      Ok(task) => task,
+      Err(err) => {
+        // Nothing will drive the instance, so it must not outlive this answer.
+        let _ = component.stop(Stop {
+          instance: instance.clone(),
+        });
+        return Err(StartTransportError::Spawn(err));
+      }
+    };
 
     self.transports.push(TransportRun {
       instance,
@@ -247,7 +271,7 @@ impl ConsumerSession {
       component,
       stop,
       state,
-      handle: Some(handle),
+      task: Some(task),
     });
     Ok(result.endpoint)
   }
@@ -255,7 +279,7 @@ impl ConsumerSession {
   /// `consumer-session/finalise` (spec §7.1, §8.2): "transports stopped, all state released."
   /// Signals every bound transport's exchange loop to stop, tells the component itself to stop
   /// (which also unblocks a loop mid-`poll-inbound`, since the instance then stops existing),
-  /// joins each loop thread, and drains its recorded evidence into the interactions it belongs to
+  /// waits for each loop to end, and drains its recorded evidence into the interactions it belongs to
   /// — after this, `results`/`contract` see exactly what really happened on the wire.
   pub fn stop_transports(&mut self) {
     for mut run in self.transports.drain(..) {
@@ -263,8 +287,8 @@ impl ConsumerSession {
       let _ = run.component.stop(Stop {
         instance: run.instance.clone(),
       });
-      if let Some(handle) = run.handle.take() {
-        let _ = handle.join();
+      if let Some(task) = run.task.take() {
+        let _ = task.join();
       }
       let outcomes = std::mem::take(&mut run.state.lock().expect("exchange state lock poisoned").outcomes);
       for ((handle, variant_id), exercised) in outcomes {

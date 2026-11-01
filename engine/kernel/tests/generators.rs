@@ -36,6 +36,7 @@ fn engine() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   // As every embedding registers them, after JSON (ADR 0036 to ADR 0039).
   engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
   engine.declare_in_tree("content", "xml", "1.0.0");

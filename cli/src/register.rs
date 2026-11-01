@@ -9,15 +9,16 @@
 //! HTTP component's `http:status-class` matcher (ADR 0057), the JSON and text content components
 //! (ADR 0036), the `exec` and `http` hook implementations, the
 //! built-in `oauth2` hook component, the WASM loader for out-of-tree components (plan task 8.1),
-//! the Pact Broker client (ADR 0032, staged plan S1.3), and the configuration loader `config/load`
-//! answers with (ADR 0055, staged plan S1.14). An engine handed none of those refuses
+//! the Pact Broker client (ADR 0032, staged plan S1.3), the configuration loader `config/load`
+//! answers with (ADR 0055, staged plan S1.14), and threads for the work that runs beside the frame
+//! stream (ADR 0062). An engine handed none of those refuses
 //! a configuration naming them — by name, before a run starts.
 
 use pact_janus_component_http::status;
 use pact_janus_hooks_host::{ExecHooks, FileLoader, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
 use pact_janus_kernel::hooks::HookInvoker;
-use pact_janus_kernel::protocol::Engine;
+use pact_janus_kernel::protocol::{Engine, Threads};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -63,5 +64,8 @@ pub fn native_engine() -> Engine {
   // `config/load` (ADR 0055): an SDK reads a project's configuration through the loader
   // `janus verify --config` runs, so a file means the same in every language.
   engine.register_config_loader(Arc::new(FileLoader));
+  // ADR 0062: the exchange loop, a verification run and a publication each run on a thread of
+  // their own, which a native process has to give.
+  engine.register_background(Arc::new(Threads));
   engine
 }

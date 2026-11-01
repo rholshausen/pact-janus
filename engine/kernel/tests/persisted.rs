@@ -40,6 +40,7 @@ fn engine() -> Engine {
     std::collections::HashMap::new(),
     Some(std::sync::Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_background(std::sync::Arc::new(pact_janus_kernel::protocol::Threads));
   let hello = send(
     &mut engine,
     "engine/hello",

@@ -77,3 +77,51 @@ fn only_the_legacy_module_knows_a_v1_v4_pact() {
     leaks.join("\n  ")
   );
 }
+
+/// ADR 0062: the kernel starts no thread itself. Its background work goes through the
+/// `Background` its embedding registered, and `protocol/background.rs`'s `Threads` is the one
+/// implementation in the kernel that starts one. A file's test module, at its end, may start
+/// threads of its own.
+#[test]
+fn only_threads_starts_a_thread() {
+  let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+  let mut files = Vec::new();
+  rust_files(&src, &mut files);
+
+  let mut spawns = Vec::new();
+  for file in files {
+    let relative: Vec<String> = file
+      .strip_prefix(&src)
+      .expect("under src/")
+      .components()
+      .map(|component| component.as_os_str().to_string_lossy().to_string())
+      .collect();
+    let relative = relative.join("/");
+    if relative == "protocol/background.rs" {
+      continue;
+    }
+    let text = std::fs::read_to_string(&file).expect("a readable source file");
+    let lines: Vec<&str> = text.lines().collect();
+    for (number, line) in lines.iter().enumerate() {
+      if line.trim() == "#[cfg(test)]"
+        && lines
+          .get(number + 1)
+          .is_some_and(|next| next.starts_with("mod tests"))
+      {
+        break;
+      }
+      let code = line.split("//").next().unwrap_or_default();
+      if ["thread::spawn", "thread::Builder", "thread::scope"]
+        .iter()
+        .any(|call| code.contains(call))
+      {
+        spawns.push(format!("src/{relative}:{}: {}", number + 1, line.trim()));
+      }
+    }
+  }
+  assert!(
+    spawns.is_empty(),
+    "the kernel starts a thread outside protocol/background.rs; ask the engine's Background instead (ADR 0062):\n  {}",
+    spawns.join("\n  ")
+  );
+}

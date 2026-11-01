@@ -15,13 +15,9 @@
 //! Nothing here re-samples (§5.1) — the contract is the sample, and the run replays all of it in
 //! recorded order.
 //!
-//! **The run owns a thread**, because `verify` must return before the run finishes (spec §8.3) and
-//! a replayed request blocks. The same `wasm32-wasip2` caveat [`super::exchange`] documents applies
-//! here and for the same reason: this module compiles for that target, but `thread::spawn` has
-//! nothing to schedule onto without the threads proposal, so a WASM-component embedding needs
-//! either wasi-threads or a single-threaded run model. Every embedding wired up today (the CLI,
-//! the subprocess binary, the integration tests) is native, so this is a documented gap rather
-//! than a silent one.
+//! **The run is background work** the embedding provides (ADR 0062), because `verify` must return
+//! before the run finishes (spec §8.3) and a replayed request waits on the provider. An embedding
+//! with none, the WASM component, refuses `verify` by name.
 //!
 //! Provider states are **resolved here, per variant** (variant-semantics spec §6.4, plan task
 //! 5.2) rather than read from the contract's recorded values: resolution is a total function of
@@ -43,6 +39,7 @@
 //! turns a pact's matching rules into *shapes*. That is a different and lossier operation than
 //! verifying the pact where it stands, and it is the reason this path exists at all.
 
+use super::background::{Background, SpawnError, Task};
 use super::contributions::Contributions;
 use super::events::Stream;
 use super::frame::EngineError;
@@ -71,7 +68,6 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
 
 /// Which recorded variants a run replays (variant-semantics spec §5.1). The default is all of
 /// them; a host may narrow it for debugging, and a narrowed run **must be reported as filtered** —
@@ -769,7 +765,7 @@ pub(crate) struct Target {
 /// is joined when the stream's terminal event is delivered.
 pub(crate) struct Run {
   pub stream: Arc<Stream>,
-  pub thread: JoinHandle<()>,
+  pub task: Task,
 }
 
 /// What a run's scope lends it: the content components that decode and encode its slots, and what
@@ -840,7 +836,8 @@ pub(crate) fn start(
   publish: Option<PublishOptions>,
   stream: Arc<Stream>,
   segments: bool,
-) -> Run {
+  background: &dyn Background,
+) -> Result<Run, SpawnError> {
   let executed_plans = Reporting::from_options(options.as_ref(), segments);
   let policy = RunPolicy::from_options(options.as_ref());
   let thread_stream = Arc::clone(&stream);
@@ -848,42 +845,61 @@ pub(crate) fn start(
     Sources::Read(sources) => crashed_summary(sources, &filter),
     Sources::Broker(_) => crashed_summary(&[], &filter),
   };
-  let thread = thread::spawn(move || {
-    let stream = Arc::clone(&thread_stream);
-    guarded(&stream, crashed, move || {
-      let (sources, broker) = match sources {
-        Sources::Read(sources) => (sources, None),
-        Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
-          Ok((sources, fetched, brokers)) => (
-            sources,
-            Some(BrokerRun {
-              client: fetch.client,
-              brokers,
-              publish,
-              fetched,
-            }),
-          ),
-          Err(summary) => {
-            stop_targets(&targets);
-            thread_stream.finish("verification/finished", summary);
-            return;
-          }
-        },
-      };
-      run(
-        sources,
-        broker,
-        targets,
-        components,
-        hooks,
-        filter,
-        executed_plans,
-        policy,
-        thread_stream,
-      )
+  // What to stop if the run never starts: its closure owns the targets.
+  let started: Vec<Target> = targets
+    .iter()
+    .map(|target| Target {
+      kind: target.kind.clone(),
+      component: Arc::clone(&target.component),
+      instance: target.instance.clone(),
+      endpoint: Value::Null,
     })
-  });
-  Run { stream, thread }
+    .collect();
+  let spawned = background.spawn(
+    "janus verification",
+    Box::new(move || {
+      let stream = Arc::clone(&thread_stream);
+      guarded(&stream, crashed, move || {
+        let (sources, broker) = match sources {
+          Sources::Read(sources) => (sources, None),
+          Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
+            Ok((sources, fetched, brokers)) => (
+              sources,
+              Some(BrokerRun {
+                client: fetch.client,
+                brokers,
+                publish,
+                fetched,
+              }),
+            ),
+            Err(summary) => {
+              stop_targets(&targets);
+              thread_stream.finish("verification/finished", summary);
+              return;
+            }
+          },
+        };
+        run(
+          sources,
+          broker,
+          targets,
+          components,
+          hooks,
+          filter,
+          executed_plans,
+          policy,
+          thread_stream,
+        )
+      })
+    }),
+  );
+  match spawned {
+    Ok(task) => Ok(Run { stream, task }),
+    Err(err) => {
+      stop_targets(&started);
+      Err(err)
+    }
+  }
 }
 
 /// Fetch a broker source's pacts and read them (spec §8.3), reporting what was fetched as a

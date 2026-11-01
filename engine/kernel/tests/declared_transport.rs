@@ -145,6 +145,7 @@ fn line_hello() -> Value {
 fn engine(transport: &Arc<LineTransport>, hello: Value) -> Engine {
   // No transport of the embedding's own: `line` exists only because the project declared it.
   let mut engine = Engine::with_components(HashMap::new(), None);
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   engine.register_component_loader(Arc::new(StubLoader {
     transport: transport.clone(),
     hello,

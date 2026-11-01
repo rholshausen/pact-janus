@@ -3,6 +3,7 @@
 //! additional rules" beyond the call pipe itself) — JSON bytes in, JSON bytes out — deliberately
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
+use super::background::Background;
 use super::broker::{self as broker_ops, PublishContracts};
 use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
 use super::events::{Event, Poll, Stream};
@@ -13,7 +14,9 @@ use super::provider_shape_session::{
   Create as CreateRecording, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
 };
 use super::scope::Scope;
-use super::session::{AddInteractionError, ServeVariantError, SessionStore, VariantsError};
+use super::session::{
+  AddInteractionError, ServeVariantError, SessionStore, StartTransportError, VariantsError,
+};
 use super::subsumption::{
   self as subsumption_ops, Check as SubsumptionCheck, Decide as SubsumptionDecide, SubsumptionError,
 };
@@ -46,7 +49,7 @@ pub struct Engine {
   sessions: SessionStore,
   /// Transport components this embedding registered, by name (component-interfaces spec §3.4,
   /// design 2.6) — empty for a plain [`Engine::new`], which is a legitimate engine that simply
-  /// answers `start-transport` with `component-unavailable` for anything named.
+  /// answers `start-transport` with `component-unavailable`.
   transports: HashMap<String, Arc<dyn TransportComponent>>,
   /// The content components compiled into this embedding, in precedence order. A session or run
   /// puts the components its project declared ahead of these ([`Scope`], plan task 8.1).
@@ -98,6 +101,11 @@ pub struct Engine {
   /// event as a verification session is, and pruned by [`Engine::handle_poll`] on the same edge.
   publications: HashMap<String, Run>,
   next_publication: u64,
+  /// What runs work beside the frame stream, when this embedding registered it (ADR 0062): a
+  /// transport's exchange loop, a verification run, a broker publication. With none, those three
+  /// operations are `component-unavailable` naming `background`, and `engine/hello` declares no
+  /// `background` capability.
+  background: Option<Arc<dyn Background>>,
 }
 
 /// The version an in-tree component answers requirements with. In-tree components ship with the
@@ -139,13 +147,15 @@ impl Engine {
       config_loader: None,
       publications: HashMap::new(),
       next_publication: 0,
+      background: None,
     }
   }
 
   /// An engine wired to real components (plan task 4.5) — what an embedding (the CLI's subprocess
   /// binary, an SDK's native binding) builds so `start-transport` and the live exchange loop it
   /// drives have something to call. The kernel never depends on `transports`/`content`'s own
-  /// crates (AGENTS.md's B3); this is the injection point that keeps it that way.
+  /// crates (AGENTS.md's B3); this is the injection point that keeps it that way. The loop also
+  /// needs [`Engine::register_background`], which this does not do (ADR 0062).
   pub fn with_components(
     transports: HashMap<String, Arc<dyn TransportComponent>>,
     content: Option<Arc<dyn ContentComponent>>,
@@ -184,6 +194,7 @@ impl Engine {
       config_loader: None,
       publications: HashMap::new(),
       next_publication: 0,
+      background: None,
     }
   }
 
@@ -261,6 +272,13 @@ impl Engine {
   /// project's configuration file with. The native embeddings register one; the WASM artifact cannot.
   pub fn register_config_loader(&mut self, loader: Arc<dyn ConfigLoader>) {
     self.config_loader = Some(loader);
+  }
+
+  /// Register what runs work beside the frame stream (ADR 0062): a native embedding registers
+  /// [`super::Threads`]. Without it, `consumer-session/start-transport`, `verification/verify` and
+  /// `broker/publish-contracts` are `component-unavailable` naming `background`.
+  pub fn register_background(&mut self, background: Arc<dyn Background>) {
+    self.background = Some(background);
   }
 
   /// Register a hook component, answering `run: { kind: component, component: <name> }`.
@@ -375,7 +393,12 @@ impl Engine {
           .collect();
         ResponseFrame::ok(
           id,
-          hello::result(&loaders, self.broker.is_some(), self.config_loader.is_some()),
+          hello::result(
+            &loaders,
+            self.broker.is_some(),
+            self.config_loader.is_some(),
+            self.background.is_some(),
+          ),
         )
       }
       None => ResponseFrame::err(
@@ -481,6 +504,10 @@ impl Engine {
     let Some(session) = self.sessions.get_mut(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
+    // ADR 0062: nothing could drive the transport, whichever one it is.
+    let Some(background) = self.background.clone() else {
+      return ResponseFrame::err(id, EngineError::background_unavailable("serve a transport"));
+    };
     // A transport the session's project declared (plan task 8.3), ahead of the embedding's own.
     let Some(component) = session
       .transport(&req.transport)
@@ -490,9 +517,18 @@ impl Engine {
     };
     self.next_transport += 1;
     let instance = format!("t-{}", self.next_transport);
-    match session.start_transport(&req.transport, component, instance, req.options) {
+    match session.start_transport(
+      &req.transport,
+      component,
+      instance,
+      req.options,
+      background.as_ref(),
+    ) {
       Ok(endpoint) => ResponseFrame::ok(id, json!({ "endpoint": endpoint })),
-      Err(err) => ResponseFrame::err(id, EngineError::component_failed(&req.transport, &err)),
+      Err(StartTransportError::Component(err)) => {
+        ResponseFrame::err(id, EngineError::component_failed(&req.transport, &err))
+      }
+      Err(StartTransportError::Spawn(err)) => ResponseFrame::err(id, EngineError::internal(err.to_string())),
     }
   }
 
@@ -615,6 +651,11 @@ impl Engine {
       return ResponseFrame::err(id, err);
     }
 
+    // ADR 0062: the run goes on after `verify` answers, so nothing is loaded or started without
+    // somewhere to run it. The request and its documents were checked first.
+    let Some(background) = self.background.clone() else {
+      return ResponseFrame::err(id, EngineError::background_unavailable("run a verification"));
+    };
     // Component-interfaces spec §2.3: load what the project declared, then collect the union of
     // every interaction's requirements and fail the unsatisfiable ones — before any transport is
     // started and before any exchange runs.
@@ -730,9 +771,17 @@ impl Engine {
       req.options,
       filter,
       publish,
-      stream,
+      Arc::clone(&stream),
       self.segments,
+      background.as_ref(),
     );
+    let run = match run {
+      Ok(run) => run,
+      Err(err) => {
+        self.streams.remove(stream.id());
+        return ResponseFrame::err(id, EngineError::internal(err.to_string()));
+      }
+    };
     let stream_id = run.stream.id().to_string();
     self.verifications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
@@ -753,10 +802,19 @@ impl Engine {
       Ok(publication) => publication,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    let Some(background) = self.background.clone() else {
+      return ResponseFrame::err(id, EngineError::background_unavailable("publish contracts"));
+    };
     self.next_publication += 1;
     let session = format!("bs-{}", self.next_publication);
     let stream = self.open_stream();
-    let run = broker_ops::start(client, publication, stream);
+    let run = match broker_ops::start(client, publication, Arc::clone(&stream), background.as_ref()) {
+      Ok(run) => run,
+      Err(err) => {
+        self.streams.remove(stream.id());
+        return ResponseFrame::err(id, EngineError::internal(err.to_string()));
+      }
+    };
     let stream_id = run.stream.id().to_string();
     self.publications.insert(session.clone(), run);
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
@@ -1045,9 +1103,9 @@ impl Engine {
         .collect();
       for session in sessions {
         if let Some(run) = self.verifications.remove(&session)
-          && run.thread.join().is_err()
+          && run.task.join().is_err()
         {
-          tracing::error!(session = %session, "the verification run's thread panicked");
+          tracing::error!(session = %session, "the verification run panicked");
         }
       }
       let publications: Vec<String> = self
@@ -1058,9 +1116,9 @@ impl Engine {
         .collect();
       for session in publications {
         if let Some(run) = self.publications.remove(&session)
-          && run.thread.join().is_err()
+          && run.task.join().is_err()
         {
-          tracing::error!(session = %session, "the publication's thread panicked");
+          tracing::error!(session = %session, "the publication panicked");
         }
       }
     }

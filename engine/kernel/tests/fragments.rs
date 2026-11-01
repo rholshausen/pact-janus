@@ -150,6 +150,7 @@ fn engine(stub: &Arc<Stub>, name: &str, answer: Value) -> Engine {
   let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
   transports.insert("line".to_string(), Arc::new(Provider { answer }));
   let mut engine = Engine::with_components(transports, None);
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   engine.register_component_loader(Arc::new(StubLoader {
     stub: stub.clone(),
     name: name.to_string(),

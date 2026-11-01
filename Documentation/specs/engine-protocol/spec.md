@@ -458,6 +458,7 @@ Capabilities defined in v1:
 | `broker` | engine | The engine has a Pact Broker client: a `broker` source for `verification/verify`, its `publish` option, and the `broker/*` operations (§8.7, ADR 0032). Value `{}`. Only native embeddings register one; without it those answer `component-unavailable` naming `broker`. |
 | `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
 | `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
+| `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker publication ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and `broker/publish-contracts` answer `component-unavailable` naming `background`, after the request and its documents are checked. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -601,7 +602,9 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 - **`start-transport`**: starts a transport component instance for this session (`transport`
   is an open vocabulary: `"http"`, …). The result `endpoint` is an **open descriptor
   document** — host/port for HTTP, broker/topic details for messaging — never assumed to be
-  a URL (spike 1.5, finding 1). A session MAY start several transports.
+  a URL (spike 1.5, finding 1). A session MAY start several transports. A served transport is
+  driven by an exchange loop that runs beside the frame stream, behind the `background`
+  capability (§5.3).
 - **`serve-variant`**: for a **passive** interaction, arms the given variant: the next
   matching inbound traffic on the session's transports is matched against it. For an
   **emissive** interaction, delivers now: the engine produces the message for that variant

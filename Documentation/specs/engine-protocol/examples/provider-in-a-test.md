@@ -18,7 +18,7 @@ engine, `←` is engine to host.
 ```json
 { "type": "response", "id": "r-1",
   "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.4.1" },
-          "capabilities": { "config-loading": {}, "broker": {},
+          "capabilities": { "config-loading": {}, "broker": {}, "background": {},
                             "components": { "loaders": ["in-tree", "wasm"] } } } }
 ```
 

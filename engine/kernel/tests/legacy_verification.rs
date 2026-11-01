@@ -54,6 +54,7 @@ fn engine_with_everything() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   // XML before text, so `text/xml` reaches it (ADR 0039), as every embedding registers them.
   engine.register_content(Arc::new(pact_janus_component_xml::XmlContent::new()));
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));

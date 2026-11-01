@@ -47,6 +47,7 @@ fn engine_with_hooks() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   hello(&mut engine);
@@ -70,6 +71,7 @@ fn engine_without_hooks() -> Engine {
     transports,
     Some(Arc::new(pact_janus_component_json::JsonContent::new())),
   );
+  engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
   hello(&mut engine);
   engine
 }

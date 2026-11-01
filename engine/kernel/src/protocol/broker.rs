@@ -14,6 +14,7 @@
 //! so the same document is the same bytes however it arrived, and `$format`, which sorts first,
 //! still opens it (contract-file spec §2.3).
 
+use super::background::{Background, SpawnError};
 use super::events::Stream;
 use super::frame::EngineError;
 use super::verification::{self, Run, VerifyError};
@@ -116,70 +117,78 @@ fn repointed(err: VerifyError) -> VerifyError {
   }
 }
 
-/// Start the publication on its own thread, as a verification run is started: the operation
-/// answers at once, and the outcome arrives on `stream`.
-pub(crate) fn start(client: Arc<dyn BrokerClient>, publication: Publication, stream: Arc<Stream>) -> Run {
+/// Start the publication in the background (ADR 0062), as a verification run is started: the
+/// operation answers at once, and the outcome arrives on `stream`.
+pub(crate) fn start(
+  client: Arc<dyn BrokerClient>,
+  publication: Publication,
+  stream: Arc<Stream>,
+  background: &dyn Background,
+) -> Result<Run, SpawnError> {
   let thread_stream = Arc::clone(&stream);
-  let thread = std::thread::spawn(move || {
-    let stream = thread_stream;
-    let shown = publication.broker.display_url();
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-      client.publish_contracts(&ContractsToPublish {
-        broker: &publication.broker,
-        consumer: &publication.consumer,
-        consumer_version: &publication.consumer_version,
-        branch: publication.branch.as_deref(),
-        tags: &publication.tags,
-        build_url: publication.build_url.as_deref(),
-        contracts: &publication.contracts,
-      })
-    }));
-    let (notices, error) = match outcome {
-      Ok(Ok(published)) => (published.notices, None),
-      Ok(Err(error)) => (Vec::new(), Some(EngineError::component_failed("broker", &error))),
-      Err(panic) => {
-        let detail = panic
-          .downcast_ref::<&str>()
-          .map(|text| text.to_string())
-          .or_else(|| panic.downcast_ref::<String>().cloned())
-          .unwrap_or_else(|| "no detail".to_string());
-        tracing::error!(stream = %stream.id(), %detail, "the publication panicked");
-        (
-          Vec::new(),
-          Some(EngineError::internal(format!(
-            "the publication stopped unexpectedly: {detail}"
-          ))),
-        )
-      }
-    };
-    let error = error.map(|error| serde_json::to_value(error).unwrap_or(Value::Null));
+  let task = background.spawn(
+    "janus publication",
+    Box::new(move || {
+      let stream = thread_stream;
+      let shown = publication.broker.display_url();
+      let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.publish_contracts(&ContractsToPublish {
+          broker: &publication.broker,
+          consumer: &publication.consumer,
+          consumer_version: &publication.consumer_version,
+          branch: publication.branch.as_deref(),
+          tags: &publication.tags,
+          build_url: publication.build_url.as_deref(),
+          contracts: &publication.contracts,
+        })
+      }));
+      let (notices, error) = match outcome {
+        Ok(Ok(published)) => (published.notices, None),
+        Ok(Err(error)) => (Vec::new(), Some(EngineError::component_failed("broker", &error))),
+        Err(panic) => {
+          let detail = panic
+            .downcast_ref::<&str>()
+            .map(|text| text.to_string())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "no detail".to_string());
+          tracing::error!(stream = %stream.id(), %detail, "the publication panicked");
+          (
+            Vec::new(),
+            Some(EngineError::internal(format!(
+              "the publication stopped unexpectedly: {detail}"
+            ))),
+          )
+        }
+      };
+      let error = error.map(|error| serde_json::to_value(error).unwrap_or(Value::Null));
 
-    // The broker accepts or refuses a publication whole, so every contract shares its outcome.
-    let mut results = Vec::with_capacity(publication.contracts.len());
-    for contract in &publication.contracts {
-      let mut result = json!({
-        "consumer": publication.consumer,
-        "provider": contract.provider,
-        "outcome": if error.is_none() { "published" } else { "failed" },
-      });
-      if let Some(error) = &error {
-        result["error"] = error.clone();
+      // The broker accepts or refuses a publication whole, so every contract shares its outcome.
+      let mut results = Vec::with_capacity(publication.contracts.len());
+      for contract in &publication.contracts {
+        let mut result = json!({
+          "consumer": publication.consumer,
+          "provider": contract.provider,
+          "outcome": if error.is_none() { "published" } else { "failed" },
+        });
+        if let Some(error) = &error {
+          result["error"] = error.clone();
+        }
+        stream.emit("broker/published", result.clone());
+        results.push(result);
       }
-      stream.emit("broker/published", result.clone());
-      results.push(result);
-    }
-    let mut finished = json!({
-      "status": if error.is_none() { "published" } else { "failed" },
-      "broker": shown,
-      "consumer": publication.consumer,
-      "consumer-version": publication.consumer_version,
-      "contracts": results,
-      "notices": notices,
-    });
-    if let Some(error) = error {
-      finished["error"] = error;
-    }
-    stream.finish("broker/finished", finished);
-  });
-  Run { stream, thread }
+      let mut finished = json!({
+        "status": if error.is_none() { "published" } else { "failed" },
+        "broker": shown,
+        "consumer": publication.consumer,
+        "consumer-version": publication.consumer_version,
+        "contracts": results,
+        "notices": notices,
+      });
+      if let Some(error) = error {
+        finished["error"] = error;
+      }
+      stream.finish("broker/finished", finished);
+    }),
+  )?;
+  Ok(Run { stream, task })
 }

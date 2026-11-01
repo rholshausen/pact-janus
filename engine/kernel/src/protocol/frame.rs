@@ -444,6 +444,18 @@ impl EngineError {
     }
   }
 
+  /// `component-unavailable` naming `background` (ADR 0062): this embedding registered nothing to
+  /// run work beside the frame stream, so an operation that needs it cannot start.
+  pub fn background_unavailable(what: &str) -> Self {
+    EngineError {
+      code: "component-unavailable".to_string(),
+      category: "component".to_string(),
+      message: format!("this engine cannot run work in the background, so it cannot {what}"),
+      details: Some(Box::new(serde_json::json!({ "component": "background" }))),
+      chain: None,
+    }
+  }
+
   /// `pacts-not-found` (spec §8.3, §10.2): a `broker` source whose selectors selected nothing. The
   /// selectors are the user's, so it is theirs to fix.
   pub fn pacts_not_found(provider: &str) -> Self {

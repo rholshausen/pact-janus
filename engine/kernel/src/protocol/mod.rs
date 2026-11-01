@@ -28,6 +28,7 @@
 //! here — `start-transport` only drives passive HTTP today, one armed exchange at a time per
 //! transport instance, which is what a sequential `serve-variant` loop actually needs.
 
+mod background;
 mod broker;
 mod consumer_session;
 mod contributions;
@@ -46,6 +47,7 @@ mod subsumption;
 mod verification;
 mod wire;
 
+pub use background::{Background, Panicked, SpawnError, Task, Threads};
 pub use contributions::in_tree_actions;
 pub use engine::Engine;
 pub use events::Event;

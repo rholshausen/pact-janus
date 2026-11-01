@@ -67,6 +67,7 @@ impl Native {
     let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
     transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
     let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
+    engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
     engine.declare_in_tree("content", "json", "1.0.0");
     engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
     engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
