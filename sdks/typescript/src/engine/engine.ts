@@ -42,7 +42,8 @@ export class Engine {
       const hello = await engine.call(Op.EngineHello, {
         "protocol-versions": [PROTOCOL_VERSION],
         host: SDK,
-        capabilities: {},
+        // ADR 0063: contracts cross the boundary as their text, so this SDK writes the engine's bytes.
+        capabilities: { "contract-text": {} },
       });
       if (hello["protocol-version"] !== PROTOCOL_VERSION) {
         throw new Error(

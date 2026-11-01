@@ -20,14 +20,15 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * Capabilities
  * <p>
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "encoding",
     "provider-shape-recording",
-    "segments"
+    "segments",
+    "contract-text"
 })
 public class Capabilities {
 
@@ -58,6 +59,15 @@ public class Capabilities {
     @JsonProperty("segments")
     @JsonPropertyDescription("Display text's segments (spec.md \u00a72.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.")
     private SegmentsCapability segments;
+    /**
+     * ContractTextCapability
+     * <p>
+     * A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("contract-text")
+    @JsonPropertyDescription("A contract crosses the boundary as its text (spec.md \u00a78.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.")
+    private ContractTextCapability contractText;
     @JsonIgnore
     private Map<java.lang.String, Map<String, Object>> additionalProperties = new LinkedHashMap<java.lang.String, Map<String, Object>>();
 
@@ -127,6 +137,28 @@ public class Capabilities {
         this.segments = segments;
     }
 
+    /**
+     * ContractTextCapability
+     * <p>
+     * A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public ContractTextCapability getContractText() {
+        return contractText;
+    }
+
+    /**
+     * ContractTextCapability
+     * <p>
+     * A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public void setContractText(ContractTextCapability contractText) {
+        this.contractText = contractText;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Map<String, Object>> getAdditionalProperties() {
         return this.additionalProperties;
@@ -153,6 +185,10 @@ public class Capabilities {
         sb.append('=');
         sb.append(((this.segments == null)?"<null>":this.segments));
         sb.append(',');
+        sb.append("contractText");
+        sb.append('=');
+        sb.append(((this.contractText == null)?"<null>":this.contractText));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -171,6 +207,7 @@ public class Capabilities {
         result = ((result* 31)+((this.providerShapeRecording == null)? 0 :this.providerShapeRecording.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.encoding == null)? 0 :this.encoding.hashCode()));
+        result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.segments == null)? 0 :this.segments.hashCode()));
         return result;
     }
@@ -184,7 +221,7 @@ public class Capabilities {
             return false;
         }
         Capabilities rhs = ((Capabilities) other);
-        return (((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))))&&((this.segments == rhs.segments)||((this.segments!= null)&&this.segments.equals(rhs.segments))));
+        return ((((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.segments == rhs.segments)||((this.segments!= null)&&this.segments.equals(rhs.segments))));
     }
 
 }

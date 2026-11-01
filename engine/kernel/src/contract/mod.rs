@@ -5,6 +5,7 @@ pub mod canonical;
 mod error;
 mod identify;
 mod model;
+pub mod text;
 mod write;
 
 pub use crate::common::{Requirement, State, Transport};

@@ -41,8 +41,10 @@ final class ScriptedEngine implements Embedding {
       served.add(body.path("variant").asText());
       return "{\"ok\":{}}";
     });
-    on("consumer-session/finalise", body -> "{\"ok\":{\"results\":[],\"contract\":"
-        + "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"c\"},\"provider\":{\"name\":\"p\"},\"interactions\":[]}}}");
+    // The contract as its text (ADR 0063), as the engine answers a host that declared 'contract-text'.
+    on("consumer-session/finalise", body -> "{\"ok\":{\"results\":[],\"contract-text\":"
+        + "\"{\\\"$format\\\":\\\"janus-contract/1\\\",\\\"consumer\\\":{\\\"name\\\":\\\"c\\\"},"
+        + "\\\"provider\\\":{\\\"name\\\":\\\"p\\\"},\\\"interactions\\\":[]}\\n\"}}");
   }
 
   /** Answers {@code op} with {@code ok}. */

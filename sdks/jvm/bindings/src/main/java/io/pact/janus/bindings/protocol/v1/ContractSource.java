@@ -50,12 +50,12 @@ public class ContractSource {
     @JsonProperty("kind")
     private java.lang.String kind;
     /**
-     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
+     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).
      * 
      */
     @JsonProperty("contracts")
-    @JsonPropertyDescription("For kind 'inline': the contract documents \u2014 Janus contracts or v1\u2013v4 pacts (any supported spec version).")
-    private List<Map<String, Object>> contracts;
+    @JsonPropertyDescription("For kind 'inline': the contract documents \u2014 Janus contracts or v1\u2013v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).")
+    private List<java.lang.Object> contracts;
     /**
      * BrokerDescriptor
      * <p>
@@ -161,20 +161,20 @@ public class ContractSource {
     }
 
     /**
-     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
+     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).
      * 
      */
     @JsonProperty("contracts")
-    public List<Map<String, Object>> getContracts() {
+    public List<java.lang.Object> getContracts() {
         return contracts;
     }
 
     /**
-     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
+     * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).
      * 
      */
     @JsonProperty("contracts")
-    public void setContracts(List<Map<String, Object>> contracts) {
+    public void setContracts(List<java.lang.Object> contracts) {
         this.contracts = contracts;
     }
 

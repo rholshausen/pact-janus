@@ -52,7 +52,7 @@ class ScriptedPipe implements FramePipe {
       case "consumer-session/variants":
         return { ok: { variants: this.variants.map((id) => ({ id, label: id === "base" ? "base" : `label of ${id}` })) } };
       case "consumer-session/finalise":
-        return { ok: { results: [{ handle: "i-1", status: "verified" }], contract: { $format: "janus-contract/1" } } };
+        return { ok: { results: [{ handle: "i-1", status: "verified" }], "contract-text": '{"$format":"janus-contract/1"}\n' } };
       default:
         return { ok: {} };
     }
@@ -202,19 +202,32 @@ describe("finalise", () => {
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
   });
 
-  it("writes the contract the engine returned, compact and unaltered, with one trailing LF (session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered)", async () => {
-    const contract = { $format: "janus-contract/1", consumer: { name: "web-app" }, zeta: 1, alpha: [2, 1] };
+  it("writes the contract text the engine returned, byte for byte (session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered)", async () => {
+    // Numbers JavaScript would respell, and members out of name order: the SDK parses none of it.
+    const text = '{"$format":"janus-contract/1","consumer":{"name":"web-app"},"zeta":1.0,"alpha":[9007199254740993,1e+16]}\n';
     const pipe = new ScriptedPipe({
-      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], contract } }),
+      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], "contract-text": text } }),
     });
     const dir = await mkdtemp(join(tmpdir(), "janus-"));
     const janus = janusOver(pipe, { contractDir: dir });
     await janus.execute(janus.interaction("x"), noop);
     const { contractFile } = await janus.finalise();
     expect(contractFile).toBe(join(dir, "web-app-orders-api.janus.json"));
-    expect(await readFile(contractFile ?? "", "utf8")).toBe(
-      '{"$format":"janus-contract/1","consumer":{"name":"web-app"},"zeta":1,"alpha":[2,1]}\n',
-    );
+    expect(await readFile(contractFile ?? "", "utf8")).toBe(text);
+    expect(pipe.bodies[pipe.ops.indexOf("engine/hello")]?.capabilities).toEqual({ "contract-text": {} });
+  });
+
+  it("fails, saying the engine is too old, when the engine answers the contract document rather than its text", async () => {
+    const pipe = new ScriptedPipe({
+      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], contract: { $format: "janus-contract/1" } } }),
+    });
+    const dir = await mkdtemp(join(tmpdir(), "janus-"));
+    const janus = janusOver(pipe, { contractDir: dir });
+    await janus.execute(janus.interaction("x"), noop);
+    const error = await janus.finalise().catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(ContractWithheldError);
+    expect(String(error)).toContain("predates 'contract-text'");
+    await expect(readFile(join(dir, "web-app-orders-api.janus.json"), "utf8")).rejects.toThrow();
   });
 
   it("fails naming every unverified variant, and writes nothing, when the engine withholds the contract (session.finalise.withheld-contract-fails-build)", async () => {

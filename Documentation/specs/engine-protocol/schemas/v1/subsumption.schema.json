@@ -13,8 +13,8 @@
       ],
       "properties": {
         "contract": {
-          "type": "object",
-          "description": "The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's."
+          "type": ["object", "string"],
+          "description": "The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's."
         },
         "provider-shape": {
           "type": "object",

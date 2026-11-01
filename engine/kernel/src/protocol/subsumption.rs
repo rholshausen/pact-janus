@@ -135,6 +135,15 @@ pub fn decide(request: &Decide) -> Result<(CompatibilityReport, crate::display::
 /// host that wants to read those calls `upgrade/pact` itself, which is why they are not smuggled
 /// into this result.
 fn consumer_contract(document: &Value) -> Result<(Contract, String), SubsumptionError> {
+  // ADR 0063 decision 3: the contract may be the file's text.
+  let document =
+    contract::text::document(document, "/contract").map_err(|problem| SubsumptionError::Document {
+      member: "contract",
+      error: contract::ContractError::Invalid {
+        problems: vec![problem],
+      },
+    })?;
+  let document = document.as_ref();
   let bytes = document.to_string();
   if contract::identify(bytes.as_bytes(), IdentifyMode::Tolerant) {
     let contract = contract::read(bytes.as_bytes(), IdentifyMode::Tolerant).map_err(|error| {

@@ -32,7 +32,8 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
     const pacts = await Promise.all(
       (script.pacts ?? []).map(async (document, i) => {
         const file = join(dir, `pact-${i + 1}.json`);
-        await writeFile(file, JSON.stringify(document), "utf8");
+        // A string is the file's exact text (ADR 0063); a document is written compactly.
+        await writeFile(file, typeof document === "string" ? document : JSON.stringify(document), "utf8");
         return file;
       }),
     );

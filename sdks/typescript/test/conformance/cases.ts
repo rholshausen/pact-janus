@@ -71,6 +71,7 @@ export interface Step {
 export interface ScriptedEngine {
   variants?: { id: string; label?: string }[];
   contract?: Record<string, unknown>;
+  "contract-text"?: string;
   "withhold-contract"?: boolean;
   results?: Record<string, unknown>[];
   errors?: Record<string, { code: string; message?: string; after?: number; details?: Record<string, unknown> }>;
@@ -91,7 +92,7 @@ export interface Behaviour {
 /** A provider case's verifier, as data. */
 export interface VerifierScript {
   "provider-url"?: string;
-  pacts?: Record<string, unknown>[];
+  pacts?: (Record<string, unknown> | string)[];
   broker?: Record<string, unknown>;
   urls?: Record<string, unknown>;
   options?: Record<string, unknown>;

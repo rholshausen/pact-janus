@@ -458,6 +458,7 @@ Capabilities defined in v1:
 | `broker` | engine | The engine has a Pact Broker client: a `broker` source for `verification/verify`, its `publish` option, and the `broker/*` operations (§8.7, ADR 0032). Value `{}`. Only native embeddings register one; without it those answer `component-unavailable` naming `broker`. |
 | `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
 | `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
+| `contract-text` | both | A contract crosses the boundary as its text (§8.9, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)). Value `{}`. Engine: wherever a request carries a contract or a v1–v4 pact, it may carry the document's text. Host: it wants an outbound contract as its canonical text, `contract-text` in place of `contract`. |
 | `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker publication ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and `broker/publish-contracts` answer `component-unavailable` naming `background`, after the request and its documents are checked. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
@@ -616,7 +617,8 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   results. The `contract` member — the Janus contract *document*; persistence is the host's
   business — is present iff every interaction verified successfully on every variant design 2.3's
   sampling requires it to exercise (an unexercised required variant is `not-exercised`, which
-  withholds the contract exactly as a failure does).
+  withholds the contract exactly as a failure does). To a host that declared `contract-text`, it is
+  `contract-text` instead, the contract's canonical text (§8.9).
   Unmatched-request and missed-interaction detail rides in `results`.
 
 ### 8.3 Verification — `verification/*`
@@ -744,7 +746,8 @@ Schema: [`schemas/v1/upgrade.schema.json`](schemas/v1/upgrade.schema.json).
 | `upgrade/pact` | `{ pact, options? }` → `{ contract, findings }` |
 
 Converts a v1–v4 pact document to a Janus contract per design 2.5's rules (matching rules become shapes;
-the single example becomes the sole variant). `findings` lists lossy or judgement-call spots
+the single example becomes the sole variant). The pact may be its text, and to a host that declared
+`contract-text` the contract is answered as its text (§8.9). `findings` lists lossy or judgement-call spots
 (each with a code from an open vocabulary, a JSON pointer location and prose) so the CLI's
 `upgrade` command can show its work. Session-less: conversion is pure document-in,
 document-out. A document without the members every pact file has (`consumer` and `provider`
@@ -958,6 +961,24 @@ the operation and answers it with `component-unavailable` naming `config-loader`
   hidden there, as in any frame.
 - **Not a run.** A verification run still reads no file and no variable; `verify` receives a
   closed document (ADR 0014). `config/load` is an operation a host chooses to make before it.
+
+### 8.9 A contract as its text
+
+A host that parses a contract and writes it back can change it: a number re-spelled by its
+language's parser, an integer above 2^53 rounded. So a contract can cross the boundary as its text,
+behind the `contract-text` capability (§5.3, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)).
+
+- **Out.** To a host that declared `contract-text`, `consumer-session/finalise` and `upgrade/pact`
+  answer with `contract-text` in place of `contract`: the contract's canonical bytes (contract-file
+  spec §2.4) as a string, its trailing LF included, present exactly when `contract` would be. The
+  host writes the string's UTF-8 encoding and adds and removes nothing. A JSON frame carries it as a
+  JSON string and a CBOR frame as a text string, exact under either. A host that did not declare it
+  gets `contract`, as before.
+- **In.** Wherever a request carries a contract or a v1–v4 pact — the `inline` source's `contracts`
+  in `verification/verify`, `upgrade/pact`'s `pact`, `subsumption/check`'s `contract` and
+  `broker/publish-contracts`'s `contracts` — it may carry the document's text. The engine reads it as
+  it reads a file, whatever its layout. A contract and a pact are always objects, so a string is never
+  ambiguous. Text that is not JSON is `contract-invalid`, with a problem at the member that held it.
 
 ## 9. Events and streams
 

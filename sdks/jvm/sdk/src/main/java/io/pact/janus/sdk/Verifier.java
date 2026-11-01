@@ -5,6 +5,8 @@ import io.pact.janus.sdk.engine.Embedding;
 import io.pact.janus.sdk.engine.FramePipe;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -324,10 +326,11 @@ public final class Verifier {
       source.putAll(broker != null ? broker : urls);
       return source;
     }
+    // Each file's text, unparsed (ADR 0063): nothing a parser changed is what is verified.
     List<Object> contracts = new ArrayList<>();
     for (Path pact : pacts) {
       try {
-        contracts.add(Json.MAPPER.readValue(pact.toFile(), LinkedHashMap.class));
+        contracts.add(Files.readString(pact, StandardCharsets.UTF_8));
       } catch (IOException e) {
         throw new UncheckedIOException("could not read " + pact, e);
       }

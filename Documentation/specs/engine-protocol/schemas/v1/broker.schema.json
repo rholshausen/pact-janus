@@ -71,7 +71,8 @@
         "contracts": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "object" }
+          "description": "Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).",
+          "items": { "type": ["object", "string"] }
         }
       }
     },

@@ -152,9 +152,8 @@ export class Verifier {
     if (urls) {
       return { kind: "urls", ...urls };
     }
-    const contracts = await Promise.all(
-      (pacts ?? []).map(async (path) => JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>),
-    );
+    // Each file's text, unparsed (ADR 0063): JavaScript's numbers would change what is verified.
+    const contracts = await Promise.all((pacts ?? []).map((path) => readFile(path, "utf8")));
     return { kind: "inline", contracts };
   }
 

@@ -1,0 +1,27 @@
+{
+  "consumer": { "name": "string-consumer" },
+  "provider": { "name": "string-provider" },
+  "interactions": [
+    {
+      "description": "every way a string is written",
+      "request": { "method": "GET", "path": "/strings" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "quote-and-backslash": "a \"quoted\" \\ backslash",
+          "short-escapes": "\b\f\n\r\t",
+          "other-control-characters": "\u0000\u0001\u001f",
+          "delete": "\u007f",
+          "solidus": "a/b",
+          "escaped-solidus": "a\/b",
+          "non-ascii": "läuft",
+          "escaped-non-ascii": "läuft",
+          "line-separators": "  ",
+          "outside-the-basic-plane": "😀"
+        }
+      }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "3.0.0" } }
+}

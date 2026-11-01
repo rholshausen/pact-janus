@@ -8,7 +8,8 @@
 //!
 //! The contract is written in its canonical bytes (ADR 0018): compact, `$format` first. That is
 //! not a display choice — deterministic bytes are what keep broker deduplication and git diffs
-//! honest. Anything that wants it readable can pipe it through `jq`.
+//! honest. They are the engine's text, written as it came (ADR 0063). Anything that wants it
+//! readable can pipe it through `jq`.
 
 use crate::Outcome;
 use crate::args::{Output, UpgradeArgs};
@@ -52,8 +53,13 @@ pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
   }
 
   // Canonical bytes, whichever way they leave: a contract's identity is its bytes, and a writer
-  // that pretty-printed to a terminal and compacted to a file would be two writers.
-  let contract = canonical(&result["contract"])?;
+  // that pretty-printed to a terminal and compacted to a file would be two writers. They are the
+  // engine's, unchanged.
+  let contract = result["contract-text"]
+    .as_str()
+    .ok_or_else(|| Error::Failed("the engine answered no contract text".to_string()))?
+    .as_bytes()
+    .to_vec();
   match &args.write {
     Some(path) => {
       std::fs::write(path, &contract)
@@ -67,13 +73,6 @@ pub fn run(args: &UpgradeArgs) -> Result<Outcome, Error> {
     report(&result["findings"]);
   }
   Ok(Outcome::Done)
-}
-
-fn canonical(contract: &Value) -> Result<Vec<u8>, Error> {
-  let contract: pact_janus_kernel::contract::Contract =
-    serde_json::from_value(contract.clone()).map_err(|err| format!("the engine's contract: {err}"))?;
-  pact_janus_kernel::contract::write_canonical(&contract)
-    .map_err(|err| Error::Failed(format!("writing the contract: {err}")))
 }
 
 /// Findings, grouped by what they mean rather than listed flat: `lossy` is the contract now saying

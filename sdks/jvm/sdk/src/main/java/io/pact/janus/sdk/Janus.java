@@ -24,6 +24,7 @@ import io.pact.janus.sdk.engine.FramePipe;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -162,23 +163,21 @@ public final class Janus implements AutoCloseable {
       return Optional.empty();
     }
     FinaliseResult result = Json.MAPPER.convertValue(response.ok(), FinaliseResult.class);
-    byte[] contract;
-    try {
-      contract = EngineClient.okMemberBytes(response.raw(), "contract");
-    } catch (IOException e) {
-      throw new JanusEmbeddingException("could not read the contract out of the finalise response", e);
+    // The engine's canonical text, its LF included, written as it came (ADR 0063).
+    String contract = result.getContractText();
+    if (contract == null && result.getContract() != null) {
+      // An engine older than ADR 0063 ignored 'contract-text' and sent the document: not withheld.
+      throw new JanusEmbeddingException("the engine answered finalise with a contract document, not its text: it "
+          + "predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins", null);
     }
-    boolean engineWithheld = result.getContract() == null || contract == null;
+    boolean engineWithheld = contract == null;
     if (engineWithheld || !failedRuns.isEmpty()) {
       throw withheld(result, added, failedRuns, engineWithheld);
     }
     Path file = contractFile();
     try {
       Files.createDirectories(file.getParent());
-      byte[] bytes = new byte[contract.length + 1];
-      System.arraycopy(contract, 0, bytes, 0, contract.length);
-      bytes[contract.length] = '\n';
-      Files.write(file, bytes);
+      Files.writeString(file, contract, StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw new UncheckedIOException("could not write the contract to " + file, e);
     }

@@ -2,56 +2,18 @@
   "$format": "janus-conformance-case/1",
   "id": "provider/call-sequence",
   "category": "provider",
-  "title": "verify sends hello, one verify with the pacts as read, and polls to the terminal event",
+  "title": "verify sends hello, one verify with each pact's text as read, and polls to the terminal event",
   "covers": [
     "verification.verify.call-sequence",
     "verification.verify.pacts-sent-as-read",
     "verification.verify.verified-passes",
     "verification.verify.endpoint-and-engine-closed"
   ],
-  "why": "behavioural spec 'verify': 'source' is { kind: 'inline', contracts: <the documents as read, in the order given> }; poll 'until an event carrying last: true arrives'; 'verified' returns the result; the engine is ended however 'verify' ends.",
+  "why": "behavioural spec 'verify': 'source' is { kind: 'inline', contracts: <each file's text as read, in the order given> }, parsing none of them (ADR 0063), so a number a parser would respell (10.0) and the file's layout reach the engine as written; poll 'until an event carrying last: true arrives'; 'verified' returns the result; the engine is ended however 'verify' ends.",
   "verifier": {
     "provider-url": "http://127.0.0.1:8080",
     "pacts": [
-      {
-        "consumer": {
-          "name": "web-app"
-        },
-        "provider": {
-          "name": "orders-api"
-        },
-        "interactions": [
-          {
-            "description": "get an order",
-            "providerStates": [
-              {
-                "name": "an order exists",
-                "params": {
-                  "id": 42
-                }
-              }
-            ],
-            "request": {
-              "method": "GET",
-              "path": "/orders/42"
-            },
-            "response": {
-              "status": 200,
-              "headers": {
-                "Content-Type": "application/json"
-              },
-              "body": {
-                "id": 42
-              }
-            }
-          }
-        ],
-        "metadata": {
-          "pactSpecification": {
-            "version": "3.0.0"
-          }
-        }
-      }
+      "{\n  \"consumer\": {\n    \"name\": \"web-app\"\n  },\n  \"provider\": {\n    \"name\": \"orders-api\"\n  },\n  \"interactions\": [\n    {\n      \"description\": \"get an order\",\n      \"providerStates\": [\n        {\n          \"name\": \"an order exists\",\n          \"params\": {\n            \"id\": 42\n          }\n        }\n      ],\n      \"request\": {\n        \"method\": \"GET\",\n        \"path\": \"/orders/42\"\n      },\n      \"response\": {\n        \"status\": 200,\n        \"headers\": {\n          \"Content-Type\": \"application/json\"\n        },\n        \"body\": {\n          \"id\": 42,\n          \"total\": 10.0\n        }\n      }\n    }\n  ],\n  \"metadata\": {\n    \"pactSpecification\": {\n      \"version\": \"3.0.0\"\n    }\n  }\n}\n"
     ]
   },
   "expect": {
@@ -65,45 +27,7 @@
         "source": {
           "kind": "inline",
           "contracts": [
-            {
-              "consumer": {
-                "name": "web-app"
-              },
-              "provider": {
-                "name": "orders-api"
-              },
-              "interactions": [
-                {
-                  "description": "get an order",
-                  "providerStates": [
-                    {
-                      "name": "an order exists",
-                      "params": {
-                        "id": 42
-                      }
-                    }
-                  ],
-                  "request": {
-                    "method": "GET",
-                    "path": "/orders/42"
-                  },
-                  "response": {
-                    "status": 200,
-                    "headers": {
-                      "Content-Type": "application/json"
-                    },
-                    "body": {
-                      "id": 42
-                    }
-                  }
-                }
-              ],
-              "metadata": {
-                "pactSpecification": {
-                  "version": "3.0.0"
-                }
-              }
-            }
+            "{\n  \"consumer\": {\n    \"name\": \"web-app\"\n  },\n  \"provider\": {\n    \"name\": \"orders-api\"\n  },\n  \"interactions\": [\n    {\n      \"description\": \"get an order\",\n      \"providerStates\": [\n        {\n          \"name\": \"an order exists\",\n          \"params\": {\n            \"id\": 42\n          }\n        }\n      ],\n      \"request\": {\n        \"method\": \"GET\",\n        \"path\": \"/orders/42\"\n      },\n      \"response\": {\n        \"status\": 200,\n        \"headers\": {\n          \"Content-Type\": \"application/json\"\n        },\n        \"body\": {\n          \"id\": 42,\n          \"total\": 10.0\n        }\n      }\n    }\n  ],\n  \"metadata\": {\n    \"pactSpecification\": {\n      \"version\": \"3.0.0\"\n    }\n  }\n}\n"
           ]
         },
         "target": {

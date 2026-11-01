@@ -142,11 +142,25 @@ export class ScriptedPipe implements FramePipe {
       case "consumer-session/finalise":
         return {
           results: this.#script.results ?? this.#verifiedResults(),
-          ...(this.#script["withhold-contract"] ? {} : { contract: this.#script.contract ?? DEFAULT_CONTRACT }),
+          ...(this.#script["withhold-contract"] ? {} : this.#contract()),
         };
       default:
         return {};
     }
+  }
+
+  /**
+   * The contract, as a real engine answers it (ADR 0063): its canonical text to a host that declared
+   * 'contract-text', else the document. A case's 'contract-text' is that text exactly; without one,
+   * it is the case's document written compactly.
+   */
+  #contract(): Record<string, unknown> {
+    const contract = this.#script.contract ?? DEFAULT_CONTRACT;
+    const capabilities = (this.bodyOf("engine/hello")?.capabilities ?? {}) as Record<string, unknown>;
+    if (capabilities["contract-text"] === undefined) {
+      return { contract };
+    }
+    return { "contract-text": this.#script["contract-text"] ?? `${JSON.stringify(contract)}\n` };
   }
 
   #verifiedResults(): Record<string, unknown>[] {

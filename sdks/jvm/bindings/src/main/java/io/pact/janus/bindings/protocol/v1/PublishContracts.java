@@ -52,32 +52,33 @@ public class PublishContracts {
      */
     @JsonProperty("consumer-version")
     @JsonPropertyDescription("The consumer's application version these contracts belong to.")
-    private java.lang.String consumerVersion;
+    private String consumerVersion;
     /**
      * The consumer version's branch.
      * 
      */
     @JsonProperty("branch")
     @JsonPropertyDescription("The consumer version's branch.")
-    private java.lang.String branch;
+    private String branch;
     @JsonProperty("tags")
-    private List<java.lang.String> tags;
+    private List<String> tags;
     /**
      * The build that produced the contracts.
      * 
      */
     @JsonProperty("build-url")
     @JsonPropertyDescription("The build that produced the contracts.")
-    private java.lang.String buildUrl;
+    private String buildUrl;
     /**
-     * 
+     * Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("contracts")
-    private List<Map<String, Object>> contracts;
+    @JsonPropertyDescription("Janus contracts or v1\u2013v4 pacts, each the document or its text, read as a file is (ADR 0063).")
+    private List<Object> contracts;
     @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
      * BrokerDescriptor
@@ -109,7 +110,7 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("consumer-version")
-    public java.lang.String getConsumerVersion() {
+    public String getConsumerVersion() {
         return consumerVersion;
     }
 
@@ -119,7 +120,7 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("consumer-version")
-    public void setConsumerVersion(java.lang.String consumerVersion) {
+    public void setConsumerVersion(String consumerVersion) {
         this.consumerVersion = consumerVersion;
     }
 
@@ -128,7 +129,7 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("branch")
-    public java.lang.String getBranch() {
+    public String getBranch() {
         return branch;
     }
 
@@ -137,17 +138,17 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("branch")
-    public void setBranch(java.lang.String branch) {
+    public void setBranch(String branch) {
         this.branch = branch;
     }
 
     @JsonProperty("tags")
-    public List<java.lang.String> getTags() {
+    public List<String> getTags() {
         return tags;
     }
 
     @JsonProperty("tags")
-    public void setTags(List<java.lang.String> tags) {
+    public void setTags(List<String> tags) {
         this.tags = tags;
     }
 
@@ -156,7 +157,7 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("build-url")
-    public java.lang.String getBuildUrl() {
+    public String getBuildUrl() {
         return buildUrl;
     }
 
@@ -165,42 +166,42 @@ public class PublishContracts {
      * 
      */
     @JsonProperty("build-url")
-    public void setBuildUrl(java.lang.String buildUrl) {
+    public void setBuildUrl(String buildUrl) {
         this.buildUrl = buildUrl;
     }
 
     /**
-     * 
+     * Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("contracts")
-    public List<Map<String, Object>> getContracts() {
+    public List<Object> getContracts() {
         return contracts;
     }
 
     /**
-     * 
+     * Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("contracts")
-    public void setContracts(List<Map<String, Object>> contracts) {
+    public void setContracts(List<Object> contracts) {
         this.contracts = contracts;
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
+    public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
+    public void setAdditionalProperty(String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(PublishContracts.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("broker");
@@ -253,7 +254,7 @@ public class PublishContracts {
     }
 
     @Override
-    public boolean equals(java.lang.Object other) {
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }

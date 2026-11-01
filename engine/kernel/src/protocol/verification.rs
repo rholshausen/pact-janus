@@ -664,6 +664,14 @@ pub(crate) fn read_source(source: &ContractSource) -> Result<Vec<Source>, Verify
 /// One source document, identified before it is parsed: [`read_source`]'s rule, for a document
 /// from anywhere — inline, or fetched from a broker.
 pub(crate) fn read_document(index: usize, doc: &Value) -> Result<Source, VerifyError> {
+  // ADR 0063 decision 3: a host may send the file's text, so nothing it parsed is what is verified.
+  let doc =
+    crate::contract::text::document(doc, &format!("/source/contracts/{index}")).map_err(|problem| {
+      VerifyError::ContractInvalid {
+        problems: vec![problem],
+      }
+    })?;
+  let doc = doc.as_ref();
   match doc.get("$format").and_then(Value::as_str) {
     Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
       Ok(Source::Janus(read_contract(index, doc)?))

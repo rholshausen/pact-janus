@@ -155,20 +155,33 @@ class SessionLifecycleTest {
   }
 
   @Test
-  @DisplayName("finalise writes the engine's contract to <dir>/<consumer>-<provider>.janus.json, byte for byte plus one LF [session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered]")
+  @DisplayName("finalise writes the engine's contract text to <dir>/<consumer>-<provider>.janus.json, byte for byte [session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered]")
   void writesContractBytesUnaltered() throws Exception {
     // Member order the SDK would never choose, integer-like names, number spellings a re-serialiser
     // would change, and both raw and escaped non-ASCII: the file must hold exactly these bytes.
     String contract = "{\"$format\":\"janus-contract/1\",\"zeta\":1,\"alpha\":{\"10\":1.0,\"9\":1e5,\"x\":-0.0},"
-        + "\"s\":\"café \\u00e9 \\/\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[]}";
-    engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],\"contract\":" + contract + "}");
+        + "\"s\":\"café \\u00e9 \\/\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[]}\n";
+    engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],\"contract-text\":"
+        + new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(contract) + "}");
     Janus janus = janus();
     janus.execute(order(janus), (mock, variant) -> {});
     Optional<Path> written = janus.finalise();
 
     Path expected = contracts.resolve("web-app-orders-api.janus.json");
     assertEquals(Optional.of(expected), written);
-    assertArrayEquals((contract + "\n").getBytes(StandardCharsets.UTF_8), Files.readAllBytes(expected));
+    assertArrayEquals(contract.getBytes(StandardCharsets.UTF_8), Files.readAllBytes(expected));
+  }
+
+  @Test
+  @DisplayName("an engine that answers the contract document rather than its text fails finalise, saying it is too old, and writes nothing")
+  void documentFromAnOldEngineFails() {
+    engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],"
+        + "\"contract\":{\"$format\":\"janus-contract/1\"}}");
+    Janus janus = janus();
+    janus.execute(order(janus), (mock, variant) -> {});
+    JanusEmbeddingException error = assertThrows(JanusEmbeddingException.class, janus::finalise);
+    assertTrue(error.getMessage().contains("predates 'contract-text'"), error.getMessage());
+    assertFalse(Files.exists(contracts.resolve("web-app-orders-api.janus.json")));
   }
 
   @Test

@@ -58,15 +58,23 @@ export interface PublishContracts {
    */
   "build-url"?: string;
   /**
+   * Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).
+   *
    * @minItems 1
    */
   contracts: [
-    {
-      [k: string]: unknown;
-    },
-    ...{
-      [k: string]: unknown;
-    }[]
+    (
+      | {
+          [k: string]: unknown;
+        }
+      | string
+    ),
+    ...(
+      | {
+          [k: string]: unknown;
+        }
+      | string
+    )[]
   ];
   [k: string]: unknown;
 }
@@ -238,11 +246,15 @@ export interface Finalise {
 export interface FinaliseResult {
   results: InteractionResult[];
   /**
-   * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+   * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.
    */
   contract?: {
     [k: string]: unknown;
   };
+  /**
+   * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
+   */
+  "contract-text"?: string;
   [k: string]: unknown;
 }
 
@@ -453,12 +465,13 @@ export interface PartyInfo {
 }
 
 /**
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.
  */
 export interface Capabilities {
   encoding?: EncodingCapability;
   "provider-shape-recording"?: ProviderShapeRecordingCapability;
   segments?: SegmentsCapability;
+  "contract-text"?: ContractTextCapability;
   [k: string]:
     | {
         [k: string]: unknown;
@@ -466,6 +479,7 @@ export interface Capabilities {
     | EncodingCapability
     | ProviderShapeRecordingCapability
     | SegmentsCapability
+    | ContractTextCapability
     | undefined;
 }
 
@@ -480,6 +494,13 @@ export interface ProviderShapeRecordingCapability {
  * Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.
  */
 export interface SegmentsCapability {
+  [k: string]: unknown;
+}
+
+/**
+ * A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.
+ */
+export interface ContractTextCapability {
   [k: string]: unknown;
 }
 
@@ -622,11 +643,13 @@ export interface RecordedProvider {
 
 export interface Check {
   /**
-   * The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
+   * The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
    */
-  contract: {
-    [k: string]: unknown;
-  };
+  contract:
+    | {
+        [k: string]: unknown;
+      }
+    | string;
   /**
    * A provider shape (design 2.8 §2), for the same provider the contract names.
    */
@@ -911,11 +934,13 @@ export interface CompatibilitySummary {
 
 export interface Pact {
   /**
-   * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
+   * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063).
    */
-  pact: {
-    [k: string]: unknown;
-  };
+  pact:
+    | {
+        [k: string]: unknown;
+      }
+    | string;
   options?: UpgradeOptions;
   [k: string]: unknown;
 }
@@ -933,11 +958,15 @@ export interface UpgradeOptions {
 
 export interface PactResult {
   /**
-   * The converted Janus contract document.
+   * The converted Janus contract document, to a host that did not declare 'contract-text'.
    */
-  contract: {
+  contract?: {
     [k: string]: unknown;
   };
+  /**
+   * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included.
+   */
+  "contract-text"?: string;
   /**
    * Lossy or judgement-call conversion spots, for 'janus upgrade' to show its work. An empty list is a claim: the conversion was exact.
    */
@@ -1056,11 +1085,14 @@ export interface VerifyResult {
 export interface ContractSource {
   kind: string;
   /**
-   * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).
+   * For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).
    */
-  contracts?: {
-    [k: string]: unknown;
-  }[];
+  contracts?: (
+    | {
+        [k: string]: unknown;
+      }
+    | string
+  )[];
   broker?: BrokerDescriptor;
   /**
    * For kind 'broker': the provider whose pacts to fetch.

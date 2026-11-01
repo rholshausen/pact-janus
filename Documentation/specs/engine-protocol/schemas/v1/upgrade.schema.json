@@ -12,8 +12,8 @@
       ],
       "properties": {
         "pact": {
-          "type": "object",
-          "description": "A v1-v4 pact document to convert to a Janus contract (rules in design 2.5)."
+          "type": ["object", "string"],
+          "description": "A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063)."
         },
         "options": {
           "title": "UpgradeOptions",
@@ -33,13 +33,16 @@
       "title": "PactResult",
       "type": "object",
       "required": [
-        "contract",
         "findings"
       ],
       "properties": {
         "contract": {
           "type": "object",
-          "description": "The converted Janus contract document."
+          "description": "The converted Janus contract document, to a host that did not declare 'contract-text'."
+        },
+        "contract-text": {
+          "type": "string",
+          "description": "In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included."
         },
         "findings": {
           "type": "array",

@@ -32,13 +32,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 public class Check {
 
     /**
-     * The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
+     * The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
      * (Required)
      * 
      */
     @JsonProperty("contract")
-    @JsonPropertyDescription("The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.")
-    private Map<String, Object> contract;
+    @JsonPropertyDescription("The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.")
+    private java.lang.Object contract;
     /**
      * A provider shape (design 2.8 §2), for the same provider the contract names.
      * (Required)
@@ -53,22 +53,22 @@ public class Check {
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
-     * The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
+     * The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
      * (Required)
      * 
      */
     @JsonProperty("contract")
-    public Map<String, Object> getContract() {
+    public java.lang.Object getContract() {
         return contract;
     }
 
     /**
-     * The consumer side: a Janus contract, or a v1-v4 pact, identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
+     * The consumer side: a Janus contract, or a v1-v4 pact, or its text, read as a file is (ADR 0063); identified rather than declared (ADR 0011). A pact is converted with design 2.5's rules before the walk; its conversion findings are upgrade/pact's to report, not this operation's.
      * (Required)
      * 
      */
     @JsonProperty("contract")
-    public void setContract(Map<String, Object> contract) {
+    public void setContract(java.lang.Object contract) {
         this.contract = contract;
     }
 

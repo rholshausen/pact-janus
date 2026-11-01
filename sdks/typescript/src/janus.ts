@@ -141,11 +141,20 @@ export class Janus {
       if (session === undefined) {
         return { results: [] };
       }
-      const { results, contract } = await engine.call(Op.ConsumerSessionFinalise, { session });
-      if (!contract || failedTests.length > 0) {
-        throw new ContractWithheldError(results, this.#descriptions, failedTests, !contract);
+      const { results, contract: document, "contract-text": contract } = await engine.call(Op.ConsumerSessionFinalise, { session });
+      if (contract === undefined && document !== undefined) {
+        // An engine older than ADR 0063 ignored 'contract-text' and sent the document: nothing was withheld.
+        throw new Error("the engine answered finalise with a contract document, not its text: it predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins");
       }
-      return { results, contractFile: await this.#write(contract) };
+      if (contract === undefined || failedTests.length > 0) {
+        throw new ContractWithheldError(results, this.#descriptions, failedTests, contract === undefined);
+      }
+      // The engine's canonical text, its LF included, written as it came (ADR 0063).
+      const dir = this.#config.contractDir ?? "contracts";
+      await mkdir(dir, { recursive: true });
+      const contractFile = join(dir, `${this.#config.consumer}-${this.#config.provider}.janus.json`);
+      await writeFile(contractFile, contract, "utf8");
+      return { results, contractFile };
     } finally {
       await engine.close();
     }
@@ -176,15 +185,6 @@ export class Janus {
       })
     ).session;
     return this.#session;
-  }
-
-  /** Compact UTF-8 JSON and one LF (contract spec §2.4), members in the order the engine sent them. */
-  async #write(contract: Record<string, unknown>): Promise<string> {
-    const dir = this.#config.contractDir ?? "contracts";
-    await mkdir(dir, { recursive: true });
-    const file = join(dir, `${this.#config.consumer}-${this.#config.provider}.janus.json`);
-    await writeFile(file, `${JSON.stringify(contract)}\n`, "utf8");
-    return file;
   }
 }
 

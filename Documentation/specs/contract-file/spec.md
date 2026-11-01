@@ -147,6 +147,24 @@ parameter values, including a binding's `value` and `default`. A component opera
 component's, and is emitted as submitted. So the same content is the same bytes whichever SDK wrote it,
 and an author's order is kept where it means something.
 
+Scalars are written one way ([ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)):
+
+- **An integer** with no fraction or exponent that fits in a signed or unsigned 64-bit integer is
+  written as its digits, with `-` when it is negative.
+- **Any other number** is the nearest IEEE 754 double, written with the fewest significant digits
+  that read back as that double. At least 1e-5 and below 1e16 in magnitude, it is positional, with
+  `.0` when it has no fraction (`100.0`, `0.00001`, `1000000000000000.0`). Outside that range it is
+  digits, an optional fraction, then `e`, a sign and an exponent (`1e+16`, `1.5e-7`, `5e-324`). Zero
+  is `0.0`, negative zero `-0.0`, and `-0` is read as negative zero. An author's spelling is not kept
+  (`1.10` is `1.1`, `1E2` is `100.0`), and nor is precision beyond a double outside 64-bit integers.
+- **A string** escapes `"` and `\` with a backslash, writes `\b`, `\f`, `\n`, `\r` and `\t` for
+  those controls and `\u00XX`, in lower-case hex, for any other below U+0020. Everything else is
+  written as itself in UTF-8: `/`, U+007F, U+2028 and U+2029, and characters outside the basic plane.
+
+`corpora/contracts/` holds a pact and the contract bytes `upgrade/pact` writes for it, for every
+spelling above, and a test fails on any byte that moves. These are the engine's spellings: a host that
+receives a contract as its text (engine-protocol spec §8.9) writes them as they are.
+
 Compact, not pretty-printed: [ADR 0018](../../decisions/0018-canonical-contract-bytes-are-compact-not-pretty-printed.md)
 found that a pretty form and §2.3's literal `{"$format":` byte prefix cannot both hold without a special
 case for exactly one member, and that the special case buys nothing a machine reader needs — a
@@ -200,9 +218,9 @@ reproduces the canonical bytes of §2.4, exactly. A round-trip test is the confo
 it is the only one — an implementation that cannot round-trip has not implemented this.
 
 **The directory is a rendering, never a second canonical form.** The engine returns a document, not a
-directory: the contract crosses the boundary as the `contract` member of `consumer-session/finalise` and
-inline in `verification/verify` (protocol spec §8.2–8.3), and the kernel has no filesystem on the WASM
-path. Anything that reads a contract reads the packed form; the directory exists between a writer and a
+directory: the contract crosses the boundary as the `contract` or `contract-text` member of
+`consumer-session/finalise` and inline in `verification/verify` (protocol spec §8.2–8.3, §8.9), and the
+kernel has no filesystem on the WASM path. Anything that reads a contract reads the packed form; the directory exists between a writer and a
 code review and nowhere else.
 
 Storing bodies as sidecar files — the other half of what a directory could buy — is **out of scope for

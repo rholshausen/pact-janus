@@ -12,7 +12,9 @@
 //!   later by two SDKs quietly disagreeing.
 //! - [`check`] reads the reports SDK runs produce and decides whether each language passed: every
 //!   case in the corpus accounted for, and passed. That is what makes "this SDK is conformant" a
-//!   claim a build makes rather than a maintainer asserts.
+//!   claim a build makes rather than a maintainer asserts. Across the reports, a live case whose
+//!   contract two SDKs wrote with different bytes fails too: neither SDK writes a contract, so
+//!   they cannot differ (ADR 0063 decision 6).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -220,6 +222,8 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
     }
   };
   let expected: BTreeSet<&str> = cases.iter().map(|case| case.id.as_str()).collect();
+  // Each case's written contract, by SDK, as the SHA-256 its report gives.
+  let mut digests: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
   if reports.is_empty() {
     report.problem("no reports given: `conformance check <report.json>...`".to_string());
     return report;
@@ -260,6 +264,12 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
         continue;
       };
       reported.insert(id);
+      if let Some(digest) = entry["contract-sha256"].as_str() {
+        digests
+          .entry(id.to_string())
+          .or_default()
+          .push((sdk.clone(), digest.to_string()));
+      }
       if !expected.contains(id) {
         report.problem(format!(
           "{sdk}: reported '{id}', which is not a case in this corpus"
@@ -283,6 +293,25 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
       ));
     }
     report.note(format!("{sdk}: {passed} of {} cases passed", expected.len()));
+  }
+  for (id, written) in &digests {
+    let distinct: BTreeSet<&str> = written.iter().map(|(_, digest)| digest.as_str()).collect();
+    if distinct.len() > 1 {
+      let each: Vec<String> = written
+        .iter()
+        .map(|(sdk, digest)| format!("{sdk} {digest}"))
+        .collect();
+      report.problem(format!(
+        "{id}: the SDKs wrote different contracts, where the engine writes the bytes and neither SDK changes them (ADR 0063): {}",
+        each.join(", ")
+      ));
+    }
+  }
+  if !digests.is_empty() {
+    report.note(format!(
+      "{} live contract(s) compared byte for byte across the reports",
+      digests.len()
+    ));
   }
   report
 }

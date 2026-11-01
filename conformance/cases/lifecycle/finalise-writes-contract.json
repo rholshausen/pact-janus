@@ -2,29 +2,84 @@
   "$format": "janus-conformance-case/1",
   "id": "lifecycle/finalise-writes-contract",
   "category": "lifecycle",
-  "title": "finalise writes the engine's contract as compact JSON and one LF, in the engine's member order, and ends the engine.",
-  "covers": ["session.finalise.writes-contract-when-verified", "session.finalise.contract-bytes-unaltered"],
-  "why": "behavioural spec 'finalise': when the result carries 'contract', writes it to '<contract directory>/<consumer>-<provider>.janus.json' as compact UTF-8 JSON followed by one LF (contract spec §2.4), members in the order the engine returned them; the SDK never reorders, merges or edits a contract. Then ends the engine (engine-protocol spec §6).",
-  "note": "The engine's members here are deliberately not in alphabetical order, and the strings carry non-ASCII and characters a writer may escape: what is checked is that the SDK reordered, re-indented and re-escaped nothing. It is not a test of number spellings — an SDK that parses the frame can only reconstruct those (Phase 9 finding 6), and ADR 0017 compares content, not bytes.",
+  "title": "finalise writes the engine's contract text exactly, numbers and escapes included, and ends the engine.",
+  "covers": [
+    "session.finalise.writes-contract-when-verified",
+    "session.finalise.contract-bytes-unaltered"
+  ],
+  "why": "behavioural spec 'finalise': when the result carries 'contract-text', writes its UTF-8 encoding to '<contract directory>/<consumer>-<provider>.janus.json', adding and removing nothing (contract spec §2.4, engine-protocol spec §8.9, ADR 0063); the SDK parses, reorders, merges or edits no contract. The hello declares 'contract-text', or the engine would answer the document. Then ends the engine (engine-protocol spec §6).",
+  "note": "The engine's members here are deliberately not in alphabetical order, its strings carry non-ASCII and characters a writer may escape, and its numbers are spelled as the engine spells them and a JavaScript or Java parser would not (1.0, an integer above 2^53, 1e+16). What is checked is that the SDK wrote the engine's text, byte for byte (ADR 0063 decision 6).",
   "engine": {
     "contract": {
       "$format": "janus-contract/1",
-      "consumer": { "name": "web-app" },
-      "provider": { "name": "orders-api" },
+      "consumer": {
+        "name": "web-app"
+      },
+      "provider": {
+        "name": "orders-api"
+      },
       "interactions": [
         {
           "description": "get an order",
-          "transport": { "kind": "http", "mode": "passive" },
-          "parts": { "response": { "body": { "shape": "equality", "example": "läuft \"quoted\" / ok" } } },
-          "selection": { "variants": [{ "id": "base" }] }
+          "transport": {
+            "kind": "http",
+            "mode": "passive"
+          },
+          "parts": {
+            "response": {
+              "body": {
+                "shape": "object",
+                "members": {
+                  "note": {
+                    "shape": "equality",
+                    "example": "läuft \"quoted\" / ok"
+                  },
+                  "amount": {
+                    "shape": "equality",
+                    "example": 1.0
+                  },
+                  "id": {
+                    "shape": "equality",
+                    "example": 9007199254740993
+                  },
+                  "large": {
+                    "shape": "equality",
+                    "example": 1e+16
+                  }
+                }
+              },
+              "status": {
+                "shape": "equality",
+                "example": 200
+              }
+            }
+          },
+          "selection": {
+            "variants": [
+              {
+                "id": "base"
+              }
+            ]
+          }
         }
       ]
-    }
+    },
+    "contract-text": "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[{\"description\":\"get an order\",\"transport\":{\"kind\":\"http\",\"mode\":\"passive\"},\"parts\":{\"response\":{\"body\":{\"shape\":\"object\",\"members\":{\"note\":{\"shape\":\"equality\",\"example\":\"läuft \\\"quoted\\\" / ok\"},\"amount\":{\"shape\":\"equality\",\"example\":1.0},\"id\":{\"shape\":\"equality\",\"example\":9007199254740993},\"large\":{\"shape\":\"equality\",\"example\":1e+16}}},\"status\":{\"shape\":\"equality\",\"example\":200}}},\"selection\":{\"variants\":[{\"id\":\"base\"}]}}]}\n"
   },
   "steps": [
     {
-      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
-      "expect": { "outcome": "ok" }
+      "execute": {
+        "interaction": {
+          "description": "get an order",
+          "request": {
+            "method": "GET",
+            "path": "/orders/42"
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok"
+      }
     },
     {
       "finalise": {},
@@ -32,7 +87,7 @@
         "outcome": "ok",
         "contract": {
           "written": true,
-          "text": "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[{\"description\":\"get an order\",\"transport\":{\"kind\":\"http\",\"mode\":\"passive\"},\"parts\":{\"response\":{\"body\":{\"shape\":\"equality\",\"example\":\"läuft \\\"quoted\\\" / ok\"}}},\"selection\":{\"variants\":[{\"id\":\"base\"}]}}]}\n"
+          "text": "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[{\"description\":\"get an order\",\"transport\":{\"kind\":\"http\",\"mode\":\"passive\"},\"parts\":{\"response\":{\"body\":{\"shape\":\"object\",\"members\":{\"note\":{\"shape\":\"equality\",\"example\":\"läuft \\\"quoted\\\" / ok\"},\"amount\":{\"shape\":\"equality\",\"example\":1.0},\"id\":{\"shape\":\"equality\",\"example\":9007199254740993},\"large\":{\"shape\":\"equality\",\"example\":1e+16}}},\"status\":{\"shape\":\"equality\",\"example\":200}}},\"selection\":{\"variants\":[{\"id\":\"base\"}]}}]}\n"
         }
       }
     }
@@ -47,6 +102,13 @@
       "consumer-session/serve-variant",
       "consumer-session/finalise"
     ],
-    "engine-closed": true
+    "engine-closed": true,
+    "frames": {
+      "engine/hello": {
+        "capabilities": {
+          "contract-text": {}
+        }
+      }
+    }
   }
 }

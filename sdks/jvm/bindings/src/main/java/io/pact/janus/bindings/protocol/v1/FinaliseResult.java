@@ -27,7 +27,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "results",
-    "contract"
+    "contract",
+    "contract-text"
 })
 public class FinaliseResult {
 
@@ -39,12 +40,19 @@ public class FinaliseResult {
     @JsonProperty("results")
     private List<InteractionResult> results;
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
-    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.")
+    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.")
     private Map<String, Object> contract;
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
+     * 
+     */
+    @JsonProperty("contract-text")
+    @JsonPropertyDescription("In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec \u00a72.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.")
+    private java.lang.String contractText;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -69,7 +77,7 @@ public class FinaliseResult {
     }
 
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
@@ -78,12 +86,30 @@ public class FinaliseResult {
     }
 
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
     public void setContract(Map<String, Object> contract) {
         this.contract = contract;
+    }
+
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public java.lang.String getContractText() {
+        return contractText;
+    }
+
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public void setContractText(java.lang.String contractText) {
+        this.contractText = contractText;
     }
 
     @JsonAnyGetter
@@ -108,6 +134,10 @@ public class FinaliseResult {
         sb.append('=');
         sb.append(((this.contract == null)?"<null>":this.contract));
         sb.append(',');
+        sb.append("contractText");
+        sb.append('=');
+        sb.append(((this.contractText == null)?"<null>":this.contractText));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -125,6 +155,7 @@ public class FinaliseResult {
         int result = 1;
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.results == null)? 0 :this.results.hashCode()));
+        result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
         return result;
     }
@@ -138,7 +169,7 @@ public class FinaliseResult {
             return false;
         }
         FinaliseResult rhs = ((FinaliseResult) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.results == rhs.results)||((this.results!= null)&&this.results.equals(rhs.results))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
+        return (((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.results == rhs.results)||((this.results!= null)&&this.results.equals(rhs.results))))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
     }
 
 }

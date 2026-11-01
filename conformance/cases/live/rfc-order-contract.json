@@ -7,7 +7,7 @@
     "session.finalise.writes-contract-when-verified"
   ],
   "why": "SDK spec §7 category 4, ADR 0017: two SDKs given equivalent DSL usage must produce contracts the engine treats as the same demonstrated interaction — the same 'parts', 'states' and 'selection' (contract spec §5–§6). This case is that comparison, made one SDK at a time: the content below is the engine's own record of the exercised interaction, captured once and reviewed, so an SDK is compared against the engine's answer rather than against another SDK's output.",
-  "note": "'metadata' and the parties are not compared. 'metadata.writer' names the SDK and version that wrote the file, by design (contract spec §3.2), and ADR 0017 places it outside content identity: a suite demanding byte-identical files would be grading a fact this project never asked two SDKs to agree on.",
+  "note": "'metadata' and the parties are not compared here. The bytes are, across languages: each report carries the SHA-256 of the contract its SDK wrote, and the checker fails when two differ, since the engine writes the contract and no SDK changes it (ADR 0063).",
   "steps": [
     {
       "execute": {

@@ -27,18 +27,25 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "contract",
+    "contract-text",
     "findings"
 })
 public class PactResult {
 
     /**
-     * The converted Janus contract document.
-     * (Required)
+     * The converted Janus contract document, to a host that did not declare 'contract-text'.
      * 
      */
     @JsonProperty("contract")
-    @JsonPropertyDescription("The converted Janus contract document.")
+    @JsonPropertyDescription("The converted Janus contract document, to a host that did not declare 'contract-text'.")
     private Map<String, Object> contract;
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included.
+     * 
+     */
+    @JsonProperty("contract-text")
+    @JsonPropertyDescription("In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec \u00a72.4) as text, its trailing LF included.")
+    private java.lang.String contractText;
     /**
      * Lossy or judgement-call conversion spots, for 'janus upgrade' to show its work. An empty list is a claim: the conversion was exact.
      * (Required)
@@ -51,8 +58,7 @@ public class PactResult {
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
-     * The converted Janus contract document.
-     * (Required)
+     * The converted Janus contract document, to a host that did not declare 'contract-text'.
      * 
      */
     @JsonProperty("contract")
@@ -61,13 +67,30 @@ public class PactResult {
     }
 
     /**
-     * The converted Janus contract document.
-     * (Required)
+     * The converted Janus contract document, to a host that did not declare 'contract-text'.
      * 
      */
     @JsonProperty("contract")
     public void setContract(Map<String, Object> contract) {
         this.contract = contract;
+    }
+
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public java.lang.String getContractText() {
+        return contractText;
+    }
+
+    /**
+     * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the converted contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included.
+     * 
+     */
+    @JsonProperty("contract-text")
+    public void setContractText(java.lang.String contractText) {
+        this.contractText = contractText;
     }
 
     /**
@@ -108,6 +131,10 @@ public class PactResult {
         sb.append('=');
         sb.append(((this.contract == null)?"<null>":this.contract));
         sb.append(',');
+        sb.append("contractText");
+        sb.append('=');
+        sb.append(((this.contractText == null)?"<null>":this.contractText));
+        sb.append(',');
         sb.append("findings");
         sb.append('=');
         sb.append(((this.findings == null)?"<null>":this.findings));
@@ -128,6 +155,7 @@ public class PactResult {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
         result = ((result* 31)+((this.findings == null)? 0 :this.findings.hashCode()));
         return result;
@@ -142,7 +170,7 @@ public class PactResult {
             return false;
         }
         PactResult rhs = ((PactResult) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))));
+        return (((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))))&&((this.findings == rhs.findings)||((this.findings!= null)&&this.findings.equals(rhs.findings))));
     }
 
 }

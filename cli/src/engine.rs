@@ -32,10 +32,11 @@ pub enum Prints {
 
 /// A `janus` engine with everything a native host can offer it, past the handshake. It asks for
 /// display text's segments only when the command prints text: a document printed for a script has
-/// no use for them.
+/// no use for them. Then it asks for a contract as its text too, which it writes as it came
+/// (ADR 0063); a document printed for a script holds the contract as a document.
 pub fn start(prints: Prints) -> Result<Engine, String> {
   let capabilities = match prints {
-    Prints::Text => json!({ "segments": {} }),
+    Prints::Text => json!({ "segments": {}, "contract-text": {} }),
     Prints::Documents => json!({}),
   };
   let mut engine = crate::register::native_engine();

@@ -24,7 +24,7 @@ final class Suite {
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   /** One case's outcome, as the report records it. */
-  record Result(String id, String status, List<String> covers, String detail) {}
+  record Result(String id, String status, List<String> covers, String detail, String contractSha256) {}
 
   private Suite() {}
 
@@ -72,6 +72,10 @@ final class Suite {
       result.covers().forEach(entry.putArray("covers")::add);
       if (result.detail() != null) {
         entry.put("detail", result.detail());
+      }
+      // A live case's written contract: the checker compares it across SDKs (ADR 0063).
+      if (result.contractSha256() != null) {
+        entry.put("contract-sha256", result.contractSha256());
       }
     });
     String configured = System.getProperty("janus.conformance.report");

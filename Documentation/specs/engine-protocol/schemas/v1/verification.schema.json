@@ -102,8 +102,8 @@
         },
         "contracts": {
           "type": "array",
-          "description": "For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version).",
-          "items": { "type": "object" }
+          "description": "For kind 'inline': the contract documents — Janus contracts or v1–v4 pacts (any supported spec version). Each may be the document's text, read as a file is (ADR 0063).",
+          "items": { "type": ["object", "string"] }
         },
         "broker": {
           "$ref": "broker.schema.json#/$defs/BrokerDescriptor",

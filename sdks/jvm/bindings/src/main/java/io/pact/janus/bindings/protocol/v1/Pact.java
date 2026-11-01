@@ -31,13 +31,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 public class Pact {
 
     /**
-     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
+     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("pact")
-    @JsonPropertyDescription("A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).")
-    private Map<String, Object> pact;
+    @JsonPropertyDescription("A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063).")
+    private Object pact;
     /**
      * UpgradeOptions
      * <p>
@@ -48,25 +48,25 @@ public class Pact {
     @JsonPropertyDescription("How to convert. Open: a member an engine does not know is ignored.")
     private UpgradeOptions options;
     @JsonIgnore
-    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
+    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
-     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
+     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("pact")
-    public Map<String, Object> getPact() {
+    public Object getPact() {
         return pact;
     }
 
     /**
-     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5).
+     * A v1-v4 pact document to convert to a Janus contract (rules in design 2.5), or the document's text, read as a file is (ADR 0063).
      * (Required)
      * 
      */
     @JsonProperty("pact")
-    public void setPact(Map<String, Object> pact) {
+    public void setPact(Object pact) {
         this.pact = pact;
     }
 
@@ -93,17 +93,17 @@ public class Pact {
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
+    public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
+    public void setAdditionalProperty(String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Pact.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("pact");
@@ -136,7 +136,7 @@ public class Pact {
     }
 
     @Override
-    public boolean equals(java.lang.Object other) {
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }

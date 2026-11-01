@@ -159,6 +159,10 @@
           "type": "object",
           "description": "The contract document 'consumer-session/finalise' returns. Absent: a small verified contract. Null is written as 'withhold-contract'."
         },
+        "contract-text": {
+          "type": "string",
+          "description": "The text 'consumer-session/finalise' answers as 'contract-text' to a host that declared that capability (ADR 0063), exactly. Absent: 'contract' written compactly, with one LF."
+        },
         "withhold-contract": {
           "type": "boolean",
           "description": "true: 'finalise' returns results and no contract — the engine itself withheld it."
@@ -261,8 +265,8 @@
         "provider-url": { "type": "string", "description": "The provider URL. Absent in a live case: the driver's own provider's." },
         "pacts": {
           "type": "array",
-          "items": { "type": "object" },
-          "description": "Documents the driver writes to files, one each, and names as the 'pacts' option, in order."
+          "items": { "type": ["object", "string"] },
+          "description": "Documents the driver writes to files, one each, and names as the 'pacts' option, in order. A string is the file's exact text; a document is written as compact JSON."
         },
         "broker": { "type": "object", "description": "The 'broker' option, as given." },
         "urls": { "type": "object", "description": "The 'urls' option, as given." },

@@ -160,15 +160,17 @@ language whose failures are not exceptions maps it to whatever failing a test me
 
 `contract.content` compares **interaction content only** (ADR 0017): each interaction by
 description, on the members the case names — `states`, `parts`, `selection` (contract spec §5–§6).
-`metadata` and the parties are never compared. `metadata.writer` names the SDK and version that
-wrote the file, by design (contract spec §3.2), and a suite demanding byte-identical files would be
-grading a fact this project never asked two SDKs to agree on.
+`metadata` and the parties are never compared. Bytes are compared across languages instead: the
+engine writes a contract and an SDK writes its text unchanged (ADR 0063), so a live case's contract
+is the same file whichever SDK wrote it, and `check` fails when two reports' digests differ (§5).
 
 ## 5. The report
 
 A run writes `{ "$format": "janus-conformance-report/1", "sdk": …, "cases": [ { "id", "status",
-"covers", "detail"? } ] }`. `status` is `passed` or `failed`; a failed case carries the `detail` the
-checker prints. The report is a build artifact (`target/conformance/`), not a checked-in file — what
+"covers", "detail"?, "contract-sha256"? } ] }`. `status` is `passed` or `failed`; a failed case carries
+the `detail` the checker prints. A live case that wrote a contract carries the SHA-256 of its bytes,
+in lower-case hex, and `check` fails when two SDKs' reports give one case different digests
+(ADR 0063 decision 6). The report is a build artifact (`target/conformance/`), not a checked-in file — what
 is checked in is the corpus, and what CI asserts is that each language's run accounted for every
 case in it.
 

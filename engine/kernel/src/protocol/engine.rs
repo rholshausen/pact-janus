@@ -43,6 +43,10 @@ pub struct Engine {
   /// Whether the host declared the `segments` capability in its hello (spec §2.7, ADR 0054): display
   /// text is then sent with its segments beside it.
   segments: bool,
+  /// Whether the host declared the `contract-text` capability (ADR 0063): `finalise` and
+  /// `upgrade/pact` then answer with `contract-text`, the contract's canonical bytes, in place of
+  /// `contract`.
+  contract_text: bool,
   /// Set by `engine/shutdown` (spec §6): every later call is `engine-shut-down`, and a subprocess
   /// embedding exits once the shutdown response is written ([`Engine::is_shut_down`]).
   shut_down: bool,
@@ -127,6 +131,7 @@ impl Engine {
     Engine {
       hello_done: false,
       segments: false,
+      contract_text: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
@@ -174,6 +179,7 @@ impl Engine {
     Engine {
       hello_done: false,
       segments: false,
+      contract_text: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports,
@@ -388,6 +394,7 @@ impl Engine {
       Some(_version) => {
         self.hello_done = true;
         self.segments = hello.wants_segments();
+        self.contract_text = hello.wants_contract_text();
         let loaders: Vec<&str> = std::iter::once("in-tree")
           .chain(self.loaders.iter().map(|loader| loader.name()))
           .collect();
@@ -562,6 +569,10 @@ impl Engine {
     session.stop_transports();
     let results = session.results();
     match session.contract() {
+      Ok(Some(contract)) if self.contract_text => match contract_text(&contract) {
+        Ok(text) => ResponseFrame::ok(id, json!({ "results": results, "contract-text": text })),
+        Err(err) => ResponseFrame::err(id, contract_error(err)),
+      },
       // Serialised from the model, not via `Value`: a `Value` map sorts members, and the contract's
       // order is specified (contract-file spec §2.4 — `$format` first, then schema order).
       Ok(Some(contract)) => {
@@ -1011,10 +1022,20 @@ impl Engine {
     let options = upgrade::Options {
       exclude_pending: req.options.exclude_pending,
     };
-    match upgrade::pact_with("pact", &req.pact, &options) {
+    let pact = match crate::contract::text::document(&req.pact, "/pact") {
+      Ok(pact) => pact,
+      Err(problem) => return ResponseFrame::err(id, EngineError::document_invalid(&[problem])),
+    };
+    match upgrade::pact_with("pact", &pact, &options) {
       Ok(upgraded) => {
-        let contract = serde_json::to_value(&upgraded.contract).expect("Contract always serializes");
         let findings = serde_json::to_value(&upgraded.findings).expect("Findings always serialize");
+        if self.contract_text {
+          return match contract_text(&upgraded.contract) {
+            Ok(text) => ResponseFrame::ok(id, json!({ "contract-text": text, "findings": findings })),
+            Err(err) => ResponseFrame::err(id, contract_error(err)),
+          };
+        }
+        let contract = serde_json::to_value(&upgraded.contract).expect("Contract always serializes");
         ResponseFrame::ok(id, json!({ "contract": contract, "findings": findings }))
       }
       Err(err) => ResponseFrame::err(id, contract_error(err)),
@@ -1224,6 +1245,13 @@ struct UpgradeOptions {
 /// A document that could not be read at all. Everything a *conversion* could not carry is a
 /// finding, not an error (contract-file spec §8.1), so this covers exactly the window before the
 /// conversion starts.
+/// A contract's canonical bytes as the text `contract-text` carries (ADR 0063 decision 2): the whole
+/// file, its trailing LF included. Canonical bytes are UTF-8 (contract-file spec §2.4).
+fn contract_text(contract: &crate::contract::Contract) -> Result<String, crate::contract::ContractError> {
+  let bytes = crate::contract::write_canonical(contract)?;
+  Ok(String::from_utf8(bytes).expect("serde_json writes UTF-8"))
+}
+
 fn contract_error(err: crate::contract::ContractError) -> EngineError {
   use crate::contract::ContractError;
   match err {

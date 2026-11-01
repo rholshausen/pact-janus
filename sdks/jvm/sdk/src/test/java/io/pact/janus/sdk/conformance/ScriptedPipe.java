@@ -133,7 +133,16 @@ final class ScriptedPipe implements Embedding, FramePipe {
           }
         }
         if (!script.path("withhold-contract").asBoolean(false)) {
-          ok.set("contract", script.has("contract") ? script.get("contract") : defaultContract());
+          // As a real engine answers (ADR 0063): the text to a host that declared 'contract-text'.
+          JsonNode contract = script.has("contract") ? script.get("contract") : defaultContract();
+          JsonNode hello = bodyOf("engine/hello");
+          if (hello != null && hello.path("capabilities").has("contract-text")) {
+            ok.put("contract-text", script.has("contract-text")
+                ? script.get("contract-text").asText()
+                : contract.toString() + "\n");
+          } else {
+            ok.set("contract", contract);
+          }
         }
       }
       default -> {

@@ -28,7 +28,7 @@
     },
     "Capabilities": {
       "title": "Capabilities",
-      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments.",
+      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.",
       "type": "object",
       "properties": {
         "encoding": { "$ref": "#/$defs/EncodingCapability" },
@@ -40,6 +40,11 @@
         "segments": {
           "title": "SegmentsCapability",
           "description": "Display text's segments (spec.md §2.7, ADR 0054). Declared by an engine that writes them; declared by a host that wants them, after which the engine sends '<member>-segments' beside each display string for the rest of the pipe. Presence is the whole signal; the object carries nothing.",
+          "type": "object"
+        },
+        "contract-text": {
+          "title": "ContractTextCapability",
+          "description": "A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.",
           "type": "object"
         }
       },

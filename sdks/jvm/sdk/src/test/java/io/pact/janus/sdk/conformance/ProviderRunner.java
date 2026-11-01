@@ -69,7 +69,8 @@ final class ProviderRunner {
         int i = 0;
         for (JsonNode document : script.get("pacts")) {
           Path file = dir.resolve("pact-" + ++i + ".json");
-          Files.writeString(file, document.toString());
+          // A string is the file's exact text (ADR 0063); a document is written compactly.
+          Files.writeString(file, document.isTextual() ? document.asText() : document.toString());
           pacts.add(file);
         }
         verifier.withPacts(pacts);

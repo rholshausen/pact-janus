@@ -2,6 +2,7 @@
 // for lives here; a case's own JSON says which ones it asks for. A failure is a list of lines, so
 // a report can carry it and a test can throw it.
 
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,17 +24,20 @@ export interface CaseResult {
   status: "passed" | "failed";
   covers: string[];
   detail?: string;
+  /** A live case's written contract, as the SHA-256 of its bytes: the checker compares it across SDKs (ADR 0063). */
+  "contract-sha256"?: string;
 }
 
 export async function runCase(testCase: Case): Promise<CaseResult> {
   const failures: string[] = [];
+  let digest: string | undefined;
   try {
     if (testCase.category === "translation") {
       await runTranslation(testCase, failures);
     } else if (testCase.verifier) {
       await runProvider(testCase, failures);
     } else {
-      await runSession(testCase, failures);
+      digest = await runSession(testCase, failures);
     }
   } catch (error) {
     failures.push(`the case did not run: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
@@ -43,6 +47,7 @@ export async function runCase(testCase: Case): Promise<CaseResult> {
     covers: testCase.covers,
     status: failures.length === 0 ? "passed" : "failed",
     ...(failures.length === 0 ? {} : { detail: failures.join("\n") }),
+    ...(digest === undefined ? {} : { "contract-sha256": digest }),
   };
 }
 
@@ -78,8 +83,10 @@ async function runTranslation(testCase: Case, failures: string[]): Promise<void>
 }
 
 /** Categories 2–4: the SDK driving an engine — the case's scripted one, or the real one. */
-async function runSession(testCase: Case, failures: string[]): Promise<void> {
+/** Runs a session case; for a live case that wrote a contract, answers the SHA-256 of its bytes. */
+async function runSession(testCase: Case, failures: string[]): Promise<string | undefined> {
   const live = testCase.category === "live";
+  let digest: string | undefined;
   const pipe = live ? undefined : new ScriptedPipe(testCase.engine ?? {});
   const contractDir = await mkdtemp(join(tmpdir(), "janus-conformance-"));
   const janus = new Janus({
@@ -124,6 +131,9 @@ async function runSession(testCase: Case, failures: string[]): Promise<void> {
           await janus.finalise();
         });
         const contract = await readContract(contractDir);
+        if (live && contract.text !== undefined) {
+          digest = createHash("sha256").update(contract.text, "utf8").digest("hex");
+        }
         await record(testCase, contract.document);
         checkStep(step.expect, { outcome, contract }, where, failures);
       }
@@ -155,6 +165,7 @@ async function runSession(testCase: Case, failures: string[]): Promise<void> {
     // still has an engine to end, and on a live case that is a subprocess.
     await janus.finalise().catch(() => undefined);
   }
+  return digest;
 }
 
 interface Actual {

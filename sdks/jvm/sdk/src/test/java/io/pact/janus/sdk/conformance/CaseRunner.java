@@ -32,6 +32,8 @@ final class CaseRunner {
 
   private final JsonNode testCase;
   private final List<String> failures = new ArrayList<>();
+  /** A live case's written contract, as the SHA-256 of its bytes (ADR 0063), or null. */
+  private String contractSha256;
 
   private CaseRunner(JsonNode testCase) {
     this.testCase = testCase;
@@ -56,7 +58,8 @@ final class CaseRunner {
         testCase.path("id").asText(),
         runner.failures.isEmpty() ? "passed" : "failed",
         covers,
-        runner.failures.isEmpty() ? null : String.join("\n", runner.failures));
+        runner.failures.isEmpty() ? null : String.join("\n", runner.failures),
+        runner.contractSha256);
   }
 
   /** Category 1: what a DSL chain builds, with no engine anywhere. */
@@ -128,7 +131,11 @@ final class CaseRunner {
           check(step.path("expect"), where, outcome, calls, null);
         } else if (step.has("finalise")) {
           Outcome outcome = capture(janus::finalise);
-          check(step.path("expect"), where, outcome, List.of(), readContract(contractDirectory));
+          Contract contract = readContract(contractDirectory);
+          if (live && contract.written()) {
+            contractSha256 = sha256(contract.text());
+          }
+          check(step.path("expect"), where, outcome, List.of(), contract);
         }
       }
 
@@ -306,6 +313,16 @@ final class CaseRunner {
   // The contract file, and the live cases' HTTP client.
 
   private record Contract(boolean written, String text, JsonNode document) {}
+
+  /** The SHA-256 of the contract file's bytes, in lower-case hex, as the report carries it. */
+  private static String sha256(String text) {
+    try {
+      byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+      return java.util.HexFormat.of().formatHex(digest);
+    } catch (java.security.NoSuchAlgorithmException e) {
+      throw new IllegalStateException("every JVM has SHA-256", e);
+    }
+  }
 
   private Contract readContract(Path directory) throws IOException {
     Path file = directory.resolve(CONSUMER + "-" + PROVIDER + ".janus.json");

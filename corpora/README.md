@@ -52,6 +52,13 @@ readability:
   from its upgraded contract to the built-in HTTP component's `http:status-class`, which the corpus
   runner registers as the native engine does (ADR 0057).
 
+`contracts/` pins how a contract is written, not how one matches (contract-file spec §2.4, ADR 0063):
+each case is a `pact.json` and the `contract.janus.json` that `upgrade/pact` writes for it, compared
+byte for byte by `engine/kernel/tests/contract_text.rs`. `numbers/` holds every way a number is
+spelled, and `strings/` every way a string is escaped. A dependency that moves a spelling fails it;
+a deliberate move changes the case in the same commit, and needs a change file, since every contract
+holding that spelling gets a new hash at a broker.
+
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with
 `janus verify`, comparing the verdicts. It holds no `case.json`, so the corpus runner below does not
