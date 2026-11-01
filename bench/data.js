@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793510925656,
+  "lastUpdate": 1793510927790,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -35718,6 +35718,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 18403,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d9134241ab793408ea70e67dd40a7bb476a91fb0",
+          "message": "docs: S2.1 is done\n\nThe kernel's background work runs through its embedding, the mock is hyper,\nand a contract crosses the boundary as its text, so the SDKs' live\nconformance contracts are byte-identical. 9.1's consumer scenarios ran on\nthe new transport in both stacks; a mock's start costs 240 µs where it cost\n150, for its thread and runtime, and requests cost about what they did.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-01T15:31:19+11:00",
+          "tree_id": "0b8383992e95cb6090db33f1e09dc7d6b4456b31",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d9134241ab793408ea70e67dd40a7bb476a91fb0"
+        },
+        "date": 1793510927144,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28362,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 23002,
             "unit": "requests per second",
             "extra": "engines 4"
           }
