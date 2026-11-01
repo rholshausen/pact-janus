@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793514190562,
+  "lastUpdate": 1793514192730,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -36072,6 +36072,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 23002,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "800a41253ddd8ace3fb93f5666cc44b2a81937ab",
+          "message": "fix: the same space selects its variants in the same order every run\n\nCI's new cross-SDK check failed on macOS: live/shape-dimensions' contract\nhad different bytes in the TypeScript and JVM SDKs. Locally it alternated\nrun to run in either SDK. janus-ipog-v1's vertical step took the targets it\nhad not yet covered from a HashSet, whose iteration order is seeded afresh\nfor every set, so covering variants could be selected, run and recorded in\nanother order. Variant-semantics spec §3.7 forbids exactly that.\n\n- The targets are an IndexSet in step 1's enumeration order, which §3.4 now\n  states: dimension combinations in variant-space order, each dimension's\n  points in point order. Removing a target keeps the rest in order.\n- variant_select.rs selects the case's space fifty times and compares; it\n  fails on the old code.\n- The conformant job checks every system before failing, so one system's\n  failure no longer hides another's.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-01T17:17:57+11:00",
+          "tree_id": "5c1a73f0e0b9082db1a32ebd51ef422aeeae25bc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/800a41253ddd8ace3fb93f5666cc44b2a81937ab"
+        },
+        "date": 1793514192007,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 30022,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 23573,
             "unit": "requests per second",
             "extra": "engines 4"
           }
