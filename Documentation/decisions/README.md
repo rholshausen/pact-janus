@@ -80,6 +80,7 @@ superseding ADR instead.
 | [0061](0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md) | The engine's logs are the runtime's own, set and shown by its logging configuration | accepted |
 | [0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md) | Run the engine's background work on threads its embedding provides, and serve mocks with hyper | accepted |
 | [0063](0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md) | Carry a contract across the engine boundary as its text, and pin how numbers are written | accepted |
+| [0064](0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md) | Report each variant's test verdict to the engine, and answer with the variant's result | accepted |
 
 ## Decision backlog
 
@@ -90,7 +91,5 @@ Each becomes a numbered ADR when its inputs are ready (feeding task in brackets)
   edit (ADR 0011 decision 6; scoped in the [format review](../prototype/contract-file-format-review.md) §8.4)
 - Adopting a binary frame encoding (CBOR the leading candidate) — held open as a capability by
   ADR 0006, waiting on benchmark evidence (task 1.7)
-- A consumer's test verdict reaching the engine (`report-variant`), so the engine, not each SDK,
-  withholds a dishonest contract — Phase 9 findings 4 and 5 (task 9.4)
 - Operator-level substitution in place of whole-slot plan fragments — ADR 0022's tripwire, Phase 9
   finding 21 (task 9.4)
