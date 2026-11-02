@@ -162,7 +162,9 @@ Three sources are the source of truth and take precedence over this file when th
 > S2.4 is split by language, without JUnit 4. S2.4a: `pact-janus/jest` is the Jest integration, as
 > `pact-janus/vitest` is Vitest's, and `test/frameworks.test.ts` runs a consumer suite, a suite whose
 > contract is withheld and a provider test under Jest, from CommonJS and as ES modules, and under
-> Vitest, from the built package as a user installs it.
+> Vitest, from the built package as a user installs it. S2.4b: Spock 2 needs no integration (a
+> `@Shared @AutoCleanup("finalise") Janus` field), and `FrameworksTest` runs the same three suites
+> under JUnit 5 and under Spock against the real engine.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

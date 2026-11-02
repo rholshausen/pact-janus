@@ -1662,6 +1662,23 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     among several.
     *Exit:* one consumer suite and one provider test run under JUnit 5 and under Spock 2. A variant
     that fails, fails the test that ran it, and a withheld contract fails the suite.
+    *Done 2026-11-02*, with no new ADR: Spock needs no integration of its own.
+    - Under JUnit 5, `JanusExtension` and `JanusProviderExtension` were already the integration.
+    - Under Spock 2, a specification's `Janus` is a `@Shared @AutoCleanup("finalise")` field, which
+      Spock finalises after the last feature, failed or not, so a withheld contract fails the
+      specification. A Groovy closure is any of the SDK's functional interfaces, so `execute` and a
+      `Verifier`'s states take closures. The SDK has no Groovy or Spock dependency, and its release
+      files are unchanged. Spock 2.5 runs on the JUnit 6 platform the build already uses.
+    - `FrameworksTest` launches the suites in `io.pact.janus.sdk.frameworks`, which use only the
+      public API, under JUnit 5 and under Spock, against the real engine. The consumer suite passes
+      and writes its contract. In a second suite, the test whose client crashes on the variant
+      without a field fails, naming the variant, and the other test passes; the withheld contract
+      fails the suite and is not written. The provider test passes: one dynamic test per interaction
+      under JUnit 5, one feature under Spock. The two contracts are byte-identical but for the
+      consumer's name.
+    - Not foreseen: Spock reports an exception from a call in an `expect:` block as the condition's
+      failure, caused by it, so a failed `execute` is the cause of the feature's failure there, not
+      the failure itself.
 - **S2.5 A compatibility facade** for today's pact-js and pact-jvm DSLs — **L**, so most existing
   consumer tests need only mechanical changes (SDK spec §6's classification). The facade is the
   hand-written layer most likely to grow matching logic, so it is its own layer in
