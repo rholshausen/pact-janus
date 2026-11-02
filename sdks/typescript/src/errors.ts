@@ -33,10 +33,13 @@ export class JanusError extends Error {
   }
 }
 
-/** One variant whose closure threw. */
+/** One variant the engine did not verify: its closure threw, or the engine found it failed or unexercised. */
 export interface VariantFailure {
   variant: protocol.VariantDescriptor;
-  cause: unknown;
+  /** The variant's result, as the engine answered the closure's report (ADR 0064). */
+  result: protocol.VariantResult;
+  /** What the closure threw, when it threw. */
+  cause?: unknown;
 }
 
 /** `execute` ran every selected variant, and at least one closure threw. */
@@ -46,9 +49,10 @@ export class VariantsFailedError extends Error {
   readonly selected: number;
 
   constructor(interaction: string, failures: VariantFailure[], selected: number) {
-    const lines = failures.map(({ variant, cause }) => {
-      const reason = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
-      return `  ✗ ${label(variant)}\n      ${reason.split("\n").join("\n      ")}`;
+    const lines = failures.map(({ variant, result, cause }) => {
+      const engine = result.status === "not-exercised" ? "nothing exercised the mock under this variant" : `the engine found this variant ${result.status}`;
+      const said = [...(cause === undefined ? engine : causeText(cause)).split("\n"), ...mismatchLines(result.mismatches)];
+      return `  ✗ ${label(variant)}\n      ${said.join("\n      ")}`;
     });
     super(`${failures.length} of ${selected} variants failed for '${interaction}':\n${lines.join("\n")}`, {
       cause: failures[0]?.cause,
@@ -61,45 +65,51 @@ export class VariantsFailedError extends Error {
 }
 
 /**
- * `finalise` wrote no contract: the engine did not verify every interaction, or a test in this
- * suite failed — the engine verified the exchanges, but only the closure knows whether the consumer
- * handled what it was sent, and a contract must not claim a variant its own test failed on.
+ * `finalise` wrote no contract, because the engine withheld it: an interaction did not verify on a
+ * variant it required — its request did not match, nothing exercised it, or its test failed — or the
+ * engine refused an interaction the suite added (ADR 0064).
  */
 export class ContractWithheldError extends Error {
   readonly results: protocol.InteractionResult[];
-  /** Descriptions of the interactions whose `execute` failed in this suite. */
-  readonly failedTests: string[];
-  /** Whether the engine itself returned no contract, as against the SDK withholding one it did. */
-  readonly engineWithheld: boolean;
+  /** The interactions the engine refused when the suite added them. */
+  readonly refused: protocol.RefusedInteraction[];
+  /** The descriptions of the interactions that did not verify, then of the ones the engine refused. */
+  readonly interactions: string[];
 
   constructor(
     results: protocol.InteractionResult[],
     descriptions: Map<string, string>,
-    failedTests: string[],
-    engineWithheld: boolean,
+    refused: protocol.RefusedInteraction[],
   ) {
+    const failed = results.filter((r) => r.status !== "verified");
+    const interactions = [
+      ...failed.map((r) => descriptions.get(r.handle) ?? r.handle),
+      ...refused.map((r) => r.description ?? "an interaction"),
+    ];
     const lines: string[] = [];
-    for (const result of results.filter((r) => r.status !== "verified")) {
-      lines.push(`  ${descriptions.get(result.handle) ?? result.handle}: ${result.status}`);
-      for (const variant of result.variants ?? []) {
-        if (variant.status === "verified") {
-          continue;
-        }
-        lines.push(`    ✗ ${variant.variant}: ${variant.status}`);
-        for (const mismatch of (variant.mismatches ?? []) as Array<Record<string, unknown>>) {
-          lines.push(`        ${String(mismatch.path ?? "")} ${String(mismatch.message ?? JSON.stringify(mismatch))}`);
-        }
+    failed.forEach((result, i) => {
+      lines.push(`  ${interactions[i]}: ${result.status}`);
+      for (const variant of (result.variants ?? []).filter((v) => v.status !== "verified")) {
+        const reason = variant.test?.reason === undefined ? [] : [`its test failed: ${variant.test.reason}`];
+        lines.push(`    ✗ ${variant.variant}: ${variant.status}`, ...[...reason, ...mismatchLines(variant.mismatches)].map((l) => `        ${l}`));
       }
-    }
-    for (const description of failedTests) {
-      lines.push(`  ${description}: its test failed`);
-    }
+    });
+    refused.forEach((refusal, i) => lines.push(`  ${interactions[failed.length + i]}: refused, ${refusal.message} [${refusal.code}]`));
     super(`No contract written:\n${lines.join("\n")}`);
     this.name = "ContractWithheldError";
     this.results = results;
-    this.failedTests = failedTests;
-    this.engineWithheld = engineWithheld;
+    this.refused = refused;
+    this.interactions = interactions;
   }
+}
+
+/** What a closure threw, as text: the engine records it (ADR 0064), and a failure prints it. */
+export function causeText(cause: unknown): string {
+  return cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+}
+
+function mismatchLines(mismatches: protocol.VariantResult["mismatches"]): string[] {
+  return (mismatches ?? []).map((m) => `${m.path === undefined ? "" : `${String(m.path)} `}${String(m.message ?? JSON.stringify(m))}`);
 }
 
 /** One interaction × variant result of a provider verification, as `verification/interaction-result` carried it. */

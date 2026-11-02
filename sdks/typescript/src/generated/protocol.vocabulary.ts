@@ -180,6 +180,7 @@ export const InteractionResultStatus = {
   Verified: "verified",
   Failed: "failed",
   NotExercised: "not-exercised",
+  NotReported: "not-reported",
 } as const;
 
 /**
@@ -231,6 +232,15 @@ export const ReasonCode = {
 } as const;
 
 /**
+ * Known values of `ReportVariant.status` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ReportVariantStatus = {
+  Passed: "passed",
+  Failed: "failed",
+} as const;
+
+/**
  * Known values of `RequestFrame.op` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -242,6 +252,7 @@ export const RequestFrameOp = {
   ConsumerSessionVariants: "consumer-session/variants",
   ConsumerSessionStartTransport: "consumer-session/start-transport",
   ConsumerSessionServeVariant: "consumer-session/serve-variant",
+  ConsumerSessionReportVariant: "consumer-session/report-variant",
   ConsumerSessionFinalise: "consumer-session/finalise",
   VerificationVerify: "verification/verify",
   VerificationExplain: "verification/explain",
@@ -290,6 +301,15 @@ export const SubsumptionViewVerdict = {
   No: "no",
   Unknown: "unknown",
   NotChecked: "not-checked",
+} as const;
+
+/**
+ * Known values of `TestVerdict.status` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const TestVerdictStatus = {
+  Passed: "passed",
+  Failed: "failed",
 } as const;
 
 /**
@@ -342,6 +362,7 @@ export const VariantResultStatus = {
   Verified: "verified",
   Failed: "failed",
   NotExercised: "not-exercised",
+  NotReported: "not-reported",
 } as const;
 
 /**

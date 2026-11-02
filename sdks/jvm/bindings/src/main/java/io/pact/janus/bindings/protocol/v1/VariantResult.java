@@ -28,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "variant",
     "status",
-    "mismatches"
+    "mismatches",
+    "test"
 })
 public class VariantResult {
 
@@ -40,11 +41,12 @@ public class VariantResult {
     @JsonProperty("variant")
     private java.lang.String variant;
     /**
-     * 
+     * In order (spec.md §8.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.
      * (Required)
      * 
      */
     @JsonProperty("status")
+    @JsonPropertyDescription("In order (spec.md \u00a78.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.")
     private java.lang.String status;
     /**
      * Mismatch documents in the plan grammar's result form (design 2.4).
@@ -53,6 +55,14 @@ public class VariantResult {
     @JsonProperty("mismatches")
     @JsonPropertyDescription("Mismatch documents in the plan grammar's result form (design 2.4).")
     private List<Map<String, Object>> mismatches;
+    /**
+     * TestVerdict
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("test")
+    private TestVerdict test;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -77,7 +87,7 @@ public class VariantResult {
     }
 
     /**
-     * 
+     * In order (spec.md §8.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.
      * (Required)
      * 
      */
@@ -87,7 +97,7 @@ public class VariantResult {
     }
 
     /**
-     * 
+     * In order (spec.md §8.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.
      * (Required)
      * 
      */
@@ -112,6 +122,28 @@ public class VariantResult {
     @JsonProperty("mismatches")
     public void setMismatches(List<Map<String, Object>> mismatches) {
         this.mismatches = mismatches;
+    }
+
+    /**
+     * TestVerdict
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("test")
+    public TestVerdict getTest() {
+        return test;
+    }
+
+    /**
+     * TestVerdict
+     * <p>
+     * 
+     * 
+     */
+    @JsonProperty("test")
+    public void setTest(TestVerdict test) {
+        this.test = test;
     }
 
     @JsonAnyGetter
@@ -140,6 +172,10 @@ public class VariantResult {
         sb.append('=');
         sb.append(((this.mismatches == null)?"<null>":this.mismatches));
         sb.append(',');
+        sb.append("test");
+        sb.append('=');
+        sb.append(((this.test == null)?"<null>":this.test));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -158,6 +194,7 @@ public class VariantResult {
         result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
         result = ((result* 31)+((this.mismatches == null)? 0 :this.mismatches.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.test == null)? 0 :this.test.hashCode()));
         result = ((result* 31)+((this.status == null)? 0 :this.status.hashCode()));
         return result;
     }
@@ -171,7 +208,7 @@ public class VariantResult {
             return false;
         }
         VariantResult rhs = ((VariantResult) other);
-        return (((((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant)))&&((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
+        return ((((((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant)))&&((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.test == rhs.test)||((this.test!= null)&&this.test.equals(rhs.test))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
     }
 
 }

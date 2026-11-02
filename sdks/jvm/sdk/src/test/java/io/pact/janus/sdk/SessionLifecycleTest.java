@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -93,7 +94,8 @@ class SessionLifecycleTest {
 
     assertEquals(List.of("engine/hello", "consumer-session/create", "consumer-session/add-interaction",
         "consumer-session/start-transport", "consumer-session/variants", "consumer-session/serve-variant",
-        "consumer-session/serve-variant", "consumer-session/finalise"), engine.ops());
+        "consumer-session/report-variant", "consumer-session/serve-variant", "consumer-session/report-variant",
+        "consumer-session/finalise"), engine.ops());
     assertEquals(MAPPER.readTree("{\"config\":{\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"}}}"),
         engine.body("consumer-session/create"));
     assertEquals(MAPPER.readTree(MAPPER.writeValueAsString(interaction.toDocument())),
@@ -102,6 +104,8 @@ class SessionLifecycleTest {
     assertEquals("http", engine.body("consumer-session/start-transport").get("transport").asText());
     assertEquals(MAPPER.readTree("{\"session\":\"cs-1\",\"handle\":\"i-1\"}"), engine.body("consumer-session/variants"));
     assertEquals(List.of("base", "shippedAt-absent"), engine.served());
+    assertEquals(MAPPER.readTree("{\"session\":\"cs-1\",\"handle\":\"i-1\",\"variant\":\"base\",\"status\":\"passed\"}"),
+        engine.body("consumer-session/report-variant"));
     assertEquals(MAPPER.readTree("{\"session\":\"cs-1\"}"), engine.body("consumer-session/finalise"));
     assertEquals(1, engine.closed);
   }
@@ -115,8 +119,8 @@ class SessionLifecycleTest {
     janus.finalise();
     assertEquals(List.of("engine/hello", "consumer-session/create", "consumer-session/add-interaction",
         "consumer-session/start-transport", "consumer-session/variants", "consumer-session/serve-variant",
-        "consumer-session/add-interaction", "consumer-session/variants", "consumer-session/serve-variant",
-        "consumer-session/finalise"), engine.ops());
+        "consumer-session/report-variant", "consumer-session/add-interaction", "consumer-session/variants",
+        "consumer-session/serve-variant", "consumer-session/report-variant", "consumer-session/finalise"), engine.ops());
     assertEquals(1, engine.opened);
   }
 
@@ -196,7 +200,7 @@ class SessionLifecycleTest {
     janus.execute(order(janus), (mock, variant) -> {});
     ContractWithheldException error = assertThrows(ContractWithheldException.class, janus::finalise);
 
-    assertTrue(error.engineWithheld());
+    assertEquals(List.of("get an order"), error.interactions());
     String message = error.getMessage();
     assertTrue(message.contains("'get an order': failed"), message);
     assertTrue(message.contains("v:shippedAt-absent [shippedAt-absent]: failed"), message);
@@ -208,7 +212,7 @@ class SessionLifecycleTest {
   }
 
   @Test
-  @DisplayName("a failed execute withholds the contract even though the engine returned one [session.finalise.failed-test-withholds-contract]")
+  @DisplayName("a failed test is reported, and the engine withholds the contract [session.finalise.failed-test-withholds-contract, session.execute.reports-each-variant]")
   void failedTestWithholdsContract() {
     engine.variants("base", "shippedAt-absent");
     Janus janus = janus();
@@ -217,26 +221,43 @@ class SessionLifecycleTest {
         throw new IllegalStateException("shippedAt missing");
       }
     }));
+    List<JsonNode> reports = engine.calls.stream().filter(c -> c.op().equals("consumer-session/report-variant"))
+        .map(ScriptedEngine.Call::body).toList();
+    assertEquals("passed", reports.get(0).path("status").asText());
+    assertEquals("failed", reports.get(1).path("status").asText());
+    assertEquals("java.lang.IllegalStateException: shippedAt missing", reports.get(1).path("reason").asText());
+
     ContractWithheldException error = assertThrows(ContractWithheldException.class, janus::finalise);
-    assertFalse(error.engineWithheld());
-    assertEquals(List.of("get an order"), error.failedInteractions());
-    assertTrue(error.getMessage().contains("v:shippedAt-absent [shippedAt-absent]: java.lang.IllegalStateException: shippedAt missing"),
-        error.getMessage());
+    assertEquals(List.of("get an order"), error.interactions());
     assertFalse(Files.exists(contracts.resolve("web-app-orders-api.janus.json")));
     assertTrue(engine.ops().contains("consumer-session/finalise"));
   }
 
   @Test
-  @DisplayName("an execute rejected by the engine also withholds the suite's contract")
-  void rejectedExecuteWithholdsContract() {
+  @DisplayName("a variant the engine did not verify fails execute though its test passed [session.execute.engine-verdict-fails-the-variant]")
+  void engineVerdictFailsTheVariant() {
+    engine.variants("base", "shippedAt-absent");
+    engine.on("consumer-session/report-variant", body -> body.path("variant").asText().equals("base")
+        ? "{\"ok\":{\"result\":{\"variant\":\"base\",\"status\":\"failed\",\"mismatches\":[{\"path\":\"$.request.path\",\"message\":\"Expected '/orders/42' but got '/orders/7'\"}]}}}"
+        : "{\"ok\":{\"result\":{\"variant\":\"shippedAt-absent\",\"status\":\"not-exercised\"}}}");
+    Janus janus = janus();
+    ExecuteFailedException error = assertThrows(ExecuteFailedException.class,
+        () -> janus.execute(order(janus), (mock, variant) -> {}));
+    assertEquals(List.of("base", "shippedAt-absent"), error.failures().stream().map(f -> f.variant().id()).toList());
+    assertTrue(error.getMessage().contains("$.request.path: Expected '/orders/42' but got '/orders/7'"), error.getMessage());
+    assertTrue(error.getMessage().contains("nothing exercised the mock under this variant"), error.getMessage());
+  }
+
+  @Test
+  @DisplayName("an interaction the engine refused is named when it withholds the contract [session.finalise.refused-interaction-withholds-contract]")
+  void refusedInteractionWithholdsContract() {
+    engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],"
+        + "\"refused\":[{\"description\":\"broken\",\"code\":\"interaction-invalid\",\"message\":\"bad\"}]}");
     Janus janus = janus();
     janus.execute(order(janus), (mock, variant) -> {});
-    engine.error("consumer-session/add-interaction", "{\"code\":\"interaction-invalid\",\"category\":\"document\","
-        + "\"message\":\"bad\",\"details\":{\"problems\":[]}}");
-    assertThrows(JanusEngineException.class,
-        () -> janus.execute(janus.interaction("broken"), (mock, variant) -> {}));
     ContractWithheldException error = assertThrows(ContractWithheldException.class, janus::finalise);
-    assertEquals(List.of("broken"), error.failedInteractions());
+    assertEquals(List.of("broken"), error.interactions());
+    assertTrue(error.getMessage().contains("'broken': refused, bad [interaction-invalid]"), error.getMessage());
   }
 
   @Test

@@ -29,7 +29,7 @@
     {
       "finalise": {},
       "expect": {
-        "outcome": { "error": "contract-withheld", "engine-withheld": true },
+        "outcome": { "error": "contract-withheld", "interactions": ["get an order"] },
         "contract": { "written": false }
       }
     }

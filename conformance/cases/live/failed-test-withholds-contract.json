@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/failed-test-withholds-contract",
+  "category": "live",
+  "title": "A consumer that cannot handle a variant fails that variant, and the engine withholds the contract though every exchange matched.",
+  "covers": ["session.finalise.failed-test-withholds-contract", "session.execute.failing-variant-fails-build"],
+  "why": "behavioural spec 'execute': when the closure ends, 'report-variant' with its verdict; the engine answers with the variant's result, 'failed' when the closure threw. 'finalise': the contract is present only when every interaction verified on every variant it required, its test included (ADR 0064). Task 4.6's careless client: it gets the response for every variant and crashes when 'shippedAt' is absent. Every exchange matches, and the engine, not the SDK, withholds the contract that would claim the variant it crashed on (Phase 9 finding 4).",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "get an order",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": { "$": "json", "args": [{ "id": 42, "shippedAt": { "$": "optional", "args": [{ "$": "string", "args": ["2026-07-30"] }] } }] }
+          }
+        },
+        "closure": {
+          "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 },
+          "fail-on": ["response.body.shippedAt#presence=absent"]
+        }
+      },
+      "expect": {
+        "outcome": { "error": "execute-failed", "variants": ["response.body.shippedAt#presence=absent"] },
+        "closure-calls": ["base", "response.body.shippedAt#presence=absent"]
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "interactions": ["get an order"] },
+        "contract": { "written": false }
+      }
+    }
+  ]
+}

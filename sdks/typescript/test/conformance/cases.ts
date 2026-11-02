@@ -51,7 +51,6 @@ export interface Outcome {
   code?: string;
   variants?: string[];
   interactions?: string[];
-  "engine-withheld"?: boolean;
   failed?: { interaction: unknown; variant: string }[];
 }
 
@@ -63,7 +62,7 @@ export interface StepExpectation {
 
 export interface Step {
   build?: InteractionScript;
-  execute?: { interaction: InteractionScript; closure?: { "fail-on"?: string[]; exchange?: Exchange } };
+  execute?: { interaction: InteractionScript; closure?: { "fail-on"?: string[]; "skip-on"?: string[]; exchange?: Exchange } };
   finalise?: Record<string, never>;
   expect?: StepExpectation;
 }
@@ -74,6 +73,9 @@ export interface ScriptedEngine {
   "contract-text"?: string;
   "withhold-contract"?: boolean;
   results?: Record<string, unknown>[];
+  refused?: Record<string, unknown>[];
+  /** Variant id -> the result 'report-variant' answers with for it. */
+  reports?: Record<string, Record<string, unknown>>;
   errors?: Record<string, { code: string; message?: string; after?: number; details?: Record<string, unknown> }>;
   capabilities?: Record<string, unknown>;
   config?: Record<string, unknown>;

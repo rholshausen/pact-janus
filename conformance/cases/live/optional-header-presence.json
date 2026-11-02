@@ -5,7 +5,7 @@
   "title": "An 'optional' header puts the presence dimension on the header name, not on the value inside it.",
   "covers": ["session.request.absence-applies-to-the-member"],
   "why": "behavioural spec 'request': 'optional(of)' in a header map becomes an 'optional' whose 'of' is the 'each-like' the rule would otherwise have built, leaving the presence dimension on the header name itself (shape spec §6.4). The dimension id is the observable difference — 'request.headers.x-trace#presence' is a statement about whether the header is sent, which is what the author wrote, and no dimension at all is what the wrapped form produced by being rejected outright.",
-  "note": "No exchange: a case's closure sends one fixed request on every variant, so it cannot both send and omit a header. What this case pins is the space the engine derived from the document the SDK built; 'live/forbidden-header-accepted' covers the round trip through the mock.",
+  "note": "No exchange: a case's closure sends one fixed request on every variant, so it cannot both send and omit a header. What this case pins is the space the engine derived from the document the SDK built; 'live/forbidden-header-accepted' covers the round trip through the mock. Nothing exercises the mock, so 'execute' fails on every variant (ADR 0064), and the case does not check how it ended.",
   "steps": [
     {
       "execute": {
@@ -18,8 +18,7 @@
           },
           "response": { "status": 200 }
         }
-      },
-      "expect": { "outcome": "ok" }
+      }
     }
   ],
   "expect": { "variant-count": 2, "dimensions": ["request.headers.x-trace#presence"] }

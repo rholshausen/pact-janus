@@ -172,6 +172,16 @@
           "items": { "type": "object" },
           "description": "The 'results' member of the finalise result. Default: one verified result per interaction added."
         },
+        "refused": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "The 'refused' member of the finalise result (ADR 0064). Default: none."
+        },
+        "reports": {
+          "type": "object",
+          "description": "Variant id -> the result 'consumer-session/report-variant' answers with for that variant (ADR 0064). Default: 'verified' for a report of 'passed', 'failed' for any other, with the report as 'test'.",
+          "additionalProperties": { "type": "object", "required": ["variant", "status"] }
+        },
         "errors": {
           "type": "object",
           "description": "Operation name -> the engine error that operation answers with instead (an engine-protocol §10 error document).",
@@ -249,7 +259,12 @@
         "fail-on": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Variant ids the closure fails on — '*' for every one. It fails the way the language fails a test."
+          "description": "Variant ids the closure fails on — '*' for every one. It fails the way the language fails a test, after its exchange when it has one."
+        },
+        "skip-on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "'live' cases: variant ids on which the closure sends no exchange, so nothing exercises the mock."
         },
         "exchange": {
           "$ref": "#/$defs/Exchange",
@@ -536,10 +551,6 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "contract-withheld: the interaction descriptions the failure must name."
-            },
-            "engine-withheld": {
-              "type": "boolean",
-              "description": "contract-withheld: whether the engine returned no contract (true) or the SDK withheld one it returned (false)."
             },
             "failed": {
               "type": "array",

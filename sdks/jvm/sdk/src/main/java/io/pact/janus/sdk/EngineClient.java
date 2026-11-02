@@ -2,6 +2,7 @@ package io.pact.janus.sdk;
 
 import io.pact.janus.bindings.protocol.v1.Capabilities;
 import io.pact.janus.bindings.protocol.v1.ContractTextCapability;
+import io.pact.janus.bindings.protocol.v1.TestVerdictsCapability;
 import io.pact.janus.bindings.protocol.v1.EngineError;
 import io.pact.janus.bindings.protocol.v1.Hello;
 import io.pact.janus.bindings.protocol.v1.HelloResult;
@@ -36,8 +37,9 @@ final class EngineClient implements AutoCloseable {
   }
 
   /**
-   * {@code engine/hello}, offering protocol version 1 and declaring {@code contract-text}: a
-   * contract crosses the boundary as its text, so this SDK writes the engine's bytes (ADR 0063).
+   * {@code engine/hello}, offering protocol version 1 and declaring {@code contract-text}, so this SDK
+   * writes the engine's bytes (ADR 0063), and {@code test-verdicts}, since it reports every variant it
+   * runs and the engine holds the suite's verdict (ADR 0064).
    */
   HelloResult hello(String hostName, String hostVersion) {
     Hello hello = new Hello();
@@ -48,6 +50,7 @@ final class EngineClient implements AutoCloseable {
     hello.setHost(host);
     Capabilities capabilities = new Capabilities();
     capabilities.setContractText(new ContractTextCapability());
+    capabilities.setTestVerdicts(new TestVerdictsCapability());
     hello.setCapabilities(capabilities);
     HelloResult result = call(RequestFrameOp.ENGINE_HELLO, hello, HelloResult.class);
     if (result.getProtocolVersion() == null || result.getProtocolVersion() != PROTOCOL_VERSION) {

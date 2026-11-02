@@ -120,11 +120,12 @@ final class CaseRunner {
           Outcome outcome = capture(() -> janus.execute(interaction, (mock, variant) -> {
             calls.add(variant.id());
             variant.assignment().forEach(point -> dimensions.add(point.dimension()));
+            // The exchange first: a consumer that cannot handle a variant fails on what the mock sent.
+            if (closure.has("exchange") && !listed(closure.path("skip-on"), variant.id())) {
+              send(mock.url(), closure.get("exchange"));
+            }
             if (fails(closure, variant.id())) {
               throw new AssertionError("the consumer cannot handle variant '" + variant.id() + "'");
-            }
-            if (closure.has("exchange")) {
-              send(mock.url(), closure.get("exchange"));
             }
           }));
           variantCounts.add(calls.size());
@@ -184,10 +185,9 @@ final class CaseRunner {
   // -------------------------------------------------------------------------------------------
   // What a step produced, in the case's own vocabulary (README §4).
 
-  private record Outcome(String kind, String code, List<String> variants, List<String> interactions,
-      Boolean engineWithheld) {
+  private record Outcome(String kind, String code, List<String> variants, List<String> interactions) {
     static Outcome ok() {
-      return new Outcome("ok", null, null, null, null);
+      return new Outcome("ok", null, null, null);
     }
   }
 
@@ -201,11 +201,11 @@ final class CaseRunner {
       return Outcome.ok();
     } catch (ExecuteFailedException failed) {
       return new Outcome("execute-failed", null,
-          failed.failures().stream().map(failure -> failure.variant().id()).toList(), null, null);
+          failed.failures().stream().map(failure -> failure.variant().id()).toList(), null);
     } catch (ContractWithheldException withheld) {
-      return new Outcome("contract-withheld", null, null, withheld.failedInteractions(), withheld.engineWithheld());
+      return new Outcome("contract-withheld", null, null, withheld.interactions());
     } catch (JanusEngineException engineError) {
-      return new Outcome("engine-error", engineError.code(), null, null, null);
+      return new Outcome("engine-error", engineError.code(), null, null);
     } catch (Exception problem) {
       throw new IllegalStateException("the case's step failed in a way no outcome describes", problem);
     }
@@ -296,12 +296,16 @@ final class CaseRunner {
         && !Suite.equal(expected.get("interactions"), Suite.MAPPER.valueToTree(actual.interactions()))) {
       return false;
     }
-    return !expected.has("engine-withheld")
-        || expected.path("engine-withheld").asBoolean() == Boolean.TRUE.equals(actual.engineWithheld());
+    return true;
   }
 
   private static boolean fails(JsonNode closure, String variant) {
-    for (JsonNode id : closure.path("fail-on")) {
+    return listed(closure.path("fail-on"), variant);
+  }
+
+  /** Whether {@code ids} names {@code variant}, or names every variant with {@code *}. */
+  private static boolean listed(JsonNode ids, String variant) {
+    for (JsonNode id : ids) {
       if ("*".equals(id.asText()) || id.asText().equals(variant)) {
         return true;
       }

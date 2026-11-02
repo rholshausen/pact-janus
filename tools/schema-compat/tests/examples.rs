@@ -132,6 +132,13 @@ fn example_transcripts_validate_against_the_schemas() {
       ),
     ),
     (
+      "consumer-session/report-variant",
+      (
+        Some("consumer-session.schema.json#/$defs/ReportVariant"),
+        Some("consumer-session.schema.json#/$defs/ReportVariantResult"),
+      ),
+    ),
+    (
       "consumer-session/finalise",
       (
         Some("consumer-session.schema.json#/$defs/Finalise"),

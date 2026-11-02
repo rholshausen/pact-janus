@@ -205,8 +205,9 @@ public final class Vocabulary {
     public static final String VERIFIED = "verified";
     public static final String FAILED = "failed";
     public static final String NOT_EXERCISED = "not-exercised";
+    public static final String NOT_REPORTED = "not-reported";
 
-    public static final List<String> KNOWN = List.of(VERIFIED, FAILED, NOT_EXERCISED);
+    public static final List<String> KNOWN = List.of(VERIFIED, FAILED, NOT_EXERCISED, NOT_REPORTED);
   }
 
   /** Known values of {@code ObservedSlotValue.encoded}. */
@@ -261,6 +262,16 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(VERIFICATION_FAILED, VERIFICATION_INCOMPLETE, VERIFICATION_MISSING, VERIFICATION_FILTERED, PROVIDER_SHAPE_MISSING, INTERACTIONS_NOT_PUBLISHED, SUBSUMPTION_FINDINGS, SUBSUMPTION_REVIEWS, SUBSUMPTION_EXEMPT, SUBSUMPTION_ADVISORIES, EXEMPTION_LAPSED, EXEMPTION_NO_EXPIRY, EXEMPTION_UNUSED, EXPIRY_NOT_EVALUATED);
   }
 
+  /** Known values of {@code ReportVariant.status}. */
+  public static final class ReportVariantStatus {
+    private ReportVariantStatus() {}
+
+    public static final String PASSED = "passed";
+    public static final String FAILED = "failed";
+
+    public static final List<String> KNOWN = List.of(PASSED, FAILED);
+  }
+
   /** Known values of {@code RequestFrame.op}. */
   public static final class RequestFrameOp {
     private RequestFrameOp() {}
@@ -272,6 +283,7 @@ public final class Vocabulary {
     public static final String CONSUMER_SESSION_VARIANTS = "consumer-session/variants";
     public static final String CONSUMER_SESSION_START_TRANSPORT = "consumer-session/start-transport";
     public static final String CONSUMER_SESSION_SERVE_VARIANT = "consumer-session/serve-variant";
+    public static final String CONSUMER_SESSION_REPORT_VARIANT = "consumer-session/report-variant";
     public static final String CONSUMER_SESSION_FINALISE = "consumer-session/finalise";
     public static final String VERIFICATION_VERIFY = "verification/verify";
     public static final String VERIFICATION_EXPLAIN = "verification/explain";
@@ -279,7 +291,7 @@ public final class Vocabulary {
     public static final String CONFIG_LOAD = "config/load";
     public static final String EVENTS_POLL = "events/poll";
 
-    public static final List<String> KNOWN = List.of(ENGINE_HELLO, ENGINE_SHUTDOWN, CONSUMER_SESSION_CREATE, CONSUMER_SESSION_ADD_INTERACTION, CONSUMER_SESSION_VARIANTS, CONSUMER_SESSION_START_TRANSPORT, CONSUMER_SESSION_SERVE_VARIANT, CONSUMER_SESSION_FINALISE, VERIFICATION_VERIFY, VERIFICATION_EXPLAIN, UPGRADE_PACT, CONFIG_LOAD, EVENTS_POLL);
+    public static final List<String> KNOWN = List.of(ENGINE_HELLO, ENGINE_SHUTDOWN, CONSUMER_SESSION_CREATE, CONSUMER_SESSION_ADD_INTERACTION, CONSUMER_SESSION_VARIANTS, CONSUMER_SESSION_START_TRANSPORT, CONSUMER_SESSION_SERVE_VARIANT, CONSUMER_SESSION_REPORT_VARIANT, CONSUMER_SESSION_FINALISE, VERIFICATION_VERIFY, VERIFICATION_EXPLAIN, UPGRADE_PACT, CONFIG_LOAD, EVENTS_POLL);
   }
 
   /** Known values of {@code Segment.kind}. */
@@ -325,6 +337,16 @@ public final class Vocabulary {
     public static final String NOT_CHECKED = "not-checked";
 
     public static final List<String> KNOWN = List.of(YES, NO, UNKNOWN, NOT_CHECKED);
+  }
+
+  /** Known values of {@code TestVerdict.status}. */
+  public static final class TestVerdictStatus {
+    private TestVerdictStatus() {}
+
+    public static final String PASSED = "passed";
+    public static final String FAILED = "failed";
+
+    public static final List<String> KNOWN = List.of(PASSED, FAILED);
   }
 
   /** Known values of {@code TransportBinding.transport}. */
@@ -379,8 +401,9 @@ public final class Vocabulary {
     public static final String VERIFIED = "verified";
     public static final String FAILED = "failed";
     public static final String NOT_EXERCISED = "not-exercised";
+    public static final String NOT_REPORTED = "not-reported";
 
-    public static final List<String> KNOWN = List.of(VERIFIED, FAILED, NOT_EXERCISED);
+    public static final List<String> KNOWN = List.of(VERIFIED, FAILED, NOT_EXERCISED, NOT_REPORTED);
   }
 
   /** Known values of {@code VerificationView.status}. */

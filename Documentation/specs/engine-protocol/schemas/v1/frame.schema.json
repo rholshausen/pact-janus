@@ -48,6 +48,7 @@
             "consumer-session/variants",
             "consumer-session/start-transport",
             "consumer-session/serve-variant",
+            "consumer-session/report-variant",
             "consumer-session/finalise",
             "verification/verify",
             "verification/explain",

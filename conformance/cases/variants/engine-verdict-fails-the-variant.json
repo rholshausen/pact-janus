@@ -1,0 +1,33 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "variants/engine-verdict-fails-the-variant",
+  "category": "variants",
+  "title": "A variant the engine did not verify fails execute, though its closure passed.",
+  "covers": ["session.execute.engine-verdict-fails-the-variant", "session.execute.every-variant-runs-after-a-failure"],
+  "why": "behavioural spec 'execute': the engine answers each report with the variant's result, and the variant failed when that result's 'status' is not 'verified': the closure threw, the mock rejected its request, or nothing exercised the mock under it. Every remaining variant still runs, and 'execute' then fails once, naming every failed variant. That is how an engine-side failure surfaces in the test that caused it, not at the end of the suite (Phase 9 finding 5, ADR 0064).",
+  "engine": {
+    "variants": [
+      { "id": "base", "label": "base" },
+      { "id": "status=SHIPPED", "label": "status SHIPPED" },
+      { "id": "shippedAt=absent", "label": "shippedAt absent" }
+    ],
+    "reports": {
+      "status=SHIPPED": {
+        "variant": "status=SHIPPED",
+        "status": "failed",
+        "mismatches": [{ "path": "$.request.path", "expected": "/orders/42", "actual": "/orders/7", "message": "path does not match" }],
+        "test": { "status": "passed" }
+      },
+      "shippedAt=absent": { "variant": "shippedAt=absent", "status": "not-exercised", "test": { "status": "passed" } }
+    }
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": {
+        "outcome": { "error": "execute-failed", "variants": ["status=SHIPPED", "shippedAt=absent"] },
+        "closure-calls": ["base", "status=SHIPPED", "shippedAt=absent"]
+      }
+    }
+  ]
+}

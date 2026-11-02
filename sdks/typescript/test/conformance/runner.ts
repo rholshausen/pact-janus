@@ -108,6 +108,7 @@ async function runSession(testCase: Case, failures: string[]): Promise<string | 
       } else if (step.execute) {
         const calls: string[] = [];
         const failOn = step.execute.closure?.["fail-on"] ?? [];
+        const skipOn = step.execute.closure?.["skip-on"] ?? [];
         const exchange = step.execute.closure?.exchange;
         const interaction = buildInteraction(janus, step.execute.interaction);
         const outcome = await capture(() =>
@@ -116,11 +117,12 @@ async function runSession(testCase: Case, failures: string[]): Promise<string | 
             for (const point of assignmentOf(variant)) {
               dimensions.add(point);
             }
+            // The exchange first: a consumer that cannot handle a variant fails on what the mock sent.
+            if (exchange && !skipOn.includes(variant.id)) {
+              await send(mock.url, exchange);
+            }
             if (failOn.includes(variant.id) || failOn.includes("*")) {
               throw new Error(`the consumer cannot handle variant '${variant.id}'`);
-            }
-            if (exchange) {
-              await send(mock.url, exchange);
             }
           }),
         );
@@ -248,9 +250,6 @@ function matches(expected: "ok" | Outcome, actual: "ok" | Outcome): boolean {
   if (expected.interactions !== undefined && !equal(expected.interactions, actual.interactions)) {
     return false;
   }
-  if (expected["engine-withheld"] !== undefined && expected["engine-withheld"] !== actual["engine-withheld"]) {
-    return false;
-  }
   return true;
 }
 
@@ -264,11 +263,7 @@ async function capture(run: () => Promise<void>): Promise<"ok" | Outcome> {
       return { error: "execute-failed", variants: error.failures.map((f) => f.variant.id) };
     }
     if (error instanceof ContractWithheldError) {
-      return {
-        error: "contract-withheld",
-        interactions: error.failedTests,
-        "engine-withheld": error.engineWithheld,
-      };
+      return { error: "contract-withheld", interactions: error.interactions };
     }
     if (error instanceof JanusError) {
       return { error: "engine-error", code: error.code };

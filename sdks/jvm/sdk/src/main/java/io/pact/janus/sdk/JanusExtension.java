@@ -63,8 +63,9 @@ public final class JanusExtension implements AfterAllCallback {
   /**
    * {@code execute} as dynamic tests: submits the interaction now (so an invalid one fails the
    * {@code @TestFactory} before any variant runs), and returns one test per selected variant, in the
-   * engine's order. Each runs {@code serve-variant} and then {@code test}, and fails with the test's
-   * own exception; a failed variant still withholds the contract at {@code finalise}.
+   * engine's order. Each runs {@code serve-variant}, {@code test} and {@code report-variant}, and fails
+   * with the test's own exception, or the engine's verdict when the engine did not verify the variant
+   * (ADR 0064); the engine withholds the contract for a failed variant.
    */
   public Stream<DynamicTest> variants(Interaction interaction, VariantTest test) {
     Objects.requireNonNull(test, "test");

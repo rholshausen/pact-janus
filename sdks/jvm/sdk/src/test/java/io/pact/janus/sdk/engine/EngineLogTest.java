@@ -9,6 +9,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.pact.janus.sdk.ContractWithheldException;
+import io.pact.janus.sdk.ExecuteFailedException;
 import io.pact.janus.sdk.Janus;
 import io.pact.janus.sdk.JanusOptions;
 import java.io.ByteArrayOutputStream;
@@ -119,9 +120,10 @@ class EngineLogTest {
   void aRealEnginesWarning(@TempDir Path contracts) {
     logger.setLevel(Level.WARN);
     Janus janus = Janus.of("web-app", "orders-api", JanusOptions.defaults().withContractDirectory(contracts));
-    janus.execute(janus.interaction("ping").request(r -> r.method("GET").path("/ping")).response(r -> r.status(204)),
+    assertThrows(ExecuteFailedException.class, () -> janus.execute(
+        janus.interaction("ping").request(r -> r.method("GET").path("/ping")).response(r -> r.status(204)),
         (mock, variant) -> HttpClient.newHttpClient().send(
-            HttpRequest.newBuilder(URI.create(mock.url() + "/pong")).GET().build(), HttpResponse.BodyHandlers.discarding()));
+            HttpRequest.newBuilder(URI.create(mock.url() + "/pong")).GET().build(), HttpResponse.BodyHandlers.discarding())));
     assertThrows(ContractWithheldException.class, janus::finalise);
     assertTrue(messages().stream().anyMatch(message ->
         message.startsWith("WARN pact_janus_kernel::protocol::exchange: request did not match the armed variant")),

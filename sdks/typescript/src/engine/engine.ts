@@ -16,6 +16,7 @@ interface Operations {
   [Op.ConsumerSessionStartTransport]: [protocol.StartTransport, protocol.StartTransportResult];
   [Op.ConsumerSessionVariants]: [protocol.Variants, protocol.VariantsResult];
   [Op.ConsumerSessionServeVariant]: [protocol.ServeVariant, protocol.ServeVariantResult];
+  [Op.ConsumerSessionReportVariant]: [protocol.ReportVariant, protocol.ReportVariantResult];
   [Op.ConsumerSessionFinalise]: [protocol.Finalise, protocol.FinaliseResult];
   [Op.ConfigLoad]: [protocol.Load, protocol.LoadResult];
   [Op.VerificationVerify]: [protocol.Verify, protocol.VerifyResult];
@@ -43,7 +44,8 @@ export class Engine {
         "protocol-versions": [PROTOCOL_VERSION],
         host: SDK,
         // ADR 0063: contracts cross the boundary as their text, so this SDK writes the engine's bytes.
-        capabilities: { "contract-text": {} },
+        // ADR 0064: this SDK reports every variant it runs, so the engine holds the suite's verdict.
+        capabilities: { "contract-text": {}, "test-verdicts": {} },
       });
       if (hello["protocol-version"] !== PROTOCOL_VERSION) {
         throw new Error(

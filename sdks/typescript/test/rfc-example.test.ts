@@ -132,7 +132,7 @@ describe("the RFC consumer example against the engine", () => {
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
   }, 30_000);
 
-  it("reports a request the mock could not match when the suite finalises", async () => {
+  it("fails the variant whose request the mock could not match, in the test that sent it", async () => {
     const dir = await mkdtemp(join(tmpdir(), "janus-rfc-"));
     const janus = new Janus({ consumer: "web-app", provider: "orders-api", contractDir: dir });
     const interaction = janus
@@ -141,12 +141,18 @@ describe("the RFC consumer example against the engine", () => {
       .response({ status: 200 });
 
     // The client forgets the header: the mock answers 500, and swallowing that is the client's bug.
-    await janus.execute(interaction, async (mock) => {
-      await fetch(`${mock.url}/orders/42`);
-    });
+    // The engine's verdict still fails the variant, in this execute (ADR 0064).
+    const executed = await janus
+      .execute(interaction, async (mock) => {
+        await fetch(`${mock.url}/orders/42`);
+      })
+      .catch((e: unknown) => e);
+    expect(executed).toBeInstanceOf(VariantsFailedError);
+    expect((executed as Error).message).toContain("✗ base");
+    expect((executed as Error).message).toContain("$.request.headers.x-trace");
+
     const error = await janus.finalise().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ContractWithheldError);
     expect((error as Error).message).toContain("get an order with a trace header: failed");
-    expect((error as Error).message).toContain("$.request.headers.x-trace");
   }, 30_000);
 });

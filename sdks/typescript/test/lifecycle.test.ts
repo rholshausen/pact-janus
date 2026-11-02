@@ -35,11 +35,14 @@ class ScriptedPipe implements FramePipe {
   async exchange(frame: protocol.RequestFrame): Promise<protocol.ResponseFrame> {
     this.ops.push(frame.op);
     this.bodies.push(frame.body);
-    const reply = this.script[frame.op]?.(frame.body) ?? this.defaultReply(frame.op);
+    const reply = this.script[frame.op]?.(frame.body) ?? this.defaultReply(frame.op, frame.body);
     return { type: "response", id: frame.id, ...reply };
   }
 
-  private defaultReply(op: string): Reply {
+  /** The variants reported failed, which withhold the contract as the engine would (ADR 0064). */
+  private readonly failedReports: string[] = [];
+
+  private defaultReply(op: string, body: Record<string, unknown>): Reply {
     switch (op) {
       case "engine/hello":
         return { ok: { "protocol-version": 1 } };
@@ -51,7 +54,22 @@ class ScriptedPipe implements FramePipe {
         return { ok: { endpoint: { kind: "http", "base-url": "http://127.0.0.1:9999" } } };
       case "consumer-session/variants":
         return { ok: { variants: this.variants.map((id) => ({ id, label: id === "base" ? "base" : `label of ${id}` })) } };
+      case "consumer-session/report-variant": {
+        const test = { status: body.status, ...(body.reason === undefined ? {} : { reason: body.reason }) };
+        if (body.status !== "passed") {
+          this.failedReports.push(String(body.variant));
+        }
+        return { ok: { result: { variant: body.variant, status: body.status === "passed" ? "verified" : "failed", test } } };
+      }
       case "consumer-session/finalise":
+        if (this.failedReports.length > 0) {
+          return {
+            ok: {
+              results: [{ handle: "i-1", status: "failed", variants: this.failedReports.map((variant) => ({ variant, status: "failed" })) }],
+              refused: [],
+            },
+          };
+        }
         return { ok: { results: [{ handle: "i-1", status: "verified" }], "contract-text": '{"$format":"janus-contract/1"}\n' } };
       default:
         return { ok: {} };
@@ -87,10 +105,88 @@ describe("execute", () => {
       "consumer-session/start-transport",
       "consumer-session/variants",
       "consumer-session/serve-variant",
+      "consumer-session/report-variant",
     ]);
-    expect(pipe.bodies[0]).toMatchObject({ "protocol-versions": [1] });
+    expect(pipe.bodies[0]).toMatchObject({ "protocol-versions": [1], capabilities: { "contract-text": {}, "test-verdicts": {} } });
     expect(pipe.bodies[1]).toEqual({ config: { consumer: { name: "web-app" }, provider: { name: "orders-api" } } });
     expect(pipe.bodies[5]).toEqual({ session: "s-1", handle: "i-1", variant: "base" });
+    expect(pipe.bodies[6]).toEqual({ session: "s-1", handle: "i-1", variant: "base", status: "passed" });
+  });
+
+  it("reports each closure's verdict once it ends, with what a failing one threw (session.execute.reports-each-variant)", async () => {
+    const pipe = new ScriptedPipe({}, ["base", "a"]);
+    const janus = janusOver(pipe);
+    await janus
+      .execute(janus.interaction("x"), (_mock, variant) => {
+        if (variant.id === "a") {
+          throw new TypeError("shippedAt is undefined");
+        }
+      })
+      .catch(() => undefined);
+    const ops = pipe.ops.slice(pipe.ops.indexOf("consumer-session/serve-variant"));
+    expect(ops).toEqual([
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant",
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant",
+    ]);
+    const reports = pipe.bodies.filter((_, i) => pipe.ops[i] === "consumer-session/report-variant");
+    expect(reports).toEqual([
+      { session: "s-1", handle: "i-1", variant: "base", status: "passed" },
+      { session: "s-1", handle: "i-1", variant: "a", status: "failed", reason: "TypeError: shippedAt is undefined" },
+    ]);
+  });
+
+  it("fails the variant the engine did not verify, though its closure passed (session.execute.engine-verdict-fails-the-variant)", async () => {
+    const pipe = new ScriptedPipe(
+      {
+        "consumer-session/report-variant": (body) => ({
+          ok: {
+            result:
+              body.variant === "a"
+                ? { variant: "a", status: "failed", mismatches: [{ path: "$.request.path", message: "Expected '/orders/7' to equal '/orders/42'" }] }
+                : body.variant === "b"
+                  ? { variant: "b", status: "not-exercised" }
+                  : { variant: body.variant, status: "verified" },
+          },
+        }),
+      },
+      ["base", "a", "b"],
+    );
+    const janus = janusOver(pipe);
+    const ran: string[] = [];
+    const error = await janus
+      .execute(janus.interaction("get an order"), (_mock, variant) => {
+        ran.push(variant.id);
+      })
+      .catch((e: unknown) => e);
+    expect(ran).toEqual(["base", "a", "b"]);
+    expect(error).toBeInstanceOf(VariantsFailedError);
+    const failed = error as VariantsFailedError;
+    expect(failed.failures.map((f) => [f.variant.id, f.result.status, f.cause])).toEqual([
+      ["a", "failed", undefined],
+      ["b", "not-exercised", undefined],
+    ]);
+    expect(failed.message).toContain("$.request.path Expected '/orders/7' to equal '/orders/42'");
+    expect(failed.message).toContain("nothing exercised the mock under this variant");
+  });
+
+  it("ends the loop at once when the engine cannot take a report (session.execute.engine-error-aborts-the-loop)", async () => {
+    const pipe = new ScriptedPipe(
+      {
+        "consumer-session/report-variant": () => ({ error: { code: "session-not-found", category: "session", message: "no such session: s-1" } }),
+      },
+      ["base", "a"],
+    );
+    const janus = janusOver(pipe);
+    const ran: string[] = [];
+    const error = await janus
+      .execute(janus.interaction("x"), (_mock, variant) => {
+        ran.push(variant.id);
+      })
+      .catch((e: unknown) => e);
+    expect(ran).toEqual(["base"]);
+    expect((error as JanusError).code).toBe("session-not-found");
   });
 
   it("opens one engine, one session and one transport per suite (session.execute.one-session-per-suite)", async () => {
@@ -184,9 +280,9 @@ describe("finalise", () => {
     expect(pipe.closed).toBe(true);
   });
 
-  it("writes no contract when a test in the suite failed, even though the engine verified every exchange (session.finalise.failed-test-withholds-contract)", async () => {
-    // The engine returned a contract: every request matched. But the closure crashed on what the
-    // mock sent, and a contract must not claim a variant the consumer's own test failed on.
+  it("writes no contract when a test in the suite failed, because the engine withheld it (session.finalise.failed-test-withholds-contract)", async () => {
+    // Every request matched. But the closure crashed on what the mock sent: the SDK reported it, and
+    // the engine withholds a contract claiming a variant the consumer's own test failed on.
     const pipe = new ScriptedPipe({}, ["base", "response.body.shippedAt#presence=absent"]);
     const dir = await mkdtemp(join(tmpdir(), "janus-"));
     const janus = janusOver(pipe, { contractDir: dir });
@@ -197,8 +293,8 @@ describe("finalise", () => {
     }).catch(() => undefined);
     const error = await janus.finalise().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ContractWithheldError);
-    expect((error as ContractWithheldError).failedTests).toEqual(["get an order"]);
-    expect((error as Error).message).toContain("get an order: its test failed");
+    expect((error as ContractWithheldError).interactions).toEqual(["get an order"]);
+    expect((error as Error).message).toContain("get an order: failed");
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
   });
 
@@ -214,7 +310,7 @@ describe("finalise", () => {
     const { contractFile } = await janus.finalise();
     expect(contractFile).toBe(join(dir, "web-app-orders-api.janus.json"));
     expect(await readFile(contractFile ?? "", "utf8")).toBe(text);
-    expect(pipe.bodies[pipe.ops.indexOf("engine/hello")]?.capabilities).toEqual({ "contract-text": {} });
+    expect(pipe.bodies[pipe.ops.indexOf("engine/hello")]?.capabilities).toEqual({ "contract-text": {}, "test-verdicts": {} });
   });
 
   it("fails, saying the engine is too old, when the engine answers the contract document rather than its text", async () => {
@@ -265,6 +361,25 @@ describe("finalise", () => {
     expect(message).not.toContain("✗ base");
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
     expect(pipe.closed).toBe(true);
+  });
+
+  it("names the interactions the engine refused, and writes nothing (session.finalise.refused-interaction-withholds-contract)", async () => {
+    const pipe = new ScriptedPipe({
+      "consumer-session/finalise": () => ({
+        ok: {
+          results: [{ handle: "i-1", status: "verified" }],
+          refused: [{ description: "a broken one", code: "interaction-invalid", message: "interaction specification is not valid" }],
+        },
+      }),
+    });
+    const dir = await mkdtemp(join(tmpdir(), "janus-"));
+    const janus = janusOver(pipe, { contractDir: dir });
+    await janus.execute(janus.interaction("get an order"), noop);
+    const error = await janus.finalise().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ContractWithheldError);
+    expect((error as ContractWithheldError).interactions).toEqual(["a broken one"]);
+    expect((error as Error).message).toContain("a broken one: refused, interaction specification is not valid [interaction-invalid]");
+    await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
   });
 
   it("does nothing but end the engine when nothing was executed", async () => {

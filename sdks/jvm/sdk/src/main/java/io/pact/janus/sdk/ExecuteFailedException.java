@@ -3,9 +3,10 @@ package io.pact.janus.sdk;
 import java.util.List;
 
 /**
- * {@code execute} failed: the closure threw on one or more variants. Thrown once, after every
- * selected variant has run, naming each failed variant by label and id with its cause (each cause
- * is also attached as suppressed, the first as the cause).
+ * {@code execute} failed: the engine did not verify one or more variants, because the test threw, the
+ * mock rejected its request, or nothing exercised the mock (ADR 0064). Thrown once, after every
+ * selected variant has run, naming each failed variant by label and id with its cause and the
+ * engine's mismatches (each cause is also attached as suppressed, the first as the cause).
  */
 public class ExecuteFailedException extends AssertionError {
   private static final long serialVersionUID = 1L;
@@ -45,6 +46,10 @@ public class ExecuteFailedException extends AssertionError {
     for (VariantFailure f : failures) {
       text.append("\n  - ").append(f.variant().label()).append(" [").append(f.variant().id()).append("]: ")
           .append(f.cause());
+      if (!(f.cause() instanceof Janus.NotVerified)) {
+        // The test threw; the engine's mismatches often say why.
+        Janus.appendMismatches(text, f.result().getMismatches(), "\n      ");
+      }
     }
     return text.toString();
   }

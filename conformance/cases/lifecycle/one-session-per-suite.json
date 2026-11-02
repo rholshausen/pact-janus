@@ -23,9 +23,11 @@
       "consumer-session/start-transport",
       "consumer-session/variants",
       "consumer-session/serve-variant",
+      "consumer-session/report-variant",
       "consumer-session/add-interaction",
       "consumer-session/variants",
-      "consumer-session/serve-variant"
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant"
     ]
   }
 }

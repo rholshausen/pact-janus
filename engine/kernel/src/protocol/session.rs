@@ -3,7 +3,7 @@
 //! there is no per-object cleanup call (spec §7.1).
 
 use super::background::{Background, SpawnError, Task};
-use super::exchange::{self, ArmedExchange, ExchangeState};
+use super::exchange::{self, ArmedExchange, Exchange};
 use super::scope::Scope;
 use crate::common::{ContentTypes, declared_type};
 use crate::component::{ComponentError, Start, Stop, TransportComponent, Unavailable};
@@ -14,8 +14,8 @@ use crate::plan::{self, Assignment, Plan};
 use crate::variant::{Selected, SelectionReport, VariantError, generate, params, select};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 /// The variant a `serve-variant` call has most recently armed for one interaction (variant-
 /// semantics spec §4.1): its id, and the concrete payload the generator produced for it, ready
@@ -53,6 +53,57 @@ pub(crate) struct InteractionEntry {
   /// the live exchange loop's evidence (plan task 4.5), or directly by
   /// [`ConsumerSession::record_exercised`]'s test callers for a session with no transport bound.
   pub exercised: BTreeMap<String, Exercised>,
+  /// The test's verdict on each variant, keyed by variant id, as the latest `report-variant` gave
+  /// it (ADR 0064).
+  pub reports: BTreeMap<String, TestVerdict>,
+}
+
+/// The test's verdict on one variant (ADR 0064 decision 1): whether it passed, and what it failed
+/// with. Any status but `passed` is a failure, so an unknown verdict verifies nothing.
+#[derive(Debug, Clone)]
+pub(crate) struct TestVerdict {
+  pub passed: bool,
+  /// The status as the host sent it, which a result repeats.
+  pub status: String,
+  pub reason: Option<String>,
+}
+
+impl TestVerdict {
+  pub fn new(status: String, reason: Option<String>) -> Self {
+    TestVerdict {
+      passed: status == "passed",
+      status,
+      reason,
+    }
+  }
+
+  fn to_json(&self) -> Value {
+    match &self.reason {
+      Some(reason) => serde_json::json!({ "status": self.status, "reason": reason }),
+      None => serde_json::json!({ "status": self.status }),
+    }
+  }
+}
+
+/// A variant's status in `results` and `report-variant`'s answer, decided in the order spec §8.2
+/// gives (ADR 0064 decision 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VariantStatus {
+  Failed,
+  NotExercised,
+  NotReported,
+  Verified,
+}
+
+impl VariantStatus {
+  fn as_str(self) -> &'static str {
+    match self {
+      VariantStatus::Failed => "failed",
+      VariantStatus::NotExercised => "not-exercised",
+      VariantStatus::NotReported => "not-reported",
+      VariantStatus::Verified => "verified",
+    }
+  }
 }
 
 /// The evidence one exercised variant produced (variant-semantics spec §4.4): whether the
@@ -83,7 +134,7 @@ pub(crate) struct TransportRun {
   pub kind: String,
   component: Arc<dyn TransportComponent>,
   stop: Arc<AtomicBool>,
-  state: Arc<Mutex<ExchangeState>>,
+  exchange: Arc<Exchange>,
   task: Option<Task>,
 }
 
@@ -108,6 +159,9 @@ pub enum ServeVariantError {
   VariantNotFound { selection: Vec<String> },
 }
 
+/// `consumer-session/report-variant` (ADR 0064) fails as `serve-variant` does.
+pub type ReportVariantError = ServeVariantError;
+
 /// One `consumer-session/*` session: config plus the interactions added to it so far. `order`
 /// tracks submission order explicitly — `i-{n}` handles are unpadded, so string-sorting them
 /// (as a `BTreeMap` would) stops matching submission order past nine interactions.
@@ -128,6 +182,12 @@ pub(crate) struct ConsumerSession {
   /// The components this session can call (component-interfaces spec §10): the ones `create`'s
   /// `config.components` declared, ahead of the embedding's in-tree ones. They end with the session.
   scope: Scope,
+  /// Whether the host that created this session declared `test-verdicts` (ADR 0064 decision 4): an
+  /// exercised variant with no report is then `not-reported`, and a refused interaction withholds
+  /// the contract.
+  verdicts_required: bool,
+  /// Every `add-interaction` this session refused, as `finalise`'s `refused` lists them.
+  refused: Vec<Value>,
 }
 
 /// Why `add-interaction` refused an interaction: it is malformed (`interaction-invalid`), or it
@@ -145,7 +205,13 @@ impl From<InteractionSpecError> for AddInteractionError {
 }
 
 impl ConsumerSession {
-  fn new(consumer: Party, provider: Party, policy: Option<Value>, scope: Scope) -> Self {
+  fn new(
+    consumer: Party,
+    provider: Party,
+    policy: Option<Value>,
+    scope: Scope,
+    verdicts_required: bool,
+  ) -> Self {
     ConsumerSession {
       consumer,
       provider,
@@ -155,7 +221,26 @@ impl ConsumerSession {
       next_handle: 1,
       transports: Vec::new(),
       scope,
+      verdicts_required,
+      refused: Vec::new(),
     }
+  }
+
+  /// Record that `add-interaction` refused `interaction` with `code` (ADR 0064 decision 4).
+  pub fn record_refusal(&mut self, interaction: &Value, code: &str, message: &str) {
+    let mut refusal = serde_json::Map::new();
+    if let Some(description) = interaction.get("description").and_then(Value::as_str) {
+      refusal.insert("description".to_string(), Value::from(description));
+    }
+    refusal.insert("code".to_string(), Value::from(code));
+    refusal.insert("message".to_string(), Value::from(message));
+    self.refused.push(Value::Object(refusal));
+  }
+
+  /// `finalise`'s `refused` (ADR 0064 decision 4): `None` to a host that did not declare
+  /// `test-verdicts`, whose results stay protocol version 1's.
+  pub fn refused(&self) -> Option<&[Value]> {
+    self.verdicts_required.then_some(self.refused.as_slice())
   }
 
   /// `consumer-session/add-interaction` (spec §8.2): validate and compile, or a structured error a
@@ -201,6 +286,7 @@ impl ConsumerSession {
         selection: None,
         armed: None,
         exercised: BTreeMap::new(),
+        reports: BTreeMap::new(),
       },
     );
     self.order.push(handle.clone());
@@ -234,10 +320,10 @@ impl ConsumerSession {
       .map_err(StartTransportError::Component)?;
 
     let stop = Arc::new(AtomicBool::new(false));
-    let state = Arc::new(Mutex::new(ExchangeState::default()));
+    let exchange = Arc::new(Exchange::default());
     let thread_component = Arc::clone(&component);
     let thread_stop = Arc::clone(&stop);
-    let thread_state = Arc::clone(&state);
+    let thread_exchange = Arc::clone(&exchange);
     let thread_instance = instance.clone();
     let content = self.scope.content();
     let contributions = self.scope.contributions();
@@ -250,7 +336,7 @@ impl ConsumerSession {
           contributions,
           thread_instance,
           thread_stop,
-          thread_state,
+          thread_exchange,
         );
       }),
     );
@@ -270,7 +356,7 @@ impl ConsumerSession {
       kind: kind.to_string(),
       component,
       stop,
-      state,
+      exchange,
       task: Some(task),
     });
     Ok(result.endpoint)
@@ -290,7 +376,14 @@ impl ConsumerSession {
       if let Some(task) = run.task.take() {
         let _ = task.join();
       }
-      let outcomes = std::mem::take(&mut run.state.lock().expect("exchange state lock poisoned").outcomes);
+      let outcomes = std::mem::take(
+        &mut run
+          .exchange
+          .state
+          .lock()
+          .expect("exchange state lock poisoned")
+          .outcomes,
+      );
       for ((handle, variant_id), exercised) in outcomes {
         if let Some(entry) = self.interactions.get_mut(&handle) {
           entry.exercised.insert(variant_id, exercised);
@@ -380,7 +473,7 @@ impl ConsumerSession {
         .map(|(name, slots)| (name.clone(), slots.clone()))
         .collect();
       for run in self.transports.iter().filter(|run| run.kind == kind) {
-        let mut state = run.state.lock().expect("exchange state lock poisoned");
+        let mut state = run.exchange.state.lock().expect("exchange state lock poisoned");
         state.armed = Some(ArmedExchange {
           handle: handle.to_string(),
           variant_id: variant_id.to_string(),
@@ -393,6 +486,86 @@ impl ConsumerSession {
       }
     }
     Ok(())
+  }
+
+  /// `consumer-session/report-variant` (ADR 0064 decision 1): the test's verdict on one variant of a
+  /// selected interaction. It ends the variant's run: every transport waits out an exchange of it
+  /// under way and disarms it, and what they recorded moves into the interaction now rather than at
+  /// `finalise`. Answers the variant's result as `results` would report it.
+  pub fn report_variant(
+    &mut self,
+    handle: &str,
+    variant_id: &str,
+    verdict: TestVerdict,
+  ) -> Result<Value, ReportVariantError> {
+    let Some(entry) = self.interactions.get(handle) else {
+      return Err(ReportVariantError::HandleNotFound);
+    };
+    let selection: Vec<String> = entry
+      .selection
+      .as_ref()
+      .map(|selection| selection.variants.iter().map(|v| v.id.clone()).collect())
+      .unwrap_or_default();
+    if !selection.iter().any(|id| id == variant_id) {
+      return Err(ReportVariantError::VariantNotFound { selection });
+    }
+    let settled: Vec<Exercised> = self
+      .transports
+      .iter()
+      .filter_map(|run| run.exchange.settle(handle, variant_id))
+      .collect();
+    let entry = self.interactions.get_mut(handle).expect("checked above");
+    for exercised in settled {
+      entry.exercised.insert(variant_id.to_string(), exercised);
+    }
+    if entry
+      .armed
+      .as_ref()
+      .is_some_and(|armed| armed.variant == variant_id)
+    {
+      entry.armed = None;
+    }
+    entry.reports.insert(variant_id.to_string(), verdict);
+    let entry = &self.interactions[handle];
+    Ok(self.variant_result(entry, variant_id).1)
+  }
+
+  /// One variant's status, in the order spec §8.2 gives (ADR 0064 decision 2).
+  fn variant_status(&self, entry: &InteractionEntry, variant_id: &str) -> VariantStatus {
+    let report = entry.reports.get(variant_id);
+    if report.is_some_and(|report| !report.passed) {
+      return VariantStatus::Failed;
+    }
+    match entry.exercised.get(variant_id).map(|e| e.outcome) {
+      Some(ExchangeOutcome::Failed) => VariantStatus::Failed,
+      None => VariantStatus::NotExercised,
+      Some(ExchangeOutcome::Verified) if self.verdicts_required && report.is_none() => {
+        VariantStatus::NotReported
+      }
+      Some(ExchangeOutcome::Verified) => VariantStatus::Verified,
+    }
+  }
+
+  /// One variant's status and its `VariantResult` document.
+  fn variant_result(&self, entry: &InteractionEntry, variant_id: &str) -> (VariantStatus, Value) {
+    let status = self.variant_status(entry, variant_id);
+    let mut result = serde_json::Map::new();
+    result.insert("variant".to_string(), Value::from(variant_id));
+    result.insert("status".to_string(), Value::from(status.as_str()));
+    if let Some(exercised) = entry
+      .exercised
+      .get(variant_id)
+      .filter(|e| !e.mismatches.is_empty())
+    {
+      result.insert(
+        "mismatches".to_string(),
+        Value::from(exercised.mismatches.clone()),
+      );
+    }
+    if let Some(report) = entry.reports.get(variant_id) {
+      result.insert("test".to_string(), report.to_json());
+    }
+    (status, Value::Object(result))
   }
 
   /// Record the outcome of actually exercising `variant_id` of `handle` (variant-semantics spec
@@ -427,7 +600,8 @@ impl ConsumerSession {
   /// `consumer-session/finalise`'s `results` (spec §8.2): one entry per interaction, in
   /// submission order, with a `variants` breakdown once `variants` has been called for it
   /// (variant-semantics spec §4.2: every selected variant is required, and honestly
-  /// `not-exercised` until something exercises it).
+  /// `not-exercised` until something exercises it). An interaction is `failed` when any variant
+  /// failed, else the first of `not-exercised` and `not-reported` any variant is, else `verified`.
   pub fn results(&self) -> Vec<Value> {
     self
       .order
@@ -437,41 +611,17 @@ impl ConsumerSession {
         match &entry.selection {
           None => serde_json::json!({ "handle": handle, "status": "not-exercised" }),
           Some(selected) => {
-            let mut any_failed = false;
-            let mut all_verified = true;
-            let variants: Vec<Value> = selected
+            let (statuses, variants): (Vec<VariantStatus>, Vec<Value>) = selected
               .variants
               .iter()
-              .map(|v| {
-                let exercised = entry.exercised.get(&v.id);
-                let status = match exercised.map(|e| e.outcome) {
-                  Some(ExchangeOutcome::Verified) => "verified",
-                  Some(ExchangeOutcome::Failed) => {
-                    any_failed = true;
-                    all_verified = false;
-                    "failed"
-                  }
-                  None => {
-                    all_verified = false;
-                    "not-exercised"
-                  }
-                };
-                match exercised.filter(|e| !e.mismatches.is_empty()) {
-                  Some(e) => {
-                    serde_json::json!({ "variant": v.id, "status": status, "mismatches": e.mismatches })
-                  }
-                  None => serde_json::json!({ "variant": v.id, "status": status }),
-                }
-              })
-              .collect();
-            let status = if any_failed {
-              "failed"
-            } else if all_verified {
-              "verified"
-            } else {
-              "not-exercised"
-            };
-            serde_json::json!({ "handle": handle, "status": status, "variants": variants })
+              .map(|v| self.variant_result(entry, &v.id))
+              .unzip();
+            let status = statuses
+              .iter()
+              .copied()
+              .min_by_key(|status| *status as u8)
+              .unwrap_or(VariantStatus::Verified);
+            serde_json::json!({ "handle": handle, "status": status.as_str(), "variants": variants })
           }
         }
       })
@@ -485,21 +635,19 @@ impl ConsumerSession {
   /// produce: two interactions sharing a description and state list (contract-file spec §4.2),
   /// detectable only once every interaction is assembled.
   pub fn contract(&self) -> Result<Option<Contract>, Vec<Problem>> {
+    if self.verdicts_required && !self.refused.is_empty() {
+      return Ok(None);
+    }
     let mut interactions = Vec::with_capacity(self.order.len());
     for handle in &self.order {
       let entry = &self.interactions[handle];
       let Some(selected) = &entry.selection else {
         return Ok(None);
       };
-      let all_verified = selected.variants.iter().all(|v| {
-        matches!(
-          entry.exercised.get(&v.id),
-          Some(Exercised {
-            outcome: ExchangeOutcome::Verified,
-            ..
-          })
-        )
-      });
+      let all_verified = selected
+        .variants
+        .iter()
+        .all(|v| self.variant_status(entry, &v.id) == VariantStatus::Verified);
       if !all_verified {
         return Ok(None);
       }
@@ -652,12 +800,19 @@ pub(crate) struct SessionStore {
 
 impl SessionStore {
   /// `consumer-session/create` (spec §8.2). Returns the new session id.
-  pub fn create(&mut self, consumer: Party, provider: Party, policy: Option<Value>, scope: Scope) -> String {
+  pub fn create(
+    &mut self,
+    consumer: Party,
+    provider: Party,
+    policy: Option<Value>,
+    scope: Scope,
+    verdicts_required: bool,
+  ) -> String {
     self.next_session += 1;
     let id = format!("cs-{}", self.next_session);
     self.sessions.insert(
       id.clone(),
-      ConsumerSession::new(consumer, provider, policy, scope),
+      ConsumerSession::new(consumer, provider, policy, scope, verdicts_required),
     );
     id
   }
@@ -695,8 +850,8 @@ mod tests {
   #[test]
   fn session_ids_are_distinct_and_stable() {
     let mut store = SessionStore::default();
-    let a = store.create(party("web-app"), party("order-api"), None, Scope::none());
-    let b = store.create(party("web-app"), party("order-api"), None, Scope::none());
+    let a = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let b = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
     assert_ne!(a, b);
     assert!(store.get_mut(&a).is_some());
     assert!(store.get_mut(&b).is_some());
@@ -704,7 +859,7 @@ mod tests {
 
   #[test]
   fn handles_are_allocated_in_submission_order() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let spec = serde_json::json!({
       "description": "a request for an order",
       "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
@@ -725,7 +880,7 @@ mod tests {
   #[test]
   fn end_removes_the_session() {
     let mut store = SessionStore::default();
-    let id = store.create(party("web-app"), party("order-api"), None, Scope::none());
+    let id = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
     assert!(store.end(&id).is_some());
     assert!(store.get_mut(&id).is_none());
     assert!(store.end(&id).is_none());
@@ -764,14 +919,14 @@ mod tests {
 
   #[test]
   fn contract_is_none_when_variants_was_never_called() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     session.add_interaction(&degenerate_interaction()).unwrap();
     assert_eq!(session.contract().unwrap(), None);
   }
 
   #[test]
   fn contract_is_withheld_until_every_selected_variant_is_verified() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let handle = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &handle);
     assert_eq!(
@@ -792,7 +947,7 @@ mod tests {
 
   #[test]
   fn contract_is_withheld_if_any_selected_variant_failed() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     assert_eq!(
@@ -812,7 +967,7 @@ mod tests {
 
   #[test]
   fn contract_records_only_exercised_variants_with_their_concrete_parts() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {
@@ -860,7 +1015,7 @@ mod tests {
 
   #[test]
   fn contract_records_a_states_literal_params_per_variant() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let interaction = serde_json::json!({
       "description": "an order exists",
       "states": [ { "name": "an order exists", "params": { "id": "42" } } ],
@@ -882,7 +1037,7 @@ mod tests {
 
   #[test]
   fn results_reports_per_variant_status_after_exercising() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     session.record_exercised(&handle, &ids[0], ExchangeOutcome::Verified);
@@ -910,7 +1065,7 @@ mod tests {
 
   #[test]
   fn contract_rejects_duplicate_interaction_identity() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let h1 = session.add_interaction(&degenerate_interaction()).unwrap();
     let h2 = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &h1);
@@ -927,7 +1082,7 @@ mod tests {
 
   #[test]
   fn a_session_built_contract_round_trips_through_canonical_bytes() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none());
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {

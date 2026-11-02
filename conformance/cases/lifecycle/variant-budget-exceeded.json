@@ -4,7 +4,7 @@
   "category": "lifecycle",
   "title": "A variant space too large to sample fails execute before any variant runs, and withholds the contract.",
   "covers": ["session.execute.variant-budget-exceeded"],
-  "why": "behavioural spec 'execute': 'variant-budget-exceeded' is thrown before any variant runs, from 'variants'. The SDK does not compute a variant space, a sample of one, or a fallback when the engine declines to (SDK spec §2.1's first failure) — it carries the engine's refusal across, and no closure runs.",
+  "why": "behavioural spec 'execute': 'variant-budget-exceeded' is thrown before any variant runs, from 'variants'. The SDK does not compute a variant space, a sample of one, or a fallback when the engine declines to (SDK spec §2.1's first failure) — it carries the engine's refusal across, and no closure runs. The engine then withholds the contract, the interaction having no variant exercised (engine-protocol spec §8.2), and 'finalise' fails naming it.",
   "engine": {
     "errors": {
       "consumer-session/variants": {
@@ -12,7 +12,9 @@
         "message": "the variant space has 4096 points, over the budget of 50",
         "details": { "size": 4096, "budget": 50 }
       }
-    }
+    },
+    "withhold-contract": true,
+    "results": [{ "handle": "i-1", "status": "not-exercised" }]
   },
   "steps": [
     {
@@ -27,7 +29,7 @@
     {
       "finalise": {},
       "expect": {
-        "outcome": { "error": "contract-withheld", "engine-withheld": false, "interactions": ["an interaction that varies too many ways"] },
+        "outcome": { "error": "contract-withheld", "interactions": ["an interaction that varies too many ways"] },
         "contract": { "written": false }
       }
     }

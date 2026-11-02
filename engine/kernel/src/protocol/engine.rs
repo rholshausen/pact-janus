@@ -5,7 +5,9 @@
 
 use super::background::Background;
 use super::broker::{self as broker_ops, PublishContracts};
-use super::consumer_session::{AddInteraction, Create, Finalise, ServeVariant, StartTransport, Variants};
+use super::consumer_session::{
+  AddInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
+};
 use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
@@ -15,7 +17,7 @@ use super::provider_shape_session::{
 };
 use super::scope::Scope;
 use super::session::{
-  AddInteractionError, ServeVariantError, SessionStore, StartTransportError, VariantsError,
+  AddInteractionError, ServeVariantError, SessionStore, StartTransportError, TestVerdict, VariantsError,
 };
 use super::subsumption::{
   self as subsumption_ops, Check as SubsumptionCheck, Decide as SubsumptionDecide, SubsumptionError,
@@ -47,6 +49,9 @@ pub struct Engine {
   /// `upgrade/pact` then answer with `contract-text`, the contract's canonical bytes, in place of
   /// `contract`.
   contract_text: bool,
+  /// Whether the host declared the `test-verdicts` capability (ADR 0064): the consumer sessions it
+  /// creates require a report for every variant, and withhold the contract for a refused interaction.
+  test_verdicts: bool,
   /// Set by `engine/shutdown` (spec §6): every later call is `engine-shut-down`, and a subprocess
   /// embedding exits once the shutdown response is written ([`Engine::is_shut_down`]).
   shut_down: bool,
@@ -132,6 +137,7 @@ impl Engine {
       hello_done: false,
       segments: false,
       contract_text: false,
+      test_verdicts: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
@@ -180,6 +186,7 @@ impl Engine {
       hello_done: false,
       segments: false,
       contract_text: false,
+      test_verdicts: false,
       shut_down: false,
       sessions: SessionStore::default(),
       transports,
@@ -369,6 +376,7 @@ impl Engine {
       "consumer-session/variants" => self.handle_variants(id, body),
       "consumer-session/start-transport" => self.handle_start_transport(id, body),
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
+      "consumer-session/report-variant" => self.handle_report_variant(id, body),
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
       "broker/publish-contracts" => self.handle_publish_contracts(id, body),
@@ -395,6 +403,7 @@ impl Engine {
         self.hello_done = true;
         self.segments = hello.wants_segments();
         self.contract_text = hello.wants_contract_text();
+        self.test_verdicts = hello.reports_test_verdicts();
         let loaders: Vec<&str> = std::iter::once("in-tree")
           .chain(self.loaders.iter().map(|loader| loader.name()))
           .collect();
@@ -452,6 +461,7 @@ impl Engine {
       create.config.provider,
       create.config.policy,
       scope,
+      self.test_verdicts,
     );
     ResponseFrame::ok(id, json!({ "session": session }))
   }
@@ -464,15 +474,14 @@ impl Engine {
     let Some(session) = self.sessions.get_mut(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
-    match session.add_interaction(&req.interaction) {
-      Ok(handle) => ResponseFrame::ok(id, json!({ "handle": handle })),
-      Err(AddInteractionError::Invalid(err)) => {
-        ResponseFrame::err(id, EngineError::interaction_invalid(&err.problems))
-      }
-      Err(AddInteractionError::Unavailable(unavailable)) => {
-        ResponseFrame::err(id, EngineError::component_unresolved(&unavailable))
-      }
-    }
+    let error = match session.add_interaction(&req.interaction) {
+      Ok(handle) => return ResponseFrame::ok(id, json!({ "handle": handle })),
+      Err(AddInteractionError::Invalid(err)) => EngineError::interaction_invalid(&err.problems),
+      Err(AddInteractionError::Unavailable(unavailable)) => EngineError::component_unresolved(&unavailable),
+    };
+    // A contract without this interaction would not be the suite's (ADR 0064 decision 4).
+    session.record_refusal(&req.interaction, &error.code, &error.message);
+    ResponseFrame::err(id, error)
   }
 
   fn handle_variants(&mut self, id: String, body: Value) -> ResponseFrame {
@@ -558,6 +567,28 @@ impl Engine {
     }
   }
 
+  /// `consumer-session/report-variant` (spec §8.2, ADR 0064): the test's verdict on one variant,
+  /// answered with the variant's result.
+  fn handle_report_variant(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: ReportVariant = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.sessions.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    let verdict = TestVerdict::new(req.status, req.reason);
+    match session.report_variant(&req.handle, &req.variant, verdict) {
+      Ok(result) => ResponseFrame::ok(id, json!({ "result": result })),
+      Err(ServeVariantError::HandleNotFound) => {
+        ResponseFrame::err(id, EngineError::handle_not_found(&req.handle))
+      }
+      Err(ServeVariantError::VariantNotFound { selection }) => {
+        ResponseFrame::err(id, EngineError::variant_not_found(&req.variant, &selection))
+      }
+    }
+  }
+
   fn handle_finalise(&mut self, id: String, body: Value) -> ResponseFrame {
     let req: Finalise = match parse_body(body) {
       Ok(req) => req,
@@ -568,9 +599,17 @@ impl Engine {
     };
     session.stop_transports();
     let results = session.results();
+    // To a host that declared `test-verdicts`, what the session refused (ADR 0064 decision 4).
+    let refused = session.refused().map(<[Value]>::to_vec);
     match session.contract() {
       Ok(Some(contract)) if self.contract_text => match contract_text(&contract) {
-        Ok(text) => ResponseFrame::ok(id, json!({ "results": results, "contract-text": text })),
+        Ok(text) => {
+          let mut answer = json!({ "results": results, "contract-text": text });
+          if let Some(refused) = refused {
+            answer["refused"] = Value::from(refused);
+          }
+          ResponseFrame::ok(id, answer)
+        }
         Err(err) => ResponseFrame::err(id, contract_error(err)),
       },
       // Serialised from the model, not via `Value`: a `Value` map sorts members, and the contract's
@@ -580,16 +619,25 @@ impl Engine {
         struct Finalised<'a> {
           results: &'a [Value],
           contract: &'a crate::contract::Contract,
+          #[serde(skip_serializing_if = "Option::is_none")]
+          refused: Option<Vec<Value>>,
         }
         ResponseFrame::ok_serialized(
           id,
           &Finalised {
             results: &results,
             contract: &contract,
+            refused,
           },
         )
       }
-      Ok(None) => ResponseFrame::ok(id, json!({ "results": results })),
+      Ok(None) => {
+        let mut answer = json!({ "results": results });
+        if let Some(refused) = refused {
+          answer["refused"] = Value::from(refused);
+        }
+        ResponseFrame::ok(id, answer)
+      }
       Err(problems) => ResponseFrame::err(id, EngineError::contract_invalid(&problems)),
     }
   }

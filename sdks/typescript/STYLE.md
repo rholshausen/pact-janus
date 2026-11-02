@@ -46,8 +46,8 @@ specification disagree, the behavioural specification wins and this file has a b
 | Failure | Type | What it carries |
 |---|---|---|
 | any engine error frame (engine-protocol spec §10) | `JanusError` | `code`, `category` (absent → `internal`), `details` and `problems` verbatim; the message leads with the interaction's description and lists each problem's `pointer` |
-| one or more closures threw | `VariantsFailedError` | `failures[]`: each variant descriptor and its cause; the message names each by label and id |
-| no contract written | `ContractWithheldError` | the engine's `results`, and `failedTests` — interactions whose `execute` failed |
+| one or more variants the engine did not verify | `VariantsFailedError` | `failures[]`: each variant descriptor, the `result` the engine answered its report with (ADR 0064), and the closure's `cause` when it threw; the message names each by label and id |
+| no contract written | `ContractWithheldError` | the engine's `results` and `refused`, and `interactions` — the descriptions of those that did not verify, then of those the engine refused |
 | no engine to start | `EngineNotStartedError` | why, then each way to get one: this platform's release asset, or a build. Wrapped to the terminal when there is one, never inside a URL or a command, and with no stack or cause, so a test runner prints the message alone |
 | the engine process died | `Error` | what the pipe saw; this is not an engine outcome |
 | a provider run whose status is `failed` | `VerificationFailedError` | `result` (status, summary, results, warnings) and `failures`: the failed results that are not pending |

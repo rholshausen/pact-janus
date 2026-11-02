@@ -73,9 +73,11 @@ SDK (plan task 6.3); what that turned up is in
   `malformed-frame` with an empty id) are `JanusEmbeddingException`. They are not engine errors,
   because the engine could not answer.
 - **Test outcomes are `AssertionError`s.** JUnit reports those as *failures*, not *errors*.
-  `ExecuteFailedException` names every failed variant by label and id, and chains each cause (first
-  as cause, the rest suppressed). `ContractWithheldException` names every interaction and variant that
-  did not verify, with the engine's mismatches, and every interaction whose `execute` failed.
+  `ExecuteFailedException` names every variant the engine did not verify by label and id, with the
+  result it answered the variant's report with (ADR 0064), and chains each closure's cause (first as
+  cause, the rest suppressed). `ContractWithheldException` names every interaction and variant that
+  did not verify, with the engine's mismatches and its test's reason, and every interaction the engine
+  refused.
 - **A failed provider run** is `VerificationFailedException`, unchecked and not an
   `AssertionError`, carrying `result()` and `failures()`: the failed results that are not pending.
   A verifier naming no source, or two, is `IllegalArgumentException` from `verify()`, before
@@ -140,7 +142,8 @@ Interaction getOrder = janus.interaction("get an order")
   shape: every variant runs within one test, and the test fails once naming each failed variant.
   `janus.variants(interaction, closure)` returned from a `@TestFactory` makes **each selected variant
   its own dynamic test**, named `label [id]` (just `base` for the base variant). A failing variant
-  fails only its own test, with the closure's own exception, and still withholds the contract. Both
+  fails only its own test, with the closure's own exception or the engine's verdict on it, and the
+  engine withholds the contract. Both
   share one implementation (`Janus.begin` / `Janus.run`), so they make the same protocol calls in the
   same order.
 - The **engine** is started lazily by the first `execute`, and ended by `finalise`. After `finalise`

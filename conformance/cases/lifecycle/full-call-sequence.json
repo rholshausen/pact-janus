@@ -2,9 +2,9 @@
   "$format": "janus-conformance-case/1",
   "id": "lifecycle/full-call-sequence",
   "category": "lifecycle",
-  "title": "One execute sends hello, create, add-interaction, start-transport, variants and serve-variant, in that order.",
-  "covers": ["session.execute.full-call-sequence", "session.janus.hello-offers-v1"],
-  "why": "behavioural spec 'execute': in order — 'create', 'add-interaction', 'start-transport', 'variants', then 'serve-variant' per variant. 'janus': 'engine/hello' offers protocol version 1 (engine-protocol spec §5) when the first 'execute' needs the engine.",
+  "title": "One execute sends hello, create, add-interaction, start-transport, variants, serve-variant and report-variant, in that order.",
+  "covers": ["session.execute.full-call-sequence", "session.janus.hello-offers-v1", "session.execute.reports-each-variant"],
+  "why": "behavioural spec 'execute': in order — 'create', 'add-interaction', 'start-transport', 'variants', then 'serve-variant' per variant, and 'report-variant' with the closure's verdict once it ends (ADR 0064). 'janus': 'engine/hello' offers protocol version 1 (engine-protocol spec §5), declaring 'contract-text' and 'test-verdicts', when the first 'execute' needs the engine.",
   "steps": [
     {
       "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
@@ -18,13 +18,15 @@
       "consumer-session/add-interaction",
       "consumer-session/start-transport",
       "consumer-session/variants",
-      "consumer-session/serve-variant"
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant"
     ],
     "frames": {
-      "engine/hello": { "protocol-versions": [1] },
+      "engine/hello": { "protocol-versions": [1], "capabilities": { "contract-text": {}, "test-verdicts": {} } },
       "consumer-session/create": { "config": { "consumer": { "name": "web-app" }, "provider": { "name": "orders-api" } } },
       "consumer-session/start-transport": { "session": "s-1", "transport": "http" },
-      "consumer-session/serve-variant": { "session": "s-1", "handle": "i-1", "variant": "base" }
+      "consumer-session/serve-variant": { "session": "s-1", "handle": "i-1", "variant": "base" },
+      "consumer-session/report-variant": { "session": "s-1", "handle": "i-1", "variant": "base", "status": "passed" }
     }
   }
 }

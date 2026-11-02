@@ -8,7 +8,7 @@ import { protocolVocabulary, type protocol } from "./generated/index.js";
 import { Engine } from "./engine/engine.js";
 import type { FramePipe } from "./engine/pipe.js";
 import { SubprocessPipe, type SubprocessOptions } from "./engine/subprocess.js";
-import { ContractWithheldError, VariantsFailedError, type VariantFailure } from "./errors.js";
+import { causeText, ContractWithheldError, VariantsFailedError, type VariantFailure } from "./errors.js";
 import { InteractionBuilder } from "./interaction.js";
 
 const Op = protocolVocabulary.RequestFrameOp;
@@ -70,8 +70,6 @@ export class Janus {
   #mock: Mock | undefined;
   /** Handle -> description, so a withheld contract names interactions the way the test did. */
   readonly #descriptions = new Map<string, string>();
-  /** Interactions whose `execute` failed this session: their contract is not written. */
-  #failedTests: string[] = [];
 
   constructor(config: JanusConfig) {
     this.#config = config;
@@ -81,17 +79,11 @@ export class Janus {
     return new InteractionBuilder(description);
   }
 
-  /** Submits `interaction` and runs `closure` once per variant the engine selects. */
+  /**
+   * Submits `interaction` and runs `closure` once per variant the engine selects, reporting each
+   * closure's verdict to the engine and failing on each variant the engine did not verify.
+   */
   async execute(interaction: InteractionBuilder, closure: Closure): Promise<void> {
-    try {
-      await this.#execute(interaction, closure);
-    } catch (error) {
-      this.#failedTests.push(interaction.description);
-      throw error;
-    }
-  }
-
-  async #execute(interaction: InteractionBuilder, closure: Closure): Promise<void> {
     const engine = await this.#start();
     const spec = interaction.build();
     const session = await this.#openSession(engine);
@@ -110,10 +102,17 @@ export class Janus {
     const failures: VariantFailure[] = [];
     for (const variant of variants) {
       await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant: variant.id });
+      let failure: { cause: unknown } | undefined;
       try {
         await closure(mock, variant);
       } catch (cause) {
-        failures.push({ variant, cause });
+        failure = { cause };
+      }
+      // The test's verdict goes to the engine, which answers with the variant's (ADR 0064).
+      const verdict = failure ? { status: "failed", reason: causeText(failure.cause) } : { status: "passed" };
+      const { result } = await engine.call(Op.ConsumerSessionReportVariant, { session, handle, variant: variant.id, ...verdict });
+      if (result.status !== "verified") {
+        failures.push({ variant, result, ...failure });
       }
     }
     if (failures.length > 0) {
@@ -122,8 +121,8 @@ export class Janus {
   }
 
   /**
-   * Ends the session and the engine, writing the contract when the engine produced one and no test
-   * in the suite failed; throws `ContractWithheldError` otherwise. Safe to call with nothing executed.
+   * Ends the session and the engine, writing the contract when the engine produced one; throws
+   * `ContractWithheldError` otherwise. Safe to call with nothing executed.
    */
   async finalise(): Promise<Finalised> {
     const started = this.#engine;
@@ -133,21 +132,20 @@ export class Janus {
     }
     const engine = await started;
     const session = this.#session;
-    const failedTests = this.#failedTests;
     this.#session = undefined;
     this.#mock = undefined;
-    this.#failedTests = [];
     try {
       if (session === undefined) {
         return { results: [] };
       }
-      const { results, contract: document, "contract-text": contract } = await engine.call(Op.ConsumerSessionFinalise, { session });
+      const finalised = await engine.call(Op.ConsumerSessionFinalise, { session });
+      const { results, refused, contract: document, "contract-text": contract } = finalised;
       if (contract === undefined && document !== undefined) {
         // An engine older than ADR 0063 ignored 'contract-text' and sent the document: nothing was withheld.
         throw new Error("the engine answered finalise with a contract document, not its text: it predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins");
       }
-      if (contract === undefined || failedTests.length > 0) {
-        throw new ContractWithheldError(results, this.#descriptions, failedTests, contract === undefined);
+      if (contract === undefined) {
+        throw new ContractWithheldError(results, this.#descriptions, refused ?? []);
       }
       // The engine's canonical text, its LF included, written as it came (ADR 0063).
       const dir = this.#config.contractDir ?? "contracts";

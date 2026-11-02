@@ -460,6 +460,7 @@ Capabilities defined in v1:
 | `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
 | `contract-text` | both | A contract crosses the boundary as its text (§8.9, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)). Value `{}`. Engine: wherever a request carries a contract or a v1–v4 pact, it may carry the document's text. Host: it wants an outbound contract as its canonical text, `contract-text` in place of `contract`. |
 | `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker publication ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and `broker/publish-contracts` answer `component-unavailable` naming `background`, after the request and its documents are checked. |
+| `test-verdicts` | both | The consumer's test verdict reaches the engine (§8.2, [ADR 0064](../../decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)). Value `{}`. Engine: it has `consumer-session/report-variant`. Host: it reports every variant it runs, so in the sessions it creates an exercised variant with no report is `not-reported`, and an `add-interaction` the session refused withholds the contract. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
 an optional area declares it as a capability; a host MUST NOT rely on operations behind a
@@ -580,7 +581,8 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 | `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
 | `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
 | `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
-| `consumer-session/finalise` | `{ session }` → `{ results, contract? }` |
+| `consumer-session/report-variant` | `{ session, handle, variant, status, reason? }` → `{ result }` |
+| `consumer-session/finalise` | `{ session }` → `{ results, contract?, refused? }` |
 
 - **`create`**: `config` names the consumer and provider (`{ "consumer": { "name": … },
   "provider": { "name": … } }`) plus open, additive options. Returns the session id.
@@ -612,6 +614,15 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   through the bound transport (or the hook path, design 2.7). Multiple interactions may be
   armed concurrently; re-arming a handle with a different variant replaces the previous
   arming.
+- **`report-variant`**: the test's verdict on one variant, once its closure has ended
+  ([ADR 0064](../../decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)).
+  `status` is `passed` or `failed`, and any other value counts as `failed`; `reason` is what the test
+  failed with, as text, which the engine records and never reads. A report ends the variant's run: the
+  engine waits for an exchange under way for that variant to be recorded, then disarms the variant if
+  it is still armed, so a later request finds nothing armed. The latest report for a variant is its
+  verdict. The result is the variant's `VariantResult` as `finalise` would report it now, so a host
+  learns the engine's verdict in the test that ran the variant. A variant outside the interaction's
+  selection is `variant-not-found`; one never served may be reported, and is `not-exercised`.
 - **`finalise`**: ends the session unconditionally (transports stopped, all state
   released — even if the result is all failures) and returns per-interaction, per-variant
   results. The `contract` member — the Janus contract *document*; persistence is the host's
@@ -620,6 +631,16 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   withholds the contract exactly as a failure does). To a host that declared `contract-text`, it is
   `contract-text` instead, the contract's canonical text (§8.9).
   Unmatched-request and missed-interaction detail rides in `results`.
+
+A variant's status in `results`, and in `report-variant`'s answer, is decided in this order: `failed`
+when its test was reported failed; `failed` when its exchange failed, with the engine's `mismatches`;
+`not-exercised` when nothing exercised it (variant-semantics spec §4.2); `not-reported` when the host
+declared `test-verdicts` (§5.3) and no report arrived; otherwise `verified`. A reported variant's result
+carries the report as `test: { status, reason? }`. An interaction is `failed` when any of its variants
+failed, else `not-exercised` when any was not exercised, else `not-reported` when any was not reported,
+else `verified`. In a session created by a host that declared `test-verdicts`, an `add-interaction` the
+session refused also withholds the contract, and `finalise` lists each refusal, in order, as `refused`:
+`{ description?, code, message }`, the description being the submitted document's when it had one.
 
 ### 8.3 Verification — `verification/*`
 

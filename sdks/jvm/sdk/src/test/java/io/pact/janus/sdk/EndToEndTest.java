@@ -124,7 +124,8 @@ class EndToEndTest {
     assertTrue(failed.getMessage().contains("shippedAt=absent [response.body.shippedAt#presence=absent]"), failed.getMessage());
 
     ContractWithheldException withheld = assertThrows(ContractWithheldException.class, janus::finalise);
-    assertFalse(withheld.engineWithheld(), "every exchange verified; it is the consumer's own test that failed");
+    // Every exchange verified; the engine withheld it on the consumer's own reported failure (ADR 0064).
+    assertEquals("failed", withheld.results().get(0).getStatus());
     assertTrue(withheld.getMessage().contains("shippedAt=absent"), withheld.getMessage());
     assertFalse(Files.exists(contracts.resolve("web-app-orders-api.janus.json")));
   }
@@ -150,14 +151,16 @@ class EndToEndTest {
   }
 
   @Test
-  @DisplayName("a request the armed variant does not match is the engine's verdict, reported by finalise with its mismatches [session.finalise.withheld-contract-fails-build]")
+  @DisplayName("a request the armed variant does not match fails its variant in execute, and the engine withholds the contract [session.execute.engine-verdict-fails-the-variant, session.finalise.withheld-contract-fails-build]")
   void engineWithholdsOnMismatch() {
     Janus janus = janus();
     Interaction ping = janus.interaction("ping").request(r -> r.method("GET").path("/ping")).response(r -> r.status(204));
-    // the closure swallows the mock's failure, so only the engine knows
-    janus.execute(ping, (mock, variant) -> send(mock.uri("/pong"), "GET", null));
+    // the closure swallows the mock's failure, so only the engine knows, and says so in this execute
+    ExecuteFailedException failed = assertThrows(ExecuteFailedException.class,
+        () -> janus.execute(ping, (mock, variant) -> send(mock.uri("/pong"), "GET", null)));
+    assertEquals("failed", failed.failures().get(0).result().getStatus());
+    assertTrue(failed.getMessage().contains("/pong"), failed.getMessage());
     ContractWithheldException withheld = assertThrows(ContractWithheldException.class, janus::finalise);
-    assertTrue(withheld.engineWithheld());
     assertEquals("failed", withheld.results().get(0).getStatus());
     assertTrue(withheld.getMessage().contains("'ping': failed"), withheld.getMessage());
     assertTrue(withheld.getMessage().contains("/pong"), withheld.getMessage());

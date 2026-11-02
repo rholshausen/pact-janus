@@ -137,6 +137,37 @@
       "title": "ServeVariantResult",
       "type": "object"
     },
+    "ReportVariant": {
+      "title": "ReportVariant",
+      "description": "The test's verdict on one variant, once its closure has ended (spec.md §8.2, ADR 0064). It ends the variant's run: an exchange under way for it is recorded first, and the variant is disarmed.",
+      "type": "object",
+      "required": ["session", "handle", "variant", "status"],
+      "properties": {
+        "session": { "type": "string" },
+        "handle": { "type": "string" },
+        "variant": { "type": "string" },
+        "status": {
+          "type": "string",
+          "description": "The test's verdict. Any value but 'passed' counts as 'failed'.",
+          "x-known-values": ["passed", "failed"]
+        },
+        "reason": {
+          "type": "string",
+          "description": "What the test failed with, as text. Recorded, and never read by the engine."
+        }
+      }
+    },
+    "ReportVariantResult": {
+      "title": "ReportVariantResult",
+      "type": "object",
+      "required": ["result"],
+      "properties": {
+        "result": {
+          "description": "The variant's result as 'finalise' would report it now.",
+          "$ref": "#/$defs/VariantResult"
+        }
+      }
+    },
     "Finalise": {
       "title": "Finalise",
       "type": "object",
@@ -156,11 +187,31 @@
         },
         "contract": {
           "type": "object",
-          "description": "The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business."
+          "description": "The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business."
         },
         "contract-text": {
           "type": "string",
           "description": "In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else."
+        },
+        "refused": {
+          "type": "array",
+          "description": "To a host that declared 'test-verdicts' (ADR 0064): every 'add-interaction' this session refused, in order. Any refusal withholds the contract.",
+          "items": {
+            "title": "RefusedInteraction",
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "The submitted document's 'description', when it had one."
+              },
+              "code": {
+                "type": "string",
+                "description": "The refusal's error code, such as 'interaction-invalid'."
+              },
+              "message": { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -172,29 +223,47 @@
         "handle": { "type": "string" },
         "status": {
           "type": "string",
-          "x-known-values": ["verified", "failed", "not-exercised"]
+          "x-known-values": ["verified", "failed", "not-exercised", "not-reported"]
         },
         "variants": {
           "type": "array",
           "description": "Per-variant outcomes.",
-          "items": {
-            "title": "VariantResult",
-            "type": "object",
-            "required": ["variant", "status"],
-            "properties": {
-              "variant": { "type": "string" },
-              "status": {
-                "type": "string",
-                "x-known-values": ["verified", "failed", "not-exercised"]
-              },
-              "mismatches": {
-                "type": "array",
-                "description": "Mismatch documents in the plan grammar's result form (design 2.4).",
-                "items": { "type": "object" }
-              }
-            }
-          }
+          "items": { "$ref": "#/$defs/VariantResult" }
         }
+      }
+    },
+    "VariantResult": {
+      "title": "VariantResult",
+      "type": "object",
+      "required": ["variant", "status"],
+      "properties": {
+        "variant": { "type": "string" },
+        "status": {
+          "type": "string",
+          "description": "In order (spec.md §8.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.",
+          "x-known-values": ["verified", "failed", "not-exercised", "not-reported"]
+        },
+        "mismatches": {
+          "type": "array",
+          "description": "Mismatch documents in the plan grammar's result form (design 2.4).",
+          "items": { "type": "object" }
+        },
+        "test": {
+          "description": "The test's verdict, as the latest 'report-variant' for this variant gave it (ADR 0064). Absent until one arrives.",
+          "$ref": "#/$defs/TestVerdict"
+        }
+      }
+    },
+    "TestVerdict": {
+      "title": "TestVerdict",
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "x-known-values": ["passed", "failed"]
+        },
+        "reason": { "type": "string" }
       }
     },
     "Party": {

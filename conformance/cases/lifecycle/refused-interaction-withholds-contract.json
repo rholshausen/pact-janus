@@ -1,0 +1,38 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/refused-interaction-withholds-contract",
+  "category": "lifecycle",
+  "title": "When the engine refused an interaction the suite added, finalise names it and writes nothing.",
+  "covers": ["session.finalise.refused-interaction-withholds-contract"],
+  "why": "behavioural spec 'finalise': when the result carries no contract, it fails naming every interaction whose status is not 'verified', then every interaction the result's 'refused' names, and writes nothing. The engine withholds a contract that would lack an interaction the suite added (engine-protocol spec §8.2, ADR 0064), so the SDK keeps no list of its own.",
+  "engine": {
+    "errors": {
+      "consumer-session/add-interaction": {
+        "code": "interaction-invalid",
+        "message": "interaction specification is not valid",
+        "after": 1,
+        "problems": [{ "pointer": "/parts/response/body", "message": "not a shape" }]
+      }
+    },
+    "withhold-contract": true,
+    "refused": [{ "description": "a broken one", "code": "interaction-invalid", "message": "interaction specification is not valid" }]
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "execute": { "interaction": { "description": "a broken one", "request": { "method": "GET", "path": "/orders" } } },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "interactions": ["a broken one"] },
+        "contract": { "written": false }
+      }
+    }
+  ],
+  "expect": { "engine-closed": true }
+}

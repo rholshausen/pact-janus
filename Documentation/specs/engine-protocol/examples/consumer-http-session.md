@@ -6,18 +6,21 @@ by `cargo test -p pact_janus_schema_compat` — these transcripts cannot rot sil
 `→` is host to engine, `←` is engine to host. Interaction-spec and contract-file interiors are
 illustrative sketches — their shapes belong to designs 2.2 and 2.5, not to this protocol.
 
-`→` handshake first, always:
+`→` handshake first, always. The host declares `test-verdicts`: it reports every variant it runs
+(§8.2, ADR 0064):
 
 ```json
 { "type": "request", "id": "r-1", "op": "engine/hello",
-  "body": { "protocol-versions": [1], "host": { "name": "janus-ts", "version": "0.1.0" }, "capabilities": {} } }
+  "body": { "protocol-versions": [1], "host": { "name": "janus-ts", "version": "0.1.0" },
+            "capabilities": { "test-verdicts": {} } } }
 ```
 
 `←`
 
 ```json
 { "type": "response", "id": "r-1",
-  "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" }, "capabilities": {} } }
+  "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" },
+          "capabilities": { "test-verdicts": {} } } }
 ```
 
 `→` create the session:
@@ -108,34 +111,66 @@ application under test to call the endpoint):
 *(the application under test makes its request and asserts on the mock's response — outside
 the protocol)*
 
+`→` the test passed, so report it. The engine answers with the variant's result, its own verdict on
+the exchange and the test's together, so a host fails the variant in the test that ran it:
+
+```json
+{ "type": "request", "id": "r-7", "op": "consumer-session/report-variant",
+  "body": { "session": "cs-1", "handle": "i-1", "variant": "base", "status": "passed" } }
+```
+
+`←`
+
+```json
+{ "type": "response", "id": "r-7",
+  "ok": { "result": { "variant": "base", "status": "verified", "test": { "status": "passed" } } } }
+```
+
 `→` re-arm with the second variant and exercise it the same way:
 
 ```json
-{ "type": "request", "id": "r-7", "op": "consumer-session/serve-variant",
+{ "type": "request", "id": "r-8", "op": "consumer-session/serve-variant",
   "body": { "session": "cs-1", "handle": "i-1", "variant": "response.body.discount#presence=absent" } }
 ```
 
 `←`
 
 ```json
-{ "type": "response", "id": "r-7", "ok": {} }
+{ "type": "response", "id": "r-8", "ok": {} }
+```
+
+`→` and report it:
+
+```json
+{ "type": "request", "id": "r-9", "op": "consumer-session/report-variant",
+  "body": { "session": "cs-1", "handle": "i-1", "variant": "response.body.discount#presence=absent", "status": "passed" } }
+```
+
+`←`
+
+```json
+{ "type": "response", "id": "r-9",
+  "ok": { "result": { "variant": "response.body.discount#presence=absent", "status": "verified",
+                      "test": { "status": "passed" } } } }
 ```
 
 `→` finalise: ends the session unconditionally, returns per-interaction/per-variant results,
 and — because everything verified — the Janus contract document (persistence is the host's business):
 
 ```json
-{ "type": "request", "id": "r-8", "op": "consumer-session/finalise",
+{ "type": "request", "id": "r-10", "op": "consumer-session/finalise",
   "body": { "session": "cs-1" } }
 ```
 
 `←`
 
 ```json
-{ "type": "response", "id": "r-8",
+{ "type": "response", "id": "r-10",
   "ok": { "results": [ { "handle": "i-1", "status": "verified",
-                         "variants": [ { "variant": "base", "status": "verified" },
-                                       { "variant": "response.body.discount#presence=absent", "status": "verified" } ] } ],
+                         "variants": [ { "variant": "base", "status": "verified", "test": { "status": "passed" } },
+                                       { "variant": "response.body.discount#presence=absent", "status": "verified",
+                                         "test": { "status": "passed" } } ] } ],
+          "refused": [],
           "contract": { "$format": "janus-contract/1",
                     "consumer": { "name": "web-app" }, "provider": { "name": "order-api" },
                     "interactions": [ { "description": "a request for an order" } ] } } }

@@ -90,17 +90,20 @@ Two rules for a case author, both because a case must mean the same thing in eve
 
 **Against a scripted engine** (`lifecycle`, `variants`): the case's `engine` member is the whole
 engine. `variants` is what `consumer-session/variants` returns, `contract` what `finalise` returns,
-`withhold-contract` makes it return none, `results` replaces the default results, and `errors` maps
+`withhold-contract` makes it return none, `results` replaces the default results, `reports` maps a
+variant id to the result `report-variant` answers with for it, and `errors` maps
 an operation to the error document it answers with instead — with `after: n` on that error, the
 operation answers `n` calls the default way first, which is how a case writes an engine that dies
 partway through the variant loop. Everything unset is answered the default way: `engine/hello` agrees protocol version 1, `create` returns session `s-1`, `add-interaction`
 returns `i-1`, `i-2`, …, `start-transport` returns an HTTP endpoint, `variants` returns one variant
-`base`, and `finalise` returns one verified result per interaction and a small contract. Every SDK
+`base`, `report-variant` answers `verified` for a report of `passed` and `failed` for any other, with
+the report as `test`, and `finalise` returns one verified result per interaction and a small contract. Every SDK
 runs as consumer `web-app` and provider `orders-api`, so the contract file is always
 `web-app-orders-api.janus.json`.
 
 **Against the real engine** (`live`): no `engine` member; the driver starts the engine `JANUS_ENGINE`
-names. A closure's `exchange` is the request the consumer sends to the mock, once per variant.
+names. A closure's `exchange` is the request the consumer sends to the mock, once per variant,
+except on the variants its `skip-on` names; a closure that `fail-on` names fails after its exchange.
 
 **A provider verification** (`provider`, and a `live` case with a `verifier`): `verifier` is the
 verifier as data. The driver writes each of its `pacts` to a file and names the files, writes
@@ -130,7 +133,7 @@ Per step (`expect` inside a step):
 
 | Member | Means |
 |---|---|
-| `outcome` | `"ok"`, or the failure: `execute-failed` (with the `variants` it must name), `contract-withheld` (with `interactions` and `engine-withheld`), `engine-error` (with its `code`) |
+| `outcome` | `"ok"`, or the failure: `execute-failed` (with the `variants` it must name), `contract-withheld` (with the `interactions` it must name), `engine-error` (with its `code`) |
 | `closure-calls` | the variant ids the closure ran on, in call order |
 | `contract` | `written`, the file's exact `text`, or its `content` |
 

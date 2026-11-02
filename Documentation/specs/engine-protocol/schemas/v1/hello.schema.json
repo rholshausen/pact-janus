@@ -28,7 +28,7 @@
     },
     "Capabilities": {
       "title": "Capabilities",
-      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.",
+      "description": "Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text, test-verdicts.",
       "type": "object",
       "properties": {
         "encoding": { "$ref": "#/$defs/EncodingCapability" },
@@ -45,6 +45,11 @@
         "contract-text": {
           "title": "ContractTextCapability",
           "description": "A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.",
+          "type": "object"
+        },
+        "test-verdicts": {
+          "title": "TestVerdictsCapability",
+          "description": "The consumer's test verdict reaches the engine (spec.md §8.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.",
           "type": "object"
         }
       },

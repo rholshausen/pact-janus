@@ -29,6 +29,8 @@ final class ScriptedEngine implements Embedding {
   private final Map<String, Function<JsonNode, String>> script = new HashMap<>();
   private int handles;
   private final List<String> served = new ArrayList<>();
+  /** The variants reported failed, which withhold the contract as the engine would (ADR 0064). */
+  private final List<String> failedReports = new ArrayList<>();
 
   ScriptedEngine() {
     ok("engine/hello", "{\"protocol-version\":1,\"engine\":{\"name\":\"scripted\",\"version\":\"0\"},\"capabilities\":{}}");
@@ -41,8 +43,25 @@ final class ScriptedEngine implements Embedding {
       served.add(body.path("variant").asText());
       return "{\"ok\":{}}";
     });
-    // The contract as its text (ADR 0063), as the engine answers a host that declared 'contract-text'.
-    on("consumer-session/finalise", body -> "{\"ok\":{\"results\":[],\"contract-text\":"
+    // The report's own verdict, with the report as 'test', as the engine answers one (ADR 0064).
+    on("consumer-session/report-variant", body -> {
+      ObjectNode result = MAPPER.createObjectNode();
+      boolean passed = "passed".equals(body.path("status").asText());
+      if (!passed) {
+        failedReports.add(body.path("variant").asText());
+      }
+      result.put("variant", body.path("variant").asText()).put("status", passed ? "verified" : "failed");
+      ObjectNode test = result.putObject("test").put("status", body.path("status").asText());
+      if (body.has("reason")) {
+        test.put("reason", body.path("reason").asText());
+      }
+      return "{\"ok\":{\"result\":" + result + "}}";
+    });
+    // The contract as its text (ADR 0063), as the engine answers a host that declared 'contract-text',
+    // unless a variant was reported failed.
+    on("consumer-session/finalise", body -> !failedReports.isEmpty()
+        ? "{\"ok\":{\"results\":[{\"handle\":\"i-1\",\"status\":\"failed\"}],\"refused\":[]}}"
+        : "{\"ok\":{\"results\":[],\"contract-text\":"
         + "\"{\\\"$format\\\":\\\"janus-contract/1\\\",\\\"consumer\\\":{\\\"name\\\":\\\"c\\\"},"
         + "\\\"provider\\\":{\\\"name\\\":\\\"p\\\"},\\\"interactions\\\":[]}\\n\"}}");
   }

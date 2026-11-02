@@ -2,10 +2,24 @@
   "$format": "janus-conformance-case/1",
   "id": "lifecycle/failed-test-withholds-contract",
   "category": "lifecycle",
-  "title": "finalise runs after a failed execute, and withholds the contract the engine did return.",
-  "covers": ["session.finalise.always-runs", "session.finalise.failed-test-withholds-contract"],
-  "why": "behavioural spec 'finalise': it writes nothing, and fails naming the interactions, when any 'execute' in the session failed — even though the engine returned a contract: only the closure knows whether the consumer handled what it was sent, and a contract must not claim a variant the consumer's own test failed on (Phase 9 finding 4). The integration MUST run 'finalise' after the suite's last 'execute', including when an 'execute' failed: sessions are the only resource (engine-protocol spec §7.1).",
-  "engine": { "variants": [{ "id": "base", "label": "base" }, { "id": "shippedAt=absent", "label": "shippedAt absent" }] },
+  "title": "A failed test is reported to the engine, and finalise runs after it and writes no contract.",
+  "covers": ["session.finalise.always-runs", "session.finalise.failed-test-withholds-contract", "session.execute.reports-each-variant"],
+  "why": "behavioural spec 'execute': when the closure ends, 'report-variant' with the closure's verdict, 'failed' with 'reason' when it threw. Only the closure knows whether the consumer handled what it was sent, so it is reported, and the engine withholds a contract claiming a variant the consumer's own test failed on (Phase 9 finding 4, ADR 0064). 'finalise': the SDK keeps no record of which tests failed, and withholds no contract the engine answered; it fails naming every interaction whose status is not 'verified'. The integration MUST run 'finalise' after the suite's last 'execute', including when an 'execute' failed: sessions are the only resource (engine-protocol spec §7.1).",
+  "note": "The scripted engine is told to withhold, as the real one does on a reported failure: what this case pins is that the SDK reported it, and that a withheld contract fails 'finalise'. 'live/failed-test-withholds-contract' is the same case against the real engine.",
+  "engine": {
+    "variants": [{ "id": "base", "label": "base" }, { "id": "shippedAt=absent", "label": "shippedAt absent" }],
+    "withhold-contract": true,
+    "results": [
+      {
+        "handle": "i-1",
+        "status": "failed",
+        "variants": [
+          { "variant": "base", "status": "verified", "test": { "status": "passed" } },
+          { "variant": "shippedAt=absent", "status": "failed", "test": { "status": "failed", "reason": "Error: the consumer cannot handle variant 'shippedAt=absent'" } }
+        ]
+      }
+    ]
+  },
   "steps": [
     {
       "execute": {
@@ -20,7 +34,7 @@
     {
       "finalise": {},
       "expect": {
-        "outcome": { "error": "contract-withheld", "engine-withheld": false, "interactions": ["get an order"] },
+        "outcome": { "error": "contract-withheld", "interactions": ["get an order"] },
         "contract": { "written": false }
       }
     }
@@ -33,9 +47,14 @@
       "consumer-session/start-transport",
       "consumer-session/variants",
       "consumer-session/serve-variant",
+      "consumer-session/report-variant",
       "consumer-session/serve-variant",
+      "consumer-session/report-variant",
       "consumer-session/finalise"
     ],
+    "frames": {
+      "consumer-session/report-variant": { "session": "s-1", "handle": "i-1", "variant": "base", "status": "passed" }
+    },
     "engine-closed": true
   }
 }

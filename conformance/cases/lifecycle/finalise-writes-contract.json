@@ -100,6 +100,7 @@
       "consumer-session/start-transport",
       "consumer-session/variants",
       "consumer-session/serve-variant",
+      "consumer-session/report-variant",
       "consumer-session/finalise"
     ],
     "engine-closed": true,

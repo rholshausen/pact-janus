@@ -57,6 +57,17 @@ pub struct ServeVariant {
   pub variant: String,
 }
 
+/// `consumer-session/report-variant` (ADR 0064): the test's verdict on one variant.
+#[derive(Debug, Deserialize)]
+pub struct ReportVariant {
+  pub session: String,
+  pub handle: String,
+  pub variant: String,
+  pub status: String,
+  #[serde(default)]
+  pub reason: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Finalise {
   pub session: String,

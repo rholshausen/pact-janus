@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * Capabilities
  * <p>
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text, test-verdicts.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -28,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "encoding",
     "provider-shape-recording",
     "segments",
-    "contract-text"
+    "contract-text",
+    "test-verdicts"
 })
 public class Capabilities {
 
@@ -68,6 +69,15 @@ public class Capabilities {
     @JsonProperty("contract-text")
     @JsonPropertyDescription("A contract crosses the boundary as its text (spec.md \u00a78.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.")
     private ContractTextCapability contractText;
+    /**
+     * TestVerdictsCapability
+     * <p>
+     * The consumer's test verdict reaches the engine (spec.md §8.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("test-verdicts")
+    @JsonPropertyDescription("The consumer's test verdict reaches the engine (spec.md \u00a78.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.")
+    private TestVerdictsCapability testVerdicts;
     @JsonIgnore
     private Map<java.lang.String, Map<String, Object>> additionalProperties = new LinkedHashMap<java.lang.String, Map<String, Object>>();
 
@@ -159,6 +169,28 @@ public class Capabilities {
         this.contractText = contractText;
     }
 
+    /**
+     * TestVerdictsCapability
+     * <p>
+     * The consumer's test verdict reaches the engine (spec.md §8.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("test-verdicts")
+    public TestVerdictsCapability getTestVerdicts() {
+        return testVerdicts;
+    }
+
+    /**
+     * TestVerdictsCapability
+     * <p>
+     * The consumer's test verdict reaches the engine (spec.md §8.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.
+     * 
+     */
+    @JsonProperty("test-verdicts")
+    public void setTestVerdicts(TestVerdictsCapability testVerdicts) {
+        this.testVerdicts = testVerdicts;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Map<String, Object>> getAdditionalProperties() {
         return this.additionalProperties;
@@ -189,6 +221,10 @@ public class Capabilities {
         sb.append('=');
         sb.append(((this.contractText == null)?"<null>":this.contractText));
         sb.append(',');
+        sb.append("testVerdicts");
+        sb.append('=');
+        sb.append(((this.testVerdicts == null)?"<null>":this.testVerdicts));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -204,10 +240,11 @@ public class Capabilities {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.testVerdicts == null)? 0 :this.testVerdicts.hashCode()));
+        result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.providerShapeRecording == null)? 0 :this.providerShapeRecording.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.encoding == null)? 0 :this.encoding.hashCode()));
-        result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.segments == null)? 0 :this.segments.hashCode()));
         return result;
     }
@@ -221,7 +258,7 @@ public class Capabilities {
             return false;
         }
         Capabilities rhs = ((Capabilities) other);
-        return ((((((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.segments == rhs.segments)||((this.segments!= null)&&this.segments.equals(rhs.segments))));
+        return (((((((this.testVerdicts == rhs.testVerdicts)||((this.testVerdicts!= null)&&this.testVerdicts.equals(rhs.testVerdicts)))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.providerShapeRecording == rhs.providerShapeRecording)||((this.providerShapeRecording!= null)&&this.providerShapeRecording.equals(rhs.providerShapeRecording))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.encoding == rhs.encoding)||((this.encoding!= null)&&this.encoding.equals(rhs.encoding))))&&((this.segments == rhs.segments)||((this.segments!= null)&&this.segments.equals(rhs.segments))));
     }
 
 }

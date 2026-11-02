@@ -85,7 +85,7 @@ final class ScriptedPipe implements Embedding, FramePipe {
     } else if (op.equals("events/poll")) {
       response.set("ok", poll());
     } else {
-      response.set("ok", reply(op));
+      response.set("ok", reply(op, frame.path("body")));
     }
     return (response + "\n").getBytes(StandardCharsets.UTF_8);
   }
@@ -95,7 +95,7 @@ final class ScriptedPipe implements Embedding, FramePipe {
     closed = true;
   }
 
-  private ObjectNode reply(String op) {
+  private ObjectNode reply(String op, JsonNode body) {
     ObjectNode ok = Suite.MAPPER.createObjectNode();
     switch (op) {
       case "engine/hello" -> {
@@ -123,7 +123,26 @@ final class ScriptedPipe implements Embedding, FramePipe {
           variants.addObject().put("id", "base").put("label", "base");
         }
       }
+      case "consumer-session/report-variant" -> {
+        // The case's result for this variant, else the report's own verdict (README §3).
+        String variant = body.path("variant").asText();
+        if (script.path("reports").has(variant)) {
+          ok.set("result", script.path("reports").get(variant));
+        } else {
+          ObjectNode result = ok.putObject("result");
+          result.put("variant", variant);
+          result.put("status", "passed".equals(body.path("status").asText()) ? "verified" : "failed");
+          ObjectNode test = result.putObject("test");
+          test.set("status", body.path("status"));
+          if (body.has("reason")) {
+            test.set("reason", body.get("reason"));
+          }
+        }
+      }
       case "consumer-session/finalise" -> {
+        if (script.has("refused")) {
+          ok.set("refused", script.get("refused"));
+        }
         if (script.path("results").isArray()) {
           ok.set("results", script.get("results"));
         } else {

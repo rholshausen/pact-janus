@@ -60,7 +60,7 @@ export class ScriptedPipe implements FramePipe {
     if (frame.op === "events/poll") {
       return { type: "response", id: frame.id, ok: await this.#poll() };
     }
-    return { type: "response", id: frame.id, ok: this.#reply(frame.op) };
+    return { type: "response", id: frame.id, ok: this.#reply(frame.op, frame.body) };
   }
 
   /**
@@ -119,7 +119,7 @@ export class ScriptedPipe implements FramePipe {
     this.closed = true;
   }
 
-  #reply(op: string): Record<string, unknown> {
+  #reply(op: string, body: Record<string, unknown>): Record<string, unknown> {
     switch (op) {
       case "engine/hello":
         return {
@@ -139,9 +139,21 @@ export class ScriptedPipe implements FramePipe {
         return { endpoint: { kind: "http", "base-url": "http://127.0.0.1:1" } };
       case "consumer-session/variants":
         return { variants: this.#script.variants ?? [{ id: "base", label: "base" }] };
+      case "consumer-session/report-variant": {
+        // The case's result for this variant, else the report's own verdict (README §3).
+        const variant = String(body.variant);
+        const test = { status: body.status, ...(body.reason === undefined ? {} : { reason: body.reason }) };
+        const result = this.#script.reports?.[variant] ?? {
+          variant,
+          status: body.status === "passed" ? "verified" : "failed",
+          test,
+        };
+        return { result };
+      }
       case "consumer-session/finalise":
         return {
           results: this.#script.results ?? this.#verifiedResults(),
+          ...(this.#script.refused === undefined ? {} : { refused: this.#script.refused }),
           ...(this.#script["withhold-contract"] ? {} : this.#contract()),
         };
       default:

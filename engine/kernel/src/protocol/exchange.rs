@@ -28,7 +28,8 @@ use crate::plan::{Plan, Status, execute_with, outcome};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 /// What `serve-variant` arms for a passive HTTP interaction (spec §4.1, §8.2): everything the
 /// background loop needs to match the next inbound request and answer it, with no further lookup
@@ -61,10 +62,57 @@ pub(crate) struct ArmedExchange {
 #[derive(Default)]
 pub(crate) struct ExchangeState {
   pub armed: Option<ArmedExchange>,
+  /// The `(handle, variant id)` whose arming an arrival has taken and whose outcome is not yet
+  /// recorded. The reply is handed to the transport before the outcome is recorded, so a client can
+  /// hold the response first: `report-variant` waits on [`Exchange::settled`] while this names its
+  /// variant (ADR 0064 decision 1).
+  pub in_flight: Option<(String, String)>,
   /// `(handle, variant id) -> evidence`, drained into the session's own per-interaction map when
   /// the transport stops ([`super::session::ConsumerSession::stop_transports`]) — this loop only
   /// ever inserts into it, one entry per exchange.
   pub outcomes: BTreeMap<(String, String), Exercised>,
+}
+
+/// One transport instance's exchange state, and the signal that an exchange under way has been
+/// recorded.
+#[derive(Default)]
+pub(crate) struct Exchange {
+  pub state: Mutex<ExchangeState>,
+  settled: Condvar,
+}
+
+/// How long `report-variant` waits for an exchange under way to be recorded. The exchange waits only
+/// on the transport's `reply` or `dispose`, so this bounds a transport that never returns.
+const SETTLE_TIMEOUT: Duration = Duration::from_secs(10);
+
+impl Exchange {
+  /// Wait until no exchange of `handle`'s `variant` is under way, then take its recorded outcome and
+  /// disarm it if it is still armed (ADR 0064 decision 1). `None` when nothing was recorded for it.
+  pub fn settle(&self, handle: &str, variant: &str) -> Option<Exercised> {
+    let key = (handle.to_string(), variant.to_string());
+    let state = self.state.lock().expect("exchange state lock poisoned");
+    let (mut state, waited) = self
+      .settled
+      .wait_timeout_while(state, SETTLE_TIMEOUT, |state| {
+        state.in_flight.as_ref() == Some(&key)
+      })
+      .expect("exchange state lock poisoned");
+    if waited.timed_out() {
+      tracing::warn!(
+        handle,
+        variant,
+        "an exchange of this variant was still under way when its test was reported"
+      );
+    }
+    if state
+      .armed
+      .as_ref()
+      .is_some_and(|armed| armed.handle == handle && armed.variant_id == variant)
+    {
+      state.armed = None;
+    }
+    state.outcomes.remove(&key)
+  }
 }
 
 const POLL_TIMEOUT_MS: u64 = 200;
@@ -79,7 +127,7 @@ pub(crate) fn run(
   contributions: Arc<Contributions>,
   instance: String,
   stop: Arc<AtomicBool>,
-  state: Arc<Mutex<ExchangeState>>,
+  exchange: Arc<Exchange>,
 ) {
   while !stop.load(Ordering::Relaxed) {
     let polled = transport.poll_inbound(PollInbound {
@@ -99,7 +147,7 @@ pub(crate) fn run(
       &contributions,
       &instance,
       inbound,
-      &state,
+      &exchange,
     );
   }
 }
@@ -114,9 +162,16 @@ pub(crate) fn handle_arrival(
   contributions: &Contributions,
   instance: &str,
   inbound: Inbound,
-  state: &Mutex<ExchangeState>,
+  exchange: &Exchange,
 ) {
-  let armed = state.lock().expect("exchange state lock poisoned").armed.take();
+  let armed = {
+    let mut state = exchange.state.lock().expect("exchange state lock poisoned");
+    let armed = state.armed.take();
+    state.in_flight = armed
+      .as_ref()
+      .map(|armed| (armed.handle.clone(), armed.variant_id.clone()));
+    armed
+  };
   let Some(armed) = armed else {
     // Plan task 4.6's own finding: this is the one line that names an arrival at all when
     // nothing was armed for it — without it, a request that missed its `serve-variant` window
@@ -234,18 +289,18 @@ pub(crate) fn handle_arrival(
         .collect(),
     ),
   };
-  state
-    .lock()
-    .expect("exchange state lock poisoned")
-    .outcomes
-    .insert(
-      (armed.handle, armed.variant_id),
-      Exercised {
-        outcome: exchange_outcome,
-        parts: armed.response_parts,
-        mismatches: recorded,
-      },
-    );
+  let mut state = exchange.state.lock().expect("exchange state lock poisoned");
+  state.in_flight = None;
+  state.outcomes.insert(
+    (armed.handle, armed.variant_id),
+    Exercised {
+      outcome: exchange_outcome,
+      parts: armed.response_parts,
+      mismatches: recorded,
+    },
+  );
+  drop(state);
+  exchange.settled.notify_all();
 }
 
 /// The armed reply, with every position the answering part's shapes give a generator filled with a

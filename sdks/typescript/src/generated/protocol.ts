@@ -238,6 +238,29 @@ export interface ServeVariantResult {
   [k: string]: unknown;
 }
 
+/**
+ * The test's verdict on one variant, once its closure has ended (spec.md §8.2, ADR 0064). It ends the variant's run: an exchange under way for it is recorded first, and the variant is disarmed.
+ */
+export interface ReportVariant {
+  session: string;
+  handle: string;
+  variant: string;
+  /**
+   * The test's verdict. Any value but 'passed' counts as 'failed'.
+   */
+  status: string;
+  /**
+   * What the test failed with, as text. Recorded, and never read by the engine.
+   */
+  reason?: string;
+  [k: string]: unknown;
+}
+
+export interface ReportVariantResult {
+  result: VariantResult;
+  [k: string]: unknown;
+}
+
 export interface Finalise {
   session: string;
   [k: string]: unknown;
@@ -246,7 +269,7 @@ export interface Finalise {
 export interface FinaliseResult {
   results: InteractionResult[];
   /**
-   * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants, and the host did not declare 'contract-text'. Persistence is the host's business.
+   * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business.
    */
   contract?: {
     [k: string]: unknown;
@@ -255,6 +278,23 @@ export interface FinaliseResult {
    * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
    */
   "contract-text"?: string;
+  /**
+   * To a host that declared 'test-verdicts' (ADR 0064): every 'add-interaction' this session refused, in order. Any refusal withholds the contract.
+   */
+  refused?: RefusedInteraction[];
+  [k: string]: unknown;
+}
+
+export interface RefusedInteraction {
+  /**
+   * The submitted document's 'description', when it had one.
+   */
+  description?: string;
+  /**
+   * The refusal's error code, such as 'interaction-invalid'.
+   */
+  code: string;
+  message: string;
   [k: string]: unknown;
 }
 
@@ -270,6 +310,9 @@ export interface InteractionResult {
 
 export interface VariantResult {
   variant: string;
+  /**
+   * In order (spec.md §8.2): 'failed' when the test was reported failed or the exchange failed; 'not-exercised' when nothing exercised the variant; 'not-reported' when the host declared 'test-verdicts' and no report arrived; otherwise 'verified'.
+   */
   status: string;
   /**
    * Mismatch documents in the plan grammar's result form (design 2.4).
@@ -277,6 +320,13 @@ export interface VariantResult {
   mismatches?: {
     [k: string]: unknown;
   }[];
+  test?: TestVerdict;
+  [k: string]: unknown;
+}
+
+export interface TestVerdict {
+  status: string;
+  reason?: string;
   [k: string]: unknown;
 }
 
@@ -465,13 +515,14 @@ export interface PartyInfo {
 }
 
 /**
- * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text.
+ * Member names are an open vocabulary; each value is an object whose shape is defined where the capability is defined ({} when presence alone is the signal). Unknown names are ignored. v1 defines: push-events, encoding, provider-shape-recording, subsumption-check, components, segments, contract-text, test-verdicts.
  */
 export interface Capabilities {
   encoding?: EncodingCapability;
   "provider-shape-recording"?: ProviderShapeRecordingCapability;
   segments?: SegmentsCapability;
   "contract-text"?: ContractTextCapability;
+  "test-verdicts"?: TestVerdictsCapability;
   [k: string]:
     | {
         [k: string]: unknown;
@@ -480,6 +531,7 @@ export interface Capabilities {
     | ProviderShapeRecordingCapability
     | SegmentsCapability
     | ContractTextCapability
+    | TestVerdictsCapability
     | undefined;
 }
 
@@ -501,6 +553,13 @@ export interface SegmentsCapability {
  * A contract crosses the boundary as its text (spec.md §8.9, ADR 0063). Declared by an engine that reads a contract's or a pact's text wherever a request carries one; declared by a host that wants an outbound contract as its canonical text, after which 'consumer-session/finalise' and 'upgrade/pact' answer 'contract-text' in place of 'contract'. Presence is the whole signal; the object carries nothing.
  */
 export interface ContractTextCapability {
+  [k: string]: unknown;
+}
+
+/**
+ * The consumer's test verdict reaches the engine (spec.md §8.2, ADR 0064). Declared by an engine that has 'consumer-session/report-variant'; declared by a host that reports every variant it runs, after which, in the sessions it creates, an exercised variant with no report is 'not-reported' and an 'add-interaction' the session refused withholds the contract. Presence is the whole signal; the object carries nothing.
+ */
+export interface TestVerdictsCapability {
   [k: string]: unknown;
 }
 

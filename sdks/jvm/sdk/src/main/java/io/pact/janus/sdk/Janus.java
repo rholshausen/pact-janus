@@ -8,6 +8,9 @@ import io.pact.janus.bindings.protocol.v1.Finalise;
 import io.pact.janus.bindings.protocol.v1.FinaliseResult;
 import io.pact.janus.bindings.protocol.v1.InteractionResult;
 import io.pact.janus.bindings.protocol.v1.Party;
+import io.pact.janus.bindings.protocol.v1.RefusedInteraction;
+import io.pact.janus.bindings.protocol.v1.ReportVariant;
+import io.pact.janus.bindings.protocol.v1.ReportVariantResult;
 import io.pact.janus.bindings.protocol.v1.ServeVariant;
 import io.pact.janus.bindings.protocol.v1.SessionConfig;
 import io.pact.janus.bindings.protocol.v1.StartTransport;
@@ -17,6 +20,7 @@ import io.pact.janus.bindings.protocol.v1.VariantResult;
 import io.pact.janus.bindings.protocol.v1.Variants;
 import io.pact.janus.bindings.protocol.v1.VariantsResult;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.InteractionResultStatus;
+import io.pact.janus.bindings.protocol.v1.Vocabulary.ReportVariantStatus;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.RequestFrameOp;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.StartTransportTransport;
 import io.pact.janus.bindings.protocol.v1.Vocabulary.VariantResultStatus;
@@ -62,8 +66,6 @@ public final class Janus implements AutoCloseable {
   private Mock mock;
   /** Every interaction added in the open session, by handle. */
   private final Map<String, Execution> executions = new LinkedHashMap<>();
-  /** The executions in the open session that failed — the one verdict the engine does not hold. */
-  private final List<Execution> failed = new ArrayList<>();
 
   private Janus(String consumer, String provider, JanusOptions options) {
     this.consumer = Objects.requireNonNull(consumer, "consumer");
@@ -105,19 +107,20 @@ public final class Janus implements AutoCloseable {
 
   /**
    * {@code execute}: submits {@code interaction} and runs {@code test} once per variant the engine
-   * selects, in the engine's order, with that variant armed on the mock.
+   * selects, in the engine's order, with that variant armed on the mock, and reports each test's
+   * verdict to the engine, which answers with the variant's result (ADR 0064).
    *
-   * <p>A test that throws fails that variant only: every remaining variant still runs, and then
-   * {@code execute} throws one {@link ExecuteFailedException} naming every failed variant. An engine
-   * error is not a test's verdict and is not recorded as one: it ends the run at once, and the
-   * variants after it do not run (ADR 0019). Whether the mock saw what the interaction describes is
-   * the engine's verdict, not this method's — {@link #finalise()} reports it.
+   * <p>A variant fails when that result is not {@code verified}: the test threw, the mock rejected its
+   * request, or nothing exercised the mock. It fails that variant only: every remaining variant still
+   * runs, and then {@code execute} throws one {@link ExecuteFailedException} naming every failed
+   * variant. An engine error is not a test's verdict and is not recorded as one: it ends the run at
+   * once, and the variants after it do not run (ADR 0019).
    *
    * @throws JanusEngineException before any variant runs, when the engine rejects the interaction
    *     ({@code interaction-invalid}, with its problems) or cannot select variants
    *     ({@code variant-budget-exceeded}); from the first {@code execute}, when the handshake fails;
    *     and from inside the loop, when the engine cannot arm a variant
-   * @throws ExecuteFailedException when the test failed on one or more variants
+   * @throws ExecuteFailedException when the engine did not verify one or more variants
    */
   public void execute(Interaction interaction, VariantTest test) {
     Objects.requireNonNull(test, "test");
@@ -136,11 +139,11 @@ public final class Janus implements AutoCloseable {
 
   /**
    * {@code finalise}: ends the session and the engine, and writes the contract if the engine
-   * produced one and every {@code execute} passed.
+   * produced one.
    *
    * @return the contract file written, or empty when there was no session to finalise
-   * @throws ContractWithheldException when no contract was written, naming every interaction and
-   *     variant that did not verify, and every interaction whose {@code execute} failed
+   * @throws ContractWithheldException when the engine withheld the contract, naming every interaction
+   *     and variant that did not verify, and every interaction the engine refused
    */
   public synchronized Optional<Path> finalise() {
     if (engine == null) {
@@ -148,7 +151,6 @@ public final class Janus implements AutoCloseable {
     }
     String open = session;
     Map<String, Execution> added = new LinkedHashMap<>(executions);
-    List<Execution> failedRuns = new ArrayList<>(failed);
     EngineClient.Response response = null;
     try {
       if (open != null) {
@@ -170,9 +172,8 @@ public final class Janus implements AutoCloseable {
       throw new JanusEmbeddingException("the engine answered finalise with a contract document, not its text: it "
           + "predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins", null);
     }
-    boolean engineWithheld = contract == null;
-    if (engineWithheld || !failedRuns.isEmpty()) {
-      throw withheld(result, added, failedRuns, engineWithheld);
+    if (contract == null) {
+      throw withheld(result, added);
     }
     Path file = contractFile();
     try {
@@ -200,8 +201,6 @@ public final class Janus implements AutoCloseable {
     private final String handle;
     private final List<Variant> variants;
     private final Mock mock;
-    private final List<VariantFailure> failures = new ArrayList<>();
-    private Throwable error;
 
     Execution(String description, String session, String handle, List<Variant> variants, Mock mock) {
       this.description = description;
@@ -236,102 +235,129 @@ public final class Janus implements AutoCloseable {
   synchronized Execution begin(Interaction interaction) {
     Objects.requireNonNull(interaction, "interaction");
     Map<String, Object> document = interaction.toDocument();
-    try {
-      EngineClient client = engine();
-      if (session == null) {
-        Create create = new Create();
-        SessionConfig config = new SessionConfig();
-        config.setConsumer(party(consumer));
-        config.setProvider(party(provider));
-        if (!options.components().isEmpty()) {
-          config.setComponents(options.components().stream().map(Janus::resolved).toList());
-        }
-        create.setConfig(config);
-        session = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class).getSession();
+    EngineClient client = engine();
+    if (session == null) {
+      Create create = new Create();
+      SessionConfig config = new SessionConfig();
+      config.setConsumer(party(consumer));
+      config.setProvider(party(provider));
+      if (!options.components().isEmpty()) {
+        config.setComponents(options.components().stream().map(Janus::resolved).toList());
       }
-      AddInteraction add = new AddInteraction();
-      add.setSession(session);
-      add.setInteraction(document);
-      String handle = client.call(RequestFrameOp.CONSUMER_SESSION_ADD_INTERACTION, add, AddInteractionResult.class)
-          .getHandle();
-      if (mock == null) {
-        StartTransport start = new StartTransport();
-        start.setSession(session);
-        start.setTransport(StartTransportTransport.HTTP);
-        mock = new Mock(client.call(RequestFrameOp.CONSUMER_SESSION_START_TRANSPORT, start, StartTransportResult.class)
-            .getEndpoint());
-      }
-      Variants ask = new Variants();
-      ask.setSession(session);
-      ask.setHandle(handle);
-      VariantsResult selection = client.call(RequestFrameOp.CONSUMER_SESSION_VARIANTS, ask, VariantsResult.class);
-      List<Variant> variants = new ArrayList<>();
-      for (VariantDescriptor descriptor : selection.getVariants()) {
-        variants.add(Variant.of(descriptor));
-      }
-      Execution run = new Execution(interaction.description(), session, handle,
-          Collections.unmodifiableList(variants), mock);
-      executions.put(handle, run);
-      return run;
-    } catch (RuntimeException e) {
-      if (session != null) {
-        // The suite's session stays open, and a contract must not be written without this
-        // interaction in it.
-        Execution run = new Execution(interaction.description(), session, null, List.of(), mock);
-        run.error = e;
-        failed.add(run);
-      }
-      throw e;
+      create.setConfig(config);
+      session = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class).getSession();
     }
+    AddInteraction add = new AddInteraction();
+    add.setSession(session);
+    add.setInteraction(document);
+    String handle = client.call(RequestFrameOp.CONSUMER_SESSION_ADD_INTERACTION, add, AddInteractionResult.class)
+        .getHandle();
+    // Known by its handle from here, so a withheld contract names it as the test did.
+    executions.put(handle, new Execution(interaction.description(), session, handle, List.of(), mock));
+    if (mock == null) {
+      StartTransport start = new StartTransport();
+      start.setSession(session);
+      start.setTransport(StartTransportTransport.HTTP);
+      mock = new Mock(client.call(RequestFrameOp.CONSUMER_SESSION_START_TRANSPORT, start, StartTransportResult.class)
+          .getEndpoint());
+    }
+    Variants ask = new Variants();
+    ask.setSession(session);
+    ask.setHandle(handle);
+    VariantsResult selection = client.call(RequestFrameOp.CONSUMER_SESSION_VARIANTS, ask, VariantsResult.class);
+    List<Variant> variants = new ArrayList<>();
+    for (VariantDescriptor descriptor : selection.getVariants()) {
+      variants.add(Variant.of(descriptor));
+    }
+    Execution run = new Execution(interaction.description(), session, handle,
+        Collections.unmodifiableList(variants), mock);
+    executions.put(handle, run);
+    return run;
   }
 
   /**
-   * {@code serve-variant}, then the test. Returns the failure, or null when the variant passed.
+   * {@code serve-variant}, the test, then {@code report-variant} with its verdict. Returns the failure,
+   * or null when the engine verified the variant.
    *
-   * <p>Arming the variant is machinery, not a verdict: an engine error there ends the run at once
-   * (ADR 0019) rather than being recorded as this variant's failure, because an engine that cannot
-   * arm this variant cannot arm the next one either, and one failure per remaining variant would say
-   * the tests failed when the engine did. The interaction is still marked failed, so {@code finalise}
-   * withholds the contract.
+   * <p>Arming the variant and reporting on it are machinery, not a verdict: an engine error there ends
+   * the run at once (ADR 0019) rather than being recorded as this variant's failure, because an engine
+   * that cannot arm this variant cannot arm the next one either, and one failure per remaining variant
+   * would say the tests failed when the engine did. Whether the variant passed is the engine's answer
+   * to the report (ADR 0064): this SDK keeps no verdict of its own.
    */
   VariantFailure run(Execution run, Variant variant, VariantTest test) {
-    try {
-      synchronized (this) {
-        if (engine == null || !run.session.equals(session)) {
-          throw new IllegalStateException(
-              "the session '" + run.description + "' was added to has been finalised; execute it again");
-        }
-        ServeVariant serve = new ServeVariant();
-        serve.setSession(run.session);
-        serve.setHandle(run.handle);
-        serve.setVariant(variant.id());
-        engine.send(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve);
-      }
-    } catch (RuntimeException machinery) {
-      synchronized (this) {
-        if (!failed.contains(run) && run.session.equals(session)) {
-          failed.add(run);
-        }
-      }
-      throw machinery;
+    synchronized (this) {
+      requireOpen(run);
+      ServeVariant serve = new ServeVariant();
+      serve.setSession(run.session);
+      serve.setHandle(run.handle);
+      serve.setVariant(variant.id());
+      engine.send(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve);
     }
+    Throwable thrown = null;
     try {
       test.run(run.mock, variant);
-      return null;
     } catch (VirtualMachineError e) {
       throw e;
     } catch (Throwable t) {
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      VariantFailure failure = new VariantFailure(variant, t);
-      synchronized (this) {
-        run.failures.add(failure);
-        if (!failed.contains(run) && run.session.equals(session)) {
-          failed.add(run);
-        }
+      thrown = t;
+    }
+    VariantResult result;
+    synchronized (this) {
+      requireOpen(run);
+      ReportVariant report = new ReportVariant();
+      report.setSession(run.session);
+      report.setHandle(run.handle);
+      report.setVariant(variant.id());
+      report.setStatus(thrown == null ? ReportVariantStatus.PASSED : ReportVariantStatus.FAILED);
+      if (thrown != null) {
+        report.setReason(thrown.toString());
       }
-      return failure;
+      result = engine.call(RequestFrameOp.CONSUMER_SESSION_REPORT_VARIANT, report, ReportVariantResult.class)
+          .getResult();
+    }
+    if (VariantResultStatus.VERIFIED.equals(result.getStatus())) {
+      return null;
+    }
+    return new VariantFailure(variant, result, thrown != null ? thrown : notVerified(result));
+  }
+
+  private void requireOpen(Execution run) {
+    if (engine == null || !run.session.equals(session)) {
+      throw new IllegalStateException(
+          "the session '" + run.description + "' was added to has been finalised; execute it again");
+    }
+  }
+
+  /** The engine's verdict on a variant whose test passed, which the variant fails with. */
+  static final class NotVerified extends AssertionError {
+    private static final long serialVersionUID = 1L;
+
+    NotVerified(String message) {
+      super(message);
+    }
+  }
+
+  /** The engine's verdict on a variant whose test passed, as the failure a test framework reports. */
+  private static AssertionError notVerified(VariantResult result) {
+    StringBuilder text = new StringBuilder();
+    if (VariantResultStatus.NOT_EXERCISED.equals(result.getStatus())) {
+      text.append("nothing exercised the mock under this variant");
+    } else {
+      text.append("the engine found this variant ").append(result.getStatus());
+    }
+    appendMismatches(text, result.getMismatches(), "\n  ");
+    return new NotVerified(text.toString());
+  }
+
+  /** Each mismatch on a line of its own, after {@code indent}: its path, then its message. */
+  static void appendMismatches(StringBuilder text, List<Map<String, Object>> mismatches, String indent) {
+    for (Map<String, Object> mismatch : mismatches == null ? List.<Map<String, Object>>of() : mismatches) {
+      Object path = mismatch.get("path");
+      text.append(indent).append(path == null ? "" : path + ": ").append(mismatch.get("message"));
     }
   }
 
@@ -363,7 +389,6 @@ public final class Janus implements AutoCloseable {
     session = null;
     mock = null;
     executions.clear();
-    failed.clear();
     if (client != null) {
       client.close();
     }
@@ -375,57 +400,46 @@ public final class Janus implements AutoCloseable {
     return party;
   }
 
-  private ContractWithheldException withheld(FinaliseResult result, Map<String, Execution> added,
-      List<Execution> failedRuns, boolean engineWithheld) {
+  private ContractWithheldException withheld(FinaliseResult result, Map<String, Execution> added) {
     StringBuilder text = new StringBuilder("No contract was written for ").append(consumer).append(" -> ")
         .append(provider).append(" (").append(contractFile()).append(").");
-    if (engineWithheld) {
-      text.append("\nThe engine withheld it: not every interaction verified on every variant it required.");
-      boolean named = false;
-      for (InteractionResult interaction : result.getResults() == null ? List.<InteractionResult>of() : result.getResults()) {
-        if (InteractionResultStatus.VERIFIED.equals(interaction.getStatus())) {
+    text.append("\nThe engine withheld it: not every interaction verified on every variant it required.");
+    List<String> interactions = new ArrayList<>();
+    for (InteractionResult interaction : result.getResults() == null ? List.<InteractionResult>of() : result.getResults()) {
+      if (InteractionResultStatus.VERIFIED.equals(interaction.getStatus())) {
+        continue;
+      }
+      Execution run = added.get(interaction.getHandle());
+      String description = run == null ? interaction.getHandle() : run.description();
+      interactions.add(description);
+      text.append("\n  - '").append(description).append("': ").append(interaction.getStatus());
+      for (VariantResult v : interaction.getVariants() == null ? List.<VariantResult>of() : interaction.getVariants()) {
+        if (VariantResultStatus.VERIFIED.equals(v.getStatus())) {
           continue;
         }
-        named = true;
-        Execution run = added.get(interaction.getHandle());
-        text.append("\n  - '").append(run == null ? interaction.getHandle() : run.description()).append("': ")
-            .append(interaction.getStatus());
-        for (VariantResult v : interaction.getVariants() == null ? List.<VariantResult>of() : interaction.getVariants()) {
-          if (VariantResultStatus.VERIFIED.equals(v.getStatus())) {
-            continue;
-          }
-          Variant variant = run == null ? null : run.variant(v.getVariant());
-          text.append("\n      - ").append(variant == null ? v.getVariant() : variant.label() + " [" + v.getVariant() + "]")
-              .append(": ").append(v.getStatus());
-          if (VariantResultStatus.NOT_EXERCISED.equals(v.getStatus())) {
-            text.append(" (nothing exercised the mock under this variant)");
-          }
-          for (Map<String, Object> mismatch : v.getMismatches() == null ? List.<Map<String, Object>>of() : v.getMismatches()) {
-            Object path = mismatch.get("path");
-            text.append("\n          ").append(path == null ? "" : path + ": ").append(mismatch.get("message"));
-          }
+        Variant variant = run == null ? null : run.variant(v.getVariant());
+        text.append("\n      - ").append(variant == null ? v.getVariant() : variant.label() + " [" + v.getVariant() + "]")
+            .append(": ").append(v.getStatus());
+        if (VariantResultStatus.NOT_EXERCISED.equals(v.getStatus())) {
+          text.append(" (nothing exercised the mock under this variant)");
         }
-      }
-      if (!named) {
-        text.append("\n  (the engine returned no contract, and named no interaction that did not verify)");
+        if (v.getTest() != null && v.getTest().getReason() != null) {
+          text.append("\n          its test failed: ").append(v.getTest().getReason());
+        }
+        appendMismatches(text, v.getMismatches(), "\n          ");
       }
     }
-    List<String> failedDescriptions = new ArrayList<>();
-    if (!failedRuns.isEmpty()) {
-      text.append("\nThese interactions' tests failed, so a contract would claim variants the consumer did not handle:");
-      for (Execution run : failedRuns) {
-        failedDescriptions.add(run.description());
-        text.append("\n  - '").append(run.description()).append("'");
-        if (run.error != null) {
-          text.append(": ").append(run.error);
-        }
-        for (VariantFailure f : run.failures) {
-          text.append("\n      - ").append(f.variant().label()).append(" [").append(f.variant().id()).append("]: ")
-              .append(f.cause());
-        }
-      }
+    List<RefusedInteraction> refused = result.getRefused() == null ? List.of() : result.getRefused();
+    for (RefusedInteraction refusal : refused) {
+      String description = refusal.getDescription() == null ? "an interaction" : refusal.getDescription();
+      interactions.add(description);
+      text.append("\n  - '").append(description).append("': refused, ").append(refusal.getMessage())
+          .append(" [").append(refusal.getCode()).append("]");
     }
-    return new ContractWithheldException(text.toString(), result.getResults(), failedDescriptions, engineWithheld);
+    if (interactions.isEmpty()) {
+      text.append("\n  (the engine returned no contract, and named no interaction that did not verify)");
+    }
+    return new ContractWithheldException(text.toString(), result.getResults(), refused, interactions);
   }
 
   @Override

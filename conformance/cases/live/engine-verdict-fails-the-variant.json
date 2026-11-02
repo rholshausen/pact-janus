@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/engine-verdict-fails-the-variant",
+  "category": "live",
+  "title": "A variant whose closure never called the mock fails in execute, naming that variant, against the real engine.",
+  "covers": ["session.execute.engine-verdict-fails-the-variant"],
+  "why": "behavioural spec 'execute': the engine answers each report with the variant's result, and the variant failed when it is not 'verified' — here 'not-exercised', because the closure passed without calling the mock. Every remaining variant still runs and 'execute' fails once, naming it, so the failure surfaces in the test that caused it rather than the suite's 'finalise' (Phase 9 finding 5, ADR 0064). The engine then withholds the contract.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "get an order",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": { "$": "json", "args": [{ "id": 42, "shippedAt": { "$": "optional", "args": [{ "$": "string", "args": ["2026-07-30"] }] } }] }
+          }
+        },
+        "closure": {
+          "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 },
+          "skip-on": ["base"]
+        }
+      },
+      "expect": {
+        "outcome": { "error": "execute-failed", "variants": ["base"] },
+        "closure-calls": ["base", "response.body.shippedAt#presence=absent"]
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": { "error": "contract-withheld", "interactions": ["get an order"] },
+        "contract": { "written": false }
+      }
+    }
+  ]
+}

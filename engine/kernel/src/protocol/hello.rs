@@ -23,6 +23,15 @@ impl Hello {
     self.capabilities.get("segments").is_some_and(Value::is_object)
   }
 
+  /// Whether the host reports every variant it runs (ADR 0064 decision 4): it declared the
+  /// `test-verdicts` capability.
+  pub fn reports_test_verdicts(&self) -> bool {
+    self
+      .capabilities
+      .get("test-verdicts")
+      .is_some_and(Value::is_object)
+  }
+
   /// Whether the host asked for an outbound contract as its canonical text (ADR 0063 decision 2):
   /// it declared the `contract-text` capability.
   pub fn wants_contract_text(&self) -> bool {
@@ -71,6 +80,9 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 /// wherever a request carries one, and writes an outbound contract as its text for a host that
 /// declared the capability too.
 ///
+/// `test-verdicts` is always declared (ADR 0064): this engine has `consumer-session/report-variant`,
+/// and requires a report for every variant from a host that declared the capability too.
+///
 /// `background` is declared only by an engine whose embedding registered a way to run work beside
 /// the frame stream (ADR 0062): the native embeddings, never the offline WASM artifact.
 pub fn result(loaders: &[&str], broker: bool, config_loading: bool, background: bool) -> Value {
@@ -83,6 +95,7 @@ pub fn result(loaders: &[&str], broker: bool, config_loading: bool, background: 
       "components": { "loaders": loaders },
       "segments": {},
       "contract-text": {},
+      "test-verdicts": {},
     }
   });
   if broker {

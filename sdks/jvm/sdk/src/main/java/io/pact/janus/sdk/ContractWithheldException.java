@@ -1,26 +1,27 @@
 package io.pact.janus.sdk;
 
 import io.pact.janus.bindings.protocol.v1.InteractionResult;
+import io.pact.janus.bindings.protocol.v1.RefusedInteraction;
 import java.util.List;
 
 /**
- * {@code finalise} wrote no contract: the engine withheld it (an interaction did not verify on a
- * variant it required), or an {@code execute} in the session failed and a contract would claim a
- * variant the consumer's own test failed on. The message names every such interaction and variant,
- * with the engine's mismatches.
+ * {@code finalise} wrote no contract, because the engine withheld it: an interaction did not verify
+ * on a variant it required (its request did not match, nothing exercised it, or its test failed), or
+ * the engine refused an interaction the suite added (ADR 0064). The message names every such
+ * interaction and variant, with the engine's mismatches and the test's reason.
  */
 public class ContractWithheldException extends AssertionError {
   private static final long serialVersionUID = 1L;
   private final transient List<InteractionResult> results;
-  private final transient List<String> failedInteractions;
-  private final boolean engineWithheld;
+  private final transient List<RefusedInteraction> refused;
+  private final List<String> interactions;
 
-  ContractWithheldException(String message, List<InteractionResult> results, List<String> failedInteractions,
-      boolean engineWithheld) {
+  ContractWithheldException(String message, List<InteractionResult> results, List<RefusedInteraction> refused,
+      List<String> interactions) {
     super(message);
     this.results = results == null ? List.of() : List.copyOf(results);
-    this.failedInteractions = List.copyOf(failedInteractions);
-    this.engineWithheld = engineWithheld;
+    this.refused = refused == null ? List.of() : List.copyOf(refused);
+    this.interactions = List.copyOf(interactions);
   }
 
   /** {@code results} exactly as {@code consumer-session/finalise} returned them. */
@@ -28,13 +29,13 @@ public class ContractWithheldException extends AssertionError {
     return results;
   }
 
-  /** The descriptions of the interactions whose {@code execute} failed. */
-  public List<String> failedInteractions() {
-    return failedInteractions;
+  /** The interactions the engine refused when the suite added them, as {@code finalise} returned them. */
+  public List<RefusedInteraction> refused() {
+    return refused;
   }
 
-  /** Whether the engine itself returned no contract (as opposed to the SDK withholding one it returned). */
-  public boolean engineWithheld() {
-    return engineWithheld;
+  /** The descriptions of the interactions that did not verify, then of the ones the engine refused. */
+  public List<String> interactions() {
+    return interactions;
   }
 }
