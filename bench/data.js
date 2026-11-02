@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793596176996,
+  "lastUpdate": 1793596179089,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -37842,6 +37842,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20545,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0a676eec9a9b0c596a0297a12a867f01595586c3",
+          "message": "docs: S2.5 split into S2.5a (pact-js) and S2.5b (pact-jvm)\n\npact-jvm's JUnit 4 consumer support is dropped, and its JUnit 4 example\nsuites are out of the exit. The verdicts are kept/adapted/dropped, as SDK\nspec §6 names them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T15:55:05+11:00",
+          "tree_id": "2b2ba3b57c63c2c1a848833be5350b7274a26c23",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0a676eec9a9b0c596a0297a12a867f01595586c3"
+        },
+        "date": 1793596178478,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 24583,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20420,
             "unit": "requests per second",
             "extra": "engines 4"
           }
