@@ -26,6 +26,7 @@ mod output;
 mod args;
 mod check;
 mod component;
+pub mod contract_files;
 mod date;
 mod engine;
 mod error;

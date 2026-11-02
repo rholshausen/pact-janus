@@ -132,8 +132,12 @@ survives a copy.
 A writer MUST produce: UTF-8 with no BOM; LF only; **compact** — no insignificant whitespace, so no
 space after `:` or `,` and no newlines except the one trailing the document; a trailing newline; no
 trailing whitespace. Members are emitted in the order this specification lists them, `$format` first.
-Arrays are emitted in their specified order — `interactions` as submitted, `variants` in recorded order,
-which is run order (variant semantics §4.3, §5.1).
+Arrays are emitted in their specified order — `interactions` in identity order (§4.2), `variants` in
+recorded order, which is run order (variant semantics §4.3, §5.1). Identity order is by `description`,
+in code-point order, then by the canonical bytes of `states`, a missing `states` first
+([ADR 0065](../../decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md)).
+Every writer sorts, so a contract merged from several sessions is the bytes one session recording all
+of them would write, whichever was merged first.
 
 The members this specification leaves open are emitted by what they are
 ([ADR 0037](../../decisions/0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md)).
@@ -300,6 +304,10 @@ name and cannot be ambiguous about which one they mean: variant semantics §6.7'
 waiver names an interaction and a variant, and design 5.5's `--interaction` filter selects one. A
 duplicate description makes a waiver silently apply to two interactions, which is the kind of quiet
 widening this project spends its exclusions machinery preventing.
+
+It is also what merging joins on (engine-protocol spec §8.2, ADR 0065): two sessions recording one
+consumer and provider into one file record an interaction once when they recorded it the same, byte for
+byte, and conflict when they recorded it differently.
 
 ### 4.3 Transport
 

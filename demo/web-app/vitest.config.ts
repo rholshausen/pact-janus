@@ -12,5 +12,5 @@ export default defineConfig({
     // The SDK's own source would otherwise load its own copy of Vitest, whose afterAll is not this run's.
     dedupe: ["vitest"],
   },
-  test: { include: ["test/**/*.test.ts"] },
+  test: { include: ["test/**/*.test.ts"], globalSetup: ["test/clear-contracts.ts"] },
 });

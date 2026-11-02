@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "results",
     "contract",
     "contract-text",
+    "written",
     "refused"
 })
 public class FinaliseResult {
@@ -41,11 +42,11 @@ public class FinaliseResult {
     @JsonProperty("results")
     private List<InteractionResult> results;
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text' or ask for the contract to be written. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
-    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business.")
+    @JsonPropertyDescription("The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text' or ask for the contract to be written. Persistence is the host's business.")
     private Map<String, Object> contract;
     /**
      * In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec §2.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.
@@ -54,6 +55,13 @@ public class FinaliseResult {
     @JsonProperty("contract-text")
     @JsonPropertyDescription("In place of 'contract', to a host that declared the 'contract-text' capability (ADR 0063): the contract's canonical bytes (contract-file spec \u00a72.4) as text, its trailing LF included, present exactly when 'contract' would be. A host writes its UTF-8 encoding and nothing else.")
     private java.lang.String contractText;
+    /**
+     * In place of 'contract' and 'contract-text', when the request carried 'write' and the contract was not withheld (ADR 0065): the path the engine's host wrote it to.
+     * 
+     */
+    @JsonProperty("written")
+    @JsonPropertyDescription("In place of 'contract' and 'contract-text', when the request carried 'write' and the contract was not withheld (ADR 0065): the path the engine's host wrote it to.")
+    private java.lang.String written;
     /**
      * To a host that declared 'test-verdicts' (ADR 0064): every 'add-interaction' this session refused, in order. Any refusal withholds the contract.
      * 
@@ -85,7 +93,7 @@ public class FinaliseResult {
     }
 
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text' or ask for the contract to be written. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
@@ -94,7 +102,7 @@ public class FinaliseResult {
     }
 
     /**
-     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text'. Persistence is the host's business.
+     * The Janus contract document (design 2.5); present iff every interaction verified successfully on its required variants and, for a host that declared 'test-verdicts', the session refused no interaction; and the host did not declare 'contract-text' or ask for the contract to be written. Persistence is the host's business.
      * 
      */
     @JsonProperty("contract")
@@ -118,6 +126,24 @@ public class FinaliseResult {
     @JsonProperty("contract-text")
     public void setContractText(java.lang.String contractText) {
         this.contractText = contractText;
+    }
+
+    /**
+     * In place of 'contract' and 'contract-text', when the request carried 'write' and the contract was not withheld (ADR 0065): the path the engine's host wrote it to.
+     * 
+     */
+    @JsonProperty("written")
+    public java.lang.String getWritten() {
+        return written;
+    }
+
+    /**
+     * In place of 'contract' and 'contract-text', when the request carried 'write' and the contract was not withheld (ADR 0065): the path the engine's host wrote it to.
+     * 
+     */
+    @JsonProperty("written")
+    public void setWritten(java.lang.String written) {
+        this.written = written;
     }
 
     /**
@@ -164,6 +190,10 @@ public class FinaliseResult {
         sb.append('=');
         sb.append(((this.contractText == null)?"<null>":this.contractText));
         sb.append(',');
+        sb.append("written");
+        sb.append('=');
+        sb.append(((this.written == null)?"<null>":this.written));
+        sb.append(',');
         sb.append("refused");
         sb.append('=');
         sb.append(((this.refused == null)?"<null>":this.refused));
@@ -183,11 +213,12 @@ public class FinaliseResult {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.refused == null)? 0 :this.refused.hashCode()));
-        result = ((result* 31)+((this.results == null)? 0 :this.results.hashCode()));
         result = ((result* 31)+((this.contractText == null)? 0 :this.contractText.hashCode()));
         result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
+        result = ((result* 31)+((this.written == null)? 0 :this.written.hashCode()));
+        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.results == null)? 0 :this.results.hashCode()));
         return result;
     }
 
@@ -200,7 +231,7 @@ public class FinaliseResult {
             return false;
         }
         FinaliseResult rhs = ((FinaliseResult) other);
-        return ((((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.refused == rhs.refused)||((this.refused!= null)&&this.refused.equals(rhs.refused))))&&((this.results == rhs.results)||((this.results!= null)&&this.results.equals(rhs.results))))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
+        return (((((((this.refused == rhs.refused)||((this.refused!= null)&&this.refused.equals(rhs.refused)))&&((this.contractText == rhs.contractText)||((this.contractText!= null)&&this.contractText.equals(rhs.contractText))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))))&&((this.written == rhs.written)||((this.written!= null)&&this.written.equals(rhs.written))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.results == rhs.results)||((this.results!= null)&&this.results.equals(rhs.results))));
     }
 
 }

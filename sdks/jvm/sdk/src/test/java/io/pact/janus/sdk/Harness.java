@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.discovery.ClassSelector;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.TestExecutionListener;
@@ -40,14 +41,25 @@ final class Harness {
    * engine, is compiled after the Java tests, so they cannot name it as a class.
    */
   static List<Outcome> run(String testClass) {
-    return run(selectClass(testClass));
+    return run(List.of(selectClass(testClass)), false);
+  }
+
+  /** Classes by their names, run at once, as a build running test classes in parallel runs them. */
+  static List<Outcome> runAtOnce(String... testClasses) {
+    return run(java.util.Arrays.stream(testClasses).map(DiscoverySelectors::selectClass).toList(), true);
   }
 
   private static List<Outcome> run(ClassSelector selector) {
-    List<Outcome> outcomes = new ArrayList<>();
+    return run(List.of(selector), false);
+  }
+
+  private static List<Outcome> run(List<ClassSelector> selectors, boolean atOnce) {
+    List<Outcome> outcomes = java.util.Collections.synchronizedList(new ArrayList<>());
     LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
-        .selectors(selector)
+        .selectors(selectors)
         .configurationParameter("junit.jupiter.conditions.deactivate", "")
+        .configurationParameter("junit.jupiter.execution.parallel.enabled", String.valueOf(atOnce))
+        .configurationParameter("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
         .build();
     Launcher launcher = LauncherFactory.create();
     System.setProperty(PROPERTY, "true");

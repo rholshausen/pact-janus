@@ -2,8 +2,7 @@
 // protocol operation with the caller's values substituted in; the only thing this file decides is
 // *when* — one engine and one session per configured object, which is to say per test suite.
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { protocolVocabulary, type protocol } from "./generated/index.js";
 import { Engine } from "./engine/engine.js";
 import type { FramePipe } from "./engine/pipe.js";
@@ -16,8 +15,13 @@ const Op = protocolVocabulary.RequestFrameOp;
 export interface JanusConfig {
   consumer: string;
   provider: string;
-  /** Where `finalise` writes the contract. Default: `contracts` under the working directory. */
+  /**
+   * Where the engine writes the contract at `finalise`. Default: `contracts` under the working
+   * directory. Several test files recording one consumer and provider merge into its one file.
+   */
   contractDir?: string;
+  /** Replace the contract file rather than merge into it (ADR 0065). Default: merge. */
+  overwriteContract?: boolean;
   /** How the engine is reached: subprocess options, or any frame pipe (a test double, or a later embedding). */
   engine?: SubprocessOptions | (() => FramePipe);
   /**
@@ -138,21 +142,19 @@ export class Janus {
       if (session === undefined) {
         return { results: [] };
       }
-      const finalised = await engine.call(Op.ConsumerSessionFinalise, { session });
-      const { results, refused, contract: document, "contract-text": contract } = finalised;
-      if (contract === undefined && document !== undefined) {
-        // An engine older than ADR 0063 ignored 'contract-text' and sent the document: nothing was withheld.
-        throw new Error("the engine answered finalise with a contract document, not its text: it predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins");
+      // The engine's host writes the file, merging into it (ADR 0065): the SDK names it, and writes nothing.
+      const { consumer, provider, contractDir, overwriteContract } = this.#config;
+      const path = resolve(contractDir ?? "contracts", `${consumer}-${provider}.janus.json`);
+      const write = { path, mode: overwriteContract ? "overwrite" : "merge" };
+      const { results, refused, written, contract, "contract-text": text } = await engine.call(Op.ConsumerSessionFinalise, { session, write });
+      if (written === undefined && (contract ?? text) !== undefined) {
+        // An engine older than ADR 0065 ignored 'write' and answered the contract: nothing was withheld.
+        throw new Error("the engine answered finalise with the contract instead of writing it: it predates 'contract-writing' (ADR 0065), which this SDK needs; use the engine this SDK pins");
       }
-      if (contract === undefined) {
+      if (written === undefined) {
         throw new ContractWithheldError(results, this.#descriptions, refused ?? []);
       }
-      // The engine's canonical text, its LF included, written as it came (ADR 0063).
-      const dir = this.#config.contractDir ?? "contracts";
-      await mkdir(dir, { recursive: true });
-      const contractFile = join(dir, `${this.#config.consumer}-${this.#config.provider}.janus.json`);
-      await writeFile(contractFile, contract, "utf8");
-      return { results, contractFile };
+      return { results, contractFile: written };
     } finally {
       await engine.close();
     }

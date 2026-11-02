@@ -127,6 +127,39 @@ class FrameworksTest {
     assertEquals(Status.SUCCESSFUL, status(run, framework.providerSuite), run::toString);
   }
 
+  // Staged plan S2.11, ADR 0065: test classes run at once, each with an engine of its own, merge
+  // into one contract file.
+  @Test
+  void twoClassesRunAtOnceMergeIntoOneContractTheBytesOneClassRecordingBothWrites() throws IOException {
+    Path merged = contract("junit5-merged");
+    Path together = CONTRACTS.resolve("together").resolve("junit5-merged-orders-api.janus.json");
+    Files.deleteIfExists(merged);
+    Files.deleteIfExists(together);
+    List<Harness.Outcome> run = Harness.runAtOnce(PACKAGE + "JUnitMergedOrdersTest", PACKAGE + "JUnitMergedDeletesTest");
+    assertEquals(Status.SUCCESSFUL, status(run, "JUnitMergedOrdersTest"), run::toString);
+    assertEquals(Status.SUCCESSFUL, status(run, "JUnitMergedDeletesTest"), run::toString);
+    List<Harness.Outcome> one = Harness.run(PACKAGE + "JUnitMergedTogetherTest");
+    assertEquals(Status.SUCCESSFUL, status(one, "JUnitMergedTogetherTest"), one::toString);
+
+    String text = Files.readString(merged);
+    assertEquals(Files.readString(together), text);
+    assertTrue(text.indexOf("\"delete an order\"") < text.indexOf("\"get an order\""), text);
+  }
+
+  @Test
+  void theSecondClassToRecordAnInteractionDifferentlyFailsNamingIt() throws IOException {
+    Files.deleteIfExists(contract("junit5-conflicting"));
+    List<Harness.Outcome> run = Harness.runAtOnce(PACKAGE + "JUnitConflictOkTest", PACKAGE + "JUnitConflictAcceptedTest");
+    List<Harness.Outcome> classes = List.of(Harness.named(run, "JUnitConflictOkTest"),
+        Harness.named(run, "JUnitConflictAcceptedTest"));
+    assertEquals(List.of(Status.SUCCESSFUL, Status.FAILED),
+        classes.stream().map(Harness.Outcome::status).sorted().toList(), run::toString);
+    Harness.Outcome failed = classes.stream().filter(c -> c.status() == Status.FAILED).findFirst().orElseThrow();
+    JanusEngineException error = assertInstanceOf(JanusEngineException.class, failed.error());
+    assertEquals("contract-conflict", error.code());
+    assertTrue(error.getMessage().contains("'create an order'"), error::getMessage);
+  }
+
   @Test
   void bothFrameworksWriteTheSameContract() throws IOException {
     String junit = Files.readString(contract("junit5")).replace("\"junit5\"", "\"web-app\"");

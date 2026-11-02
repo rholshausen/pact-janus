@@ -4,7 +4,7 @@
 
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { protocol } from "../src/generated/index.js";
 import {
@@ -298,31 +298,49 @@ describe("finalise", () => {
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"))).rejects.toThrow();
   });
 
-  it("writes the contract text the engine returned, byte for byte (session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered)", async () => {
-    // Numbers JavaScript would respell, and members out of name order: the SDK parses none of it.
-    const text = '{"$format":"janus-contract/1","consumer":{"name":"web-app"},"zeta":1.0,"alpha":[9007199254740993,1e+16]}\n';
+  it("names the contract file, which the engine writes, merging into it (session.finalise.writes-contract-when-verified, session.finalise.names-contract-file)", async () => {
     const pipe = new ScriptedPipe({
-      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], "contract-text": text } }),
+      "consumer-session/finalise": (body) => ({
+        ok: { results: [{ handle: "i-1", status: "verified" }], written: (body.write as { path: string }).path },
+      }),
     });
     const dir = await mkdtemp(join(tmpdir(), "janus-"));
     const janus = janusOver(pipe, { contractDir: dir });
     await janus.execute(janus.interaction("x"), noop);
     const { contractFile } = await janus.finalise();
-    expect(contractFile).toBe(join(dir, "web-app-orders-api.janus.json"));
-    expect(await readFile(contractFile ?? "", "utf8")).toBe(text);
+    const path = join(dir, "web-app-orders-api.janus.json");
+    expect(pipe.bodies[pipe.ops.indexOf("consumer-session/finalise")]?.write).toEqual({ path, mode: "merge" });
+    expect(contractFile).toBe(path);
+    // The engine's host writes the file (ADR 0065); this engine wrote none, and nor did the SDK.
+    await expect(readFile(path)).rejects.toThrow();
     expect(pipe.bodies[pipe.ops.indexOf("engine/hello")]?.capabilities).toEqual({ "contract-text": {}, "test-verdicts": {} });
   });
 
-  it("fails, saying the engine is too old, when the engine answers the contract document rather than its text", async () => {
+  it("asks the engine to overwrite the file when told to (session.finalise.names-contract-file)", async () => {
     const pipe = new ScriptedPipe({
-      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], contract: { $format: "janus-contract/1" } } }),
+      "consumer-session/finalise": (body) => ({
+        ok: { results: [{ handle: "i-1", status: "verified" }], written: (body.write as { path: string }).path },
+      }),
+    });
+    const janus = janusOver(pipe, { contractDir: "relative/contracts", overwriteContract: true });
+    await janus.execute(janus.interaction("x"), noop);
+    await janus.finalise();
+    expect(pipe.bodies[pipe.ops.indexOf("consumer-session/finalise")]?.write).toEqual({
+      path: resolve("relative/contracts", "web-app-orders-api.janus.json"),
+      mode: "overwrite",
+    });
+  });
+
+  it("fails, saying the engine is too old, when the engine answers the contract instead of writing it", async () => {
+    const pipe = new ScriptedPipe({
+      "consumer-session/finalise": () => ({ ok: { results: [{ handle: "i-1", status: "verified" }], "contract-text": "{}\n" } }),
     });
     const dir = await mkdtemp(join(tmpdir(), "janus-"));
     const janus = janusOver(pipe, { contractDir: dir });
     await janus.execute(janus.interaction("x"), noop);
     const error = await janus.finalise().catch((e: unknown) => e);
     expect(error).not.toBeInstanceOf(ContractWithheldError);
-    expect(String(error)).toContain("predates 'contract-text'");
+    expect(String(error)).toContain("predates 'contract-writing'");
     await expect(readFile(join(dir, "web-app-orders-api.janus.json"), "utf8")).rejects.toThrow();
   });
 

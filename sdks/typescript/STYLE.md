@@ -41,6 +41,18 @@ specification disagree, the behavioural specification wins and this file has a b
   exchange loop), so concurrent tests would serve each other's variants. Vitest runs a file's tests
   sequentially by default; `test.concurrent` must not be used with a shared `Janus`.
 
+## The contract file
+
+- The engine writes it (ADR 0065). `finalise` sends `write`: `<contractDir>/<consumer>-<provider>.janus.json`,
+  resolved against the working directory, and `merge`, or `overwrite` when `overwriteContract` is set.
+  It resolves with the path the engine answered, as `contractFile`. The SDK opens no file.
+- Several test files recording one consumer and provider, which Jest and Vitest run in workers of
+  their own, each with an engine of its own, merge into that one file. An interaction two of them
+  recorded differently fails the second to finalise with the engine's `contract-conflict`, a
+  `JanusError` naming it, and the file keeps the first's.
+- What merges is whatever the file held, an earlier run's included: clear `contractDir` before a run,
+  as pact-js users clear their pact directory.
+
 ## The error surface
 
 | Failure | Type | What it carries |
@@ -185,4 +197,3 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 | Primitive | Deviation | Reason |
 |---|---|---|
 | `execute` | Each selected variant is a line in `execute`'s failure, not a separately reported test | Vitest cannot add tests to a test that is already running, and naming variants at collection time would need an engine session before any test runs. The failure message names every failed variant by label and id, which task 4.6 found is what makes a failing variant identifiable (SDK spec §5 SHOULD). |
-| `finalise` | "Members in the order the engine returned them" holds except for integer-like member names, which are written first, in ascending numeric order | The contract arrives parsed, inside a frame, and JavaScript enumerates integer-like keys first whatever order they were written in; `JSON.stringify` of the parsed document is otherwise the engine's canonical form ([Phase 9 finding 6](../../Documentation/prototype/phase-9-findings.md)). |

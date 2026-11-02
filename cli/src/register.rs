@@ -10,7 +10,8 @@
 //! (ADR 0036), the `exec` and `http` hook implementations, the
 //! built-in `oauth2` hook component, the WASM loader for out-of-tree components (plan task 8.1),
 //! the Pact Broker client (ADR 0032, staged plan S1.3), the configuration loader `config/load`
-//! answers with (ADR 0055, staged plan S1.14), and threads for the work that runs beside the frame
+//! answers with (ADR 0055, staged plan S1.14), the contract file writer `finalise` writes and merges
+//! through (ADR 0065, staged plan S2.11), and threads for the work that runs beside the frame
 //! stream (ADR 0062). An engine handed none of those refuses
 //! a configuration naming them — by name, before a run starts.
 
@@ -64,6 +65,8 @@ pub fn native_engine() -> Engine {
   // `config/load` (ADR 0055): an SDK reads a project's configuration through the loader
   // `janus verify --config` runs, so a file means the same in every language.
   engine.register_config_loader(Arc::new(FileLoader));
+  // `finalise`'s `write` (ADR 0065): several test files' engines merge into one contract file.
+  engine.register_contract_writer(Arc::new(crate::contract_files::FileContractWriter));
   // ADR 0062: the exchange loop, a verification run and a publication each run on a thread of
   // their own, which a native process has to give.
   engine.register_background(Arc::new(Threads));

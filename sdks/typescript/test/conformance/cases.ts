@@ -153,7 +153,7 @@ export interface Case {
   note?: string;
   interaction?: InteractionScript;
   /** The 'janus' options beyond consumer and provider. */
-  janus?: { components?: ComponentDeclaration[] };
+  janus?: { components?: ComponentDeclaration[]; "overwrite-contract"?: boolean };
   engine?: ScriptedEngine;
   verifier?: VerifierScript;
   verify?: boolean;

@@ -41,6 +41,10 @@
           "type": "array",
           "description": "The project's declared components, handed to 'janus' as its components option.",
           "items": { "type": "object" }
+        },
+        "overwrite-contract": {
+          "type": "boolean",
+          "description": "Handed to 'janus' as its option to overwrite the contract file rather than merge into it (ADR 0065)."
         }
       },
       "additionalProperties": false

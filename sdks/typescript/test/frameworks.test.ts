@@ -88,7 +88,7 @@ describe.each([
     flags: [],
     suites: [{ files: "vitest/*.test.ts", ext: ".test.ts", consumer: "vitest" }],
   },
-])("under $framework", ({ script, args, flags, suites }) => {
+])("under $framework", ({ framework, script, args, flags, suites }) => {
   let files: ReturnType<typeof byFile>;
   let status: number | null;
 
@@ -101,6 +101,30 @@ describe.each([
   it("fails the run, for the suites whose contracts are withheld", () => {
     expect(status).toBe(1);
   });
+
+  // Staged plan S2.11, ADR 0065: test files in workers of their own, each with an engine of its own,
+  // merge into one contract file.
+  if (framework === "Vitest") {
+    it("merges two files' interactions into one contract, the bytes one file recording both writes", async () => {
+      for (const file of ["merged-orders.test.ts", "merged-deletes.test.ts", "merged-together.test.ts"]) {
+        expect(files[file]?.status, file).toBe("passed");
+      }
+      const merged = await readFile(join(root, "contracts", "vitest-merged-orders-api.janus.json"), "utf8");
+      const together = await readFile(join(root, "contracts", "together", "vitest-merged-orders-api.janus.json"), "utf8");
+      expect(merged).toBe(together);
+      const recorded = JSON.parse(merged).interactions.map((i: { description: string }) => i.description);
+      expect(recorded).toEqual(["delete an order", "get an order"]);
+    });
+
+    it("fails the second file to record an interaction differently, naming it, and keeps the first's", async () => {
+      const outcomes = ["conflict-ok.test.ts", "conflict-accepted.test.ts"].map((file) => files[file]);
+      expect(outcomes.map((outcome) => outcome?.status).sort()).toEqual(["failed", "passed"]);
+      const failed = outcomes.find((outcome) => outcome?.status === "failed");
+      expect(failed?.message).toContain("'create an order'");
+      const kept = JSON.parse(await readFile(join(root, "contracts", "vitest-conflicting-orders-api.janus.json"), "utf8"));
+      expect(kept.interactions).toHaveLength(1);
+    });
+  }
 
   for (const { ext, consumer } of suites) {
     describe(`from *${ext}`, () => {

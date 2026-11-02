@@ -2,7 +2,6 @@ package io.pact.janus.sdk;
 
 import static io.pact.janus.sdk.Shapes.map;
 import static io.pact.janus.sdk.Shapes.optional;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -11,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -106,7 +104,9 @@ class SessionLifecycleTest {
     assertEquals(List.of("base", "shippedAt-absent"), engine.served());
     assertEquals(MAPPER.readTree("{\"session\":\"cs-1\",\"handle\":\"i-1\",\"variant\":\"base\",\"status\":\"passed\"}"),
         engine.body("consumer-session/report-variant"));
-    assertEquals(MAPPER.readTree("{\"session\":\"cs-1\"}"), engine.body("consumer-session/finalise"));
+    assertEquals(MAPPER.readTree("{\"session\":\"cs-1\",\"write\":{\"path\":"
+        + MAPPER.writeValueAsString(contracts.resolve("web-app-orders-api.janus.json").toAbsolutePath().toString())
+        + ",\"mode\":\"merge\"}}"), engine.body("consumer-session/finalise"));
     assertEquals(1, engine.closed);
   }
 
@@ -159,32 +159,41 @@ class SessionLifecycleTest {
   }
 
   @Test
-  @DisplayName("finalise writes the engine's contract text to <dir>/<consumer>-<provider>.janus.json, byte for byte [session.finalise.writes-contract-when-verified, session.finalise.contract-bytes-unaltered]")
-  void writesContractBytesUnaltered() throws Exception {
-    // Member order the SDK would never choose, integer-like names, number spellings a re-serialiser
-    // would change, and both raw and escaped non-ASCII: the file must hold exactly these bytes.
-    String contract = "{\"$format\":\"janus-contract/1\",\"zeta\":1,\"alpha\":{\"10\":1.0,\"9\":1e5,\"x\":-0.0},"
-        + "\"s\":\"café \\u00e9 \\/\",\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"},\"interactions\":[]}\n";
-    engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],\"contract-text\":"
-        + new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(contract) + "}");
+  @DisplayName("finalise names the contract file for the engine to write, merging into it, and writes none itself [session.finalise.writes-contract-when-verified, session.finalise.names-contract-file]")
+  void namesTheContractFile() throws Exception {
+    engine.on("consumer-session/finalise", body -> "{\"ok\":{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],"
+        + "\"written\":" + body.path("write").path("path") + "}}");
     Janus janus = janus();
     janus.execute(order(janus), (mock, variant) -> {});
     Optional<Path> written = janus.finalise();
 
-    Path expected = contracts.resolve("web-app-orders-api.janus.json");
+    Path expected = contracts.resolve("web-app-orders-api.janus.json").toAbsolutePath();
+    assertEquals(MAPPER.readTree("{\"path\":" + MAPPER.writeValueAsString(expected.toString()) + ",\"mode\":\"merge\"}"),
+        engine.body("consumer-session/finalise").get("write"));
     assertEquals(Optional.of(expected), written);
-    assertArrayEquals(contract.getBytes(StandardCharsets.UTF_8), Files.readAllBytes(expected));
+    // The engine's host writes the file (ADR 0065); this engine wrote none, and nor did the SDK.
+    assertFalse(Files.exists(expected));
   }
 
   @Test
-  @DisplayName("an engine that answers the contract document rather than its text fails finalise, saying it is too old, and writes nothing")
-  void documentFromAnOldEngineFails() {
+  @DisplayName("told to, finalise asks the engine to overwrite the contract file [session.finalise.names-contract-file]")
+  void asksToOverwrite() {
+    Janus janus = Janus.of("web-app", "orders-api",
+        JanusOptions.defaults().withEmbedding(engine).withContractDirectory(contracts).withContractOverwrite(true));
+    janus.execute(order(janus), (mock, variant) -> {});
+    janus.finalise();
+    assertEquals("overwrite", engine.body("consumer-session/finalise").path("write").path("mode").asText());
+  }
+
+  @Test
+  @DisplayName("an engine that answers the contract instead of writing it fails finalise, saying it is too old, and writes nothing")
+  void contractFromAnOldEngineFails() {
     engine.ok("consumer-session/finalise", "{\"results\":[{\"handle\":\"i-1\",\"status\":\"verified\"}],"
-        + "\"contract\":{\"$format\":\"janus-contract/1\"}}");
+        + "\"contract-text\":\"{}\\n\"}");
     Janus janus = janus();
     janus.execute(order(janus), (mock, variant) -> {});
     JanusEmbeddingException error = assertThrows(JanusEmbeddingException.class, janus::finalise);
-    assertTrue(error.getMessage().contains("predates 'contract-text'"), error.getMessage());
+    assertTrue(error.getMessage().contains("predates 'contract-writing'"), error.getMessage());
     assertFalse(Files.exists(contracts.resolve("web-app-orders-api.janus.json")));
   }
 

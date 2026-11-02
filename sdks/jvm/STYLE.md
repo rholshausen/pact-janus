@@ -146,6 +146,14 @@ Interaction getOrder = janus.interaction("get an order")
   engine withholds the contract. Both
   share one implementation (`Janus.begin` / `Janus.run`), so they make the same protocol calls in the
   same order.
+- **The contract file is the engine's to write** (ADR 0065). `finalise` sends `write`:
+  `contractFile()`, made absolute, and `merge`, or `overwrite` with
+  `JanusOptions.withContractOverwrite(true)`. It returns the path the engine answered and opens no
+  file. Test classes recording one consumer and provider, in Gradle's forks or run in parallel, each
+  with an engine of its own, merge into that one file; an interaction two of them recorded
+  differently fails the second to finalise with the engine's `contract-conflict`, a
+  `JanusEngineException` naming it, and the file keeps the first's. What merges is whatever the file
+  held, so the contract directory is cleared before a run, as `build/` is by `clean`.
 - The **engine** is started lazily by the first `execute`, and ended by `finalise`. After `finalise`
   the same `Janus` may be used again; the next `execute` starts a fresh engine and session.
 - **Spock 2** needs no integration of its own, so the SDK has no Spock or Groovy dependency. A

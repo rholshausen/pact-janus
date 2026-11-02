@@ -2,6 +2,8 @@
 // operation the SDK sends and answers from the case's script (README §3). What these cases check
 // is what the SDK sends and what it does with what comes back — not what an engine would decide.
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { protocol } from "../../src/generated/index.js";
 import type { FramePipe } from "../../src/index.js";
 import type { Invoke, ScriptedEngine } from "./cases.js";
@@ -154,7 +156,7 @@ export class ScriptedPipe implements FramePipe {
         return {
           results: this.#script.results ?? this.#verifiedResults(),
           ...(this.#script.refused === undefined ? {} : { refused: this.#script.refused }),
-          ...(this.#script["withhold-contract"] ? {} : this.#contract()),
+          ...(this.#script["withhold-contract"] ? {} : this.#contract(body.write as protocol.ContractWrite | undefined)),
         };
       default:
         return {};
@@ -162,17 +164,24 @@ export class ScriptedPipe implements FramePipe {
   }
 
   /**
-   * The contract, as a real engine answers it (ADR 0063): its canonical text to a host that declared
-   * 'contract-text', else the document. A case's 'contract-text' is that text exactly; without one,
-   * it is the case's document written compactly.
+   * The contract, as a real engine answers it. Asked to write it (ADR 0065), it writes its canonical
+   * text to the file, as the engine's host would, and answers the path; otherwise its text to a host
+   * that declared 'contract-text' (ADR 0063), else the document. A case's 'contract-text' is that text
+   * exactly; without one, it is the case's document written compactly.
    */
-  #contract(): Record<string, unknown> {
+  #contract(write: protocol.ContractWrite | undefined): Record<string, unknown> {
     const contract = this.#script.contract ?? DEFAULT_CONTRACT;
+    const text = this.#script["contract-text"] ?? `${JSON.stringify(contract)}\n`;
+    if (write !== undefined) {
+      mkdirSync(dirname(write.path), { recursive: true });
+      writeFileSync(write.path, text, "utf8");
+      return { written: write.path };
+    }
     const capabilities = (this.bodyOf("engine/hello")?.capabilities ?? {}) as Record<string, unknown>;
     if (capabilities["contract-text"] === undefined) {
       return { contract };
     }
-    return { "contract-text": this.#script["contract-text"] ?? `${JSON.stringify(contract)}\n` };
+    return { "contract-text": text };
   }
 
   #verifiedResults(): Record<string, unknown>[] {

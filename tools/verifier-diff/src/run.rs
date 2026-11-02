@@ -370,6 +370,7 @@ pub fn run_case(case: &Case, tools: &Tools, work: &Path) -> Result<CaseResult, S
       provider.state_url.as_deref(),
       work,
       &expected,
+      Locate::Index,
     )
   };
 
@@ -439,6 +440,22 @@ fn upgraded_run(
     }
     let upgraded: Value = serde_json::from_slice(&output.stdout)
       .map_err(|err| format!("{}: the upgrade is not JSON: {err}", pact.display()))?;
+    // The contract's interactions are in identity order, so its verdicts are found by description:
+    // two a pact gave one description could not be told apart.
+    let mut descriptions = std::collections::BTreeSet::new();
+    for interaction in document[fixture::interactions_key(document)]
+      .as_array()
+      .into_iter()
+      .flatten()
+    {
+      let description = interaction["description"].as_str().unwrap_or_default();
+      if !descriptions.insert(description) {
+        return Err(format!(
+          "{}: '{description}' describes two interactions, so the upgraded contract's verdicts cannot be paired with the pact's",
+          pact.display()
+        ));
+      }
+    }
     let interactions = |value: &Value| value.as_array().map_or(0, Vec::len);
     if interactions(&upgraded["contract"]["interactions"])
       != interactions(&document[fixture::interactions_key(document)])
@@ -463,6 +480,7 @@ fn upgraded_run(
     provider.state_url.as_deref(),
     work,
     expected,
+    Locate::Description,
   )))
 }
 
@@ -655,6 +673,7 @@ fn broker_side(
       provider.state_url.as_deref(),
       &side_work,
       &expected,
+      Locate::Index,
     ),
   };
   let traffic = broker::normalised(proxy.exchanges(), prefix, &proxy.base_url());
@@ -1029,6 +1048,17 @@ fn mismatch_text(mismatch: &Value) -> String {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// How a failure in `janus verify`'s summary is found for an interaction of the pact.
+#[derive(Clone, Copy, PartialEq)]
+enum Locate {
+  /// By its index: the documents verified are the pacts themselves.
+  Index,
+  /// By its description: the documents verified are the contracts the pacts upgrade into, whose
+  /// interactions are in identity order (contract-file spec §2.4, ADR 0065), not the pact's.
+  Description,
+}
+
+#[allow(clippy::too_many_arguments)]
 fn run_janus(
   tools: &Tools,
   connection: &ConnectionSpec,
@@ -1038,6 +1068,7 @@ fn run_janus(
   state_url: Option<&str>,
   work: &Path,
   expected: &[Expected],
+  locate: Locate,
 ) -> (Judged, Vec<Judged>) {
   let mut command = Command::new(&tools.janus);
   command.arg("verify");
@@ -1151,8 +1182,11 @@ fn run_janus(
         .unwrap_or(0);
       let failure = failures.iter().find(|failure| {
         let interaction = &failure["interaction"];
-        interaction["index"].as_u64() == Some(index as u64)
-          && interaction["contract"]["consumer"].as_str() == Some(entry.consumer.as_str())
+        let at = match locate {
+          Locate::Index => interaction["index"].as_u64() == Some(index as u64),
+          Locate::Description => interaction["description"].as_str() == Some(entry.description.as_str()),
+        };
+        at && interaction["contract"]["consumer"].as_str() == Some(entry.consumer.as_str())
       });
       match failure {
         Some(failure) => {

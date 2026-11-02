@@ -57,16 +57,29 @@ final class ScriptedEngine implements Embedding {
       }
       return "{\"ok\":{\"result\":" + result + "}}";
     });
-    // The contract as its text (ADR 0063), as the engine answers a host that declared 'contract-text',
-    // unless a variant was reported failed.
-    on("consumer-session/finalise", body -> !failedReports.isEmpty()
-        ? "{\"ok\":{\"results\":[{\"handle\":\"i-1\",\"status\":\"failed\"}],\"refused\":[]}}"
-        : "{\"ok\":{\"results\":[],\"contract-text\":"
-        + "\"{\\\"$format\\\":\\\"janus-contract/1\\\",\\\"consumer\\\":{\\\"name\\\":\\\"c\\\"},"
-        + "\\\"provider\\\":{\\\"name\\\":\\\"p\\\"},\\\"interactions\\\":[]}\\n\"}}");
+    // Unless a variant was reported failed, the contract is written to the file the request names, as
+    // the engine's host writes it (ADR 0065), and the answer is its path.
+    on("consumer-session/finalise", body -> {
+      if (!failedReports.isEmpty()) {
+        return "{\"ok\":{\"results\":[{\"handle\":\"i-1\",\"status\":\"failed\"}],\"refused\":[]}}";
+      }
+      String path = body.path("write").path("path").asText();
+      try {
+        java.nio.file.Path file = java.nio.file.Path.of(path);
+        java.nio.file.Files.createDirectories(file.getParent());
+        java.nio.file.Files.writeString(file, CONTRACT);
+      } catch (java.io.IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+      return "{\"ok\":{\"results\":[],\"written\":" + com.fasterxml.jackson.databind.node.TextNode.valueOf(path) + "}}";
+    });
   }
 
-  /** Answers {@code op} with {@code ok}. */
+  /** The contract a scripted finalise writes. */
+  static final String CONTRACT =
+      "{\"$format\":\"janus-contract/1\",\"consumer\":{\"name\":\"c\"},\"provider\":{\"name\":\"p\"},\"interactions\":[]}\n";
+
+    /** Answers {@code op} with {@code ok}. */
   ScriptedEngine ok(String op, String okJson) {
     return on(op, body -> "{\"ok\":" + okJson + "}");
   }

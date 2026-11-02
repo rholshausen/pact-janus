@@ -178,3 +178,8 @@ and — because everything verified — the Janus contract document (persistence
 
 After this frame `cs-1`, `i-1` and the endpoint no longer exist — nothing was ever
 individually released.
+
+A host that wants the file written instead, as both SDKs do, sends `"write": { "path":
+"/work/contracts/web-app-order-api.janus.json" }` beside `session` to an engine that declared
+`contract-writing` (spec §8.2, ADR 0065). The answer then carries `"written"` and that path in place of
+`contract`, and the file holds the contract merged with whatever other test files recorded there.

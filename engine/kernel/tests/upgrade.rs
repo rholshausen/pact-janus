@@ -684,7 +684,8 @@ fn descriptions(upgraded: &upgrade::Upgraded) -> Vec<&str> {
 #[test]
 fn a_pending_interaction_converts_without_its_flag_by_default() {
   let upgraded = upgrade(&with_a_pending_interaction());
-  assert_eq!(descriptions(&upgraded), vec!["not built yet", "built"]);
+  // In identity order (contract-file spec §2.4, ADR 0065), not the pact's.
+  assert_eq!(descriptions(&upgraded), vec!["built", "not built yet"]);
   let finding = find(&upgraded.findings, "pending-dropped");
   assert_eq!(finding.kind, "lossy");
   assert_eq!(finding.path, "/interactions/1/pending");
@@ -741,8 +742,13 @@ fn provider_states_convert_with_their_parameters_and_a_note_about_their_types() 
   assert_eq!(find(&upgraded.findings, "state-params-untyped").kind, "note");
 
   let zoo = upgrade(&fixture("zoo_app-animal_service.json"));
-  let states = zoo.contract.interactions[0].states.as_ref().expect("states");
-  assert_eq!(states[0].name, "there are alligators");
+  let states = zoo
+    .contract
+    .interactions
+    .iter()
+    .filter_map(|interaction| interaction.states.as_ref())
+    .find(|states| states[0].name == "there are alligators")
+    .expect("the alligators' state");
   assert!(
     states[0].params.is_none(),
     "a v1 state has no parameters to carry"

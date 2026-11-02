@@ -152,10 +152,23 @@ final class ScriptedPipe implements Embedding, FramePipe {
           }
         }
         if (!script.path("withhold-contract").asBoolean(false)) {
-          // As a real engine answers (ADR 0063): the text to a host that declared 'contract-text'.
           JsonNode contract = script.has("contract") ? script.get("contract") : defaultContract();
+          String text = script.has("contract-text") ? script.get("contract-text").asText() : contract.toString() + "\n";
           JsonNode hello = bodyOf("engine/hello");
-          if (hello != null && hello.path("capabilities").has("contract-text")) {
+          JsonNode write = body.path("write");
+          if (write.has("path")) {
+            // Asked to write it (ADR 0065): the text goes to the file the request names, as the
+            // engine's host writes it, and the answer is its path.
+            try {
+              java.nio.file.Path file = java.nio.file.Path.of(write.path("path").asText());
+              java.nio.file.Files.createDirectories(file.getParent());
+              java.nio.file.Files.writeString(file, text);
+            } catch (java.io.IOException e) {
+              throw new java.io.UncheckedIOException(e);
+            }
+            ok.set("written", write.get("path"));
+          } else if (hello != null && hello.path("capabilities").has("contract-text")) {
+            // As a real engine answers (ADR 0063): the text to a host that declared 'contract-text'.
             ok.put("contract-text", script.has("contract-text")
                 ? script.get("contract-text").asText()
                 : contract.toString() + "\n");

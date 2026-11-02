@@ -28,6 +28,7 @@ use crate::component::{
   ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, InTreeMatcher, MatcherComponent,
   Start, Stop, TransportComponent,
 };
+use crate::contract::files::{self, ContractWriter};
 use crate::hooks::ConfigLoader;
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
 use crate::legacy::upgrade;
@@ -106,6 +107,11 @@ pub struct Engine {
   /// capability, as the broker client is. With none, `config/load` is `component-unavailable` naming
   /// `config-loader`, and `engine/hello` declares no `config-loading` capability.
   config_loader: Option<Arc<dyn ConfigLoader>>,
+  /// The contract file writer, when this embedding registered one (ADR 0065): a native host
+  /// capability, as the configuration loader is. With none, `finalise`'s `write` is
+  /// `component-unavailable` naming `contract-writer`, and `engine/hello` declares no
+  /// `contract-writing` capability.
+  contract_writer: Option<Arc<dyn ContractWriter>>,
   /// Broker sessions by id (spec §7.3's fourth kind): one publication each, ended at its terminal
   /// event as a verification session is, and pruned by [`Engine::handle_poll`] on the same edge.
   publications: HashMap<String, Run>,
@@ -156,6 +162,7 @@ impl Engine {
       next_recording: 0,
       broker: None,
       config_loader: None,
+      contract_writer: None,
       publications: HashMap::new(),
       next_publication: 0,
       background: None,
@@ -205,6 +212,7 @@ impl Engine {
       next_recording: 0,
       broker: None,
       config_loader: None,
+      contract_writer: None,
       publications: HashMap::new(),
       next_publication: 0,
       background: None,
@@ -285,6 +293,12 @@ impl Engine {
   /// project's configuration file with. The native embeddings register one; the WASM artifact cannot.
   pub fn register_config_loader(&mut self, loader: Arc<dyn ConfigLoader>) {
     self.config_loader = Some(loader);
+  }
+
+  /// Register the contract file writer (spec §8.2, ADR 0065): what `finalise`'s `write` writes and
+  /// merges through. The native embeddings register one; the WASM artifact cannot.
+  pub fn register_contract_writer(&mut self, writer: Arc<dyn ContractWriter>) {
+    self.contract_writer = Some(writer);
   }
 
   /// Register what runs work beside the frame stream (ADR 0062): a native embedding registers
@@ -413,6 +427,7 @@ impl Engine {
             &loaders,
             self.broker.is_some(),
             self.config_loader.is_some(),
+            self.contract_writer.is_some(),
             self.background.is_some(),
           ),
         )
@@ -594,22 +609,46 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    let write = match &req.write {
+      None => None,
+      Some(write) => match files::Mode::parse(write.mode.as_deref()) {
+        Ok(mode) => Some((write.path.as_str(), mode)),
+        Err(err) => return ResponseFrame::err(id, err),
+      },
+    };
     let Some(mut session) = self.sessions.end(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
     session.stop_transports();
+    // The session has ended either way: a `write` with no writer to do it is refused whether or not
+    // there is a contract, so a host learns it from its first finalise.
+    let writer = match (write, &self.contract_writer) {
+      (Some(_), None) => return ResponseFrame::err(id, EngineError::component_unavailable(files::WRITER)),
+      (Some((path, mode)), Some(writer)) => Some((path, mode, Arc::clone(writer))),
+      (None, _) => None,
+    };
     let results = session.results();
     // To a host that declared `test-verdicts`, what the session refused (ADR 0064 decision 4).
     let refused = session.refused().map(<[Value]>::to_vec);
+    let answer = |mut answer: Value| {
+      if let Some(refused) = &refused {
+        answer["refused"] = Value::from(refused.clone());
+      }
+      answer
+    };
     match session.contract() {
-      Ok(Some(contract)) if self.contract_text => match contract_text(&contract) {
-        Ok(text) => {
-          let mut answer = json!({ "results": results, "contract-text": text });
-          if let Some(refused) = refused {
-            answer["refused"] = Value::from(refused);
-          }
-          ResponseFrame::ok(id, answer)
+      // ADR 0065: the engine's host writes the file, merging into what it holds.
+      Ok(Some(contract)) if writer.is_some() => {
+        let (path, mode, writer) = writer.expect("matched");
+        match writer.update(path, &mut |existing| {
+          files::next_bytes(path, existing, &contract, mode)
+        }) {
+          Ok(()) => ResponseFrame::ok(id, answer(json!({ "results": results, "written": path }))),
+          Err(err) => ResponseFrame::err(id, err),
         }
+      }
+      Ok(Some(contract)) if self.contract_text => match contract_text(&contract) {
+        Ok(text) => ResponseFrame::ok(id, answer(json!({ "results": results, "contract-text": text }))),
         Err(err) => ResponseFrame::err(id, contract_error(err)),
       },
       // Serialised from the model, not via `Value`: a `Value` map sorts members, and the contract's
@@ -631,13 +670,7 @@ impl Engine {
           },
         )
       }
-      Ok(None) => {
-        let mut answer = json!({ "results": results });
-        if let Some(refused) = refused {
-          answer["refused"] = Value::from(refused);
-        }
-        ResponseFrame::ok(id, answer)
-      }
+      Ok(None) => ResponseFrame::ok(id, answer(json!({ "results": results }))),
       Err(problems) => ResponseFrame::err(id, EngineError::contract_invalid(&problems)),
     }
   }

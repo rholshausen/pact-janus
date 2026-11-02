@@ -2,6 +2,7 @@ package io.pact.janus.sdk;
 
 import io.pact.janus.bindings.protocol.v1.AddInteraction;
 import io.pact.janus.bindings.protocol.v1.AddInteractionResult;
+import io.pact.janus.bindings.protocol.v1.ContractWrite;
 import io.pact.janus.bindings.protocol.v1.Create;
 import io.pact.janus.bindings.protocol.v1.CreateResult;
 import io.pact.janus.bindings.protocol.v1.Finalise;
@@ -27,9 +28,6 @@ import io.pact.janus.bindings.protocol.v1.Vocabulary.VariantResultStatus;
 import io.pact.janus.sdk.engine.FramePipe;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -156,6 +154,11 @@ public final class Janus implements AutoCloseable {
       if (open != null) {
         Finalise body = new Finalise();
         body.setSession(open);
+        // The engine's host writes the file, merging into it (ADR 0065): the SDK names it, and writes nothing.
+        ContractWrite write = new ContractWrite();
+        write.setPath(contractFile().toAbsolutePath().toString());
+        write.setMode(options.overwritesContract() ? "overwrite" : "merge");
+        body.setWrite(write);
         response = engine.send(RequestFrameOp.CONSUMER_SESSION_FINALISE, body);
       }
     } finally {
@@ -165,24 +168,16 @@ public final class Janus implements AutoCloseable {
       return Optional.empty();
     }
     FinaliseResult result = Json.MAPPER.convertValue(response.ok(), FinaliseResult.class);
-    // The engine's canonical text, its LF included, written as it came (ADR 0063).
-    String contract = result.getContractText();
-    if (contract == null && result.getContract() != null) {
-      // An engine older than ADR 0063 ignored 'contract-text' and sent the document: not withheld.
-      throw new JanusEmbeddingException("the engine answered finalise with a contract document, not its text: it "
-          + "predates 'contract-text' (ADR 0063), which this SDK needs; use the engine this SDK pins", null);
+    String written = result.getWritten();
+    if (written == null && (result.getContractText() != null || result.getContract() != null)) {
+      // An engine older than ADR 0065 ignored 'write' and answered the contract: nothing was withheld.
+      throw new JanusEmbeddingException("the engine answered finalise with the contract instead of writing it: it "
+          + "predates 'contract-writing' (ADR 0065), which this SDK needs; use the engine this SDK pins", null);
     }
-    if (contract == null) {
+    if (written == null) {
       throw withheld(result, added);
     }
-    Path file = contractFile();
-    try {
-      Files.createDirectories(file.getParent());
-      Files.writeString(file, contract, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new UncheckedIOException("could not write the contract to " + file, e);
-    }
-    return Optional.of(file);
+    return Optional.of(Path.of(written));
   }
 
   /** {@link #finalise()}, for try-with-resources outside a test framework. */

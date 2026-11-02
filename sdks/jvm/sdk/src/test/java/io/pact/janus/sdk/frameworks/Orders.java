@@ -16,6 +16,10 @@ public final class Orders {
     return send(HttpRequest.newBuilder(URI.create(url)).GET());
   }
 
+  public static String post(String url) throws IOException, InterruptedException {
+    return send(HttpRequest.newBuilder(URI.create(url)).POST(HttpRequest.BodyPublishers.noBody()));
+  }
+
   public static String delete(String url) throws IOException, InterruptedException {
     return send(HttpRequest.newBuilder(URI.create(url)).DELETE());
   }

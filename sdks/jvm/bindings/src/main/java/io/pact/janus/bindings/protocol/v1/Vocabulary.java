@@ -56,6 +56,16 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(INLINE, BROKER, URLS);
   }
 
+  /** Known values of {@code ContractWrite.mode}. */
+  public static final class ContractWriteMode {
+    private ContractWriteMode() {}
+
+    public static final String MERGE = "merge";
+    public static final String OVERWRITE = "overwrite";
+
+    public static final List<String> KNOWN = List.of(MERGE, OVERWRITE);
+  }
+
   /** Known values of {@code Decision}. */
   public static final class Decision {
     private Decision() {}
@@ -109,11 +119,12 @@ public final class Vocabulary {
     public static final String CONTRACT_VERSION_UNSUPPORTED = "contract-version-unsupported";
     public static final String VARIANT_BUDGET_EXCEEDED = "variant-budget-exceeded";
     public static final String PACTS_NOT_FOUND = "pacts-not-found";
+    public static final String CONTRACT_CONFLICT = "contract-conflict";
     public static final String COMPONENT_UNAVAILABLE = "component-unavailable";
     public static final String COMPONENT_FAILED = "component-failed";
     public static final String INTERNAL = "internal";
 
-    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, FILTER_MATCHES_NOTHING, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, PACTS_NOT_FOUND, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
+    public static final List<String> KNOWN = List.of(MALFORMED_FRAME, HANDSHAKE_REQUIRED, PROTOCOL_VERSION_UNSUPPORTED, OPERATION_UNSUPPORTED, CAPABILITY_REQUIRED, ENGINE_SHUT_DOWN, SESSION_NOT_FOUND, HANDLE_NOT_FOUND, VARIANT_NOT_FOUND, FILTER_MATCHES_NOTHING, STREAM_NOT_FOUND, INTERACTION_INVALID, CONTRACT_INVALID, CONTRACT_VERSION_UNSUPPORTED, VARIANT_BUDGET_EXCEEDED, PACTS_NOT_FOUND, CONTRACT_CONFLICT, COMPONENT_UNAVAILABLE, COMPONENT_FAILED, INTERNAL);
   }
 
   /** Known values of {@code Event.kind}. */

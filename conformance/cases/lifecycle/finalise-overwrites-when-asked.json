@@ -1,0 +1,47 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/finalise-overwrites-when-asked",
+  "category": "lifecycle",
+  "title": "Told to overwrite the contract file, finalise asks the engine to, rather than to merge into it.",
+  "covers": [
+    "session.finalise.names-contract-file"
+  ],
+  "why": "behavioural spec 'finalise': 'write.mode' is 'overwrite' when the options ask for it, and 'merge' otherwise (engine-protocol spec §8.2, ADR 0065). Whether the file is merged into is the engine's to do; the SDK only says which.",
+  "janus": {
+    "overwrite-contract": true
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "get an order",
+          "request": {
+            "method": "GET",
+            "path": "/orders/42"
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok"
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true
+        }
+      }
+    }
+  ],
+  "expect": {
+    "frames": {
+      "consumer-session/finalise": {
+        "write": {
+          "mode": "overwrite"
+        }
+      }
+    }
+  }
+}

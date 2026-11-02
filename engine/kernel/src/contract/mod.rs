@@ -3,7 +3,9 @@
 
 pub mod canonical;
 mod error;
+pub mod files;
 mod identify;
+pub mod merge;
 mod model;
 pub mod text;
 mod write;

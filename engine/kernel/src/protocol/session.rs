@@ -708,6 +708,9 @@ impl ConsumerSession {
       });
     }
 
+    // Identity order (contract-file spec §2.4, ADR 0065), before the check, so its pointers are
+    // positions in the array that is written.
+    contract::merge::sort(&mut interactions);
     if let Some(problems) = duplicate_identity_problems(&interactions) {
       return Err(problems);
     }

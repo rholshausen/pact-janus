@@ -83,9 +83,18 @@ pub fn negotiate(hello: &Hello) -> Option<u32> {
 /// `test-verdicts` is always declared (ADR 0064): this engine has `consumer-session/report-variant`,
 /// and requires a report for every variant from a host that declared the capability too.
 ///
+/// `contract-writing` is declared only by an engine whose embedding registered a contract file writer
+/// (ADR 0065): the native embeddings, never the offline WASM artifact.
+///
 /// `background` is declared only by an engine whose embedding registered a way to run work beside
 /// the frame stream (ADR 0062): the native embeddings, never the offline WASM artifact.
-pub fn result(loaders: &[&str], broker: bool, config_loading: bool, background: bool) -> Value {
+pub fn result(
+  loaders: &[&str],
+  broker: bool,
+  config_loading: bool,
+  contract_writing: bool,
+  background: bool,
+) -> Value {
   let mut result = json!({
     "protocol-version": crate::PROTOCOL_VERSION,
     "engine": { "name": "janus-engine", "version": crate::ENGINE_VERSION },
@@ -103,6 +112,9 @@ pub fn result(loaders: &[&str], broker: bool, config_loading: bool, background: 
   }
   if config_loading {
     result["capabilities"]["config-loading"] = json!({});
+  }
+  if contract_writing {
+    result["capabilities"]["contract-writing"] = json!({});
   }
   if background {
     result["capabilities"]["background"] = json!({});

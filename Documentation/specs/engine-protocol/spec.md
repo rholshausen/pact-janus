@@ -460,6 +460,7 @@ Capabilities defined in v1:
 | `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
 | `contract-text` | both | A contract crosses the boundary as its text (§8.9, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)). Value `{}`. Engine: wherever a request carries a contract or a v1–v4 pact, it may carry the document's text. Host: it wants an outbound contract as its canonical text, `contract-text` in place of `contract`. |
 | `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker publication ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and `broker/publish-contracts` answer `component-unavailable` naming `background`, after the request and its documents are checked. |
+| `contract-writing` | engine | The engine's host can write a contract file, merging into what it holds: `finalise`'s `write` (§8.2, [ADR 0065](../../decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md)). Value `{}`. Only native embeddings register a writer; without it a `write` answers `component-unavailable` naming `contract-writer`. |
 | `test-verdicts` | both | The consumer's test verdict reaches the engine (§8.2, [ADR 0064](../../decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)). Value `{}`. Engine: it has `consumer-session/report-variant`. Host: it reports every variant it runs, so in the sessions it creates an exercised variant with no report is `not-reported`, and an `add-interaction` the session refused withholds the contract. |
 
 Optional operations and future frame types are gated the same way: an engine that implements
@@ -582,7 +583,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 | `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
 | `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
 | `consumer-session/report-variant` | `{ session, handle, variant, status, reason? }` → `{ result }` |
-| `consumer-session/finalise` | `{ session }` → `{ results, contract?, refused? }` |
+| `consumer-session/finalise` | `{ session, write? }` → `{ results, contract?, written?, refused? }` |
 
 - **`create`**: `config` names the consumer and provider (`{ "consumer": { "name": … },
   "provider": { "name": … } }`) plus open, additive options. Returns the session id.
@@ -626,11 +627,28 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 - **`finalise`**: ends the session unconditionally (transports stopped, all state
   released — even if the result is all failures) and returns per-interaction, per-variant
   results. The `contract` member — the Janus contract *document*; persistence is the host's
-  business — is present iff every interaction verified successfully on every variant design 2.3's
+  business, unless it asked for the file to be written (`write`, below) — is present iff every interaction verified successfully on every variant design 2.3's
   sampling requires it to exercise (an unexercised required variant is `not-exercised`, which
   withholds the contract exactly as a failure does). To a host that declared `contract-text`, it is
   `contract-text` instead, the contract's canonical text (§8.9).
   Unmatched-request and missed-interaction detail rides in `results`.
+- **`finalise`'s `write`** (ADR 0065), behind `contract-writing` (§5.3): `{ path, mode? }` asks the
+  engine's host to write the contract to the file at `path`, which is absolute (a relative one is
+  `malformed-frame`); its directory is created. When the session produces a contract, the answer
+  carries `written`, the path, in place of `contract` and `contract-text`. When it withholds one,
+  nothing is written and the file is left as it was. `mode` is `merge`, the default, or `overwrite`.
+  - **`merge`** joins the file's interactions and the session's by identity (contract-file spec §4.2:
+    `description` with `states`), and writes them in identity order (§2.4). Two with the same identity
+    and the same canonical bytes are one. Two with the same identity and any difference, or a file that
+    names another consumer or provider, is `contract-conflict`, carrying `path` and each conflicting
+    interaction's `description` and `states`, and the file is left as it was. An empty or absent file
+    is written as new; a file that is not a contract fails as reading one does, with `path` in
+    `details`.
+  - **`overwrite`** writes the session's contract whatever the file held.
+  - The host holds an exclusive lock on the file from reading it until the new bytes are written, and
+    waits for one as long as it takes, so writers in other processes merge in turn. A file it cannot
+    create, read or write is `component-failed` naming `contract-writer`, with `{ message }` as
+    `error`.
 
 A variant's status in `results`, and in `report-variant`'s answer, is decided in this order: `failed`
 when its test was reported failed; `failed` when its exchange failed, with the engine's `mismatches`;
@@ -990,7 +1008,7 @@ language's parser, an integer above 2^53 rounded. So a contract can cross the bo
 behind the `contract-text` capability (§5.3, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)).
 
 - **Out.** To a host that declared `contract-text`, `consumer-session/finalise` and `upgrade/pact`
-  answer with `contract-text` in place of `contract`: the contract's canonical bytes (contract-file
+  answer with `contract-text` in place of `contract` (unless `finalise` wrote it, §8.2): the contract's canonical bytes (contract-file
   spec §2.4) as a string, its trailing LF included, present exactly when `contract` would be. The
   host writes the string's UTF-8 encoding and adds and removes nothing. A JSON frame carries it as a
   JSON string and a CBOR frame as a text string, exact under either. A host that did not declare it
@@ -1149,7 +1167,7 @@ rules, is on every error that has the protocol's shape: a component's (component
 |---|---|---|
 | `protocol` | the host is using the pipe wrongly — an SDK/embedding bug; fail the run, report as integration error | `malformed-frame`, `handshake-required`, `protocol-version-unsupported`, `operation-unsupported`, `capability-required`, `engine-shut-down` |
 | `session` | a stale or wrong identifier; fail the operation, report as SDK/user error | `session-not-found`, `handle-not-found`, `variant-not-found`, `filter-matches-nothing`, `stream-not-found` |
-| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded`, `pacts-not-found` |
+| `document` | a document the *user* authored is invalid; surface with positions | `interaction-invalid`, `contract-invalid`, `contract-version-unsupported`, `document-mismatched`, `variant-budget-exceeded`, `pacts-not-found`, `contract-conflict` |
 | `component` | a component (transport, content handler, matcher, hook — built-in or third-party) is missing or failed | `component-unavailable`, `component-failed` |
 | `internal` | an engine bug; report upstream | `internal` |
 
@@ -1171,6 +1189,10 @@ invalid" would send a reader to the wrong file.
 failures, `error` — the component's own error document, passed through opaquely: the kernel
 does not understand component error interiors and MUST NOT translate them (design 2.6 owns
 their shape).
+
+`contract-conflict` is a contract file that `finalise`'s `write` cannot merge into (§8.2): it carries
+`path`, and `interactions: [{ description, states? }]` naming each interaction recorded differently,
+or `consumer` and `provider` when the file is another pair's.
 
 `pacts-not-found` is a `broker` source whose selectors selected nothing (§8.3): the selectors are
 the user's, so it is theirs to fix. A broker that cannot be reached, refuses the credentials or

@@ -42,6 +42,15 @@ export const ContractSourceKind = {
 } as const;
 
 /**
+ * Known values of `ContractWrite.mode` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const ContractWriteMode = {
+  Merge: "merge",
+  Overwrite: "overwrite",
+} as const;
+
+/**
  * Known values of `Decision` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -92,6 +101,7 @@ export const EngineErrorCode = {
   ContractVersionUnsupported: "contract-version-unsupported",
   VariantBudgetExceeded: "variant-budget-exceeded",
   PactsNotFound: "pacts-not-found",
+  ContractConflict: "contract-conflict",
   ComponentUnavailable: "component-unavailable",
   ComponentFailed: "component-failed",
   Internal: "internal",

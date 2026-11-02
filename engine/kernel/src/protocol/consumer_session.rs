@@ -71,4 +71,15 @@ pub struct ReportVariant {
 #[derive(Debug, Deserialize)]
 pub struct Finalise {
   pub session: String,
+  /// Write the contract to a file through the engine's host (spec §8.2, ADR 0065).
+  #[serde(default)]
+  pub write: Option<ContractWrite>,
+}
+
+/// `finalise`'s `write`: the file, and whether to merge into it or overwrite it.
+#[derive(Debug, Deserialize)]
+pub struct ContractWrite {
+  pub path: String,
+  #[serde(default)]
+  pub mode: Option<String>,
 }

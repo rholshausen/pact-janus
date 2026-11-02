@@ -97,6 +97,9 @@ final class CaseRunner {
     ScriptedPipe pipe = live ? null : new ScriptedPipe(testCase.get("engine"));
     Path contractDirectory = Files.createTempDirectory("janus-conformance-");
     JanusOptions options = JanusOptions.defaults().withContractDirectory(contractDirectory);
+    if (testCase.path("janus").path("overwrite-contract").asBoolean(false)) {
+      options = options.withContractOverwrite(true);
+    }
     JsonNode components = testCase.path("janus").path("components");
     if (components.isArray()) {
       options = options.withComponents(Suite.MAPPER.convertValue(

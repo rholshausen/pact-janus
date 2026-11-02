@@ -207,6 +207,9 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
   if !problems.is_empty() {
     return Err(ContractError::Invalid { problems });
   }
+  // Identity order, as every contract is written (contract-file spec §2.4, ADR 0065). Findings point
+  // into the pact, so no pointer moves.
+  contract::merge::sort(&mut interactions);
 
   Ok(Upgraded {
     contract: Contract {
