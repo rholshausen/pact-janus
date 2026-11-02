@@ -18,7 +18,7 @@
 //! that target waits on (ADR 0062 decision 7).
 
 use super::contributions::Contributions;
-use super::session::{ExchangeOutcome, Exercised};
+use super::session::{ExchangeOutcome, Exercised, Payload};
 use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
 use crate::common::ContentTypes;
 use crate::component::{
@@ -33,26 +33,27 @@ use std::time::Duration;
 
 /// What `serve-variant` arms for a passive HTTP interaction (spec §4.1, §8.2): everything the
 /// background loop needs to match the next inbound request and answer it, with no further lookup
-/// into session state — the loop runs on its own thread and this is the whole handoff.
+/// into session state — the loop runs on its own thread and this is the whole handoff. What it holds
+/// is shared with the session's cache of the variant's arming (S2.3), so arming copies no document.
 pub(crate) struct ArmedExchange {
   pub handle: String,
   pub variant_id: String,
   /// The interaction's plan, pinned to this variant's assignment (plan-grammar spec §5.1); only
   /// its `request` subtree is read here.
-  pub request_plan: Plan,
+  pub request_plan: Arc<Plan>,
   /// The response [`crate::variant::generate::interaction`] produced for this variant — replayed
   /// verbatim on a match, the consumer side's own mirror of variant-semantics spec §5.2's
   /// replay-by-example.
-  pub response_parts: BTreeMap<String, BTreeMap<String, Value>>,
+  pub response_parts: Arc<Payload>,
   /// The interaction's declared content types (contract-file spec §5.5): how the inbound request's
   /// slots are decoded and the reply's encoded.
-  pub content_types: ContentTypes,
+  pub content_types: Arc<ContentTypes>,
   /// The interaction's shapes, by part, for the parts whose shapes name a generator (ADR 0048): a
   /// reply is filled with fresh values there each time it is served. The recorded evidence stays
   /// `response_parts`, so a contract recorded twice is the same contract.
-  pub fresh: BTreeMap<String, crate::contract::ShapePart>,
+  pub fresh: Arc<BTreeMap<String, crate::contract::ShapePart>>,
   /// The variant's resolved provider-state parameters, which a reply's generators read.
-  pub provider_state: serde_json::Map<String, Value>,
+  pub provider_state: Arc<serde_json::Map<String, Value>>,
 }
 
 /// Shared between `serve_variant` (arms) and this module's background loop (matches, replies,
@@ -305,11 +306,15 @@ pub(crate) fn handle_arrival(
 
 /// The armed reply, with every position the answering part's shapes give a generator filled with a
 /// fresh value, on the consumer's side (ADR 0048): a new value for every exchange. A generator that
-/// produces nothing leaves the armed value, and says so in the log.
-fn fresh_reply(armed: &ArmedExchange, answering: &str) -> BTreeMap<String, BTreeMap<String, Value>> {
-  let mut reply = armed.response_parts.clone();
-  let (Some(shapes), Some(slots)) = (armed.fresh.get(answering), reply.get_mut(answering)) else {
-    return reply;
+/// produces nothing leaves the armed value, and says so in the log. A reply with no generators is the
+/// armed one, shared rather than copied.
+fn fresh_reply(armed: &ArmedExchange, answering: &str) -> Arc<Payload> {
+  let Some(shapes) = armed.fresh.get(answering) else {
+    return Arc::clone(&armed.response_parts);
+  };
+  let mut reply = Payload::clone(&armed.response_parts);
+  let Some(slots) = reply.get_mut(answering) else {
+    return Arc::clone(&armed.response_parts);
   };
   let fresh = crate::shape::fresh::Fresh {
     generators: &crate::component::PactGenerators,
@@ -331,7 +336,7 @@ fn fresh_reply(armed: &ArmedExchange, answering: &str) -> BTreeMap<String, BTree
   for failure in failures {
     tracing::warn!(handle = %armed.handle, variant = %armed.variant_id, target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was served");
   }
-  reply
+  Arc::new(reply)
 }
 
 /// The generated payload of the part that answers, wired for reply (component-interfaces spec §4).

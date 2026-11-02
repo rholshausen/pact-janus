@@ -17,15 +17,28 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+/// A generated payload: `part -> slot -> value`.
+pub(crate) type Payload = BTreeMap<String, BTreeMap<String, Value>>;
+
 /// The variant a `serve-variant` call has most recently armed for one interaction (variant-
-/// semantics spec §4.1): its id, and the concrete payload the generator produced for it, ready
-/// for whatever eventually drives a transport from it (no transport is bound to a consumer
-/// session yet — `start-transport` isn't wired into [`super::engine`]'s dispatch).
+/// semantics spec §4.1): its id, and the concrete payload the generator produced for it.
 pub struct Armed {
-  #[allow(dead_code)]
   pub variant: String,
   #[allow(dead_code)]
-  pub parts: BTreeMap<String, BTreeMap<String, Value>>,
+  pub(crate) parts: Arc<Payload>,
+}
+
+/// What arming one variant takes, worked out the first time it is armed and shared by every arming
+/// after (staged plan S2.3, Phase 9 finding 28). The selection is fixed once `variants` answers, and
+/// a variant's id names its assignment (variant-semantics spec §2.2), so none of it can change. A
+/// generator's fresh values are not here: they are filled each time a reply is served (ADR 0048).
+pub(crate) struct Arming {
+  /// The payload the generator produced for the variant.
+  parts: Arc<Payload>,
+  /// The interaction's plan pinned to the variant, for a passive interaction.
+  request_plan: Option<Arc<Plan>>,
+  /// The variant's resolved provider-state parameters, which a reply's generators read.
+  provider_state: Arc<serde_json::Map<String, Value>>,
 }
 
 /// One interaction as validated and compiled by `add-interaction`. Spec §8.2: "the engine
@@ -56,6 +69,12 @@ pub(crate) struct InteractionEntry {
   /// The test's verdict on each variant, keyed by variant id, as the latest `report-variant` gave
   /// it (ADR 0064).
   pub reports: BTreeMap<String, TestVerdict>,
+  /// Each variant's [`Arming`], by variant id, from the first time it was armed.
+  armings: HashMap<String, Arming>,
+  /// The parts whose shapes name a generator (ADR 0048), which a reply is filled from fresh.
+  fresh: Arc<BTreeMap<String, contract::ShapePart>>,
+  /// The interaction's declared content types, as an exchange reads them.
+  content_types: Arc<ContentTypes>,
 }
 
 /// The test's verdict on one variant (ADR 0064 decision 1): whether it passed, and what it failed
@@ -111,7 +130,7 @@ impl VariantStatus {
 /// `part -> slot -> value` document [`Armed`] carries, generated the same way.
 pub(crate) struct Exercised {
   pub outcome: ExchangeOutcome,
-  pub parts: BTreeMap<String, BTreeMap<String, Value>>,
+  pub parts: Arc<Payload>,
   /// Why a `Failed` exchange failed, as the protocol carries mismatches ([`super::wire::mismatch_json`]):
   /// `finalise` reports them per variant (spec §8.2, "unmatched-request … detail rides in
   /// `results`"), so a host can say what went wrong without reading the engine's log.
@@ -154,6 +173,7 @@ pub enum StartTransportError {
   Spawn(SpawnError),
 }
 
+#[derive(Debug)]
 pub enum ServeVariantError {
   HandleNotFound,
   VariantNotFound { selection: Vec<String> },
@@ -277,6 +297,12 @@ impl ConsumerSession {
     let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
     self.next_handle += 1;
+    let fresh = raw_parts
+      .iter()
+      .filter(|(_, slots)| slots.values().any(crate::shape::fresh::has_generators))
+      .map(|(name, slots)| (name.clone(), slots.clone()))
+      .collect();
+    let content_types = Arc::new(spec.content_types.clone().unwrap_or_default());
     self.interactions.insert(
       handle.clone(),
       InteractionEntry {
@@ -287,6 +313,9 @@ impl ConsumerSession {
         armed: None,
         exercised: BTreeMap::new(),
         reports: BTreeMap::new(),
+        armings: HashMap::new(),
+        fresh: Arc::new(fresh),
+        content_types,
       },
     );
     self.order.push(handle.clone());
@@ -440,12 +469,6 @@ impl ConsumerSession {
         }
       }
     };
-    let parts = generate::interaction(&entry.spec, &assignment);
-    entry.armed = Some(Armed {
-      variant: variant_id.to_string(),
-      parts: parts.clone(),
-    });
-
     // Arm every bound transport of the interaction's own kind. Until plan task 8.3 this read
     // `kind == "http"` — HTTP knowledge in the kernel, which no transport of another kind could
     // get past (kernel-boundary review, finding 7).
@@ -455,33 +478,33 @@ impl ConsumerSession {
       .as_ref()
       .filter(|t| t.mode.as_deref() != Some("emissive"))
       .map(|t| t.kind.clone());
-    if let Some(kind) = passive_kind {
-      let request_plan = contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id));
-      // What a reply's generators read (ADR 0048): the variant's resolved state parameters.
-      let space = plan::variant_space(&entry.spec);
-      let mut provider_state = serde_json::Map::new();
-      for state in params::resolve_states(entry.spec.states.as_ref(), &space, &assignment)
-        .into_iter()
-        .flatten()
-      {
-        provider_state.extend(state.params.into_iter().flatten());
-      }
-      let fresh: BTreeMap<String, contract::ShapePart> = entry
-        .raw_parts
-        .iter()
-        .filter(|(_, slots)| slots.values().any(crate::shape::fresh::has_generators))
-        .map(|(name, slots)| (name.clone(), slots.clone()))
-        .collect();
+    if !entry.armings.contains_key(variant_id) {
+      let arming = Arming {
+        parts: Arc::new(generate::interaction(&entry.spec, &assignment)),
+        request_plan: passive_kind.is_some().then(|| {
+          Arc::new(contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id)))
+        }),
+        provider_state: Arc::new(provider_state(&entry.spec, &assignment)),
+      };
+      entry.armings.insert(variant_id.to_string(), arming);
+    }
+    let arming = &entry.armings[variant_id];
+    entry.armed = Some(Armed {
+      variant: variant_id.to_string(),
+      parts: Arc::clone(&arming.parts),
+    });
+
+    if let (Some(kind), Some(request_plan)) = (passive_kind, &arming.request_plan) {
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.exchange.state.lock().expect("exchange state lock poisoned");
         state.armed = Some(ArmedExchange {
           handle: handle.to_string(),
           variant_id: variant_id.to_string(),
-          request_plan: request_plan.clone(),
-          response_parts: parts.clone(),
-          content_types: entry.spec.content_types.clone().unwrap_or_default(),
-          fresh: fresh.clone(),
-          provider_state: provider_state.clone(),
+          request_plan: Arc::clone(request_plan),
+          response_parts: Arc::clone(&arming.parts),
+          content_types: Arc::clone(&entry.content_types),
+          fresh: Arc::clone(&entry.fresh),
+          provider_state: Arc::clone(&arming.provider_state),
         });
       }
     }
@@ -591,7 +614,7 @@ impl ConsumerSession {
       variant_id.to_string(),
       Exercised {
         outcome,
-        parts,
+        parts: Arc::new(parts),
         mismatches: Vec::new(),
       },
     );
@@ -698,6 +721,19 @@ impl ConsumerSession {
       metadata: None,
     }))
   }
+}
+
+/// What a reply's generators read for a variant (ADR 0048): its resolved state parameters.
+fn provider_state(spec: &InteractionSpec, assignment: &Assignment) -> serde_json::Map<String, Value> {
+  let space = plan::variant_space(spec);
+  let mut provider_state = serde_json::Map::new();
+  for state in params::resolve_states(spec.states.as_ref(), &space, assignment)
+    .into_iter()
+    .flatten()
+  {
+    provider_state.extend(state.params.into_iter().flatten());
+  }
+  provider_state
 }
 
 /// An `add-interaction` request's `parts` member, taken verbatim (contract-file spec §5.1: "which
@@ -943,6 +979,31 @@ mod tests {
     assert_eq!(contract.interactions.len(), 1);
     assert_eq!(contract.interactions[0].selection.variants.len(), 1);
     assert_eq!(contract.interactions[0].selection.variants[0].id, "base");
+  }
+
+  /// S2.3, Phase 9 finding 28: a variant is generated and compiled the first time it is armed, and
+  /// every later arming shares that work rather than repeating it.
+  #[test]
+  fn re_arming_a_variant_reuses_what_its_first_arming_built() {
+    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let handle = session.add_interaction(&widened_interaction()).unwrap();
+    let ids = variant_ids(&mut session, &handle);
+
+    session.serve_variant(&handle, &ids[0]).unwrap();
+    let first = Arc::clone(&session.interactions[&handle].armed.as_ref().unwrap().parts);
+    session.serve_variant(&handle, &ids[1]).unwrap();
+    session.serve_variant(&handle, &ids[0]).unwrap();
+    let again = &session.interactions[&handle].armed.as_ref().unwrap().parts;
+
+    assert!(
+      Arc::ptr_eq(&first, again),
+      "the second arming of a variant generated nothing new"
+    );
+    assert_eq!(
+      session.interactions[&handle].armings.len(),
+      2,
+      "one arming per variant armed"
+    );
   }
 
   #[test]
