@@ -81,6 +81,7 @@ superseding ADR instead.
 | [0062](0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md) | Run the engine's background work on threads its embedding provides, and serve mocks with hyper | accepted |
 | [0063](0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md) | Carry a contract across the engine boundary as its text, and pin how numbers are written | accepted |
 | [0064](0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md) | Report each variant's test verdict to the engine, and answer with the variant's result | accepted |
+| [0065](0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md) | Let the engine's host write and merge contract files, in identity order | accepted |
 
 ## Decision backlog
 
