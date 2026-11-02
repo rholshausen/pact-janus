@@ -4,25 +4,21 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildPackage } from "./package.js";
 
 type Conditions = { import?: { default: string }; require?: { default: string } };
 
 describe("the CommonJS build", () => {
   it("is what require() resolves for every export but pact-janus/vitest", async () => {
     const root = await mkdtemp(join(tmpdir(), "pact-janus-cjs-"));
-    const pkg = join(root, "node_modules", "pact-janus");
+    const pkg = await buildPackage(root, { esm: false });
     const manifest = JSON.parse(await readFile("package.json", "utf8")) as {
       exports: Record<string, Conditions>;
     };
-    execFileSync(process.execPath, [join("node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.cjs.json",
-      "--outDir", join(pkg, "dist", "cjs")]);
-    execFileSync(process.execPath, ["--experimental-strip-types", "--disable-warning=ExperimentalWarning",
-      join("scripts", "commonjs-package.ts"), join(pkg, "dist", "cjs")]);
-    await cp("package.json", join(pkg, "package.json"));
 
     for (const [entry, conditions] of Object.entries(manifest.exports)) {
       if (entry === "./vitest") {

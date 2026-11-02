@@ -35,7 +35,8 @@
       "src/facade"
     ],
     "integration": [
-      "src/vitest.ts"
+      "src/vitest.ts",
+      "src/jest.ts"
     ],
     "tests": [
       "test",

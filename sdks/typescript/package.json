@@ -25,6 +25,16 @@
         "default": "./dist/vitest.js"
       }
     },
+    "./jest": {
+      "import": {
+        "types": "./dist/jest.d.ts",
+        "default": "./dist/jest.js"
+      },
+      "require": {
+        "types": "./dist/cjs/jest.d.ts",
+        "default": "./dist/cjs/jest.js"
+      }
+    },
     "./verifier": {
       "import": {
         "types": "./dist/facade/verifier.d.ts",
@@ -58,17 +68,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@jest/globals": "^30.5.2",
     "@types/node": "^22.20.4",
     "eslint": "^10.11.0",
+    "jest": "^30.5.2",
     "json-schema-to-typescript": "^16.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.1"
   },
   "peerDependencies": {
+    "jest": ">=30",
     "vitest": ">=3"
   },
   "peerDependenciesMeta": {
+    "jest": {
+      "optional": true
+    },
     "vitest": {
       "optional": true
     }

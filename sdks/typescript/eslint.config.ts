@@ -8,4 +8,11 @@ export default defineConfig(
   { ignores: ["dist/", "src/generated/"] },
   js.configs.recommended,
   tseslint.configs.strict,
+  // test/frameworks is a user's project, in plain JavaScript beside TypeScript: Node's globals, and
+  // `require` in its CommonJS files.
+  {
+    files: ["test/frameworks/**/*.{cjs,mjs}"],
+    languageOptions: { globals: { fetch: "readonly", module: "writable", require: "readonly" } },
+  },
+  { files: ["test/frameworks/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
 );

@@ -8,7 +8,7 @@ specification disagree, the behavioural specification wins and this file has a b
 ## Naming and module layout
 
 - Primitive ids become camelCase functions and methods: `each-like` → `eachLike`, `any-of` → `anyOf`,
-  `one-of` → `oneOf`. `janus` is the `Janus` class (`useJanus` under Vitest); `interaction`, `execute`
+  `one-of` → `oneOf`. `janus` is the `Janus` class (`useJanus` under Jest and Vitest); `interaction`, `execute`
   and `finalise` are its methods; `given`, `request` and `response` are methods of the builder
   `interaction` returns. The `literal` primitive is not a function — it is what happens to a plain
   value written where a shape is expected. `when-variant` and `variant-cases` are `whenVariant` and
@@ -22,8 +22,8 @@ specification disagree, the behavioural specification wins and this file has a b
   - `src/engine/` — the embedding: `pipe.ts` (the frozen frame pipe), `subprocess.ts` (the
     `janus-engine` embedding), `engine.ts` (typed operations over the pipe).
   - `src/shapes.ts`, `src/interaction.ts`, `src/janus.ts`, `src/errors.ts` — the idiomatic layer.
-  - `src/vitest.ts` — test-framework integration, a separate entry point (`pact-janus/vitest`) so the
-    core never imports a test framework.
+  - `src/jest.ts` and `src/vitest.ts` — the test-framework integrations, separate entry points
+    (`pact-janus/jest`, `pact-janus/vitest`) so the core never imports a test framework.
 - Generated types are used inside the idiomatic layer and appear in its public types where the
   protocol's own document *is* the answer (`Variant` is `protocol.VariantDescriptor`; `build()`
   returns `contract.InteractionSpec`). Users import from `pact-janus`, not from `generated/`;
@@ -84,11 +84,25 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 
 ## Test-framework integration
 
-- Vitest: `useJanus(config)` at the top of a test file (or `describe`) creates the suite's `Janus`
-  and registers `afterAll(() => janus.finalise())`, so the session is released and the contract
-  written after the last test, pass or fail — and a withheld contract fails the suite.
-- Without Vitest, use `new Janus(config)` and call `await janus.finalise()` yourself, in whatever
-  after-all hook the framework has.
+- Jest and Vitest: `useJanus(config)` at the top of a test file (or `describe`), imported from
+  `pact-janus/jest` or `pact-janus/vitest`, creates the suite's `Janus` and registers
+  `afterAll(() => janus.finalise())`, so the session is released and the contract written after the
+  last test, pass or fail — and a withheld contract fails the suite. Jest reports it as the test
+  file's "Test suite failed to run", and Vitest as the file's error.
+- A variant that fails throws from `execute`, so it fails the test that ran it in either framework,
+  and the file's other tests are unaffected.
+- `pact-janus/jest` takes `afterAll` from `@jest/globals`, which Jest's runtime provides to every
+  module it loads, so it works with `injectGlobals: false` and needs no package installed beside
+  Jest. It is CommonJS and ES modules alike; Jest runs ES module test files only under Node's
+  `--experimental-vm-modules`, as it does any ES module.
+- `pact-janus/vitest` is ES modules only. Vitest refuses to be `require()`d, so a Vitest test file
+  imports, even in a CommonJS project.
+- With another framework, use `new Janus(config)` and call `await janus.finalise()` yourself, in
+  whatever after-all hook the framework has.
+- The provider side imports no framework (`Verifier`, `pact-janus/verifier`), so it runs under Jest
+  and Vitest alike. `test/frameworks.test.ts` runs a consumer suite, a suite whose contract is
+  withheld and a provider test under Jest, from CommonJS and as ES modules, and under Vitest, from
+  the built package as a user installs it.
 - `engine: { command }` names the `janus-engine` executable, else `JANUS_ENGINE` does, else the SDK
   runs the engine it was released with, fetched on first use, as the JVM SDK does.
 
@@ -150,8 +164,8 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - ES modules, and a CommonJS build beside them: `npm run build` writes `dist/` and `dist/cjs/`
   (`tsconfig.cjs.json`), and each export gives `require` the second. pact-js is CommonJS, and Jest's
   runtime cannot `require()` an ES module before Node 24.9, so a pact-js suite moving to
-  `pact-janus/verifier` needs it. `pact-janus/vitest` is ES modules only, as Vitest is. A process that
-  loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
+  `pact-janus/verifier` and `pact-janus/jest` need it. `pact-janus/vitest` is ES modules only, as
+  Vitest is. A process that loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
 - The engine is not bundled; it is pinned (ADR 0060 decision 6). `src/engine/pin.ts` names a
   `janus-engine` release by version and by digest per platform: `sdks/engine-release.json`, which
   `engine-pin` writes there too. Told no executable, the SDK runs that release's engine, from the

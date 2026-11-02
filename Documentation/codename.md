@@ -86,7 +86,7 @@ anything, so the rename changes them and its change file says so:
 | Release asset names | `janus-engine-<triple>`, `janus-<triple>`, `janus-sdk-gates-<triple>`, `janus-engine.wasm`, `janus-spec.tar.gz` | `.github/workflows/release.yml`; ADR 0028 decision 9 and ADR 0030 name them, so renaming them is a superseding ADR |
 | The engine's own WIT package | `pact:janus-engine@0.1.0` | `engine/wasm/wit/engine.wit`. It ships in the same release as every host that embeds it |
 | The component interface's WIT package | `pact:janus-component@1.0.0` | `Documentation/specs/component-interfaces/wit/component.wit` and its copies. What the loader looks up is dual-spelled, as above |
-| The TypeScript SDK | the npm package `pact-janus`, `pact-janus/vitest`; `Janus`, `JanusError`, `useJanus`, … | `sdks/typescript/package.json` and `src/` |
+| The TypeScript SDK | the npm package `pact-janus`, `pact-janus/jest`, `pact-janus/vitest`; `Janus`, `JanusError`, `useJanus`, … | `sdks/typescript/package.json` and `src/` |
 | The JVM SDK | group `io.pact.janus`; packages `io.pact.janus.sdk`, `io.pact.janus.bindings.*`; `Janus`, `JanusOptions`, `JanusExtension`, … | `sdks/jvm/build.gradle.kts`, `settings.gradle.kts`, `sdks/bindings.json` |
 | Environment variables | `JANUS_ENGINE`, `JANUS_ENGINE_RELEASE`, `JANUS_ENGINE_CACHE`, `JANUS_SPEC`, `JANUS_CONFORMANCE_REPORT`, `JANUS_COMPONENT_CACHE`, `JANUS_OCI_REGISTRY`, `JANUS_OCI_USERNAME`, `JANUS_OCI_PASSWORD`; for development, `JANUS_CSV_COMPONENT`, `JANUS_ENGINE_WASM`, `JANUS_SDK`, `JANUS_SIGNING_SECRET` and the benchmarks' | where each is read (`git grep 'JANUS_'`) |
 | The user cache directory | `pact-janus/components`, `pact-janus/engines` | `engine/component-host/src/oci.rs`, each SDK's engine resolver. A cache refills |

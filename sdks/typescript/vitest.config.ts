@@ -21,6 +21,8 @@ function engineUnderTest(): string {
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    // The suites test/frameworks.test.ts runs under Jest and Vitest, as a user's project runs them.
+    exclude: ["test/frameworks/**", "**/node_modules/**", "**/.git/**"],
     // Builds or fetches janus-engine once, so no test runs against a stale engine.
     globalSetup: ["test/build-engine.ts"],
     env: {
