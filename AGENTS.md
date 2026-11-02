@@ -153,7 +153,10 @@ Three sources are the source of truth and take precedence over this file when th
 > a contract crosses the boundary as its text (`contract-text`, engine-protocol spec §8.9), so both
 > SDKs write the engine's bytes, contract-file spec §2.4 says how numbers and strings are written
 > (`corpora/contracts/`), and the conformance checker fails when two SDKs' live contracts differ by a
-> byte. S2.11, merging several test files' contracts, is new.
+> byte. S2.11, merging several test files' contracts, is new. S2.2 (ADR 0064): an SDK reports each
+> variant's test verdict through `consumer-session/report-variant`, whose answer is the variant's result,
+> so a variant fails in the test that ran it; behind `test-verdicts`, the engine, not the SDK, withholds
+> a contract for a failed test, an unreported variant or a refused interaction.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

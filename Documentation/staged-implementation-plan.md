@@ -1590,6 +1590,32 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   results arrive before the suite ends, so an engine-side failure surfaces in the test that caused it.
   *Exit:* the TypeScript SDK's own withholding logic is deleted; a conformance case fails a suite on
   the variant that failed.
+  *Done 2026-11-02*, as [ADR 0064](decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md) decides:
+  - `consumer-session/report-variant` carries the test's verdict on a variant once its closure ends,
+    and answers with the variant's result: the engine's verdict on the exchange and the test's
+    together. One call closes both findings. A variant result carries the report as `test`, and a
+    reported failure withholds the contract in the engine.
+  - Both SDKs declare `test-verdicts` and report every variant. A variant the engine did not verify
+    fails `execute`, or its own JUnit dynamic test, naming the closure's cause, the engine's
+    mismatches, or that nothing called the mock. Both SDKs' lists of failed executes are deleted,
+    with the error members that exposed them (`failedTests`, `failedInteractions`, `engineWithheld`).
+  - Conformance cases `variants/engine-verdict-fails-the-variant` and
+    `live/engine-verdict-fails-the-variant` fail a suite on the variant that failed, against the
+    scripted engine and the real one; `live/failed-test-withholds-contract` is task 4.6's careless
+    client, whose contract the engine withholds though every exchange matched.
+  - Not foreseen:
+    - An exchange's outcome is recorded after its reply is handed to the transport, so a client can
+      hold the response before the engine holds the outcome. A report waits for an exchange of its
+      variant still under way, then disarms the variant.
+    - The SDKs' lists held more than closures: an `add-interaction` the engine refused withheld the
+      contract too. For a host that declared `test-verdicts`, the engine now does that itself and
+      `finalise` names each refusal as `refused`. An exercised variant such a host never reported is
+      `not-reported`, so an SDK that forgets fails closed.
+    - A closure that never calls the mock now fails its `execute`. `live/optional-header-presence`,
+      which pins a variant space without exchanging anything, no longer checks how `execute` ended.
+    - The JVM SDK learned an interaction's description only once `variants` answered, so a contract
+      withheld after `variant-budget-exceeded` named the interaction by its handle. It records the
+      description when the handle arrives, as the TypeScript SDK did.
 - **S2.3 Plans cached per (handle, variant)** — **S**. Arming a variant recompiles its plan (finding
   28); the cache, and a decision on what a fresh-per-exchange generator means under it. S1.19 decided
   that one (ADR 0048): a reply's generated positions are filled every time it is served, after the
