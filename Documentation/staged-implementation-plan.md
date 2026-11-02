@@ -1634,10 +1634,20 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   - Not foreseen: the arming was copied as well as rebuilt. The plan, the payload and the
     interaction's generator shapes were cloned into every transport's arming, and the payload again
     into each reply, which cost as much as the compile did for a large request.
-- **S2.4 Two SDKs rebuilt from the SDK specification** — **L**. JavaScript/TypeScript and JVM, each
-  with generated bindings, an idiomatic layer, the test-framework integrations people use (Jest and
-  Vitest; JUnit 5, plus JUnit 4 and Spock if the community wants them), and the thinness audit. The
-  JVM SDK is the proof that pact-jvm becomes one SDK among several.
+- **S2.4 Two SDKs rebuilt from the SDK specification** — **L**, in two steps, one per language. Each
+  SDK has generated bindings, an idiomatic layer, the test-framework integrations people use, and the
+  thinness audit. JUnit 4 is not supported. It is legacy, and a project that still has JUnit 4
+  tests can run them beside JUnit 5 ones on the JUnit Platform's vintage engine.
+  - **S2.4a JavaScript/TypeScript, with Jest and Vitest** — **M**. Vitest has `pact-janus/vitest`
+    today; Jest has nothing.
+    *Exit:* one consumer suite and one provider test run under Jest and under Vitest, from ESM and
+    from CommonJS. A variant that fails, fails the test that ran it, and a withheld contract fails
+    the suite.
+  - **S2.4b JVM, with JUnit 5 and Spock** — **M**. JUnit 5 has `JanusExtension` and
+    `JanusProviderExtension` today; Spock has nothing. This is the proof that pact-jvm becomes one SDK
+    among several.
+    *Exit:* one consumer suite and one provider test run under JUnit 5 and under Spock 2. A variant
+    that fails, fails the test that ran it, and a withheld contract fails the suite.
 - **S2.5 A compatibility facade** for today's pact-js and pact-jvm DSLs — **L**, so most existing
   consumer tests need only mechanical changes (SDK spec §6's classification). The facade is the
   hand-written layer most likely to grow matching logic, so it is its own layer in
