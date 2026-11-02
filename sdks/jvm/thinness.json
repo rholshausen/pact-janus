@@ -3,7 +3,8 @@
   "name": "pact-janus-jvm",
   "language": "Java",
   "extensions": [
-    ".java"
+    ".java",
+    ".groovy"
   ],
   "ignore": [
     "build",

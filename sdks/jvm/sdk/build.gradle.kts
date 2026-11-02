@@ -5,6 +5,8 @@
 
 plugins {
   `java-library`
+  // For the Spock specifications under src/test/groovy; the SDK itself has no Groovy.
+  groovy
 }
 
 java {
@@ -35,6 +37,10 @@ dependencies {
   testImplementation("ch.qos.logback:logback-classic:1.5.18")
   // The integration's own tests launch small JUnit classes and inspect the outcome.
   testImplementation("org.junit.platform:junit-platform-launcher")
+  // Spock specifications run beside the Jupiter tests, through Spock's own JUnit Platform engine:
+  // FrameworksTest shows the SDK used from Spock, which needs nothing of it but its public API.
+  testImplementation("org.spockframework:spock-core:2.5-groovy-4.0")
+  testImplementation("org.apache.groovy:groovy:4.0.33")
 }
 
 // The repository root, where the Cargo workspace (and so `target/debug/janus-engine`) lives.

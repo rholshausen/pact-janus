@@ -148,6 +148,20 @@ Interaction getOrder = janus.interaction("get an order")
   same order.
 - The **engine** is started lazily by the first `execute`, and ended by `finalise`. After `finalise`
   the same `Janus` may be used again; the next `execute` starts a fresh engine and session.
+- **Spock 2** needs no integration of its own, so the SDK has no Spock or Groovy dependency. A
+  specification holds its `Janus` in a shared field that Spock finalises after the last feature,
+  failed or not, so a withheld contract fails the specification:
+  `@Shared @AutoCleanup("finalise") Janus janus = Janus.of("web-app", "orders-api")`. A Groovy closure
+  is a `VariantTest`, as it is the request and response builders' `Consumer`:
+  `janus.execute(getOrder) { mock, variant -> assert ... }`. A failing variant fails the feature that
+  ran it; in an `expect:` block, Spock reports `ExecuteFailedException` as the cause of the condition
+  that called `execute`. Conditions inside the closure need `assert`, since Spock makes conditions
+  only of a block's own statements.
+- **JUnit 4 is not supported.** It is legacy; a project with JUnit 4 tests runs them beside JUnit 5
+  ones on the JUnit Platform's vintage engine.
+- `FrameworksTest` runs a consumer suite, a suite whose contract is withheld and a provider test
+  under JUnit 5 and under Spock, against the real engine. The suites are `io.pact.janus.sdk.frameworks`,
+  which uses only the public API.
 
 ## Provider verification
 
@@ -204,6 +218,9 @@ Interaction getOrder = janus.interaction("get an order")
 - Closing the stream, which JUnit does, closes the run, and `afterAll` closes any run still open.
 - pact-jvm's annotations map to these as
   [`provider-test-migration.md`](../../Documentation/provider-test-migration.md) records.
+- Under Spock, a feature calls `verify()` on a `Verifier` whose states are closures, and checks the
+  result's `status()`; a failed run throws `VerificationFailedException`, naming each failure. The run
+  is one feature, not one per interaction.
 
 ## Logging
 

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.platform.engine.TestExecutionResult;
+import org.junit.platform.engine.discovery.ClassSelector;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.TestExecutionListener;
@@ -15,8 +16,8 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
 /**
- * Runs a JUnit test class the way a build would, and records what happened to every test and
- * container — so the JUnit integration itself can be tested: that {@code finalise} runs after a
+ * Runs a JUnit test class, or a Spock specification, the way a build would, and records what
+ * happened to every test and container — so the integrations themselves can be tested: that {@code finalise} runs after a
  * failing test, that a withheld contract fails the class, that each variant is its own test.
  *
  * <p>Classes it runs carry {@code @EnabledIfSystemProperty(named = Harness.PROPERTY, ...)}, so the
@@ -31,9 +32,21 @@ final class Harness {
   record Outcome(String name, boolean container, TestExecutionResult.Status status, Throwable error) {}
 
   static List<Outcome> run(Class<?> testClass) {
+    return run(selectClass(testClass));
+  }
+
+  /**
+   * A class by its name: a Spock specification, which the JUnit Platform runs through Spock's own
+   * engine, is compiled after the Java tests, so they cannot name it as a class.
+   */
+  static List<Outcome> run(String testClass) {
+    return run(selectClass(testClass));
+  }
+
+  private static List<Outcome> run(ClassSelector selector) {
     List<Outcome> outcomes = new ArrayList<>();
     LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
-        .selectors(selectClass(testClass))
+        .selectors(selector)
         .configurationParameter("junit.jupiter.conditions.deactivate", "")
         .build();
     Launcher launcher = LauncherFactory.create();
