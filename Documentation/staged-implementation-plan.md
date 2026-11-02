@@ -1643,6 +1643,20 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     *Exit:* one consumer suite and one provider test run under Jest and under Vitest, from ESM and
     from CommonJS. A variant that fails, fails the test that ran it, and a withheld contract fails
     the suite.
+    *Done 2026-11-02*, with no new ADR: the Jest integration is the Vitest one's twin.
+    - `useJanus` from `pact-janus/jest` creates the suite's `Janus` and runs `finalise` in an
+      `afterAll`, as `pact-janus/vitest`'s does. It takes `afterAll` from `@jest/globals`, which
+      Jest's runtime gives every module it loads, so it is CommonJS and ES modules alike and needs
+      no globals injected.
+    - `test/frameworks.test.ts` installs the built package in a scratch project and runs
+      `test/frameworks/` there: under Jest 30 from CommonJS and as ES modules, and under Vitest.
+      Each runner's own JSON report shows the consumer suite passing and writing its contract. In a
+      second suite, the test whose client crashes on the variant without a field fails and the
+      other test passes, and the withheld contract fails the file and is not written. The provider
+      test passes: pact-js's `Verifier` from CommonJS, the Janus `Verifier` as ES modules and under
+      Vitest. The three contracts are byte-identical but for the consumer's name.
+    - Not foreseen: Vitest refuses to be `require()`d, so a Vitest test file imports, even in a
+      CommonJS project, and "from CommonJS" is Jest's alone.
   - **S2.4b JVM, with JUnit 5 and Spock** — **M**. JUnit 5 has `JanusExtension` and
     `JanusProviderExtension` today; Spock has nothing. This is the proof that pact-jvm becomes one SDK
     among several.

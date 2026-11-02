@@ -159,6 +159,10 @@ Three sources are the source of truth and take precedence over this file when th
 > a contract for a failed test, an unreported variant or a refused interaction. S2.3: a variant's
 > payload and request plan are built the first time it is armed and shared by every arming after, so
 > re-arming a 100 KB request costs microseconds; a generator's fresh values are still filled per reply.
+> S2.4 is split by language, without JUnit 4. S2.4a: `pact-janus/jest` is the Jest integration, as
+> `pact-janus/vitest` is Vitest's, and `test/frameworks.test.ts` runs a consumer suite, a suite whose
+> contract is withheld and a provider test under Jest, from CommonJS and as ES modules, and under
+> Vitest, from the built package as a user installs it.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
