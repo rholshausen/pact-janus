@@ -1621,6 +1621,19 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   that one (ADR 0048): a reply's generated positions are filled every time it is served, after the
   cached plan and the armed reply, so the cache holds no generated value.
   *Exit:* the 100 KB request scenario in S0.3's trend drops to the small-exchange cost.
+  *Done 2026-11-02*, with no new ADR: ADR 0048 had already decided the generator question.
+  - A variant's payload, its pinned request plan and its resolved provider state are built the first
+    time it is armed and kept on the interaction, by variant id, which names an assignment
+    (variant-semantics spec §2.2). Later armings share them, and each transport's arming holds
+    shared references, so arming copies no document. A generator's fresh values are still filled
+    each time a reply is served, from the shared payload, which is copied only when the reply has
+    generators to fill.
+  - On the native stack, arming the 100 KB request's variant went from 19,940 µs to 22 µs, below a
+    whole small exchange (28 µs). The 100 KB exchange went from 27.9 ms to 9.0 ms, a small arming
+    from 11.9 µs to 4.2 µs, and four engines' throughput from 76,000 to 115,000 requests a second.
+  - Not foreseen: the arming was copied as well as rebuilt. The plan, the payload and the
+    interaction's generator shapes were cloned into every transport's arming, and the payload again
+    into each reply, which cost as much as the compile did for a large request.
 - **S2.4 Two SDKs rebuilt from the SDK specification** — **L**. JavaScript/TypeScript and JVM, each
   with generated bindings, an idiomatic layer, the test-framework integrations people use (Jest and
   Vitest; JUnit 5, plus JUnit 4 and Spock if the community wants them), and the thinness audit. The

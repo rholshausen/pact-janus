@@ -156,7 +156,9 @@ Three sources are the source of truth and take precedence over this file when th
 > byte. S2.11, merging several test files' contracts, is new. S2.2 (ADR 0064): an SDK reports each
 > variant's test verdict through `consumer-session/report-variant`, whose answer is the variant's result,
 > so a variant fails in the test that ran it; behind `test-verdicts`, the engine, not the SDK, withholds
-> a contract for a failed test, an unreported variant or a refused interaction.
+> a contract for a failed test, an unreported variant or a refused interaction. S2.3: a variant's
+> payload and request plan are built the first time it is armed and shared by every arming after, so
+> re-arming a 100 KB request costs microseconds; a generator's fresh values are still filled per reply.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
