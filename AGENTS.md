@@ -165,6 +165,10 @@ Three sources are the source of truth and take precedence over this file when th
 > Vitest, from the built package as a user installs it. S2.4b: Spock 2 needs no integration (a
 > `@Shared @AutoCleanup("finalise") Janus` field), and `FrameworksTest` runs the same three suites
 > under JUnit 5 and under Spock against the real engine.
+> S2.11 (ADR 0065): `finalise`'s `write` has the engine's host write the contract file, merging test
+> files' interactions by identity under a file lock (`contract-writing`); one recorded differently is
+> `contract-conflict`. Every contract's interactions are written in identity order. The SDKs write no
+> file.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

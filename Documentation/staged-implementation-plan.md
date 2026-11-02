@@ -1745,6 +1745,34 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* two Vitest files in separate workers, and two JUnit classes in separate forks, write one
   contract holding both files' interactions, byte-identical to recording them in one file; an
   interaction recorded differently by two files fails, naming it.
+  *Done 2026-11-02*, as [ADR 0065](decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md) decides:
+  - `finalise` takes `write: { path, mode? }`, and the engine's host writes the file, behind the
+    `contract-writing` capability. The host only opens, locks, reads and writes
+    (`cli/src/contract_files.rs`, an operating-system lock held from reading to writing). What to
+    write is the kernel's (`contract::files`, `contract::merge`): interactions joined by contract-file
+    spec §4.2's identity. One recorded differently, or another pair's file, is `contract-conflict`,
+    naming each interaction, and the file is left as it was. `mode: "overwrite"` replaces the file,
+    and a withheld contract writes nothing.
+  - Both SDKs name the file, `<contract directory>/<consumer>-<provider>.janus.json` made absolute,
+    and write none. Each has an option to overwrite it (`overwriteContract`,
+    `JanusOptions.withContractOverwrite`).
+  - `test/frameworks.test.ts` runs Vitest files in workers of their own. Two recording one consumer
+    and provider merge into one contract, byte-identical to a third file recording both into another
+    directory, and of two recording 'create an order' differently, the second to finish fails, naming
+    it. `FrameworksTest` does the same with JUnit classes run at once, each with an engine process of
+    its own. The kernel's tests merge sessions in both orders, and the writer's own race sixteen
+    threads on one file.
+  - Not foreseen:
+    - §2.4 wrote `interactions` as submitted, so a merged file's bytes would have depended on which
+      worker finished first. Every contract's interactions are now in identity order, recorded and
+      upgraded alike. S1.1's harness had found an upgraded contract's verdicts by index, and now
+      finds them by description.
+    - The demo records its contract twice in one directory. The widened interaction's states differ,
+      so it is another interaction, and the first run's stayed in the file beside it. The demo's
+      consumer now clears its contract directory in a Vitest global setup, as ADR 0065 says a run
+      should.
+    - "Separate forks" are JUnit classes run at once in one JVM here. The writers are the classes'
+      engine processes, which are separate either way.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones
