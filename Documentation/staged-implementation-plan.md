@@ -1680,11 +1680,24 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
       failure, caused by it, so a failed `execute` is the cause of the feature's failure there, not
       the failure itself.
 - **S2.5 A compatibility facade** for today's pact-js and pact-jvm DSLs — **L**, so most existing
-  consumer tests need only mechanical changes (SDK spec §6's classification). The facade is the
-  hand-written layer most likely to grow matching logic, so it is its own layer in
-  each SDK's `thinness.json`, with its own budget, and a `kept`/`changed`/`dropped` verdict per old primitive
-  is published as the migration note.
-  *Exit:* the example suites of pact-js and pact-jvm run on the facade.
+  consumer tests need only mechanical changes (SDK spec §6's classification). In two steps, one per
+  language, as S2.4 is. It is the consumer side's: the provider side's came with S1.15. The facade is
+  the hand-written layer most likely to grow matching logic, so it is its own layer in each SDK's
+  `thinness.json`, with its own budget, and a `kept`/`adapted`/`dropped` verdict per old primitive is
+  published as each language's migration note. Both steps follow S2.11, since both example suites
+  have several test files.
+  - **S2.5a pact-js** — **M**. The `PactV3` and `PactV4` builders, `MatchersV3`, and the message
+    consumer API, in the TypeScript SDK's `facade` layer, beside S1.15's provider API.
+    *Exit:* pact-js's consumer example suites run on the facade.
+  - **S2.5b pact-jvm** — **L**. The `PactDslWithProvider` chain, `PactDslJsonBody`,
+    `PactDslJsonArray` and the `LambdaDsl` over them, the JUnit 5 consumer extension (`@Pact` methods,
+    `@PactTestFor`, the injected mock server), and message pacts, in a `facade` layer the JVM SDK's
+    `thinness.json` does not have yet. pact-jvm's JUnit 4 consumer support (`PactProviderRule`,
+    `@PactVerification`) is `dropped`, migrating to JUnit 5, since JUnit 4 is not supported (S2.4).
+    Whether pact-jvm's Groovy `PactBuilder`, which its Spock users write, is in scope is decided
+    before the step starts. The JSON body DSL may become a step of its own if this one proves too
+    big.
+    *Exit:* pact-jvm's consumer example suites run on the facade, except those written for JUnit 4.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -1733,8 +1746,9 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   contract holding both files' interactions, byte-identical to recording them in one file; an
   interaction recorded differently by two files fails, naming it.
 
-**Done when** both SDKs pass the extended conformance suite against a pinned engine, the example suites
-of pact-js and pact-jvm run on the compatibility facade, both SDKs have graduated (S2.9), and early
+**Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
+example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones
+excepted, S2.5b), both SDKs have graduated (S2.9), and early
 adopters publish contracts to a broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers,
 before or after.
 
