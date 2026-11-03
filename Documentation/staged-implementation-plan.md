@@ -657,7 +657,7 @@ item in 1a is done when S1.1 agrees.
   the transport binding says which part is inbound and which the answer, and a mismatch is a `dispose`
   with a `reject` disposition. Then a message transport, and the `produce-message` and
   `consume-message` hooks spike 1.5 and design 2.7 specified, hardened as the way a provider's message
-  producer is invoked. Consumer-side message interactions are S6.2.
+  producer is invoked. Consumer-side message interactions are S2.12 (moved from S6.2).
   *Exit:* corpus cases for message interactions; pact-jvm's and pact-js's message provider examples
   verify identically in S1.1.
   *Done 2026-10-23* ([ADR 0046](decisions/0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md)).
@@ -682,7 +682,7 @@ item in 1a is done when S1.1 agrees.
   today's verifier reads an asynchronous message from a 500 and passes, Janus fails it, deliberately.
   The whole corpus is 1124 verdicts over 538 cases: 1110 agree and 14 are known. Four corpus cases
   cover messages. Left out: `janus upgrade` still drops
-  a message (S6.2); provider-side `consume-message`, which today's verifier does not have; a transport
+  a message (S2.12); provider-side `consume-message`, which today's verifier does not have; a transport
   for a real broker (S6.3).
 - **S1.8 Plugin-backed v4 interactions are refused by name** — **S**. A v4 pact whose interaction
   requires a pact-plugins plugin (protobuf, gRPC, Avro, CSV) cannot verify "exactly as today" until the
@@ -1686,9 +1686,14 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   `thinness.json`, with its own budget, and a `kept`/`adapted`/`dropped` verdict per old primitive is
   published as each language's migration note. Both steps follow S2.11, since both example suites
   have several test files.
-  - **S2.5a pact-js** — **M**. The `PactV3` and `PactV4` builders, `MatchersV3`, and the message
-    consumer API, in the TypeScript SDK's `facade` layer, beside S1.15's provider API.
-    *Exit:* pact-js's consumer example suites run on the facade.
+  - **S2.5a pact-js** — **M**. The `PactV3` and `PactV4` HTTP builders, GraphQL, XML and multipart
+    bodies, and `MatchersV3`, in the TypeScript SDK's `facade` layer, beside S1.15's provider API.
+    [ADR 0066](decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)
+    decides where the conversion lives: the facade records the FFI calls pact-js's builders make,
+    and `add-interaction` converts them as `janus upgrade` converts a pact. The message consumer API
+    is S2.5c, and pact plugins are refused by name (ADR 0045).
+    *Exit:* pact-js's consumer example suites run on the facade, but for the message one (S2.5c) and
+    the plugin one; each records the contract `janus upgrade` writes from the pact pact-js wrote.
   - **S2.5b pact-jvm** — **L**. The `PactDslWithProvider` chain, `PactDslJsonBody`,
     `PactDslJsonArray` and the `LambdaDsl` over them, the JUnit 5 consumer extension (`@Pact` methods,
     `@PactTestFor`, the injected mock server), and message pacts, in a `facade` layer the JVM SDK's
@@ -1698,6 +1703,12 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     before the step starts. The JSON body DSL may become a step of its own if this one proves too
     big.
     *Exit:* pact-jvm's consumer example suites run on the facade, except those written for JUnit 4.
+  - **S2.5c pact-js messages** — **S**, after S2.12. `addAsynchronousInteraction`,
+    `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
+    message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
+    same S2.12.
+    *Exit:* pact-js's message consumer example runs on the facade, and pact-js's message provider
+    example verifies the contract it records.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -1774,9 +1785,29 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     - "Separate forks" are JUnit classes run at once in one JVM here. The writers are the classes'
       engine processes, which are separate either way.
 
+- **S2.12 Message interactions in a Janus contract** — **M**, S6.2's core brought forward, since
+  S2.9 graduates the SDKs into pact-js and pact-jvm and their message users must be able to move. A
+  contract has no message form, so `janus upgrade` drops a message interaction (ADR 0046), `janus
+  verify` cannot replay one from a contract, and a consumer session cannot hand one to a test. The
+  contract-file spec gains an emissive `message` interaction, its parts the message transport's
+  (`metadata`, `body`). `upgrade` converts v3 messages and v4 asynchronous and synchronous messages.
+  `janus verify` asks a contract's message of the `produce-message` hooks, as it does a pact's. For an
+  emissive interaction with nothing bound to deliver it, `serve-variant` answers with the message, and
+  the host hands it to the test and reports the verdict (ADR 0064).
+  *Exit:* S1.1's message fixtures upgrade with no `interaction-dropped` finding and verify as their
+  pacts do; a consumer session records a message interaction a provider then verifies.
+- **S2.13 Several interactions armed at once, and an interaction served more than once** — **M**.
+  Engine-protocol spec §8.2 lets several interactions be armed at once, but a transport holds one
+  arming, and its first request ends it. A pact-js `PactV3` test adds several interactions before one
+  `executeTest`, and a client may call one endpoint twice. pact-jvm's `@PactTestFor` with several
+  `pactMethods` does the same. The exchange loop matches an arrival against every armed interaction,
+  as today's mock server does, and keeps an arming until its variant is reported.
+  *Exit:* a facade test with two interactions, and one calling an interaction twice, pass, and one
+  that never calls an armed interaction fails, naming it.
+
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
-example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones
-excepted, S2.5b), both SDKs have graduated (S2.9), and early
+example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,
+S2.5b, and pact-js's plugin one, S2.5a, excepted), both SDKs have graduated (S2.9), and early
 adopters publish contracts to a broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers,
 before or after.
 
@@ -1886,8 +1917,10 @@ content component exists written by someone outside the core team.
   language's existing repository the way S2.9 did (ADR 0027). The regeneration trial (task 6.5) showed
   agents can carry a specification change into several SDKs under the suite's judgement. That is what
   makes this stage affordable for a small team, but it does not replace the suite.
-- **S6.2 Consumer-side message interactions**, end to end, with broker adapters as components. The
-  provider side landed in S1.7.
+- **S6.2 Message brokers for consumer-side message interactions**, as components: delivering an
+  emissive interaction's message through a real broker rather than to the test. The contract form,
+  `upgrade` and verification of a contract's messages moved to S2.12; the provider side landed in
+  S1.7.
 - **S6.3 gRPC and other transports** as components.
 - **S6.4 The RFC's fourth migration step:** today's FFI and pact-jvm cores go into maintenance mode as
   each language's MkII SDK passes conformance on both sides. The timeline is the community's (§7).
@@ -2012,6 +2045,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |
 | S2.11 | A Janus SDK overwrites the contract, so of several test files recording one pair, the last wins | ADR 0063 decision 7 |
+| S2.12 | A contract has no message form: `upgrade` drops messages, and a consumer session cannot hand one to a test | ADR 0046; moved from S6.2 by S2.5a |
+| S2.13 | A transport holds one armed interaction, and its first request ends the arming | found building S2.5a; ADR 0066 |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |

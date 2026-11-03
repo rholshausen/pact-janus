@@ -82,6 +82,7 @@ superseding ADR instead.
 | [0063](0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md) | Carry a contract across the engine boundary as its text, and pin how numbers are written | accepted |
 | [0064](0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md) | Report each variant's test verdict to the engine, and answer with the variant's result | accepted |
 | [0065](0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md) | Let the engine's host write and merge contract files, in identity order | accepted |
+| [0066](0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md) | Let a compatibility facade submit today's builder calls, and convert them as `upgrade` does | accepted |
 
 ## Decision backlog
 
