@@ -169,6 +169,12 @@ Three sources are the source of truth and take precedence over this file when th
 > files' interactions by identity under a file lock (`contract-writing`); one recorded differently is
 > `contract-conflict`. Every contract's interactions are written in identity order. The SDKs write no
 > file.
+> S2.5a (ADR 0066): `pact-janus/pact` is pact-js's consumer API beside its provider one. Its matchers
+> are pact-js's own data and its builders record the `pact_ffi` calls pact-js's make, which
+> `consumer-session/add-pact-interaction` makes in the engine (`engine/kernel/src/legacy/builder/`,
+> ported from `pact_ffi`) and converts as `janus upgrade` converts a pact. pact-js's consumer examples
+> run on it, but the message one (S2.5c, on S2.12, which brings S6.2's core into stage 2) and the
+> plugin one; `Documentation/consumer-test-migration.md` has each primitive's verdict.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

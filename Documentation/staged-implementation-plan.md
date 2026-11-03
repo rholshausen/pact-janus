@@ -1694,6 +1694,38 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     is S2.5c, and pact plugins are refused by name (ADR 0045).
     *Exit:* pact-js's consumer example suites run on the facade, but for the message one (S2.5c) and
     the plugin one; each records the contract `janus upgrade` writes from the pact pact-js wrote.
+    *Done 2026-11-03*, as ADR 0066 decides:
+    - `pact-janus/pact` exports pact-js's names, consumer and provider: `Pact` (`PactV4`), `PactV3`,
+      `Matchers`, `XmlBuilder`, `SpecificationVersion`, and S1.15's `Verifier`. The matchers are
+      pact-js's integration JSON, unchanged. The builders, HTTP and GraphQL, record the `pact_ffi`
+      calls pact-js's make, in its order. `consumer-session/add-pact-interaction` makes them, with
+      the integration JSON, XML builder and multipart handling ported from `pact_ffi` into
+      `engine/kernel/src/legacy/builder/`, and converts the interaction as `janus upgrade` converts a
+      pact. The kernel's tests replay each example's calls and compare the interaction they build with
+      the pact pact-js wrote.
+    - pact-js's http, matchers, provider-state, graphql, xml and multipart consumer tests run in
+      `sdks/typescript/test/examples`, their imports changed and their clients on `fetch`. Each
+      records the interaction `janus upgrade` makes of pact-js's pact, its recorded variant too, but
+      for multipart's boundary. Each provider test verifies the recorded contract as well: GraphQL's
+      and XML's verify, and the other four fail only on S3.4's `Content-Type`, as their upgraded
+      pacts do in S1.1's ledger. The plugin example is refused by name (`usingPlugin`), and the
+      message one is S2.5c's.
+    - [`consumer-test-migration.md`](consumer-test-migration.md) gives each primitive's verdict, as
+      the conversion decides it (SDK spec §6.3). The facade layer's budget went from 300 to 1,200
+      code lines: pact-js's builder surface is wide, though no method does more than record a call.
+    - Not foreseen:
+      - `add-interaction` could not take a second form: relaxing its required `interaction` is a
+        change the protocol's compatibility check refuses. `add-pact-interaction` is a new operation.
+      - A base variant chosen by `base-only` pins every dimension, and a pinned `min` admits exactly
+        `min` elements (ADR 0024), so a recorded `eachLike` demanded one element where pact-js's
+        demanded one or more. A converted interaction's selection is `upgrade`'s instead: `base`,
+        pinning nothing.
+      - Shapes cannot always give the example back: `eachKey`'s `each-entry` generates no entry, the
+        XML example's `eachLike` no `book`, and a multipart request body has no shape. A converted
+        interaction is served its own example, decoded as a reply is, and records it as `upgrade`
+        does, so a verifier replays the request today's verifier sends.
+      - pact-js's `XmlBuilder` writes its `Map` of attributes as `{}`, so its pacts lose an element's
+        attributes. The facade keeps that, so it records what pact-js's pact holds.
   - **S2.5b pact-jvm** — **L**. The `PactDslWithProvider` chain, `PactDslJsonBody`,
     `PactDslJsonArray` and the `LambdaDsl` over them, the JUnit 5 consumer extension (`@Pact` methods,
     `@PactTestFor`, the injected mock server), and message pacts, in a `facade` layer the JVM SDK's
