@@ -169,6 +169,26 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   (`options.report`, ADR 0059), so this SDK, like `janus verify`, lays nothing out; `options` may give
   its own `report`, such as `{ "error-chain": true }`.
 
+## pact-js's consumer API (`pact-janus/pact`)
+
+- `Pact` (`PactV4`), `PactV3`, `Matchers` (`MatchersV3`), `XmlBuilder` and `SpecificationVersion`,
+  by pact-js's names, beside the provider side's, so a suite moves by changing its import
+  ([ADR 0066](../../Documentation/decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md);
+  [`consumer-test-migration.md`](../../Documentation/consumer-test-migration.md) has the verdicts).
+- The matchers return pact-js's own data, the FFI's integration JSON, unchanged. The builders record
+  the `pact_ffi` calls pact-js's would make, in its order, and `executeTest` hands them to
+  `consumer-session/add-pact-interaction`. Neither decides what a value admits: the engine converts
+  the interaction as `janus upgrade` converts a pact.
+- Each `executeTest` starts an engine, one session, adds the interaction, serves its one variant,
+  runs the test, reports its verdict, and finalises, writing `<dir>/<consumer>-<provider>.janus.json`
+  by merge. It fails as pact-js's does: the test's own error, else "Test failed for the following
+  reasons" naming each mismatch or missing request.
+- What the engine cannot carry is refused by name at the call (`usingPlugin`, `tls`, the message
+  API until S2.5c); what only decorated a pact file (`pending`, `comment`, …) is accepted and does
+  nothing. A `lossy` conversion finding is printed with `console.warn`, prefixed `pact-janus:`.
+- It is `src/facade/`, the `facade` layer, as the provider side is. Its budget is most of the layer's:
+  pact-js's builder surface is wide, though no method holds more than recording a call.
+
 ## Packaging and distribution
 
 - npm, Node ≥ 22.6 (the generator script uses type stripping). Not published: this is the
@@ -176,7 +196,7 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - ES modules, and a CommonJS build beside them: `npm run build` writes `dist/` and `dist/cjs/`
   (`tsconfig.cjs.json`), and each export gives `require` the second. pact-js is CommonJS, and Jest's
   runtime cannot `require()` an ES module before Node 24.9, so a pact-js suite moving to
-  `pact-janus/verifier` and `pact-janus/jest` need it. `pact-janus/vitest` is ES modules only, as
+  `pact-janus/pact`, `pact-janus/verifier` and `pact-janus/jest` need it. `pact-janus/vitest` is ES modules only, as
   Vitest is. A process that loads the SDK both ways has two copies of its classes, so `instanceof` across them fails.
 - The engine is not bundled; it is pinned (ADR 0060 decision 6). `src/engine/pin.ts` names a
   `janus-engine` release by version and by digest per platform: `sdks/engine-release.json`, which

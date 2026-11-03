@@ -45,6 +45,56 @@
         }
       }
     },
+    "AddPactInteraction": {
+      "title": "AddPactInteraction",
+      "type": "object",
+      "required": ["session", "pact"],
+      "description": "consumer-session/add-pact-interaction (spec.md §8.2, ADR 0066): a v1–v4 interaction as a consumer library builds it through pact_ffi, added as add-interaction adds an interaction specification.",
+      "properties": {
+        "session": { "type": "string" },
+        "pact": { "$ref": "#/$defs/PactSteps" }
+      }
+    },
+    "PactSteps": {
+      "title": "PactSteps",
+      "type": "object",
+      "required": ["steps"],
+      "description": "A v1–v4 interaction as a consumer library builds it through pact_ffi (spec.md §8.2, ADR 0066): the calls it makes, in order, which the engine applies as pact_ffi does to an interaction that starts empty, then converts as upgrade/pact converts a pact's interaction.",
+      "properties": {
+        "specification": {
+          "type": "string",
+          "description": "The pact specification the library would write, which decides what some calls add (with_binary_file's body rule, from V3). Default 'V4'.",
+          "x-known-values": ["V2", "V3", "V4"]
+        },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/PactStep" } }
+      }
+    },
+    "PactStep": {
+      "title": "PactStep",
+      "type": "object",
+      "required": ["call"],
+      "description": "One pact_ffi call, named without its 'pactffi_' prefix, its arguments by name (spec.md §8.2 lists them). 'part' is 'request' or 'response'. A value the FFI takes as integration JSON in a string is the JSON value, a string being the text as given. A file the FFI would read is its name and its octets, base64-encoded.",
+      "properties": {
+        "call": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Open vocabulary: a call the engine does not make is 'interaction-invalid', pointing at it.",
+          "x-known-values": [
+            "upon_receiving",
+            "given",
+            "given_with_params",
+            "with_request",
+            "with_query_parameter",
+            "with_header_v2",
+            "response_status_v2",
+            "with_body",
+            "with_binary_file",
+            "with_matching_rules",
+            "with_multipart_file_v2"
+          ]
+        }
+      }
+    },
     "AddInteractionResult": {
       "title": "AddInteractionResult",
       "type": "object",
@@ -54,6 +104,46 @@
           "type": "string",
           "minLength": 1,
           "description": "Identifies the interaction within this session; invalid after finalise."
+        }
+      }
+    },
+    "AddPactInteractionResult": {
+      "title": "AddPactInteractionResult",
+      "type": "object",
+      "required": ["handle"],
+      "properties": {
+        "handle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifies the interaction within this session, as add-interaction's handle does."
+        },
+        "findings": {
+          "type": "array",
+          "description": "What converting the built interaction lost or decided (ADR 0066 decision 3), in contract-file spec §8.4's vocabulary; present when there is any.",
+          "items": {
+            "type": "object",
+            "required": ["code", "kind", "path", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Open vocabulary; an unknown code is displayed, never dispatched on. Codes are listed in contract-file spec §8.4."
+              },
+              "kind": {
+                "type": "string",
+                "description": "'lossy', 'judgement' or 'note', as contract-file spec §8.4 means them.",
+                "x-known-values": ["lossy", "judgement", "note"]
+              },
+              "path": {
+                "type": "string",
+                "description": "RFC 6901 JSON pointer into the v4 interaction the steps built, as a pact would hold it; the empty pointer is the whole interaction."
+              },
+              "message": { "type": "string", "minLength": 1 },
+              "target": {
+                "type": "string",
+                "description": "RFC 6901 JSON pointer into the interaction specification the conversion produced, when the construct ended up somewhere."
+              }
+            }
+          }
         }
       }
     },

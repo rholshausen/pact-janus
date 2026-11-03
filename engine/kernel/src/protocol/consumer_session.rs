@@ -30,6 +30,14 @@ pub struct AddInteraction {
   pub interaction: Value,
 }
 
+/// `add-pact-interaction` (ADR 0066): the builder calls a consumer library makes to `pact_ffi`,
+/// which the engine applies and converts as `upgrade` does.
+#[derive(Debug, Deserialize)]
+pub struct AddPactInteraction {
+  pub session: String,
+  pub pact: Value,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Variants {
   pub session: String,

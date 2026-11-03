@@ -14,6 +14,17 @@ import java.util.List;
 public final class Vocabulary {
   private Vocabulary() {}
 
+  /** Known values of {@code AddPactInteractionResult.findings.kind}. */
+  public static final class AddPactInteractionResultFindingsKind {
+    private AddPactInteractionResultFindingsKind() {}
+
+    public static final String LOSSY = "lossy";
+    public static final String JUDGEMENT = "judgement";
+    public static final String NOTE = "note";
+
+    public static final List<String> KNOWN = List.of(LOSSY, JUDGEMENT, NOTE);
+  }
+
   /** Known values of {@code BrokerAuth.kind}. */
   public static final class BrokerAuthKind {
     private BrokerAuthKind() {}
@@ -230,6 +241,36 @@ public final class Vocabulary {
     public static final List<String> KNOWN = List.of(BASE64);
   }
 
+  /** Known values of {@code PactStep.call}. */
+  public static final class PactStepCall {
+    private PactStepCall() {}
+
+    public static final String UPON_RECEIVING = "upon_receiving";
+    public static final String GIVEN = "given";
+    public static final String GIVEN_WITH_PARAMS = "given_with_params";
+    public static final String WITH_REQUEST = "with_request";
+    public static final String WITH_QUERY_PARAMETER = "with_query_parameter";
+    public static final String WITH_HEADER_V2 = "with_header_v2";
+    public static final String RESPONSE_STATUS_V2 = "response_status_v2";
+    public static final String WITH_BODY = "with_body";
+    public static final String WITH_BINARY_FILE = "with_binary_file";
+    public static final String WITH_MATCHING_RULES = "with_matching_rules";
+    public static final String WITH_MULTIPART_FILE_V2 = "with_multipart_file_v2";
+
+    public static final List<String> KNOWN = List.of(UPON_RECEIVING, GIVEN, GIVEN_WITH_PARAMS, WITH_REQUEST, WITH_QUERY_PARAMETER, WITH_HEADER_V2, RESPONSE_STATUS_V2, WITH_BODY, WITH_BINARY_FILE, WITH_MATCHING_RULES, WITH_MULTIPART_FILE_V2);
+  }
+
+  /** Known values of {@code PactSteps.specification}. */
+  public static final class PactStepsSpecification {
+    private PactStepsSpecification() {}
+
+    public static final String V2 = "V2";
+    public static final String V3 = "V3";
+    public static final String V4 = "V4";
+
+    public static final List<String> KNOWN = List.of(V2, V3, V4);
+  }
+
   /** Known values of {@code PolicyAction}. */
   public static final class PolicyAction {
     private PolicyAction() {}
@@ -291,6 +332,7 @@ public final class Vocabulary {
     public static final String ENGINE_SHUTDOWN = "engine/shutdown";
     public static final String CONSUMER_SESSION_CREATE = "consumer-session/create";
     public static final String CONSUMER_SESSION_ADD_INTERACTION = "consumer-session/add-interaction";
+    public static final String CONSUMER_SESSION_ADD_PACT_INTERACTION = "consumer-session/add-pact-interaction";
     public static final String CONSUMER_SESSION_VARIANTS = "consumer-session/variants";
     public static final String CONSUMER_SESSION_START_TRANSPORT = "consumer-session/start-transport";
     public static final String CONSUMER_SESSION_SERVE_VARIANT = "consumer-session/serve-variant";
@@ -302,7 +344,7 @@ public final class Vocabulary {
     public static final String CONFIG_LOAD = "config/load";
     public static final String EVENTS_POLL = "events/poll";
 
-    public static final List<String> KNOWN = List.of(ENGINE_HELLO, ENGINE_SHUTDOWN, CONSUMER_SESSION_CREATE, CONSUMER_SESSION_ADD_INTERACTION, CONSUMER_SESSION_VARIANTS, CONSUMER_SESSION_START_TRANSPORT, CONSUMER_SESSION_SERVE_VARIANT, CONSUMER_SESSION_REPORT_VARIANT, CONSUMER_SESSION_FINALISE, VERIFICATION_VERIFY, VERIFICATION_EXPLAIN, UPGRADE_PACT, CONFIG_LOAD, EVENTS_POLL);
+    public static final List<String> KNOWN = List.of(ENGINE_HELLO, ENGINE_SHUTDOWN, CONSUMER_SESSION_CREATE, CONSUMER_SESSION_ADD_INTERACTION, CONSUMER_SESSION_ADD_PACT_INTERACTION, CONSUMER_SESSION_VARIANTS, CONSUMER_SESSION_START_TRANSPORT, CONSUMER_SESSION_SERVE_VARIANT, CONSUMER_SESSION_REPORT_VARIANT, CONSUMER_SESSION_FINALISE, VERIFICATION_VERIFY, VERIFICATION_EXPLAIN, UPGRADE_PACT, CONFIG_LOAD, EVENTS_POLL);
   }
 
   /** Known values of {@code Segment.kind}. */

@@ -47,7 +47,7 @@
     "idiomatic": 860,
     "embedding": 390,
     "loopback": 80,
-    "facade": 300,
+    "facade": 1200,
     "integration": 60
   }
 }

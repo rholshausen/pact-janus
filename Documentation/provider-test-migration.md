@@ -36,7 +36,9 @@ await new Verifier({
 }).verifyProvider();
 ```
 
-It runs under Jest and Vitest alike: it is a promise, and imports neither. As it runs, it prints the
+`pact-janus/pact` exports the same names, beside pact-js's consumer API
+([`consumer-test-migration.md`](consumer-test-migration.md)), so a suite with both sides changes
+both imports to it. It runs under Jest and Vitest alike: it is a promise, and imports neither. As it runs, it prints the
 run's report to standard output, as pact-js prints the verifier's: each interaction, its states and
 whether it verified, then a summary. The engine writes it, so it reads as `janus verify`'s does
 ([ADR 0059](decisions/0059-the-engine-writes-a-verification-runs-report.md)). `require("pact-janus/verifier")`

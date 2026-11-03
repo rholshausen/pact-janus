@@ -4,6 +4,16 @@
  */
 
 /**
+ * Known values of `AddPactInteractionResult.findings.kind` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const AddPactInteractionResultFindingsKind = {
+  Lossy: "lossy",
+  Judgement: "judgement",
+  Note: "note",
+} as const;
+
+/**
  * Known values of `BrokerAuth.kind` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -202,6 +212,34 @@ export const ObservedSlotValueEncoded = {
 } as const;
 
 /**
+ * Known values of `PactStep.call` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const PactStepCall = {
+  UponReceiving: "upon_receiving",
+  Given: "given",
+  GivenWithParams: "given_with_params",
+  WithRequest: "with_request",
+  WithQueryParameter: "with_query_parameter",
+  WithHeaderV2: "with_header_v2",
+  ResponseStatusV2: "response_status_v2",
+  WithBody: "with_body",
+  WithBinaryFile: "with_binary_file",
+  WithMatchingRules: "with_matching_rules",
+  WithMultipartFileV2: "with_multipart_file_v2",
+} as const;
+
+/**
+ * Known values of `PactSteps.specification` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const PactStepsSpecification = {
+  V2: "V2",
+  V3: "V3",
+  V4: "V4",
+} as const;
+
+/**
  * Known values of `PolicyAction` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -259,6 +297,7 @@ export const RequestFrameOp = {
   EngineShutdown: "engine/shutdown",
   ConsumerSessionCreate: "consumer-session/create",
   ConsumerSessionAddInteraction: "consumer-session/add-interaction",
+  ConsumerSessionAddPactInteraction: "consumer-session/add-pact-interaction",
   ConsumerSessionVariants: "consumer-session/variants",
   ConsumerSessionStartTransport: "consumer-session/start-transport",
   ConsumerSessionServeVariant: "consumer-session/serve-variant",

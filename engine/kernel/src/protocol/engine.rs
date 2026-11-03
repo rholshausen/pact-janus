@@ -6,7 +6,7 @@
 use super::background::Background;
 use super::broker::{self as broker_ops, PublishContracts};
 use super::consumer_session::{
-  AddInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
+  AddInteraction, AddPactInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
 };
 use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
@@ -387,6 +387,7 @@ impl Engine {
       "engine/shutdown" => self.handle_shutdown(id),
       "consumer-session/create" => self.handle_create(id, body),
       "consumer-session/add-interaction" => self.handle_add_interaction(id, body),
+      "consumer-session/add-pact-interaction" => self.handle_add_pact_interaction(id, body),
       "consumer-session/variants" => self.handle_variants(id, body),
       "consumer-session/start-transport" => self.handle_start_transport(id, body),
       "consumer-session/serve-variant" => self.handle_serve_variant(id, body),
@@ -496,6 +497,38 @@ impl Engine {
     };
     // A contract without this interaction would not be the suite's (ADR 0064 decision 4).
     session.record_refusal(&req.interaction, &error.code, &error.message);
+    ResponseFrame::err(id, error)
+  }
+
+  /// `consumer-session/add-pact-interaction` (ADR 0066): a facade's builder calls, built and
+  /// converted into the interaction specification `add-interaction` would have been handed, which
+  /// everything after this point handles as one.
+  fn handle_add_pact_interaction(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: AddPactInteraction = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(session) = self.sessions.get_mut(&req.session) else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    let (interaction, error) = match crate::legacy::builder::interaction(&req.pact) {
+      Err(problems) => (
+        built_description(&req.pact),
+        EngineError::interaction_invalid(&problems),
+      ),
+      Ok(built) => match session.add_converted_interaction(&built.spec, &built.example) {
+        Ok(handle) if built.findings.is_empty() => return ResponseFrame::ok(id, json!({ "handle": handle })),
+        Ok(handle) => return ResponseFrame::ok(id, json!({ "handle": handle, "findings": built.findings })),
+        Err(AddInteractionError::Invalid(err)) => {
+          (built.spec, EngineError::interaction_invalid(&err.problems))
+        }
+        Err(AddInteractionError::Unavailable(unavailable)) => {
+          (built.spec, EngineError::component_unresolved(&unavailable))
+        }
+      },
+    };
+    // A contract without this interaction would not be the suite's (ADR 0064 decision 4).
+    session.record_refusal(&interaction, &error.code, &error.message);
     ResponseFrame::err(id, error)
   }
 
@@ -1428,6 +1461,23 @@ fn stop_targets(targets: &[Target]) {
     let _ = target.component.stop(Stop {
       instance: target.instance.clone(),
     });
+  }
+}
+
+/// The description `add-pact-interaction`'s steps gave the interaction, for naming a refused one (ADR 0064
+/// decision 4): the last `upon_receiving`, as the FFI keeps the last.
+fn built_description(pact: &Value) -> Value {
+  let description = pact
+    .get("steps")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+    .filter(|step| step.get("call").and_then(Value::as_str) == Some("upon_receiving"))
+    .filter_map(|step| step.get("description").cloned())
+    .next_back();
+  match description {
+    Some(description) => json!({ "description": description }),
+    None => json!({}),
   }
 }
 

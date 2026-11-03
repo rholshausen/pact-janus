@@ -2830,24 +2830,7 @@ fn interaction_ref(
 /// header says so), so this rebuilds the specification rather than teaching the compiler a second
 /// input shape — which is also what makes the verifier's plans the consumer's plans.
 fn interaction_spec(interaction: &contract::Interaction) -> Result<InteractionSpec, Vec<Problem>> {
-  let mut document = json!({
-    "description": interaction.description,
-    "parts": interaction.parts,
-  });
-  let map = document.as_object_mut().expect("a json! object literal");
-  if let Some(transport) = &interaction.transport {
-    map.insert("transport".to_string(), json!(transport));
-  }
-  if let Some(states) = &interaction.states {
-    map.insert("states".to_string(), json!(states));
-  }
-  if let Some(content_types) = &interaction.content_types {
-    map.insert("content-types".to_string(), json!(content_types));
-  }
-  if let Some(requires) = &interaction.requires {
-    map.insert("requires".to_string(), json!(requires));
-  }
-  interaction_spec::parse(&document).map_err(|err| err.problems)
+  interaction_spec::parse(&interaction.spec_document()).map_err(|err| err.problems)
 }
 
 /// A replayed request's declared content slots, turned back into octets (contract-file spec §5.5):

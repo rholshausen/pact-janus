@@ -20,7 +20,10 @@
 //! - [`xml`] reads a v1–v4 XML body into the document the built-in XML component decodes one to
 //!   (ADR 0039), which [`compile`] walks as today's verifier walks XML;
 //! - [`multipart`] splits a v1–v4 multipart body into the parts [`compile`] compares as today's
-//!   verifier compares them (ADR 0040).
+//!   verifier compares them (ADR 0040);
+//! - [`builder`] builds a v1–v4 interaction from the calls a consumer library makes to `pact_ffi`,
+//!   as the FFI builds one, and converts it as [`upgrade`] does (ADR 0066):
+//!   `consumer-session/add-pact-interaction`, which a compatibility facade calls.
 //!
 //! The rest of the kernel calls these, and holds what they return, without naming a `pact_models`
 //! type: a request kept for its generators is a [`pact::RequestTemplate`]. `tests/boundary.rs`
@@ -31,6 +34,7 @@
 //! A module rather than a crate: the compiler builds the kernel's plan nodes and the verification
 //! path calls the compiler, so a crate would need the kernel and the kernel would need it.
 
+pub mod builder;
 pub mod compile;
 pub mod multipart;
 pub mod pact;

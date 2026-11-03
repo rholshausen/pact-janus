@@ -36,37 +36,47 @@ classifies `like(object)` as `dropped`, while `upgrade` converts the same rule f
 
 ## Decision
 
-1. **`add-interaction` takes today's builder calls.** `consumer-session/add-interaction` takes either
-   `interaction`, an interaction specification, or `pact`: `{ specification?, steps }`. `steps` lists,
-   in order, the calls a consumer library makes to `pact_ffi` to build one interaction. Each step is
-   `{ call, … }`, named after the FFI function without its `pactffi_` prefix and carrying its
-   arguments by name. `specification` is `V2`, `V3` or `V4` (the default), the version the library
-   would write. In S2.5a the calls are the ones pact-js's HTTP builders make: `upon_receiving`, `given`,
+1. **A new operation takes today's builder calls.** `consumer-session/add-pact-interaction` takes
+   `{ session, pact }`, where `pact` is `{ specification?, steps }`, and adds the interaction they
+   build as `add-interaction` adds an interaction specification. `steps` lists, in order, the calls
+   a consumer library makes to `pact_ffi` to build one interaction. Each step is `{ call, … }`, named
+   after the FFI function without its `pactffi_` prefix and carrying its arguments by name.
+   `specification` is `V2`, `V3` or `V4` (the default), the version the library would write. In
+   S2.5a the calls are the ones pact-js's HTTP builders make: `upon_receiving`, `given`,
    `given_with_params`, `with_request`, `with_query_parameter`, `with_header_v2`, `with_body`,
    `with_binary_file`, `with_multipart_file_v2`, `with_matching_rules` and `response_status_v2`. A
-   value the FFI takes as integration JSON in a string is that JSON value in the step, not text. A file
-   the FFI would read is read by the host: the step carries its name and its octets, base64-encoded.
-   The engine reads no file. The vocabulary is open: an S6.1 SDK, or S2.5c's message calls, adds the
-   calls it makes.
+   value the FFI takes as integration JSON in a string is that JSON value in the step, not text. A
+   file the FFI would read is read by the host: the step carries its name and its octets,
+   base64-encoded. The engine reads no file. The vocabulary is open: an S6.1 SDK, or S2.5c's message
+   calls, adds the calls it makes.
 2. **The engine applies each call as `pact_ffi` does**, to an interaction that starts empty, in
-   `engine/kernel/src/legacy/builder.rs`. The integration JSON, XML builder and multipart handling is
+   `engine/kernel/src/legacy/builder/`. The integration JSON, XML builder and multipart handling is
    ported from `pact_ffi` at the commit above, with its provenance recorded, and stays with the other
-   v1–v4 code (S1.11). A step the FFI would reject, such as an unknown call, a missing argument, or an
-   XML builder document it cannot read, is `interaction-invalid`, with a problem pointing at
-   `/pact/steps/<n>`.
+   v1–v4 code (S1.11). A step the FFI would reject, such as an unknown call or a missing argument, or
+   a matcher or XML builder document it cannot read, is `interaction-invalid`, with a problem pointing
+   at `/pact/steps/<n>`.
 3. **Then the interaction is converted as `janus upgrade` converts one.** It is upgraded as a
    one-interaction v4 pact, and the converted interaction becomes the session's interaction
    specification, so everything after it, from variants to the recorded contract, is a normal
-   interaction's. `add-interaction` answers `{ handle, findings? }`. `findings` lists the conversion's
-   findings in contract-file spec §8.4's vocabulary, with pointers into the built interaction, and is
-   present when there are any. The contract a facade test records is therefore the one `janus upgrade`
-   writes from the pact today's library would have written, and S1.1's harness already holds those to
-   the pact's verdicts.
-4. **The facade keeps today's data and calls, and selects the base variant only.** pact-js's matchers
-   are its integration JSON, returned unchanged, and its builders record the calls they would have
-   made. Each `executeTest` asks for variants with `strategy: base-only` (variant-semantics spec §3.2),
-   so a test runs once, against the example, as it does today. A test that wants variants moves to the
-   Janus DSL.
+   interaction's. `add-pact-interaction` answers `{ handle, findings? }`. `findings` lists the
+   conversion's findings in contract-file spec §8.4's vocabulary, with pointers into the built
+   interaction, and is present when there are any. The contract a facade test records is therefore
+   the one `janus upgrade` writes from the pact today's library would have written, and S1.1's
+   harness already holds those to the pact's verdicts.
+4. **The facade keeps today's data and calls, and the test runs against the example only.**
+   pact-js's matchers are its integration JSON, returned unchanged, and its builders record the calls
+   they would have made. A converted interaction's selection is the one `upgrade` records: one
+   variant, `base`, whose assignment pins no dimension (variant-semantics spec §9), whatever policy a
+   host asks `variants` for. So a test runs once, against the example, as it does today, and an
+   `eachLike` admits any length its rule does. A base variant chosen by `base-only` would pin each
+   dimension at its base point, and a pinned `min` admits exactly `min` elements (ADR 0024): the
+   contract would demand one element where pact-js's demanded one or more. That variant is the
+   interaction's own example, as `upgrade` records it: a mock serves it, each slot decoded as a
+   reply's is, generators still filling fresh values, and the contract records it as the variant's
+   values. Shapes cannot always give the example back. An `eachKey` rule converts to an `each-entry`
+   whose values are open and whose least size is 0, from which nothing is generated, and a pact's
+   multipart request body has no shape at all. Recording the example means a verifier replays the
+   request today's verifier sends. A test that wants variants moves to the Janus DSL.
 5. **A primitive's verdict is the conversion's.** For a facade built this way, SDK spec §6.1's three
    verdicts describe what the conversion does with the rule the old primitive writes. `kept`: the rule
    converts with no `lossy` or `judgement` finding. `adapted`: it converts with a `judgement`, which the
@@ -90,6 +100,9 @@ classifies `like(object)` as `dropped`, while `upgrade` converts the same rule f
 - **Map each matcher to a shape in the SDK**, as SDK spec §6 sketched. The conversion would be decided
   per language and checked against `upgrade` by hand. The facade budget would grow by the size of the
   FFI's body processing, in TypeScript and again in Java.
+- **A second form of `add-interaction`.** `add-interaction` would take `interaction` or `pact`, but its
+  request schema requires `interaction`, and relaxing a required member is a change engine-protocol
+  spec §11.2's checker refuses. A new operation is additive, and its answer's `findings` belong to it.
 - **A declarative document: a v4 interaction whose values may be integration JSON.** It reads better
   than a list of calls, but `pact_ffi`'s result depends on their order. A body's content type falls
   back to a `Content-Type` header set before it, the body sets that header only when no call has, and a
@@ -102,6 +115,9 @@ classifies `like(object)` as `dropped`, while `upgrade` converts the same rule f
 - **Run every variant the converted shapes allow.** An upgraded `each-like` or `optional` would make a
   pact-js test run several times, against values its author never wrote. That is the Janus DSL's
   feature, and a test opts into it by moving to that DSL.
+- **Let the facade ask for `base-only`.** It runs the test once, but the base variant it selects pins
+  every dimension, which `upgrade`'s does not, so the recorded contract would be stricter than the
+  upgraded pact and fail providers the pact passes.
 
 ## Consequences
 
@@ -110,13 +126,15 @@ record calls. pact-jvm's facade (S2.5b) can send the rules its DSL builds. Every
 brings in gets the same conversion for the price of recording its calls. A facade test records what
 `janus upgrade` would make of today's pact, so S1.1's verdicts and upgrade ledger cover it.
 
-Harder: the kernel's legacy layer grows by the FFI's builder, about a thousand lines of Rust that must
-follow `pact_ffi` as it changes. Where they differ, a facade test records something today's library
-would not. The kernel tests replay pact-js's examples' calls and compare the result with the pacts
-pact-js wrote, which are in S1.1's corpus.
+Harder: a converted interaction is not served or recorded from its shapes, as every other
+interaction is. The session holds its example beside them, so what its mock serves and its contract
+records is the pact's, not the shapes'. The kernel's legacy layer grows by the FFI's builder, about
+a thousand lines of Rust that must follow `pact_ffi` as it changes. Where they differ, a facade test
+records something today's library would not. The kernel tests replay pact-js's examples' calls and
+compare the result with the pacts pact-js wrote, which are in S1.1's corpus.
 
-Committed to: `add-interaction`'s `pact` form and its step vocabulary, `findings` in its answer, and
-the verdict rule in decision 5.
+Committed to: `add-pact-interaction`, its step vocabulary and the `findings` in its answer, and the
+verdict rule in decision 5.
 
 Not decided here: the one interaction armed per transport and the one exchange per arming are the
 kernel's, not this ADR's. A pact-js test that adds several interactions before one `executeTest`, or

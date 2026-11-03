@@ -2,7 +2,7 @@
   "name": "pact-janus",
   "private": true,
   "version": "0.1.1",
-  "description": "Pact Janus TypeScript SDK: the consumer DSL, the provider verifier and pact-js's verifier API over the Janus engine. Released as a file on this repository's GitHub releases, not to npm (ADR 0060).",
+  "description": "Pact Janus TypeScript SDK: the consumer DSL, the provider verifier, and pact-js's consumer and provider API over the Janus engine. Released as a file on this repository's GitHub releases, not to npm (ADR 0060).",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -43,6 +43,16 @@
       "require": {
         "types": "./dist/cjs/facade/verifier.d.ts",
         "default": "./dist/cjs/facade/verifier.js"
+      }
+    },
+    "./pact": {
+      "import": {
+        "types": "./dist/facade/pact.d.ts",
+        "default": "./dist/facade/pact.js"
+      },
+      "require": {
+        "types": "./dist/cjs/facade/pact.d.ts",
+        "default": "./dist/cjs/facade/pact.js"
       }
     },
     "./bindings": {

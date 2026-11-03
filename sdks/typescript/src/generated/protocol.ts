@@ -160,11 +160,74 @@ export interface AddInteraction {
   [k: string]: unknown;
 }
 
+/**
+ * consumer-session/add-pact-interaction (spec.md §8.2, ADR 0066): a v1–v4 interaction as a consumer library builds it through pact_ffi, added as add-interaction adds an interaction specification.
+ */
+export interface AddPactInteraction {
+  session: string;
+  pact: PactSteps;
+  [k: string]: unknown;
+}
+
+/**
+ * A v1–v4 interaction as a consumer library builds it through pact_ffi (spec.md §8.2, ADR 0066): the calls it makes, in order, which the engine applies as pact_ffi does to an interaction that starts empty, then converts as upgrade/pact converts a pact's interaction.
+ */
+export interface PactSteps {
+  /**
+   * The pact specification the library would write, which decides what some calls add (with_binary_file's body rule, from V3). Default 'V4'.
+   */
+  specification?: string;
+  steps: PactStep[];
+  [k: string]: unknown;
+}
+
+/**
+ * One pact_ffi call, named without its 'pactffi_' prefix, its arguments by name (spec.md §8.2 lists them). 'part' is 'request' or 'response'. A value the FFI takes as integration JSON in a string is the JSON value, a string being the text as given. A file the FFI would read is its name and its octets, base64-encoded.
+ */
+export interface PactStep {
+  /**
+   * Open vocabulary: a call the engine does not make is 'interaction-invalid', pointing at it.
+   */
+  call: string;
+  [k: string]: unknown;
+}
+
 export interface AddInteractionResult {
   /**
    * Identifies the interaction within this session; invalid after finalise.
    */
   handle: string;
+  [k: string]: unknown;
+}
+
+export interface AddPactInteractionResult {
+  /**
+   * Identifies the interaction within this session, as add-interaction's handle does.
+   */
+  handle: string;
+  /**
+   * What converting the built interaction lost or decided (ADR 0066 decision 3), in contract-file spec §8.4's vocabulary; present when there is any.
+   */
+  findings?: {
+    /**
+     * Open vocabulary; an unknown code is displayed, never dispatched on. Codes are listed in contract-file spec §8.4.
+     */
+    code: string;
+    /**
+     * 'lossy', 'judgement' or 'note', as contract-file spec §8.4 means them.
+     */
+    kind: string;
+    /**
+     * RFC 6901 JSON pointer into the v4 interaction the steps built, as a pact would hold it; the empty pointer is the whole interaction.
+     */
+    path: string;
+    message: string;
+    /**
+     * RFC 6901 JSON pointer into the interaction specification the conversion produced, when the construct ended up somewhere.
+     */
+    target?: string;
+    [k: string]: unknown;
+  }[];
   [k: string]: unknown;
 }
 

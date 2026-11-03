@@ -12,6 +12,10 @@ same as [order-example-mapping.md](order-example-mapping.md).
 
 ## 1. `like` has two faces, and only one maps cleanly
 
+This classification is for a facade that maps old primitives onto new ones. A facade over today's
+FFI hands the engine the old rule instead, and `upgrade` writes composite `like` out position by
+position, so there it is `kept` (spec.md §6.3, ADR 0066).
+
 Classic `like(v)` means two different things depending on what `v` is, and the facade has to say so
 rather than pick one and hope:
 

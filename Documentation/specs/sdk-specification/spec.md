@@ -306,6 +306,24 @@ representative slice of today's classic consumer DSL (`like`, `eachLike`, `term`
 vocabulary, so 6.2/6.3 have a concrete table to build the actual facade module from rather than starting
 the classification from nothing.
 
+### 6.3 A facade over today's FFI
+
+A facade over a library built on `pact_ffi` (pact-js today, and pact-python, pact-go, pact-net and
+pact-php when S6.1 brings them in) does not map its primitives here. Its matchers are the FFI's
+integration JSON, and its builders record the FFI calls they would have made. The engine makes those
+calls and converts the interaction as `upgrade/pact` converts a pact's
+(`consumer-session/add-pact-interaction`, engine-protocol spec §8.2,
+[ADR 0066](../../decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)).
+So the conversion is decided once, in the engine, for every such SDK, and none of it is the SDK's.
+
+§6.1's verdicts then describe what the conversion does with the rule an old primitive writes.
+**`kept`**: it converts with no `lossy` or `judgement` finding (contract-file spec §8.4). **`adapted`**:
+it converts with a `judgement`, which the migration note states. **`dropped`**: it is refused, or
+converts with a `lossy` finding, and the note says what to write instead. The verdicts are published
+in the language's migration note, not in `facade` arrays, since the facade maps onto `pact` steps
+rather than onto a primitive. Where §6.2's worked example and a conversion disagree, as for composite
+`like`, which `upgrade` writes out position by position, a facade of this kind follows the conversion.
+
 ## 7. Conformance
 
 [ADR 0017](../../decisions/0017-sdk-conformance-is-suite-passing-not-prose-matching.md) is the decision

@@ -37,6 +37,9 @@ multer = { version = "3.1", default-features = false }
 futures-util = { version = "0.3", default-features = false }
 mime = "0.3"
 serde_path_to_error = "0.1"
+# The rules a matching-rule expression names, as `pact_models` parses them, in the FFI's builder
+# (ADR 0066). Already in the tree through `pact_models`.
+either = "1"
 # The interpreter's match:regex/match:semver/bytes-literal support. Pure Rust, no OS bindings -
 # pact-reference's own matching engine depends on the same three for the same reasons.
 regex = "1"

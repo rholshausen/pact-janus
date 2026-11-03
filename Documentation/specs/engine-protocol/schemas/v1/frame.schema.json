@@ -45,6 +45,7 @@
             "engine/shutdown",
             "consumer-session/create",
             "consumer-session/add-interaction",
+            "consumer-session/add-pact-interaction",
             "consumer-session/variants",
             "consumer-session/start-transport",
             "consumer-session/serve-variant",

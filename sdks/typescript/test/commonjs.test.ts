@@ -34,12 +34,13 @@ describe("the CommonJS build", () => {
     await writeFile(
       script,
       `const { Verifier, MessageProviderPact, providerWithMetadata } = require("pact-janus/verifier");
+       const { Pact, PactV3, Matchers } = require("pact-janus/pact");
        const janus = require("pact-janus");
        require("pact-janus/bindings");
        console.log(JSON.stringify([typeof Verifier, typeof MessageProviderPact, typeof providerWithMetadata,
-         typeof janus.Verifier, typeof janus.VerificationFailedError]));`,
+         typeof janus.Verifier, typeof janus.VerificationFailedError, typeof Pact, typeof PactV3, typeof Matchers.like]));`,
     );
     const loaded = execFileSync(process.execPath, [script], { cwd: root, encoding: "utf8" });
-    expect(JSON.parse(loaded)).toEqual(["function", "function", "function", "function", "function"]);
+    expect(JSON.parse(loaded)).toEqual(Array(8).fill("function"));
   }, 60_000);
 });

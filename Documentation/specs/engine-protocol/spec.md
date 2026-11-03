@@ -579,6 +579,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 |---|---|
 | `consumer-session/create` | `{ config }` → `{ session }` |
 | `consumer-session/add-interaction` | `{ session, interaction }` → `{ handle }` |
+| `consumer-session/add-pact-interaction` | `{ session, pact }` → `{ handle, findings? }` |
 | `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
 | `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
 | `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
@@ -598,6 +599,43 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
   enough for an SDK user are a stated goal (plan 3.2). The returned `handle` identifies the
   interaction within this session.
+- **`add-pact-interaction`** ([ADR 0066](../../decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)):
+  adds a v1–v4 interaction as a consumer library builds it through `pact_ffi`, so a compatibility
+  facade over pact-js, or any library built on the FFI, records its builder calls rather than making
+  them. `pact` is `{ specification?, steps }`: `specification` is `V2`, `V3` or `V4` (the default),
+  the version the library would write, and `steps` the calls it makes, in order, each `{ call, … }`
+  named after the FFI function without its `pactffi_` prefix. The engine applies them as the FFI
+  does to an interaction that starts empty, then converts the interaction as `upgrade/pact` converts
+  a pact's (contract-file spec §8), and adds the result as `add-interaction` adds an interaction
+  specification: the `handle` is an ordinary interaction's, and a refusal withholds the contract as
+  `add-interaction`'s does. Its selection is the one `upgrade/pact` records: `variants` answers one
+  variant, `base`, whose assignment pins no dimension (variant-semantics spec §9), whatever policy
+  is asked for, so the test runs against the example and an `each-like` admits any length its rule
+  does. `findings` is the conversion's (contract-file spec §8.4), each `path` a
+  pointer into the built v4 interaction and each `target` into the interaction specification it
+  became, present when there is any. A value the FFI takes as integration JSON in a string is that
+  JSON value, a string being the text as given; a file the FFI would read is its name and its
+  octets, base64-encoded, since the engine reads no file. `part` is `request` or `response`. The
+  calls and their arguments:
+
+  | `call` | Arguments |
+  |---|---|
+  | `upon_receiving` | `description` |
+  | `given` | `description` |
+  | `given_with_params` | `description`, `params` |
+  | `with_request` | `method`, `path` |
+  | `with_query_parameter` | `name`, `index` (default 0), `value` |
+  | `with_header_v2` | `part`, `name`, `index` (default 0), `value` |
+  | `response_status_v2` | `status` |
+  | `with_body` | `part`, `content_type?`, `body` |
+  | `with_binary_file` | `part`, `content_type`, `body` (base64) |
+  | `with_matching_rules` | `part`, `rules` |
+  | `with_multipart_file_v2` | `part`, `content_type`, `file`, `contents` (base64), `part_name?` (default `file`), `boundary?` |
+
+  Two things differ from the FFI. A multipart boundary not given is derived from the part, so the
+  same test records the same bytes on every run, and a part's `Content-Type` is the call's
+  `content_type`. A step the engine does not make, or cannot read, is `interaction-invalid`, each
+  problem pointing at `/pact/steps/<n>`.
 - **`variants`**: the variants the engine has *selected* for this interaction (design 2.3),
   in run order, for variant-driven test loops — the sample, not the whole space, with a
   sibling `report` describing how it was chosen. An optional `policy` in the request

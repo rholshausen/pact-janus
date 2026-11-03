@@ -1,11 +1,67 @@
-// pact-js examples/provider-state/provider.test.ts, on pact-janus/verifier (ADR 0056 decision 5): a
-// parameterised state whose handler's returned value feeds the pact's ProviderState generator.
+// pact-js examples/provider-state, both sides, on pact-janus/pact (ADR 0056 decision 5, ADR 0066): a
+// PactV3 consumer test with a parameterised state and fromProviderState, which records what `janus
+// upgrade` makes of the pact pact-js wrote; and the provider, whose state handler's returned value
+// feeds the ProviderState generator.
 
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Verifier } from "../../src/facade/verifier.js";
-import { corpusPact, json, serve, type Provider } from "./support.js";
+import { Matchers, PactV3, Verifier } from "../../src/facade/pact.js";
+import { contractDir, corpusPact, documents, failsOnlyOnMediaType, json, recorded, serve, upgraded, type Provider } from "./support.js";
+
+const { integer, string, fromProviderState } = Matchers;
 
 type Account = { id: number; accountNumber: string; ownerName: string; balance: number };
+
+/** examples/provider-state/consumer.ts, on fetch. */
+class AccountServiceClient {
+  readonly baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  async getAccountByNumber(accountNumber: string): Promise<Account> {
+    const response = await fetch(`${this.baseUrl}/accounts/${accountNumber}`, { headers: { Accept: "application/json" } });
+    return (await response.json()) as Account;
+  }
+}
+
+const dir = contractDir();
+const pact = corpusPact("examples/pact-js/provider-state/pact.json");
+const contract = "AccountConsumer-AccountService.janus.json";
+const description = "a GET request for account ACC-001";
+
+describe("AccountServiceClient", () => {
+  const provider = new PactV3({ consumer: "AccountConsumer", provider: "AccountService", dir, logLevel: "warn" });
+
+  it("fetches an account by account number — parameterised state + fromProviderState()", () => {
+    provider
+      .given("an account with number {accountNumber} exists", { accountNumber: "ACC-001" })
+      .uponReceiving(description)
+      .withRequest({ method: "GET", path: "/accounts/ACC-001", headers: { Accept: "application/json" } })
+      .willRespondWith({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: {
+          id: fromProviderState("${accountId}", 42),
+          accountNumber: string("ACC-001"),
+          ownerName: string("Jane Smith"),
+          balance: integer(1000),
+        },
+      });
+
+    return provider.executeTest(async (mockserver) => {
+      const account = await new AccountServiceClient(mockserver.url).getAccountByNumber("ACC-001");
+      expect(typeof account.id).toBe("number");
+      expect(account.accountNumber).toBe("ACC-001");
+    });
+  }, 30_000);
+
+  it("records what janus upgrade makes of pact-js's pact", async () => {
+    expect(documents(recorded(dir, contract, description))).toEqual(documents(await upgraded(pact, description)));
+  }, 30_000);
+});
+
 const accounts = new Map<string, Account>();
 let nextId = 1;
 function seedAccount(accountNumber: string, ownerName: string): number {
@@ -34,10 +90,10 @@ describe("AccountService", () => {
 
   afterAll(() => server.close());
 
-  it("satisfies all AccountConsumer expectations", async () => {
-    const result = await new Verifier({
+  const verifier = (file: string) =>
+    new Verifier({
       providerBaseUrl: server.url,
-      pactUrls: [corpusPact("examples/pact-js/provider-state/pact.json")],
+      pactUrls: [file],
       stateHandlers: {
         "an account with number {accountNumber} exists": async (parameters: Record<string, unknown> = {}) => {
           clearAccounts();
@@ -47,7 +103,14 @@ describe("AccountService", () => {
         },
       },
       logLevel: "warn",
-    }).verifyProvider();
+    });
+
+  it("satisfies all AccountConsumer expectations", async () => {
+    const result = await verifier(pact).verifyProvider();
     expect(result.status).toBe("verified");
+  }, 30_000);
+
+  it("verifies the contract the consumer test recorded, but for S3.4's Content-Type", async () => {
+    await failsOnlyOnMediaType(verifier(join(dir, contract)).verifyProvider(), 1);
   }, 30_000);
 });

@@ -71,6 +71,32 @@ pub struct Interaction {
   pub selection: RecordedSelection,
 }
 
+impl Interaction {
+  /// The interaction specification this recorded interaction was written from (protocol spec §8.2):
+  /// its description, transport, states, shapes, declared content types and requirements, without
+  /// the variants it recorded.
+  pub fn spec_document(&self) -> Value {
+    let mut document = serde_json::json!({
+      "description": self.description,
+      "parts": self.parts,
+    });
+    let map = document.as_object_mut().expect("a json! object literal");
+    if let Some(transport) = &self.transport {
+      map.insert("transport".to_string(), serde_json::json!(transport));
+    }
+    if let Some(states) = &self.states {
+      map.insert("states".to_string(), serde_json::json!(states));
+    }
+    if let Some(content_types) = &self.content_types {
+      map.insert("content-types".to_string(), serde_json::json!(content_types));
+    }
+    if let Some(requires) = &self.requires {
+      map.insert("requires".to_string(), serde_json::json!(requires));
+    }
+    document
+  }
+}
+
 /// Design 2.3's variant-selection document plus this design's evidence
 /// (contract-file spec §5.1).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

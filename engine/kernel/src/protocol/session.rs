@@ -75,6 +75,20 @@ pub(crate) struct InteractionEntry {
   fresh: Arc<BTreeMap<String, contract::ShapePart>>,
   /// The interaction's declared content types, as an exchange reads them.
   content_types: Arc<ContentTypes>,
+  /// Converted from a v1–v4 interaction (`add-pact-interaction`, ADR 0066): its selection is the
+  /// one `upgrade` records, a `base` variant that pins nothing, whatever policy a host asks for, and
+  /// that variant is the interaction's own example.
+  converted: Option<Converted>,
+}
+
+/// A converted interaction's example (ADR 0066 decisions 3 and 4), as today's mock server serves it
+/// and as `upgrade` records it.
+struct Converted {
+  /// What a mock serves: the example's slots, decoded as a reply's are, over what the shapes generate.
+  served: Arc<Payload>,
+  /// What the contract records as the base variant's values: the example as `upgrade` records it,
+  /// so a verifier replays the request today's verifier sends, octets and all.
+  recorded: BTreeMap<String, contract::ValuePart>,
 }
 
 /// The test's verdict on one variant (ADR 0064 decision 1): whether it passed, and what it failed
@@ -316,9 +330,50 @@ impl ConsumerSession {
         armings: HashMap::new(),
         fresh: Arc::new(fresh),
         content_types,
+        converted: None,
       },
     );
     self.order.push(handle.clone());
+    Ok(handle)
+  }
+
+  /// `add-pact-interaction` (ADR 0066): an interaction specification converted from a v1–v4
+  /// interaction, added as [`Self::add_interaction`] adds one. Its one variant is the example, as
+  /// an upgraded pact's is (variant-semantics spec §9): `base`, pinning no dimension, so an
+  /// `each-like` admits any length its rules do, as the pact's matching rules did, rather than the
+  /// one element a pinned base point would (ADR 0024). The mock serves it `example`, the
+  /// interaction's own, as today's mock server does, and the contract records `example` as its
+  /// values, as `upgrade` does.
+  pub fn add_converted_interaction(
+    &mut self,
+    interaction: &Value,
+    example: &BTreeMap<String, contract::ValuePart>,
+  ) -> Result<String, AddInteractionError> {
+    let handle = self.add_interaction(interaction)?;
+    let content = self.scope.content();
+    if let Some(entry) = self.interactions.get_mut(&handle) {
+      // The example's slots decoded as a reply's are (`wire::decode_slot`), over what the shapes
+      // generate: a slot whose octets no component decodes keeps its generated value.
+      let mut served = generate::interaction(&entry.spec, &Assignment::new());
+      for (part, slots) in example {
+        for (slot, value) in slots {
+          let declared = declared_type(Some(&entry.content_types), part, slot);
+          match super::wire::decode_slot(value, declared, content.as_deref()) {
+            crate::plan::RuntimeValue::Absent | crate::plan::RuntimeValue::Bytes(_) => {}
+            document => {
+              served
+                .entry(part.clone())
+                .or_default()
+                .insert(slot.clone(), document.to_json());
+            }
+          }
+        }
+      }
+      entry.converted = Some(Converted {
+        served: Arc::new(served),
+        recorded: example.clone(),
+      });
+    }
     Ok(handle)
   }
 
@@ -431,10 +486,24 @@ impl ConsumerSession {
       return Err(VariantsError::HandleNotFound);
     };
     let space = plan::variant_space(&entry.spec);
-    let layers = [self.policy.as_ref(), call_policy];
-    let policy = crate::variant::SamplingPolicy::resolve(&layers)
-      .map_err(|problem| VariantsError::Variant(VariantError::InvalidPolicy(vec![problem])))?;
-    let selected = select(&space, &policy).map_err(VariantsError::Variant)?;
+    let selected = if entry.converted.is_some() {
+      // The selection `upgrade` records for a converted interaction (ADR 0066 decision 3).
+      let policy = crate::variant::SamplingPolicy {
+        strategy: "base-only".to_string(),
+        boundaries: false,
+        ..crate::variant::SamplingPolicy::default()
+      };
+      let mut selected = select(&space, &policy).map_err(VariantsError::Variant)?;
+      for variant in &mut selected.variants {
+        variant.assignment.clear();
+      }
+      selected
+    } else {
+      let layers = [self.policy.as_ref(), call_policy];
+      let policy = crate::variant::SamplingPolicy::resolve(&layers)
+        .map_err(|problem| VariantsError::Variant(VariantError::InvalidPolicy(vec![problem])))?;
+      select(&space, &policy).map_err(VariantsError::Variant)?
+    };
 
     let variants: Vec<Value> = selected.variants.iter().map(|v| v.to_json(&space)).collect();
     let result = serde_json::json!({ "variants": variants, "report": selected.report.to_json() });
@@ -480,7 +549,10 @@ impl ConsumerSession {
       .map(|t| t.kind.clone());
     if !entry.armings.contains_key(variant_id) {
       let arming = Arming {
-        parts: Arc::new(generate::interaction(&entry.spec, &assignment)),
+        parts: match &entry.converted {
+          Some(converted) => Arc::clone(&converted.served),
+          None => Arc::new(generate::interaction(&entry.spec, &assignment)),
+        },
         request_plan: passive_kind.is_some().then(|| {
           Arc::new(contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id)))
         }),
@@ -689,7 +761,10 @@ impl ConsumerSession {
             // is the whole point of a binding, and recording the resolved values is what lets a
             // verifier's own resolution be checked against this one rather than trusted.
             states: params::resolve_states(entry.spec.states.as_ref(), &space, &v.assignment),
-            parts: to_value_parts(&exercised.parts, entry.spec.content_types.as_ref()),
+            parts: match &entry.converted {
+              Some(converted) => converted.recorded.clone(),
+              None => to_value_parts(&exercised.parts, entry.spec.content_types.as_ref()),
+            },
           }
         })
         .collect();

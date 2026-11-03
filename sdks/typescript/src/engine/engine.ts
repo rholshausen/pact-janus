@@ -13,6 +13,7 @@ interface Operations {
   [Op.EngineHello]: [protocol.Hello, protocol.HelloResult];
   [Op.ConsumerSessionCreate]: [protocol.Create, protocol.CreateResult];
   [Op.ConsumerSessionAddInteraction]: [protocol.AddInteraction, protocol.AddInteractionResult];
+  [Op.ConsumerSessionAddPactInteraction]: [protocol.AddPactInteraction, protocol.AddPactInteractionResult];
   [Op.ConsumerSessionStartTransport]: [protocol.StartTransport, protocol.StartTransportResult];
   [Op.ConsumerSessionVariants]: [protocol.Variants, protocol.VariantsResult];
   [Op.ConsumerSessionServeVariant]: [protocol.ServeVariant, protocol.ServeVariantResult];
