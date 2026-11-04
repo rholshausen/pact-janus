@@ -17,12 +17,13 @@
 
 use super::contributions::Contributions;
 use super::session::{ExchangeOutcome, Exercised, Payload};
-use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver, plain_slot};
+use super::wire::{encode_slot, find_container, mismatch_json, octets_slot, parts_resolver, plain_slot};
 use crate::common::ContentTypes;
 use crate::component::{
   ContentComponent, ContentSlots, Dispose, Inbound, Part, Parts, PollInbound, Reply, TransportComponent,
 };
 use crate::plan::{Plan, Status, execute_with, outcome};
+use crate::variant::generate::Generated;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -431,7 +432,8 @@ fn fill_fresh(
       continue;
     };
     for (slot_name, value) in slots.iter_mut() {
-      if let Some(shape) = shapes.get(slot_name) {
+      // Octets have no generator to fill: a generator's value is a document (S2.15).
+      if let (Some(shape), Generated::Document(value)) = (shapes.get(slot_name), value) {
         crate::shape::fresh::fill(
           shape,
           value,
@@ -463,9 +465,13 @@ pub(crate) fn wire_parts(
       let part: Part = slots
         .iter()
         .map(|(slot_name, value)| {
-          let wired = match types.and_then(|types| types.get(slot_name)) {
-            Some(content_type) => encode_slot(value, Some(content_type), content),
-            None => plain_slot(value),
+          let declared = types.and_then(|types| types.get(slot_name)).map(String::as_str);
+          let wired = match (value, declared) {
+            (Generated::Octets(bytes), declared) => octets_slot(bytes, declared),
+            (Generated::Document(value), Some(content_type)) => {
+              encode_slot(value, Some(content_type), content)
+            }
+            (Generated::Document(value), None) => plain_slot(value),
           };
           (slot_name.clone(), wired)
         })
@@ -480,7 +486,7 @@ pub(crate) fn wire_parts(
 /// (component-interfaces spec §5.5); every other slot — an HTTP response's `headers` map is as
 /// structured as any body — is handed over as its plain JSON value.
 fn response_parts(
-  response: &BTreeMap<String, BTreeMap<String, Value>>,
+  response: &Payload,
   answering: &str,
   content_slots: &ContentSlots,
   declared_types: Option<&BTreeMap<String, String>>,
@@ -492,13 +498,14 @@ fn response_parts(
     let mut part = Part::new();
     for (slot_name, value) in slots {
       let is_content = declared.is_some_and(|names| names.contains(slot_name));
-      let wired = if is_content {
-        let declared_type = declared_types
-          .and_then(|slots| slots.get(slot_name))
-          .map(String::as_str);
-        encode_slot(value, declared_type, content)
-      } else {
-        plain_slot(value)
+      let declared_type = declared_types
+        .filter(|_| is_content)
+        .and_then(|slots| slots.get(slot_name))
+        .map(String::as_str);
+      let wired = match value {
+        Generated::Octets(bytes) => octets_slot(bytes, declared_type),
+        Generated::Document(value) if is_content => encode_slot(value, declared_type, content),
+        Generated::Document(value) => plain_slot(value),
       };
       part.insert(slot_name.clone(), wired);
     }

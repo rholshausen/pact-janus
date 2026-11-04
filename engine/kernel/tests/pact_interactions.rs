@@ -277,6 +277,110 @@ fn a_facade_message_test_is_handed_the_example_and_records_what_upgrade_makes_of
   assert_eq!(documents(recorded.clone()), documents(expected));
 }
 
+/// Octets that are not UTF-8, so no component reads them as text.
+const OCTETS: [u8; 4] = [0, 1, 2, 0xff];
+
+/// Adds `pact`, selects its one variant and arms it, answering the handle, the variant and what
+/// `serve-variant` answered.
+fn armed(engine: &mut Engine, session: &str, pact: Value) -> (String, String, Value) {
+  let added = send(
+    engine,
+    "consumer-session/add-pact-interaction",
+    json!({ "session": session, "pact": pact }),
+  );
+  let handle = added["ok"]["handle"]
+    .as_str()
+    .unwrap_or_else(|| panic!("{added}"))
+    .to_string();
+  let selected = send(
+    engine,
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let base = selected["ok"]["variants"][0]["id"].as_str().unwrap().to_string();
+  let served = send(
+    engine,
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": base }),
+  );
+  (handle, base, served)
+}
+
+/// S2.15: a message given octets is handed exactly those octets, and its contract records them.
+#[test]
+fn a_facade_message_given_octets_is_handed_those_octets() {
+  let (mut engine, session) = engine();
+  let (handle, base, served) = armed(
+    &mut engine,
+    &session,
+    json!({ "specification": "V4", "steps": [
+      { "call": "new_async_message", "description": "" },
+      { "call": "message_expects_to_receive", "description": "a blob" },
+      { "call": "message_with_contents", "content_type": "application/octet-stream", "contents": BASE64.encode(OCTETS) }
+    ] }),
+  );
+  let body = &served["ok"]["parts"]["message"]["body"];
+  assert_eq!(body["encoded"], "base64", "{served}");
+  assert_eq!(BASE64.decode(body["content"].as_str().unwrap()).unwrap(), OCTETS);
+
+  send(
+    &mut engine,
+    "consumer-session/report-variant",
+    json!({ "session": session, "handle": handle, "variant": base, "status": "passed" }),
+  );
+  let finalised = send(
+    &mut engine,
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let recorded =
+    &finalised["ok"]["contract"]["interactions"][0]["selection"]["variants"][0]["parts"]["message"]["body"];
+  assert_eq!(recorded["encoded"], "base64", "{finalised}");
+  assert_eq!(
+    BASE64.decode(recorded["content"].as_str().unwrap()).unwrap(),
+    OCTETS
+  );
+}
+
+/// S2.15: an HTTP reply given octets is served exactly those octets.
+#[test]
+fn a_facade_reply_given_octets_is_served_those_octets() {
+  let (mut engine, session) = engine();
+  let started = send(
+    &mut engine,
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!(
+    "{}:{}",
+    endpoint["host"].as_str().unwrap(),
+    endpoint["port"].as_u64().unwrap()
+  );
+  armed(
+    &mut engine,
+    &session,
+    json!({ "specification": "V4", "steps": [
+      { "call": "upon_receiving", "description": "a GET for a blob" },
+      { "call": "with_request", "method": "GET", "path": "/blob" },
+      { "call": "response_status_v2", "status": "200" },
+      { "call": "with_binary_file", "part": "response", "content_type": "application/octet-stream", "body": BASE64.encode(OCTETS) }
+    ] }),
+  );
+
+  let mut stream = TcpStream::connect(&addr).unwrap();
+  stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+  let request = format!("GET /blob HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+  stream.write_all(request.as_bytes()).unwrap();
+  let mut response = Vec::new();
+  let _ = stream.read_to_end(&mut response);
+  let head_end = response.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+  let head = String::from_utf8_lossy(&response[..head_end]).to_lowercase();
+  assert!(head.starts_with("http/1.1 200"), "{head}");
+  assert!(head.contains("content-type: application/octet-stream"), "{head}");
+  assert_eq!(&response[head_end..], OCTETS);
+}
+
 #[test]
 fn a_step_the_engine_cannot_make_is_refused_pointing_at_it() {
   let (mut engine, session) = engine();

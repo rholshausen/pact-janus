@@ -11,6 +11,7 @@
 use crate::common::{ContentTypes, declared_type};
 use crate::component::{ContentComponent, Decode, Encode, Parts, SlotValue};
 use crate::plan::{CapturedValues, Executed, ExecutedKind, Mismatch, RuntimeValue};
+use crate::variant::generate::Generated;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::Value;
@@ -59,11 +60,7 @@ pub(crate) fn decode_slot(
   declared: Option<&str>,
   content: Option<&dyn ContentComponent>,
 ) -> RuntimeValue {
-  let content_type = declared.or(slot.content_type.as_deref());
-  let claimed = content_type
-    .zip(content)
-    .filter(|(content_type, content)| content.handles(content_type));
-  match claimed {
+  match claimant(slot, declared, content) {
     Some((content_type, content)) => match content.decode(Decode {
       content_type: content_type.to_string(),
       value: slot.clone(),
@@ -88,6 +85,38 @@ pub(crate) fn decode_slot(
         .unwrap_or(RuntimeValue::Absent),
       _ => RuntimeValue::from_json(&slot.content),
     },
+  }
+}
+
+/// The content type a slot is decoded as and the component that claims it, if one does: the type
+/// declared for the slot, else the one it is labelled with.
+fn claimant<'a, 'c>(
+  slot: &'a SlotValue,
+  declared: Option<&'a str>,
+  content: Option<&'c dyn ContentComponent>,
+) -> Option<(&'a str, &'c dyn ContentComponent)> {
+  declared
+    .or(slot.content_type.as_deref())
+    .zip(content)
+    .filter(|(content_type, content)| content.handles(content_type))
+}
+
+/// A recorded example's slot as a mock serves it (ADR 0066 decision 4, S2.15): decoded as a reply's
+/// is ([`decode_slot`]), except that octets no component claims are served as those octets, whether
+/// they were recorded as `base64` or as UTF-8 `text`. `None` is a slot that could not be decoded.
+pub(crate) fn served_slot(
+  slot: &SlotValue,
+  declared: Option<&str>,
+  content: Option<&dyn ContentComponent>,
+) -> Option<Generated> {
+  let unclaimed_text = claimant(slot, declared, content).is_none() && slot.encoded.as_deref() == Some("text");
+  if unclaimed_text && let Some(text) = slot.content.as_str() {
+    return Some(Generated::Octets(text.as_bytes().to_vec()));
+  }
+  match decode_slot(slot, declared, content) {
+    RuntimeValue::Absent => None,
+    RuntimeValue::Bytes(bytes) => Some(Generated::Octets(bytes)),
+    document => Some(Generated::Document(document.to_json())),
   }
 }
 
@@ -128,6 +157,16 @@ pub(crate) fn encode_slot(
       Err(_) => plain_slot(value),
     },
     _ => plain_slot(value),
+  }
+}
+
+/// Octets wired as octets (S2.15): `base64`, with the type declared for the slot, if any. No content
+/// component encodes them, since they are already what a transport carries.
+pub(crate) fn octets_slot(bytes: &[u8], content_type: Option<&str>) -> SlotValue {
+  SlotValue {
+    content: Value::String(BASE64.encode(bytes)),
+    encoded: Some("base64".to_string()),
+    content_type: content_type.map(str::to_string),
   }
 }
 
@@ -228,6 +267,41 @@ mod tests {
     assert_eq!(
       decode_slot(&octets(Some("image/png")), Some("text/plain"), Some(&Failing)),
       RuntimeValue::Absent
+    );
+  }
+
+  #[test]
+  fn an_example_no_component_claims_is_served_as_its_octets() {
+    let text = SlotValue {
+      content: json!("\u{0}\u{1}\u{2}"),
+      encoded: Some("text".to_string()),
+      content_type: Some("application/octet-stream".to_string()),
+    };
+    assert_eq!(
+      served_slot(&text, None, Some(&Failing)),
+      Some(Generated::Octets(vec![0, 1, 2]))
+    );
+    assert_eq!(
+      served_slot(&octets(None), None, Some(&Failing)),
+      Some(Generated::Octets(vec![0, 1, 2]))
+    );
+    assert_eq!(
+      served_slot(&plain_slot(&json!({ "id": 1 })), None, Some(&Failing)),
+      Some(Generated::Document(json!({ "id": 1 })))
+    );
+  }
+
+  #[test]
+  fn an_example_a_component_claims_is_its_document_or_nothing() {
+    let text = SlotValue {
+      content: json!("hello"),
+      encoded: Some("text".to_string()),
+      content_type: Some("text/plain".to_string()),
+    };
+    assert_eq!(
+      served_slot(&text, None, Some(&Failing)),
+      None,
+      "it could not be decoded"
     );
   }
 

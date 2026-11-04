@@ -157,9 +157,7 @@ describe("a message test", () => {
     ]);
   }, 30_000);
 
-  // A served example's octets are its base64 text until S2.15, in a message as in an HTTP reply.
-  // When S2.15 lands this fails, and it goes back to `it`.
-  it.fails("given octets is handed them as a Buffer (S2.15)", async () => {
+  it("given octets is handed them as a Buffer (S2.15)", async () => {
     const messages = new MessageConsumerPact({ consumer: "Blobs", provider: "Store", dir: contractDir(), logLevel: "warn" });
     await messages
       .expectsToReceive("a blob")

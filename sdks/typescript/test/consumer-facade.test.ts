@@ -169,3 +169,14 @@ it("serves a matcher with no example a fresh value, as pact-js's mock does", asy
     .executeTest(async (mock) => (await (await fetch(`${mock.url}/orders/random`)).json()) as { id: number });
   expect(served?.id).toBeLessThanOrEqual(10);
 }, 30_000);
+
+it("serves a reply given octets exactly those octets (S2.15)", async () => {
+  const octets = Buffer.from([0, 1, 2, 0xff]);
+  const served = await new Pact(options(contractDir()))
+    .addInteraction()
+    .uponReceiving("a blob")
+    .withRequest("GET", "/blob")
+    .willRespondWith(200, (builder) => builder.body("application/octet-stream", octets))
+    .executeTest(async (mock) => Buffer.from(await (await fetch(`${mock.url}/blob`)).arrayBuffer()));
+  expect(served).toEqual(octets);
+}, 30_000);

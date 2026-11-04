@@ -11,14 +11,15 @@ use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
 use crate::plan::{self, Assignment, Plan};
+use crate::variant::generate::Generated;
 use crate::variant::{Selected, SelectionReport, VariantError, generate, params, select};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// A generated payload: `part -> slot -> value`.
-pub(crate) type Payload = BTreeMap<String, BTreeMap<String, Value>>;
+/// A generated payload: `part -> slot -> value`, a slot's value a document or octets (S2.15).
+pub(crate) type Payload = BTreeMap<String, BTreeMap<String, Generated>>;
 
 /// The variant a `serve-variant` call has most recently armed for one interaction (variant-
 /// semantics spec §4.1): its id, and the concrete payload the generator produced for it.
@@ -380,20 +381,17 @@ impl ConsumerSession {
     let handle = self.add_interaction(interaction)?;
     let content = self.scope.content();
     if let Some(entry) = self.interactions.get_mut(&handle) {
-      // The example's slots decoded as a reply's are (`wire::decode_slot`), over what the shapes
-      // generate: a slot whose octets no component decodes keeps its generated value.
+      // The example's slots as a mock serves them (`wire::served_slot`), over what the shapes
+      // generate: octets no component decodes are served as those octets (S2.15).
       let mut served = generate::interaction(&entry.spec, &Assignment::new());
       for (part, slots) in example {
         for (slot, value) in slots {
           let declared = declared_type(Some(&entry.content_types), part, slot);
-          match super::wire::decode_slot(value, declared, content.as_deref()) {
-            crate::plan::RuntimeValue::Absent | crate::plan::RuntimeValue::Bytes(_) => {}
-            document => {
-              served
-                .entry(part.clone())
-                .or_default()
-                .insert(slot.clone(), document.to_json());
-            }
+          if let Some(generated) = super::wire::served_slot(value, declared, content.as_deref()) {
+            served
+              .entry(part.clone())
+              .or_default()
+              .insert(slot.clone(), generated);
           }
         }
       }
@@ -907,12 +905,12 @@ pub(crate) fn raw_parts(interaction: &Value) -> BTreeMap<String, contract::Shape
 }
 
 /// Wrap a generated payload's values as the contract format's slot values (contract-file spec
-/// §5.3): `content` as-is and no `encoded` tag, which is the default `json` encoding — exactly right
-/// for a value [`generate::interaction`] already produced as a document-model `Value`. A declared
-/// content slot also carries its type (§5.5), which is how a verifier knows which component turns
-/// the recorded document back into the octets the consumer sent.
+/// §5.3): a document as-is with no `encoded` tag, which is the default `json` encoding, and octets
+/// as `base64` (S2.15), so a verifier replays the octets themselves. A declared content slot also
+/// carries its type (§5.5), which is how a verifier knows which component turns the recorded
+/// document back into the octets the consumer sent.
 fn to_value_parts(
-  parts: &BTreeMap<String, BTreeMap<String, Value>>,
+  parts: &Payload,
   content_types: Option<&ContentTypes>,
 ) -> BTreeMap<String, contract::ValuePart> {
   parts
@@ -921,14 +919,16 @@ fn to_value_parts(
       let slots = slots
         .iter()
         .map(|(slot, value)| {
-          (
-            slot.clone(),
-            contract::SlotValue {
-              content: value.clone(),
+          let content_type = declared_type(content_types, part, slot);
+          let recorded = match value {
+            Generated::Document(document) => contract::SlotValue {
+              content: document.clone(),
               encoded: None,
-              content_type: declared_type(content_types, part, slot).map(str::to_string),
+              content_type: content_type.map(str::to_string),
             },
-          )
+            Generated::Octets(bytes) => super::wire::octets_slot(bytes, content_type),
+          };
+          (slot.clone(), recorded)
         })
         .collect();
       (part.clone(), slots)

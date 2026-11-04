@@ -63,7 +63,7 @@ fn names(value: &Value) -> Vec<&str> {
 #[test]
 fn a_generated_document_has_its_members_in_the_order_the_shape_declares_them() {
   let parts = generate::interaction(&body(declared()), &Assignment::new());
-  let generated = &parts["response"]["body"];
+  let generated = parts["response"]["body"].as_document().expect("a document");
   assert_eq!(names(generated), ["status", "id", "shipping", "meta", "note"]);
   assert_eq!(names(&generated["shipping"]), ["street", "city"]);
   assert_eq!(
