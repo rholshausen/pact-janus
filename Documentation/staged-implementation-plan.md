@@ -1726,15 +1726,25 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
         does, so a verifier replays the request today's verifier sends.
       - pact-js's `XmlBuilder` writes its `Map` of attributes as `{}`, so its pacts lose an element's
         attributes. The facade keeps that, so it records what pact-js's pact holds.
-  - **S2.5b pact-jvm** — **L**. The `PactDslWithProvider` chain, `PactDslJsonBody`,
-    `PactDslJsonArray` and the `LambdaDsl` over them, the JUnit 5 consumer extension (`@Pact` methods,
-    `@PactTestFor`, the injected mock server), and message pacts, in a `facade` layer the JVM SDK's
-    `thinness.json` does not have yet. pact-jvm's JUnit 4 consumer support (`PactProviderRule`,
-    `@PactVerification`) is `dropped`, migrating to JUnit 5, since JUnit 4 is not supported (S2.4).
-    Whether pact-jvm's Groovy `PactBuilder`, which its Spock users write, is in scope is decided
-    before the step starts. The JSON body DSL may become a step of its own if this one proves too
-    big.
-    *Exit:* pact-jvm's consumer example suites run on the facade, except those written for JUnit 4.
+  - **S2.5b pact-jvm, for JUnit 5 and the Java DSL** — **L**. Most pact-jvm consumers write the Java
+    DSL under JUnit 5, so that is this step, and the rest of pact-jvm's consumer surface is S2.5d.
+    It covers the `PactDslWithProvider` chain (states, requests, responses, form posts, file
+    uploads), `PactDslJsonBody`, `PactDslJsonArray`, `PactDslJsonRootValue`, `PactDslRootValue` and
+    the `LambdaDsl` over them, `PactXmlBuilder`, `MessagePactBuilder`, and the JUnit 5 consumer
+    extension (`PactConsumerTestExt`, `@Pact` methods, `@PactTestFor` with one provider or several,
+    the injected `MockServer`, and the messages a message test is handed). They go in a `facade`
+    layer the JVM SDK's `thinness.json` does not have yet. pact-jvm's JUnit 4 consumer support
+    (`PactProviderRule`, `@PactVerification`) is `dropped`, migrating to JUnit 5, since JUnit 4 is
+    not supported (S2.4).
+    [ADR 0070](decisions/0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md)
+    decides how the Java DSL reaches the engine: the facade ports it, building the example, rules and
+    generators pact-jvm builds, and submits them as `add-pact-interaction` calls. Migrating replaces
+    `au.com.dius.pact.` with `io.pact.janus.facade.` in a suite's imports. The JSON body DSL may
+    become a step of its own if this one proves too big.
+    *Exit:* pact-jvm's JUnit 5 consumer tests (`consumer/junit5` at 4.7.8) that are written in Java
+    and use these DSLs run on the facade. Each records the contract `janus upgrade` writes from the
+    pact pact-jvm wrote. Excepted are the tests that ask for TLS or name a mock server implementation,
+    which are refused by name (ADR 0066 decision 6), and those S2.5d holds.
   - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
     message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
@@ -1765,6 +1775,15 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     - Not foreseen: a served example's octets are their base64 text, in a message's `parts` and in an
       HTTP mock's reply, since a generated payload is a JSON document. S2.5a's binary replies have it
       too. It is S2.15, and the facade's binary message test expects it to fail until then.
+  - **S2.5d The rest of pact-jvm's consumer DSLs** — **M**, split from S2.5b, and **not** a stage 2
+    exit condition. It covers the Groovy `PactBuilder` and `PactMessageBuilder` (`consumer/groovy`),
+    which pact-jvm's Spock users write, and its Spock extension (`consumer/spock`). It also covers
+    the Kotlin DSL (`consumer/kotlin`) and pact-jvm's V4 `PactBuilder` (`expectsToReceiveHttpInteraction`,
+    its HTTP and synchronous message builders, and `MultipartBuilder`), and the `consumer/junit5`
+    tests written in Groovy or Kotlin. Each goes on S2.5b's facade, translating to the same
+    `add-pact-interaction` calls. If it lands after S2.9, it lands in pact-jvm's repository.
+    *Exit:* the rest of pact-jvm's `consumer/junit5` tests, and its Groovy and Spock consumer tests, run
+    on the facade, but for those refused by name.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -1966,7 +1985,7 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,
-S2.5b, and pact-js's plugin one, S2.5a, excepted), both SDKs have graduated (S2.9), and early
+S2.5b, those S2.5d holds, and pact-js's plugin one, S2.5a, excepted), both SDKs have graduated (S2.9), and early
 adopters publish contracts to a broker that the stage 1 verifier checks. S2.7 lands when §7.1 answers,
 before or after.
 
@@ -2200,6 +2219,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
+| S2.5d | pact-jvm's Groovy, Spock and Kotlin DSLs and its V4 `PactBuilder` have no facade | split from S2.5b |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |

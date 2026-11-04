@@ -86,6 +86,7 @@ superseding ADR instead.
 | [0067](0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md) | Record a message as an emissive interaction, and hand it to the test when nothing delivers it | accepted |
 | [0068](0068-build-a-message-with-its-own-builder-and-hand-the-closure-the-message-in-place-of-a-mock.md) | Build a message with its own builder, and hand the closure the message in place of a mock | accepted |
 | [0069](0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md) | Keep an arming until its variant is reported, and give an arrival to the arming it matches best | accepted |
+| [0070](0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md) | Port pact-jvm's Java DSL into the facade, and submit what it builds as `pact_ffi` calls | accepted |
 
 ## Decision backlog
 
