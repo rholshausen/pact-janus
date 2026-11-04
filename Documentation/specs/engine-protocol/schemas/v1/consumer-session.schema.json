@@ -97,7 +97,9 @@
             "message_expects_to_receive",
             "message_given",
             "message_with_contents",
-            "message_with_metadata_v2"
+            "message_with_metadata_v2",
+            "with_binary_body",
+            "with_generators"
           ]
         }
       }

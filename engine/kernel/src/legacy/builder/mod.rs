@@ -43,7 +43,7 @@ use integration::{
 use pact_models::PactSpecification;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::{ContentType, TEXT, detect_content_type_from_string};
-use pact_models::generators::Generators;
+use pact_models::generators::{Generators, generators_from_json};
 use pact_models::headers::parse_header;
 use pact_models::http_parts::HttpPart;
 use pact_models::matchingrules::{MatchingRule, MatchingRules, RuleLogic, matchers_from_json};
@@ -318,6 +318,17 @@ enum Step {
     part: Part,
     rules: Map<String, Value>,
   },
+  /// `pactffi_with_binary_body`: octets as they stand, with no rule (ADR 0070).
+  WithBinaryBody {
+    part: Part,
+    content_type: Option<String>,
+    body: Vec<u8>,
+  },
+  /// `pactffi_with_generators` (ADR 0070).
+  WithGenerators {
+    part: Part,
+    generators: Map<String, Value>,
+  },
   WithMultipartFile(Box<MultipartFile>),
   MessageWithContents {
     content_type: Option<String>,
@@ -464,6 +475,23 @@ impl Step {
           ));
         }
       },
+      "with_binary_body" => Step::WithBinaryBody {
+        part: args.part()?,
+        content_type: args.optional_string("content_type")?,
+        body: args.octets("body")?,
+      },
+      "with_generators" => match args.value("generators")? {
+        Value::Object(generators) => Step::WithGenerators {
+          part: args.part()?,
+          generators: generators.clone(),
+        },
+        other => {
+          return Err(problem(
+            &format!("{at}/generators"),
+            &format!("'generators' is {other}, not an object"),
+          ));
+        }
+      },
       "with_multipart_file_v2" => Step::WithMultipartFile(Box::new(MultipartFile {
         part: args.part()?,
         content_type: args.string("content_type")?,
@@ -513,6 +541,8 @@ impl Step {
       Step::WithBody { .. } => "with_body",
       Step::WithBinaryFile { .. } => "with_binary_file",
       Step::WithMatchingRules { .. } => "with_matching_rules",
+      Step::WithBinaryBody { .. } => "with_binary_body",
+      Step::WithGenerators { .. } => "with_generators",
       Step::WithMultipartFile(_) => "with_multipart_file_v2",
       Step::MessageWithContents { .. } => "message_with_contents",
       Step::MessageWithMetadata { .. } => "message_with_metadata_v2",
@@ -579,6 +609,38 @@ impl Step {
         },
         Err(message) => problems.push(message),
       },
+      (
+        Step::WithBinaryBody {
+          content_type, body, ..
+        },
+        Building::Asynchronous(message),
+      ) => message_binary_body(&mut message.contents, content_type, body),
+      (
+        Step::WithBinaryBody {
+          part,
+          content_type,
+          body,
+        },
+        Building::Synchronous(message),
+      ) => message_binary_body(synchronous_part(message, part), content_type, body),
+      (Step::WithGenerators { generators, .. }, Building::Asynchronous(message)) => {
+        match read_generators(generators) {
+          Ok(generators) => message.contents.generators.add_generators(generators),
+          Err(message) => problems.push(message),
+        }
+      }
+      (Step::WithGenerators { part, generators }, Building::Synchronous(message)) => {
+        match read_generators(generators) {
+          Ok(generators) => match part {
+            Part::Request => message.request.generators.add_generators(generators),
+            Part::Response => message
+              .response
+              .iter_mut()
+              .for_each(|response| response.generators.add_generators(generators.clone())),
+          },
+          Err(message) => problems.push(message),
+        }
+      }
       (
         Step::MessageWithContents {
           content_type,
@@ -684,6 +746,21 @@ impl Step {
         },
         Err(message) => problems.push(message),
       },
+      Step::WithBinaryBody {
+        part,
+        content_type,
+        body,
+      } => match part {
+        Part::Request => with_binary_body(&mut built.request, content_type, body),
+        Part::Response => with_binary_body(&mut built.response, content_type, body),
+      },
+      Step::WithGenerators { part, generators } => match read_generators(generators) {
+        Ok(generators) => match part {
+          Part::Request => built.request.generators.add_generators(generators),
+          Part::Response => built.response.generators.add_generators(generators),
+        },
+        Err(message) => problems.push(message),
+      },
       Step::WithMultipartFile(file) => match file.part {
         Part::Request => with_multipart_file(&mut built.request, &file),
         Part::Response => with_multipart_file(&mut built.response, &file),
@@ -708,6 +785,51 @@ fn read_rules(rules: Map<String, Value>) -> Result<MatchingRules, String> {
     json!({ "matchingRules": rules })
   };
   matchers_from_json(&rules, &None).map_err(|err| format!("the matching rules cannot be read: {err}"))
+}
+
+/// `pactffi_with_generators`' generators, wrapped in `generators` when not already, as
+/// `generators_from_json` reads them.
+fn read_generators(generators: Map<String, Value>) -> Result<Generators, String> {
+  let generators = if generators.contains_key("generators") {
+    Value::Object(generators)
+  } else {
+    json!({ "generators": generators })
+  };
+  generators_from_json(&generators).map_err(|err| format!("the generators cannot be read: {err}"))
+}
+
+/// The octets `pactffi_with_binary_body` sets, typed by `content_type` (`application/octet-stream`
+/// when none is named), and that type.
+fn binary_body(content_type: Option<String>, body: Vec<u8>) -> (OptionalBody, String) {
+  let content_type = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
+  let body = if body.is_empty() {
+    OptionalBody::Empty
+  } else {
+    OptionalBody::Present(body.into(), ContentType::parse(content_type.as_str()).ok(), None)
+  };
+  (body, content_type)
+}
+
+/// `pactffi_with_binary_body` for an HTTP part: the octets as they stand, and a `Content-Type`
+/// header unless the part has one. No rule is added.
+fn with_binary_body<P: Fields>(http: &mut P, content_type: Option<String>, body: Vec<u8>) {
+  let (body, content_type) = binary_body(content_type, body);
+  *http.body_mut() = body;
+  if !http.has_header(CONTENT_TYPE) {
+    http
+      .headers_mut()
+      .insert(CONTENT_TYPE.to_string(), vec![content_type]);
+  }
+}
+
+/// `pactffi_with_binary_body` for a message's contents: the octets as they stand, and their type
+/// in the metadata.
+fn message_binary_body(contents: &mut MessageContents, content_type: Option<String>, body: Vec<u8>) {
+  let (body, content_type) = binary_body(content_type, body);
+  contents.contents = body;
+  contents
+    .metadata
+    .insert(MESSAGE_CONTENT_TYPE.to_string(), json!(content_type));
 }
 
 /// A synchronous message's part a body goes to: its request, or one more response, as the FFI adds

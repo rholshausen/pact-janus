@@ -437,6 +437,71 @@ fn a_binary_body_has_a_content_type_rule_from_v3() {
   );
 }
 
+/// ADR 0070: pact-jvm's facade sends the example as octets, its rules and its generators beside it,
+/// and none of them is read as integration JSON.
+#[test]
+fn a_binary_body_with_rules_and_generators_is_what_was_sent() {
+  let body = json!({ "id": 100, "pact:matcher:type": "not a matcher here" });
+  let built = built(json!([
+    { "call": "upon_receiving", "description": "an order" },
+    { "call": "with_request", "method": "GET", "path": "/orders/1" },
+    { "call": "with_binary_body", "part": "response", "content_type": "application/json",
+      "body": BASE64.encode(body.to_string()) },
+    { "call": "with_matching_rules", "part": "response", "rules": {
+        "body": { "$.id": { "matchers": [{ "match": "integer" }] } } } },
+    { "call": "with_generators", "part": "response", "generators": {
+        "body": { "$.id": { "type": "RandomInt", "min": 0, "max": 2147483647 } } } }
+  ]));
+  let response = &built["response"];
+  assert_eq!(response["body"]["content"], body);
+  assert_eq!(response["headers"]["Content-Type"], json!(["application/json"]));
+  assert_eq!(
+    response["matchingRules"],
+    json!({ "body": { "$.id": { "combine": "AND", "matchers": [{ "match": "integer" }] } } })
+  );
+  assert_eq!(
+    response["generators"],
+    json!({ "body": { "$.id": { "type": "RandomInt", "min": 0, "max": 2147483647 } } })
+  );
+}
+
+#[test]
+fn a_binary_body_keeps_a_content_type_header_already_set() {
+  let built = built(json!([
+    { "call": "upon_receiving", "description": "a blob" },
+    { "call": "with_request", "method": "GET", "path": "/blob" },
+    { "call": "with_header_v2", "part": "response", "name": "Content-Type", "index": 0, "value": "image/png" },
+    { "call": "with_binary_body", "part": "response", "body": BASE64.encode([0x89, b'P']) }
+  ]));
+  assert_eq!(built["response"]["headers"]["Content-Type"], json!(["image/png"]));
+  assert_eq!(
+    built["response"]["matchingRules"],
+    Value::Null,
+    "no rule is added"
+  );
+}
+
+#[test]
+fn a_message_takes_a_binary_body_and_generators() {
+  let built = built_message(
+    "V4",
+    json!([
+      { "call": "new_async_message", "description": "" },
+      { "call": "message_expects_to_receive", "description": "an event" },
+      { "call": "with_binary_body", "part": "request", "content_type": "application/json",
+        "body": BASE64.encode(r#"{"id":1}"#) },
+      { "call": "with_generators", "part": "request", "generators": {
+          "body": { "$.id": { "type": "RandomInt", "min": 0, "max": 10 } } } }
+    ]),
+  );
+  assert_eq!(built["contents"]["content"], json!({ "id": 1 }));
+  assert_eq!(built["metadata"], json!({ "contentType": "application/json" }));
+  assert_eq!(
+    built["generators"],
+    json!({ "body": { "$.id": { "type": "RandomInt", "min": 0, "max": 10 } } })
+  );
+}
+
 #[test]
 fn each_problem_points_at_its_step() {
   let problems = build(&json!({ "steps": [

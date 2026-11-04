@@ -630,6 +630,8 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   | `with_body` | `part`, `content_type?`, `body` |
   | `with_binary_file` | `part`, `content_type`, `body` (base64) |
   | `with_matching_rules` | `part`, `rules` |
+  | `with_binary_body` | `part`, `content_type?` (default `application/octet-stream`), `body` (base64) |
+  | `with_generators` | `part`, `generators` |
   | `with_multipart_file_v2` | `part`, `content_type`, `file`, `contents` (base64), `part_name?` (default `file`), `boundary?` |
   | `new_async_message`, `new_message` | `description` |
   | `new_sync_message_interaction` | `description` |
@@ -643,9 +645,13 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   asynchronous message and `new_sync_message_interaction` a synchronous one, each converted as
   `upgrade/pact` converts a message ([ADR 0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)),
   so `serve-variant` answers its example as `parts`. `upon_receiving`, `given`, `given_with_params`,
-  `with_body`, `with_binary_file` and `with_matching_rules` apply to a message as the FFI's message
-  branches do: a synchronous message's `response` body is one more response, and its `response`
-  rules reach every response so far. `message_with_contents` and `message_with_metadata_v2` apply
+  `with_body`, `with_binary_file`, `with_binary_body`, `with_matching_rules` and `with_generators`
+  apply to a message as the FFI's message branches do: a synchronous message's `response` body is
+  one more response, and its `response` rules and generators reach every response so far.
+  `with_binary_body` sets the octets as they stand, with no rule and no integration JSON read from
+  them, and `with_generators` merges generators by category as a pact writes them, so a library
+  that builds its own rules, as pact-jvm's DSL does, sends what it built
+  ([ADR 0070](../../decisions/0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md)). `message_with_contents` and `message_with_metadata_v2` apply
   to an asynchronous message, and a call for another kind of interaction is refused, but for
   `message_with_metadata_v2` on a synchronous message, which the FFI ignores.
 

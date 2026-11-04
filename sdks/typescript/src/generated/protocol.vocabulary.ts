@@ -244,6 +244,8 @@ export const PactStepCall = {
   MessageGiven: "message_given",
   MessageWithContents: "message_with_contents",
   MessageWithMetadataV2: "message_with_metadata_v2",
+  WithBinaryBody: "with_binary_body",
+  WithGenerators: "with_generators",
 } as const;
 
 /**
