@@ -267,8 +267,15 @@ public final class Vocabulary {
     public static final String WITH_BINARY_FILE = "with_binary_file";
     public static final String WITH_MATCHING_RULES = "with_matching_rules";
     public static final String WITH_MULTIPART_FILE_V2 = "with_multipart_file_v2";
+    public static final String NEW_ASYNC_MESSAGE = "new_async_message";
+    public static final String NEW_MESSAGE = "new_message";
+    public static final String NEW_SYNC_MESSAGE_INTERACTION = "new_sync_message_interaction";
+    public static final String MESSAGE_EXPECTS_TO_RECEIVE = "message_expects_to_receive";
+    public static final String MESSAGE_GIVEN = "message_given";
+    public static final String MESSAGE_WITH_CONTENTS = "message_with_contents";
+    public static final String MESSAGE_WITH_METADATA_V2 = "message_with_metadata_v2";
 
-    public static final List<String> KNOWN = List.of(UPON_RECEIVING, GIVEN, GIVEN_WITH_PARAMS, WITH_REQUEST, WITH_QUERY_PARAMETER, WITH_HEADER_V2, RESPONSE_STATUS_V2, WITH_BODY, WITH_BINARY_FILE, WITH_MATCHING_RULES, WITH_MULTIPART_FILE_V2);
+    public static final List<String> KNOWN = List.of(UPON_RECEIVING, GIVEN, GIVEN_WITH_PARAMS, WITH_REQUEST, WITH_QUERY_PARAMETER, WITH_HEADER_V2, RESPONSE_STATUS_V2, WITH_BODY, WITH_BINARY_FILE, WITH_MATCHING_RULES, WITH_MULTIPART_FILE_V2, NEW_ASYNC_MESSAGE, NEW_MESSAGE, NEW_SYNC_MESSAGE_INTERACTION, MESSAGE_EXPECTS_TO_RECEIVE, MESSAGE_GIVEN, MESSAGE_WITH_CONTENTS, MESSAGE_WITH_METADATA_V2);
   }
 
   /** Known values of {@code PactSteps.specification}. */

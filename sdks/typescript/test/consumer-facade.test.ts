@@ -39,7 +39,8 @@ describe("what has no conversion", () => {
   it("is refused at the call, by name", () => {
     expect(() => new Pact({ ...options(dir), tls: true })).toThrow(/tls/);
     expect(() => new Pact(options(dir)).addInteraction().usingPlugin({ plugin: "protobuf", version: "0.4" })).toThrow(/'protobuf'/);
-    expect(() => new Pact(options(dir)).addAsynchronousInteraction()).toThrow(/S2\.5c/);
+    expect(() => new Pact(options(dir)).addAsynchronousInteraction().usingPlugin({ plugin: "protobuf", version: "0.4" })).toThrow(/'protobuf'/);
+    expect(() => new Pact(options(dir)).addSynchronousInteraction("a plugin message").usingPlugin({ plugin: "protobuf", version: "0.4" })).toThrow(/'protobuf'/);
   });
 
   it("refuses several interactions in one executeTest until several can be armed", async () => {

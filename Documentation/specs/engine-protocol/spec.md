@@ -631,6 +631,23 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   | `with_binary_file` | `part`, `content_type`, `body` (base64) |
   | `with_matching_rules` | `part`, `rules` |
   | `with_multipart_file_v2` | `part`, `content_type`, `file`, `contents` (base64), `part_name?` (default `file`), `boundary?` |
+  | `new_async_message`, `new_message` | `description` |
+  | `new_sync_message_interaction` | `description` |
+  | `message_expects_to_receive` | `description` |
+  | `message_given` | `description` |
+  | `message_with_contents` | `content_type?` (default `text/plain`), `body` or `contents` (base64) |
+  | `message_with_metadata_v2` | `name`, `value` |
+
+  The steps build an HTTP interaction unless the first is one of the three that begin a message
+  (staged plan S2.5c), which no later step may be. `new_async_message` and `new_message` begin an
+  asynchronous message and `new_sync_message_interaction` a synchronous one, each converted as
+  `upgrade/pact` converts a message ([ADR 0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)),
+  so `serve-variant` answers its example as `parts`. `upon_receiving`, `given`, `given_with_params`,
+  `with_body`, `with_binary_file` and `with_matching_rules` apply to a message as the FFI's message
+  branches do: a synchronous message's `response` body is one more response, and its `response`
+  rules reach every response so far. `message_with_contents` and `message_with_metadata_v2` apply
+  to an asynchronous message, and a call for another kind of interaction is refused, but for
+  `message_with_metadata_v2` on a synchronous message, which the FFI ignores.
 
   Two things differ from the FFI. A multipart boundary not given is derived from the part, so the
   same test records the same bytes on every run, and a part's `Content-Type` is the call's

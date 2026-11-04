@@ -1,5 +1,5 @@
 // pact-js's consumer API over the engine (ADR 0066): `PactV4` (`Pact`), its HTTP and GraphQL
-// builders, and `PactV3`. Each builder records the `pact_ffi` calls pact-js's builder makes, in the
+// builders, and `PactV3`; its message builders are `message.ts`'s. Each builder records the `pact_ffi` calls pact-js's builder makes, in the
 // order it makes them, and `executeTest` hands them to `consumer-session/add-pact-interaction`, which
 // builds and converts the interaction as `janus upgrade` converts a pact. The test runs once, against
 // the base variant, as it does today. Nothing here matches anything or decides a verdict.
@@ -16,6 +16,7 @@ import type { FramePipe } from "../engine/pipe.js";
 import { SubprocessPipe, type SubprocessOptions } from "../engine/subprocess.js";
 import { causeText, ContractWithheldError } from "../errors.js";
 import { isMatcher, isStatusCodeMatcher, reify, regex, type Matcher, type StatusCodeMatcher } from "./matchers.js";
+import { UnconfiguredAsynchronousMessage, UnconfiguredSynchronousMessage } from "./message.js";
 
 const Op = protocolVocabulary.RequestFrameOp;
 
@@ -87,15 +88,18 @@ export interface V3Interaction {
   willRespondWith: V3Response;
 }
 
-type Part = "request" | "response";
+export type Part = "request" | "response";
+
+/** The calls that name an interaction's description. */
+const DESCRIBING = new Set(["upon_receiving", "message_expects_to_receive", "new_async_message", "new_message", "new_sync_message_interaction"]);
 
 /** One interaction's `pact_ffi` calls, in the order pact-js's builder made them. */
-class Calls {
+export class Calls {
   readonly steps: protocol.PactStep[] = [];
   description = "";
 
   call(call: string, args: Record<string, unknown> = {}): this {
-    if (call === "upon_receiving") {
+    if (DESCRIBING.has(call)) {
       this.description = String(args.description);
     }
     this.steps.push({ call, ...args });
@@ -147,7 +151,7 @@ function read(file: string): Buffer {
 }
 
 /** pact-js's `validateRules` and `convertRulesToFFI`. */
-function rulesForFfi(rules: Rules): Record<string, unknown> {
+export function rulesForFfi(rules: Rules): Record<string, unknown> {
   if (!rules || typeof rules !== "object" || Array.isArray(rules)) {
     throw new Error("rules must be an object");
   }
@@ -179,8 +183,30 @@ function rulesForFfi(rules: Rules): Record<string, unknown> {
 
 const SPECIFICATIONS: Record<number, string> = { 3: "V2", 4: "V3", 5: "V4" };
 
-/** One `executeTest`: one engine session, the interaction added, its base variant served once. */
-async function execute<T>(opts: PactV4Options, specification: string, interactions: Calls[], testFn: TestFunction<T>): Promise<T | undefined> {
+/** What a test runs against: the mock's endpoint, or the message the engine hands over (ADR 0067). */
+export interface Served {
+  endpoint?: Record<string, unknown>;
+  parts?: protocol.ServeVariantResult["parts"];
+}
+
+/** One HTTP `executeTest`, against the mock. */
+function execute<T>(opts: PactV4Options, specification: string, interactions: Calls[], testFn: TestFunction<T>): Promise<T | undefined> {
+  return run(opts, specification, interactions, "http", ({ endpoint = {} }) =>
+    testFn({ port: Number(endpoint.port), url: String(endpoint["base-url"]), id: "unknown" }),
+  );
+}
+
+/**
+ * One test: one engine session, the interaction added, its base variant served once, through
+ * `transport` when it names one; a message is served with none and answered as its parts.
+ */
+export async function run<T>(
+  opts: Pick<PactV4Options, "consumer" | "provider" | "dir" | "spec" | "logLevel" | "host" | "port" | "engine">,
+  specification: string,
+  interactions: Calls[],
+  transport: string | undefined,
+  test: (served: Served) => Promise<T>,
+): Promise<T | undefined> {
   const calls = interactions[0];
   if (calls === undefined || interactions.length !== 1) {
     throw new Error(
@@ -201,16 +227,19 @@ async function execute<T>(opts: PactV4Options, specification: string, interactio
       }
     }
     const options = opts.host === undefined && opts.port === undefined ? {} : { options: { host: opts.host ?? "127.0.0.1", port: opts.port ?? 0 } };
-    const { endpoint } = await engine.call(Op.ConsumerSessionStartTransport, { session, transport: "http", ...options });
+    const endpoint = transport === undefined ? undefined : (await engine.call(Op.ConsumerSessionStartTransport, { session, transport, ...options })).endpoint;
     // A converted interaction's one variant is its example, `base`, as an upgraded pact's is.
     const { variants } = await engine.call(Op.ConsumerSessionVariants, { session, handle }, name);
     const variant = variants[0]?.id ?? "base";
-    await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant });
+    const { parts } = await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant });
+    if (transport === undefined && parts === undefined) {
+      throw new Error(`${name}: the engine handed over no message, so it is older than ADR 0067's`);
+    }
 
     let value: T | undefined;
     let failure: { error: unknown } | undefined;
     try {
-      value = await testFn({ port: Number(endpoint.port), url: String(endpoint["base-url"]), id: "unknown" });
+      value = await test({ endpoint, parts });
     } catch (error) {
       failure = { error };
     }
@@ -279,13 +308,12 @@ export class PactV4 {
     return new UnconfiguredGraphQLInteraction(this.opts, new Calls());
   }
 
-  addSynchronousInteraction(description: string): never {
-    void description;
-    throw new Error("addSynchronousInteraction: pact-janus has no message consumer API yet (staged plan S2.5c)");
+  addSynchronousInteraction(description: string): UnconfiguredSynchronousMessage {
+    return new UnconfiguredSynchronousMessage(this.opts, new Calls().call("new_sync_message_interaction", { description }));
   }
 
-  addAsynchronousInteraction(): never {
-    throw new Error("addAsynchronousInteraction: pact-janus has no message consumer API yet (staged plan S2.5c)");
+  addAsynchronousInteraction(): UnconfiguredAsynchronousMessage {
+    return new UnconfiguredAsynchronousMessage(this.opts, new Calls().call("new_async_message", { description: "" }));
   }
 }
 

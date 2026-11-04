@@ -18,6 +18,14 @@
 //! `response_multipart` and `add_part_to_multipart`). Two things differ, as ADR 0066 decision 7
 //! says: a multipart boundary is derived from the part, not drawn at random, and a part's
 //! `Content-Type` is the one the call names, not one guessed from the file's extension.
+//!
+//! A message (staged plan S2.5c) is begun by the call that makes it, `new_async_message`,
+//! `new_message` or `new_sync_message_interaction`, as the first step, and built by the calls
+//! pact-js's message builders make: `message_expects_to_receive`, `message_given`,
+//! `message_with_contents` and `message_with_metadata_v2` (`handles.rs`, the same commit), and
+//! `with_body`, `with_binary_file` and `with_matching_rules`, whose message branches are ported too.
+//! A call the FFI applies only to an interaction of another kind is refused, but for
+//! `message_with_metadata_v2` on a synchronous message, which the FFI ignores and pact-js makes.
 
 pub mod form;
 pub mod integration;
@@ -29,7 +37,9 @@ use crate::error::Problem;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use either::Either;
-use integration::{Problems, from_integration_json, from_integration_json_v2, process_json};
+use integration::{
+  Problems, from_integration_json, from_integration_json_v2, process_array, process_json, process_object,
+};
 use pact_models::PactSpecification;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::{ContentType, TEXT, detect_content_type_from_string};
@@ -39,8 +49,11 @@ use pact_models::http_parts::HttpPart;
 use pact_models::matchingrules::{MatchingRule, MatchingRules, RuleLogic, matchers_from_json};
 use pact_models::path_exp::DocPath;
 use pact_models::provider_states::ProviderState;
+use pact_models::v4::async_message::AsynchronousMessage;
 use pact_models::v4::http_parts::{HttpRequest, HttpResponse};
 use pact_models::v4::interaction::V4Interaction;
+use pact_models::v4::message_parts::MessageContents;
+use pact_models::v4::sync_message::SynchronousMessage;
 use pact_models::v4::synch_http::SynchronousHttp;
 use regex::Regex;
 use serde_json::{Map, Value, json};
@@ -48,6 +61,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::LazyLock;
 
 const CONTENT_TYPE: &str = "Content-Type";
+/// The metadata member a message's body type is in.
+const MESSAGE_CONTENT_TYPE: &str = "contentType";
 
 /// What `add-pact-interaction` hands on: the converted interaction as an interaction specification,
 /// the example a mock serves for it, and what the conversion lost or decided, its pointers into the
@@ -68,8 +83,49 @@ pub fn interaction(pact: &Value) -> Result<Built, Vec<Problem>> {
   convert(build(pact)?)
 }
 
+/// The v4 interaction the steps build: HTTP, unless the first step begins a message.
+enum Building {
+  Http(Box<SynchronousHttp>),
+  Asynchronous(AsynchronousMessage),
+  Synchronous(SynchronousMessage),
+}
+
+impl Building {
+  fn to_json(&self) -> Value {
+    match self {
+      Building::Http(http) => http.to_json(),
+      Building::Asynchronous(message) => message.to_json(),
+      Building::Synchronous(message) => message.to_json(),
+    }
+  }
+
+  fn kind(&self) -> &'static str {
+    match self {
+      Building::Http(_) => "an HTTP interaction",
+      Building::Asynchronous(_) => "an asynchronous message",
+      Building::Synchronous(_) => "a synchronous message",
+    }
+  }
+
+  fn set_description(&mut self, description: String) {
+    match self {
+      Building::Http(http) => http.description = description,
+      Building::Asynchronous(message) => message.description = description,
+      Building::Synchronous(message) => message.description = description,
+    }
+  }
+
+  fn provider_states(&mut self) -> &mut Vec<ProviderState> {
+    match self {
+      Building::Http(http) => &mut http.provider_states,
+      Building::Asynchronous(message) => &mut message.provider_states,
+      Building::Synchronous(message) => &mut message.provider_states,
+    }
+  }
+}
+
 /// The v4 interaction `pact`'s steps build, as `pact_ffi` would have built it.
-fn build(pact: &Value) -> Result<SynchronousHttp, Vec<Problem>> {
+fn build(pact: &Value) -> Result<Building, Vec<Problem>> {
   let Some(form) = pact.as_object() else {
     return Err(vec![problem(
       "/pact",
@@ -100,12 +156,18 @@ fn build(pact: &Value) -> Result<SynchronousHttp, Vec<Problem>> {
     return Err(vec![problem("/pact/steps", "'steps' is missing or not a list")]);
   };
 
-  let mut built = SynchronousHttp::default();
+  let mut built = Building::Http(Box::default());
   let mut problems = Vec::new();
   for (index, step) in steps.iter().enumerate() {
     let at = format!("/pact/steps/{index}");
     let mut found = Problems::new();
     match Step::read(step, &at) {
+      // The call that makes an interaction is the one that decides its kind, so it comes first.
+      Ok(Step::Begin(kind, description)) if index == 0 => built = kind.begin(description),
+      Ok(Step::Begin(..)) => problems.push(problem(
+        &format!("{at}/call"),
+        "a call that begins an interaction is the first step, and only the first",
+      )),
       Ok(step) => step.apply(&mut built, specification, &mut found),
       Err(problem) => problems.push(problem),
     }
@@ -118,7 +180,7 @@ fn build(pact: &Value) -> Result<SynchronousHttp, Vec<Problem>> {
 }
 
 /// Upgrade the built interaction as a one-interaction v4 pact (ADR 0066 decision 3).
-fn convert(built: SynchronousHttp) -> Result<Built, Vec<Problem>> {
+fn convert(built: Building) -> Result<Built, Vec<Problem>> {
   let document = json!({
     "consumer": { "name": "consumer" },
     "provider": { "name": "provider" },
@@ -190,9 +252,41 @@ enum Part {
   Response,
 }
 
+/// The kind of message a call begins.
+#[derive(Clone, Copy)]
+enum MessageKind {
+  Asynchronous,
+  Synchronous,
+}
+
+impl MessageKind {
+  fn begin(self, description: String) -> Building {
+    match self {
+      MessageKind::Asynchronous => Building::Asynchronous(AsynchronousMessage {
+        description,
+        ..AsynchronousMessage::default()
+      }),
+      MessageKind::Synchronous => Building::Synchronous(SynchronousMessage {
+        description,
+        ..SynchronousMessage::default()
+      }),
+    }
+  }
+}
+
+/// A message's contents as `pactffi_message_with_contents` takes them: text, or octets.
+enum Contents {
+  Text(String),
+  Octets(Vec<u8>),
+}
+
 /// One FFI call, its arguments read.
 enum Step {
-  UponReceiving(String),
+  /// `new_async_message`, `new_message` or `new_sync_message_interaction`.
+  Begin(MessageKind, String),
+  /// `upon_receiving` or `message_expects_to_receive`.
+  Description(String),
+  /// `given`, `message_given` or `given_with_params`.
   Given(String, Option<Value>),
   WithRequest {
     method: String,
@@ -225,6 +319,14 @@ enum Step {
     rules: Map<String, Value>,
   },
   WithMultipartFile(Box<MultipartFile>),
+  MessageWithContents {
+    content_type: Option<String>,
+    contents: Contents,
+  },
+  MessageWithMetadata {
+    name: String,
+    value: String,
+  },
 }
 
 struct MultipartFile {
@@ -317,8 +419,12 @@ impl Step {
     let args = Args { step, at };
     let call = args.string("call")?;
     Ok(match call.as_str() {
-      "upon_receiving" => Step::UponReceiving(args.string("description")?),
-      "given" => Step::Given(args.string("description")?, None),
+      "new_async_message" | "new_message" => {
+        Step::Begin(MessageKind::Asynchronous, args.string("description")?)
+      }
+      "new_sync_message_interaction" => Step::Begin(MessageKind::Synchronous, args.string("description")?),
+      "upon_receiving" | "message_expects_to_receive" => Step::Description(args.string("description")?),
+      "given" | "message_given" => Step::Given(args.string("description")?, None),
       "given_with_params" => Step::Given(args.string("description")?, Some(args.value("params")?.clone())),
       "with_request" => Step::WithRequest {
         method: args.string("method")?,
@@ -368,6 +474,23 @@ impl Step {
           .unwrap_or_else(|| "file".to_string()),
         boundary: args.optional_string("boundary")?,
       })),
+      "message_with_contents" => Step::MessageWithContents {
+        content_type: args.optional_string("content_type")?,
+        contents: match (args.step.get("body"), args.step.get("contents")) {
+          (Some(_), None) => Contents::Text(args.text("body")?),
+          (None, Some(_)) => Contents::Octets(args.octets("contents")?),
+          _ => {
+            return Err(problem(
+              at,
+              "'message_with_contents' takes its contents as 'body', text, or as 'contents', base64, and not both",
+            ));
+          }
+        },
+      },
+      "message_with_metadata_v2" => Step::MessageWithMetadata {
+        name: args.string("name")?,
+        value: args.text("value")?,
+      },
       other => {
         return Err(problem(
           &format!("{at}/call"),
@@ -377,17 +500,121 @@ impl Step {
     })
   }
 
-  fn apply(self, built: &mut SynchronousHttp, specification: PactSpecification, problems: &mut Problems) {
+  /// The call's name, as a refusal names it.
+  fn call(&self) -> &'static str {
     match self {
-      Step::UponReceiving(description) => built.description = description,
-      Step::Given(name, None) => built.provider_states.push(ProviderState::default(&name)),
-      Step::Given(name, Some(params)) => {
+      Step::Begin(..) => "a call that begins a message",
+      Step::Description(_) => "upon_receiving",
+      Step::Given(..) => "given",
+      Step::WithRequest { .. } => "with_request",
+      Step::WithQueryParameter { .. } => "with_query_parameter",
+      Step::WithHeader { .. } => "with_header_v2",
+      Step::ResponseStatus(_) => "response_status_v2",
+      Step::WithBody { .. } => "with_body",
+      Step::WithBinaryFile { .. } => "with_binary_file",
+      Step::WithMatchingRules { .. } => "with_matching_rules",
+      Step::WithMultipartFile(_) => "with_multipart_file_v2",
+      Step::MessageWithContents { .. } => "message_with_contents",
+      Step::MessageWithMetadata { .. } => "message_with_metadata_v2",
+    }
+  }
+
+  fn apply(self, built: &mut Building, specification: PactSpecification, problems: &mut Problems) {
+    match (self, built) {
+      (Step::Begin(..), _) => unreachable!("a step that begins an interaction is applied by `build`"),
+      (Step::Description(description), built) => built.set_description(description),
+      (Step::Given(name, None), built) => built.provider_states().push(ProviderState::default(&name)),
+      (Step::Given(name, Some(params)), built) => {
         let params = match params {
           Value::Object(map) => map.into_iter().collect(),
           other => HashMap::from([("value".to_string(), other)]),
         };
-        built.provider_states.push(ProviderState { name, params });
+        built.provider_states().push(ProviderState { name, params });
       }
+      (
+        Step::WithBody {
+          content_type, body, ..
+        },
+        Building::Asynchronous(message),
+      ) => message_body(&mut message.contents, content_type, &body, problems),
+      (
+        Step::WithBody {
+          part,
+          content_type,
+          body,
+        },
+        Building::Synchronous(message),
+      ) => message_body(synchronous_part(message, part), content_type, &body, problems),
+      (
+        Step::WithBinaryFile {
+          content_type, body, ..
+        },
+        Building::Asynchronous(message),
+      ) => message_binary(&mut message.contents, &content_type, body, specification),
+      (
+        Step::WithBinaryFile {
+          part,
+          content_type,
+          body,
+        },
+        Building::Synchronous(message),
+      ) => message_binary(
+        synchronous_part(message, part),
+        &content_type,
+        body,
+        specification,
+      ),
+      (Step::WithMatchingRules { rules, .. }, Building::Asynchronous(message)) => match read_rules(rules) {
+        Ok(rules) => message.contents.matching_rules.merge(&rules),
+        Err(message) => problems.push(message),
+      },
+      (Step::WithMatchingRules { part, rules }, Building::Synchronous(message)) => match read_rules(rules) {
+        Ok(rules) => match part {
+          Part::Request => message.request.matching_rules.merge(&rules),
+          // Every response the message has so far, as the FFI merges them.
+          Part::Response => message
+            .response
+            .iter_mut()
+            .for_each(|response| response.matching_rules.merge(&rules)),
+        },
+        Err(message) => problems.push(message),
+      },
+      (
+        Step::MessageWithContents {
+          content_type,
+          contents,
+        },
+        Building::Asynchronous(message),
+      ) => message_with_contents(&mut message.contents, content_type, contents, problems),
+      (Step::MessageWithMetadata { name, value }, Building::Asynchronous(message)) => {
+        message_with_metadata(&mut message.contents, &name, &value, problems)
+      }
+      // The FFI reaches only an asynchronous message's metadata, and pact-js's synchronous message
+      // builder calls it anyway: its pacts have no such metadata.
+      (Step::MessageWithMetadata { .. }, Building::Synchronous(_)) => {}
+      (step @ (Step::MessageWithContents { .. } | Step::MessageWithMetadata { .. }), built) => {
+        problems.push(format!(
+          "'{}' builds an asynchronous message, and these steps build {}",
+          step.call(),
+          built.kind()
+        ))
+      }
+      (step, Building::Http(http)) => step.apply_to_http(http, specification, problems),
+      (step, built) => problems.push(format!(
+        "'{}' builds an HTTP interaction, and these steps build {}",
+        step.call(),
+        built.kind()
+      )),
+    }
+  }
+
+  fn apply_to_http(
+    self,
+    built: &mut SynchronousHttp,
+    specification: PactSpecification,
+    problems: &mut Problems,
+  ) {
+    match self {
       Step::WithRequest { method, path } => {
         let request = &mut built.request;
         let path = from_integration_json_v2(
@@ -450,27 +677,163 @@ impl Step {
           Part::Response => with_binary_file(&mut built.response, &content_type, body, rule),
         }
       }
-      Step::WithMatchingRules { part, rules } => {
-        // Wrapped in `matchingRules` when not already, as `matchers_from_json` reads them.
-        let rules = if rules.contains_key("matchingRules") {
-          Value::Object(rules)
-        } else {
-          json!({ "matchingRules": rules })
-        };
-        match matchers_from_json(&rules, &None) {
-          Ok(rules) => match part {
-            Part::Request => built.request.matching_rules_mut().merge(&rules),
-            Part::Response => built.response.matching_rules_mut().merge(&rules),
-          },
-          Err(err) => problems.push(format!("the matching rules cannot be read: {err}")),
-        }
-      }
+      Step::WithMatchingRules { part, rules } => match read_rules(rules) {
+        Ok(rules) => match part {
+          Part::Request => built.request.matching_rules_mut().merge(&rules),
+          Part::Response => built.response.matching_rules_mut().merge(&rules),
+        },
+        Err(message) => problems.push(message),
+      },
       Step::WithMultipartFile(file) => match file.part {
         Part::Request => with_multipart_file(&mut built.request, &file),
         Part::Response => with_multipart_file(&mut built.response, &file),
       },
+      Step::Begin(..)
+      | Step::Description(_)
+      | Step::Given(..)
+      | Step::MessageWithContents { .. }
+      | Step::MessageWithMetadata { .. } => {
+        unreachable!("applied to any interaction, or refused, by `apply`")
+      }
     }
   }
+}
+
+/// `pactffi_with_matching_rules`' rules, wrapped in `matchingRules` when not already, as
+/// `matchers_from_json` reads them.
+fn read_rules(rules: Map<String, Value>) -> Result<MatchingRules, String> {
+  let rules = if rules.contains_key("matchingRules") {
+    Value::Object(rules)
+  } else {
+    json!({ "matchingRules": rules })
+  };
+  matchers_from_json(&rules, &None).map_err(|err| format!("the matching rules cannot be read: {err}"))
+}
+
+/// A synchronous message's part a body goes to: its request, or one more response, as the FFI adds
+/// one for each body a response is given.
+fn synchronous_part(message: &mut SynchronousMessage, part: Part) -> &mut MessageContents {
+  match part {
+    Part::Request => &mut message.request,
+    Part::Response => {
+      message.response.push(MessageContents::default());
+      message.response.last_mut().expect("one was pushed")
+    }
+  }
+}
+
+/// `pactffi_with_body` for a message: the body processed by its content type, and its type in the
+/// metadata unless the metadata names one.
+fn message_body(
+  contents: &mut MessageContents,
+  content_type: Option<String>,
+  body: &str,
+  problems: &mut Problems,
+) {
+  let content_type = content_type.and_then(|ct| ContentType::parse(ct.as_str()).ok());
+  contents.contents = process_body(
+    body,
+    &content_type,
+    &None,
+    &mut contents.matching_rules,
+    &mut contents.generators,
+    problems,
+  );
+  if let Some(content_type) = contents.content_type() {
+    contents
+      .metadata
+      .entry(MESSAGE_CONTENT_TYPE.to_string())
+      .or_insert(json!(content_type.to_string()));
+  }
+}
+
+/// `pactffi_with_binary_file` for a message: the octets as its contents, their type in the metadata,
+/// and from v3 a rule that the contents are of that type.
+fn message_binary(
+  contents: &mut MessageContents,
+  content_type: &str,
+  body: Vec<u8>,
+  specification: PactSpecification,
+) {
+  contents.contents = if body.is_empty() {
+    OptionalBody::Empty
+  } else {
+    OptionalBody::Present(body.into(), None, None)
+  };
+  if specification >= PactSpecification::V3 {
+    content_type_rule(&mut contents.matching_rules, content_type);
+  }
+  contents
+    .metadata
+    .insert(MESSAGE_CONTENT_TYPE.to_string(), json!(content_type));
+}
+
+/// `pactffi_message_with_contents`: an asynchronous message's contents, processed by their content
+/// type (`text/plain` when none is named): an XML builder document for XML, integration JSON for
+/// text and JSON, and the octets as given for any other type, or for one that does not parse.
+fn message_with_contents(
+  contents: &mut MessageContents,
+  content_type: Option<String>,
+  given: Contents,
+  problems: &mut Problems,
+) {
+  let content_type = ContentType::parse(content_type.as_deref().unwrap_or("text/plain")).ok();
+  let octets = |given: Contents| match given {
+    Contents::Text(text) => text.into_bytes(),
+    Contents::Octets(octets) => octets,
+  };
+  contents.contents = match content_type {
+    Some(content_type) => {
+      let text = |given: Contents| match given {
+        Contents::Text(text) => text,
+        Contents::Octets(octets) => String::from_utf8_lossy(&octets).into_owned(),
+      };
+      let category = contents.matching_rules.add_category("body");
+      let bytes = if content_type.is_xml() {
+        match serde_json::from_str::<Value>(&text(given)) {
+          Ok(Value::Object(document)) => {
+            match xml::generate_xml_body(&document, category, &mut contents.generators) {
+              Ok(bytes) => bytes,
+              Err(message) => {
+                problems.push(message);
+                Vec::new()
+              }
+            }
+          }
+          _ => {
+            problems.push("an XML builder document is a JSON object".to_string());
+            Vec::new()
+          }
+        }
+      } else if content_type.is_text() || content_type.is_json() {
+        process_json(&text(given), category, &mut contents.generators, problems).into_bytes()
+      } else {
+        octets(given)
+      };
+      OptionalBody::Present(bytes.into(), Some(content_type), None)
+    }
+    None => OptionalBody::Present(octets(given).into(), None, None),
+  };
+}
+
+/// `pactffi_message_with_metadata_v2`: an asynchronous message's metadata member `name`, its value
+/// integration JSON whose matchers become `metadata` rules, or the text as given when it is not JSON.
+fn message_with_metadata(contents: &mut MessageContents, name: &str, value: &str, problems: &mut Problems) {
+  let Ok(path) = DocPath::new(name) else {
+    problems.push(format!(
+      "the metadata name '{name}' is not one the FFI can write a rule for"
+    ));
+    return;
+  };
+  let rules = contents.matching_rules.add_category("metadata");
+  let generators = &mut contents.generators;
+  let value = match serde_json::from_str::<Value>(value) {
+    Ok(Value::Object(map)) => process_object(&map, rules, generators, path, false, problems),
+    Ok(Value::Array(array)) => process_array(&array, rules, generators, path, false, false, problems),
+    Ok(json) => json,
+    Err(_) => Value::String(value.to_string()),
+  };
+  contents.metadata.insert(name.to_string(), value);
 }
 
 /// The FFI keeps the first of several values where it can hold one.
@@ -672,12 +1035,17 @@ fn with_binary_file<P: Fields>(http: &mut P, content_type: &str, body: Vec<u8>, 
       .insert(CONTENT_TYPE.to_string(), vec![content_type.to_string()]);
   }
   if rule {
-    http.matching_rules_mut().add_category("body").add_rule(
-      DocPath::root(),
-      MatchingRule::ContentType(content_type.into()),
-      RuleLogic::And,
-    );
+    content_type_rule(http.matching_rules_mut(), content_type);
   }
+}
+
+/// The FFI's `add_content_type_matching_rule_to_body`: the body is of `content_type`.
+fn content_type_rule(rules: &mut MatchingRules, content_type: &str) {
+  rules.add_category("body").add_rule(
+    DocPath::root(),
+    MatchingRule::ContentType(content_type.into()),
+    RuleLogic::And,
+  );
 }
 
 static MULTIPART_MARKER: LazyLock<Regex> =

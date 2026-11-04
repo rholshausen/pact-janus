@@ -3,6 +3,8 @@
 //! against the real HTTP transport: a facade test, written as pact-js's http example is, serves its
 //! base variant, and the contract it records holds what `janus upgrade` makes of pact-js's pact.
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::component::TransportComponent;
@@ -181,6 +183,98 @@ fn documents(mut interaction: Value) -> Value {
     }
   }
   interaction
+}
+
+/// pact-js's messages example, as `addAsynchronousInteraction` and its builder call the FFI.
+fn order_placed() -> Value {
+  let string = |value: &str| like(json!(value));
+  json!({ "specification": "V4", "steps": [
+    { "call": "new_async_message", "description": "" },
+    { "call": "message_given", "description": "an order has been placed" },
+    { "call": "message_expects_to_receive", "description": "an OrderPlaced event" },
+    { "call": "message_with_contents", "content_type": "application/json", "body": {
+        "orderId": string("order-123"),
+        "customerId": string("customer-456"),
+        "totalAmount": { "pact:matcher:type": "decimal", "value": 99.99 },
+        "currency": { "pact:matcher:type": "regex", "regex": "^[A-Z]{3}$", "value": "USD" },
+        "items": { "pact:matcher:type": "type", "min": 1, "value": [{
+          "productId": string("prod-789"),
+          "quantity": { "pact:matcher:type": "integer", "value": 2 }
+        }] }
+    } },
+    { "call": "message_with_metadata_v2", "name": "queue", "value": "\"orders.placed\"" },
+    { "call": "message_with_metadata_v2", "name": "contentType", "value": "\"application/json\"" }
+  ] })
+}
+
+/// S2.5c: a message's calls build a message, which `serve-variant` hands the host with no transport
+/// started (ADR 0067 decision 5), its example as pact-js's test would have been handed it, and the
+/// contract records what `janus upgrade` makes of pact-js's pact.
+#[test]
+fn a_facade_message_test_is_handed_the_example_and_records_what_upgrade_makes_of_the_pact() {
+  let (mut engine, session) = engine();
+  let added = send(
+    &mut engine,
+    "consumer-session/add-pact-interaction",
+    json!({ "session": session, "pact": order_placed() }),
+  );
+  let handle = added["ok"]["handle"]
+    .as_str()
+    .unwrap_or_else(|| panic!("{added}"))
+    .to_string();
+  let selected = send(
+    &mut engine,
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let base = selected["ok"]["variants"][0]["id"].as_str().unwrap().to_string();
+  let served = send(
+    &mut engine,
+    "consumer-session/serve-variant",
+    json!({ "session": session, "handle": handle, "variant": base }),
+  );
+  let message = &served["ok"]["parts"]["message"];
+  assert_eq!(
+    message["metadata"]["content"],
+    json!({ "queue": "orders.placed", "contentType": "application/json" }),
+    "{served}"
+  );
+  assert_eq!(message["body"]["content-type"], "application/json", "{served}");
+  // The body is its octets, as a transport carries it (ADR 0067 decision 5).
+  assert_eq!(message["body"]["encoded"], "base64", "{served}");
+  let octets = BASE64
+    .decode(message["body"]["content"].as_str().unwrap())
+    .unwrap();
+  let body: Value = serde_json::from_slice(&octets).unwrap();
+  assert_eq!(
+    body,
+    json!({ "orderId": "order-123", "customerId": "customer-456", "totalAmount": 99.99, "currency": "USD",
+            "items": [{ "productId": "prod-789", "quantity": 2 }] })
+  );
+  let reported = send(
+    &mut engine,
+    "consumer-session/report-variant",
+    json!({ "session": session, "handle": handle, "variant": base, "status": "passed" }),
+  );
+  assert_eq!(reported["ok"]["result"]["status"], "verified", "{reported}");
+
+  let finalised = send(
+    &mut engine,
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let recorded = &finalised["ok"]["contract"]["interactions"][0];
+  let path = format!(
+    "{}/../../corpora/verifier/messages/pact-js-order-placed/pact.json",
+    env!("CARGO_MANIFEST_DIR")
+  );
+  let upgraded = send(
+    &mut engine,
+    "upgrade/pact",
+    json!({ "pact": serde_json::from_str::<Value>(&std::fs::read_to_string(path).unwrap()).unwrap() }),
+  );
+  let expected = upgraded["ok"]["contract"]["interactions"][0].clone();
+  assert_eq!(documents(recorded.clone()), documents(expected));
 }
 
 #[test]

@@ -237,6 +237,13 @@ export const PactStepCall = {
   WithBinaryFile: "with_binary_file",
   WithMatchingRules: "with_matching_rules",
   WithMultipartFileV2: "with_multipart_file_v2",
+  NewAsyncMessage: "new_async_message",
+  NewMessage: "new_message",
+  NewSyncMessageInteraction: "new_sync_message_interaction",
+  MessageExpectsToReceive: "message_expects_to_receive",
+  MessageGiven: "message_given",
+  MessageWithContents: "message_with_contents",
+  MessageWithMetadataV2: "message_with_metadata_v2",
 } as const;
 
 /**

@@ -61,6 +61,37 @@ fn built_as(specification: &str, steps: Value) -> Value {
   comparable(interaction.to_json())
 }
 
+/// The v4 form of the message `description` in a pact S1.1's corpus holds, by its path below
+/// corpora/verifier, with each contents' JSON text read as the document it holds.
+fn recorded_message(pact: &str, description: &str) -> Value {
+  let path = format!("{}/../../corpora/verifier/{pact}", env!("CARGO_MANIFEST_DIR"));
+  let text = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{path}: {err}"));
+  let pact = crate::legacy::pact::read(&path, &serde_json::from_str(&text).unwrap()).unwrap();
+  let v4 = pact.as_v4_pact().unwrap();
+  let interaction = v4
+    .interactions
+    .iter()
+    .find(|interaction| interaction.description() == description)
+    .unwrap_or_else(|| panic!("{path} has no '{description}'"));
+  message_documents(interaction.to_json())
+}
+
+/// A built message, its contents' JSON text read as the document it holds.
+fn built_message(specification: &str, steps: Value) -> Value {
+  let interaction = build(&json!({ "specification": specification, "steps": steps }))
+    .unwrap_or_else(|problems| panic!("{problems:?}"));
+  message_documents(interaction.to_json())
+}
+
+/// A message's JSON without what the FFI does not decide: its key, which is a hash of the rest, and
+/// the pending flag, which a contract has none of (ADR 0051).
+fn message_documents(mut json: Value) -> Value {
+  let object = json.as_object_mut().unwrap();
+  object.remove("key");
+  object.remove("pending");
+  json
+}
+
 fn like(value: Value) -> Value {
   json!({ "pact:matcher:type": "type", "value": value })
 }
@@ -461,5 +492,204 @@ fn the_built_interaction_converts_as_upgrade_converts_the_pact() {
       .findings
       .iter()
       .all(|finding| !finding.path.starts_with("/interactions"))
+  );
+}
+
+fn string(value: &str) -> Value {
+  like(json!(value))
+}
+
+/// pact-js's messages example, as `addAsynchronousInteraction` and its builder call the FFI: the
+/// contents through `withJSONContent`, each metadata member's value as its JSON text.
+#[test]
+fn pact_js_messages_example() {
+  assert_eq!(
+    built_message(
+      "V4",
+      json!([
+        { "call": "new_async_message", "description": "" },
+        { "call": "message_given", "description": "an order has been placed" },
+        { "call": "message_expects_to_receive", "description": "an OrderPlaced event" },
+        { "call": "message_with_contents", "content_type": "application/json", "body": {
+            "orderId": string("order-123"),
+            "customerId": string("customer-456"),
+            "totalAmount": decimal(99.99),
+            "currency": { "pact:matcher:type": "regex", "regex": "^[A-Z]{3}$", "value": "USD" },
+            "items": each_like(json!({ "productId": string("prod-789"), "quantity": integer(2) }))
+        } },
+        { "call": "message_with_metadata_v2", "name": "queue", "value": "\"orders.placed\"" },
+        { "call": "message_with_metadata_v2", "name": "contentType", "value": "\"application/json\"" }
+      ])
+    ),
+    recorded_message("messages/pact-js-order-placed/pact.json", "an OrderPlaced event")
+  );
+}
+
+/// A synchronous message as pact-js's `addSynchronousInteraction` builds one: each response body is
+/// one more response, rules reach every response so far, and metadata, which the FFI writes only to
+/// an asynchronous message, is not written.
+#[test]
+fn a_synchronous_message_is_built_as_the_ffi_builds_one() {
+  let built = built_message(
+    "V4",
+    json!([
+      { "call": "new_sync_message_interaction", "description": "a square's area" },
+      { "call": "given", "description": "squares exist" },
+      { "call": "with_body", "part": "request", "content_type": "application/json", "body": { "side": integer(3) } },
+      { "call": "with_body", "part": "response", "content_type": "application/json", "body": { "area": integer(9) } },
+      { "call": "message_with_metadata_v2", "name": "queue", "value": "\"squares\"" },
+      { "call": "with_binary_file", "part": "response", "content_type": "application/octet-stream", "body": "AAE=" },
+      { "call": "with_matching_rules", "part": "response", "rules": { "body": { "$.area": { "matchers": [{ "match": "number" }] } } } }
+    ]),
+  );
+  assert_eq!(built["type"], json!("Synchronous/Messages"));
+  assert_eq!(built["providerStates"], json!([{ "name": "squares exist" }]));
+  assert_eq!(built["request"]["contents"]["content"], json!({ "side": 3 }));
+  assert_eq!(
+    built["request"]["metadata"],
+    json!({ "contentType": "application/json" })
+  );
+  let responses = built["response"].as_array().unwrap();
+  assert_eq!(responses.len(), 2);
+  assert_eq!(responses[0]["contents"]["content"], json!({ "area": 9 }));
+  assert_eq!(
+    responses[0]["metadata"],
+    json!({ "contentType": "application/json" })
+  );
+  assert_eq!(
+    responses[1]["metadata"],
+    json!({ "contentType": "application/octet-stream" })
+  );
+  // Merged into the rules the first response's body wrote, and written for the second.
+  assert_eq!(
+    responses[0]["matchingRules"]["body"]["$.area"]["matchers"],
+    json!([{ "match": "integer" }, { "match": "number" }])
+  );
+  assert_eq!(
+    responses[1]["matchingRules"]["body"]["$.area"]["matchers"],
+    json!([{ "match": "number" }])
+  );
+}
+
+/// `MessageConsumerPact`'s text and binary contents, and a metadata value that is not JSON, which the
+/// FFI keeps as its text.
+#[test]
+fn message_contents_are_text_octets_or_integration_json_by_their_type() {
+  let text = built_message(
+    "V3",
+    json!([
+      { "call": "new_message", "description": "a note" },
+      { "call": "message_with_contents", "content_type": "text/plain", "body": "hello" },
+      { "call": "message_with_metadata_v2", "name": "topic", "value": "notes" }
+    ]),
+  );
+  assert_eq!(text["contents"]["content"], json!("hello"));
+  assert_eq!(text["metadata"], json!({ "topic": "notes" }));
+
+  let binary = built_message(
+    "V3",
+    json!([
+      { "call": "new_message", "description": "a blob" },
+      { "call": "message_with_contents", "content_type": "application/octet-stream", "contents": "AAEC" }
+    ]),
+  );
+  assert_eq!(binary["contents"]["content"], json!("AAEC"));
+  assert_eq!(binary["contents"]["encoded"], json!("base64"));
+
+  let matched = built_message(
+    "V4",
+    json!([
+      { "call": "new_async_message", "description": "a tagged order" },
+      { "call": "message_with_metadata_v2", "name": "tag", "value": "{\"pact:matcher:type\":\"type\",\"value\":\"t-1\"}" }
+    ]),
+  );
+  assert_eq!(matched["metadata"], json!({ "tag": "t-1" }));
+  assert_eq!(
+    matched["matchingRules"]["metadata"]["tag"]["matchers"],
+    json!([{ "match": "type" }])
+  );
+}
+
+#[test]
+fn a_call_for_another_kind_of_interaction_is_refused_pointing_at_it() {
+  let problems = build(&json!({ "steps": [
+    { "call": "new_async_message", "description": "an event" },
+    { "call": "with_request", "method": "GET", "path": "/" },
+    { "call": "new_sync_message_interaction", "description": "too late" },
+    { "call": "message_with_contents", "content_type": "text/plain" }
+  ] }))
+  .err()
+  .unwrap();
+  let said: Vec<(&str, &str)> = problems
+    .iter()
+    .map(|p| (p.pointer.as_str(), p.message.as_str()))
+    .collect();
+  assert_eq!(
+    said,
+    [
+      (
+        "/pact/steps/1",
+        "'with_request' builds an HTTP interaction, and these steps build an asynchronous message"
+      ),
+      (
+        "/pact/steps/2/call",
+        "a call that begins an interaction is the first step, and only the first"
+      ),
+      (
+        "/pact/steps/3",
+        "'message_with_contents' takes its contents as 'body', text, or as 'contents', base64, and not both"
+      ),
+    ]
+  );
+  let problems = build(&json!({ "steps": [
+    { "call": "upon_receiving", "description": "a request" },
+    { "call": "message_with_contents", "content_type": "text/plain", "body": "hi" }
+  ] }))
+  .err()
+  .unwrap();
+  assert_eq!(
+    problems[0].message,
+    "'message_with_contents' builds an asynchronous message, and these steps build an HTTP interaction"
+  );
+}
+
+/// The example's message converts as `janus upgrade` converts pact-js's pact.
+#[test]
+fn the_built_message_converts_as_upgrade_converts_the_pact() {
+  let converted = interaction(&json!({ "steps": [
+    { "call": "new_async_message", "description": "" },
+    { "call": "message_given", "description": "an order has been placed" },
+    { "call": "message_expects_to_receive", "description": "an OrderPlaced event" },
+    { "call": "message_with_contents", "content_type": "application/json", "body": {
+        "orderId": string("order-123"),
+        "customerId": string("customer-456"),
+        "totalAmount": decimal(99.99),
+        "currency": { "pact:matcher:type": "regex", "regex": "^[A-Z]{3}$", "value": "USD" },
+        "items": each_like(json!({ "productId": string("prod-789"), "quantity": integer(2) }))
+    } },
+    { "call": "message_with_metadata_v2", "name": "queue", "value": "\"orders.placed\"" },
+    { "call": "message_with_metadata_v2", "name": "contentType", "value": "\"application/json\"" }
+  ] }))
+  .unwrap_or_else(|problems| panic!("{problems:?}"));
+
+  let path = format!(
+    "{}/../../corpora/verifier/messages/pact-js-order-placed/pact.json",
+    env!("CARGO_MANIFEST_DIR")
+  );
+  let pact = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+  let upgraded = upgrade::pact(&path, &pact).unwrap();
+  let expected = &upgraded.contract.interactions[0];
+  assert_eq!(converted.spec, expected.spec_document());
+  // The example as the test wrote it: pact_ffi wrote pact-js's pact with its members sorted, and the
+  // engine keeps their order (ADR 0037), which decides nothing.
+  let document = |parts: &BTreeMap<String, ValuePart>| {
+    let mut parts = serde_json::to_value(parts).unwrap();
+    let body = &mut parts["message"]["body"]["content"];
+    *body = serde_json::from_str(body.as_str().unwrap()).unwrap();
+    parts
+  };
+  assert_eq!(
+    document(&converted.example),
+    document(&expected.selection.variants[0].parts)
   );
 }

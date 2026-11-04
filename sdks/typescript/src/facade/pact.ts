@@ -25,6 +25,20 @@ export {
   type TemplateQuery,
   type Rules,
 } from "./consumer.js";
+export {
+  MessageConsumerPact,
+  synchronousBodyHandler,
+  asynchronousBodyHandler,
+  v4SynchronousBodyHandler,
+  v4AsynchronousBodyHandler,
+  type AsynchronousMessage,
+  type SynchronousMessage,
+  type ConcreteMessage,
+  type MessageConsumer,
+  type MessageConsumerOptions,
+  type V4MessageConsumer,
+  type Metadata,
+} from "./message.js";
 export { XmlBuilder, XmlElement, XmlText, type XmlNode } from "./xml.js";
 export {
   Verifier,

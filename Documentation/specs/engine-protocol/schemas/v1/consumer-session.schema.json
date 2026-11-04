@@ -90,7 +90,14 @@
             "with_body",
             "with_binary_file",
             "with_matching_rules",
-            "with_multipart_file_v2"
+            "with_multipart_file_v2",
+            "new_async_message",
+            "new_message",
+            "new_sync_message_interaction",
+            "message_expects_to_receive",
+            "message_given",
+            "message_with_contents",
+            "message_with_metadata_v2"
           ]
         }
       }

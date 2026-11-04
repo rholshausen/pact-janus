@@ -2,8 +2,8 @@
 
 How a consumer test written with pact-js moves to Janus. Staged plan S2.5a built it, and
 [ADR 0066](decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)
-decides how. pact-jvm's is S2.5b, and pact-js's message consumer API is S2.5c. A provider test has its
-own note: [`provider-test-migration.md`](provider-test-migration.md).
+decides how, and S2.5c added pact-js's message consumer API to it. pact-jvm's is S2.5b. A provider
+test has its own note: [`provider-test-migration.md`](provider-test-migration.md).
 
 Today's builders record the calls they would have made to `pact_ffi`, and the engine makes those
 calls itself. It then converts the interaction they build as `janus upgrade` converts a pact's
@@ -92,10 +92,18 @@ ledger lists each example this affects.
 | `pending()` | Accepted, no effect: a contract has no pending interactions, and the broker decides ([ADR 0051](decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md)) | dropped |
 | `comment()`, `testName()`, `reference()` | Accepted, no effect: a contract records none of them | dropped |
 | `withCompleteRequest()` | Throws, as pact-js's does | kept |
-| `usingPlugin()` | Refused by name: Janus cannot load pact plugins ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)) | dropped |
+| `usingPlugin()`, on an interaction or a message, and so `withPluginContents` and `startTransport` | Refused by name: Janus cannot load pact plugins ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)) | dropped |
 | `PactV3`: `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, `withRequestBinaryFile`, `withResponseBinaryFile`, `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload`, `withRequestMatchingRules`, `withResponseMatchingRules`, `executeTest` | The same calls, in pact-js's order | kept |
 | Several interactions before one `executeTest`, or one interaction called twice | Refused, and a second call fails, until the mock arms several at once (S2.13). Give each interaction its own `executeTest` | dropped |
-| `addAsynchronousInteraction()`, `addSynchronousInteraction()`, `MessageConsumerPact` | Refused until S2.5c | — |
+| `addAsynchronousInteraction()`: `given`, `expectsToReceive(description, builder)`, `withJSONContent`, `withMetadata`, `withMatchingRules`, `executeTest` | The same calls. `executeTest`'s function is handed the message, `{ contents: { content }, metadata }`, its JSON contents as their document and any other as text, and no mock is started ([ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)) | kept |
+| A message's `contentType` metadata | Compared as written, where pact-js compared it as a media type, until S3.4. A message that names none has its contents' type checked as today's verifier checks it | adapted |
+| `withContent(contentType, buffer)` on a message, `MessageConsumerPact`'s `withBinaryContent` | The same calls, but until S2.15 the test is handed the base64 text of the octets, not the octets | adapted |
+| `addSynchronousInteraction(description)`: `given`, `withRequest(builder)`, `withResponse(builder)`, `withJSONContent`, `withContent`, `withMatchingRules`, `executeTest` | The same calls. `executeTest`'s function is handed `{ Request: { content }, Response: [{ content }] }`, each a `Buffer`, with each generator's fresh value, where pact-js handed the contents as written | adapted |
+| A synchronous message's response `withMetadata` | Accepted, no effect, as pact-js's: `pact_ffi` writes no synchronous message's metadata | kept |
+| A synchronous message with several responses | The contract keeps the first, reported as `responses-dropped`, since today's verifier fails a message expecting more than one | dropped |
+| `MessageConsumerPact`: `given`, `expectsToReceive`, `withContent`, `withTextContent`, `withMetadata`, `verify(handler)` | The same calls, a V3 message pact's unless `spec` says otherwise. The handler is handed `{ description, providerStates, contents, metadata }`, and the contract is written when it resolves. `pactfileWriteMode` is accepted: contracts are always merged ([ADR 0065](decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md)) | kept |
+| `MessageConsumerPact.json()` | Not provided: it returned pact-js's own state | dropped |
+| `synchronousBodyHandler`, `asynchronousBodyHandler`, `v4SynchronousBodyHandler`, `v4AsynchronousBodyHandler` | The same | kept |
 | `PactV2`, `MatchersV2` | Not provided: they are pact-js's older API. Move to `PactV3` or `Pact` first | dropped |
 
 ### The matchers
