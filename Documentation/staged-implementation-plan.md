@@ -1877,6 +1877,25 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   calls build on it.
   *Exit:* a TypeScript and a JVM consumer test each record an asynchronous and a synchronous message
   interaction, and `janus verify` verifies the contract through a message producer.
+  *Done 2026-11-04*, as [ADR 0068](decisions/0068-build-a-message-with-its-own-builder-and-hand-the-closure-the-message-in-place-of-a-mock.md) decides:
+  - The behavioural spec has `message`, `message-contents` and `message-request`, and `execute` a
+    message form: no `start-transport`, and the closure handed `(message, variant)`. A message's body
+    always declares its type, `content`'s or `application/json`, since no transport says what an
+    undeclared one is. Both SDKs build it (`MessageBuilder` and `ReceivedMessage` in TypeScript;
+    `MessageInteraction`, `MessageSlots`, `ReceivedMessage` and `MessageTest` on the JVM, with
+    `JanusExtension.variants` for a message), and both drivers replay message chains.
+  - Nine conformance ids, with four translation cases, three scripted cases and `live/message-contract`,
+    whose content is the engine's record of an asynchronous message with an `optional` member and a
+    synchronous one. Both SDKs pass all 81 cases, and the live contracts are byte-identical across them.
+  - `test/messages.test.ts` and `MessagesTest` record an asynchronous, a synchronous and a text message,
+    and a `Verifier`'s message producers verify the contract, each producing the variant a
+    `whenVariant` state parameter names.
+  - The idiomatic layers' budgets rose by what the builders cost: TypeScript from 860 to 980 code lines,
+    the JVM from 2,100 to 2,300.
+  - Not foreseen: a producer is asked for a message with its description and states, never its
+    variant, so a contract's message variants are told apart by a `whenVariant` parameter, as an HTTP
+    interaction's are. The tests do that; nothing else needed it.
+  - Left out: a message naming its transport kind (ADR 0068, until S6.2 gives one a meaning).
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,

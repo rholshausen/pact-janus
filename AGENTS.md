@@ -179,7 +179,10 @@ Three sources are the source of truth and take precedence over this file when th
 > `body` (a synchronous one has a `request` part too). `janus upgrade` converts v3 and v4 messages,
 > `janus verify` asks for a contract's message through `produce-message` hooks with today's
 > `pact-message` request, and `serve-variant` for a message with no transport of its kind started
-> answers `{ parts }`, the message for the host's test. The SDKs' message builder is S2.14.
+> answers `{ parts }`, the message for the host's test. S2.14 (ADR 0068): both SDKs build one,
+> `janus.message(d).given(..).contents({ metadata, body })` (and `.request(..)` for a synchronous
+> message), its body declared JSON unless `content` names a type, and `execute` of a message starts
+> no mock and hands the closure a `ReceivedMessage`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
