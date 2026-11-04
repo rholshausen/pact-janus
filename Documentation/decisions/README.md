@@ -83,6 +83,7 @@ superseding ADR instead.
 | [0064](0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md) | Report each variant's test verdict to the engine, and answer with the variant's result | accepted |
 | [0065](0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md) | Let the engine's host write and merge contract files, in identity order | accepted |
 | [0066](0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md) | Let a compatibility facade submit today's builder calls, and convert them as `upgrade` does | accepted |
+| [0067](0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md) | Record a message as an emissive interaction, and hand it to the test when nothing delivers it | accepted |
 
 ## Decision backlog
 
