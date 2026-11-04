@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793834479448,
+  "lastUpdate": 1793834481331,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -41382,6 +41382,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20388,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "fe141fac68b76e4138b50b0ecc7cbc81b9e85474",
+          "message": "feat: add-pact-interaction takes with_binary_body and with_generators\n\nTwo more pact_ffi calls, ported from pact-reference's pact_ffi at\n1f1c2e61 (src/mock_server/handles.rs: pactffi_with_binary_body,\npactffi_with_generators), as ADR 0070 decides. with_binary_body sets a\nbody's octets as they stand, with no rule and no integration JSON read\nfrom them, and a Content-Type header unless one is set; a message gets\nthe type in its metadata. with_generators merges generators by category.\nBoth apply to HTTP interactions and either kind of message.\n\nThe spec's call table, the schema's known calls and both SDKs' bindings\nlist them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T10:15:44+11:00",
+          "tree_id": "2289ef98c322c31ad9d516c01af8778902ba4145",
+          "url": "https://github.com/rholshausen/pact-janus/commit/fe141fac68b76e4138b50b0ecc7cbc81b9e85474"
+        },
+        "date": 1793834480908,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28282,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20577,
             "unit": "requests per second",
             "extra": "engines 4"
           }
