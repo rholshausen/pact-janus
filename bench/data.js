@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793762860759,
+  "lastUpdate": 1793762862895,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -38904,6 +38904,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20117,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "10f4321ea9237e75b3eada50c615543f244c01eb",
+          "message": "docs: S2.12 is done, and S2.14 builds messages in the SDKs\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-04T14:22:55+11:00",
+          "tree_id": "753eada55f0fe637379e986142d817f335f3dc1b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/10f4321ea9237e75b3eada50c615543f244c01eb"
+        },
+        "date": 1793762862328,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 34009,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 26115,
             "unit": "requests per second",
             "extra": "engines 4"
           }
