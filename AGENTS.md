@@ -185,7 +185,10 @@ Three sources are the source of truth and take precedence over this file when th
 > no mock and hands the closure a `ReceivedMessage`. S2.5c: `pact-janus/pact` has pact-js's message
 > consumer API (`addAsynchronousInteraction`, `addSynchronousInteraction`, `MessageConsumerPact`, the
 > body handlers), whose builders record the `pact_ffi` message calls `add-pact-interaction` now makes.
-> S2.15, serving an example's octets as octets rather than their base64 text, is new.
+> S2.15, serving an example's octets as octets rather than their base64 text, is new. S2.13
+> (ADR 0069): a transport holds every arming of its kind until its variant is reported, and an
+> arrival goes to the arming it matches best (most plan actions passed, then first armed), or fails
+> the closest; the facade's `executeTest` serves every interaction pact-js would serve.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

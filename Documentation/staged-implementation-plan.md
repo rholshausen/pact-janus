@@ -1891,6 +1891,25 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   as today's mock server does, and keeps an arming until its variant is reported.
   *Exit:* a facade test with two interactions, and one calling an interaction twice, pass, and one
   that never calls an armed interaction fails, naming it.
+  *Done 2026-11-04*, as [ADR 0069](decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md) decides:
+  - Each transport holds every arming of its kind, in the order armed, each until its variant is
+    reported, its handle is armed again or the session ends. An arrival goes to an arming it matches,
+    the one whose match passed the most plan actions first, then the first armed, which is today's
+    mock server's best score measured on the plan rather than on HTTP's fields. One that matches
+    none fails the arming it came closest to. Every exchange of a variant is merged into its
+    evidence, failed if any failed. `engine/kernel/tests/several_armed.rs` holds each decision on
+    the real HTTP transport.
+  - The facade's `executeTest` adds every interaction pact-js would serve to one session and arms
+    them all: `PactV3`'s, and `Pact`'s added since its last `executeTest`. Its failure names each
+    interaction's missing request or mismatches. `test/consumer-facade.test.ts` runs two
+    interactions in one test, one interaction called three times, and a test that never calls one,
+    which fails naming it and writes no contract.
+  - The engine-protocol spec's `serve-variant` and the variant-semantics spec's §4.1 and §4.2 say how
+    long an arming lasts and what several exchanges of a variant mean, and the migration note's row
+    for several interactions is `kept`.
+  - Not foreseen: nothing in the kernel's own tests, the conformance suite or either SDK depended
+    on the first request ending an arming. A Janus DSL test that calls its mock twice under one
+    variant is now served twice.
 
 - **S2.14 Message interactions in the SDKs** — **M**, split from S2.12 by ADR 0067 decision 6. The
   engine hands a message to the host, and neither SDK can build one: their DSL is HTTP's. A message
