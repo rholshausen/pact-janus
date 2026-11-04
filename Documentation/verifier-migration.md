@@ -182,8 +182,13 @@ produce the message too, as the `message` part with `metadata` and `body` slots 
 | A synchronous message with more than one response compares the first, and fails | The same | |
 | A provider with no message endpoint fails each message on the request | The same, through the hook; with a configuration whose `produce-message` hooks select no interaction, a message fails as `component-unavailable` naming `hook/produce-message` | |
 
-`janus upgrade` still drops a message interaction, with an `interaction-dropped` finding: a contract has
-no message form until the consumer side has one (S6.2). `janus explain` shows a message's plan.
+`janus upgrade` converts a message into a contract's message form, an emissive interaction with a
+`message` part (S2.12, [ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)),
+and `janus verify` asks for a contract's message as for a pact's, with the same POST and the same
+default producer. A synchronous message's request is sent as the contract records it, without the
+pact's `matchingRules`, which a contract does not have: a provider that reads them is the one
+difference (fixture `messages/pact-jvm-synchronous`, in the upgrade ledger). `janus explain` shows a
+message's plan.
 
 ## Provider states and request filters
 

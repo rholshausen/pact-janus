@@ -175,6 +175,11 @@ Three sources are the source of truth and take precedence over this file when th
 > ported from `pact_ffi`) and converts as `janus upgrade` converts a pact. pact-js's consumer examples
 > run on it, but the message one (S2.5c, on S2.12, which brings S6.2's core into stage 2) and the
 > plugin one; `Documentation/consumer-test-migration.md` has each primitive's verdict.
+> S2.12 (ADR 0067): a message is an emissive interaction whose `message` part has `metadata` and
+> `body` (a synchronous one has a `request` part too). `janus upgrade` converts v3 and v4 messages,
+> `janus verify` asks for a contract's message through `produce-message` hooks with today's
+> `pact-message` request, and `serve-variant` for a message with no transport of its kind started
+> answers `{ parts }`, the message for the host's test. The SDKs' message builder is S2.14.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

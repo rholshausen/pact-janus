@@ -1735,10 +1735,10 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     before the step starts. The JSON body DSL may become a step of its own if this one proves too
     big.
     *Exit:* pact-jvm's consumer example suites run on the facade, except those written for JUnit 4.
-  - **S2.5c pact-js messages** — **S**, after S2.12. `addAsynchronousInteraction`,
+  - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
     message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
-    same S2.12.
+    same S2.12 and S2.14.
     *Exit:* pact-js's message consumer example runs on the facade, and pact-js's message provider
     example verifies the contract it records.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
@@ -1828,6 +1828,37 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   the host hands it to the test and reports the verdict (ADR 0064).
   *Exit:* S1.1's message fixtures upgrade with no `interaction-dropped` finding and verify as their
   pacts do; a consumer session records a message interaction a provider then verifies.
+  *Done 2026-11-04*, as [ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md) decides:
+  - A message is an emissive interaction whose `message` part has `metadata` and `body`; a synchronous
+    message also has a `request` part. `janus upgrade` converts v3 messages and v4 asynchronous and
+    synchronous ones: the metadata member by member, a `contentType` with no rule as `equality`
+    (`rule-narrowed`, as a header), the contents as a body of their type, and today's type check on
+    the metadata, as an `optional` pattern when the pact names no `contentType`
+    (`body-type-on-metadata`). A second response is `responses-dropped`.
+  - `janus verify` asks for a contract's message through its `produce-message` hooks, with today's
+    `pact-message` request built from the contract, so the default producer, `--transports` and the
+    SDKs' message producers work unchanged. A produced message's metadata `contentType` is read as its
+    body's label, else its own, else what its octets are detected as.
+  - `serve-variant` for an emissive interaction with no transport of its kind started answers
+    `{ parts }`, the variant's message as a transport would carry it, and the variant is exercised;
+    `report-variant` decides it. With one started it is `operation-unsupported` (S6.2).
+    `engine/kernel/tests/message_interactions.rs` records a message with two variants, hands each its
+    message, and verifies the contract through a producer.
+  - Every S1.1 message fixture upgrades whole, so the harness verifies their contracts too: 1194
+    upgraded verdicts, of which 1146 agree and 48 are known. The 20 new ones are the pending message (ADR 0051)
+    and `messages/pact-jvm-synchronous` (ADR 0067); every other message fixture verifies as its pact
+    does. The corpus has `upgrade-message/` and its mismatch twin, and the two-path agreement test
+    takes message cases: `v3-message` disagrees, on its narrowed `contentType`.
+  - Not foreseen:
+    - A `Pact-Message-Metadata` header is written over the reply's `Content-Type` in the metadata, so
+      a relabelled body passed a check on the metadata's own `contentType`. Reading it as today's
+      verifier reads a message's type, label first, closed it.
+    - Today's synchronous request carries the pact's `matchingRules`, and S1.1's provider recognises
+      it only with them. A contract has none to send, which is the deliberate difference.
+    - A synchronous request recorded as text would have been sent as a string. It is written as a v4
+      pact writes contents: JSON as its value.
+  - Left out: building a message in either SDK, and handing it to the closure (S2.14); delivering a
+    message through a transport (S6.2).
 - **S2.13 Several interactions armed at once, and an interaction served more than once** — **M**.
   Engine-protocol spec §8.2 lets several interactions be armed at once, but a transport holds one
   arming, and its first request ends it. A pact-js `PactV3` test adds several interactions before one
@@ -1836,6 +1867,16 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   as today's mock server does, and keeps an arming until its variant is reported.
   *Exit:* a facade test with two interactions, and one calling an interaction twice, pass, and one
   that never calls an armed interaction fails, naming it.
+
+- **S2.14 Message interactions in the SDKs** — **M**, split from S2.12 by ADR 0067 decision 6. The
+  engine hands a message to the host, and neither SDK can build one: their DSL is HTTP's. A message
+  builder (description, states, metadata, body, and a synchronous message's request) and an `execute`
+  that, for a message, starts no transport and hands the closure the message, its body as octets with
+  its type, in place of a mock, then reports the closure's verdict as for any variant. Specified in the
+  behavioural spec first, with conformance cases, and built in both SDKs. S2.5b's and S2.5c's message
+  calls build on it.
+  *Exit:* a TypeScript and a JVM consumer test each record an asynchronous and a synchronous message
+  interaction, and `janus verify` verifies the contract through a message producer.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,
@@ -2079,6 +2120,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.11 | A Janus SDK overwrites the contract, so of several test files recording one pair, the last wins | ADR 0063 decision 7 |
 | S2.12 | A contract has no message form: `upgrade` drops messages, and a consumer session cannot hand one to a test | ADR 0046; moved from S6.2 by S2.5a |
 | S2.13 | A transport holds one armed interaction, and its first request ends the arming | found building S2.5a; ADR 0066 |
+| S2.14 | Neither SDK can build a message interaction, or hand its test the message the engine answers | ADR 0067 decision 6 |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |
