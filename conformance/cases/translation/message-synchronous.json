@@ -1,0 +1,69 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/message-synchronous",
+  "category": "translation",
+  "title": "A synchronous message declares the request it answers as a 'request' part beside its 'message'.",
+  "covers": [
+    "session.message-request.request-part"
+  ],
+  "why": "behavioural spec 'message-request': identical treatment to 'message-contents', populating 'parts.request' and declaring its body's type at part 'request'; a message interaction with a 'request' part is a synchronous message (ADR 0067 decision 2).",
+  "interaction": {
+    "description": "a square's area",
+    "message-request": {
+      "body": {
+        "side": 3
+      }
+    },
+    "message": {
+      "body": {
+        "area": {
+          "$": "integer",
+          "args": [
+            9
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "a square's area",
+      "transport": {
+        "kind": "message",
+        "mode": "emissive"
+      },
+      "parts": {
+        "request": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "side": {
+                "shape": "equality",
+                "example": 3
+              }
+            }
+          }
+        },
+        "message": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "area": {
+                "shape": "integer",
+                "example": 9
+              }
+            }
+          }
+        }
+      },
+      "content-types": {
+        "request": {
+          "body": "application/json"
+        },
+        "message": {
+          "body": "application/json"
+        }
+      }
+    }
+  }
+}

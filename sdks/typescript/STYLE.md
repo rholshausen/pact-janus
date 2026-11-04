@@ -14,6 +14,14 @@ specification disagree, the behavioural specification wins and this file has a b
   value written where a shape is expected. `when-variant` and `variant-cases` are `whenVariant` and
   `variantCases`, written as a `given` param's value; `variantCases`' default is a trailing optional
   argument, so "no default" and "a default of `undefined`" cannot be confused.
+- `message` is `Janus.message`, returning a `MessageBuilder` (ADR 0068): `given` as an interaction's,
+  and `message-contents` and `message-request` spelled `contents` and `request` on it, each an options
+  bag of `metadata` and `body`. The builder has no `response`, and an `InteractionBuilder` no
+  `contents`, so a chain mixing HTTP and a message does not type-check. `execute` is overloaded: a
+  `MessageBuilder` takes a `MessageClosure`, `(message, variant)`, whose `message` is a
+  `ReceivedMessage` — `body` a `Uint8Array`, `contentType` (`undefined` for none), `metadata`, and
+  `text()` and `json()` reading the body; a synchronous message's `request` is one more
+  `ReceivedMessage`.
 - A primitive whose `signature` is empty is still a function, called with no arguments —
   `forbidden()`, not a `forbidden` constant. Every shape helper is then written the same way, and a
   call is a fresh node rather than one document fragment shared by every use of it.
@@ -21,7 +29,8 @@ specification disagree, the behavioural specification wins and this file has a b
   - `src/generated/` — layer 1, the generated bindings (task 6.1). Never edited, never linted.
   - `src/engine/` — the embedding: `pipe.ts` (the frozen frame pipe), `subprocess.ts` (the
     `janus-engine` embedding), `engine.ts` (typed operations over the pipe).
-  - `src/shapes.ts`, `src/interaction.ts`, `src/janus.ts`, `src/errors.ts` — the idiomatic layer.
+  - `src/shapes.ts`, `src/interaction.ts`, `src/message.ts`, `src/janus.ts`, `src/errors.ts` — the
+    idiomatic layer.
   - `src/jest.ts` and `src/vitest.ts` — the test-framework integrations, separate entry points
     (`pact-janus/jest`, `pact-janus/vitest`) so the core never imports a test framework.
 - Generated types are used inside the idiomatic layer and appear in its public types where the

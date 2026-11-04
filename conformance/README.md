@@ -66,7 +66,10 @@ for, and a driver that "helps" a case pass has broken the one property the suite
 A case is one JSON document under `cases/<category>/<name>.json`, with `id` `"<category>/<name>"`.
 
 **The DSL, as data.** `interaction` (and a step's `execute.interaction`) is the chain to replay:
-`description`, `given`, `request`, `response`, exactly the behavioural spec's primitives. A value
+`description`, `given`, `request`, `response`, exactly the behavioural spec's primitives. A chain
+with `message` or `message-request` is a message chain instead (ADR 0068): `message` and
+`message-request` are `message-contents` and `message-request`, each with `metadata` and `body`, and
+the driver builds it with `message` in place of `interaction`. A value
 where a shape is expected is a **template**: plain JSON is written as itself and compiles by the
 `literal` rule, and an object carrying a `$` member is a shape-helper call instead —
 
@@ -91,7 +94,8 @@ Two rules for a case author, both because a case must mean the same thing in eve
 **Against a scripted engine** (`lifecycle`, `variants`): the case's `engine` member is the whole
 engine. `variants` is what `consumer-session/variants` returns, `contract` what `finalise` returns,
 `withhold-contract` makes it return none, `results` replaces the default results, `reports` maps a
-variant id to the result `report-variant` answers with for it, and `errors` maps
+variant id to the result `report-variant` answers with for it, `served` maps a variant id to the
+`parts` `serve-variant` answers with for it (a message's, ADR 0067), and `errors` maps
 an operation to the error document it answers with instead — with `after: n` on that error, the
 operation answers `n` calls the default way first, which is how a case writes an engine that dies
 partway through the variant loop. Everything unset is answered the default way: `engine/hello` agrees protocol version 1, `create` returns session `s-1`, `add-interaction`
@@ -135,6 +139,7 @@ Per step (`expect` inside a step):
 |---|---|
 | `outcome` | `"ok"`, or the failure: `execute-failed` (with the `variants` it must name), `contract-withheld` (with the `interactions` it must name), `engine-error` (with its `code`) |
 | `closure-calls` | the variant ids the closure ran on, in call order |
+| `received` | for a message, what the closure was handed on each call, in call order, on the members each entry names: `json` (the body read as JSON), `text` (read as UTF-8), `content-type` (`null` for none), `metadata`, and `request`, a synchronous message's, read the same way |
 | `contract` | `written`, the file's exact `text`, or its `content` |
 
 Per case (`expect` at the top level): `spec` (the whole built document), `at` (JSON pointer → value)

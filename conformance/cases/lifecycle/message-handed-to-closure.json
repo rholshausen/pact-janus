@@ -1,0 +1,118 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/message-handed-to-closure",
+  "category": "lifecycle",
+  "title": "The closure is handed the message 'serve-variant' answers: its body's octets, its type and its metadata.",
+  "covers": [
+    "session.execute.message-handed-to-closure"
+  ],
+  "why": "behavioural spec 'execute': the closure receives (message, variant), 'message' read from that variant's 'serve-variant' answer: the 'message' part's 'body' as its octets, base64 decoded, text as its UTF-8 encoding, any other value as its JSON text; its 'content-type' when it has one; its 'metadata' slot's content, an empty map when there is none; with a way to read the octets as UTF-8 text and as JSON.",
+  "engine": {
+    "variants": [
+      {
+        "id": "v-1"
+      },
+      {
+        "id": "v-2"
+      },
+      {
+        "id": "v-3"
+      }
+    ],
+    "served": {
+      "v-1": {
+        "message": {
+          "metadata": {
+            "content": {
+              "queue": "orders.placed"
+            }
+          },
+          "body": {
+            "content": "eyJpZCI6NDJ9",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        }
+      },
+      "v-2": {
+        "message": {
+          "body": {
+            "content": "cancelled",
+            "encoded": "text",
+            "content-type": "text/plain"
+          }
+        }
+      },
+      "v-3": {
+        "message": {
+          "metadata": {
+            "content": {
+              "attempt": 2
+            }
+          },
+          "body": {
+            "content": {
+              "id": 7
+            }
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order was placed",
+          "message": {
+            "metadata": {
+              "queue": "orders.placed"
+            },
+            "body": {
+              "id": {
+                "$": "integer",
+                "args": [
+                  42
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok",
+        "closure-calls": [
+          "v-1",
+          "v-2",
+          "v-3"
+        ],
+        "received": [
+          {
+            "json": {
+              "id": 42
+            },
+            "text": "{\"id\":42}",
+            "content-type": "application/json",
+            "metadata": {
+              "queue": "orders.placed"
+            }
+          },
+          {
+            "text": "cancelled",
+            "content-type": "text/plain",
+            "metadata": {}
+          },
+          {
+            "json": {
+              "id": 7
+            },
+            "content-type": null,
+            "metadata": {
+              "attempt": 2
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/message-contract",
+  "category": "live",
+  "title": "The real engine hands each variant of a message to the closure, and records the messages, asynchronous and synchronous, in the contract.",
+  "covers": [
+    "session.execute.message-handed-to-closure",
+    "session.finalise.writes-contract-when-verified"
+  ],
+  "why": "behavioural spec 'execute': a message is executed with no transport, and the closure receives each selected variant's message as the engine answers it (ADR 0067 decision 5, ADR 0068 decision 3). The content below is the engine's own record of the exercised messages (README §6).",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order was placed",
+          "given": [
+            {
+              "name": "an order exists"
+            }
+          ],
+          "message": {
+            "metadata": {
+              "queue": "orders.placed"
+            },
+            "body": {
+              "id": {
+                "$": "integer",
+                "args": [
+                  42
+                ]
+              },
+              "note": {
+                "$": "optional",
+                "args": [
+                  "fragile"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok",
+        "received": [
+          {
+            "json": {
+              "id": 42,
+              "note": "fragile"
+            },
+            "content-type": "application/json",
+            "metadata": {
+              "queue": "orders.placed"
+            }
+          },
+          {
+            "json": {
+              "id": 42
+            },
+            "content-type": "application/json",
+            "metadata": {
+              "queue": "orders.placed"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "execute": {
+        "interaction": {
+          "description": "a square's area",
+          "message-request": {
+            "body": {
+              "side": 3
+            }
+          },
+          "message": {
+            "body": {
+              "area": {
+                "$": "integer",
+                "args": [
+                  9
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok",
+        "received": [
+          {
+            "json": {
+              "area": 9
+            },
+            "request": {
+              "json": {
+                "side": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "content": {
+            "interactions": [
+              {
+                "description": "a square's area",
+                "parts": {
+                  "message": {
+                    "body": {
+                      "members": {
+                        "area": {
+                          "example": 9,
+                          "shape": "integer"
+                        }
+                      },
+                      "shape": "object"
+                    }
+                  },
+                  "request": {
+                    "body": {
+                      "members": {
+                        "side": {
+                          "example": 3,
+                          "shape": "equality"
+                        }
+                      },
+                      "shape": "object"
+                    }
+                  }
+                },
+                "selection": {
+                  "variants": [
+                    {
+                      "id": "base",
+                      "origin": "base",
+                      "assignment": [],
+                      "parts": {
+                        "message": {
+                          "body": {
+                            "content": {
+                              "area": 9
+                            },
+                            "content-type": "application/json"
+                          }
+                        },
+                        "request": {
+                          "body": {
+                            "content": {
+                              "side": 3
+                            },
+                            "content-type": "application/json"
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "report": {
+                    "algorithm": "janus-ipog-v1",
+                    "boundaries": true,
+                    "budgets": {
+                      "exhaustive-threshold": 8,
+                      "max-variants": 50
+                    },
+                    "coverage": {
+                      "covered": 0,
+                      "dropped": 0,
+                      "removed": 0,
+                      "targets": 0
+                    },
+                    "selected": 1,
+                    "space": {
+                      "dimensions": 0,
+                      "exact": true,
+                      "size": 1
+                    },
+                    "strategy": "exhaustive"
+                  }
+                }
+              },
+              {
+                "description": "an order was placed",
+                "states": [
+                  {
+                    "name": "an order exists"
+                  }
+                ],
+                "parts": {
+                  "message": {
+                    "body": {
+                      "members": {
+                        "id": {
+                          "example": 42,
+                          "shape": "integer"
+                        },
+                        "note": {
+                          "of": {
+                            "example": "fragile",
+                            "shape": "equality"
+                          },
+                          "shape": "optional"
+                        }
+                      },
+                      "shape": "object"
+                    },
+                    "metadata": {
+                      "members": {
+                        "queue": {
+                          "example": "orders.placed",
+                          "shape": "equality"
+                        }
+                      },
+                      "shape": "object"
+                    }
+                  }
+                },
+                "selection": {
+                  "variants": [
+                    {
+                      "id": "base",
+                      "origin": "base",
+                      "assignment": [
+                        {
+                          "dimension": "message.body.note#presence",
+                          "point": "present"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists"
+                        }
+                      ],
+                      "parts": {
+                        "message": {
+                          "body": {
+                            "content": {
+                              "id": 42,
+                              "note": "fragile"
+                            },
+                            "content-type": "application/json"
+                          },
+                          "metadata": {
+                            "content": {
+                              "queue": "orders.placed"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "message.body.note#presence=absent",
+                      "origin": "boundary",
+                      "assignment": [
+                        {
+                          "dimension": "message.body.note#presence",
+                          "point": "absent"
+                        }
+                      ],
+                      "states": [
+                        {
+                          "name": "an order exists"
+                        }
+                      ],
+                      "parts": {
+                        "message": {
+                          "body": {
+                            "content": {
+                              "id": 42
+                            },
+                            "content-type": "application/json"
+                          },
+                          "metadata": {
+                            "content": {
+                              "queue": "orders.placed"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "report": {
+                    "algorithm": "janus-ipog-v1",
+                    "boundaries": true,
+                    "budgets": {
+                      "exhaustive-threshold": 8,
+                      "max-variants": 50
+                    },
+                    "coverage": {
+                      "covered": 0,
+                      "dropped": 0,
+                      "removed": 0,
+                      "targets": 0
+                    },
+                    "selected": 2,
+                    "space": {
+                      "dimensions": 1,
+                      "exact": true,
+                      "size": 2
+                    },
+                    "strategy": "exhaustive"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

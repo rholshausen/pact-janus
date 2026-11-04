@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.pact.janus.sdk.Cardinality;
 import io.pact.janus.sdk.Interaction;
 import io.pact.janus.sdk.Janus;
+import io.pact.janus.sdk.MessageInteraction;
+import io.pact.janus.sdk.MessageSlots;
 import io.pact.janus.sdk.Shapes;
 import io.pact.janus.sdk.VariantBinding;
 import java.util.ArrayList;
@@ -92,6 +94,40 @@ final class Dsl {
       default -> throw new IllegalArgumentException(
           "the case names a shape primitive this SDK does not implement: '" + primitive + "'");
     };
+  }
+
+  /** Whether the case scripts a message chain (ADR 0068): one with 'message' or 'message-request'. */
+  static boolean isMessage(JsonNode script) {
+    return script.has("message") || script.has("message-request");
+  }
+
+  /** The document the scripted chain builds, an interaction's or a message's. */
+  static Map<String, Object> document(Janus janus, JsonNode script) {
+    return isMessage(script) ? message(janus, script).toDocument() : interaction(janus, script).toDocument();
+  }
+
+  /** A message chain: message, given*, message-request, message-contents. */
+  static MessageInteraction message(Janus janus, JsonNode script) {
+    MessageInteraction message = janus.message(script.path("description").asText());
+    for (JsonNode state : script.path("given")) {
+      message = state.has("params")
+          ? message.given(state.path("name").asText(), literalMap(state.path("params")))
+          : message.given(state.path("name").asText());
+    }
+    if (script.has("message-request")) {
+      message = message.request(slots -> slots(slots, script.get("message-request")));
+    }
+    if (script.has("message")) {
+      message = message.contents(slots -> slots(slots, script.get("message")));
+    }
+    return message;
+  }
+
+  private static void slots(MessageSlots slots, JsonNode script) {
+    script.path("metadata").properties().forEach(m -> slots.metadata(m.getKey(), template(m.getValue())));
+    if (script.has("body")) {
+      slots.body(template(script.get("body")));
+    }
   }
 
   /** The chain a case scripts, built with this SDK's builder, one call per member. */

@@ -123,6 +123,12 @@ final class ScriptedPipe implements Embedding, FramePipe {
           variants.addObject().put("id", "base").put("label", "base");
         }
       }
+      case "consumer-session/serve-variant" -> {
+        JsonNode parts = script.path("served").path(body.path("variant").asText());
+        if (parts.isObject()) {
+          ok.set("parts", parts);
+        }
+      }
       case "consumer-session/report-variant" -> {
         // The case's result for this variant, else the report's own verdict (README §3).
         String variant = body.path("variant").asText();

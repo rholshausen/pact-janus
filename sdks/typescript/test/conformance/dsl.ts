@@ -25,11 +25,12 @@ import {
   variantCases,
   whenVariant,
   type InteractionBuilder,
+  type MessageBuilder,
   type MultiValue as SdkMultiValue,
   type Shape,
   type Template,
 } from "../../src/index.js";
-import type { HelperCall, InteractionScript, MultiValue } from "./cases.js";
+import type { HelperCall, InteractionScript, MessageSlotsScript, MultiValue } from "./cases.js";
 
 /** Primitive id (behavioural-spec.json) -> how this SDK spells it. */
 const helpers: Record<string, (args: unknown[], options: Record<string, number>) => Shape | Template> = {
@@ -79,7 +80,33 @@ function call(helperCall: HelperCall): Shape | Template {
 }
 
 /** The chain a case scripts, built with this SDK's builder, one call per member. */
-export function buildInteraction(janus: Janus, script: InteractionScript): InteractionBuilder {
+export function buildInteraction(janus: Janus, script: InteractionScript): InteractionBuilder | MessageBuilder {
+  if (script.message !== undefined || script["message-request"] !== undefined) {
+    return buildMessage(janus, script);
+  }
+  return buildHttp(janus, script);
+}
+
+/** A message chain (ADR 0068): message, given*, message-request, message-contents. */
+function buildMessage(janus: Janus, script: InteractionScript): MessageBuilder {
+  let message = janus.message(script.description);
+  for (const state of script.given ?? []) {
+    message = state.params === undefined ? message.given(state.name) : message.given(state.name, stateParams(state.params));
+  }
+  const slots = ({ metadata, body }: MessageSlotsScript) => ({
+    ...(metadata === undefined ? {} : { metadata: mapValues(metadata, template) }),
+    ...(body === undefined ? {} : { body: template(body) }),
+  });
+  if (script["message-request"]) {
+    message = message.request(slots(script["message-request"]));
+  }
+  if (script.message) {
+    message = message.contents(slots(script.message));
+  }
+  return message;
+}
+
+function buildHttp(janus: Janus, script: InteractionScript): InteractionBuilder {
   let interaction = janus.interaction(script.description);
   for (const state of script.given ?? []) {
     interaction =

@@ -1,0 +1,66 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/synchronous-message-handed-its-request",
+  "category": "lifecycle",
+  "title": "A synchronous message's closure is handed the request it answers too, read as the message is.",
+  "covers": [
+    "session.execute.synchronous-message-handed-its-request"
+  ],
+  "why": "behavioural spec 'execute': a synchronous message's closure also receives, as the message's 'request', the 'request' part read the same way.",
+  "engine": {
+    "served": {
+      "base": {
+        "request": {
+          "body": {
+            "content": "eyJzaWRlIjozfQ==",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        },
+        "message": {
+          "body": {
+            "content": "eyJhcmVhIjo5fQ==",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "a square's area",
+          "message-request": {
+            "body": {
+              "side": 3
+            }
+          },
+          "message": {
+            "body": {
+              "area": 9
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok",
+        "received": [
+          {
+            "json": {
+              "area": 9
+            },
+            "request": {
+              "json": {
+                "side": 3
+              },
+              "content-type": "application/json",
+              "metadata": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

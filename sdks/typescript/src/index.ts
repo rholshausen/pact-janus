@@ -9,8 +9,10 @@ export {
   type Mock,
   type Variant,
   type Closure,
+  type MessageClosure,
   type Finalised,
 } from "./janus.js";
+export { MessageBuilder, ReceivedMessage, type MessageSlots } from "./message.js";
 export {
   InteractionBuilder,
   VariantBinding,

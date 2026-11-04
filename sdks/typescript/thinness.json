@@ -21,6 +21,7 @@
       "src/index.ts",
       "src/janus.ts",
       "src/interaction.ts",
+      "src/message.ts",
       "src/shapes.ts",
       "src/errors.ts",
       "src/verifier.ts"
@@ -44,7 +45,7 @@
     ]
   },
   "budgets": {
-    "idiomatic": 860,
+    "idiomatic": 980,
     "embedding": 390,
     "loopback": 80,
     "facade": 1200,

@@ -10,10 +10,12 @@ import {
   ContractWithheldError,
   Janus,
   JanusError,
+  MessageBuilder,
   VariantsFailedError,
+  type ReceivedMessage,
   type Variant,
 } from "../../src/index.js";
-import type { Case, Exchange, InteractionScript, Outcome, StepExpectation } from "./cases.js";
+import type { Case, Exchange, InteractionScript, Outcome, Received, StepExpectation } from "./cases.js";
 import { equal, pointer, show, subset } from "./compare.js";
 import { buildInteraction } from "./dsl.js";
 import { runProvider } from "./provider.js";
@@ -112,23 +114,37 @@ async function runSession(testCase: Case, failures: string[]): Promise<string | 
         const skipOn = step.execute.closure?.["skip-on"] ?? [];
         const exchange = step.execute.closure?.exchange;
         const interaction = buildInteraction(janus, step.execute.interaction);
+        const handed: ReceivedMessage[] = [];
+        const ran = (variant: Variant) => {
+          calls.push(variant.id);
+          for (const point of assignmentOf(variant)) {
+            dimensions.add(point);
+          }
+        };
+        const verdict = (variant: Variant) => {
+          if (failOn.includes(variant.id) || failOn.includes("*")) {
+            throw new Error(`the consumer cannot handle variant '${variant.id}'`);
+          }
+        };
         const outcome = await capture(() =>
-          janus.execute(interaction, async (mock, variant: Variant) => {
-            calls.push(variant.id);
-            for (const point of assignmentOf(variant)) {
-              dimensions.add(point);
-            }
-            // The exchange first: a consumer that cannot handle a variant fails on what the mock sent.
-            if (exchange && !skipOn.includes(variant.id)) {
-              await send(mock.url, exchange);
-            }
-            if (failOn.includes(variant.id) || failOn.includes("*")) {
-              throw new Error(`the consumer cannot handle variant '${variant.id}'`);
-            }
-          }),
+          interaction instanceof MessageBuilder
+            ? janus.execute(interaction, (message, variant: Variant) => {
+                ran(variant);
+                handed.push(message);
+                verdict(variant);
+              })
+            : janus.execute(interaction, async (mock, variant: Variant) => {
+                ran(variant);
+                // The exchange first: a consumer that cannot handle a variant fails on what the mock sent.
+                if (exchange && !skipOn.includes(variant.id)) {
+                  await send(mock.url, exchange);
+                }
+                verdict(variant);
+              }),
         );
         variantCounts.push(calls.length);
         checkStep(step.expect, { outcome, calls }, where, failures);
+        checkReceived(step.expect?.received, handed, where, failures);
       } else if (step.finalise) {
         const outcome = await capture(async () => {
           await janus.finalise();
@@ -201,6 +217,35 @@ function checkStep(expected: StepExpectation | undefined, actual: Actual, where:
       checkContent(contract.content, actual.contract.document, where, failures);
     }
   }
+}
+
+/** What each message closure call was handed, on the members each expected entry names (README §4). */
+function checkReceived(expected: Received[] | undefined, handed: ReceivedMessage[], where: string, failures: string[]): void {
+  if (expected === undefined) {
+    return;
+  }
+  if (expected.length !== handed.length) {
+    failures.push(`${where}: the closure was handed ${handed.length} messages, and the case expects ${expected.length}`);
+  }
+  const compare = (wanted: Received, message: ReceivedMessage | undefined, at: string) => {
+    if (!message) {
+      failures.push(`${at}: no message was handed`);
+      return;
+    }
+    const actual: Record<string, unknown> = {};
+    if ("json" in wanted) actual.json = message.json();
+    if ("text" in wanted) actual.text = message.text();
+    if ("content-type" in wanted) actual["content-type"] = message.contentType ?? null;
+    if ("metadata" in wanted) actual.metadata = message.metadata;
+    const { request, ...members } = wanted;
+    if (!equal(members, actual)) {
+      failures.push(`${at}: the message handed differs\n  expected: ${show(members)}\n  actual:   ${show(actual)}`);
+    }
+    if (request) {
+      compare(request, message.request, `${at}'s request`);
+    }
+  };
+  expected.forEach((wanted, index) => compare(wanted, handed[index], `${where}, call ${index + 1}`));
 }
 
 /**

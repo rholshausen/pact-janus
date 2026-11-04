@@ -9,6 +9,7 @@ import type { FramePipe } from "./engine/pipe.js";
 import { SubprocessPipe, type SubprocessOptions } from "./engine/subprocess.js";
 import { causeText, ContractWithheldError, VariantsFailedError, type VariantFailure } from "./errors.js";
 import { InteractionBuilder } from "./interaction.js";
+import { MessageBuilder, received, type ReceivedMessage } from "./message.js";
 
 const Op = protocolVocabulary.RequestFrameOp;
 
@@ -60,6 +61,9 @@ export type Variant = protocol.VariantDescriptor;
 
 export type Closure = (mock: Mock, variant: Variant) => unknown;
 
+/** A message test: handed each variant's message in place of a mock (ADR 0068 decision 3). */
+export type MessageClosure = (message: ReceivedMessage, variant: Variant) => unknown;
+
 /** What `finalise` returns when a contract was written. */
 export interface Finalised {
   results: protocol.InteractionResult[];
@@ -83,14 +87,23 @@ export class Janus {
     return new InteractionBuilder(description);
   }
 
+  /** Begins a message interaction: a message the provider emits and the consumer receives. */
+  message(description: string): MessageBuilder {
+    return new MessageBuilder(description);
+  }
+
   /**
    * Submits `interaction` and runs `closure` once per variant the engine selects, reporting each
-   * closure's verdict to the engine and failing on each variant the engine did not verify.
+   * closure's verdict to the engine and failing on each variant the engine did not verify. A message
+   * starts no transport, and its closure is handed the variant's message instead of a mock.
    */
-  async execute(interaction: InteractionBuilder, closure: Closure): Promise<void> {
+  async execute(interaction: InteractionBuilder, closure: Closure): Promise<void>;
+  async execute(message: MessageBuilder, closure: MessageClosure): Promise<void>;
+  async execute(interaction: InteractionBuilder | MessageBuilder, closure: Closure | MessageClosure): Promise<void> {
     const engine = await this.#start();
     const spec = interaction.build();
     const session = await this.#openSession(engine);
+    const isMessage = interaction instanceof MessageBuilder;
 
     const { handle } = await engine.call(
       Op.ConsumerSessionAddInteraction,
@@ -99,16 +112,23 @@ export class Janus {
     );
     this.#descriptions.set(handle, spec.description);
 
-    this.#mock ??= mockFor(await engine.call(Op.ConsumerSessionStartTransport, { session, transport: "http" }));
+    if (!isMessage) {
+      this.#mock ??= mockFor(await engine.call(Op.ConsumerSessionStartTransport, { session, transport: "http" }));
+    }
     const mock = this.#mock;
 
     const { variants } = await engine.call(Op.ConsumerSessionVariants, { session, handle }, `'${spec.description}'`);
     const failures: VariantFailure[] = [];
     for (const variant of variants) {
-      await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant: variant.id });
+      const served = await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant: variant.id });
+      if (isMessage && served.parts === undefined) {
+        throw new Error("the engine served a message with no parts: it predates ADR 0067, which this SDK needs; use the engine this SDK pins");
+      }
       let failure: { cause: unknown } | undefined;
       try {
-        await closure(mock, variant);
+        await (isMessage
+          ? (closure as MessageClosure)(received(served.parts ?? {}), variant)
+          : (closure as Closure)(mock as Mock, variant));
       } catch (cause) {
         failure = { cause };
       }

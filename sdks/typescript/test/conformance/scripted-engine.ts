@@ -141,6 +141,10 @@ export class ScriptedPipe implements FramePipe {
         return { endpoint: { kind: "http", "base-url": "http://127.0.0.1:1" } };
       case "consumer-session/variants":
         return { variants: this.#script.variants ?? [{ id: "base", label: "base" }] };
+      case "consumer-session/serve-variant": {
+        const parts = this.#script.served?.[String(body.variant)];
+        return parts === undefined ? {} : { parts };
+      }
       case "consumer-session/report-variant": {
         // The case's result for this variant, else the report's own verdict (README §3).
         const variant = String(body.variant);

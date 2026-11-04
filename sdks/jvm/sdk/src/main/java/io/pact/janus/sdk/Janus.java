@@ -13,6 +13,7 @@ import io.pact.janus.bindings.protocol.v1.RefusedInteraction;
 import io.pact.janus.bindings.protocol.v1.ReportVariant;
 import io.pact.janus.bindings.protocol.v1.ReportVariantResult;
 import io.pact.janus.bindings.protocol.v1.ServeVariant;
+import io.pact.janus.bindings.protocol.v1.ServeVariantResult;
 import io.pact.janus.bindings.protocol.v1.SessionConfig;
 import io.pact.janus.bindings.protocol.v1.StartTransport;
 import io.pact.janus.bindings.protocol.v1.StartTransportResult;
@@ -101,6 +102,31 @@ public final class Janus implements AutoCloseable {
   /** {@code interaction}: begins a new interaction specification. No protocol call happens. */
   public Interaction interaction(String description) {
     return new Interaction(description);
+  }
+
+  /** {@code message}: begins a message interaction (ADR 0068). No protocol call happens. */
+  public MessageInteraction message(String description) {
+    return new MessageInteraction(description);
+  }
+
+  /**
+   * {@code execute} for a message: as {@link #execute(Interaction, VariantTest)}, but no transport is
+   * started, and {@code test} is handed each variant's message, which the engine answers
+   * {@code serve-variant} with (ADR 0067 decision 5, ADR 0068 decision 3).
+   */
+  public void execute(MessageInteraction message, MessageTest test) {
+    Objects.requireNonNull(test, "test");
+    Execution run = begin(message);
+    List<VariantFailure> failures = new ArrayList<>();
+    for (Variant variant : run.variants()) {
+      VariantFailure failure = run(run, variant, test);
+      if (failure != null) {
+        failures.add(failure);
+      }
+    }
+    if (!failures.isEmpty()) {
+      throw new ExecuteFailedException(run.description(), failures, run.variants().size());
+    }
   }
 
   /**
@@ -229,7 +255,16 @@ public final class Janus implements AutoCloseable {
    */
   synchronized Execution begin(Interaction interaction) {
     Objects.requireNonNull(interaction, "interaction");
-    Map<String, Object> document = interaction.toDocument();
+    return begin(interaction.description(), interaction.toDocument(), true);
+  }
+
+  /** {@link #begin(Interaction)} for a message, which starts no transport (ADR 0068 decision 3). */
+  synchronized Execution begin(MessageInteraction message) {
+    Objects.requireNonNull(message, "message");
+    return begin(message.description(), message.toDocument(), false);
+  }
+
+  private Execution begin(String description, Map<String, Object> document, boolean http) {
     EngineClient client = engine();
     if (session == null) {
       Create create = new Create();
@@ -248,8 +283,8 @@ public final class Janus implements AutoCloseable {
     String handle = client.call(RequestFrameOp.CONSUMER_SESSION_ADD_INTERACTION, add, AddInteractionResult.class)
         .getHandle();
     // Known by its handle from here, so a withheld contract names it as the test did.
-    executions.put(handle, new Execution(interaction.description(), session, handle, List.of(), mock));
-    if (mock == null) {
+    executions.put(handle, new Execution(description, session, handle, List.of(), mock));
+    if (http && mock == null) {
       StartTransport start = new StartTransport();
       start.setSession(session);
       start.setTransport(StartTransportTransport.HTTP);
@@ -264,8 +299,7 @@ public final class Janus implements AutoCloseable {
     for (VariantDescriptor descriptor : selection.getVariants()) {
       variants.add(Variant.of(descriptor));
     }
-    Execution run = new Execution(interaction.description(), session, handle,
-        Collections.unmodifiableList(variants), mock);
+    Execution run = new Execution(description, session, handle, Collections.unmodifiableList(variants), mock);
     executions.put(handle, run);
     return run;
   }
@@ -281,17 +315,40 @@ public final class Janus implements AutoCloseable {
    * to the report (ADR 0064): this SDK keeps no verdict of its own.
    */
   VariantFailure run(Execution run, Variant variant, VariantTest test) {
+    return attempt(run, variant, served -> test.run(run.mock, variant));
+  }
+
+  /** {@link #run(Execution, Variant, VariantTest)} for a message: the test is handed its message. */
+  VariantFailure run(Execution run, Variant variant, MessageTest test) {
+    return attempt(run, variant, served -> {
+      if (served.getParts() == null) {
+        throw new JanusEmbeddingException("the engine served a message with no parts: it predates ADR 0067, which"
+            + " this SDK needs; use the engine this SDK pins", null);
+      }
+      test.run(ReceivedMessage.of(served.getParts()), variant);
+    });
+  }
+
+  /** What one variant's test does with what {@code serve-variant} answered. */
+  private interface Attempt {
+    void run(ServeVariantResult served) throws Exception;
+  }
+
+  private VariantFailure attempt(Execution run, Variant variant, Attempt test) {
+    ServeVariantResult served;
     synchronized (this) {
       requireOpen(run);
       ServeVariant serve = new ServeVariant();
       serve.setSession(run.session);
       serve.setHandle(run.handle);
       serve.setVariant(variant.id());
-      engine.send(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve);
+      served = engine.call(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve, ServeVariantResult.class);
     }
     Throwable thrown = null;
     try {
-      test.run(run.mock, variant);
+      test.run(served);
+    } catch (JanusEmbeddingException e) {
+      throw e; // the engine's, not the test's
     } catch (VirtualMachineError e) {
       throw e;
     } catch (Throwable t) {

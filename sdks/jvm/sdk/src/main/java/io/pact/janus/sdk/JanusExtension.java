@@ -60,6 +60,28 @@ public final class JanusExtension implements AfterAllCallback {
     janus.execute(interaction, test);
   }
 
+  /** {@link Janus#message}. */
+  public MessageInteraction message(String description) {
+    return janus.message(description);
+  }
+
+  /** {@link Janus#execute(MessageInteraction, MessageTest)}. */
+  public void execute(MessageInteraction message, MessageTest test) {
+    janus.execute(message, test);
+  }
+
+  /** {@link #variants(Interaction, VariantTest)} for a message: one test per variant, each handed its message. */
+  public Stream<DynamicTest> variants(MessageInteraction message, MessageTest test) {
+    Objects.requireNonNull(test, "test");
+    Janus.Execution run = janus.begin(message);
+    return run.variants().stream().map(variant -> DynamicTest.dynamicTest(variant.displayName(), () -> {
+      VariantFailure failure = janus.run(run, variant, test);
+      if (failure != null) {
+        throw failure.cause();
+      }
+    }));
+  }
+
   /**
    * {@code execute} as dynamic tests: submits the interaction now (so an invalid one fails the
    * {@code @TestFactory} before any variant runs), and returns one test per selected variant, in the

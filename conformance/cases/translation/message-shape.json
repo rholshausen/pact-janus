@@ -1,0 +1,97 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/message-shape",
+  "category": "translation",
+  "title": "A message is an emissive interaction whose 'message' part holds its metadata, member by member, and its body, declared as JSON.",
+  "covers": [
+    "session.message.emissive-message-transport",
+    "session.message-contents.metadata-members",
+    "session.message-contents.body-declared-json"
+  ],
+  "why": "behavioural spec 'message': 'transport' is { kind: 'message', mode: 'emissive' }, and its chain is 'given', as an interaction's. 'message-contents': 'metadata' compiles to an 'object' node with one member per name, each by the 'literal' rules; 'body' is compiled by the 'literal' rules and declares 'application/json' when it is not written with 'content' (ADR 0068 decision 2).",
+  "interaction": {
+    "description": "an order was placed",
+    "given": [
+      {
+        "name": "an order exists"
+      }
+    ],
+    "message": {
+      "metadata": {
+        "queue": "orders.placed",
+        "attempt": {
+          "$": "integer",
+          "args": [
+            1
+          ]
+        }
+      },
+      "body": {
+        "id": {
+          "$": "integer",
+          "args": [
+            42
+          ]
+        },
+        "note": {
+          "$": "optional",
+          "args": [
+            "fragile"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "an order was placed",
+      "transport": {
+        "kind": "message",
+        "mode": "emissive"
+      },
+      "states": [
+        {
+          "name": "an order exists"
+        }
+      ],
+      "parts": {
+        "message": {
+          "metadata": {
+            "shape": "object",
+            "members": {
+              "queue": {
+                "shape": "equality",
+                "example": "orders.placed"
+              },
+              "attempt": {
+                "shape": "integer",
+                "example": 1
+              }
+            }
+          },
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": {
+                "shape": "integer",
+                "example": 42
+              },
+              "note": {
+                "shape": "optional",
+                "of": {
+                  "shape": "equality",
+                  "example": "fragile"
+                }
+              }
+            }
+          }
+        }
+      },
+      "content-types": {
+        "message": {
+          "body": "application/json"
+        }
+      }
+    }
+  }
+}

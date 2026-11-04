@@ -1,0 +1,94 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/message-call-sequence",
+  "category": "lifecycle",
+  "title": "Executing a message sends what an interaction does but 'start-transport', and building one sends nothing.",
+  "covers": [
+    "session.execute.message-starts-no-transport",
+    "session.message.no-call-until-execute"
+  ],
+  "why": "behavioural spec 'execute': a message is executed the same way, but sends no 'start-transport', whatever the session has started (ADR 0068 decision 3). 'message': no protocol call happens; the document is submitted by 'execute'.",
+  "engine": {
+    "served": {
+      "base": {
+        "message": {
+          "metadata": {
+            "content": {
+              "queue": "orders.placed"
+            }
+          },
+          "body": {
+            "content": "eyJpZCI6NDJ9",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "build": {
+        "description": "a message nobody executes",
+        "message": {
+          "body": {
+            "id": 1
+          }
+        }
+      }
+    },
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order was placed",
+          "message": {
+            "metadata": {
+              "queue": "orders.placed"
+            },
+            "body": {
+              "id": {
+                "$": "integer",
+                "args": [
+                  42
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok",
+        "closure-calls": [
+          "base"
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant"
+    ],
+    "frames": {
+      "consumer-session/add-interaction": {
+        "session": "s-1",
+        "interaction": {
+          "transport": {
+            "kind": "message",
+            "mode": "emissive"
+          }
+        }
+      },
+      "consumer-session/report-variant": {
+        "session": "s-1",
+        "handle": "i-1",
+        "variant": "base",
+        "status": "passed"
+      }
+    }
+  }
+}

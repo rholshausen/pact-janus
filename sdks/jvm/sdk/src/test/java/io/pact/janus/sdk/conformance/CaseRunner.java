@@ -7,6 +7,8 @@ import io.pact.janus.sdk.Interaction;
 import io.pact.janus.sdk.Janus;
 import io.pact.janus.sdk.JanusEngineException;
 import io.pact.janus.sdk.JanusOptions;
+import io.pact.janus.sdk.MessageInteraction;
+import io.pact.janus.sdk.ReceivedMessage;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -70,14 +72,14 @@ final class CaseRunner {
       // The chain must not become a document. How it refuses is this language's business; that it
       // refuses is the case's (ADR 0019).
       try {
-        JsonNode document = Suite.MAPPER.valueToTree(Dsl.interaction(janus, testCase.path("interaction")).toDocument());
+        JsonNode document = Suite.MAPPER.valueToTree(Dsl.document(janus, testCase.path("interaction")));
         failures.add("the chain was accepted, and the case expects it refused: " + Suite.show(document));
       } catch (RuntimeException refused) {
         // Refused, as the case requires.
       }
       return;
     }
-    JsonNode built = Suite.MAPPER.valueToTree(Dsl.interaction(janus, testCase.path("interaction")).toDocument());
+    JsonNode built = Suite.MAPPER.valueToTree(Dsl.document(janus, testCase.path("interaction")));
     if (expect.has("spec") && !Suite.equal(expect.get("spec"), built)) {
       failures.add("the built interaction-spec document differs\n  expected: " + Suite.show(expect.get("spec"))
           + "\n  actual:   " + Suite.show(built));
@@ -114,12 +116,29 @@ final class CaseRunner {
       for (JsonNode step : testCase.path("steps")) {
         String where = "step " + ++index;
         if (step.has("build")) {
-          Dsl.interaction(janus, step.get("build"));
+          Dsl.document(janus, step.get("build"));
           check(step.path("expect"), where, Outcome.ok(), List.of(), null);
         } else if (step.has("execute")) {
           List<String> calls = new ArrayList<>();
           JsonNode closure = step.path("execute").path("closure");
-          Interaction interaction = Dsl.interaction(janus, step.path("execute").path("interaction"));
+          JsonNode script = step.path("execute").path("interaction");
+          if (Dsl.isMessage(script)) {
+            List<ReceivedMessage> handed = new ArrayList<>();
+            MessageInteraction message = Dsl.message(janus, script);
+            Outcome outcome = capture(() -> janus.execute(message, (received, variant) -> {
+              calls.add(variant.id());
+              variant.assignment().forEach(point -> dimensions.add(point.dimension()));
+              handed.add(received);
+              if (fails(closure, variant.id())) {
+                throw new AssertionError("the consumer cannot handle variant '" + variant.id() + "'");
+              }
+            }));
+            variantCounts.add(calls.size());
+            check(step.path("expect"), where, outcome, calls, null);
+            checkReceived(step.path("expect").path("received"), handed, where);
+            continue;
+          }
+          Interaction interaction = Dsl.interaction(janus, script);
           Outcome outcome = capture(() -> janus.execute(interaction, (mock, variant) -> {
             calls.add(variant.id());
             variant.assignment().forEach(point -> dimensions.add(point.dimension()));
@@ -300,6 +319,49 @@ final class CaseRunner {
       return false;
     }
     return true;
+  }
+
+  /** What each message closure call was handed, on the members each expected entry names (README §4). */
+  private void checkReceived(JsonNode expected, List<ReceivedMessage> handed, String where) {
+    if (!expected.isArray()) {
+      return;
+    }
+    if (expected.size() != handed.size()) {
+      failures.add(where + ": the closure was handed " + handed.size() + " messages, and the case expects "
+          + expected.size());
+    }
+    for (int i = 0; i < expected.size(); i++) {
+      compareReceived(expected.get(i), i < handed.size() ? handed.get(i) : null, where + ", call " + (i + 1));
+    }
+  }
+
+  private void compareReceived(JsonNode wanted, ReceivedMessage message, String at) {
+    if (message == null) {
+      failures.add(at + ": no message was handed");
+      return;
+    }
+    com.fasterxml.jackson.databind.node.ObjectNode members = wanted.deepCopy();
+    members.remove("request");
+    com.fasterxml.jackson.databind.node.ObjectNode actual = Suite.MAPPER.createObjectNode();
+    if (wanted.has("json")) {
+      actual.set("json", Suite.MAPPER.valueToTree(message.json()));
+    }
+    if (wanted.has("text")) {
+      actual.put("text", message.text());
+    }
+    if (wanted.has("content-type")) {
+      actual.put("content-type", message.contentType().orElse(null));
+    }
+    if (wanted.has("metadata")) {
+      actual.set("metadata", Suite.MAPPER.valueToTree(message.metadata()));
+    }
+    if (!Suite.equal(members, actual)) {
+      failures.add(at + ": the message handed differs\n  expected: " + Suite.show(members) + "\n  actual:   "
+          + Suite.show(actual));
+    }
+    if (wanted.has("request")) {
+      compareReceived(wanted.get("request"), message.request().orElse(null), at + "'s request");
+    }
   }
 
   private static boolean fails(JsonNode closure, String variant) {

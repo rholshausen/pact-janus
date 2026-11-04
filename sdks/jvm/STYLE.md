@@ -27,7 +27,9 @@ SDK (plan task 6.3); what that turned up is in
   | `interaction` | `janus.interaction(description)` → `Interaction` |
   | `given`, `request`, `response` | `Interaction.given(...)`, `.request(r -> ...)`, `.response(r -> ...)` |
   | `when-variant`, `variant-cases` | static methods on `io.pact.janus.sdk.VariantBinding`, written as a `given` parameter's value: `given("an order exists", map("shipped", whenVariant("shippedAt", "present")))`. Not on `Shapes`, because a binding is not a shape and is refused wherever a shape is expected |
-  | `execute` | `janus.execute(interaction, (mock, variant) -> ...)` |
+  | `message` | `janus.message(description)` → `MessageInteraction` (ADR 0068) |
+  | `message-contents`, `message-request` | `MessageInteraction.contents(m -> m.metadata(..).body(..))`, `.request(m -> ...)`, lambda-configured `MessageSlots`; `given` as an interaction's |
+  | `execute` | `janus.execute(interaction, (mock, variant) -> ...)`; for a message, `janus.execute(message, (received, variant) -> ...)` |
   | `finalise` | `janus.finalise()`; run for you by `JanusExtension` |
   | `literal` | no call site: any plain value where a shape is expected |
   | `json`, `integer`, `number`, `decimal`, `string`, `boolean`, `datetime`, `date`, `time`, `regex`, `any-of`, `one-of`, `optional`, `nullable`, `forbidden`, `each-like` | static methods on `io.pact.janus.sdk.Shapes`, for `import static io.pact.janus.sdk.Shapes.*` |
@@ -56,6 +58,11 @@ SDK (plan task 6.3); what that turned up is in
   inside one `ExecuteFailedException` after every variant has run. The SDK never swallows it.
   `VirtualMachineError`s (`OutOfMemoryError` and the like) are not caught. A closure that wants to
   test async client code joins its own futures before it returns.
+- **A message's closure** (`MessageTest`: `void run(ReceivedMessage message, Variant variant) throws
+  Exception`) is the same, handed the variant's message instead of a mock. `ReceivedMessage` has
+  `body()` (a copy of the octets), `contentType()` and `request()` as `Optional`s, `metadata()`, and
+  `text()`, `json()` and `json(Class<T>)` reading the body. The JVM SDK's `Message` is what a
+  provider's producer returns, so the consumer's type is named for what it was handed.
 - `Janus` synchronises its own methods, and it does not hold the lock while the closure runs.
 
 ## The error surface
@@ -143,7 +150,8 @@ Interaction getOrder = janus.interaction("get an order")
   `janus.variants(interaction, closure)` returned from a `@TestFactory` makes **each selected variant
   its own dynamic test**, named `label [id]` (just `base` for the base variant). A failing variant
   fails only its own test, with the closure's own exception or the engine's verdict on it, and the
-  engine withholds the contract. Both
+  engine withholds the contract. A message has both too: `execute(message, test)` and
+  `variants(message, test)`. Both
   share one implementation (`Janus.begin` / `Janus.run`), so they make the same protocol calls in the
   same order.
 - **The contract file is the engine's to write** (ADR 0065). `finalise` sends `write`:

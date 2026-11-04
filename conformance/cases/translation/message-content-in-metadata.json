@@ -1,0 +1,30 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/message-content-in-metadata",
+  "category": "translation",
+  "title": "'content' as a message's metadata value is refused at the call.",
+  "covers": [
+    "shape.content.body-only"
+  ],
+  "why": "behavioural spec 'message-contents': a metadata value written with 'content' is refused at the call, for the reason 'content' gives: a declaration names a whole slot, and a metadata member is not one.",
+  "interaction": {
+    "description": "an event with a typed header",
+    "message": {
+      "metadata": {
+        "contentType": {
+          "$": "content",
+          "args": [
+            "text/plain",
+            "x"
+          ]
+        }
+      },
+      "body": {
+        "id": 1
+      }
+    }
+  },
+  "expect": {
+    "refused": true
+  }
+}

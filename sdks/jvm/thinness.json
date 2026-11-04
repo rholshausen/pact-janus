@@ -41,7 +41,10 @@
       "sdk/src/main/java/io/pact/janus/sdk/VerificationResult.java",
       "sdk/src/main/java/io/pact/janus/sdk/VerificationFailedException.java",
       "sdk/src/main/java/io/pact/janus/sdk/StateUnsupportedException.java",
-      "sdk/src/main/java/io/pact/janus/sdk/Message.java"
+      "sdk/src/main/java/io/pact/janus/sdk/Message.java",
+      "sdk/src/main/java/io/pact/janus/sdk/MessageInteraction.java",
+      "sdk/src/main/java/io/pact/janus/sdk/MessageSlots.java",
+      "sdk/src/main/java/io/pact/janus/sdk/ReceivedMessage.java"
     ],
     "loopback": [
       "sdk/src/main/java/io/pact/janus/sdk/Loopback.java"
@@ -52,6 +55,7 @@
     "integration": [
       "sdk/src/main/java/io/pact/janus/sdk/JanusExtension.java",
       "sdk/src/main/java/io/pact/janus/sdk/VariantTest.java",
+      "sdk/src/main/java/io/pact/janus/sdk/MessageTest.java",
       "sdk/src/main/java/io/pact/janus/sdk/JanusProviderExtension.java",
       "sdk/src/main/java/io/pact/janus/sdk/State.java",
       "sdk/src/main/java/io/pact/janus/sdk/ProvidesMessage.java"
@@ -63,7 +67,7 @@
     ]
   },
   "budgets": {
-    "idiomatic": 2100,
+    "idiomatic": 2300,
     "embedding": 600,
     "loopback": 100,
     "integration": 280

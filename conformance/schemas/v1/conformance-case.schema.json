@@ -105,7 +105,7 @@
     },
     "InteractionScript": {
       "type": "object",
-      "description": "A DSL chain, as data: the driver replays it through its own surface, one call per member, in this order — interaction, given*, request, response.",
+      "description": "A DSL chain, as data: the driver replays it through its own surface, one call per member, in this order — interaction, given*, request, response. A chain with 'message' or 'message-request' is a message chain instead (ADR 0068): message, given*, message-request, message-contents.",
       "required": ["description"],
       "properties": {
         "description": { "type": "string" },
@@ -140,7 +140,21 @@
             "body": { "$ref": "#/$defs/Template" }
           },
           "additionalProperties": false
-        }
+        },
+        "message": { "$ref": "#/$defs/MessageScript", "description": "'message-contents': the message the interaction delivers. Its presence makes this a message chain." },
+        "message-request": { "$ref": "#/$defs/MessageScript", "description": "'message-request': the request a synchronous message answers." }
+      },
+      "not": { "anyOf": [
+        { "required": ["message", "request"] }, { "required": ["message", "response"] },
+        { "required": ["message-request", "request"] }, { "required": ["message-request", "response"] } ] },
+      "additionalProperties": false
+    },
+    "MessageScript": {
+      "type": "object",
+      "description": "A message's slots, as 'message-contents' and 'message-request' take them.",
+      "properties": {
+        "metadata": { "type": "object", "additionalProperties": { "$ref": "#/$defs/Template" } },
+        "body": { "$ref": "#/$defs/Template" }
       },
       "additionalProperties": false
     },
@@ -166,6 +180,11 @@
         "contract-text": {
           "type": "string",
           "description": "The text 'consumer-session/finalise' answers as 'contract-text' to a host that declared that capability (ADR 0063), exactly. Absent: 'contract' written compactly, with one LF."
+        },
+        "served": {
+          "type": "object",
+          "description": "Variant id -> the 'parts' 'consumer-session/serve-variant' answers with for that variant: the message an emissive interaction hands the test (ADR 0067 decision 5). Default: '{}', no parts.",
+          "additionalProperties": { "type": "object" }
         },
         "withhold-contract": {
           "type": "boolean",
@@ -418,10 +437,27 @@
       },
       "additionalProperties": false
     },
+    "Received": {
+      "type": "object",
+      "description": "A message the closure was handed: 'json' its body read as JSON, 'text' read as UTF-8 text, 'content-type' its type (null for none), 'metadata' its metadata, and 'request' a synchronous message's request, read the same way.",
+      "properties": {
+        "json": {},
+        "text": { "type": "string" },
+        "content-type": { "type": ["string", "null"] },
+        "metadata": { "type": "object" },
+        "request": { "$ref": "#/$defs/Received" }
+      },
+      "additionalProperties": false
+    },
     "StepExpectation": {
       "type": "object",
       "properties": {
         "outcome": { "$ref": "#/$defs/Outcome" },
+        "received": {
+          "type": "array",
+          "description": "What the closure was handed on each call, in call order, for a message (ADR 0068 decision 3): each compared on the members it names.",
+          "items": { "$ref": "#/$defs/Received" }
+        },
         "closure-calls": {
           "type": "array",
           "items": { "type": "string" },

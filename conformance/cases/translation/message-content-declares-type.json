@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/message-content-declares-type",
+  "category": "translation",
+  "title": "A message body written with 'content' declares that media type in place of JSON.",
+  "covers": [
+    "session.message-contents.content-declares-type"
+  ],
+  "why": "behavioural spec 'message-contents': 'body' declares the media type 'content' names when the body is written with it; 'content' is accepted as the 'body' of 'message-contents'.",
+  "interaction": {
+    "description": "an order was cancelled",
+    "message": {
+      "body": {
+        "$": "content",
+        "args": [
+          "text/plain",
+          "cancelled"
+        ]
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/message": {
+        "body": {
+          "shape": "equality",
+          "example": "cancelled"
+        }
+      },
+      "/content-types": {
+        "message": {
+          "body": "text/plain"
+        }
+      }
+    }
+  }
+}

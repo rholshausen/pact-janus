@@ -50,6 +50,12 @@ public final class Interaction {
    * binding.
    */
   public Interaction given(String name, Map<String, ?> params) {
+    states.add(state(name, params));
+    return this;
+  }
+
+  /** One {@code given}, as the {@code states} entry it appends, for an interaction or a message. */
+  static State state(String name, Map<String, ?> params) {
     State state = new State();
     state.setName(Objects.requireNonNull(name, "state name"));
     Map<String, Object> literal = new LinkedHashMap<>();
@@ -69,8 +75,20 @@ public final class Interaction {
     if (!bindings.isEmpty()) {
       state.setVariantParams(bindings);
     }
-    states.add(state);
-    return this;
+    return state;
+  }
+
+  /** A copy of each state, so a built document shares nothing with the builder. */
+  static List<State> copy(List<State> states) {
+    List<State> copy = new ArrayList<>();
+    for (State s : states) {
+      State c = new State();
+      c.setName(s.getName());
+      c.setParams(s.getParams() == null ? null : new LinkedHashMap<>(s.getParams()));
+      c.setVariantParams(s.getVariantParams() == null ? null : new ArrayList<>(s.getVariantParams()));
+      copy.add(c);
+    }
+    return copy;
   }
 
   /**
@@ -116,15 +134,7 @@ public final class Interaction {
     transport.setMode("passive");
     spec.setTransport(transport);
     if (!states.isEmpty()) {
-      List<State> copy = new ArrayList<>();
-      for (State s : states) {
-        State c = new State();
-        c.setName(s.getName());
-        c.setParams(s.getParams() == null ? null : new LinkedHashMap<>(s.getParams()));
-        c.setVariantParams(s.getVariantParams() == null ? null : new ArrayList<>(s.getVariantParams()));
-        copy.add(c);
-      }
-      spec.setStates(copy);
+      spec.setStates(copy(states));
     }
     Map<String, ShapePart> parts = new LinkedHashMap<>();
     if (request != null) {

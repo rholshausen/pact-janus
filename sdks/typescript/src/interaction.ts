@@ -100,21 +100,7 @@ export class InteractionBuilder {
    * `variant-params` binding under that name; every other param is passed through as written.
    */
   given(name: string, params?: { readonly [k: string]: unknown }): this {
-    const literal: Record<string, unknown> = {};
-    const bindings: { [k: string]: unknown }[] = [];
-    for (const [key, value] of Object.entries(params ?? {})) {
-      if (value instanceof VariantBinding) {
-        bindings.push(value.binding(key));
-      } else {
-        refuseNestedBinding(value, `given('${name}').${key}`);
-        literal[key] = value;
-      }
-    }
-    this.#states.push({
-      name,
-      ...(Object.keys(literal).length > 0 ? { params: literal } : {}),
-      ...(bindings.length > 0 ? { "variant-params": bindings } : {}),
-    });
+    this.#states.push(providerState(name, params));
     return this;
   }
 
@@ -166,6 +152,25 @@ export class InteractionBuilder {
         : {}),
     };
   }
+}
+
+/** One `given` (behavioural spec 'given'), as the `states` entry it appends, for an interaction or a message. */
+export function providerState(name: string, params?: { readonly [k: string]: unknown }): contract.State {
+  const literal: Record<string, unknown> = {};
+  const bindings: { [k: string]: unknown }[] = [];
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value instanceof VariantBinding) {
+      bindings.push(value.binding(key));
+    } else {
+      refuseNestedBinding(value, `given('${name}').${key}`);
+      literal[key] = value;
+    }
+  }
+  return {
+    name,
+    ...(Object.keys(literal).length > 0 ? { params: literal } : {}),
+    ...(bindings.length > 0 ? { "variant-params": bindings } : {}),
+  };
 }
 
 /**

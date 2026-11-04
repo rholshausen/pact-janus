@@ -35,6 +35,25 @@ export interface InteractionScript {
     body?: unknown;
   };
   response?: { status?: unknown; headers?: Record<string, MultiValue>; body?: unknown };
+  /** 'message-contents': its presence makes this a message chain (ADR 0068). */
+  message?: MessageSlotsScript;
+  /** 'message-request': the request a synchronous message answers. */
+  "message-request"?: MessageSlotsScript;
+}
+
+/** A message's slots, as 'message-contents' and 'message-request' take them. */
+export interface MessageSlotsScript {
+  metadata?: Record<string, unknown>;
+  body?: unknown;
+}
+
+/** What a message closure was handed, compared on the members a case names (README §4). */
+export interface Received {
+  json?: unknown;
+  text?: string;
+  "content-type"?: string | null;
+  metadata?: Record<string, unknown>;
+  request?: Received;
 }
 
 export interface Exchange {
@@ -57,6 +76,7 @@ export interface Outcome {
 export interface StepExpectation {
   outcome?: "ok" | Outcome;
   "closure-calls"?: string[];
+  received?: Received[];
   contract?: { written?: boolean; text?: string; content?: { interactions?: Record<string, unknown>[] } };
 }
 
@@ -76,6 +96,8 @@ export interface ScriptedEngine {
   refused?: Record<string, unknown>[];
   /** Variant id -> the result 'report-variant' answers with for it. */
   reports?: Record<string, Record<string, unknown>>;
+  /** Variant id -> the 'parts' 'serve-variant' answers with for it: a message's (ADR 0067). */
+  served?: Record<string, Record<string, unknown>>;
   errors?: Record<string, { code: string; message?: string; after?: number; details?: Record<string, unknown> }>;
   capabilities?: Record<string, unknown>;
   config?: Record<string, unknown>;
