@@ -1948,6 +1948,21 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   mock encode them as `base64`, and a fresh generator's value is filled around them.
   *Exit:* a facade test given octets, as an HTTP reply and as a message, is handed exactly those
   octets, and the `it.fails` in `test/examples/messages.test.ts` becomes an `it`.
+  *Done 2026-11-05*, with no new ADR: the shape language and contract-file spec §5.3 already had
+  octets, and only the generator dropped them.
+  - A payload's slot is a document or octets (`variant::generate::Generated`). A slot whose shape
+    resolves to an example tagged `base64` is octets, through `nullable`, `one-of` and `any-of`. Inside
+    a document such an example is still its base64 text, since JSON has no bytes.
+  - `wire_parts`, the mock's reply and the recorded variant tag octets `base64`, with the slot's
+    declared type, and no content component encodes them. A generator fills the rest of the payload
+    and leaves octets alone, since its value is a document.
+  - A converted interaction's example is served as the mock serves it (`wire::served_slot`): octets
+    no component claims are served as those octets, whether `upgrade` recorded them as `base64` or,
+    being UTF-8, as `text`. `decode_slot` is unchanged, so no verdict moves.
+  - `tests/pact_interactions.rs` gives a facade message and an HTTP reply octets that are not UTF-8
+    and checks they are served exactly, and the message's contract records them. The facade's binary
+    message test is an `it`, and `test/consumer-facade.test.ts` has the HTTP reply's.
+    [`consumer-test-migration.md`](consumer-test-migration.md)'s binary message row is `kept`.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,
