@@ -97,6 +97,14 @@ const DESCRIBING = new Set(["upon_receiving", "message_expects_to_receive", "new
 export class Calls {
   readonly steps: protocol.PactStep[] = [];
   description = "";
+  /** A `PactV4`'s interactions added since its last `executeTest`, this one among them. */
+  queue?: Calls[];
+
+  /** Every interaction an `executeTest` of this one serves: this one's queue, as pact-js's mock serves its pact. */
+  take(): Calls[] {
+    const taken = this.queue?.splice(0) ?? [];
+    return taken.includes(this) ? taken : [...taken, this];
+  }
 
   call(call: string, args: Record<string, unknown> = {}): this {
     if (DESCRIBING.has(call)) {
@@ -197,8 +205,9 @@ function execute<T>(opts: PactV4Options, specification: string, interactions: Ca
 }
 
 /**
- * One test: one engine session, the interaction added, its base variant served once, through
- * `transport` when it names one; a message is served with none and answered as its parts.
+ * One test: one engine session, every interaction added and its base variant armed, through
+ * `transport` when it names one, as pact-js's mock serves every interaction it was given (ADR 0069
+ * decision 5). A message is served with no transport and answered as its parts.
  */
 export async function run<T>(
   opts: Pick<PactV4Options, "consumer" | "provider" | "dir" | "spec" | "logLevel" | "host" | "port" | "engine">,
@@ -207,33 +216,35 @@ export async function run<T>(
   transport: string | undefined,
   test: (served: Served) => Promise<T>,
 ): Promise<T | undefined> {
-  const calls = interactions[0];
-  if (calls === undefined || interactions.length !== 1) {
-    throw new Error(
-      `executeTest runs one interaction at a time on pact-janus, and ${interactions.length} were added; ` +
-        "add each in its own executeTest until several can be armed at once (staged plan S2.13)",
-    );
+  if (interactions.length === 0) {
+    throw new Error("executeTest: no interaction was added to serve");
   }
-  const name = `'${calls.description}'`;
   const engine = await Engine.start(typeof opts.engine === "function" ? opts.engine() : await SubprocessPipe.start(opts.engine, opts.logLevel));
   try {
     const config = { consumer: { name: opts.consumer }, provider: { name: opts.provider } };
     const { session } = await engine.call(Op.ConsumerSessionCreate, { config });
-    const pact = { specification: SPECIFICATIONS[opts.spec ?? 0] ?? specification, steps: calls.steps };
-    const { handle, findings } = await engine.call(Op.ConsumerSessionAddPactInteraction, { session, pact }, name);
-    for (const finding of findings ?? []) {
-      if (finding.kind === "lossy" && opts.logLevel !== "error") {
-        console.warn(`pact-janus: ${name} ${finding.path}: ${finding.message}`);
-      }
-    }
     const options = opts.host === undefined && opts.port === undefined ? {} : { options: { host: opts.host ?? "127.0.0.1", port: opts.port ?? 0 } };
     const endpoint = transport === undefined ? undefined : (await engine.call(Op.ConsumerSessionStartTransport, { session, transport, ...options })).endpoint;
-    // A converted interaction's one variant is its example, `base`, as an upgraded pact's is.
-    const { variants } = await engine.call(Op.ConsumerSessionVariants, { session, handle }, name);
-    const variant = variants[0]?.id ?? "base";
-    const { parts } = await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant });
-    if (transport === undefined && parts === undefined) {
-      throw new Error(`${name}: the engine handed over no message, so it is older than ADR 0067's`);
+
+    const served: { handle: string; variant: string; description: string }[] = [];
+    let parts: Served["parts"];
+    for (const calls of interactions) {
+      const name = `'${calls.description}'`;
+      const pact = { specification: SPECIFICATIONS[opts.spec ?? 0] ?? specification, steps: calls.steps };
+      const { handle, findings } = await engine.call(Op.ConsumerSessionAddPactInteraction, { session, pact }, name);
+      for (const finding of findings ?? []) {
+        if (finding.kind === "lossy" && opts.logLevel !== "error") {
+          console.warn(`pact-janus: ${name} ${finding.path}: ${finding.message}`);
+        }
+      }
+      // A converted interaction's one variant is its example, `base`, as an upgraded pact's is.
+      const { variants } = await engine.call(Op.ConsumerSessionVariants, { session, handle }, name);
+      const variant = variants[0]?.id ?? "base";
+      ({ parts } = await engine.call(Op.ConsumerSessionServeVariant, { session, handle, variant }));
+      if (transport === undefined && parts === undefined) {
+        throw new Error(`${name}: the engine handed over no message, so it is older than ADR 0067's`);
+      }
+      served.push({ handle, variant, description: calls.description });
     }
 
     let value: T | undefined;
@@ -244,22 +255,29 @@ export async function run<T>(
       failure = { error };
     }
     const verdict = failure ? { status: "failed", reason: causeText(failure.error) } : { status: "passed" };
-    const { result } = await engine.call(Op.ConsumerSessionReportVariant, { session, handle, variant, ...verdict });
+    const results: { description: string; result: protocol.VariantResult }[] = [];
+    for (const { handle, variant, description } of served) {
+      const { result } = await engine.call(Op.ConsumerSessionReportVariant, { session, handle, variant, ...verdict });
+      results.push({ description, result });
+    }
     const write = { path: resolve(opts.dir ?? "./pacts", `${opts.consumer}-${opts.provider}.janus.json`), mode: "merge" };
     const finalised = await engine.call(Op.ConsumerSessionFinalise, { session, write });
 
+    // What the mock found wanting: an interaction never called, or a request it did not match.
+    const wanting = results.filter(({ result }) => result.status === "not-exercised" || (result.mismatches ?? []).length > 0);
     if (failure) {
       // As pact-js: the test's own error, with what the mock found written beside it.
-      if (result.status === "not-exercised" || (result.mismatches ?? []).length > 0) {
-        console.error(failureReport(calls.description, result));
+      if (wanting.length > 0) {
+        console.error(failureReport(wanting));
       }
       throw failure.error;
     }
-    if (result.status !== "verified") {
-      throw new Error(failureReport(calls.description, result));
+    if (results.some(({ result }) => result.status !== "verified")) {
+      throw new Error(failureReport(wanting));
     }
     if (finalised.written === undefined) {
-      throw new ContractWithheldError(finalised.results, new Map([[handle, calls.description]]), finalised.refused ?? []);
+      const named = new Map(served.map(({ handle, description }) => [handle, description]));
+      throw new ContractWithheldError(finalised.results, named, finalised.refused ?? []);
     }
     return value;
   } finally {
@@ -267,13 +285,14 @@ export async function run<T>(
   }
 }
 
-/** What pact-js says when the mock found the test wanting. */
-function failureReport(description: string, result: protocol.VariantResult): string {
-  const said =
+/** What pact-js says when the mock found the test wanting: each interaction's missing request or mismatches. */
+function failureReport(wanting: { description: string; result: protocol.VariantResult }[]): string {
+  const said = wanting.flatMap(({ description, result }) =>
     result.status === "not-exercised"
       ? [`Missing request: the interaction '${description}' was expected, but not received`]
-      : (result.mismatches ?? []).map((m) => `${m.path === undefined ? "" : `${String(m.path)}: `}${String(m.message ?? JSON.stringify(m))}`);
-  return `Test failed for the following reasons:\n\n  Mock server failed with the following mismatches for '${description}':\n\n${said.map((line, i) => `\t${i}) ${line}`).join("\n")}`;
+      : (result.mismatches ?? []).map((m) => `'${description}': ${m.path === undefined ? "" : `${String(m.path)}: `}${String(m.message ?? JSON.stringify(m))}`),
+  );
+  return `Test failed for the following reasons:\n\n  Mock server failed with the following mismatches:\n\n${said.map((line, i) => `\t${i}) ${line}`).join("\n")}`;
 }
 
 function refuseTls(opts: PactV4Options): void {
@@ -300,12 +319,22 @@ export class PactV4 {
     refuseTls(opts);
   }
 
+  /** Every interaction added since the last `executeTest`, which the next one serves (ADR 0069 decision 5). */
+  readonly #pending: Calls[] = [];
+
+  #queued(): Calls {
+    const calls = new Calls();
+    calls.queue = this.#pending;
+    this.#pending.push(calls);
+    return calls;
+  }
+
   addInteraction(): UnconfiguredInteraction {
-    return new UnconfiguredInteraction(this.opts, new Calls());
+    return new UnconfiguredInteraction(this.opts, this.#queued());
   }
 
   addGraphQLInteraction(): UnconfiguredGraphQLInteraction {
-    return new UnconfiguredGraphQLInteraction(this.opts, new Calls());
+    return new UnconfiguredGraphQLInteraction(this.opts, this.#queued());
   }
 
   addSynchronousInteraction(description: string): UnconfiguredSynchronousMessage {
@@ -471,7 +500,7 @@ export class InteractionWithResponse {
   }
 
   executeTest<T>(testFn: TestFunction<T>): Promise<T | undefined> {
-    return execute(this.opts, "V4", [this.calls], testFn);
+    return execute(this.opts, "V4", this.calls.take(), testFn);
   }
 }
 

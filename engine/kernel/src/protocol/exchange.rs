@@ -8,10 +8,8 @@
 //!
 //! What this closes: `serve-variant` (plan task 4.3) already computed the concrete payload a
 //! variant should produce; nothing before this task ever put it on the wire, or looked at what
-//! came back. What it does not attempt: routing one inbound request across *several* concurrently
-//! armed interactions (spec §4.1 allows this) — one transport instance here holds at most one
-//! armed exchange at a time, which is exactly what the sequential `serve-variant` loop a consumer
-//! test runs actually needs; broader routing is for whoever exercises that concurrency for real.
+//! came back. A transport instance holds every interaction armed on it, each until its variant is
+//! reported, and an arrival goes to the arming it matches best (ADR 0069, staged plan S2.13).
 //!
 //! An embedding with no background work to offer, the WASM component, refuses `start-transport` by
 //! name before this module is reached. Gate W's driver would call [`handle_arrival`] from whatever
@@ -62,16 +60,26 @@ pub(crate) struct ArmedExchange {
 /// consumed — which a one-way channel does not give without a second one back the other way.
 #[derive(Default)]
 pub(crate) struct ExchangeState {
-  pub armed: Option<ArmedExchange>,
-  /// The `(handle, variant id)` whose arming an arrival has taken and whose outcome is not yet
-  /// recorded. The reply is handed to the transport before the outcome is recorded, so a client can
-  /// hold the response first: `report-variant` waits on [`Exchange::settled`] while this names its
-  /// variant (ADR 0064 decision 1).
-  pub in_flight: Option<(String, String)>,
+  /// Every arming on this transport, in the order it was armed (ADR 0069 decision 2). Each stays
+  /// until its variant is reported or its handle is armed again.
+  armed: Vec<Arc<ArmedExchange>>,
+  /// The `(handle, variant id)` of every arming an arrival is being matched against, until its
+  /// outcome is recorded. The reply is handed to the transport before the outcome is recorded, so a
+  /// client can hold the response first: `report-variant` waits on [`Exchange::settled`] while this
+  /// names its variant (ADR 0064 decision 1, ADR 0069 decision 4).
+  in_flight: Vec<(String, String)>,
   /// `(handle, variant id) -> evidence`, drained into the session's own per-interaction map when
-  /// the transport stops ([`super::session::ConsumerSession::stop_transports`]) — this loop only
-  /// ever inserts into it, one entry per exchange.
+  /// the transport stops ([`super::session::ConsumerSession::stop_transports`]) or the variant is
+  /// reported. Every exchange of a variant is merged into its one entry ([`Exercised::merge`]).
   pub outcomes: BTreeMap<(String, String), Exercised>,
+}
+
+impl ExchangeState {
+  /// Arm `armed`, replacing its handle's arming if it has one; it goes last (ADR 0069 decision 2).
+  pub fn arm(&mut self, armed: ArmedExchange) {
+    self.armed.retain(|other| other.handle != armed.handle);
+    self.armed.push(Arc::new(armed));
+  }
 }
 
 /// One transport instance's exchange state, and the signal that an exchange under way has been
@@ -94,9 +102,7 @@ impl Exchange {
     let state = self.state.lock().expect("exchange state lock poisoned");
     let (mut state, waited) = self
       .settled
-      .wait_timeout_while(state, SETTLE_TIMEOUT, |state| {
-        state.in_flight.as_ref() == Some(&key)
-      })
+      .wait_timeout_while(state, SETTLE_TIMEOUT, |state| state.in_flight.contains(&key))
       .expect("exchange state lock poisoned");
     if waited.timed_out() {
       tracing::warn!(
@@ -105,13 +111,9 @@ impl Exchange {
         "an exchange of this variant was still under way when its test was reported"
       );
     }
-    if state
+    state
       .armed
-      .as_ref()
-      .is_some_and(|armed| armed.handle == handle && armed.variant_id == variant)
-    {
-      state.armed = None;
-    }
+      .retain(|armed| !(armed.handle == handle && armed.variant_id == variant));
     state.outcomes.remove(&key)
   }
 }
@@ -153,10 +155,53 @@ pub(crate) fn run(
   }
 }
 
-/// One arrival: match it against whatever is currently armed, reply, and record the outcome. It
-/// waits on nothing but the transport's `reply` or `dispose` (ADR 0062 decision 4).
-/// Nothing is armed → this exchange proves nothing about any variant, so it is refused rather than
-/// guessed at (variant-semantics spec §4.2's honesty applies here too, not only to recording).
+/// One arming's request plan, executed against an arrival.
+struct Candidate {
+  armed: Arc<ArmedExchange>,
+  status: Status,
+  mismatches: Vec<crate::plan::Mismatch>,
+  /// How many plan actions in the request passed: what makes one match more specific than another.
+  passed: usize,
+}
+
+/// The arming an arrival goes to (ADR 0069 decisions 2 and 3): one it matches, else the one it came
+/// closest to; the fewest mismatches, then the most actions passed, then the first armed.
+fn best(candidates: Vec<Candidate>) -> Option<Candidate> {
+  candidates
+    .into_iter()
+    .enumerate()
+    .min_by_key(|(order, candidate)| {
+      (
+        candidate.mismatches.len(),
+        std::cmp::Reverse(candidate.passed),
+        *order,
+      )
+    })
+    .map(|(_, candidate)| candidate)
+}
+
+/// The plan actions in an executed subtree that ran and did not fail.
+fn passed_actions(executed: &crate::plan::Executed) -> usize {
+  use crate::plan::{ExecutedKind, NodeResult};
+  let own = match (&executed.kind, &executed.result) {
+    (ExecutedKind::Action { .. }, Some(result)) if !matches!(result, NodeResult::Error { .. }) => 1,
+    _ => 0,
+  };
+  let children: &[crate::plan::Executed] = match &executed.kind {
+    ExecutedKind::Container { children, .. }
+    | ExecutedKind::Action { children, .. }
+    | ExecutedKind::Pipeline { children }
+    | ExecutedKind::Splat { children } => children,
+    _ => &[],
+  };
+  own + children.iter().map(passed_actions).sum::<usize>()
+}
+
+/// One arrival: match it against every arming, reply as the one it goes to, and record that
+/// variant's outcome. It waits on nothing but the transport's `reply` or `dispose` (ADR 0062
+/// decision 4). Nothing armed → this exchange proves nothing about any variant, so it is refused
+/// rather than guessed at (variant-semantics spec §4.2's honesty applies here too, not only to
+/// recording).
 pub(crate) fn handle_arrival(
   transport: &dyn TransportComponent,
   content: Option<&dyn ContentComponent>,
@@ -165,15 +210,16 @@ pub(crate) fn handle_arrival(
   inbound: Inbound,
   exchange: &Exchange,
 ) {
-  let armed = {
+  let armings = {
     let mut state = exchange.state.lock().expect("exchange state lock poisoned");
-    let armed = state.armed.take();
-    state.in_flight = armed
-      .as_ref()
-      .map(|armed| (armed.handle.clone(), armed.variant_id.clone()));
-    armed
+    let armings = state.armed.clone();
+    state.in_flight = armings
+      .iter()
+      .map(|armed| (armed.handle.clone(), armed.variant_id.clone()))
+      .collect();
+    armings
   };
-  let Some(armed) = armed else {
+  if armings.is_empty() {
     // Plan task 4.6's own finding: this is the one line that names an arrival at all when
     // nothing was armed for it — without it, a request that missed its `serve-variant` window
     // entirely (a race, a typo'd variant id upstream) leaves no trace anywhere.
@@ -185,30 +231,48 @@ pub(crate) fn handle_arrival(
       details: None,
     });
     return;
-  };
+  }
 
   // The part names are the transport's (kernel-boundary review finding 8): the arrival is matched
   // against the plan's subtree for the part that starts an exchange, and answered with the part
   // that answers one.
   let names = transport.exchange_parts();
-  let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
-  // `match:content-type` reads the arrival's own octets and labels (staged plan S1.10, ADR 0049).
-  let detection = content.map(|content| crate::component::ContentDetection {
-    content,
-    parts: Some(&inbound.parts),
-    declared: Some(&armed.content_types),
-    by_label: true,
-  });
-  let executed = execute_with(
-    &armed.request_plan,
-    &resolver,
-    detection
-      .as_ref()
-      .map(|detection| detection as &dyn crate::plan::ContentDetector),
-    Some(contributions),
-  );
-  let request_subtree = find_container(&executed, &names.initiating).unwrap_or(&executed);
-  let (status, mismatches) = outcome(request_subtree);
+  let candidates = armings
+    .into_iter()
+    .map(|armed| {
+      let resolver = parts_resolver(&inbound.parts, &armed.content_types, content);
+      // `match:content-type` reads the arrival's own octets and labels (staged plan S1.10, ADR 0049).
+      let detection = content.map(|content| crate::component::ContentDetection {
+        content,
+        parts: Some(&inbound.parts),
+        declared: Some(&armed.content_types),
+        by_label: true,
+      });
+      let executed = execute_with(
+        &armed.request_plan,
+        &resolver,
+        detection
+          .as_ref()
+          .map(|detection| detection as &dyn crate::plan::ContentDetector),
+        Some(contributions),
+      );
+      let request_subtree = find_container(&executed, &names.initiating).unwrap_or(&executed);
+      let (status, mismatches) = outcome(request_subtree);
+      let passed = passed_actions(request_subtree);
+      Candidate {
+        armed,
+        status,
+        mismatches,
+        passed,
+      }
+    })
+    .collect();
+  let Candidate {
+    armed,
+    status,
+    mismatches,
+    ..
+  } = best(candidates).expect("an arrival is matched against at least one arming");
 
   // The one line plan task 4.6's report leans on: `RUST_LOG=debug` names the variant a failure
   // belongs to, which nothing else on this loop's own thread does — a consumer's own crash
@@ -291,15 +355,21 @@ pub(crate) fn handle_arrival(
     ),
   };
   let mut state = exchange.state.lock().expect("exchange state lock poisoned");
-  state.in_flight = None;
-  state.outcomes.insert(
-    (armed.handle, armed.variant_id),
-    Exercised {
-      outcome: exchange_outcome,
-      parts: armed.response_parts,
-      mismatches: recorded,
-    },
-  );
+  state.in_flight.clear();
+  let exercised = Exercised {
+    outcome: exchange_outcome,
+    parts: Arc::clone(&armed.response_parts),
+    mismatches: recorded,
+  };
+  match state
+    .outcomes
+    .entry((armed.handle.clone(), armed.variant_id.clone()))
+  {
+    std::collections::btree_map::Entry::Occupied(mut earlier) => earlier.get_mut().merge(exercised),
+    std::collections::btree_map::Entry::Vacant(first) => {
+      first.insert(exercised);
+    }
+  }
   drop(state);
   exchange.settled.notify_all();
 }

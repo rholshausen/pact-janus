@@ -524,6 +524,10 @@ be armed at a time.** Two variants of the same interaction can differ only in th
 armings that the same inbound request would match, and an engine choosing between them would be
 guessing which variant the test meant. Different interactions may of course be armed concurrently —
 that is ordinary parallel-interaction mocking, and their request shapes are what distinguish them.
+An arming lasts until its variant is reported, and serves every request it is given until then
+([ADR 0069](../../decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md)).
+A request two armings both admit goes to the more specific: the one whose match passed more of its
+plan, then the one armed first.
 
 Dimensions may live in any part. A dimension in the *request* changes what the mock will accept and
 what the verifier will replay; a dimension in the *response* changes what is produced and what is
@@ -549,7 +553,8 @@ still the example, so recording the same variant twice writes the same contract.
 A variant is **exercised** when the interaction actually ran under it: for a passive interaction, the
 armed variant matched inbound traffic and the exchange completed; for an emissive one, the message was
 produced and delivered to the consumer's handler. Arming a variant and never sending the request is
-not exercising it.
+not exercising it. A variant served several requests is exercised by each: it fails if any of them
+failed, whatever the others did.
 
 Every variant in the selection is **required**. Protocol spec §8.2 makes the consequence structural: an
 unexercised required variant has status `not-exercised`, and `finalise` withholds the pact exactly as

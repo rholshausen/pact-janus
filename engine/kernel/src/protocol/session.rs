@@ -151,6 +151,27 @@ pub(crate) struct Exercised {
   pub mismatches: Vec<Value>,
 }
 
+impl Exercised {
+  /// One more exchange of the same variant (ADR 0069 decision 1): failed if either failed, with
+  /// every failed exchange's mismatches.
+  pub fn merge(&mut self, later: Exercised) {
+    if later.outcome == ExchangeOutcome::Failed {
+      self.outcome = ExchangeOutcome::Failed;
+    }
+    self.mismatches.extend(later.mismatches);
+  }
+}
+
+/// Record `exercised` as one more of `variant_id`'s exchanges.
+fn record(exercised_by: &mut BTreeMap<String, Exercised>, variant_id: String, exercised: Exercised) {
+  match exercised_by.entry(variant_id) {
+    std::collections::btree_map::Entry::Occupied(mut earlier) => earlier.get_mut().merge(exercised),
+    std::collections::btree_map::Entry::Vacant(first) => {
+      first.insert(exercised);
+    }
+  }
+}
+
 /// Statuses: `verified`, `failed`, `not-exercised` (variant-semantics spec §4.2). The third is
 /// the *absence* of an [`Exercised`] entry, not a variant of this enum — nothing distinguishes
 /// "skipped" from "never got there", and nothing should.
@@ -477,7 +498,7 @@ impl ConsumerSession {
       );
       for ((handle, variant_id), exercised) in outcomes {
         if let Some(entry) = self.interactions.get_mut(&handle) {
-          entry.exercised.insert(variant_id, exercised);
+          record(&mut entry.exercised, variant_id, exercised);
         }
       }
     }
@@ -613,7 +634,7 @@ impl ConsumerSession {
     if let (Some(kind), Some(request_plan)) = (passive_kind, &arming.request_plan) {
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.exchange.state.lock().expect("exchange state lock poisoned");
-        state.armed = Some(ArmedExchange {
+        state.arm(ArmedExchange {
           handle: handle.to_string(),
           variant_id: variant_id.to_string(),
           request_plan: Arc::clone(request_plan),
@@ -655,7 +676,7 @@ impl ConsumerSession {
       .collect();
     let entry = self.interactions.get_mut(handle).expect("checked above");
     for exercised in settled {
-      entry.exercised.insert(variant_id.to_string(), exercised);
+      record(&mut entry.exercised, variant_id.to_string(), exercised);
     }
     if entry
       .armed

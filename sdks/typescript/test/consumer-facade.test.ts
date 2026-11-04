@@ -43,13 +43,72 @@ describe("what has no conversion", () => {
     expect(() => new Pact(options(dir)).addSynchronousInteraction("a plugin message").usingPlugin({ plugin: "protobuf", version: "0.4" })).toThrow(/'protobuf'/);
   });
 
-  it("refuses several interactions in one executeTest until several can be armed", async () => {
+});
+
+// ADR 0069 (staged plan S2.13): every interaction pact-js would serve is armed at once, each for
+// as many calls as the test makes.
+describe("several interactions", () => {
+  const order = (path: string) => ({ method: "GET", path });
+
+  it("are each served in one PactV3 executeTest, in any order, and recorded", async () => {
+    const dir = contractDir();
     const provider = new PactV3(options(dir));
-    for (const path of ["/a", "/b"]) {
-      provider.uponReceiving(`get ${path}`).withRequest({ method: "GET", path }).willRespondWith({ status: 200 });
+    for (const id of [1, 2]) {
+      provider
+        .uponReceiving(`get order ${id}`)
+        .withRequest(order(`/orders/${id}`))
+        .willRespondWith({ status: 200, body: { id: integer(id) } });
     }
-    await expect(provider.executeTest(async () => undefined)).rejects.toThrow(/S2\.13/);
-  });
+    await provider.executeTest(async (mock) => {
+      expect(await (await fetch(`${mock.url}/orders/2`)).json()).toEqual({ id: 2 });
+      expect(await (await fetch(`${mock.url}/orders/1`)).json()).toEqual({ id: 1 });
+    });
+    const contract = JSON.parse(readFileSync(join(dir, "Web-Orders.janus.json"), "utf8")) as { interactions: { description: string }[] };
+    expect(contract.interactions.map((i) => i.description).sort()).toEqual(["get order 1", "get order 2"]);
+  }, 30_000);
+
+  it("are every one PactV4 added since its last executeTest", async () => {
+    const dir = contractDir();
+    const provider = new Pact(options(dir));
+    getOrder(provider, "get order 1");
+    await provider
+      .addInteraction()
+      .uponReceiving("get order 2")
+      .withRequest("GET", "/orders/2")
+      .willRespondWith(200, (builder) => builder.jsonBody({ id: integer(2) }))
+      .executeTest(async (mock) => {
+        expect((await fetch(`${mock.url}/orders/1`)).status).toBe(200);
+        expect((await fetch(`${mock.url}/orders/2`)).status).toBe(200);
+      });
+    // Taken by that executeTest: the next one serves only its own.
+    await getOrder(provider, "get order 1 again").executeTest(async (mock) => {
+      expect((await fetch(`${mock.url}/orders/1`)).status).toBe(200);
+    });
+  }, 30_000);
+
+  it("serve an interaction as often as the test calls it", async () => {
+    const dir = contractDir();
+    await getOrder(new Pact(options(dir))).executeTest(async (mock) => {
+      for (let page = 0; page < 3; page++) {
+        expect(await (await fetch(`${mock.url}/orders/1`)).json()).toEqual({ id: 1 });
+      }
+    });
+    expect(existsSync(join(dir, "Web-Orders.janus.json"))).toBe(true);
+  }, 30_000);
+
+  it("fail a test that never called one of them, naming it, and write no contract", async () => {
+    const dir = contractDir();
+    const provider = new PactV3(options(dir));
+    for (const id of [1, 2]) {
+      provider.uponReceiving(`get order ${id}`).withRequest(order(`/orders/${id}`)).willRespondWith({ status: 200 });
+    }
+    const run = provider.executeTest(async (mock) => {
+      await fetch(`${mock.url}/orders/1`);
+    });
+    await expect(run).rejects.toThrow(/Missing request: the interaction 'get order 2' was expected, but not received/);
+    await expect(run).rejects.not.toThrow(/'get order 1'/);
+    expect(existsSync(join(dir, "Web-Orders.janus.json"))).toBe(false);
+  }, 30_000);
 });
 
 describe("executeTest", () => {

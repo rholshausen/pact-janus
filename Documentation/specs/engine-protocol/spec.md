@@ -664,12 +664,18 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   a URL (spike 1.5, finding 1). A session MAY start several transports. A served transport is
   driven by an exchange loop that runs beside the frame stream, behind the `background`
   capability (§5.3).
-- **`serve-variant`**: for a **passive** interaction, arms the given variant: the next
-  matching inbound traffic on the session's transports is matched against it. For an
-  **emissive** interaction, delivers now: the engine produces the message for that variant
+- **`serve-variant`**: for a **passive** interaction, arms the given variant on every started
+  transport of the interaction's kind, until the variant is reported, the handle is armed again,
+  or the session ends ([ADR 0069](../../decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md)).
+  For an **emissive** interaction, delivers now: the engine produces the message for that variant
   through the bound transport (or the hook path, design 2.7). Multiple interactions may be
   armed concurrently; re-arming a handle with a different variant replaces the previous
-  arming.
+  arming. Each arrival on a transport is matched against every arming on it, and goes to an arming
+  it matches: of several, the one whose match passed the most plan actions, then the first armed.
+  An arrival that matches none goes to the arming it came closest to (the fewest mismatches, then
+  the most actions passed, then the first armed), whose variant it fails, and the transport rejects
+  it. Every arrival an arming takes is one more exchange of its variant, so a test may call it as
+  often as it likes. An arrival with nothing armed is refused and fails nothing.
   - **With nothing to deliver it** ([ADR 0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)):
     when no transport of an emissive interaction's kind is started in the session, the answer is
     `parts`, the variant's message for the host to hand to its test: every part, with each
