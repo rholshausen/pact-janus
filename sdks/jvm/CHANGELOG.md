@@ -1,5 +1,7 @@
 ## 0.2.0 (2026-11-04)
 
+The SDK runs janus-engine 0.4.4, where it ran 0.4.3: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.4) says what changed.
+
 ### Breaking Changes
 
 #### Test files recording one consumer and provider write one contract
