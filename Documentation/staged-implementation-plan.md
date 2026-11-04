@@ -1741,6 +1741,30 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     same S2.12 and S2.14.
     *Exit:* pact-js's message consumer example runs on the facade, and pact-js's message provider
     example verifies the contract it records.
+    *Done 2026-11-04*, on ADR 0066 decision 1's open vocabulary:
+    - `add-pact-interaction` takes the `pact_ffi` calls pact-js's message builders make, ported from
+      `pact_ffi`'s message branches at the commit S2.5a ported from. A first step `new_async_message`
+      or `new_message` begins an asynchronous message, and `new_sync_message_interaction` a
+      synchronous one. `message_expects_to_receive`, `message_given`, `message_with_contents` and
+      `message_with_metadata_v2` build them, and `with_body`, `with_binary_file` and
+      `with_matching_rules` apply as the FFI's message branches do. A call for another kind of
+      interaction is refused, but for `message_with_metadata_v2` on a synchronous message, which the
+      FFI ignores and pact-js's synchronous builder makes anyway. The kernel replays the example's
+      calls and builds the interaction pact-js's pact holds, and `tests/pact_interactions.rs` hands
+      its message over `serve-variant` and records what `upgrade` makes of the pact.
+    - `pact-janus/pact` has `addAsynchronousInteraction`, `addSynchronousInteraction`,
+      `MessageConsumerPact` and the four body handlers (`src/facade/message.ts`). A test is handed
+      the message in the form pact-js hands it: a JSON body as its document, any other as text, and a
+      synchronous message's halves as `Buffer`s. The facade reads JSON by its content type, as
+      pact-js's `reify` does, because it reproduces pact-js's surface.
+    - `test/examples/messages.test.ts` runs the example's consumer test, which records what
+      `janus upgrade` makes of S1.7's `messages/pact-js-order-placed`, and its provider test, which
+      verifies that pact and the recorded contract.
+    - [`consumer-test-migration.md`](consumer-test-migration.md) gives each message primitive's
+      verdict. The facade layer's budget went from 1,200 to 1,550 code lines, for the message builders.
+    - Not foreseen: a served example's octets are their base64 text, in a message's `parts` and in an
+      HTTP mock's reply, since a generated payload is a JSON document. S2.5a's binary replies have it
+      too. It is S2.15, and the facade's binary message test expects it to fail until then.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -1896,6 +1920,15 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     variant, so a contract's message variants are told apart by a `whenVariant` parameter, as an HTTP
     interaction's are. The tests do that; nothing else needed it.
   - Left out: a message naming its transport kind (ADR 0068, until S6.2 gives one a meaning).
+- **S2.15 A served example's octets, as octets** — **S**, found building S2.5c. A generated payload
+  is a JSON document per slot, so an example that is octets (`encoded: base64`, a body no component
+  decodes) is served as its base64 text: a converted interaction keeps the generated value where its
+  example decodes to bytes. pact-js's `withContent(contentType, buffer)`, `withBinaryContent`,
+  `binaryFile` and `body` replies reach the test that way, and so does any binary body a contract's
+  message records. The payload carries bytes where a shape's example is bytes, `wire_parts` and the
+  mock encode them as `base64`, and a fresh generator's value is filled around them.
+  *Exit:* a facade test given octets, as an HTTP reply and as a message, is handed exactly those
+  octets, and the `it.fails` in `test/examples/messages.test.ts` becomes an `it`.
 
 **Done when** both SDKs pass the extended conformance suite against a pinned engine, the consumer
 example suites of pact-js and pact-jvm run on the compatibility facade (pact-jvm's JUnit 4 ones,
@@ -2140,6 +2173,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.12 | A contract has no message form: `upgrade` drops messages, and a consumer session cannot hand one to a test | ADR 0046; moved from S6.2 by S2.5a |
 | S2.13 | A transport holds one armed interaction, and its first request ends the arming | found building S2.5a; ADR 0066 |
 | S2.14 | Neither SDK can build a message interaction, or hand its test the message the engine answers | ADR 0067 decision 6 |
+| S2.15 | A served example that is octets reaches the test as its base64 text | found building S2.5c |
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |

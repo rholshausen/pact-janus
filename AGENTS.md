@@ -182,7 +182,10 @@ Three sources are the source of truth and take precedence over this file when th
 > answers `{ parts }`, the message for the host's test. S2.14 (ADR 0068): both SDKs build one,
 > `janus.message(d).given(..).contents({ metadata, body })` (and `.request(..)` for a synchronous
 > message), its body declared JSON unless `content` names a type, and `execute` of a message starts
-> no mock and hands the closure a `ReceivedMessage`.
+> no mock and hands the closure a `ReceivedMessage`. S2.5c: `pact-janus/pact` has pact-js's message
+> consumer API (`addAsynchronousInteraction`, `addSynchronousInteraction`, `MessageConsumerPact`, the
+> body handlers), whose builders record the `pact_ffi` message calls `add-pact-interaction` now makes.
+> S2.15, serving an example's octets as octets rather than their base64 text, is new.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
