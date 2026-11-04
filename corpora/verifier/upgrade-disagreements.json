@@ -196,6 +196,146 @@
       "pact": "pass",
       "contract": "fail",
       "reason": "S3.4: the pact's Content-Type header has no rule, and the contract writes it as equality, which a reply adding a charset fails; v1-v4 compare MIME parameters as a set (legacy:header-value). The upgrade reports it as rule-narrowed"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/header/Content-Type/changed",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.one/same-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.one/other-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.two/same-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.two/other-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.one/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "compatibility-suite/v4-messages/01-verifying-a-pending-message-interaction/mutations/0/0/body/$.two/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Content-Type/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Content-Type/missing",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Pact-Message-Metadata/changed",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Pact-Message-Metadata/changed",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Pact-Message-Metadata/missing",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/header/Pact-Message-Metadata/missing",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/body/$.name/same-type",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/body/$.name/same-type",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/body/$/extra-member",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
+    },
+    {
+      "case": "messages/pact-jvm-synchronous/mutations/0/0/body/$/extra-member",
+      "key": "0/0",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0067: the contract asks for the synchronous message with its recorded request, which carries no matchingRules since a contract has none, and this provider recognises today's request only with the pact's matchingRules, so it answers no message"
     }
   ]
 }

@@ -309,34 +309,100 @@ pub(crate) fn handle_arrival(
 /// produces nothing leaves the armed value, and says so in the log. A reply with no generators is the
 /// armed one, shared rather than copied.
 fn fresh_reply(armed: &ArmedExchange, answering: &str) -> Arc<Payload> {
-  let Some(shapes) = armed.fresh.get(answering) else {
-    return Arc::clone(&armed.response_parts);
-  };
-  let mut reply = Payload::clone(&armed.response_parts);
-  let Some(slots) = reply.get_mut(answering) else {
-    return Arc::clone(&armed.response_parts);
-  };
-  let fresh = crate::shape::fresh::Fresh {
+  fill_fresh(
+    &armed.response_parts,
+    &armed.fresh,
+    &[answering],
+    &armed.provider_state,
+    &armed.handle,
+    &armed.variant_id,
+  )
+}
+
+/// Every part of an armed payload with its generators' fresh values filled, as a reply's are: what
+/// an emissive interaction hands its test (ADR 0067 decision 5).
+pub(crate) fn fresh_payload(
+  payload: &Arc<Payload>,
+  fresh: &BTreeMap<String, crate::contract::ShapePart>,
+  provider_state: &serde_json::Map<String, Value>,
+  handle: &str,
+  variant: &str,
+) -> Arc<Payload> {
+  let parts: Vec<&str> = fresh.keys().map(String::as_str).collect();
+  fill_fresh(payload, fresh, &parts, provider_state, handle, variant)
+}
+
+/// `payload` with every position the named parts' shapes give a generator filled with a fresh value
+/// (ADR 0048). A generator that produces nothing leaves the armed value, and says so in the log. A
+/// payload with no generators in those parts is the armed one, shared rather than copied.
+fn fill_fresh(
+  payload: &Arc<Payload>,
+  fresh: &BTreeMap<String, crate::contract::ShapePart>,
+  parts: &[&str],
+  provider_state: &serde_json::Map<String, Value>,
+  handle: &str,
+  variant: &str,
+) -> Arc<Payload> {
+  if !parts
+    .iter()
+    .any(|part| fresh.contains_key(*part) && payload.contains_key(*part))
+  {
+    return Arc::clone(payload);
+  }
+  let mut filled = Payload::clone(payload);
+  let generators = crate::shape::fresh::Fresh {
     generators: &crate::component::PactGenerators,
     side: "consumer",
-    provider_state: &armed.provider_state,
+    provider_state,
   };
   let mut failures = Vec::new();
-  for (slot_name, value) in slots.iter_mut() {
-    if let Some(shape) = shapes.get(slot_name) {
-      crate::shape::fresh::fill(
-        shape,
-        value,
-        &format!("$.{answering}.{slot_name}"),
-        &fresh,
-        &mut failures,
-      );
+  for part in parts {
+    let (Some(shapes), Some(slots)) = (fresh.get(*part), filled.get_mut(*part)) else {
+      continue;
+    };
+    for (slot_name, value) in slots.iter_mut() {
+      if let Some(shape) = shapes.get(slot_name) {
+        crate::shape::fresh::fill(
+          shape,
+          value,
+          &format!("$.{part}.{slot_name}"),
+          &generators,
+          &mut failures,
+        );
+      }
     }
   }
   for failure in failures {
-    tracing::warn!(handle = %armed.handle, variant = %armed.variant_id, target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was served");
+    tracing::warn!(handle, variant, target = %failure.target, generator = %failure.generator, message = %failure.message, "a generator produced no value; the recorded one was served");
   }
-  Arc::new(reply)
+  Arc::new(filled)
+}
+
+/// A payload in the form a transport carries, with no transport to say which slots are content
+/// (ADR 0067 decision 5): a slot the interaction declares a type for is encoded through the content
+/// component for it, and every other slot is its plain value.
+pub(crate) fn wire_parts(
+  payload: &Payload,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> Parts {
+  payload
+    .iter()
+    .map(|(part_name, slots)| {
+      let types = declared.get(part_name);
+      let part: Part = slots
+        .iter()
+        .map(|(slot_name, value)| {
+          let wired = match types.and_then(|types| types.get(slot_name)) {
+            Some(content_type) => encode_slot(value, Some(content_type), content),
+            None => plain_slot(value),
+          };
+          (slot_name.clone(), wired)
+        })
+        .collect();
+      (part_name.clone(), part)
+    })
+    .collect()
 }
 
 /// The generated payload of the part that answers, wired for reply (component-interfaces spec §4).

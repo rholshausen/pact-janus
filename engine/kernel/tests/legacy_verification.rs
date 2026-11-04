@@ -1128,6 +1128,124 @@ fn a_mixed_pact_drives_its_requests_and_produces_its_messages() {
   assert_all_verified(&events, 2);
 }
 
+/// A pact's contract, as `janus upgrade` converts it (ADR 0067).
+fn upgraded(pact: &Value) -> Value {
+  let upgraded = pact_janus_kernel::legacy::upgrade::pact("test", pact).expect("converts");
+  serde_json::to_value(&upgraded.contract).expect("a contract serialises")
+}
+
+/// ADR 0067 decision 4: the contract a v3 message pact upgrades into is asked for each message as
+/// the pact is, by the same POST, and reaches the same verdicts on the same answers.
+#[test]
+fn an_upgraded_message_contract_verifies_as_its_pact_does() {
+  let replies = || {
+    vec![
+      canned(200, r#"{"testParam1": "value3", "testParam2": "value4"}"#),
+      canned(200, r#"{"testParam1": "value1", "testParam2": "value2"}"#)
+        .with_header("pact-message-metadata", &message_metadata(json!({ "destination": "Y002" }))),
+      canned(200, r#"{"testParam1": "value1", "testParam2": "value2"}"#).with_header(
+        "pact-message-metadata",
+        &message_metadata(json!({
+          "metadata1": "metadataValue1", "metadata2": "metadataValue2", "metadata3": 10, "partitionKey": "abc01"
+        })),
+      ),
+    ]
+  };
+  let pact = fixture("test_consumer_v3-MessageProvider.json");
+  let contract = upgraded(&pact);
+  // The contract's interactions are in identity order, and the pact's in its own: the stub answers
+  // in turn, so each document is asked in the order its replies are canned.
+  let order: Vec<&str> = contract["interactions"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|interaction| interaction["description"].as_str().unwrap())
+    .collect();
+  assert_eq!(
+    order,
+    vec!["a test message", "a test message", "a test message with metadata"]
+  );
+  assert_eq!(
+    contract["interactions"][0]["states"][0]["name"],
+    json!("SomeProviderState"),
+    "a missing parameter list sorts first, then by state"
+  );
+  let mut replies = replies();
+  replies.swap(0, 1);
+  let (base_url, requests) = recording_stub(replies);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![contract],
+    &base_url,
+    Some(message_hooks(&base_url)),
+  );
+
+  let asked: Vec<Value> = (0..3)
+    .map(|_| requests.recv_timeout(Duration::from_secs(5)).expect("asked").1)
+    .collect();
+  assert_eq!(
+    asked[1],
+    json!({ "description": "a test message", "providerStates": [{ "name": "SomeProviderState2" }] }),
+    "today's request for a message, and nothing else"
+  );
+  let statuses: Vec<&Value> = results(&events).iter().map(|result| &result["status"]).collect();
+  assert_eq!(
+    statuses,
+    vec![&json!("verified"), &json!("verified"), &json!("failed")]
+  );
+  assert_eq!(
+    results(&events)[2]["mismatches"][0]["path"],
+    json!("$.message.metadata.partitionKey")
+  );
+}
+
+/// ADR 0067 decision 4: a synchronous message's contract asks the provider with its recorded request,
+/// written as a v4 message's contents, and with no matching rules, which a contract does not have.
+#[test]
+fn an_upgraded_synchronous_message_sends_its_recorded_request() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Synchronous/Messages",
+      "description": "a square's area",
+      "providerStates": [{ "name": "a square", "params": { "side": 3 } }],
+      "request": {
+        "contents": { "content": { "side": 3 }, "contentType": "application/json", "encoded": false },
+        "matchingRules": { "content": { "$.side": { "combine": "AND", "matchers": [{ "match": "integer" }] } } },
+      },
+      "response": [{
+        "contents": { "content": { "area": 9 }, "contentType": "application/json", "encoded": false },
+        "matchingRules": { "content": { "$.area": { "combine": "AND", "matchers": [{ "match": "integer" }] } } },
+      }],
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } },
+  });
+  let (base_url, requests) = recording_stub(vec![canned(200, r#"{"area": 16}"#)]);
+  let mut engine = engine_with_everything();
+
+  let events = verify(
+    &mut engine,
+    vec![upgraded(&pact)],
+    &base_url,
+    Some(message_hooks(&base_url)),
+  );
+
+  let (_, asked) = requests
+    .recv_timeout(Duration::from_secs(5))
+    .expect("the provider was asked");
+  assert_eq!(
+    asked,
+    json!({
+      "description": "a square's area",
+      "providerStates": [{ "name": "a square", "params": { "side": 3 } }],
+      "request": { "contents": { "content": { "side": 3 }, "contentType": "application/json", "encoded": false } },
+    })
+  );
+  assert_all_verified(&events, 1);
+}
+
 /// A tiny HTTP endpoint that records the `pact-state-change` documents it is sent and answers
 /// `200 {}` — for the pacts whose providers are not in this repo but whose states still have to
 /// arrive somewhere.

@@ -608,15 +608,155 @@ fn a_body_with_no_content_type_header_checks_the_type_on_the_header() {
   assert!(!codes(&named.findings).contains(&"body-type-on-header"));
 }
 
-/// A message interaction has no contract form yet. Vanishing silently is exactly the outcome the
-/// honesty rule forbids, so the count is reported.
+/// ADR 0067: a v3 message converts into an emissive interaction whose `message` part is the
+/// message, its metadata member by member and its contents as a body. A finding points into the
+/// pact's `messages`, where a v3 message pact holds them.
 #[test]
-fn interactions_that_cannot_be_converted_are_counted_rather_than_vanishing() {
+fn a_v3_message_converts_into_an_emissive_interaction() {
   let upgraded = upgrade(&fixture("test_consumer_v3-MessageProvider.json"));
-  assert!(upgraded.contract.interactions.is_empty());
-  let finding = find(&upgraded.findings, "interaction-dropped");
-  assert_eq!(finding.kind, "lossy");
-  assert!(finding.message.contains("3 of 3"), "{}", finding.message);
+  assert_eq!(upgraded.contract.interactions.len(), 3);
+  assert!(!codes(&upgraded.findings).contains(&"interaction-dropped"));
+  let with_metadata = upgraded
+    .contract
+    .interactions
+    .iter()
+    .position(|interaction| interaction.description == "a test message with metadata")
+    .expect("converted");
+  let interaction = &upgraded.contract.interactions[with_metadata];
+  let transport = interaction.transport.as_ref().expect("a transport");
+  assert_eq!(
+    (transport.kind.as_str(), transport.mode.as_deref()),
+    ("message", Some("emissive"))
+  );
+  assert_eq!(interaction.parts.keys().collect::<Vec<_>>(), vec!["message"]);
+  let metadata = shape(&upgraded, with_metadata, "message", "metadata");
+  assert_eq!(
+    metadata["members"]["partitionKey"],
+    json!({ "shape": "regex", "pattern": "^(?:[A-Z]{3}\\d{2})$", "example": "ABC01" })
+  );
+  assert_eq!(
+    metadata["members"]["metadata3"],
+    json!({ "shape": "equality", "example": 10 })
+  );
+  assert_eq!(
+    shape(&upgraded, with_metadata, "message", "body")["members"]["testParam1"],
+    json!({ "shape": "equality", "example": "value1" })
+  );
+  assert_eq!(
+    interaction.content_types.as_ref().expect("declared")["message"]["body"],
+    "application/json"
+  );
+  // The evidence is the pact's own message.
+  let recorded = &interaction.selection.variants[0].parts["message"];
+  assert_eq!(recorded["metadata"].content["partitionKey"], json!("ABC01"));
+  assert_eq!(recorded["body"].encoded.as_deref(), Some("text"));
+  // A contentType with no rule is narrowed, as a header is.
+  let narrowed = upgraded
+    .findings
+    .iter()
+    .find(|f| f.code == "rule-narrowed" && f.path.ends_with("/metadata"))
+    .expect("the contentType is narrowed");
+  assert!(narrowed.path.starts_with("/messages/"), "{}", narrowed.path);
+  assert_eq!(narrowed.kind, "judgement");
+}
+
+/// ADR 0067 decision 2: a v4 synchronous message records its request as a `request` part beside its
+/// first response's `message`, and a second response is reported rather than silently kept or lost.
+#[test]
+fn a_synchronous_message_records_its_request_and_its_first_response() {
+  let message = |content: Value| {
+    json!({ "contents": { "content": content, "contentType": "application/json" },
+            "metadata": { "contentType": "application/json" } })
+  };
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Synchronous/Messages", "description": "ask", "transport": "kafka",
+      "request": message(json!({ "q": 1 })),
+      "response": [message(json!({ "a": 1 })), message(json!({ "a": 2 }))],
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  });
+  let upgraded = upgrade(&pact);
+  let interaction = &upgraded.contract.interactions[0];
+  let transport = interaction.transport.as_ref().expect("a transport");
+  assert_eq!(
+    (transport.kind.as_str(), transport.mode.as_deref()),
+    ("kafka", Some("emissive"))
+  );
+  assert_eq!(
+    interaction.parts.keys().collect::<Vec<_>>(),
+    vec!["message", "request"]
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "request", "body")["members"]["q"]["example"],
+    json!(1)
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "message", "body")["members"]["a"]["example"],
+    json!(1)
+  );
+  let dropped = find(&upgraded.findings, "responses-dropped");
+  assert_eq!(dropped.kind, "lossy");
+  assert_eq!(dropped.path, "/interactions/0/response");
+  assert!(
+    dropped.message.contains("expects 2 responses"),
+    "{}",
+    dropped.message
+  );
+  // Its findings point at the response it came from.
+  let frozen = upgraded
+    .findings
+    .iter()
+    .find(|f| f.code == "example-frozen-as-equality" && f.path.contains("/response/0/"))
+    .expect("the response's frozen positions");
+  assert_eq!(frozen.path, "/interactions/0/response/0/contents");
+}
+
+/// ADR 0067 decision 3: today's check that a produced message's type agrees with the pact's is on
+/// the metadata. A message whose metadata names no contentType gets an optional pattern there, which
+/// a message with none passes, and the judgement is reported.
+#[test]
+fn a_message_with_no_content_type_in_its_metadata_checks_it_with_a_pattern() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Asynchronous/Messages", "description": "an event",
+      "contents": { "content": { "a": 1 }, "contentType": "application/json" },
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  });
+  let upgraded = upgrade(&pact);
+  let member = &shape(&upgraded, 0, "message", "metadata")["members"]["contentType"];
+  assert_eq!(member["shape"], json!("optional"));
+  assert_eq!(member["of"]["shape"], json!("regex"));
+  assert_eq!(member["of"]["example"], json!("application/json"));
+  let finding = find(&upgraded.findings, "body-type-on-metadata");
+  assert_eq!(finding.kind, "judgement");
+  assert_eq!(
+    finding.target.as_deref(),
+    Some("/interactions/0/parts/message/metadata/members/contentType")
+  );
+}
+
+/// A generator in a message's metadata lands on the member it names (ADR 0067 decision 3), as a
+/// header's does on its header.
+#[test]
+fn a_metadata_generator_lands_on_its_member() {
+  let pact = json!({
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Asynchronous/Messages", "description": "an event",
+      "contents": { "content": { "a": 1 }, "contentType": "application/json" },
+      "metadata": { "contentType": "application/json", "id": "1234" },
+      "generators": { "metadata": { "id": { "type": "Uuid" } } },
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  });
+  let upgraded = upgrade(&pact);
+  let member = &shape(&upgraded, 0, "message", "metadata")["members"]["id"];
+  assert_eq!(member["generator"]["name"], json!("pact:Uuid"));
+  assert!(!codes(&upgraded.findings).contains(&"generator-dropped"));
 }
 
 /// An interaction that needs a pact plugin (staged plan S1.8) is not converted as the HTTP or message
@@ -685,7 +825,10 @@ fn descriptions(upgraded: &upgrade::Upgraded) -> Vec<&str> {
 fn a_pending_interaction_converts_without_its_flag_by_default() {
   let upgraded = upgrade(&with_a_pending_interaction());
   // In identity order (contract-file spec §2.4, ADR 0065), not the pact's.
-  assert_eq!(descriptions(&upgraded), vec!["built", "not built yet"]);
+  assert_eq!(
+    descriptions(&upgraded),
+    vec!["a message", "built", "not built yet"]
+  );
   let finding = find(&upgraded.findings, "pending-dropped");
   assert_eq!(finding.kind, "lossy");
   assert_eq!(finding.path, "/interactions/1/pending");
@@ -693,23 +836,22 @@ fn a_pending_interaction_converts_without_its_flag_by_default() {
 }
 
 /// ADR 0051: asked to, the conversion leaves a pending interaction out, naming it, so a contract
-/// upgraded from a pact whose pending interactions fail verifies as the pact does. The message is
-/// still counted as not converted, and the pending interaction is not counted with it.
+/// upgraded from a pact whose pending interactions fail verifies as the pact does. Nothing else is
+/// left out: the message converts (ADR 0067).
 #[test]
 fn a_pending_interaction_is_left_out_when_asked() {
   let options = upgrade::Options {
     exclude_pending: true,
   };
   let upgraded = upgrade::pact_with("test", &with_a_pending_interaction(), &options).expect("converts");
-  assert_eq!(descriptions(&upgraded), vec!["built"]);
+  assert_eq!(descriptions(&upgraded), vec!["a message", "built"]);
   let finding = find(&upgraded.findings, "pending-excluded");
   assert_eq!(finding.kind, "lossy");
   assert_eq!(finding.path, "/interactions/1");
   assert!(finding.message.contains("'not built yet'"), "{}", finding.message);
   assert!(finding.target.is_none());
   assert!(!codes(&upgraded.findings).contains(&"pending-dropped"));
-  let dropped = find(&upgraded.findings, "interaction-dropped");
-  assert!(dropped.message.starts_with("1 of 3 "), "{}", dropped.message);
+  assert!(!codes(&upgraded.findings).contains(&"interaction-dropped"));
   // The plain interaction's own findings point at it where the pact has it.
   let query = find(&upgraded.findings, "request-query-opened");
   assert!(query.path.starts_with("/interactions/2/"), "{}", query.path);

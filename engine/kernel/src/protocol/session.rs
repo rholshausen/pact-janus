@@ -6,7 +6,7 @@ use super::background::{Background, SpawnError, Task};
 use super::exchange::{self, ArmedExchange, Exchange};
 use super::scope::Scope;
 use crate::common::{ContentTypes, declared_type};
-use crate::component::{ComponentError, Start, Stop, TransportComponent, Unavailable};
+use crate::component::{ComponentError, Parts, Start, Stop, TransportComponent, Unavailable};
 use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
@@ -190,7 +190,14 @@ pub enum StartTransportError {
 #[derive(Debug)]
 pub enum ServeVariantError {
   HandleNotFound,
-  VariantNotFound { selection: Vec<String> },
+  VariantNotFound {
+    selection: Vec<String>,
+  },
+  /// An emissive interaction whose kind a started transport serves: delivering through it is S6.2's
+  /// (ADR 0067 decision 5), and until it is built the engine says so rather than claim a delivery.
+  DeliveryUnsupported {
+    kind: String,
+  },
 }
 
 /// `consumer-session/report-variant` (ADR 0064) fails as `serve-variant` does.
@@ -519,7 +526,15 @@ impl ConsumerSession {
   /// exchange loop (plan task 4.5) with the pinned request plan to match and the response to
   /// answer with; an emissive interaction, or one with no transport bound, stops at recording the
   /// arming, exactly as before.
-  pub fn serve_variant(&mut self, handle: &str, variant_id: &str) -> Result<(), ServeVariantError> {
+  ///
+  /// An emissive interaction with no transport of its kind started is handed to the host instead
+  /// (ADR 0067 decision 5): the answer is the variant's parts, as a transport would carry them, and
+  /// the variant is exercised, its test's verdict deciding it.
+  pub fn serve_variant(
+    &mut self,
+    handle: &str,
+    variant_id: &str,
+  ) -> Result<Option<Parts>, ServeVariantError> {
     let contributions = self.scope.contributions();
     let Some(entry) = self.interactions.get_mut(handle) else {
       return Err(ServeVariantError::HandleNotFound);
@@ -566,6 +581,35 @@ impl ConsumerSession {
       parts: Arc::clone(&arming.parts),
     });
 
+    let emissive = entry
+      .spec
+      .transport
+      .as_ref()
+      .filter(|t| t.mode.as_deref() == Some("emissive"))
+      .map(|t| t.kind.clone());
+    if let Some(kind) = emissive {
+      if self.transports.iter().any(|run| run.kind == kind) {
+        return Err(ServeVariantError::DeliveryUnsupported { kind });
+      }
+      let delivered = exchange::fresh_payload(
+        &arming.parts,
+        &entry.fresh,
+        &arming.provider_state,
+        handle,
+        variant_id,
+      );
+      let parts = exchange::wire_parts(&delivered, &entry.content_types, self.scope.content().as_deref());
+      entry.exercised.insert(
+        variant_id.to_string(),
+        Exercised {
+          outcome: ExchangeOutcome::Verified,
+          parts: Arc::clone(&arming.parts),
+          mismatches: Vec::new(),
+        },
+      );
+      return Ok(Some(parts));
+    }
+
     if let (Some(kind), Some(request_plan)) = (passive_kind, &arming.request_plan) {
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.exchange.state.lock().expect("exchange state lock poisoned");
@@ -580,7 +624,7 @@ impl ConsumerSession {
         });
       }
     }
-    Ok(())
+    Ok(None)
   }
 
   /// `consumer-session/report-variant` (ADR 0064 decision 1): the test's verdict on one variant of a

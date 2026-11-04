@@ -70,6 +70,7 @@
                   "response-body-opened",
                   "request-query-opened",
                   "body-type-on-header",
+                  "body-type-on-metadata",
                   "rule-as-pattern",
                   "content-type-inferred",
                   "body-not-parsed",
@@ -77,7 +78,8 @@
                   "duplicate-description",
                   "pending-dropped",
                   "pending-excluded",
-                  "interaction-dropped"
+                  "interaction-dropped",
+                  "responses-dropped"
                 ]
               },
               "kind": {

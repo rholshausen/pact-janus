@@ -31,7 +31,9 @@ readability:
   `upgrade-binary-body/`, `upgrade-form-body/`, `upgrade-xml-body/`, `upgrade-multipart-body/` and their
   `-mismatch` twins are the body kinds that are not JSON, each in its component's document (ADR 0047).
   `upgrade-generated-request-slot/` and `upgrade-generated-response-slot/` carry generators on their
-  shapes, and admit a generated value where the example was (ADR 0048).
+  shapes, and admit a generated value where the example was (ADR 0048). `upgrade-message/` and its
+  `-mismatch` twin are a v3 message and the emissive interaction it converts into, its metadata
+  member by member and its contents a body (ADR 0067).
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`

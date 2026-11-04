@@ -582,7 +582,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 | `consumer-session/add-pact-interaction` | `{ session, pact }` → `{ handle, findings? }` |
 | `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
 | `consumer-session/start-transport` | `{ session, transport, options? }` → `{ endpoint }` |
-| `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ }` |
+| `consumer-session/serve-variant` | `{ session, handle, variant }` → `{ parts? }` |
 | `consumer-session/report-variant` | `{ session, handle, variant, status, reason? }` → `{ result }` |
 | `consumer-session/finalise` | `{ session, write? }` → `{ results, contract?, written?, refused? }` |
 
@@ -653,6 +653,17 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   through the bound transport (or the hook path, design 2.7). Multiple interactions may be
   armed concurrently; re-arming a handle with a different variant replaces the previous
   arming.
+  - **With nothing to deliver it** ([ADR 0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)):
+    when no transport of an emissive interaction's kind is started in the session, the answer is
+    `parts`, the variant's message for the host to hand to its test: every part, with each
+    generator's fresh value filled as a mock fills a reply's, in the form a transport carries. A slot
+    whose type the interaction declares is its octets, encoded by that type's content component and
+    labelled with it; any other slot is its value as it stands. The variant is exercised, and its test's
+    verdict (`report-variant`) decides it. A synchronous message's `parts` hold its `request` and its
+    `message`, and no request is matched, since nothing sent one.
+  - Delivering through a started transport of the kind is not built (staged plan S6.2): until it is,
+    `serve-variant` for such an interaction is `operation-unsupported`, rather than claim a delivery
+    it did not make.
 - **`report-variant`**: the test's verdict on one variant, once its closure has ended
   ([ADR 0064](../../decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)).
   `status` is `passed` or `failed`, and any other value counts as `failed`; `reason` is what the test

@@ -124,7 +124,7 @@ pub struct PluginInteraction {
 /// `pact-message` format answers with, and what a message's plan is rooted at. Its slots are
 /// `metadata`, the message's metadata as one object, and `body`, its contents as octets labelled
 /// with their content type.
-pub const MESSAGE_PART: &str = "message";
+pub const MESSAGE_PART: &str = crate::hooks::points::PRODUCED_PART;
 
 /// A v3 message, or a v4 asynchronous or synchronous message, that needs no plugin (staged plan
 /// S1.7). Verified as today's verifier verifies one: the provider is asked for the message, and what
@@ -145,6 +145,9 @@ pub struct MessageInteraction {
   /// The message expected back: an asynchronous message, or a synchronous message's first response.
   /// `None` for a synchronous message with no response, which expects nothing.
   pub expected: Option<MessageContents>,
+  /// A synchronous message's request: the message the consumer sends, which `janus upgrade` records
+  /// as the contract's `request` part (ADR 0067 decision 2). `None` for an asynchronous message.
+  pub sent: Option<MessageContents>,
   /// How many responses a synchronous message expects; 1 for an asynchronous one. Today's verifier
   /// compares one, so a synchronous message expecting more always fails, as it does today.
   pub responses: usize,
@@ -250,6 +253,7 @@ fn message_interaction(
       synchronous: true,
       request: Value::Object(request),
       expected: sync.response.first().cloned(),
+      sent: Some(sync.request.clone()),
       responses: sync.response.len(),
     });
   }
@@ -266,6 +270,7 @@ fn message_interaction(
     synchronous: false,
     request: Value::Object(request),
     expected: Some(message.contents),
+    sent: None,
     responses: 1,
   })
 }
@@ -439,6 +444,119 @@ pub fn message_plan(message: &MessageInteraction) -> Result<crate::plan::Plan, U
     root: crate::plan::Node::container(Some(message.description.clone()), vec![plan.root]),
     ..plan
   })
+}
+
+/// A message's own example as the slots of a contract's message part (ADR 0067 decision 1): its
+/// metadata as one object, when it has any, and its contents as their octets, labelled with the type
+/// today's verifier reads them by. What `janus upgrade` records as the variant's evidence.
+pub fn message_parts(message: &MessageContents) -> Part {
+  let mut part = Part::new();
+  if !message.metadata.is_empty() {
+    part.insert(
+      "metadata".to_string(),
+      SlotValue {
+        content: Value::Object(
+          message
+            .metadata
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
+        ),
+        encoded: None,
+        content_type: None,
+      },
+    );
+  }
+  if let OptionalBody::Present(bytes, _, _) = &message.contents {
+    part.insert(
+      "body".to_string(),
+      SlotValue {
+        content: Value::String(BASE64.encode(bytes)),
+        encoded: Some("base64".to_string()),
+        content_type: message
+          .message_content_type()
+          .map(|content_type| content_type.to_string()),
+      },
+    );
+  }
+  part
+}
+
+/// What today's verifier POSTs to ask for a **contract's** message (ADR 0067 decision 4), as
+/// [`MessageInteraction::request`] is for a pact's: its `description`, its `providerStates` when it
+/// has any, and a synchronous message's `request`, written as a v4 message's `contents` and
+/// `metadata` from the variant's recorded `request` part. A contract has no matching rules, so the
+/// request carries none. The `http` hook's `pact-message` format sends it, and an SDK's message
+/// producer receives it, so neither knows which document the message came from.
+pub fn contract_message_request(
+  description: &str,
+  states: &[crate::contract::ResolvedState],
+  request: Option<&Part>,
+  declared: Option<&BTreeMap<String, String>>,
+) -> Value {
+  let mut asked = Map::new();
+  asked.insert("description".to_string(), json!(description));
+  if let Some(request) = request {
+    let mut sent = Map::new();
+    let metadata = request.get("metadata").map(|slot| slot.content.clone());
+    if let Some(body) = request.get("body") {
+      let content_type = body
+        .content_type
+        .clone()
+        .or_else(|| declared.and_then(|slots| slots.get("body")).cloned())
+        .or_else(|| {
+          metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("contentType"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+        });
+      // As a v4 pact writes contents: JSON as its value, text as a string, anything else as base64.
+      let octets = match (body.encoded.as_deref(), &body.content) {
+        (Some("base64"), Value::String(text)) => BASE64.decode(text).ok(),
+        (Some("text"), Value::String(text)) => Some(text.as_bytes().to_vec()),
+        _ => None,
+      };
+      let kind = content_type
+        .as_deref()
+        .and_then(|content_type| ContentType::parse(content_type).ok())
+        .map(|content_type| BodyKind::of(&content_type));
+      let (content, encoded) = match octets {
+        // A document recorded as itself is already the value a v4 pact writes.
+        None => (body.content.clone(), json!(false)),
+        Some(octets) => match (kind, serde_json::from_slice::<Value>(&octets)) {
+          (Some(BodyKind::Json), Ok(document)) => (document, json!(false)),
+          _ => match String::from_utf8(octets) {
+            Ok(text) if kind != Some(BodyKind::Bytes) => (Value::String(text), json!(false)),
+            Ok(text) => (Value::String(BASE64.encode(text)), json!("base64")),
+            Err(err) => (Value::String(BASE64.encode(err.into_bytes())), json!("base64")),
+          },
+        },
+      };
+      let mut contents = Map::new();
+      contents.insert("content".to_string(), content);
+      contents.insert("encoded".to_string(), encoded);
+      if let Some(content_type) = content_type {
+        contents.insert("contentType".to_string(), json!(content_type));
+      }
+      sent.insert("contents".to_string(), Value::Object(contents));
+    }
+    if let Some(metadata) = metadata {
+      sent.insert("metadata".to_string(), metadata);
+    }
+    asked.insert("request".to_string(), Value::Object(sent));
+  }
+  let states: Vec<Value> = states
+    .iter()
+    .map(|state| match &state.params {
+      Some(params) => json!({ "name": state.name, "params": params }),
+      None => json!({ "name": state.name }),
+    })
+    .collect();
+  if !states.is_empty() {
+    asked.insert("providerStates".to_string(), Value::Array(states));
+  }
+  Value::Object(asked)
 }
 
 /// The content types a produced message is decoded under (ADR 0036 decision 4, as a response's

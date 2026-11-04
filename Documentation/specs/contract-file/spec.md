@@ -320,6 +320,14 @@ An unknown `kind` is `component-unavailable` naming it, never a silent skip. A v
 speak an interaction's transport has not verified that interaction, and saying so is the only honest
 outcome available.
 
+A **message** is an `emissive` interaction ([ADR
+0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)).
+Its `kind` is the transport it travels by, `message` when nothing more particular is known, and no
+transport drives it in verification: its `produce-message` hooks produce the message and the plan
+scores it (lifecycle-hooks spec §3.4), so a verifier needs no component for its `kind`. On the
+consumer's side, a session with no transport of its kind started hands the message to the test
+(engine-protocol spec §8.2).
+
 ## 5. Shapes and evidence
 
 ### 5.1 Parts, slots and shapes
@@ -339,6 +347,21 @@ the kernel's. This specification fixes only the nesting — part name, then slot
 document owned by design 2.2 — which is what keeps HTTP out of the kernel (architecture rule B3, plan
 task 3.8). There is no `request`/`response` pair in the schema, because a message interaction has
 neither and would need a second shape of interaction record if there were.
+
+A message interaction's message is its **`message`** part, the part `produce-message` hooks produce:
+`metadata`, an `object` shape over the message's metadata, and `body`, its contents, whose type is
+declared in `content-types` as any body's is (§5.5). A synchronous message — a request the provider
+answers with a message — also has a **`request`** part, the message the consumer sends, with the same
+two slots. Nothing else marks it synchronous: the parts already say so (ADR 0067 decision 2).
+
+```json sketch
+{ "description": "an order was placed",
+  "transport": { "kind": "message", "mode": "emissive" },
+  "content-types": { "message": { "body": "application/json" } },
+  "parts": { "message": {
+      "metadata": { "shape": "object", "members": { "queue": { "shape": "equality", "example": "orders" } } },
+      "body": { "shape": "object", "members": { "id": { "shape": "type", "example": 42 } } } } } }
+```
 
 ### 5.2 The selection
 
@@ -551,6 +574,19 @@ Two constructs need judgement rather than a row:
   language expresses that only where the alternatives are value sets it can name; where it cannot, the
   converter keeps the first rule and reports `rule-combination-or` as `lossy`.
 
+**Messages** are converted part by part ([ADR
+0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)).
+A v3 message and a v4 asynchronous message become an emissive interaction with a `message` part, and a
+v4 synchronous message one with a `request` part from its request and a `message` part from its first
+response; a second response is `responses-dropped`. The `kind` is the transport the pact names, else
+`message`. The metadata is an `object` with a member per key, by the key's rule, else `equality`; a
+`contentType` with no rule is `equality` where v1–v4 compare it as a MIME type, which is `rule-narrowed`,
+as a header is. The contents are converted as a body of their type is, above. Today's check that the
+produced message's type agrees with the pact's is on the metadata's `contentType`: the pact's own when
+it names one, else an `optional` pattern that admits what the check admits (`body-type-on-metadata`).
+A verifier reads a produced message's `contentType` as today's verifier reads its type: the body's
+label, else the metadata's own, else what its octets are detected as (lifecycle-hooks spec §3.4).
+
 **Generators** map onto the shape's `generator` member (shape spec §3.4) at the position today's
 verifier generates into, naming the built-in `pact` component's generator and its configuration: `{
 "name": "pact:RandomInt", "config": { "min": 1, "max": 100 } }` ([ADR 0048](../../decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)). A verifier fills a
@@ -565,7 +601,7 @@ generator is lossy but not dangerous — it weakens what the contract can *produ
 A converted interaction has one variant. Its shape has no variant dimensions, so the space is `size: 1`
 with `dimensions: 0`, the base variant is the only variant, and every strategy agrees on it. The
 recorded variant is `id: "base"` with an empty `assignment`, and its `parts` are the pact's request and
-response examples.
+response examples, or a message's own.
 
 There is no special case anywhere for this. Variant semantics §9 makes the same point from the other
 side: the degenerate contract falls out of the arithmetic rather than branching around it, which is the
@@ -603,6 +639,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `request-body-opened` | `lossy` | a request body was an object, a form or XML: v1–v4 close it to unnamed members, names, attributes and children, shapes cannot (ADR 0007) |
 | `response-body-opened` | `lossy` | a response form, or an XML element a type rule reaches the children of: v1–v4 close it to names or children the pact does not have, shapes cannot (ADR 0047) |
 | `body-type-on-header` | `judgement` | the pact named no `Content-Type` header, and its check of the reply's type became a pattern on the header, which refuses a label that is not a type or has a wildcard (ADR 0047) |
+| `body-type-on-metadata` | `judgement` | a message's metadata named no `contentType`, and its check of the produced message's type became an `optional` pattern on the metadata's `contentType`, which refuses a label that is not a type or has a wildcard (ADR 0067) |
 | `rule-as-pattern` | `note` | a number or boolean rule on text became the pattern v1–v4 read the text by; an integer's admits values too large for 64 bits (ADR 0047) |
 | `request-query-opened` | `lossy` | every request: v1–v4 close its query to unnamed parameters — one with no query admits none — and shapes cannot (ADR 0007) |
 | `content-type-inferred` | `judgement` | the pact declared no content type and one was inferred from the body |
@@ -611,7 +648,8 @@ distinguish), and `note` (neither, and still worth reading).
 | `duplicate-description` | `lossy` | two interactions collided under §4.2 and were disambiguated |
 | `pending-dropped` | `lossy` | a v4 interaction was marked pending, which a contract has no form for (§4.1): it is converted, and a failure of it fails the run (ADR 0051) |
 | `pending-excluded` | `lossy` | the conversion was asked to leave pending interactions out (`upgrade/pact`'s `exclude-pending`), and this one was: the contract says nothing about it (ADR 0051) |
-| `interaction-dropped` | `lossy` | an interaction could not be converted at all: a message interaction, or one that needs a pact plugin, named in the message (ADR 0045) |
+| `interaction-dropped` | `lossy` | an interaction could not be converted at all: one that needs a pact plugin, named in the message (ADR 0045), or one that is neither HTTP nor a message |
+| `responses-dropped` | `lossy` | a synchronous message expects more than one response, and the contract records the first; today's verifier fails it for expecting more (ADR 0067) |
 
 An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an
 HTTP request can make it, because `request-query-opened` is raised for every one — the loss is real

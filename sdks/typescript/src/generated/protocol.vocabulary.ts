@@ -71,6 +71,16 @@ export const Decision = {
 } as const;
 
 /**
+ * Known values of `DeliveredSlotValue.encoded` — an open vocabulary: values not listed here may appear and must
+ * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
+ */
+export const DeliveredSlotValueEncoded = {
+  Json: "json",
+  Text: "text",
+  Base64: "base64",
+} as const;
+
+/**
  * Known values of `EncodingName` — an open vocabulary: values not listed here may appear and must
  * be handled by policy, never rejected (engine-protocol spec §2.2 rule 3).
  */
@@ -383,6 +393,7 @@ export const UpgradeFindingCode = {
   ResponseBodyOpened: "response-body-opened",
   RequestQueryOpened: "request-query-opened",
   BodyTypeOnHeader: "body-type-on-header",
+  BodyTypeOnMetadata: "body-type-on-metadata",
   RuleAsPattern: "rule-as-pattern",
   ContentTypeInferred: "content-type-inferred",
   BodyNotParsed: "body-not-parsed",
@@ -391,6 +402,7 @@ export const UpgradeFindingCode = {
   PendingDropped: "pending-dropped",
   PendingExcluded: "pending-excluded",
   InteractionDropped: "interaction-dropped",
+  ResponsesDropped: "responses-dropped",
 } as const;
 
 /**

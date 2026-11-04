@@ -1,0 +1,118 @@
+{
+  "description": "a v3 message and the contract `janus upgrade` converts it into accept the same produced message (ADR 0067): the metadata member by member, its rule a regex and its contentType an equality, and the contents as a JSON body, open to members the pact does not name — plan-grammar spec section 4.4's two-path agreement",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "messages": [
+        {
+          "description": "an order was shipped",
+          "providerStates": [
+            {
+              "name": "an order exists"
+            }
+          ],
+          "contents": {
+            "id": "42",
+            "status": "SHIPPED"
+          },
+          "metaData": {
+            "contentType": "application/json",
+            "destination": "X001"
+          },
+          "matchingRules": {
+            "body": {
+              "$.id": {
+                "matchers": [
+                  {
+                    "match": "type"
+                  }
+                ]
+              }
+            },
+            "metadata": {
+              "destination": {
+                "matchers": [
+                  {
+                    "match": "regex",
+                    "regex": "\\w+\\d+"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order was shipped",
+      "parts": {
+        "message": {
+          "body": {
+            "members": {
+              "id": {
+                "example": "42",
+                "shape": "type"
+              },
+              "status": {
+                "example": "SHIPPED",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          },
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "application/json",
+                "shape": "equality"
+              },
+              "destination": {
+                "example": "X001",
+                "pattern": "^(?:\\w+\\d+)$",
+                "shape": "regex"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "content-types": {
+        "message": {
+          "body": "application/json"
+        }
+      }
+    }
+  },
+  "values": {
+    "$.message.content-type": "application/json",
+    "$.message.metadata": {
+      "contentType": "application/json",
+      "destination": "Y002",
+      "partition": 3
+    },
+    "$.message.body": {
+      "id": "77",
+      "status": "SHIPPED",
+      "extra": true
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

@@ -12,6 +12,8 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -23,27 +25,56 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-
+    "parts"
 })
 public class ServeVariantResult {
 
+    /**
+     * An emissive interaction with no transport of its kind started in the session: the variant's message, every part of it, as a transport would carry it, for the host to hand to its test (spec.md §8.2, ADR 0067). Absent for a passive interaction, which is armed instead.
+     * 
+     */
+    @JsonProperty("parts")
+    @JsonPropertyDescription("An emissive interaction with no transport of its kind started in the session: the variant's message, every part of it, as a transport would carry it, for the host to hand to its test (spec.md \u00a78.2, ADR 0067). Absent for a passive interaction, which is armed instead.")
+    private Map<String, Map<String, DeliveredSlotValue>> parts;
     @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
+
+    /**
+     * An emissive interaction with no transport of its kind started in the session: the variant's message, every part of it, as a transport would carry it, for the host to hand to its test (spec.md §8.2, ADR 0067). Absent for a passive interaction, which is armed instead.
+     * 
+     */
+    @JsonProperty("parts")
+    public Map<String, Map<String, DeliveredSlotValue>> getParts() {
+        return parts;
+    }
+
+    /**
+     * An emissive interaction with no transport of its kind started in the session: the variant's message, every part of it, as a transport would carry it, for the host to hand to its test (spec.md §8.2, ADR 0067). Absent for a passive interaction, which is armed instead.
+     * 
+     */
+    @JsonProperty("parts")
+    public void setParts(Map<String, Map<String, DeliveredSlotValue>> parts) {
+        this.parts = parts;
+    }
 
     @JsonAnyGetter
-    public Map<String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public String toString() {
+    public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(ServeVariantResult.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
+        sb.append("parts");
+        sb.append('=');
+        sb.append(((this.parts == null)?"<null>":this.parts));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -59,6 +90,7 @@ public class ServeVariantResult {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.parts == null)? 0 :this.parts.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
     }
@@ -72,7 +104,7 @@ public class ServeVariantResult {
             return false;
         }
         ServeVariantResult rhs = ((ServeVariantResult) other);
-        return ((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)));
+        return (((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

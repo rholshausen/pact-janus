@@ -31,7 +31,9 @@ use super::compile::{
   only_element, rerooted, rules_for, status_class, type_rule_names, type_rule_reaches,
 };
 use super::multipart as legacy_multipart;
-use super::pact::{self as legacy_pact, BodyKind, LegacyInteraction, Unsupported};
+use super::pact::{
+  self as legacy_pact, BodyKind, LegacyInteraction, MESSAGE_PART, MessageInteraction, Unsupported,
+};
 use super::xml::{self as legacy_xml, rule_name};
 use crate::common::{ContentTypes, Requirement, State, Transport};
 use crate::component::PactGenerators;
@@ -49,7 +51,9 @@ use pact_models::generators::{Generator, Generators};
 use pact_models::http_parts::HttpPart;
 use pact_models::matchingrules::{MatchingRule, MatchingRuleCategory, MatchingRules, RuleList, RuleLogic};
 use pact_models::path_exp::{DocPath, PathToken};
+use pact_models::provider_states::ProviderState;
 use pact_models::v4::http_parts::{HttpRequest, HttpResponse};
+use pact_models::v4::message_parts::MessageContents;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -122,10 +126,17 @@ pub fn pact(source: &str, doc: &Value) -> Result<Upgraded, ContractError> {
 /// Convert a v1–v4 pact document to a Janus contract, as `options` ask.
 pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgraded, ContractError> {
   let pact = legacy_pact::read(source, doc)?;
+  // A v3 message pact holds its interactions as `messages`, and a finding points into the array the
+  // author wrote.
+  let key = if doc.get("interactions").is_none() && doc.get("messages").is_some_and(Value::is_array) {
+    "messages"
+  } else {
+    "interactions"
+  };
   let mut conversion = Conversion::default();
-  // Each HTTP interaction beside its position in the pact, so a finding points at the interaction
-  // the author wrote, whatever was left out before it.
-  let mut http = Vec::new();
+  // Each interaction beside its position in the pact, so a finding points at the interaction the
+  // author wrote, whatever was left out before it.
+  let mut converting = Vec::new();
   let mut needing_plugins = Vec::new();
   let mut excluded = 0;
   for (index, interaction) in legacy_pact::interactions(pact.as_ref()).into_iter().enumerate() {
@@ -137,7 +148,7 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
       conversion.finding(Finding::new(
         "pending-excluded",
         "lossy",
-        format!("/interactions/{index}"),
+        format!("/{key}/{index}"),
         format!(
           "'{}' is pending and was left out, as asked: the contract says nothing about it. Pending \
            is the broker's to decide for a contract, from the provider's results (ADR 0051)",
@@ -147,27 +158,25 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
       continue;
     }
     match interaction {
-      legacy_pact::PactInteraction::Http(interaction) => http.push((index, *interaction)),
-      // Verified since staged plan S1.7, but not converted: a contract has no message form until the
-      // consumer side has one (S6.2). Counted below, with whatever else is not HTTP.
-      legacy_pact::PactInteraction::Message(_) => {}
       legacy_pact::PactInteraction::NeedsPlugins(needs) => needing_plugins.push(needs),
+      // HTTP and messages alike (ADR 0067), in the pact's order, so a duplicate description is
+      // found against what came before it.
+      convertible => converting.push((index, convertible)),
     }
   }
 
-  // Every interaction the pact declared, HTTP or not — a message interaction cannot be converted
-  // by a design that has no message support yet, and vanishing silently is exactly the outcome
-  // §8.1's honesty rule forbids.
+  // Every interaction the pact declared: one that is neither HTTP nor a message is not converted,
+  // and vanishing silently is exactly the outcome §8.1's honesty rule forbids.
   let declared = pact.interactions().len();
-  let messages = declared - excluded - http.len() - needing_plugins.len();
-  if messages > 0 {
+  let unknown = declared - excluded - converting.len() - needing_plugins.len();
+  if unknown > 0 {
     conversion.finding(Finding::new(
       "interaction-dropped",
       "lossy",
-      "/interactions".to_string(),
+      format!("/{key}"),
       format!(
-        "{messages} of {declared} interactions are not HTTP request/response and were not converted; \
-         message interactions have no contract form yet"
+        "{unknown} of {declared} interactions are neither HTTP request/response nor messages and \
+         were not converted"
       ),
     ));
   }
@@ -183,7 +192,7 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
     conversion.finding(Finding::new(
       "interaction-dropped",
       "lossy",
-      "/interactions".to_string(),
+      format!("/{key}"),
       format!(
         "'{}' needs the pact plugin(s) {named} and was not converted; pact plugins have no contract \
          form yet",
@@ -192,11 +201,17 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
     ));
   }
 
-  let mut interactions = Vec::with_capacity(http.len());
+  let mut interactions = Vec::with_capacity(converting.len());
   let mut seen: Vec<(String, Option<Vec<State>>)> = Vec::new();
   let mut problems = Vec::new();
-  for (index, interaction) in &http {
-    match conversion.interaction(*index, interaction, &mut seen) {
+  for (index, interaction) in &converting {
+    let at = format!("/{key}/{index}");
+    let converted = match interaction {
+      legacy_pact::PactInteraction::Http(http) => conversion.interaction(&at, http, &mut seen),
+      legacy_pact::PactInteraction::Message(message) => conversion.message(&at, message, &mut seen),
+      legacy_pact::PactInteraction::NeedsPlugins(_) => continue,
+    };
+    match converted {
       Ok(converted) => interactions.push(converted),
       Err(mut found) => problems.append(&mut found),
     }
@@ -228,6 +243,26 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
   })
 }
 
+/// A v1–v4 interaction's provider states as a recorded variant's resolved states.
+fn resolved_states(provider_states: &[ProviderState]) -> Option<Vec<ResolvedState>> {
+  if provider_states.is_empty() {
+    return None;
+  }
+  Some(
+    provider_states
+      .iter()
+      .map(|state| ResolvedState {
+        name: state.name.clone(),
+        params: (!state.params.is_empty())
+          .then(|| state.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
+      })
+      .collect(),
+  )
+}
+
+/// The kind a message is routed by when its pact names no transport (ADR 0046 decision 5).
+const MESSAGE_TRANSPORT_KIND: &str = "message";
+
 #[derive(Default)]
 struct Conversion {
   findings: Vec<Finding>,
@@ -240,42 +275,15 @@ impl Conversion {
 
   fn interaction(
     &mut self,
-    index: usize,
+    at: &str,
     interaction: &LegacyInteraction,
     seen: &mut Vec<(String, Option<Vec<State>>)>,
   ) -> Result<Interaction, Vec<Problem>> {
-    let at = format!("/interactions/{index}");
-    let states = self.states(interaction, &at);
-
-    // Contract-file spec §4.2: an interaction is identified by description *and* states, and two
-    // that collide would make the contract unreadable back. Disambiguated rather than dropped,
-    // and reported either way.
-    let mut description = interaction.description.clone();
-    if seen.iter().any(|(d, s)| d == &description && s == &states) {
-      let disambiguated = format!("{description} ({})", index + 1);
-      self.finding(Finding::new(
-        "duplicate-description",
-        "lossy",
-        format!("{at}/description"),
-        format!(
-          "another interaction already has the description '{description}' and the same states; \
-           this one was renamed to '{disambiguated}' so both survive"
-        ),
-      ));
-      description = disambiguated;
-    }
-    seen.push((description.clone(), states.clone()));
+    let at = at.to_string();
+    let states = self.states(&interaction.provider_states, &at);
+    let description = self.identity(&interaction.description, &states, &at, seen);
     if interaction.pending {
-      self.finding(Finding::new(
-        "pending-dropped",
-        "lossy",
-        format!("{at}/pending"),
-        "the interaction is pending, so v1–v4 report its failure without failing the run; a contract \
-         has no pending interactions, so a failure of this one fails the run. Pending is the broker's \
-         to decide for a contract, from the provider's results; to leave the interaction out instead, \
-         ask the conversion to exclude pending interactions (ADR 0051)"
-          .to_string(),
-      ));
+      self.pending(&at);
     }
 
     let mut declarations = Declarations::default();
@@ -318,7 +326,7 @@ impl Conversion {
           id: "base".to_string(),
           origin: variant::Origin::Base,
           assignment: Vec::new(),
-          states: self.resolved_states(interaction),
+          states: resolved_states(&interaction.provider_states),
           parts: values,
         }],
         report: selection,
@@ -326,15 +334,151 @@ impl Conversion {
     })
   }
 
+  /// A v1–v4 message (ADR 0067): an emissive interaction whose `message` part is the message the
+  /// provider produces, and, for a synchronous message, whose `request` part is the one the consumer
+  /// sends. Each is converted as a response is, slot by slot: the metadata member by member, the
+  /// contents as a body of their type.
+  fn message(
+    &mut self,
+    at: &str,
+    message: &MessageInteraction,
+    seen: &mut Vec<(String, Option<Vec<State>>)>,
+  ) -> Result<Interaction, Vec<Problem>> {
+    let states = self.states(&message.provider_states, at);
+    let description = self.identity(&message.description, &states, at, seen);
+    if message.pending {
+      self.pending(at);
+    }
+
+    let mut declarations = Declarations::default();
+    let mut parts: BTreeMap<String, ShapePart> = BTreeMap::new();
+    let mut values = Parts::new();
+    if let Some(sent) = &message.sent {
+      let source = format!("{at}/request");
+      parts.insert(
+        "request".to_string(),
+        self.message_shapes(sent, &source, at, "request", &mut declarations),
+      );
+      values.insert("request".to_string(), legacy_pact::message_parts(sent));
+    }
+    // A synchronous message's answer is its first response: today's verifier compares that one.
+    let source = if message.synchronous {
+      format!("{at}/response/0")
+    } else {
+      at.to_string()
+    };
+    if message.responses > 1 {
+      self.finding(Finding::new(
+        "responses-dropped",
+        "lossy",
+        format!("{at}/response"),
+        format!(
+          "the synchronous message expects {} responses, and a contract records one, the first; \
+           today's verifier compares the first and fails the interaction for expecting more, so the \
+           contract can verify where the pact cannot (ADR 0067)",
+          message.responses
+        ),
+      ));
+    }
+    let expected = match &message.expected {
+      Some(expected) => {
+        values.insert(MESSAGE_PART.to_string(), legacy_pact::message_parts(expected));
+        self.message_shapes(expected, &source, at, MESSAGE_PART, &mut declarations)
+      }
+      None => {
+        values.insert(MESSAGE_PART.to_string(), Default::default());
+        ShapePart::new()
+      }
+    };
+    parts.insert(MESSAGE_PART.to_string(), expected);
+    declarations.record_evidence(&mut values);
+    let Declarations {
+      content_types,
+      requires,
+      ..
+    } = declarations;
+
+    let selection = self.selection(&description, &states, &parts, &content_types, at)?;
+    Ok(Interaction {
+      description,
+      transport: Some(Transport {
+        kind: message
+          .transport
+          .clone()
+          .unwrap_or_else(|| MESSAGE_TRANSPORT_KIND.to_string()),
+        mode: Some("emissive".to_string()),
+      }),
+      states,
+      parts,
+      content_types: (!content_types.is_empty()).then_some(content_types),
+      requires: (!requires.is_empty()).then_some(requires),
+      selection: RecordedSelection {
+        variants: vec![RecordedVariant {
+          id: "base".to_string(),
+          origin: variant::Origin::Base,
+          assignment: Vec::new(),
+          states: resolved_states(&message.provider_states),
+          parts: values,
+        }],
+        report: selection,
+      },
+    })
+  }
+
+  /// Contract-file spec §4.2: an interaction is identified by description *and* states, and two
+  /// that collide would make the contract unreadable back. Disambiguated rather than dropped, and
+  /// reported either way.
+  fn identity(
+    &mut self,
+    description: &str,
+    states: &Option<Vec<State>>,
+    at: &str,
+    seen: &mut Vec<(String, Option<Vec<State>>)>,
+  ) -> String {
+    let mut description = description.to_string();
+    if seen.iter().any(|(d, s)| d == &description && s == states) {
+      let index = at
+        .rsplit('/')
+        .next()
+        .and_then(|i| i.parse::<usize>().ok())
+        .unwrap_or(0);
+      let disambiguated = format!("{description} ({})", index + 1);
+      self.finding(Finding::new(
+        "duplicate-description",
+        "lossy",
+        format!("{at}/description"),
+        format!(
+          "another interaction already has the description '{description}' and the same states; \
+           this one was renamed to '{disambiguated}' so both survive"
+        ),
+      ));
+      description = disambiguated;
+    }
+    seen.push((description.clone(), states.clone()));
+    description
+  }
+
+  fn pending(&mut self, at: &str) {
+    self.finding(Finding::new(
+      "pending-dropped",
+      "lossy",
+      format!("{at}/pending"),
+      "the interaction is pending, so v1–v4 report its failure without failing the run; a contract \
+       has no pending interactions, so a failure of this one fails the run. Pending is the broker's \
+       to decide for a contract, from the provider's results; to leave the interaction out instead, \
+       ask the conversion to exclude pending interactions (ADR 0051)"
+        .to_string(),
+    ));
+  }
+
   /// The interaction's states. v3's list carries parameters; v1/v2's bare string arrives here as a
   /// one-element list with none, because `as_v4_http` already normalised it.
-  fn states(&mut self, interaction: &LegacyInteraction, at: &str) -> Option<Vec<State>> {
-    if interaction.provider_states.is_empty() {
+  fn states(&mut self, provider_states: &[ProviderState], at: &str) -> Option<Vec<State>> {
+    if provider_states.is_empty() {
       return None;
     }
     let mut typed = false;
-    let states = interaction
-      .provider_states
+    let states = provider_states
       .iter()
       .map(|state| {
         typed |= !state.params.is_empty();
@@ -360,23 +504,6 @@ impl Conversion {
       ));
     }
     Some(states)
-  }
-
-  fn resolved_states(&self, interaction: &LegacyInteraction) -> Option<Vec<ResolvedState>> {
-    if interaction.provider_states.is_empty() {
-      return None;
-    }
-    Some(
-      interaction
-        .provider_states
-        .iter()
-        .map(|state| ResolvedState {
-          name: state.name.clone(),
-          params: (!state.params.is_empty())
-            .then(|| state.params.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
-        })
-        .collect(),
-    )
   }
 
   /// The selection report a converted interaction carries (contract-file spec §8.3): computed from
@@ -510,7 +637,15 @@ impl Conversion {
       at,
       decl,
     );
-    self.place_generators(&mut part, request, &request.generators, body, "request", at, decl);
+    self.place_generators(
+      &mut part,
+      request,
+      &request.generators,
+      body,
+      "request",
+      &format!("{at}/request"),
+      decl,
+    );
     part
   }
 
@@ -533,10 +668,132 @@ impl Conversion {
       &response.generators,
       body,
       "response",
-      at,
+      &format!("{at}/response"),
       decl,
     );
     part
+  }
+
+  /// A message's slots (ADR 0067 decision 3), from the message object at `source` in the pact:
+  /// `metadata`, member by member, and `body`, its contents converted as an HTTP body of their type
+  /// is. Today's check that the produced message's type agrees with the pact's is on the metadata's
+  /// `contentType`: written there by the pact, or added as a pattern a message with none passes.
+  fn message_shapes(
+    &mut self,
+    message: &MessageContents,
+    source: &str,
+    at: &str,
+    part_name: &str,
+    decl: &mut Declarations,
+  ) -> ShapePart {
+    let mut part = ShapePart::new();
+    // The contents as the body of an HTTP part, which is what the body conversion reads: their own
+    // type, else the metadata's `contentType` as a header, as `pact_models` reads a message's type.
+    let as_part = HttpResponse {
+      status: 200,
+      headers: message.metadata.get("contentType").map(|content_type| {
+        let text = match content_type {
+          Value::String(text) => text.clone(),
+          other => other.to_string(),
+        };
+        std::collections::HashMap::from([("Content-Type".to_string(), vec![text])])
+      }),
+      body: message.contents.clone(),
+      matching_rules: message.matching_rules.clone(),
+      generators: message.generators.clone(),
+    };
+    let target = format!("{at}/parts/{part_name}");
+    let body_at = Where {
+      source: format!("{source}/contents"),
+      target: format!("{target}/body"),
+    };
+    // A message is never matched as a request is, so its body is open as a response's (`message`
+    // is not `request` to the body conversion).
+    let body = self.body_slot(&as_part, &message.matching_rules, MESSAGE_PART, &body_at);
+    let metadata_at = Where {
+      source: format!("{source}/metadata"),
+      target: format!("{target}/metadata"),
+    };
+    let mut metadata = self.metadata_slot(message, &metadata_at);
+    if let Some(body) = &body
+      && let Some(checked) = &body.checked_type
+      && !message
+        .metadata
+        .keys()
+        .any(|key| key.eq_ignore_ascii_case("contenttype") || key.eq_ignore_ascii_case("content-type"))
+      && let Some(pattern) = media_type_pattern(checked)
+    {
+      let member = metadata_at.push("", "/members/contentType");
+      self.finding(Finding::at(
+        "body-type-on-metadata",
+        "judgement",
+        &member,
+        format!(
+          "the message's metadata names no contentType, and v1–v4 check that the produced \
+           message's type agrees with '{checked}' before they compare its contents; the contract \
+           checks the metadata's contentType with a pattern that admits what that check admits, \
+           except a type that is not one or has a wildcard, which v1–v4 also admit (ADR 0067)"
+        ),
+      ));
+      let slot = metadata.get_or_insert_with(|| json!({ "shape": "object", "members": {} }));
+      slot["members"]["contentType"] = json!({
+        "shape": "optional",
+        "of": { "shape": "regex", "pattern": pattern, "example": checked },
+      });
+    }
+    if let Some(metadata) = metadata {
+      part.insert("metadata".to_string(), metadata);
+    }
+    let kind = body.map(|body| {
+      decl.body(part_name, &body);
+      part.insert("body".to_string(), body.shape);
+      body.kind
+    });
+    self.place_generators(
+      &mut part,
+      &as_part,
+      &message.generators,
+      kind,
+      part_name,
+      source,
+      decl,
+    );
+    part
+  }
+
+  /// A message's metadata, one member per key the pact names, each by its rule, else as `equality`,
+  /// as today's verifier compares them key by key. A `contentType` with no rule is compared by
+  /// v1–v4 as a MIME type, as a header value is, which `equality` narrows (ADR 0067 decision 3).
+  fn metadata_slot(&mut self, message: &MessageContents, at: &Where) -> Option<Value> {
+    if message.metadata.is_empty() {
+      return None;
+    }
+    let category = rules_for(&message.matching_rules, "metadata");
+    let keys: BTreeMap<&String, &Value> = message.metadata.iter().collect();
+    let mut members = Map::new();
+    let mut narrowed = false;
+    for (key, example) in keys {
+      let escaped = escape_pointer(key);
+      let member = at.push(&format!("/{escaped}"), &format!("/members/{escaped}"));
+      let fragments = vec!["$".to_string(), key.clone()];
+      let list = best_rule(category.as_ref(), &fragments, false);
+      narrowed |= list.is_none()
+        && (key.eq_ignore_ascii_case("contenttype") || key.eq_ignore_ascii_case("content-type"));
+      let shape = self.shape_for(list.map(|(list, _)| list), example, &member, Text::of(example));
+      members.insert(key.clone(), shape);
+    }
+    if narrowed {
+      self.finding(Finding::at(
+        "rule-narrowed",
+        "judgement",
+        at,
+        "the metadata's contentType has no matching rule and became an exact `equality` \
+         constraint; v1–v4 compared it as a MIME type, as they compare a header, and the shape \
+         language has no operator for that comparison yet"
+          .to_string(),
+      ));
+    }
+    Some(json!({ "shape": "object", "members": members }))
   }
 
   /// A part's `headers` and `body` slots, which are converted together: a pact that names no
@@ -1682,7 +1939,7 @@ impl Conversion {
     generators: &Generators,
     body: Option<BodyKindShaped>,
     part_name: &str,
-    at: &str,
+    source: &str,
     decl: &mut Declarations,
   ) {
     let mut placed_in_body = false;
@@ -1701,12 +1958,12 @@ impl Conversion {
       // Where the pact holds it: a body generator under its path, a header or query one under its
       // name, and a path or status one as the category itself.
       let pointer = match category.as_str() {
-        "body" => format!("{at}/{part_name}/generators/body/{}", escape_pointer(&path)),
-        "header" | "query" => format!(
-          "{at}/{part_name}/generators/{category}/{}",
+        "body" => format!("{source}/generators/body/{}", escape_pointer(&path)),
+        "header" | "query" | "metadata" => format!(
+          "{source}/generators/{category}/{}",
           escape_pointer(key.first_field().unwrap_or(&path))
         ),
-        _ => format!("{at}/{part_name}/generators/{category}"),
+        _ => format!("{source}/generators/{category}"),
       };
       let name = generator.name();
       if !PactGenerators::GENERATORS.contains(&name.as_str()) {
@@ -1732,6 +1989,11 @@ impl Conversion {
             )],
           ),
           None => ("headers", Vec::new()),
+        },
+        // A message's metadata member, by its key (ADR 0067 decision 3).
+        "metadata" => match key.first_field() {
+          Some(member) => ("metadata", vec![format!("/members/{}", escape_pointer(member))]),
+          None => ("metadata", Vec::new()),
         },
         "query" => match key.first_field() {
           Some(name) => {
@@ -2006,7 +2268,14 @@ fn xml_targets(shape: &Value, tokens: &[PathToken]) -> Vec<String> {
 /// in the contract — both are "the first four or five non-empty segments", so one rule serves.
 fn slot_of(pointer: &str) -> String {
   let segments: Vec<&str> = pointer.split('/').skip(1).collect();
-  let keep = if segments.get(2) == Some(&"parts") { 5 } else { 4 };
+  // A message's slots are the message object's own members (`/interactions/{i}/contents`, ADR
+  // 0067), a synchronous message's answer its first response's (`/interactions/{i}/response/0/…`).
+  let keep = match (segments.get(2), segments.get(3)) {
+    (Some(&"parts"), _) => 5,
+    (Some(&"contents" | &"metadata"), _) => 3,
+    (Some(&"response"), Some(index)) if index.parse::<usize>().is_ok() => 5,
+    _ => 4,
+  };
   format!(
     "/{}",
     segments.into_iter().take(keep).collect::<Vec<_>>().join("/")

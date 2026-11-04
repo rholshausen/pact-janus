@@ -168,8 +168,9 @@ Every case whose pacts all convert into contracts with every interaction is run 
 (staged plan S1.19, [ADR 0048](../../Documentation/decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)):
 `janus upgrade` converts each pact, and `janus verify` verifies the contracts against a provider of
 their own. Each verdict is compared with `janus verify`'s on the pact itself. That is plan-grammar spec
-§4.4's two-path agreement, observed against a provider rather than over captured values. A case with a
-message, or an interaction that needs a plugin, has no contract form for it yet, so it is left out.
+§4.4's two-path agreement, observed against a provider rather than over captured values. A message
+converts too, and is asked of the same producer (S2.12, ADR 0067). A case with an interaction that
+needs a plugin has no contract form for it yet, so it is left out.
 
 [`upgrade-disagreements.json`](upgrade-disagreements.json) is this comparison's ledger, with
 `pact` and `contract` in place of `today` and `janus`, and it is held to the same rules: a difference

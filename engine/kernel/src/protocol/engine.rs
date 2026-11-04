@@ -134,6 +134,22 @@ impl Default for Engine {
   }
 }
 
+/// A `serve-variant` or `report-variant` failure as the engine error it answers with.
+fn serve_variant_error(err: ServeVariantError, handle: &str, variant: &str) -> EngineError {
+  match err {
+    ServeVariantError::HandleNotFound => EngineError::handle_not_found(handle),
+    ServeVariantError::VariantNotFound { selection } => EngineError::variant_not_found(variant, &selection),
+    ServeVariantError::DeliveryUnsupported { kind } => EngineError {
+      message: format!(
+        "a '{kind}' transport is started in this session, and delivering an emissive interaction \
+         through a transport is not built yet (staged plan S6.2); start none, and serve-variant \
+         answers with the message for the test to use (ADR 0067)"
+      ),
+      ..EngineError::operation_unsupported("consumer-session/serve-variant")
+    },
+  }
+}
+
 impl Engine {
   /// An engine with no components registered — `start-transport` always answers
   /// `component-unavailable`. What every test and the protocol skeleton used before plan task 4.5
@@ -605,13 +621,10 @@ impl Engine {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
     match session.serve_variant(&req.handle, &req.variant) {
-      Ok(()) => ResponseFrame::ok(id, json!({})),
-      Err(ServeVariantError::HandleNotFound) => {
-        ResponseFrame::err(id, EngineError::handle_not_found(&req.handle))
-      }
-      Err(ServeVariantError::VariantNotFound { selection }) => {
-        ResponseFrame::err(id, EngineError::variant_not_found(&req.variant, &selection))
-      }
+      Ok(None) => ResponseFrame::ok(id, json!({})),
+      // An emissive interaction nothing delivers is handed to the host (ADR 0067 decision 5).
+      Ok(Some(parts)) => ResponseFrame::ok(id, json!({ "parts": parts })),
+      Err(err) => ResponseFrame::err(id, serve_variant_error(err, &req.handle, &req.variant)),
     }
   }
 
@@ -628,12 +641,7 @@ impl Engine {
     let verdict = TestVerdict::new(req.status, req.reason);
     match session.report_variant(&req.handle, &req.variant, verdict) {
       Ok(result) => ResponseFrame::ok(id, json!({ "result": result })),
-      Err(ServeVariantError::HandleNotFound) => {
-        ResponseFrame::err(id, EngineError::handle_not_found(&req.handle))
-      }
-      Err(ServeVariantError::VariantNotFound { selection }) => {
-        ResponseFrame::err(id, EngineError::variant_not_found(&req.variant, &selection))
-      }
+      Err(err) => ResponseFrame::err(id, serve_variant_error(err, &req.handle, &req.variant)),
     }
   }
 

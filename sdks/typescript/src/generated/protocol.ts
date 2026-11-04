@@ -298,6 +298,33 @@ export interface ServeVariant {
 }
 
 export interface ServeVariantResult {
+  /**
+   * An emissive interaction with no transport of its kind started in the session: the variant's message, every part of it, as a transport would carry it, for the host to hand to its test (spec.md §8.2, ADR 0067). Absent for a passive interaction, which is armed instead.
+   */
+  parts?: {
+    [k: string]: {
+      [k: string]: DeliveredSlotValue;
+    };
+  };
+  [k: string]: unknown;
+}
+
+/**
+ * One slot of a delivered message, wrapped as contract spec §5.3 wraps one: a slot whose type the interaction declares is its octets, encoded by that type's content component and labelled with it, and any other slot is its value as it stands.
+ */
+export interface DeliveredSlotValue {
+  /**
+   * The value, represented as 'encoded' says.
+   */
+  content: unknown;
+  /**
+   * How to read 'content': 'json' is the value as it stands, 'text' a string whose octets are its UTF-8 encoding, 'base64' RFC 4648 §4 octets (ADR 0006).
+   */
+  encoded?: string;
+  /**
+   * The media type the octets are, for a slot whose type the interaction declares.
+   */
+  "content-type"?: string;
   [k: string]: unknown;
 }
 

@@ -25,6 +25,7 @@ export const FindingCode = {
   ResponseBodyOpened: "response-body-opened",
   RequestQueryOpened: "request-query-opened",
   BodyTypeOnHeader: "body-type-on-header",
+  BodyTypeOnMetadata: "body-type-on-metadata",
   RuleAsPattern: "rule-as-pattern",
   ContentTypeInferred: "content-type-inferred",
   BodyNotParsed: "body-not-parsed",
@@ -33,6 +34,7 @@ export const FindingCode = {
   PendingDropped: "pending-dropped",
   PendingExcluded: "pending-excluded",
   InteractionDropped: "interaction-dropped",
+  ResponsesDropped: "responses-dropped",
 } as const;
 
 /**

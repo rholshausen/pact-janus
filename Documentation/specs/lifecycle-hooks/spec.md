@@ -279,6 +279,18 @@ reply to take one from, where the `pact-message` format always writes one
 ([ADR 0056](../../decisions/0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md)
 decision 1).
 
+A Janus contract's message — an `emissive` interaction (contract-file spec §4.3) — is verified the
+same way ([ADR 0067](../../decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)):
+its hooks produce the `message` part, and the plan's `message` subtree, pinned to the variant, scores
+it. Its `interaction.pact-message` is what today's verifier would send for it, built from the contract:
+`request` holds its `description`, the variant's resolved states as `providerStates`, and, for a
+synchronous message, its recorded `request` part written as a v4 message's `contents` and `metadata`,
+with no `matchingRules`, since a contract has none; `synchronous` is whether it has that part; and
+`transport` is its `kind` unless that is `message`. So a producer cannot tell which document a message
+came from. The produced message's metadata `contentType` is read as the message's type, as today's
+verifier takes it: the body's label, else the metadata's own, else what the content registry detects
+its octets as, which is where a contract checks the type.
+
 Normative, from spike 1.5 finding 6 and protocol §8.3: **a hook and a wire transport are interchangeable
 sources of the same parts and MUST produce identical results.** The engine matches the parts it was
 given; where they came from is not a matching input. §13 makes that a corpus obligation rather than a

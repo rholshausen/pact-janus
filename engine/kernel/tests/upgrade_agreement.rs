@@ -1,5 +1,5 @@
 //! Plan-grammar spec §4.4's two-path agreement, over the golden corpus (staged plan S1.25): every
-//! v1–v4 HTTP case under `corpora/legacy/` is compiled the two ways a pact can reach a plan —
+//! v1–v4 case under `corpora/legacy/`, HTTP or a message, is compiled the two ways a pact can reach a plan —
 //! directly (design 3.5), and upgraded to a contract (design 2.5) whose shapes are compiled — and
 //! both plans run against the case's values. They must reach the same verdict. Their mismatches may
 //! say different things, so only the verdict is compared; a case's `also-compiled-from` is where
@@ -24,6 +24,9 @@ const KNOWN: &[(&str, &str)] = &[
   // A header with no rule became `equality`, which a parameter the reply adds fails, where v1–v4
   // compare MIME parameters as a set (`legacy:header-value`).
   ("v3-xml-body", "rule-narrowed"),
+  // A message's contentType with no rule became `equality`, which a charset the producer adds fails,
+  // where v1–v4 compare it as a MIME type, as a header (ADR 0067).
+  ("v3-message", "rule-narrowed"),
   // A size rule on an XML element counts its children of every name, which no shape counts: the
   // upgrade drops it, saying so.
   ("v3-xml-min-children-mismatch", "rule-unmapped"),
@@ -112,29 +115,54 @@ fn every_legacy_case_reaches_the_same_verdict_upgraded() {
     let index = input["index"].as_u64().unwrap_or(0) as usize;
     let read = legacy_pact::read("corpus case", pact).expect("a readable pact");
     let interactions = legacy_pact::interactions(read.as_ref());
-    let legacy_pact::PactInteraction::Http(interaction) = &interactions[index] else {
-      continue; // a message has no contract form yet
+    let (legacy, description, message) = match &interactions[index] {
+      legacy_pact::PactInteraction::Http(interaction) => (
+        compile_interaction(
+          &interaction.description,
+          &legacy_pact::legacy_request(&interaction.request).unwrap(),
+          &legacy_pact::legacy_response(&interaction.response).unwrap(),
+        ),
+        interaction.description.clone(),
+        false,
+      ),
+      // A message is compared as its produced `message` part (ADR 0067).
+      legacy_pact::PactInteraction::Message(message) => (
+        legacy_pact::message_plan(message).unwrap(),
+        message.description.clone(),
+        true,
+      ),
+      legacy_pact::PactInteraction::NeedsPlugins(_) => continue,
     };
-    let legacy = compile_interaction(
-      &interaction.description,
-      &legacy_pact::legacy_request(&interaction.request).unwrap(),
-      &legacy_pact::legacy_response(&interaction.response).unwrap(),
-    );
     let upgraded = upgrade::pact("corpus case", pact).expect("the pact upgrades");
-    let http_index = interactions[..index]
+    let contract_interaction = upgraded
+      .contract
+      .interactions
       .iter()
-      .filter(|i| matches!(i, legacy_pact::PactInteraction::Http(_)))
-      .count();
-    let contract_interaction = &upgraded.contract.interactions[http_index];
-    let document = serde_json::to_value(contract_interaction).unwrap();
+      .find(|interaction| interaction.description == description)
+      .unwrap_or_else(|| panic!("{name}: '{description}' was not converted"));
+    let mut document = serde_json::to_value(contract_interaction).unwrap();
+    if message {
+      // A verifier scores the message a producer produced, and never a synchronous message's
+      // request, which it sent.
+      document["parts"].as_object_mut().unwrap().remove("request");
+      if let Some(types) = document.get_mut("content-types").and_then(Value::as_object_mut) {
+        types.remove("request");
+      }
+    }
     let spec = interaction_spec::parse(&document).unwrap_or_else(|err| panic!("{name}: {:?}", err.problems));
     let shaped = plan::compile(&spec, &Default::default(), None);
 
     let values = case["values"].as_object().unwrap();
     let no_tags = Map::new();
     let encoded = case.get("encoded").and_then(Value::as_object).unwrap_or(&no_tags);
+    // A produced message's type, which the legacy plan reads at `$.message.content-type`, is read by a
+    // contract's verifier into its metadata's `contentType` (ADR 0067 decision 3).
+    let mut shaped_values = values.clone();
+    if message && let Some(label) = shaped_values.remove("$.message.content-type") {
+      shaped_values.insert("$.message.metadata.contentType".to_string(), label);
+    }
     let (legacy_status, legacy_mismatches) = status(&legacy, &captured(values, encoded, true));
-    let (shaped_status, shaped_mismatches) = status(&shaped, &captured(values, encoded, false));
+    let (shaped_status, shaped_mismatches) = status(&shaped, &captured(&shaped_values, encoded, false));
     checked += 1;
     let known = KNOWN.iter().find(|(case, _)| *case == name);
     match (legacy_status == shaped_status, known) {

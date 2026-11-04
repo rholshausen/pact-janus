@@ -12,6 +12,11 @@
 //! never a silently ignored block — an ignored hook is indistinguishable from a hook that ran, and
 //! the ignored one is how an unsigned request reaches a provider (spec §12.2).
 
+/// The part `produce-message` hooks produce (spec §3.4): the message a provider emits, with a
+/// `metadata` slot and a `body` slot. The hook system's word for it, not a transport's (ADR 0046
+/// decision 3), and the part an emissive interaction records its message as (ADR 0067 decision 1).
+pub const PRODUCED_PART: &str = "message";
+
 /// How often a point runs, and therefore what its context can hold (spec §2.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {

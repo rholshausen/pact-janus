@@ -55,6 +55,7 @@ use crate::component::{
 };
 use crate::contract::{self, Contract};
 use crate::error::Problem;
+use crate::hooks::points::PRODUCED_PART;
 use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
 use crate::interaction_spec::{self, InteractionSpec};
 use crate::legacy::compile::{self as legacy_compile, compile_response as compile_legacy_response};
@@ -1722,6 +1723,13 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
   // same way from the same input.
   let space = plan::variant_space(&spec);
 
+  // An emissive interaction is a message the provider emits (ADR 0067 decision 4): no transport
+  // drives it, its `produce-message` hooks produce it, and the plan's message subtree scores it.
+  let emissive = interaction
+    .transport
+    .as_ref()
+    .is_some_and(|transport| transport.mode.as_deref() == Some("emissive"));
+
   let replays = interaction
     .selection
     .variants
@@ -1742,9 +1750,23 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
       }
       let request = recorded_parts(variant);
       let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+      let mut hooked = json!({
+        "description": interaction.description,
+        "states": states_json,
+        "transport": interaction.transport,
+      });
+      if emissive {
+        hooked["pact-message"] = produced_request(interaction, &transport, states.as_deref(), &request);
+      }
       Replay::Ready(Box::new(Ready {
         variant: variant.id.clone(),
-        answer: Answer::Driven,
+        answer: if emissive {
+          Answer::Produced {
+            part: PRODUCED_PART.to_string(),
+          }
+        } else {
+          Answer::Driven
+        },
         origin: json!(variant.origin),
         assignment: json!(variant.assignment),
         // Pinned to this variant (shape spec §7.1, variant-semantics spec §5.2 step 3): an
@@ -1752,7 +1774,11 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         // that. Matching against the unpinned shape would accept `PENDING` where the consumer
         // demonstrated `SHIPPED`, and the variant would have proved nothing.
         plan: contributions.compile(&spec, &interaction.parts, &assignment, Some(&variant.id)),
-        resolve: parts_resolver,
+        resolve: if emissive {
+          produced_resolver
+        } else {
+          parts_resolver
+        },
         content_types: interaction.content_types.clone().unwrap_or_default(),
         states: states.unwrap_or_default(),
         request,
@@ -1760,11 +1786,7 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         fresh: fresh_parts(&interaction.parts),
         legacy: false,
         warnings,
-        interaction: json!({
-          "description": interaction.description,
-          "states": states_json,
-          "transport": interaction.transport,
-        }),
+        interaction: hooked,
       }))
     })
     .collect();
@@ -1773,6 +1795,86 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
     reference,
     transport,
     replays,
+  }
+}
+
+/// What the hooks are told about a contract's message (ADR 0067 decision 4), as
+/// `interaction.pact-message`: today's request for it, built from the contract, whether it is
+/// synchronous, and the transport it names when that is not the default kind, which the `http`
+/// hook's `pact-message` format routes by as `--transports` does (ADR 0046 decision 4).
+fn produced_request(
+  interaction: &contract::Interaction,
+  kind: &str,
+  states: Option<&[contract::ResolvedState]>,
+  recorded: &crate::component::Parts,
+) -> Value {
+  // A message's request is any part beside the message (ADR 0067 decision 2).
+  let sent = recorded
+    .iter()
+    .find(|(name, _)| name.as_str() != PRODUCED_PART)
+    .map(|(name, part)| (name.as_str(), part));
+  let declared = sent.and_then(|(name, _)| {
+    interaction
+      .content_types
+      .as_ref()
+      .and_then(|types| types.get(name))
+  });
+  let mut asked = json!({
+    "request": legacy_pact::contract_message_request(
+      &interaction.description,
+      states.unwrap_or_default(),
+      sent.map(|(_, part)| part),
+      declared,
+    ),
+    "synchronous": sent.is_some(),
+  });
+  if kind != MESSAGE_TRANSPORT_KIND {
+    asked["transport"] = json!(kind);
+  }
+  asked
+}
+
+/// A produced message read as a reply is, with one addition (ADR 0067 decision 3): its metadata's
+/// `contentType` is read as the message's content type, as today's verifier takes it: the body's
+/// label, else the metadata's own `contentType`, else the type the content registry detects its
+/// octets as. A body's label is where an `http` hook in `pact-message` format puts the reply's
+/// `Content-Type`, and a producer in a test that gave no type has neither label nor member (ADR 0056
+/// decision 1). So the contract's check of the type, on the metadata, sees the type the message has.
+fn produced_resolver(
+  parts: &crate::component::Parts,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> CapturedValues {
+  let resolver = parts_resolver(parts, declared, content);
+  let Some(message) = parts.get(PRODUCED_PART) else {
+    return resolver;
+  };
+  let body = message.get("body");
+  let labelled = body.and_then(|body| body.content_type.clone());
+  let own = || {
+    message
+      .get("metadata")
+      .and_then(|metadata| metadata.content.get("contentType"))
+      .and_then(Value::as_str)
+      .filter(|content_type| !content_type.is_empty())
+      .map(str::to_string)
+  };
+  let detected = || {
+    let (body, content) = (body?, content?);
+    content
+      .detect(crate::component::Detect {
+        value: body.clone(),
+        hint: None,
+      })
+      .ok()?
+      .media_type
+  };
+  match labelled.or_else(own).or_else(detected) {
+    Some(content_type) => resolver.capture(
+      format!("$.{PRODUCED_PART}.metadata.contentType"),
+      plan::RuntimeValue::String(content_type),
+    ),
+    None => resolver,
   }
 }
 
