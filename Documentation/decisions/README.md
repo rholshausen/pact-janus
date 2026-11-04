@@ -84,6 +84,7 @@ superseding ADR instead.
 | [0065](0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md) | Let the engine's host write and merge contract files, in identity order | accepted |
 | [0066](0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md) | Let a compatibility facade submit today's builder calls, and convert them as `upgrade` does | accepted |
 | [0067](0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md) | Record a message as an emissive interaction, and hand it to the test when nothing delivers it | accepted |
+| [0068](0068-build-a-message-with-its-own-builder-and-hand-the-closure-the-message-in-place-of-a-mock.md) | Build a message with its own builder, and hand the closure the message in place of a mock | accepted |
 
 ## Decision backlog
 
