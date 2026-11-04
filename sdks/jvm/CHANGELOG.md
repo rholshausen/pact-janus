@@ -1,3 +1,73 @@
+## 0.2.0 (2026-11-04)
+
+### Breaking Changes
+
+#### Test files recording one consumer and provider write one contract
+
+`finalise` no longer writes the contract file: it names it, and the engine writes it, merging into
+what the file holds (ADR 0065). Several test files recording one consumer and provider, in separate
+workers or processes, write one contract with all of their interactions, where the last to finish
+used to overwrite the others. An interaction two of them record differently fails the second to
+finalise with the engine's `contract-conflict`, a `JanusEngineException` naming it. `JanusOptions.withContractOverwrite(true)` replaces the file
+instead. Because what merges is whatever the file held, a run should clear its contract directory
+first. This needs an engine with `contract-writing`; an older one named by `JANUS_ENGINE` fails
+`finalise`, saying so.
+
+#### A variant fails in its own test, and the engine withholds the contract
+
+`execute`, and each dynamic test `variants` returns, reports the test's verdict to the engine and
+fails on each variant the engine did not verify (ADR 0064): the test threw, the mock rejected its
+request, or nothing called the mock. These used to fail only `finalise`, after the class's last
+test. A test that never calls the mock now fails. `VariantFailure` is `(variant, result, cause)`,
+whose `cause` is the test's throwable or an `AssertionError` saying the engine's verdict.
+
+The SDK no longer withholds a contract itself: the engine does. `ContractWithheldException` loses
+`failedInteractions()` and `engineWithheld()`, and gains `interactions()` (those that did not verify,
+then those the engine refused) and `refused()`. This needs an engine with
+`consumer-session/report-variant`, which an older engine named by `JANUS_ENGINE` answers
+`operation-unsupported` at the first `execute`.
+
+### Features
+
+#### A consumer test can record a message
+
+`janus.message(description)` builds a `MessageInteraction` (ADR 0068): `given`,
+`contents(m -> m.metadata(..).body(..))` for the message and `request(m -> ...)` for the request a
+synchronous message answers. A body written with `Shapes.content(type, …)` declares that type, and any
+other is JSON. `janus.execute(message, (received, variant) -> ...)` starts no mock, and hands the test
+each variant's `ReceivedMessage`: `body()`, `contentType()`, `metadata()`, `text()`, `json()`, and a
+synchronous message's `request()`. `JanusExtension` has `message`, `execute` and `variants` for it.
+It needs an engine with ADR 0067's `serve-variant` parts.
+
+### Fixes
+
+#### Bindings for `add-pact-interaction`
+
+The generated protocol bindings have the types of the engine's new
+`consumer-session/add-pact-interaction` (ADR 0066): `AddPactInteraction`, `PactSteps`, `PactStep`
+and `AddPactInteractionResult`. Nothing in the SDK calls it yet; pact-jvm's facade will (S2.5b).
+
+#### Bindings know the message calls of `add-pact-interaction`
+
+The generated protocol bindings' vocabulary lists the `pact_ffi` message calls
+`consumer-session/add-pact-interaction` now makes (S2.5c). Nothing in the SDK calls them yet;
+pact-jvm's facade will (S2.5b).
+
+#### Bindings for a delivered message
+
+The generated protocol bindings have `ServeVariantResult.parts` and `DeliveredSlotValue`, the message
+`consumer-session/serve-variant` answers for an emissive interaction (ADR 0067), and the upgrade
+findings `body-type-on-metadata` and `responses-dropped`. Nothing in the SDK builds a message
+interaction yet (S2.14).
+
+#### The contract written is the engine's text, and pacts are sent as read
+
+`finalise` writes the contract text the engine answers, where it copied the contract's bytes out of
+the response frame, which only worked while frames were JSON. The `Verifier` sends each pact file's
+text unparsed (ADR 0063). Both need an engine with the `contract-text` capability, which the SDK's
+pinned engine has. An older engine named by `JANUS_ENGINE` fails `finalise`, saying so, rather than
+reporting a withheld contract.
+
 ## 0.1.1 (2026-10-31)
 
 The SDK runs janus-engine 0.4.3, where it ran 0.4.2: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.3) says what changed.

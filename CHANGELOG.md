@@ -1,3 +1,159 @@
+## 0.4.4 (2026-11-04)
+
+### Features
+
+#### `add-pact-interaction` takes a consumer library's pact_ffi calls
+
+A new operation, `consumer-session/add-pact-interaction` (ADR 0066), takes
+`{ session, pact: { specification?, steps } }`: the calls a consumer library built on `pact_ffi`
+makes to build one interaction, each `{ call, … }` named after the FFI function without its
+`pactffi_` prefix. The engine applies them as `pact_ffi` does, integration JSON, XML builder
+documents and multipart files included, then converts the interaction as `upgrade/pact` converts a
+pact's, and adds it to the session. It answers `{ handle, findings? }`, the conversion's findings
+pointing into the built interaction. Its one variant is `base`, pinning nothing, whatever policy is
+asked for; a mock serves it the interaction's own example, and the contract records that example, as
+`upgrade` does. A multipart boundary not given is derived from the part, not drawn at random. A step
+the engine does not make, or cannot read, is `interaction-invalid`, pointing at `/pact/steps/<n>`.
+The calls are pact-js's HTTP builders': `upon_receiving`, `given`, `given_with_params`,
+`with_request`, `with_query_parameter`, `with_header_v2`, `response_status_v2`, `with_body`,
+`with_binary_file`, `with_matching_rules` and `with_multipart_file_v2`.
+
+#### `add-pact-interaction` builds messages
+
+`consumer-session/add-pact-interaction` takes the `pact_ffi` calls pact-js's message builders make
+(staged plan S2.5c). A first step `new_async_message` or `new_message` begins an asynchronous message,
+and `new_sync_message_interaction` a synchronous one. `message_expects_to_receive`, `message_given`,
+`message_with_contents` (its contents as `body`, text, or `contents`, base64) and
+`message_with_metadata_v2` build them, and `upon_receiving`, `given`, `given_with_params`,
+`with_body`, `with_binary_file` and `with_matching_rules` apply to a message as `pact_ffi`'s message
+branches do. The message is converted as `upgrade/pact` converts one (ADR 0067), so `serve-variant`
+with no transport started answers its example as `parts`, and the contract records what
+`janus upgrade` writes from the pact the library would have written. A call for another kind of
+interaction is `interaction-invalid`, pointing at it, but for `message_with_metadata_v2` on a
+synchronous message, which `pact_ffi` ignores. A message body given as octets is still served as
+its base64 text, until S2.15.
+
+#### `engine/hello` declares `background`
+
+The engine runs a mock's exchange loop, a verification run and a broker publication beside the frame
+stream, on work its embedding provides (ADR 0062). `janus-engine` and `janus` provide threads, and
+their hello now declares the `background` capability. The offline WASM engine provides none. It
+declares no `background`, and answers `consumer-session/start-transport` and `verification/verify`
+with `component-unavailable` naming `background`, where it named the transport before. Nothing an
+SDK sends to `janus-engine` changes.
+
+#### A contract crosses the engine boundary as its text
+
+A host that declares the `contract-text` capability in its hello gets `consumer-session/finalise`'s
+and `upgrade/pact`'s contract as `contract-text`: the contract's canonical bytes as a string, its
+trailing LF included, in place of the `contract` document (ADR 0063, engine-protocol spec §8.9). A
+host that does not declare it gets the document, as before. Wherever a request carries a contract or
+a v1–v4 pact (`verification/verify`'s inline `contracts`, `upgrade/pact`'s `pact`,
+`subsumption/check`'s `contract`, `broker/publish-contracts`'s `contracts`), it may now carry the
+file's text, which the engine reads as it reads a file. Contract-file spec §2.4 now says how a number
+and a string are written. That is what the engine already wrote, pinned by `corpora/contracts/`.
+
+#### The engine's host writes the contract file, merging test files into one
+
+`consumer-session/finalise` takes `write: { path, mode? }` (ADR 0065). Behind the new
+`contract-writing` capability, which `janus-engine` declares, the engine writes the contract to the
+absolute `path` and answers `written` in place of `contract` or `contract-text`. With `mode: "merge"`,
+the default, it joins the file's interactions and the session's by identity (a description with its
+states) under an exclusive lock on the file, so test files run in separate workers or processes write
+one contract. An interaction recorded differently, or a file holding another consumer's or provider's
+contract, is the new `contract-conflict` error, naming each interaction, and the file is left as it
+was. `mode: "overwrite"` replaces the file. A withheld contract writes nothing.
+
+Every contract's interactions are now written in identity order: by description, then by states
+(contract-file spec §2.4). A contract with several interactions, recorded or upgraded, changes its bytes
+once, and `janus explain --index` counts in that order.
+
+#### A contract records messages, and a consumer session hands one to its test
+
+A Janus contract has a message form (ADR 0067): an interaction whose `transport.mode` is `emissive`,
+with a `message` part, `metadata` and `body`, and, for a synchronous message, a `request` part beside
+it. `janus upgrade` converts v3 messages and v4 asynchronous and synchronous messages into it, where
+it dropped them with `interaction-dropped`. Two new findings: `body-type-on-metadata`, when a
+message's metadata names no `contentType` and today's type check becomes a pattern there, and
+`responses-dropped`, when a synchronous message expects more than one response. A metadata
+`contentType` with no rule becomes `equality`, reported as `rule-narrowed`, as a header is.
+
+`janus verify` asks a contract's message of its `produce-message` hooks, as it asks a pact's, with
+the same `pact-message` request: the description, the provider states and a synchronous message's
+recorded request, without matching rules. A produced message's metadata `contentType` is read as its
+body's label, else its own, else what its octets are detected as.
+
+`consumer-session/serve-variant` for an emissive interaction, with no transport of its kind started,
+answers `{ parts }`: the variant's message, every part of it, a declared body encoded and labelled.
+The variant is exercised, and `report-variant` decides it. With a transport of its kind started it is
+`operation-unsupported`, until delivery through a transport is built (S6.2). A passive interaction's
+answer is `{}`, as before.
+
+#### A consumer test's mock serves HTTP/2, on hyper
+
+The HTTP transport's mock server is now hyper, on a thread and runtime of its own per mock
+(ADR 0062), where it was `tiny_http`. It serves HTTP/1.1 and HTTP/2 with prior knowledge, as today's
+Pact mock server does. A client that offers an upgrade is still answered over HTTP/1.1. A recorded
+`Content-Length` or `Transfer-Encoding` header is no longer served: the body served decides them.
+Nothing an SDK sends to `janus-engine` changes.
+
+#### A consumer test's verdict reaches the engine: `consumer-session/report-variant`
+
+A host reports the test's verdict on each variant once its closure ends, `passed` or `failed` with
+a `reason`, and the engine answers with that variant's result: its own verdict on the exchange and
+the test's together (ADR 0064, engine-protocol spec §8.2). A host learns in the test that ran a
+variant that its request did not match, or that nothing exercised the mock. A report waits for an
+exchange still being recorded and disarms the variant, so a later request finds nothing armed. A
+reported failure withholds the contract. A variant result carries the report as `test`.
+
+`engine/hello` declares `test-verdicts`. A host that declares it too reports every variant, and in
+its sessions an exercised variant with no report is `not-reported`, an `add-interaction` the
+session refused withholds the contract, and `finalise` lists the refusals as `refused`. A host that
+does not declare it gets the results it got before.
+
+#### The behavioural specification builds messages
+
+For an SDK maintainer: the behavioural specification gains `message`, `message-contents` and
+`message-request` (ADR 0068). A message is an interaction-spec document with `transport`
+`{ kind: message, mode: emissive }`, its `message` part, and a synchronous message's `request` part,
+each with `metadata` and `body`. A message's body always declares its type: `content`'s, else
+`application/json`. `execute` of a message sends no `start-transport`, and hands the closure the
+message `serve-variant` answers, its body as octets with its type and metadata, and a synchronous
+message's request. Nine conformance ids, with four translation cases, three scripted cases and one
+live case; the case format gains a message chain, the scripted engine's `served`, and a step's
+`received`.
+
+#### Several interactions armed at once, each for every call
+
+A transport now holds every interaction armed on it, and an arming lasts until its variant is
+reported, the handle is armed again, or the session ends (ADR 0069). Each arrival is matched against
+every arming and goes to one it matches, the most specific first: the one whose match passed the most
+plan actions, then the first armed. An arrival that matches none fails the arming it came closest to,
+and is rejected as a mismatch is now. Every call an arming takes is one more exchange of its variant,
+which fails if any of them failed. So a test that arms several interactions and then runs its client,
+or calls an interaction more than once, is served as today's mock server serves it. A host that
+served and called one variant at a time sees no difference, but for a second call under one variant,
+which is now served where it was refused.
+
+### Fixes
+
+#### Arming a variant again costs what arming a small one does
+
+`consumer-session/serve-variant` generated a variant's payload and compiled its request plan every
+time it armed it, and copied both into each transport. It now does that the first time a variant is
+armed, and every later arming shares it. Arming a variant of a 100 KB request went from about 20 ms
+to about 22 µs, and a small one from 12 µs to 4 µs. A generator still fills a fresh value each time a
+reply is served (ADR 0048), so what the mock answers and what a contract records do not change.
+
+#### The same interaction selects its variants in the same order every run
+
+`janus-ipog-v1` took the targets it had not yet covered in the order of a hashed set, which differs
+from run to run, so an interaction with several dimensions could select its covering variants in a
+different order on a different run, or in a different SDK. A contract records variants in the order
+they ran, so the same consumer test could record a contract with different bytes, and a broker
+would see a new version. Selection now takes the targets in the order variant-semantics spec §3.4
+states. A contract recorded before this may list its covering variants in another order, once.
+
 ## 0.4.3 (2026-10-31)
 
 ### Features
