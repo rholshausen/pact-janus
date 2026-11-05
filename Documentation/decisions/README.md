@@ -87,6 +87,7 @@ superseding ADR instead.
 | [0068](0068-build-a-message-with-its-own-builder-and-hand-the-closure-the-message-in-place-of-a-mock.md) | Build a message with its own builder, and hand the closure the message in place of a mock | accepted |
 | [0069](0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md) | Keep an arming until its variant is reported, and give an arrival to the arming it matches best | accepted |
 | [0070](0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md) | Port pact-jvm's Java DSL into the facade, and submit what it builds as `pact_ffi` calls | accepted |
+| [0071](0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md) | Compare a `Content-Type` as a media type, with the HTTP component's `http:media-type` | accepted |
 
 ## Decision backlog
 
