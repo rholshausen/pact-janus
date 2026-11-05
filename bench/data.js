@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793857602000,
+  "lastUpdate": 1793857604284,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -43152,6 +43152,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 21250,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "66c21a32c4463df0a57ff4c630912ce827b7264b",
+          "message": "docs: S2.5b is done\n\nconsumer-test-migration.md has a pact-jvm section with each primitive's\nverdict: the JUnit 5 extension and its annotations, the builders, and the\nmatchers, as the conversion decides them. The staged plan records S2.5b\ndone, and adds S2.17, found writing it: a v1-v4 rule read as a plugin's,\nsuch as pact-jvm's ignore-order, upgrades on an array to an each-like with\nno finding.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T16:40:55+11:00",
+          "tree_id": "1327edc097916b8098e70ada8fcf147fa2588f50",
+          "url": "https://github.com/rholshausen/pact-janus/commit/66c21a32c4463df0a57ff4c630912ce827b7264b"
+        },
+        "date": 1793857603502,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 35259,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29154,
             "unit": "requests per second",
             "extra": "engines 4"
           }
