@@ -630,7 +630,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   | `with_body` | `part`, `content_type?`, `body` |
   | `with_binary_file` | `part`, `content_type`, `body` (base64) |
   | `with_matching_rules` | `part`, `rules` |
-  | `with_binary_body` | `part`, `content_type?` (default `application/octet-stream`), `body` (base64) |
+  | `with_binary_body` | `part`, `content_type?` (default `application/octet-stream`), `content_type_header?` (default `true`), `body` (base64) |
   | `with_generators` | `part`, `generators` |
   | `with_multipart_file_v2` | `part`, `content_type`, `file`, `contents` (base64), `part_name?` (default `file`), `boundary?` |
   | `new_async_message`, `new_message` | `description` |
@@ -649,7 +649,8 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   apply to a message as the FFI's message branches do: a synchronous message's `response` body is
   one more response, and its `response` rules and generators reach every response so far.
   `with_binary_body` sets the octets as they stand, with no rule and no integration JSON read from
-  them, and `with_generators` merges generators by category as a pact writes them, so a library
+  them, and gives an HTTP part with no `Content-Type` header one, as the FFI does, unless
+  `content_type_header` is `false`, which types the body without one. `with_generators` merges generators by category as a pact writes them, so a library
   that builds its own rules, as pact-jvm's DSL does, sends what it built
   ([ADR 0070](../../decisions/0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md)). `message_with_contents` and `message_with_metadata_v2` apply
   to an asynchronous message, and a call for another kind of interaction is refused, but for

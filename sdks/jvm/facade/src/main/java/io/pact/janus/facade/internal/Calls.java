@@ -62,7 +62,8 @@ public final class Calls {
 
   /**
    * The body's octets as they stand, typed as given, else by the part's {@code Content-Type}, else as
-   * detected, which is the type pact-jvm writes the body with.
+   * detected, which is the type pact-jvm writes the body with. No {@code Content-Type} header is added:
+   * the part has every header pact-jvm gave it, and pact-jvm types a body it detects without one.
    */
   public Calls body(String part, OptionalBody body, Map<String, List<String>> headers) {
     if (body.isPresent() || body.isEmpty() && body.getContentType() != null) {
@@ -71,7 +72,7 @@ public final class Calls {
           .map(header -> header.getValue().get(0)).findFirst().orElse(null);
       String contentType = body.getContentType() != null ? body.getContentType()
           : declared != null ? declared : contentType(body);
-      call("with_binary_body", "part", part, "content_type", contentType,
+      call("with_binary_body", "part", part, "content_type", contentType, "content_type_header", false,
           "body", Base64.getEncoder().encodeToString(body.orEmpty()));
     }
     return this;

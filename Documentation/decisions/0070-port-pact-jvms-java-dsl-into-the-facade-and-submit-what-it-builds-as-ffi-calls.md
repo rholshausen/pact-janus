@@ -46,7 +46,11 @@ for the DSL itself.
    - `with_binary_body`, `{ part, content_type, body }`, `body` base64: the example's octets as
      pact-jvm writes them, with no integration JSON read from them and no rule added. pact-jvm's
      examples are plain values, so `with_body`'s processing would only misread a body that happens to
-     contain a `pact:matcher:type` member.
+     contain a `pact:matcher:type` member. As the FFI does, it gives an HTTP part with no
+     `Content-Type` header one, unless `content_type_header` is `false`. The facade always sends
+     `false`, since it sends every header pact-jvm's DSL set, and pact-jvm types a body it detects as
+     JSON without writing a header. *Amended 2026-11-05*: the member was added when the facade's
+     contracts were found to require a header pact-jvm's pacts do not name.
    - `with_generators`, `{ part, generators }`: the generators by category, as a pact writes them,
      merged into the part's as `with_matching_rules` merges rules.
 

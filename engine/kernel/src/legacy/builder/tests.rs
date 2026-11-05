@@ -481,6 +481,49 @@ fn a_binary_body_keeps_a_content_type_header_already_set() {
   );
 }
 
+/// pact-jvm's DSL types a body it detects as JSON without writing a `Content-Type` header, so its
+/// facade asks for none, and the body keeps its type.
+#[test]
+fn a_binary_body_can_be_typed_without_a_content_type_header() {
+  let interaction = build(&json!({ "specification": "V4", "steps": [
+    { "call": "upon_receiving", "description": "an order" },
+    { "call": "with_request", "method": "GET", "path": "/orders/1" },
+    { "call": "with_binary_body", "part": "response", "content_type": "application/json",
+      "content_type_header": false, "body": BASE64.encode(r#"{"id":1}"#) }
+  ] }))
+  .unwrap_or_else(|problems| panic!("{problems:?}"))
+  .to_json();
+  let response = &interaction["response"];
+  assert_eq!(response["headers"], Value::Null);
+  assert_eq!(response["body"]["contentType"], json!("application/json"));
+  assert_eq!(
+    comparable(interaction)["response"]["body"]["content"],
+    json!({ "id": 1 })
+  );
+}
+
+#[test]
+fn a_content_type_header_that_is_not_a_boolean_is_refused() {
+  let problems = build(&json!({ "steps": [
+    { "call": "upon_receiving", "description": "an order" },
+    { "call": "with_binary_body", "part": "response", "content_type_header": "no",
+      "body": BASE64.encode("{}") }
+  ] }))
+  .err()
+  .unwrap();
+  let said: Vec<(&str, &str)> = problems
+    .iter()
+    .map(|p| (p.pointer.as_str(), p.message.as_str()))
+    .collect();
+  assert_eq!(
+    said,
+    [(
+      "/pact/steps/1/content_type_header",
+      "'content_type_header' is \"no\", not true or false"
+    )]
+  );
+}
+
 #[test]
 fn a_message_takes_a_binary_body_and_generators() {
   let built = built_message(

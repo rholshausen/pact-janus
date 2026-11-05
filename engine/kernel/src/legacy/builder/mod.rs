@@ -355,11 +355,13 @@ enum Step {
     part: Part,
     rules: Map<String, Value>,
   },
-  /// `pactffi_with_binary_body`: octets as they stand, with no rule (ADR 0070).
+  /// `pactffi_with_binary_body`: octets as they stand, with no rule (ADR 0070). `header` is
+  /// whether an HTTP part with no `Content-Type` is given one, as the FFI gives it.
   WithBinaryBody {
     part: Part,
     content_type: Option<String>,
     body: Vec<u8>,
+    header: bool,
   },
   /// `pactffi_with_generators` (ADR 0070).
   WithGenerators {
@@ -414,6 +416,17 @@ impl Args<'_> {
     match self.step.get(name) {
       None | Some(Value::Null) => Ok(None),
       Some(_) => self.string(name).map(Some),
+    }
+  }
+
+  fn optional_bool(&self, name: &str) -> Result<Option<bool>, Problem> {
+    match self.step.get(name) {
+      None | Some(Value::Null) => Ok(None),
+      Some(Value::Bool(value)) => Ok(Some(*value)),
+      Some(other) => Err(problem(
+        &format!("{}/{name}", self.at),
+        &format!("'{name}' is {other}, not true or false"),
+      )),
     }
   }
 
@@ -516,6 +529,7 @@ impl Step {
         part: args.part()?,
         content_type: args.optional_string("content_type")?,
         body: args.octets("body")?,
+        header: args.optional_bool("content_type_header")?.unwrap_or(true),
       },
       "with_generators" => match args.value("generators")? {
         Value::Object(generators) => Step::WithGenerators {
@@ -657,6 +671,7 @@ impl Step {
           part,
           content_type,
           body,
+          ..
         },
         Building::Synchronous(message),
       ) => message_binary_body(synchronous_part(message, part), content_type, body),
@@ -787,9 +802,10 @@ impl Step {
         part,
         content_type,
         body,
+        header,
       } => match part {
-        Part::Request => with_binary_body(&mut built.request, content_type, body),
-        Part::Response => with_binary_body(&mut built.response, content_type, body),
+        Part::Request => with_binary_body(&mut built.request, content_type, body, header),
+        Part::Response => with_binary_body(&mut built.response, content_type, body, header),
       },
       Step::WithGenerators { part, generators } => match read_generators(generators) {
         Ok(generators) => match part {
@@ -848,11 +864,12 @@ fn binary_body(content_type: Option<String>, body: Vec<u8>) -> (OptionalBody, St
 }
 
 /// `pactffi_with_binary_body` for an HTTP part: the octets as they stand, and a `Content-Type`
-/// header unless the part has one. No rule is added.
-fn with_binary_body<P: Fields>(http: &mut P, content_type: Option<String>, body: Vec<u8>) {
+/// header unless the part has one or `header` is false, as pact-jvm's DSL gives a body its type
+/// without one. No rule is added.
+fn with_binary_body<P: Fields>(http: &mut P, content_type: Option<String>, body: Vec<u8>, header: bool) {
   let (body, content_type) = binary_body(content_type, body);
   *http.body_mut() = body;
-  if !http.has_header(CONTENT_TYPE) {
+  if header && !http.has_header(CONTENT_TYPE) {
     http
       .headers_mut()
       .insert(CONTENT_TYPE.to_string(), vec![content_type]);
