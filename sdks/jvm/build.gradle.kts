@@ -6,6 +6,12 @@ subprojects {
     mavenCentral()
   }
 
+  // Sources are UTF-8 on every system. The compilers' default is the platform's charset, which on
+  // Windows is cp1252, and reads a literal such as "Привет, café" as other characters.
+  tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+  tasks.withType<GroovyCompile>().configureEach { options.encoding = "UTF-8" }
+  tasks.withType<Javadoc>().configureEach { options.encoding = "UTF-8" }
+
   // What a release carries (ADR 0060 decision 4): each module as `janus-<project>`, its jar, sources
   // jar, Ivy descriptor and POM, in one flat directory, under the names a GitHub release serves them
   // by. Gradle reads them in place through an `ivy` repository whose pattern is the release's
