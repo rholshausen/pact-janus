@@ -74,6 +74,9 @@ pub struct Built {
   /// an `eachKey` rule converts to an `each-entry` whose values are open and whose least size is 0,
   /// from which no entry is generated.
   pub example: BTreeMap<String, ValuePart>,
+  /// Part -> each body's octets as the steps wrote them, which a mock serves where no generator
+  /// fills the body, as today's mocks serve a body as it was written (ADR 0066 decision 4).
+  pub written: BTreeMap<String, Vec<u8>>,
   pub findings: Vec<Finding>,
 }
 
@@ -90,7 +93,39 @@ enum Building {
   Synchronous(SynchronousMessage),
 }
 
+/// A body's octets, when it has any.
+fn octets_of(body: &OptionalBody) -> Option<Vec<u8>> {
+  match body {
+    OptionalBody::Present(bytes, _, _) => Some(bytes.to_vec()),
+    _ => None,
+  }
+}
+
 impl Building {
+  /// Each body's octets as the steps wrote them, by the contract part it becomes (ADR 0067): an HTTP
+  /// interaction's `request` and `response`, a message's `message`, and a synchronous message's
+  /// `request` and its first response's `message`.
+  fn written(&self) -> BTreeMap<String, Vec<u8>> {
+    let bodies = match self {
+      Building::Http(http) => vec![
+        ("request", octets_of(&http.request.body)),
+        ("response", octets_of(&http.response.body)),
+      ],
+      Building::Asynchronous(message) => vec![("message", octets_of(&message.contents.contents))],
+      Building::Synchronous(message) => vec![
+        ("request", octets_of(&message.request.contents)),
+        (
+          "message",
+          message.response.first().and_then(|r| octets_of(&r.contents)),
+        ),
+      ],
+    };
+    bodies
+      .into_iter()
+      .filter_map(|(part, octets)| octets.map(|octets| (part.to_string(), octets)))
+      .collect()
+  }
+
   fn to_json(&self) -> Value {
     match self {
       Building::Http(http) => http.to_json(),
@@ -181,6 +216,7 @@ fn build(pact: &Value) -> Result<Building, Vec<Problem>> {
 
 /// Upgrade the built interaction as a one-interaction v4 pact (ADR 0066 decision 3).
 fn convert(built: Building) -> Result<Built, Vec<Problem>> {
+  let written = built.written();
   let document = json!({
     "consumer": { "name": "consumer" },
     "provider": { "name": "provider" },
@@ -234,6 +270,7 @@ fn convert(built: Building) -> Result<Built, Vec<Problem>> {
   Ok(Built {
     spec: interaction.spec_document(),
     example,
+    written,
     findings,
   })
 }

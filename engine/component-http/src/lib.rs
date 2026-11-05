@@ -338,11 +338,17 @@ impl HttpTransport {
     let server = serve::Server::start(&req.instance, host, port)?;
     let bound_port = server.address.port();
 
+    // An IPv6 address is bracketed in a URL (RFC 3986 §3.2.2).
+    let authority = if host.contains(':') {
+      format!("[{host}]")
+    } else {
+      host.to_string()
+    };
     let endpoint = serde_json::json!({
       "kind": "http",
       "host": host,
       "port": bound_port,
-      "base-url": format!("http://{host}:{bound_port}"),
+      "base-url": format!("http://{authority}:{bound_port}"),
     });
 
     self.instances.lock().expect("instance lock poisoned").insert(

@@ -532,7 +532,7 @@ impl Engine {
         built_description(&req.pact),
         EngineError::interaction_invalid(&problems),
       ),
-      Ok(built) => match session.add_converted_interaction(&built.spec, &built.example) {
+      Ok(built) => match session.add_converted_interaction(&built.spec, &built.example, &built.written) {
         Ok(handle) if built.findings.is_empty() => return ResponseFrame::ok(id, json!({ "handle": handle })),
         Ok(handle) => return ResponseFrame::ok(id, json!({ "handle": handle, "findings": built.findings })),
         Err(AddInteractionError::Invalid(err)) => {

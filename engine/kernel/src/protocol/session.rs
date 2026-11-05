@@ -377,17 +377,31 @@ impl ConsumerSession {
     &mut self,
     interaction: &Value,
     example: &BTreeMap<String, contract::ValuePart>,
+    written: &BTreeMap<String, Vec<u8>>,
   ) -> Result<String, AddInteractionError> {
     let handle = self.add_interaction(interaction)?;
     let content = self.scope.content();
     if let Some(entry) = self.interactions.get_mut(&handle) {
-      // The example's slots as a mock serves them (`wire::served_slot`), over what the shapes
-      // generate: octets no component decodes are served as those octets (S2.15).
+      // The example's slots as a mock serves them, over what the shapes generate. A body no generator
+      // fills is served as the octets the library wrote, as today's mocks serve it (ADR 0066 decision
+      // 4, as amended); any other slot is decoded as a reply's is (`wire::served_slot`), so its
+      // generators can fill it fresh.
       let mut served = generate::interaction(&entry.spec, &Assignment::new());
       for (part, slots) in example {
         for (slot, value) in slots {
+          let generated_here = entry
+            .raw_parts
+            .get(part)
+            .and_then(|shapes| shapes.get(slot))
+            .is_some_and(crate::shape::fresh::has_generators);
+          let recorded = (!generated_here && slot == "body")
+            .then(|| written.get(part).cloned())
+            .flatten()
+            .map(Generated::Octets);
           let declared = declared_type(Some(&entry.content_types), part, slot);
-          if let Some(generated) = super::wire::served_slot(value, declared, content.as_deref()) {
+          if let Some(generated) =
+            recorded.or_else(|| super::wire::served_slot(value, declared, content.as_deref()))
+          {
             served
               .entry(part.clone())
               .or_default()

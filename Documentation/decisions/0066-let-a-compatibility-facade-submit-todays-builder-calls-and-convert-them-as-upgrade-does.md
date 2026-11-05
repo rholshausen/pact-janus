@@ -76,7 +76,10 @@ classifies `like(object)` as `dropped`, while `upgrade` converts the same rule f
    values. Shapes cannot always give the example back. An `eachKey` rule converts to an `each-entry`
    whose values are open and whose least size is 0, from which nothing is generated, and a pact's
    multipart request body has no shape at all. Recording the example means a verifier replays the
-   request today's verifier sends. A test that wants variants moves to the Janus DSL.
+   request today's verifier sends. A test that wants variants moves to the Janus DSL. *Amended
+   2026-11-05* (S2.5b): a body that no generator fills is served as the octets the library wrote, as
+   today's mocks serve it, rather than re-encoded from its document, since tests compare a reply's
+   text. A body a generator fills is still decoded, so the generator can fill it fresh.
 5. **A primitive's verdict is the conversion's.** For a facade built this way, SDK spec §6.1's three
    verdicts describe what the conversion does with the rule the old primitive writes. `kept`: the rule
    converts with no `lossy` or `judgement` finding. `adapted`: it converts with a `judgement`, which the

@@ -381,6 +381,44 @@ fn a_facade_reply_given_octets_is_served_those_octets() {
   assert_eq!(&response[head_end..], OCTETS);
 }
 
+/// ADR 0066 decision 4, as amended: a body no generator fills is served as the library wrote it, as
+/// today's mocks serve it, rather than re-encoded from its document.
+#[test]
+fn a_facade_reply_no_generator_fills_is_served_as_written() {
+  let (mut engine, session) = engine();
+  let started = send(
+    &mut engine,
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!(
+    "{}:{}",
+    endpoint["host"].as_str().unwrap(),
+    endpoint["port"].as_u64().unwrap()
+  );
+  let written = "{\"responsetest\": true, \"version\": \"v3\"}";
+  armed(
+    &mut engine,
+    &session,
+    json!({ "specification": "V4", "steps": [
+      { "call": "upon_receiving", "description": "a GET written by hand" },
+      { "call": "with_request", "method": "GET", "path": "/written" },
+      { "call": "response_status_v2", "status": "200" },
+      { "call": "with_binary_body", "part": "response", "content_type": "application/json", "body": BASE64.encode(written) }
+    ] }),
+  );
+
+  let mut stream = TcpStream::connect(&addr).unwrap();
+  stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+  let request = format!("GET /written HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+  stream.write_all(request.as_bytes()).unwrap();
+  let mut response = Vec::new();
+  let _ = stream.read_to_end(&mut response);
+  let head_end = response.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+  assert_eq!(String::from_utf8_lossy(&response[head_end..]), written);
+}
+
 #[test]
 fn a_step_the_engine_cannot_make_is_refused_pointing_at_it() {
   let (mut engine, session) = engine();
