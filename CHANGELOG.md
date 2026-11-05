@@ -1,3 +1,60 @@
+## 0.4.5 (2026-11-05)
+
+### Features
+
+#### `add-pact-interaction` takes `with_binary_body` and `with_generators`
+
+`consumer-session/add-pact-interaction` makes two more `pact_ffi` calls (ADR 0070, staged plan S2.5b).
+`with_binary_body` (`part`, `content_type?`, `body` as base64) sets a body's octets as they stand,
+with no rule added and no integration JSON read from them, and a `Content-Type` header unless the
+part has one or `content_type_header` is `false`. A message gets the octets' type in its metadata. `with_generators` (`part`, `generators`)
+merges generators by category, as a pact writes them, as `with_matching_rules` merges rules. Both
+apply to an HTTP interaction and to either kind of message, as the FFI's do. A library that builds
+its own rules, as pact-jvm's DSL does, sends what it built: its example, its rules and its generators.
+
+#### A `Content-Type` with no rule is compared as a media type in an upgraded contract
+
+The built-in HTTP component runs `http:media-type` (ADR 0071, staged plan S2.16): a value of the
+same type and subtype as its `type` member, in any case, with each of its parameters, other
+parameters allowed. `janus upgrade` and `add-pact-interaction` write a `Content-Type` with no matching
+rule as it, in a request, a response and a message's metadata, where they wrote `equality`, so a
+reply or request that adds a charset the pact does not name passes, as it does today. Such an
+interaction now requires the `http` component, which the native engines register; its finding is a
+`rule-narrowed` note rather than a judgement. A pact verified as a pact is unchanged.
+
+### Fixes
+
+#### `integer` and `decimal` read a number's kind from how it is written
+
+A number is an integer when it is written with no fraction or exponent and fits in a signed or
+unsigned 64-bit integer, and a decimal otherwise (ADR 0072, staged plan S1.38), as today's verifiers
+read a v1–v4 `integer` or `decimal` rule. `match:integer` and `match:decimal`, so the shapes
+`integer` and `decimal`, now refuse `100.0` and `100` respectively, where they decided by value and
+admitted them. A v1–v4 pact verifies as today's verifier verifies it, and so does the contract
+`janus upgrade` writes from it, and a mock built from either accepts what today's mock does. Equality is
+unchanged: `100` and `100.0` are one value. Subsumption's value membership and the provider-shape
+recorder read the same classification, so a recorded `100.0` is a `decimal`. A provider whose
+verification relied on the old reading, answering `100.0` to an `integer` shape, now fails it.
+
+#### A converted interaction's body is served as it was written
+
+An interaction from `add-pact-interaction` whose body no generator fills is served as the octets the
+library wrote, as today's mocks serve it, where it was re-encoded from its document: a JSON reply
+written with spaces keeps them (ADR 0066 decision 4, as amended). A body a generator fills is still
+decoded, so the generator fills it fresh. An HTTP mock started on an IPv6 address answers a
+`base-url` with the address in brackets, where it had none.
+
+#### A served example's octets are octets
+
+An example that is octets is served as those octets, where it was served as its base64 text
+(staged plan S2.15). A slot whose shape's example is tagged `base64` is generated as octets, so
+`serve-variant` answers a message's octets as a `base64` slot, an HTTP mock replies with them, and a
+recorded variant records them as `base64`, which a verifier replays as the octets themselves. An
+interaction from `add-pact-interaction` given a body no content component reads, recorded as
+`base64` or as UTF-8 `text`, is served as those octets too. A generator's fresh values are still
+filled everywhere else in the payload. Inside a document, such as a JSON body's member, a
+`base64` example is still its base64 text, since JSON has no bytes.
+
 ## 0.4.4 (2026-11-04)
 
 ### Features
