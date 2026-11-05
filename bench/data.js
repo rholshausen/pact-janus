@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793853374730,
+  "lastUpdate": 1793853376884,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -42090,6 +42090,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 29617,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2ff45e0c0a3954c14822885a1cdcfa63ca8f4a48",
+          "message": "fix: the benchmark's native engine registers the HTTP matcher\n\nS2.16 (ADR 0071) upgrades a Content-Type with no rule to the HTTP\ncomponent's http:media-type, so an upgraded contract requires the http\ncomponent. The benchmark's native embedding registered the HTTP transport\nbut not its matcher, and verify-corpus-small-upgraded failed every\ninteraction. It now registers it as cli/src/register.rs does.\n\nNo-Changeset: the benchmark harness ships in no release\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T15:30:59+11:00",
+          "tree_id": "5bd2794f7356854e4dbb52092bed7f22756eb4e8",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2ff45e0c0a3954c14822885a1cdcfa63ca8f4a48"
+        },
+        "date": 1793853376295,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28975,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20687,
             "unit": "requests per second",
             "extra": "engines 4"
           }
