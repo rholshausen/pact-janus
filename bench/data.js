@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793863080657,
+  "lastUpdate": 1793863082708,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -44214,6 +44214,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20787,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "7e23cb67072bc7de3ca1018a02c716b6ab17fd3a",
+          "message": "docs: the JVM SDK's release notes say how to install janus-facade\n\nThe \"Installing it\" section named only janus-bindings and janus-sdk. It now adds janus-facade to the\nGradle dependencies, says how a pact-jvm suite moves to it, and puts it last in Maven's install order.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T18:12:42+11:00",
+          "tree_id": "c31f6714ec7c459c5d639d9fda59754a139253aa",
+          "url": "https://github.com/rholshausen/pact-janus/commit/7e23cb67072bc7de3ca1018a02c716b6ab17fd3a"
+        },
+        "date": 1793863082077,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 64199,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 47117,
             "unit": "requests per second",
             "extra": "engines 4"
           }
