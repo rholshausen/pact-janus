@@ -156,10 +156,14 @@ jobs:
               echo
               echo 'dependencies {'
               echo "  testImplementation(\"io.pact.janus:janus-sdk:$VERSION\")"
+              echo '  // Or, for a suite written with pact-jvm'"'"'s consumer DSL, its port (ADR 0070):'
+              echo "  testImplementation(\"io.pact.janus:janus-facade:$VERSION\")"
               echo '}'
               echo '```'
               echo
-              echo "Maven installs \`janus-bindings-$VERSION.jar\` and then \`janus-sdk-$VERSION.jar\`, each with its POM:"
+              echo "A pact-jvm consumer suite moves to \`janus-facade\` by replacing \`au.com.dius.pact.\` with \`io.pact.janus.facade.\` in its imports. It depends on \`janus-sdk\`, so Gradle resolves both."
+              echo
+              echo "Maven installs \`janus-bindings-$VERSION.jar\`, then \`janus-sdk-$VERSION.jar\`, then \`janus-facade-$VERSION.jar\` if the suite uses it, each with its POM:"
               echo "\`mvn install:install-file -Dfile=janus-sdk-$VERSION.jar -DpomFile=janus-sdk-$VERSION.pom\`."
             fi
             echo
