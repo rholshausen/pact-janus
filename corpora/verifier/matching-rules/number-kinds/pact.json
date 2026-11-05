@@ -1,0 +1,177 @@
+{
+  "consumer": {
+    "name": "numbers-consumer"
+  },
+  "provider": {
+    "name": "numbers-provider"
+  },
+  "interactions": [
+    {
+      "description": "an amount written with a fraction",
+      "request": {
+        "method": "GET",
+        "path": "/amounts/fraction"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 19.99
+        },
+        "matchingRules": {
+          "body": {
+            "$.amount": {
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "an amount written without one",
+      "request": {
+        "method": "GET",
+        "path": "/amounts/whole"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 19.99
+        },
+        "matchingRules": {
+          "body": {
+            "$.amount": {
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "an amount written with an exponent",
+      "request": {
+        "method": "GET",
+        "path": "/amounts/exponent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 19.99
+        },
+        "matchingRules": {
+          "body": {
+            "$.amount": {
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a count written without a fraction",
+      "request": {
+        "method": "GET",
+        "path": "/counts/whole"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "count": 7
+        },
+        "matchingRules": {
+          "body": {
+            "$.count": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a count written with one",
+      "request": {
+        "method": "GET",
+        "path": "/counts/fraction"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "count": 7
+        },
+        "matchingRules": {
+          "body": {
+            "$.count": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a total written with a fraction",
+      "request": {
+        "method": "GET",
+        "path": "/totals/fraction"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "total": 7
+        },
+        "matchingRules": {
+          "body": {
+            "$.total": {
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

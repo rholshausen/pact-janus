@@ -1,0 +1,49 @@
+(
+  :"get an order's amounts" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/order'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
+        :"$.amount" (
+          %match:decimal (
+            $.response.body.amount
+          )
+        ),
+        :"$.count" (
+          %match:integer (
+            $.response.body.count
+          )
+        )
+      )
+    )
+  )
+)

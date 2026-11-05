@@ -10,6 +10,15 @@ use base64::Engine;
 use indexmap::IndexMap;
 use serde_json::{Number, Value};
 
+/// Whether a number is an integer, by how it was written (ADR 0072): with no fraction or exponent,
+/// and in a signed or unsigned 64-bit integer. Any other number is a decimal: `100.0`, `1e2`, `-0`.
+/// It is contract-file spec §2.4's classification, and the one today's verifiers read, since a
+/// number here is serde_json's, which keeps an integer as one and reads anything else as a double.
+/// Only the kind predicates ask it: to equality, `1` and `1.0` are one value.
+pub fn is_written_integer(n: &Number) -> bool {
+  n.is_i64() || n.is_u64()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum RuntimeValue {
   Absent,

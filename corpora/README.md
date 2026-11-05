@@ -20,7 +20,9 @@ readability:
   (staged plan S0.13) — the corpus's one case with no plan; and `member-order/`, members declared out
   of name order and compiled by name, with an example and a body that hold the same members in other
   orders compared as equal (ADR 0037); and `member-name-quoted/`, members whose names a path segment
-  cannot hold (a dot, a brace, a quote, no name at all), each resolved by a quoted segment (ADR 0047).
+  cannot hold (a dot, a brace, a quote, no name at all), each resolved by a quoted segment (ADR 0047). `number-kinds-as-written/` and its `-mismatch` twin are `integer` and `decimal` reading a
+  number's kind from how it is written, `100.0`, `1e2` and `-0` being decimals, while `equality` holds
+  `100` and `100.0` to be one value (ADR 0072).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
@@ -31,7 +33,8 @@ readability:
   `upgrade-binary-body/`, `upgrade-form-body/`, `upgrade-xml-body/`, `upgrade-multipart-body/` and their
   `-mismatch` twins are the body kinds that are not JSON, each in its component's document (ADR 0047).
   `upgrade-generated-request-slot/` and `upgrade-generated-response-slot/` carry generators on their
-  shapes, and admit a generated value where the example was (ADR 0048). `upgrade-message/` and its
+  shapes, and admit a generated value where the example was (ADR 0048). `upgrade-number-kinds/` and its `-mismatch` twin are a v4 `decimal` and `integer` rule, which
+  read how a number is written in the pact and in its contract alike (ADR 0072). `upgrade-message/` and its
   `-mismatch` twin are a v3 message and the emissive interaction it converts into, its metadata
   member by member and its contents a body (ADR 0067).
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies

@@ -1,0 +1,129 @@
+{
+  "description": "a v4 `decimal` and `integer` rule, and the contract `janus upgrade` converts them into, read a number's kind from how it is written, as today's verifier does: `100.0` is a decimal and `100` an integer (staged plan S1.38, ADR 0072) — plan-grammar spec section 4.4's two-path agreement",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get an order's amounts",
+          "request": {
+            "method": "GET",
+            "path": "/order"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "amount": 19.99,
+              "count": 7
+            },
+            "matchingRules": {
+              "body": {
+                "$.amount": {
+                  "matchers": [
+                    {
+                      "match": "decimal"
+                    }
+                  ]
+                },
+                "$.count": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order's amounts",
+      "parts": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/order",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "body": {
+            "members": {
+              "amount": {
+                "example": 19.99,
+                "shape": "decimal"
+              },
+              "count": {
+                "example": 7,
+                "shape": "integer"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "of": {
+                  "entries": [
+                    {
+                      "example": "application/json",
+                      "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                      "shape": "regex"
+                    }
+                  ],
+                  "shape": "array"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/json"
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/order",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {},
+    "$.response.body": {
+      "amount": 100.0,
+      "count": 100
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

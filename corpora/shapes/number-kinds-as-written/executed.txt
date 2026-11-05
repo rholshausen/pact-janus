@@ -1,0 +1,42 @@
+(
+  :"an order's amounts" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'count': 100, 'amount': 100.0, 'scaled': 100.0, 'zero': -0.0, 'total': 100.0, 'fixed': 100.0}
+        ) => BOOL(true),
+        :"$.amount" (
+          %match:decimal (
+            $.response.body.amount => 100.0
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.count" (
+          %match:integer (
+            $.response.body.count => 100
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.fixed" (
+          %match:equality (
+            $.response.body.fixed => 100.0,
+            100
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.scaled" (
+          %match:decimal (
+            $.response.body.scaled => 100.0
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.total" (
+          %match:number (
+            $.response.body.total => 100.0
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.zero" (
+          %match:decimal (
+            $.response.body.zero => -0.0
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

@@ -1,0 +1,35 @@
+{
+  "description": "`integer` and `decimal` read a number's kind from how it is written (staged plan S1.38, ADR 0072): `100` is an integer, and `100.0`, `1e2` and `-0` are decimals, while `number` admits both and `equality` holds `100` and `100.0` to be one value",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order's amounts",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "count": { "shape": "integer", "example": 100 },
+              "amount": { "shape": "decimal", "example": 100.0 },
+              "scaled": { "shape": "decimal", "example": 1e2 },
+              "zero": { "shape": "decimal", "example": -0 },
+              "total": { "shape": "number", "example": 100.0 },
+              "fixed": { "shape": "equality", "example": 100 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "count": 100,
+      "amount": 100.0,
+      "scaled": 1e2,
+      "zero": -0,
+      "total": 100.0,
+      "fixed": 100.0
+    }
+  },
+  "result": { "status": "matched" }
+}

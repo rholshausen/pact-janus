@@ -254,7 +254,8 @@ impl Profile {
           Value::String(_) => self.strings = true,
           Value::Bool(_) => self.booleans = true,
           Value::Number(number) => {
-            if number.as_f64().is_some_and(|n| n.fract() == 0.0) {
+            // By how it is written, so a recorded `100.0` is a decimal (ADR 0072).
+            if crate::plan::is_written_integer(number) {
               self.integers = true;
             } else {
               self.decimals = true;

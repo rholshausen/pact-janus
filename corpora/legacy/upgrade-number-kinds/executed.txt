@@ -1,0 +1,49 @@
+(
+  :"get an order's amounts" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/order',
+          '/order'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => ABSENT,
+          'application/json'
+        ) => BOOL(true),
+        :"$.amount" (
+          %match:decimal (
+            $.response.body.amount => 100.0
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.count" (
+          %match:integer (
+            $.response.body.count => 100
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

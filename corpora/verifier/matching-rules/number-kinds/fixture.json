@@ -1,0 +1,117 @@
+{
+  "description": "v3 `decimal`, `integer` and `number` rules read a number's kind from how it is written: `100.0`, `100.00` and `1e2` are decimals and not integers, `100` an integer and not a decimal, and `number` admits either",
+  "source": "staged plan S1.38; ADR 0072; pact_matching::json's Integer and Decimal rules (is_i64 or is_u64, and is_f64)",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/amounts/fraction"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"amount\":100.0}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/amounts/whole"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"amount\":100}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/amounts/exponent"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"amount\":1e2}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/counts/whole"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"count\":100}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/counts/fraction"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"count\":100.00}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/totals/fraction"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "text": "{\"total\":100.0}"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail",
+  "mutations": true
+}

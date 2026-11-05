@@ -1,0 +1,48 @@
+{
+  "description": "`integer` refuses a number written with a fraction or an exponent, whatever its value, and `decimal` one written without (staged plan S1.38, ADR 0072)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "an order's amounts",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "count": { "shape": "integer", "example": 100 },
+              "scaled": { "shape": "integer", "example": 100 },
+              "amount": { "shape": "decimal", "example": 100.0 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "count": 100.0,
+      "scaled": 1e2,
+      "amount": 100
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.amount",
+        "message": "Expected a decimal but got 100",
+        "action": "match:decimal"
+      },
+      {
+        "path": "$.response.body.count",
+        "message": "Expected an integer but got 100.0",
+        "action": "match:integer"
+      },
+      {
+        "path": "$.response.body.scaled",
+        "message": "Expected an integer but got 100.0",
+        "action": "match:integer"
+      }
+    ]
+  }
+}

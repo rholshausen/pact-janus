@@ -1209,8 +1209,9 @@ fn admits_value(node: &ShapeNode, value: &Value) -> Option<bool> {
     CoreShape::Kind(kind) => Some(match kind {
       ValueKind::String => value.is_string(),
       ValueKind::Number => value.is_number(),
-      ValueKind::Integer => value.as_f64().is_some_and(|n| n.fract() == 0.0),
-      ValueKind::Decimal => value.as_f64().is_some_and(|n| n.fract() != 0.0),
+      // By how the number is written, as the kind predicates read it (ADR 0072).
+      ValueKind::Integer => value.as_number().is_some_and(plan::is_written_integer),
+      ValueKind::Decimal => value.as_number().is_some_and(|n| !plan::is_written_integer(n)),
       ValueKind::Boolean => value.is_boolean(),
       ValueKind::Null => value.is_null(),
     }),

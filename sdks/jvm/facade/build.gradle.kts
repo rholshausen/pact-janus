@@ -58,12 +58,6 @@ tasks.test {
   }
   val pactsDir = pacts.get().asFile
   doFirst { pactsDir.deleteRecursively() }
-  filter {
-    // pact-jvm's tests that wait on an engine item, each with the item that closes it. Delete the line
-    // when the item lands, and the test runs.
-    // S1.38: 100.0 is a v1-v4 decimal by how it is written.
-    excludeTestsMatching("io.pact.janus.facade.consumer.junit5.OkHttpTest")
-  }
   when {
     namedEngine != null -> {
       environment("JANUS_ENGINE", namedEngine)

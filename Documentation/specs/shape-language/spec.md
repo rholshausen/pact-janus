@@ -338,8 +338,12 @@ expands the old recursive form into the explicit structural shape it means, whic
 transformation `janus upgrade` should be showing its work for (design 2.5).
 
 **Kind predicates.** `string`, `boolean` and `null` are unambiguous. For numbers: `number` admits any
-JSON number, `integer` admits a number with no fractional part, `decimal` admits a number written with
-one. Where a content component cannot distinguish lexical forms — a binary encoding with one numeric
+JSON number; `integer` and `decimal` read how it is written, as today's verifiers do
+([ADR 0072](../../decisions/0072-read-a-numbers-kind-from-how-it-is-written.md)). `integer` admits a
+number written with no fraction or exponent that fits in a signed or unsigned 64-bit integer, which is
+how contract-file spec §2.4 writes one; `decimal` admits every other number. So `100` is an integer,
+and `100.0`, `1e2` and `-0` are decimals, though `equality` holds `100` and `100.0` to be one value.
+The two partition `number`. Where a content component cannot distinguish lexical forms — a binary encoding with one numeric
 type — `decimal` degrades to `number`, and the component MUST say so rather than pretend; the
 comparability class is unaffected, since the domain is the decoded document.
 

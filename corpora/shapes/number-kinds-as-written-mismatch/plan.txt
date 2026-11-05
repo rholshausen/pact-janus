@@ -1,0 +1,26 @@
+(
+  :"an order's amounts" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$.amount" (
+          %match:decimal (
+            $.response.body.amount
+          )
+        ),
+        :"$.count" (
+          %match:integer (
+            $.response.body.count
+          )
+        ),
+        :"$.scaled" (
+          %match:integer (
+            $.response.body.scaled
+          )
+        )
+      )
+    )
+  )
+)

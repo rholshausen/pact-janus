@@ -20,7 +20,7 @@
 
 use super::model::{Literal, Node, NodeKind, Plan};
 use super::resolve::{ContentDetector, Resolver};
-use super::value::{RuntimeValue, navigate};
+use super::value::{RuntimeValue, is_written_integer, navigate};
 use crate::display::{Kind, Marked};
 use serde_json::Number;
 
@@ -1001,12 +1001,12 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
     "match:number" => match_kind(children, |v| matches!(v, RuntimeValue::Number(_)), "number"),
     "match:integer" => match_kind(
       children,
-      |v| matches!(v, RuntimeValue::Number(n) if is_integer(n)),
+      |v| matches!(v, RuntimeValue::Number(n) if is_written_integer(n)),
       "integer",
     ),
     "match:decimal" => match_kind(
       children,
-      |v| matches!(v, RuntimeValue::Number(n) if !is_integer(n)),
+      |v| matches!(v, RuntimeValue::Number(n) if !is_written_integer(n)),
       "decimal",
     ),
     "match:regex" => {
@@ -1651,10 +1651,6 @@ fn kind_of(value: &RuntimeValue) -> &'static str {
     RuntimeValue::Bytes(_) => "bytes",
     RuntimeValue::Entry { .. } => "entry",
   }
-}
-
-fn is_integer(n: &Number) -> bool {
-  n.is_i64() || n.is_u64() || n.as_f64().map(|f| f.fract() == 0.0).unwrap_or(false)
 }
 
 /// Structural equality with the shape language's numeric rule (shape spec §4.2): `1` and `1.0`

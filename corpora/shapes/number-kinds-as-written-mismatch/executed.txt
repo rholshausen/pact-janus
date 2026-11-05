@@ -1,0 +1,26 @@
+(
+  :"an order's amounts" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'count': 100.0, 'scaled': 100.0, 'amount': 100}
+        ) => BOOL(true),
+        :"$.amount" (
+          %match:decimal (
+            $.response.body.amount => 100
+          ) => ERROR(Expected a decimal but got 100)
+        ) => BOOL(false),
+        :"$.count" (
+          %match:integer (
+            $.response.body.count => 100.0
+          ) => ERROR(Expected an integer but got 100.0)
+        ) => BOOL(false),
+        :"$.scaled" (
+          %match:integer (
+            $.response.body.scaled => 100.0
+          ) => ERROR(Expected an integer but got 100.0)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)
