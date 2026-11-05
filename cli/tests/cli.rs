@@ -2190,7 +2190,14 @@ fn csv_component() -> String {
 
 /// A consumer's contract for the orders export: one interaction, one recorded variant, a body the
 /// interaction declares as `text/csv` (contract spec §5.5) and records as the document it decoded.
+/// Written once: tests that run at the same time all read it, and one rewriting it could truncate it
+/// under another.
 fn csv_contract() -> String {
+  static CONTRACT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+  CONTRACT.get_or_init(write_csv_contract).clone()
+}
+
+fn write_csv_contract() -> String {
   let path = temp("reporting.janus.json");
   let row = json!({ "id": "66", "status": "PENDING", "items": "1" });
   let document = json!({ "$format": "janus-contract/1",
