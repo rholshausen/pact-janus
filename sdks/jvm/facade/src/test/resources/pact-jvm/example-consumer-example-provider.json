@@ -1,0 +1,101 @@
+{
+  "consumer": {
+    "name": "example-consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.OkHttpTest.should_create_order(MockServer)",
+        "text": [
+
+        ]
+      },
+      "description": "a request to create an order",
+      "key": "6725b4ff",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "provider accepts an order"
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "amount": 100.0,
+            "customerId": "cust-123"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.customerId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/orders"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "orderId": "order-456",
+            "status": "CREATED"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.orderId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "example-provider"
+  }
+}

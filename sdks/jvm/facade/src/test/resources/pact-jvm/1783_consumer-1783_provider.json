@@ -1,0 +1,40 @@
+{
+  "consumer": {
+    "name": "1783_consumer"
+  },
+  "interactions": [
+    {
+      "description": "a JSON request without a charset",
+      "request": {
+        "body": {
+          "name": "\u041F\u0440\u0438\u0432\u0435\u0442, caf\u00E9"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/greeting"
+      },
+      "response": {
+        "body": {
+          "name": "\u041F\u0440\u0438\u0432\u0435\u0442, caf\u00E9"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "1783_provider"
+  }
+}

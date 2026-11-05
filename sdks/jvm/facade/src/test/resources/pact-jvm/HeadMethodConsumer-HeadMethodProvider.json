@@ -1,0 +1,35 @@
+{
+  "consumer": {
+    "name": "HeadMethodConsumer"
+  },
+  "interactions": [
+    {
+      "description": "HEAD request",
+      "key": "64bb1a57",
+      "pending": false,
+      "request": {
+        "method": "HEAD",
+        "path": "/v1/my/path"
+      },
+      "response": {
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+
+    ]
+  },
+  "provider": {
+    "name": "HeadMethodProvider"
+  }
+}

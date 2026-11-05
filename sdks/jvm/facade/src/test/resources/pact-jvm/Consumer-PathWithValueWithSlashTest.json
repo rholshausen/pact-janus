@@ -1,0 +1,28 @@
+{
+  "consumer": {
+    "name": "Consumer"
+  },
+  "interactions": [
+    {
+      "description": "a request with a slash in the path",
+      "request": {
+        "method": "GET",
+        "path": "/endpoint/Some%2FValue"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "PathWithValueWithSlashTest"
+  }
+}

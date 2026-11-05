@@ -1,0 +1,53 @@
+{
+  "consumer": {
+    "name": "v4_test_consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.V4HttpPactTest.runTest(MockServer)",
+        "text": [
+          "This is a comment",
+          "Another comment",
+          "This is also a comment"
+        ]
+      },
+      "description": "V4 PactProviderTest test interaction",
+      "key": "cbfd6e81",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "good state"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "responsetest": true,
+            "version": "v3"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "test_provider"
+  }
+}

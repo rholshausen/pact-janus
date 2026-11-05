@@ -52,13 +52,16 @@ for the DSL itself.
 
    The rules go as `with_matching_rules`, by category: `body`, `header`, `query`, `path`, `status` and
    `metadata`, as pact-jvm's DSL fills them.
-3. **The facade draws nothing at random.** Where pact-jvm draws an example at random, as
-   `stringMatcher(name, regex)`, `matchPath(regex)`, `matchHeader(name, regex)` and
-   `matchQuery(name, regex)` do when given no example, the call is refused by name and asks for one.
-   A random example would make every run record different bytes, and two runs merging into one
-   contract (ADR 0065) would conflict, as ADR 0066 decision 7 found for a multipart boundary. Where
-   pact-jvm puts a fixed example beside a random generator, as `integerType(name)` does with `100`, the
-   facade does the same: the generator is a generator, and a mock fills it fresh (ADR 0048).
+3. **The facade draws nothing at random.** Where pact-jvm draws an example at random from a regular
+   expression, as `stringMatcher(name, regex)`, `matchPath(regex)`, `matchHeader(name, regex)` and
+   `matchQuery(name, regex)` do when given no example, the facade draws it the way pact-jvm does, with
+   pact-jvm's own generator, but seeded by the pattern, so every run draws the same example. A random
+   example would make every run record different bytes, and two runs merging into one contract
+   (ADR 0065) would conflict, as ADR 0066 decision 7 found for a multipart boundary. Where pact-jvm
+   puts a fixed example beside a random generator, as `integerType(name)` does with `100`, the facade
+   does the same: the generator is a generator, and a mock fills it fresh (ADR 0048). *Amended
+   2026-11-05*: this decision first refused such a call. pact-jvm's own `consumer/junit5` tests make
+   three of them, so the tripwire below fired before any pilot did.
 4. **Migrating is one textual replacement.** The facade's classes keep pact-jvm's names and sub-packages
    under the prefix `io.pact.janus.facade.`: `au.com.dius.pact.consumer.dsl.PactDslJsonBody` is
    `io.pact.janus.facade.consumer.dsl.PactDslJsonBody`, and `au.com.dius.pact.core.model.annotations.Pact`
@@ -68,10 +71,13 @@ for the DSL itself.
    ships it under.
 5. **The JUnit 5 extension runs a test as pact-jvm's does, through the engine.** `PactConsumerTestExt`
    finds the `@Pact` methods `@PactTestFor` names, calls each with its builder, and runs the test in
-   one engine session. It adds each interaction, arms its one variant (ADR 0066 decision 4), starts
-   one HTTP transport per provider for an HTTP test, and hands the test what pact-jvm hands it: a
-   `MockServer` for each provider, or the messages, `List<Message>` or the `MessagePact`, served with no
-   transport (ADR 0067 decision 5). Then it reports the test's verdict for every variant (ADR 0064). A
+   one engine session per provider. It adds each interaction, arms its one variant (ADR 0066
+   decision 4), starts one HTTP transport per provider for an HTTP test, and hands the test what
+   pact-jvm hands it: a `MockServer` for each provider, or the messages, `List<Message>` or the
+   `MessagePact`. A message is served with no transport (ADR 0067 decision 5), which records it
+   exercised, and the test is handed the message as its builder built it, with its examples and their
+   own types, as pact-jvm hands it over. *Amended 2026-11-05*: it was first the message the engine
+   served, whose metadata had been through JSON, so a `10L` came back an `Integer`. Then it reports the test's verdict for every variant (ADR 0064). A
    test passes when pact-jvm's would: every interaction was called, and nothing the mock received was
    wanting. Otherwise it fails with pact-jvm's message. The contract is written with `finalise`'s
    `write` in merge mode (ADR 0065), to `<consumer>-<provider>.janus.json` in the directory pact-jvm
@@ -98,9 +104,9 @@ for the DSL itself.
 - **Keep pact-jvm's own package names.** Moving would be only a dependency change. But both jars on one
   classpath would split packages, and naming another project's packages is that project's decision.
   S2.9 makes it, when the SDK becomes pact-jvm's next major version.
-- **Draw a deterministic example from the regex.** The engine, or the facade, could derive an example
-  from the pattern. That is a regex generator the facade would own, or a call the FFI does not have.
-  Refusing asks the test for one line it should arguably have had already.
+- **Refuse a call with no example**, asking the test for one. It was this ADR's first decision, and it
+  failed three of pact-jvm's own tests. A seeded draw costs the test nothing and records the same
+  contract every run.
 
 ## Consequences
 
@@ -114,10 +120,10 @@ says so. It has to follow pact-jvm's DSL as that changes. The kernel tests repla
 drift shows up as a test failure.
 
 Committed to: the `io.pact.janus.facade.` prefix until S2.9, `with_binary_body` and `with_generators`
-in `add-pact-interaction`'s vocabulary, and refusing a random example.
+in `add-pact-interaction`'s vocabulary, and an example drawn from a pattern the same way every run.
 
 Not decided here: pact-jvm's Groovy, Spock and Kotlin DSLs, and its V4 `PactBuilder`, which are
 S2.5d's. They translate to the same calls.
 
-Tripwire: if pilot suites lean on random regex examples so much that the refusal costs more than one
-line per test, the facade derives a deterministic example from the pattern, and this ADR is amended.
+Tripwire: if a pilot suite depends on a random example being different on every run, the facade's
+seeded draw does not reproduce it, and decision 3 is revisited.

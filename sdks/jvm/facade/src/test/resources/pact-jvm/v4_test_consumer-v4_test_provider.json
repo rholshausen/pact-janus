@@ -1,0 +1,112 @@
+{
+  "consumer": {
+    "name": "v4_test_consumer"
+  },
+  "interactions": [
+    {
+      "contents": {
+        "content": {
+          "testParam1": "value1",
+          "testParam2": "value2"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "a test message",
+      "key": "c5ebc81a",
+      "matchingRules": {
+        "metadata": {
+          "destination": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "\\w+\\d+"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json",
+        "destination": "X001"
+      },
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "SomeProviderState"
+        }
+      ],
+      "transport": "http",
+      "type": "Asynchronous/Messages"
+    },
+    {
+      "comments": {
+        "text": [
+          "This is a comment",
+          "Another comment",
+          "This is also a comment"
+        ]
+      },
+      "description": "V4 PactProviderTest test interaction",
+      "key": "cbfd6e81",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "good state"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "responsetest": true,
+            "version": "v3"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ],
+          "test": [
+            "Example"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "test": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "notEmpty"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+
+    ]
+  },
+  "provider": {
+    "name": "v4_test_provider"
+  }
+}

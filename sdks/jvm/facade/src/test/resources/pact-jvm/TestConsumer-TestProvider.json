@@ -1,0 +1,51 @@
+{
+  "consumer": {
+    "name": "TestConsumer"
+  },
+  "interactions": [
+    {
+      "description": "a request for all animals",
+      "providerStates": [
+        {
+          "name": "is authenticated"
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": "Bearer token"
+        },
+        "method": "GET",
+        "path": "/animals/available"
+      },
+      "response": {
+        "status": 200
+      }
+    },
+    {
+      "description": "a request for all animals",
+      "providerStates": [
+        {
+          "name": "is not authenticated"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/animals/available"
+      },
+      "response": {
+        "status": 401
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "TestProvider"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "consumer": {
+    "name": "rest-fights"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.PactMultiProviderTest.helloVillains(MockServer)",
+        "text": [
+
+        ]
+      },
+      "description": "A hello request",
+      "key": "2ec6e2e8",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/hello/villain"
+      },
+      "response": {
+        "body": {
+          "content": "Hello Villains!",
+          "contentType": "text/plain",
+          "contentTypeHint": "DEFAULT",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "text/plain"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": ".+"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "rest-villains"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "consumer": {
+    "name": "ArticlesConsumer"
+  },
+  "interactions": [
+    {
+      "description": "retrieving article data",
+      "providerStates": [
+        {
+          "name": "Articles exist"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/articles.json"
+      },
+      "response": {
+        "body": {
+          "articles": [
+            {
+              "variants": {
+                "0032": {
+                  "description": "sample description"
+                }
+              }
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.articles": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.articles[*].variants": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "values"
+                }
+              ]
+            },
+            "$.articles[*].variants.*.description": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "retrieving article data",
+      "providerStates": [
+        {
+          "name": "No articles exist"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/articles.json"
+      },
+      "response": {
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 404
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "ArticlesProvider"
+  }
+}

@@ -5,3 +5,5 @@ rootProject.name = "pact-janus-jvm"
 
 include("bindings")
 include("sdk")
+// pact-jvm's consumer DSL over the engine (ADR 0070), its own jar so a user of the Janus DSL does not get it.
+include("facade")

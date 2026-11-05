@@ -1,0 +1,36 @@
+{
+  "consumer": {
+    "name": "HeadersWithParametersConsumer"
+  },
+  "interactions": [
+    {
+      "description": "retrieving header data",
+      "request": {
+        "headers": {
+          "Content-Security-Policy": "default-src: 'none'; frame-ancestors 'none'; base-uri 'self'",
+          "strict-transport-security": "max-age=3600; includeSubDomains; reload"
+        },
+        "method": "POST",
+        "path": "/path"
+      },
+      "response": {
+        "headers": {
+          "Content-Security-Policy": "default-src: 'none'; frame-ancestors 'none'; base-uri 'self'",
+          "strict-transport-security": "max-age=3600; includeSubDomains; reload"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "HeadersWithParametersProvider"
+  }
+}

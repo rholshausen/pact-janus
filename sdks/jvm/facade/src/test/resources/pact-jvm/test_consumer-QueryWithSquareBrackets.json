@@ -1,0 +1,60 @@
+{
+  "consumer": {
+    "name": "test_consumer"
+  },
+  "interactions": [
+    {
+      "description": "Get request with square brackets",
+      "request": {
+        "matchingRules": {
+          "$.query['identifier[other]']": {
+            "match": "regex",
+            "regex": "\\w{3}\\d{4}"
+          },
+          "$.query['principle_identifier[account_id]']": {
+            "match": "regex",
+            "regex": "\\d{4}"
+          }
+        },
+        "method": "GET",
+        "path": "/",
+        "query": "principle_identifier[account_id]=1234&identifier[other]=ABC1234"
+      },
+      "response": {
+        "status": 200
+      }
+    },
+    {
+      "description": "Put request with square brackets",
+      "request": {
+        "matchingRules": {
+          "$.query['identifier[other]']": {
+            "match": "regex",
+            "regex": "\\w{3}\\d{4}"
+          },
+          "$.query['principle_identifier[account_id]']": {
+            "match": "regex",
+            "regex": "\\d{4}"
+          }
+        },
+        "method": "PUT",
+        "path": "/",
+        "query": "principle_identifier[account_id]=1234&identifier[other]=ABC1234"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  },
+  "provider": {
+    "name": "QueryWithSquareBrackets"
+  }
+}

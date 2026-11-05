@@ -1,0 +1,97 @@
+{
+  "consumer": {
+    "name": "reservation-service"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.KotlinV4MessageTest.testPactForReservationBooking(V4Pact)"
+      },
+      "contents": {
+        "content": {
+          "name": "PURCHASE_STARTED",
+          "products": [
+            {
+              "availabilityId": "28e80c5987c6a242516ccdc004235b5e",
+              "productID": "1",
+              "productType": "FLIGHT"
+            }
+          ],
+          "purchaseId": "111"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "a purchase started message to book a reservation",
+      "key": "",
+      "matchingRules": {
+        "body": {
+          "$.name": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.products": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.products[*].availabilityId": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.products[*].productID": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.products[*].productType": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.purchaseId": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json"
+      },
+      "pending": false,
+      "type": "Asynchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "checkout-service"
+  }
+}

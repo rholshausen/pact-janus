@@ -68,7 +68,7 @@ subprojects {
 tasks.register<Sync>("releaseFiles") {
   group = "publishing"
   description = "Writes the files a JVM SDK release carries (ADR 0060 decision 4) to build/release/files."
-  val modules = listOf("bindings", "sdk")
+  val modules = listOf("bindings", "sdk", "facade")
   dependsOn(modules.map { ":$it:publishIvyPublicationToReleaseRepository" })
   dependsOn(modules.map { ":$it:generatePomFileForMavenPublication" })
   into(layout.buildDirectory.dir("release/files"))

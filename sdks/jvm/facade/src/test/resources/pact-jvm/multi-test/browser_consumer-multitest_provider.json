@@ -1,0 +1,110 @@
+{
+  "consumer": {
+    "name": "browser_consumer"
+  },
+  "interactions": [
+    {
+      "description": "existing user lookup",
+      "providerStates": [
+        {
+          "name": "An automation user with id: abcdefghijklmnop"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/some-service/user/abcdefghijklmnop"
+      },
+      "response": {
+        "body": {
+          "boolean": "true",
+          "firstname": "Brent",
+          "lastname": "Barker",
+          "password": "123456",
+          "username": "bbarke"
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a new user",
+      "providerStates": [
+        {
+          "name": "An env"
+        }
+      ],
+      "request": {
+        "body": {
+          "boolean": "true",
+          "firstname": "Brent",
+          "lastname": "Barker",
+          "password": "123456",
+          "username": "bbarke"
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/some-service/users"
+      },
+      "response": {
+        "headers": {
+          "Location": "http://localhost:8080/some-service/user/abcdefghijklmnop"
+        },
+        "matchingRules": {
+          "header": {
+            "Location": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "http(s)?://\\w+:\\d+//some-service/user/\\w{36}$"
+                }
+              ]
+            }
+          }
+        },
+        "status": 201
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "multitest_provider"
+  }
+}

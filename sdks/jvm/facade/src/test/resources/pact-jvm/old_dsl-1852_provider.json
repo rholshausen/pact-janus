@@ -1,0 +1,44 @@
+{
+  "consumer": {
+    "name": "old_dsl"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.AcceptHeaderTest.runOldDslTest(MockServer)",
+        "text": [
+
+        ]
+      },
+      "description": "get",
+      "key": "1143a4",
+      "pending": false,
+      "request": {
+        "headers": {
+          "accept": [
+            "application/json",
+            "application/*+json"
+          ]
+        },
+        "method": "GET",
+        "path": "/old_dsl"
+      },
+      "response": {
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "1852_provider"
+  }
+}

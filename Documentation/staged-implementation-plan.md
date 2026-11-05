@@ -1528,6 +1528,15 @@ SDK implements it, and the SDK specification covers only the consumer side.
     the test's stderr as it is, so an older engine's text is not logged at a level it never had. And
     an SDK whose release comes with an engine release waits for the pin, each SDK released on its own
     (ADR 0060 decision 7, amended).
+- **S1.38 A v1–v4 number's kind is how it is written** — **S**, found by S2.5b's `OkHttpTest`. Today's
+  verifiers and mocks call `100.0` a decimal and not an integer, by its JSON text. The engine calls it
+  an integer, since `1` and `1.0` are one value in the shape language (shape spec §4.2). So a provider
+  that answers `100.0` to a pact's `decimal` rule fails `janus verify` and passes today, and the facade's
+  mock refuses what pact-jvm's accepts. The legacy compiler compiles a v1–v4 `integer` and `decimal`
+  rule to a check on the number as written, which the document model keeps; the shape language's own
+  `integer` and `decimal` keep their meaning. An ADR decides it, with corpus cases on both sides.
+  *Exit:* S1.1's harness has a fixture whose provider answers `100.0` and `100` to `decimal` and
+  `integer` rules, with no entry for it; `OkHttpTest` runs on the facade once S2.16 has landed.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
@@ -1745,6 +1754,35 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     and use these DSLs run on the facade. Each records the contract `janus upgrade` writes from the
     pact pact-jvm wrote. Excepted are the tests that ask for TLS or name a mock server implementation,
     which are refused by name (ADR 0066 decision 6), and those S2.5d holds.
+    *Built so far (2026-11-05)*:
+    - `sdks/jvm/facade` is the facade's jar: pact-jvm's rule and generator model, the
+      `PactDslWithProvider` chain, `PactDslJsonBody`, `PactDslJsonArray`, both root values,
+      `PactXmlBuilder`, `FormPostBuilder`, `MessagePactBuilder` with `MetadataBuilder`, the
+      `LambdaDsl` classes (pact-jvm's own Java, its package changed) and `PactConsumerTestExt`. The
+      SDK's `Engine` lets it send frames. Its layer is budgeted at 9,600 code lines.
+    - 28 of pact-jvm's Java `consumer/junit5` test classes are ported with only their imports changed, beside
+      test-only stand-ins for pact-jvm's internal `SimpleHttp` and `JsonParser`. The
+      `compareContracts` task compares each contract they write with `janus upgrade` of the pact
+      pact-jvm 4.7.8 wrote (`src/test/resources/pact-jvm/`), as documents, and every one matches but
+      two, each recorded with its reason.
+    - Four tests wait on S2.16, and one of them on S1.38 too. The build excludes them, naming those
+      items.
+    - Not foreseen:
+      - pact-jvm hands a message test the message as its builder built it, with its examples and
+        their own types (a `10L` stays a `Long`), so the facade does too (ADR 0070 decision 5, as
+        amended).
+      - pact-jvm's own tests use regex matchers with no example, so the facade draws one from the
+        pattern as pact-jvm does, from a generator seeded by the pattern (ADR 0070 decision 3, as
+        amended).
+      - pact-jvm's mock serves a body as it was written, and tests compare its text, so a converted
+        interaction's body that no generator fills is served as the octets the library wrote
+        (ADR 0066 decision 4, as amended).
+      - pact-jvm's JSON type is Apache's `application/json; charset=UTF-8`, which most of its users'
+        clients send. The engine compares a `Content-Type` as written, so consumer tests fail that
+        pass today: S2.16 brings S3.3's media-type half and S3.4 forward.
+      - An IPv6 mock's `base-url` had no brackets.
+    - Left: S2.16 and S1.38, the pact-jvm section of `consumer-test-migration.md`, and the facade
+      jar in the JVM SDK's release check and release notes.
   - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
     message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
@@ -1784,6 +1822,15 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     `add-pact-interaction` calls. If it lands after S2.9, it lands in pact-jvm's repository.
     *Exit:* the rest of pact-jvm's `consumer/junit5` tests, and its Groovy and Spock consumer tests, run
     on the facade, but for those refused by name.
+- **S2.16 Content types compared as media types** — **M**, S3.3's media-type half and S3.4,
+  brought forward by S2.5b. pact-jvm's builders write `application/json; charset=UTF-8`, and most of
+  its users' clients send a `Content-Type` with a charset the pact does not name. Today's mocks and
+  verifiers compare it as a media type, and the engine compares it as written, so consumer tests that
+  pass today fail on the facade. `http:media-type` is S3.3's namespaced operator, which the HTTP
+  component contributes, and `upgrade` stops narrowing a pact's `Content-Type` to its text (S3.4).
+  List-valued headers stay in S3.3. An ADR decides the operator's semantics against today's mocks.
+  *Exit:* the four `consumer/junit5` tests S2.5b's build excludes for it run; the pact-js examples'
+  provider tests and S1.1's upgrade ledger lose their `Content-Type` entries.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -2000,7 +2047,8 @@ The RFC's answer to optional fields, delivered to users.
   `whenVariant` and `variantCases`, designed with the community, specified first, then implemented in
   both SDKs under the conformance suite.
 - **S3.3 `http:media-type` and list-valued headers** (finding 1) — **M**, as namespaced operators the
-  HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again.
+  HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again. The
+  media-type half moved to S2.16, brought forward by S2.5b; list-valued headers are this item.
   List-valued headers stay here rather than in stage 1a, deliberately, though S1.1's ledger carries a
   disagreement they account for (a repeated response header judged as one list). Treating header
   values as lists has broken users more than once across the Pact implementations, in issues and
@@ -2008,7 +2056,7 @@ The RFC's answer to optional fields, delivered to users.
   lists; HTTP/2 and later carry each field line separately and define field values precisely. So the
   semantics are specified per HTTP version, and checked against those reports, before they change.
 - **S3.4 `upgrade` without the media-type narrowing** — **S**. It already reports the narrowing; with
-  S3.3 it stops making it.
+  S3.3 it stops making it. Moved to S2.16, with S3.3's media-type half.
 - **S3.5 Variant failure reporting in each test framework** — **M**: one test per variant where the
   framework registers tests dynamically, a per-variant result list where it does not, and the exchange
   loop's match decision as an event a host can surface while the run is going (variant ergonomics
@@ -2219,6 +2267,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.2 | The consumer's test verdict and per-interaction results reaching the engine | findings 4, 5 |
 | S2.3 | Arming a variant recompiles its plan: cache per (handle, variant) | finding 28 |
 | S2.5 | The compatibility facade is an unbudgeted hand-written layer | thinness audit |
+| S1.38 | A v1–v4 `decimal` or `integer` rule decides by a number's value, not by how it is written | found by S2.5b |
+| S2.16 | A `Content-Type` is compared as written, not as a media type | S3.3 and S3.4, brought forward by S2.5b |
 | S2.5d | pact-jvm's Groovy, Spock and Kotlin DSLs and its V4 `PactBuilder` have no facade | split from S2.5b |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |

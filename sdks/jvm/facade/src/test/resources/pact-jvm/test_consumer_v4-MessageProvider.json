@@ -1,0 +1,152 @@
+{
+  "consumer": {
+    "name": "test_consumer_v4"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.V4AsyncMessageTest.test2(V4Pact)"
+      },
+      "contents": {
+        "content": {
+          "testParam1": "value3",
+          "testParam2": "value4"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "a test message",
+      "key": "7a924cf4",
+      "metadata": {
+        "contentType": "application/json"
+      },
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "SomeProviderState2"
+        }
+      ],
+      "type": "Asynchronous/Messages"
+    },
+    {
+      "comments": {
+        "testname": "au.com.dius.pact.consumer.junit5.V4AsyncMessageTest.test(AsynchronousMessage)"
+      },
+      "contents": {
+        "content": {
+          "testParam1": "value1",
+          "testParam2": "value2"
+        },
+        "contentType": "application/json",
+        "encoded": false
+      },
+      "description": "a test message",
+      "key": "c5ebc81a",
+      "matchingRules": {
+        "body": {
+          "$.testParam1": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "\\w+"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "destination": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "regex",
+                "regex": "\\w+\\d+"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/json",
+        "destination": "X001"
+      },
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "SomeProviderState"
+        }
+      ],
+      "type": "Asynchronous/Messages"
+    },
+    {
+      "description": "a test message",
+      "key": "c13464bf",
+      "pending": false,
+      "request": {
+        "contents": {
+          "content": {
+            "testParam1": "value1",
+            "testParam2": "value2"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.testParam1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\w+"
+                }
+              ]
+            }
+          },
+          "metadata": {
+            "destination": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\w+\\d+"
+                }
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "contentType": "application/json",
+          "destination": "X001"
+        }
+      },
+      "response": [
+        {
+          "contents": {
+            "content": {
+              "testParam1": "value3",
+              "testParam2": "value4"
+            },
+            "contentType": "application/json",
+            "encoded": false
+          },
+          "metadata": {
+            "contentType": "application/json"
+          }
+        }
+      ],
+      "type": "Synchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "MessageProvider"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "consumer": {
+    "name": "test-integration"
+  },
+  "interactions": [
+    {
+      "description": "valid configuration",
+      "request": {
+        "body": "text",
+        "headers": {
+          "Content-Type": "text/plain"
+        },
+        "method": "GET",
+        "path": "/config"
+      },
+      "response": {
+        "body": {
+          "data": "",
+          "status": "success"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "config-service"
+  }
+}

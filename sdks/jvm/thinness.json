@@ -44,7 +44,8 @@
       "sdk/src/main/java/io/pact/janus/sdk/Message.java",
       "sdk/src/main/java/io/pact/janus/sdk/MessageInteraction.java",
       "sdk/src/main/java/io/pact/janus/sdk/MessageSlots.java",
-      "sdk/src/main/java/io/pact/janus/sdk/ReceivedMessage.java"
+      "sdk/src/main/java/io/pact/janus/sdk/ReceivedMessage.java",
+      "sdk/src/main/java/io/pact/janus/sdk/Engine.java"
     ],
     "loopback": [
       "sdk/src/main/java/io/pact/janus/sdk/Loopback.java"
@@ -60,16 +61,21 @@
       "sdk/src/main/java/io/pact/janus/sdk/State.java",
       "sdk/src/main/java/io/pact/janus/sdk/ProvidesMessage.java"
     ],
+    "facade": [
+      "facade/src/main"
+    ],
     "tests": [
       "sdk/src/test",
       "bindings/src/test",
-      "release-check"
+      "release-check",
+      "facade/src/test"
     ]
   },
   "budgets": {
-    "idiomatic": 2300,
+    "idiomatic": 2400,
     "embedding": 600,
     "loopback": 100,
-    "integration": 280
+    "integration": 280,
+    "facade": 9600
   }
 }

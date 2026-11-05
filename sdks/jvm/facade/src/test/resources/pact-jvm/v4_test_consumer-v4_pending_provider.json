@@ -1,0 +1,68 @@
+{
+  "consumer": {
+    "name": "v4_test_consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "text": [
+          "Marking this as pending"
+        ]
+      },
+      "description": "Pending interaction",
+      "key": "72ee84f5",
+      "pending": true,
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "responsetest": true,
+            "version": "v3"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ],
+          "test": [
+            "Example"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "test": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "notEmpty"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+
+    ]
+  },
+  "provider": {
+    "name": "v4_pending_provider"
+  }
+}

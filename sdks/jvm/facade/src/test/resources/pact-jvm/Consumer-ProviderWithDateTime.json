@@ -1,0 +1,93 @@
+{
+  "consumer": {
+    "name": "Consumer"
+  },
+  "interactions": [
+    {
+      "description": "a request with some datetime info",
+      "request": {
+        "body": {
+          "datetime": "2000-02-01T00:00:00.000+11:00"
+        },
+        "generators": {
+          "body": {
+            "$.datetime": {
+              "format": "YYYY-MM-dd'T'HH:mm:ss.SSSXXX",
+              "type": "DateTime"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$.datetime": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "YYYY-MM-dd'T'HH:mm:ss.SSSXXX",
+                  "match": "timestamp"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/values"
+      },
+      "response": {
+        "body": {
+          "datetime": "2000-02-01T00:00:00.000+11:00"
+        },
+        "generators": {
+          "body": {
+            "$.datetime": {
+              "format": "YYYY-MM-dd'T'HH:mm:ss.SSSXXX",
+              "type": "DateTime"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$.datetime": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "YYYY-MM-dd'T'HH:mm:ss.SSSXXX",
+                  "match": "timestamp"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json(;\\s?charset=[\\w\\-]+)?"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.8"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "ProviderWithDateTime"
+  }
+}
