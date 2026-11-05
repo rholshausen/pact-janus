@@ -63,11 +63,11 @@ and `require("pact-janus/pact")` works as `import` does. Each `executeTest` star
 something, the test prints the engine's finding as a warning, prefixed `pact-janus:`, unless
 `logLevel` is `error`.
 
-One difference catches most suites, until S3.4. A header the test wrote without a matcher is compared
-as written. pact-js compared a `Content-Type` by its media type and parameters, so a provider that
-adds `; charset=utf-8` passed. Against the contract it fails. Write the header the provider sends, or
-a `regex` matcher for it. `janus upgrade` converts a pact's header the same way, and S1.1's upgrade
-ledger lists each example this affects.
+A `Content-Type` the test wrote without a matcher is compared as a media type, as pact-js compared it:
+a provider, or a consumer's client, that adds `; charset=utf-8` passes (S2.16, [ADR
+0071](decisions/0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md)).
+The contract says so with the HTTP component's `http:media-type`. Any other header the test wrote
+without a matcher is compared as written.
 
 ### The builders and their options
 
@@ -96,7 +96,7 @@ ledger lists each example this affects.
 | `PactV3`: `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, `withRequestBinaryFile`, `withResponseBinaryFile`, `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload`, `withRequestMatchingRules`, `withResponseMatchingRules`, `executeTest` | The same calls, in pact-js's order | kept |
 | Several interactions before one `executeTest`, or one interaction called twice | The same: `PactV3`'s `executeTest` serves every interaction added since the last, and `Pact`'s every one added since its last `executeTest`, each as often as the test calls it ([ADR 0069](decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md)). A request two interactions match goes to the more specific | kept |
 | `addAsynchronousInteraction()`: `given`, `expectsToReceive(description, builder)`, `withJSONContent`, `withMetadata`, `withMatchingRules`, `executeTest` | The same calls. `executeTest`'s function is handed the message, `{ contents: { content }, metadata }`, its JSON contents as their document and any other as text, and no mock is started ([ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)) | kept |
-| A message's `contentType` metadata | Compared as written, where pact-js compared it as a media type, until S3.4. A message that names none has its contents' type checked as today's verifier checks it | adapted |
+| A message's `contentType` metadata | Compared as a media type, as pact-js compared it (ADR 0071). A message that names none has its contents' type checked as today's verifier checks it | kept |
 | `withContent(contentType, buffer)` on a message, `MessageConsumerPact`'s `withBinaryContent` | The same calls: the test is handed the octets, as a `Buffer` | kept |
 | `addSynchronousInteraction(description)`: `given`, `withRequest(builder)`, `withResponse(builder)`, `withJSONContent`, `withContent`, `withMatchingRules`, `executeTest` | The same calls. `executeTest`'s function is handed `{ Request: { content }, Response: [{ content }] }`, each a `Buffer`, with each generator's fresh value, where pact-js handed the contents as written | adapted |
 | A synchronous message's response `withMetadata` | Accepted, no effect, as pact-js's: `pact_ffi` writes no synchronous message's metadata | kept |

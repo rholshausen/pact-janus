@@ -1,5 +1,6 @@
 //! The HTTP component's matcher half (component-interfaces spec §7.1, ADR 0057): `http:status-class`,
-//! the operator a v4 `statusCode` matcher becomes (contract-file spec §8.2). The kernel knows nothing
+//! the operator a v4 `statusCode` matcher becomes (contract-file spec §8.2), and `http:media-type`
+//! (ADR 0071, [`crate::media_type`]), the one a `Content-Type` with no rule becomes. The kernel knows nothing
 //! of statuses (shape spec §3.5), so the component that speaks HTTP is the one that says what a
 //! status class is.
 //!
@@ -17,9 +18,10 @@ pub const NAME: &str = "http";
 pub const STATUS_CLASS: &str = "http:status-class";
 
 /// Every action this component runs, as an embedding registers it.
-pub const ACTIONS: &[&str] = &[STATUS_CLASS];
+pub const ACTIONS: &[&str] = &[STATUS_CLASS, crate::media_type::MEDIA_TYPE];
 
-/// Runs `http:status-class`. Holds nothing: a status and its class are all it reads.
+/// Runs `http:status-class` and `http:media-type`. Holds nothing: a value and the operator's members
+/// are all it reads.
 #[derive(Debug, Default)]
 pub struct HttpMatcher;
 
@@ -109,6 +111,9 @@ fn as_status(value: &Value) -> Option<u16> {
 
 impl MatcherComponent for HttpMatcher {
   fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
+    if req.action == crate::media_type::MEDIA_TYPE {
+      return crate::media_type::apply(req.config.as_ref(), &req.values);
+    }
     if req.action != STATUS_CLASS {
       return Err(ComponentError::operation_unsupported(&req.action));
     }

@@ -243,7 +243,8 @@ Namespacing rules, matching the plan grammar's (design 2.4):
 
 The HTTP status matcher of today's model is the worked case: `status-code` is *not* a core operator,
 because the kernel knows nothing about HTTP. It arrives as `http:status-class`, contributed by the
-transport component that knows what a status class is.
+transport component that knows what a status class is. A `Content-Type` compared as a media type is the
+second: `http:media-type`, whose member `type` is the media type expected (ADR 0071).
 
 ### 3.6 Where shapes attach
 

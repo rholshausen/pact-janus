@@ -33,7 +33,8 @@ fn send(engine: &mut Engine, op: &str, body: Value) -> Value {
   serde_json::from_slice(&engine.dispatch(&serde_json::to_vec(&request).unwrap())).unwrap()
 }
 
-/// An engine past its handshake, with the JSON content component every embedding has: the contract
+/// An engine past its handshake, with the JSON content component every embedding has, and the HTTP
+/// matcher every native one has: the contract
 /// declares its JSON body, and `explain` checks a declared type as a run does (ADR 0050).
 fn engine() -> Engine {
   let mut engine = Engine::with_components(
@@ -41,6 +42,17 @@ fn engine() -> Engine {
     Some(std::sync::Arc::new(pact_janus_component_json::JsonContent::new())),
   );
   engine.register_background(std::sync::Arc::new(pact_janus_kernel::protocol::Threads));
+  // The HTTP component's matcher, as every native embedding registers it: the upgraded sample's
+  // `Content-Type` is its `http:media-type`, so the contract requires it (ADR 0071).
+  {
+    use pact_janus_component_http::status;
+    engine.register_matcher(
+      status::NAME,
+      "1.0.0",
+      status::ACTIONS,
+      std::sync::Arc::new(status::HttpMatcher::new()),
+    );
+  }
   let hello = send(
     &mut engine,
     "engine/hello",

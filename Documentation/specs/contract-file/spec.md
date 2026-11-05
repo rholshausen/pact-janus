@@ -552,6 +552,7 @@ slot, this position, this constraint", which is where a shape node goes.
 | `eachKey`, `eachValue` | `each-entry` over keys / values | each by the rule's own matchers. `eachKey` leaves the values open, since v1–v4 compare a member the pact names only when the reply has it (`rule-unmapped`). `eachValue` on a list is `each-like` with `min: 0` (ADR 0048) |
 | `arrayContains` | `contains` | |
 | `statusCode` | `http:status-class` | a component operator, not a core one — the kernel does not know what a status class is (shape spec §3.5). Its members are `class` (`information`, `success`, `redirect`, `client-error`, `server-error`, `non-error`, `error`) or `codes`, a list of statuses; the built-in HTTP component runs it ([ADR 0057](../../decisions/0057-the-http-component-runs-http-status-class-as-an-in-tree-matcher.md)) |
+| a `Content-Type` header, or a message's `contentType`, with no rule | `http:media-type` | a component operator, as `http:status-class` is: v1–v4 compare it as a media type, the same type and subtype and the pact's parameters, others allowed, and the shape language's own operators cannot say so. Its member `type` and its example are the pact's value; the interaction requires the built-in HTTP component, which runs it, and the finding is a `rule-narrowed` note ([ADR 0071](../../decisions/0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md)). Other headers with no rule are `equality`, which is a `rule-narrowed` judgement |
 
 **Bodies** are converted by their type, as the legacy compiler compares them ([ADR
 0047](../../decisions/0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md)).
@@ -580,8 +581,7 @@ A v3 message and a v4 asynchronous message become an emissive interaction with a
 v4 synchronous message one with a `request` part from its request and a `message` part from its first
 response; a second response is `responses-dropped`. The `kind` is the transport the pact names, else
 `message`. The metadata is an `object` with a member per key, by the key's rule, else `equality`; a
-`contentType` with no rule is `equality` where v1–v4 compare it as a MIME type, which is `rule-narrowed`,
-as a header is. The contents are converted as a body of their type is, above. Today's check that the
+`contentType` with no rule is `http:media-type`, as a header's is (below). The contents are converted as a body of their type is, above. Today's check that the
 produced message's type agrees with the pact's is on the metadata's `contentType`: the pact's own when
 it names one, else an `optional` pattern that admits what the check admits (`body-type-on-metadata`).
 A verifier reads a produced message's `contentType` as today's verifier reads its type: the body's
@@ -634,7 +634,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `example-frozen-as-equality` | `note` | a position had no rule, so its example became an `equality` constraint |
 | `rule-unmapped` | `lossy` | no shape equivalent, including unresolvable `AND` combinations |
 | `rule-combination-or` | `lossy` | `combine: "OR"` the shape language cannot name |
-| `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator, or what v1–v4 compare loosely became exact: a header with no rule, a group of XML children or multipart parts the reply may have more of (ADR 0047) |
+| `rule-narrowed` | `judgement` | a rule mapped onto a strictly narrower operator, or what v1–v4 compare loosely became exact: a header with no rule, a group of XML children or multipart parts the reply may have more of (ADR 0047). A `note` when a rule, or a `Content-Type` with none, became a component's operator, which the interaction now requires (ADR 0057, ADR 0071) |
 | `generator-dropped` | `lossy` | a generator no component provides, one today's verifier does not apply, or one whose path names no position of the converted shape |
 | `request-body-opened` | `lossy` | a request body was an object, a form or XML: v1–v4 close it to unnamed members, names, attributes and children, shapes cannot (ADR 0007) |
 | `response-body-opened` | `lossy` | a response form, or an XML element a type rule reaches the children of: v1–v4 close it to names or children the pact does not have, shapes cannot (ADR 0047) |

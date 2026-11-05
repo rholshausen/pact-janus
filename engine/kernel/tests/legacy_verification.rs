@@ -60,6 +60,17 @@ fn engine_with_everything() -> Engine {
   engine.register_content(Arc::new(pact_janus_component_text::TextContent::new()));
   engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
   engine.register_content(Arc::new(pact_janus_component_multipart::MultipartContent::new()));
+  // The HTTP component's matcher, as the native embeddings register it: an upgraded contract's
+  // `Content-Type` is its `http:media-type` (ADR 0071), and a v4 status class its `http:status-class`.
+  {
+    use pact_janus_component_http::status;
+    engine.register_matcher(
+      status::NAME,
+      "1.0.0",
+      status::ACTIONS,
+      Arc::new(status::HttpMatcher::new()),
+    );
+  }
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));

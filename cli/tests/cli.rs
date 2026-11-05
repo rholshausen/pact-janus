@@ -1309,8 +1309,10 @@ fn upgrade_writes_canonical_bytes_and_reports_its_findings() {
     !findings.contains("generator-dropped"),
     "this pact has no generators to lose: {findings}"
   );
-  assert!(findings.contains("JUDGEMENT"), "{findings}");
+  // Its `Content-Type` is compared as a media type, as the pact's is: a note, not a judgement (ADR 0071).
+  assert!(!findings.contains("JUDGEMENT"), "{findings}");
   assert!(findings.contains("rule-narrowed"), "{findings}");
+  assert!(findings.contains("http:media-type"), "{findings}");
   assert!(findings.contains("NOTE"), "{findings}");
 
   // A pact's generators are carried onto the shapes, naming the built-in `pact` component (staged

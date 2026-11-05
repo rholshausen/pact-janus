@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pact, SpecificationVersion, Verifier } from "../../src/facade/pact.js";
-import { contractDir, corpusPact, failsOnlyOnMediaType, json, recorded, serve, shapes, upgraded, type Provider } from "./support.js";
+import { contractDir, corpusPact, json, recorded, serve, shapes, upgraded, type Provider } from "./support.js";
 
 /** examples/multipart/consumer.ts, on fetch and FormData. */
 async function uploadFile(baseUrl: string, filePath: string, fieldName: string): Promise<{ success: boolean }> {
@@ -93,7 +93,8 @@ describe("UploadProvider", () => {
     expect(result.status).toBe("verified");
   }, 30_000);
 
-  it("verifies the contract the consumer test recorded, but for S3.4's Content-Type", async () => {
-    await failsOnlyOnMediaType(verifier(join(dir, contract)).verifyProvider(), 1);
+  it("verifies the contract the consumer test recorded", async () => {
+    const result = await verifier(join(dir, contract)).verifyProvider();
+    expect(result.status).toBe("verified");
   }, 30_000);
 });

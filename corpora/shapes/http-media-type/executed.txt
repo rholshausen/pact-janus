@@ -1,0 +1,26 @@
+(
+  :"get an order" (
+    :response (
+      :headers (
+        %expect:object (
+          $.response.headers => {'content-type': ['Application/JSON; charset=UTF-8']}
+        ) => BOOL(true),
+        :"$.content-type" (
+          %expect:array (
+            $.response.headers.content-type => ['Application/JSON; charset=UTF-8']
+          ) => BOOL(true),
+          %expect:count (
+            $.response.headers.content-type => ['Application/JSON; charset=UTF-8'],
+            1
+          ) => BOOL(true),
+          :"$.content-type[0]" (
+            %http:media-type (
+              $.response.headers.content-type[0] => 'Application/JSON; charset=UTF-8',
+              {'type': 'application/json'}
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

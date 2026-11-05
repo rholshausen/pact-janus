@@ -1,0 +1,50 @@
+{
+  "description": "`http:media-type` refuses a value of another type, saying what it expected (staged plan S2.16, ADR 0071): the built-in HTTP component runs it, as the native engine registers it",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "response": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "content-type": {
+                "shape": "array",
+                "entries": [
+                  {
+                    "shape": "http:media-type",
+                    "type": "application/json; charset=UTF-8",
+                    "example": "application/json; charset=UTF-8"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.headers": {
+      "content-type": [
+        "application/json; charset=ISO-8859-1"
+      ]
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.headers.content-type[0]",
+        "message": "Expected a media type matching 'application/json; charset=UTF-8' but was \"application/json; charset=ISO-8859-1\"",
+        "action": "http:media-type"
+      }
+    ]
+  }
+}

@@ -26,9 +26,9 @@
 //! `kernel-boundary-review.md`'s findings 3 and 6 asked that the module tree say so (S1.11).
 
 use super::compile::{
-  LegacyBody, LegacyPart, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text, anchored_pattern,
-  best_rule, definition_rules, each_value_category, form_parameters, is_whole_equality, namespace_of,
-  only_element, rerooted, rules_for, status_class, type_rule_names, type_rule_reaches,
+  LegacyBody, LegacyPart, MEDIA_TYPE, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text,
+  anchored_pattern, best_rule, definition_rules, each_value_category, form_parameters, is_whole_equality,
+  namespace_of, only_element, rerooted, rules_for, status_class, type_rule_names, type_rule_reaches,
 };
 use super::multipart as legacy_multipart;
 use super::pact::{
@@ -625,7 +625,7 @@ impl Conversion {
       let category = rules_for(rules, "query");
       part.insert(
         "query".to_string(),
-        self.multi_map_slot(category.as_ref(), &query, false, &query_where),
+        self.multi_map_slot(category.as_ref(), &query, false, &query_where, None),
       );
     }
     let body = self.headers_and_body(
@@ -714,7 +714,7 @@ impl Conversion {
       source: format!("{source}/metadata"),
       target: format!("{target}/metadata"),
     };
-    let mut metadata = self.metadata_slot(message, &metadata_at);
+    let mut metadata = self.metadata_slot(message, &metadata_at, decl);
     if let Some(body) = &body
       && let Some(checked) = &body.checked_type
       && !message
@@ -764,34 +764,38 @@ impl Conversion {
   /// A message's metadata, one member per key the pact names, each by its rule, else as `equality`,
   /// as today's verifier compares them key by key. A `contentType` with no rule is compared by
   /// v1–v4 as a MIME type, as a header value is, which `equality` narrows (ADR 0067 decision 3).
-  fn metadata_slot(&mut self, message: &MessageContents, at: &Where) -> Option<Value> {
+  fn metadata_slot(
+    &mut self,
+    message: &MessageContents,
+    at: &Where,
+    decl: &mut Declarations,
+  ) -> Option<Value> {
     if message.metadata.is_empty() {
       return None;
     }
     let category = rules_for(&message.matching_rules, "metadata");
     let keys: BTreeMap<&String, &Value> = message.metadata.iter().collect();
     let mut members = Map::new();
-    let mut narrowed = false;
+    let mut media_type = false;
     for (key, example) in keys {
       let escaped = escape_pointer(key);
       let member = at.push(&format!("/{escaped}"), &format!("/members/{escaped}"));
       let fragments = vec!["$".to_string(), key.clone()];
       let list = best_rule(category.as_ref(), &fragments, false);
-      narrowed |= list.is_none()
-        && (key.eq_ignore_ascii_case("contenttype") || key.eq_ignore_ascii_case("content-type"));
+      // A `contentType` with no rule is a media type, as v1–v4 compare it (ADR 0071).
+      if list.is_none()
+        && (key.eq_ignore_ascii_case("contenttype") || key.eq_ignore_ascii_case("content-type"))
+        && let Value::String(text) = example
+      {
+        media_type = true;
+        members.insert(key.clone(), media_type_shape(text));
+        continue;
+      }
       let shape = self.shape_for(list.map(|(list, _)| list), example, &member, Text::of(example));
       members.insert(key.clone(), shape);
     }
-    if narrowed {
-      self.finding(Finding::at(
-        "rule-narrowed",
-        "judgement",
-        at,
-        "the metadata's contentType has no matching rule and became an exact `equality` \
-         constraint; v1–v4 compared it as a MIME type, as they compare a header, and the shape \
-         language has no operator for that comparison yet"
-          .to_string(),
-      ));
+    if media_type {
+      self.media_type_written(at, decl);
     }
     Some(json!({ "shape": "object", "members": members }))
   }
@@ -818,7 +822,7 @@ impl Conversion {
     });
     let mut slot = headers
       .filter(|headers| !headers.is_empty())
-      .map(|headers| self.headers_slot(rules, headers, &headers_at));
+      .map(|headers| self.headers_slot(rules, headers, &headers_at, decl));
     let body = self.body_slot(http, rules, part_name, &Where::slot(at, part_name, "body"));
     if let Some(body) = &body
       && !named
@@ -835,6 +839,21 @@ impl Conversion {
     decl.body(part_name, &body);
     part.insert("body".to_string(), body.shape);
     Some(body.kind)
+  }
+
+  /// A `Content-Type` became `http:media-type` (ADR 0071): the interaction requires the HTTP
+  /// component, which a verifier reports by name if it is not loaded, and the finding says so.
+  fn media_type_written(&mut self, at: &Where, decl: &mut Declarations) {
+    decl.require("http");
+    self.finding(Finding::at(
+      "rule-narrowed",
+      "note",
+      at,
+      "the Content-Type with no matching rule became the component operator 'http:media-type', \
+       which compares it as a media type, as v1–v4 do; the interaction now requires the 'http' \
+       component, which a verifier reports by name if it is not loaded"
+        .to_string(),
+    ));
   }
 
   /// `status`, with the one component operator contract-file spec §8.2's table names: a v4
@@ -892,6 +911,7 @@ impl Conversion {
     rules: &MatchingRules,
     headers: &std::collections::HashMap<String, Vec<String>>,
     at: &Where,
+    decl: &mut Declarations,
   ) -> Value {
     let headers: BTreeMap<String, Vec<String>> = headers
       .iter()
@@ -899,7 +919,11 @@ impl Conversion {
       .collect();
     let before = self.findings.len();
     let category = rules_for(rules, "header");
-    let slot = self.multi_map_slot(category.as_ref(), &headers, true, at);
+    let mut media_type = false;
+    let slot = self.multi_map_slot(category.as_ref(), &headers, true, at, Some(&mut media_type));
+    if media_type {
+      self.media_type_written(at, decl);
+    }
     if self.findings[before..]
       .iter()
       .any(|f| f.code == "example-frozen-as-equality")
@@ -926,7 +950,9 @@ impl Conversion {
     entries: &BTreeMap<String, Vec<String>>,
     case_insensitive: bool,
     at: &Where,
+    media_types: Option<&mut bool>,
   ) -> Value {
+    let mut media_types = media_types;
     let mut members = Map::new();
     for (name, values) in entries {
       let escaped = escape_pointer(name);
@@ -937,6 +963,15 @@ impl Conversion {
         let list = best_rule(category, &fragments, case_insensitive);
         let example = Value::String(value.clone());
         let entry = member.push(&format!("/{index}"), &format!("/entries/{index}"));
+        // A `Content-Type` with no rule is a media type, as v1–v4 compare it (ADR 0071).
+        if list.is_none()
+          && name.eq_ignore_ascii_case("content-type")
+          && let Some(written) = media_types.as_deref_mut()
+        {
+          *written = true;
+          shapes.push(media_type_shape(value));
+          continue;
+        }
         shapes.push(self.shape_for(list.map(|(list, _)| list), &example, &entry, Text::Yes));
       }
       members.insert(name.clone(), json!({ "shape": "array", "entries": shapes }));
@@ -1091,7 +1126,7 @@ impl Conversion {
           },
           OPENED_NAMES,
         );
-        let shape = self.multi_map_slot(category.as_ref(), &form_parameters(form), false, at);
+        let shape = self.multi_map_slot(category.as_ref(), &form_parameters(form), false, at, None);
         ConvertedBody::declared(shape, &content_type.to_string(), "form", BodyKindShaped::Form)
       }
       (_, LegacyBody::Xml(document)) => {
@@ -1779,7 +1814,7 @@ impl Conversion {
           },
           OPENED_NAMES,
         );
-        self.multi_map_slot(rules, &form_parameters(form), false, at)
+        self.multi_map_slot(rules, &form_parameters(form), false, at, None)
       }
       LegacyBody::Xml(document) => {
         if closed {
@@ -2591,6 +2626,11 @@ fn text_pattern(rule: &MatchingRule) -> Option<&'static str> {
     MatchingRule::Boolean => Some(BOOLEAN_TEXT),
     _ => None,
   }
+}
+
+/// A `Content-Type` value as `http:media-type` (ADR 0071): its `type` and its example are the pact's.
+fn media_type_shape(value: &str) -> Value {
+  json!({ "shape": MEDIA_TYPE, "type": value, "example": value })
 }
 
 /// A pattern for a `Content-Type` that `legacy:body-type` finds agrees with `expected`: the same type

@@ -1,0 +1,43 @@
+{
+  "description": "`http:media-type` admits a value of its type that adds a parameter it does not name, as v1–v4 compare a Content-Type, which is what `janus upgrade` writes for one with no rule (staged plan S2.16, ADR 0071); the built-in HTTP component runs it, as the native engine registers it",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "response": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "content-type": {
+                "shape": "array",
+                "entries": [
+                  {
+                    "shape": "http:media-type",
+                    "type": "application/json",
+                    "example": "application/json"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.response.headers": {
+      "content-type": [
+        "Application/JSON; charset=UTF-8"
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

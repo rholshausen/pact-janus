@@ -1,0 +1,26 @@
+(
+  :"get an order" (
+    :response (
+      :headers (
+        %expect:object (
+          $.response.headers => {'content-type': ['application/json; charset=ISO-8859-1']}
+        ) => BOOL(true),
+        :"$.content-type" (
+          %expect:array (
+            $.response.headers.content-type => ['application/json; charset=ISO-8859-1']
+          ) => BOOL(true),
+          %expect:count (
+            $.response.headers.content-type => ['application/json; charset=ISO-8859-1'],
+            1
+          ) => BOOL(true),
+          :"$.content-type[0]" (
+            %http:media-type (
+              $.response.headers.content-type[0] => 'application/json; charset=ISO-8859-1',
+              {'type': 'application/json; charset=UTF-8'}
+            ) => ERROR(Expected a media type matching 'application/json; charset=UTF-8' but was "application/json; charset=ISO-8859-1")
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

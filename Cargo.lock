@@ -2364,6 +2364,7 @@ dependencies = [
  "pact_janus_http_client",
  "pact_janus_kernel",
  "pretty_assertions",
+ "rstest",
  "serde_json",
  "tokio",
  "tracing",

@@ -554,6 +554,10 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, 
 /// built-in HTTP component's, which this layer may name because a v1–v4 pact is HTTP.
 pub(crate) const STATUS_CLASS: &str = "http:status-class";
 
+/// The component operator a `Content-Type` with no rule becomes in an upgraded contract (ADR 0071):
+/// the built-in HTTP component's media-type comparison, which `legacy:header-value` makes of a pact.
+pub(crate) const MEDIA_TYPE: &str = "http:media-type";
+
 /// What `http:status-class` reads, as the compiled plan and an upgraded contract both write it
 /// (ADR 0057): `class`, one of the seven classes by its lower-case name, or `codes`, the statuses
 /// allowed.

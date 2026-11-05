@@ -6,7 +6,7 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Matchers, Pact, SpecificationVersion, Verifier } from "../../src/facade/pact.js";
-import { contractDir, corpusPact, documents, failsOnlyOnMediaType, json, recorded, serve, upgraded, type Provider } from "./support.js";
+import { contractDir, corpusPact, documents, json, recorded, serve, upgraded, type Provider } from "./support.js";
 
 const { like, integer, eachLike } = Matchers;
 
@@ -139,7 +139,8 @@ describe("UserProvider", () => {
     expect(result.results.map((r) => r.status)).toEqual(["verified", "verified"]);
   }, 30_000);
 
-  it("verifies the contract the consumer test recorded, but for S3.4's Content-Type", async () => {
-    await failsOnlyOnMediaType(verifier(join(dir, "UserConsumer-UserProvider.janus.json")).verifyProvider(), 2);
+  it("verifies the contract the consumer test recorded", async () => {
+    const result = await verifier(join(dir, "UserConsumer-UserProvider.janus.json")).verifyProvider();
+    expect(result.status).toBe("verified");
   }, 30_000);
 });

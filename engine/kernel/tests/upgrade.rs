@@ -207,11 +207,11 @@ fn headers_convert_to_the_document_form_a_transport_actually_produces() {
   let headers = shape(&upgraded, 0, "response", "headers");
   assert_eq!(headers["shape"], json!("object"));
   assert_eq!(
-    headers["members"]["content-type"],
-    json!({ "shape": "array", "entries": [{ "shape": "equality", "example": "application/json" }] }),
+    headers["members"]["x-trace"],
+    json!({ "shape": "array", "entries": [{ "shape": "equality", "example": "abc" }] }),
     "names are lower-cased and values are a list, exactly as the HTTP component reads them back"
   );
-  assert!(headers["members"].get("x-trace").is_some());
+  assert!(headers["members"].get("content-type").is_some());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -457,11 +457,37 @@ fn an_opened_request_query_is_reported_with_or_without_a_query_in_the_pact() {
 fn narrowing_a_header_comparison_to_equality_is_a_judgement_not_a_silent_tightening() {
   let upgraded = upgrade(&pact_with(
     get_slash(),
-    json!({ "status": 200, "headers": { "Content-Type": "application/json; charset=UTF-8" } }),
+    json!({ "status": 200, "headers": { "X-Accept-Version": "1, 2" } }),
   ));
   let finding = find(&upgraded.findings, "rule-narrowed");
   assert_eq!(finding.kind, "judgement");
   assert!(finding.message.contains("MIME parameters"), "{}", finding.message);
+}
+
+/// ADR 0071: a `Content-Type` with no rule is compared as a media type, as v1–v4 compare it, by the
+/// HTTP component's `http:media-type`, which the interaction then requires. Nothing is narrowed, and
+/// the finding says what it became.
+#[test]
+fn a_content_type_with_no_rule_becomes_the_http_components_media_type() {
+  let upgraded = upgrade(&pact_with(
+    get_slash(),
+    json!({ "status": 200, "headers": { "Content-Type": "application/json; charset=UTF-8" } }),
+  ));
+  assert_eq!(
+    shape(&upgraded, 0, "response", "headers")["members"]["content-type"],
+    json!({ "shape": "array", "entries": [{ "shape": "http:media-type",
+      "type": "application/json; charset=UTF-8", "example": "application/json; charset=UTF-8" }] })
+  );
+  let requires: Vec<&str> = upgraded.contract.interactions[0]
+    .requires
+    .iter()
+    .flatten()
+    .map(|r| r.component.as_str())
+    .collect();
+  assert_eq!(requires, ["http"]);
+  let finding = find(&upgraded.findings, "rule-narrowed");
+  assert_eq!(finding.kind, "note");
+  assert!(finding.message.contains("http:media-type"), "{}", finding.message);
 }
 
 /// A v4 pact with one interaction, answered with `body`.
@@ -650,14 +676,18 @@ fn a_v3_message_converts_into_an_emissive_interaction() {
   let recorded = &interaction.selection.variants[0].parts["message"];
   assert_eq!(recorded["metadata"].content["partitionKey"], json!("ABC01"));
   assert_eq!(recorded["body"].encoded.as_deref(), Some("text"));
-  // A contentType with no rule is narrowed, as a header is.
-  let narrowed = upgraded
+  // A contentType with no rule is a media type, as a header's is (ADR 0071).
+  assert_eq!(
+    metadata["members"]["contentType"],
+    json!({ "shape": "http:media-type", "type": "application/json", "example": "application/json" })
+  );
+  let noted = upgraded
     .findings
     .iter()
     .find(|f| f.code == "rule-narrowed" && f.path.ends_with("/metadata"))
-    .expect("the contentType is narrowed");
-  assert!(narrowed.path.starts_with("/messages/"), "{}", narrowed.path);
-  assert_eq!(narrowed.kind, "judgement");
+    .expect("the contentType's operator is noted");
+  assert!(noted.path.starts_with("/messages/"), "{}", noted.path);
+  assert_eq!(noted.kind, "note");
 }
 
 /// ADR 0067 decision 2: a v4 synchronous message records its request as a `request` part beside its

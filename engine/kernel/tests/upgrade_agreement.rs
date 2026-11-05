@@ -21,12 +21,6 @@ use std::path::PathBuf;
 const KNOWN: &[(&str, &str)] = &[
   // A request body's unnamed member: v1–v4 close it, shapes cannot (ADR 0007).
   ("v4-closed-request-body", "request-body-opened"),
-  // A header with no rule became `equality`, which a parameter the reply adds fails, where v1–v4
-  // compare MIME parameters as a set (`legacy:header-value`).
-  ("v3-xml-body", "rule-narrowed"),
-  // A message's contentType with no rule became `equality`, which a charset the producer adds fails,
-  // where v1–v4 compare it as a MIME type, as a header (ADR 0067).
-  ("v3-message", "rule-narrowed"),
   // A size rule on an XML element counts its children of every name, which no shape counts: the
   // upgrade drops it, saying so.
   ("v3-xml-min-children-mismatch", "rule-unmapped"),
@@ -82,7 +76,16 @@ fn captured(values: &Map<String, Value>, encoded: &Map<String, Value>, legacy: b
 }
 
 fn status(plan: &plan::Plan, values: &CapturedValues) -> (Status, Vec<String>) {
-  let executed = plan::execute(plan, values);
+  // The HTTP component's actions, as every native engine registers them: an upgraded contract's
+  // `Content-Type` is its `http:media-type` (ADR 0071), and a v4 status class its `http:status-class`.
+  use pact_janus_component_http::status;
+  let actions =
+    pact_janus_kernel::protocol::in_tree_actions(&[pact_janus_kernel::component::InTreeMatcher {
+      name: status::NAME.to_string(),
+      actions: status::ACTIONS.iter().map(|action| action.to_string()).collect(),
+      matcher: std::sync::Arc::new(status::HttpMatcher::new()),
+    }]);
+  let executed = plan::execute_with(plan, values, None, Some(&actions));
   let (status, mismatches) = plan::outcome(&executed);
   (
     status,

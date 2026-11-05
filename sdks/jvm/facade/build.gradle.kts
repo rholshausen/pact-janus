@@ -61,13 +61,7 @@ tasks.test {
   filter {
     // pact-jvm's tests that wait on an engine item, each with the item that closes it. Delete the line
     // when the item lands, and the test runs.
-    // S3.4, brought forward to S2.5b's exit: their clients send a Content-Type with a charset the
-    // pact does not name, which today's mocks compare as a media type and the engine as written.
-    excludeTestsMatching("io.pact.janus.facade.consumer.junit5.Issue1176Test")
-    // Their whole nested class, whose after-all check would otherwise find runTest2's @Pact method unrun.
-    excludeTestsMatching("io.pact.janus.facade.consumer.junit5.NestedMultiTest\$Test2")
-    excludeTestsMatching("io.pact.janus.facade.consumer.junit5.PactConsumerAnnotationTest\$Test2")
-    // S3.4, and S1.38: 100.0 is a v1-v4 decimal by how it is written.
+    // S1.38: 100.0 is a v1-v4 decimal by how it is written.
     excludeTestsMatching("io.pact.janus.facade.consumer.junit5.OkHttpTest")
   }
   when {

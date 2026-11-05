@@ -52,7 +52,10 @@ readability:
   hook produces, and its case names the interaction by its position in the pact, as every case does.
   `v4-status-class/` and its `-mismatch` twin are a v4 `statusCode` rule, compiled from the pact and
   from its upgraded contract to the built-in HTTP component's `http:status-class`, which the corpus
-  runner registers as the native engine does (ADR 0057).
+  runner registers as the native engine does (ADR 0057). `shapes/http-media-type/` and its
+  `-mismatch` twin are the same component's `http:media-type`, which `janus upgrade` writes for a
+  `Content-Type` with no rule (ADR 0071); a pact's own header goes through `legacy:header-value`, which
+  reads headers in another form, so they are spec cases.
 
 `contracts/` pins how a contract is written, not how one matches (contract-file spec §2.4, ADR 0063):
 each case is a `pact.json` and the `contract.janus.json` that `upgrade/pact` writes for it, compared

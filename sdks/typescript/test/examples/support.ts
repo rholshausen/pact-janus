@@ -8,9 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect } from "vitest";
 import { SubprocessPipe } from "../../src/engine/subprocess.js";
-import { VerificationFailedError } from "../../src/errors.js";
 import { specRoot } from "../conformance/cases.js";
 
 /** A pact in S1.1's corpus, by its path below corpora/verifier. */
@@ -111,26 +109,4 @@ export function documents(interaction: Record<string, unknown>): Record<string, 
 /** What a contract says about an interaction, without the variants that recorded it. */
 export function shapes(interaction: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(interaction).filter(([member]) => member !== "selection"));
-}
-
-/**
- * A verification of a recorded contract, which fails only where S1.1's upgrade ledger says an
- * upgraded pact does (`corpora/verifier/upgrade-disagreements.json`): S3.4's `Content-Type`, which a
- * contract compares as written and the provider answers with a charset. Every interaction is
- * replayed; each failed one has that mismatch and no other. When S3.4 lands this fails, and the
- * tests that call it go back to expecting `verified`.
- */
-export async function failsOnlyOnMediaType(run: Promise<unknown>, interactions: number): Promise<void> {
-  const failure = await run.then(
-    () => undefined,
-    (error: unknown) => error as VerificationFailedError,
-  );
-  if (!(failure instanceof VerificationFailedError)) {
-    throw new Error(`expected the recorded contract to fail only on its Content-Type (S3.4), and it verified`);
-  }
-  expect(failure.result.results).toHaveLength(interactions);
-  for (const result of failure.failures) {
-    const paths = (result.mismatches ?? []).map((m) => String(m.path));
-    expect(paths, JSON.stringify(result.mismatches)).toEqual(["$.response.headers.content-type[0]"]);
-  }
 }

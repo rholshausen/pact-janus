@@ -29,6 +29,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 pretty_assertions = "1"
+rstest = "0.28"
 
 [lints]
 workspace = true

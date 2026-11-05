@@ -78,8 +78,9 @@
           "metadata": {
             "members": {
               "contentType": {
-                "example": "application/json",
-                "shape": "equality"
+                "shape": "http:media-type",
+                "type": "application/json",
+                "example": "application/json"
               },
               "destination": {
                 "example": "X001",
@@ -95,7 +96,12 @@
         "message": {
           "body": "application/json"
         }
-      }
+      },
+      "requires": [
+        {
+          "component": "http"
+        }
+      ]
     }
   },
   "values": {

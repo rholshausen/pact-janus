@@ -1,0 +1,26 @@
+(
+  :"get an order" (
+    :response (
+      :headers (
+        %expect:object (
+          $.response.headers
+        ),
+        :"$.content-type" (
+          %expect:array (
+            $.response.headers.content-type
+          ),
+          %expect:count (
+            $.response.headers.content-type,
+            1
+          ),
+          :"$.content-type[0]" (
+            %http:media-type (
+              $.response.headers.content-type[0],
+              {'type': 'application/json; charset=UTF-8'}
+            )
+          )
+        )
+      )
+    )
+  )
+)
