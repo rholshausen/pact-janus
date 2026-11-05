@@ -1,5 +1,7 @@
 ## 0.2.1 (2026-11-05)
 
+The SDK runs janus-engine 0.4.5, where it ran 0.4.4: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.5) says what changed.
+
 ### Features
 
 #### `janus-facade`: pact-jvm's Java DSL and JUnit 5 consumer extension
