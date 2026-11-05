@@ -32,6 +32,7 @@ public class MetadataBuilder {
   private static final String ISO_DATETIME = "yyyy-MM-dd'T'HH:mm:ss";
   private static final String ISO_DATE = "yyyy-MM-dd";
   private static final String ISO_TIME = "'T'HH:mm:ss";
+  private static final String ISO_TIME_NO_T = "HH:mm:ss";
 
   private final Map<String, Object> values = new LinkedHashMap<>();
   private final MatchingRuleCategory matchers = new MatchingRuleCategory("metadata");
@@ -155,6 +156,30 @@ public class MetadataBuilder {
 
   public MetadataBuilder time(String name, String format, Date example, TimeZone timeZone) {
     return put(name, Dates.format(format, timeZone, example), new TimeMatcher(format), null);
+  }
+
+  public MetadataBuilder dateExpression(String name, String expression) {
+    return dateExpression(name, expression, ISO_DATE);
+  }
+
+  public MetadataBuilder dateExpression(String name, String expression, String format) {
+    return put(name, Dates.local2000(format), new DateMatcher(format), new DateGenerator(format, expression));
+  }
+
+  public MetadataBuilder timeExpression(String name, String expression) {
+    return timeExpression(name, expression, ISO_TIME_NO_T);
+  }
+
+  public MetadataBuilder timeExpression(String name, String expression, String format) {
+    return put(name, Dates.local2000(format), new TimeMatcher(format), new TimeGenerator(format, expression));
+  }
+
+  public MetadataBuilder datetimeExpression(String name, String expression) {
+    return datetimeExpression(name, expression, ISO_DATETIME);
+  }
+
+  public MetadataBuilder datetimeExpression(String name, String expression, String format) {
+    return put(name, Dates.local2000(format), new TimestampMatcher(format), new DateTimeGenerator(format, expression));
   }
 
   public MetadataBuilder ipAddress(String name) {

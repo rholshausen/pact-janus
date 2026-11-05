@@ -32,13 +32,21 @@ repositories {
 
 dependencies {
   testImplementation("io.pact.janus:janus-sdk:$janusVersion")
+  // pact-jvm's consumer DSL over the engine (S2.5b), its own jar, which a user moving a suite adds.
+  testImplementation("io.pact.janus:janus-facade:$janusVersion")
   testImplementation(platform("org.junit:junit-bom:6.1.3"))
   testImplementation("org.junit.jupiter:junit-jupiter")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// Where the facade writes its contracts: pact-jvm's own property, cleared first, since contracts merge.
+val pacts = layout.buildDirectory.dir("pacts")
+
 tasks.test {
   useJUnitPlatform()
+  val pactsDir = pacts.get().asFile
+  doFirst { pactsDir.deleteRecursively() }
+  systemProperty("pact.rootDir", pactsDir.path)
   // Never up to date: what is under test is the release, which Gradle does not see change.
   outputs.upToDateWhen { false }
   testLogging {
