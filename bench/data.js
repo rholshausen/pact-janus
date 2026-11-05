@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793855585641,
+  "lastUpdate": 1793855587918,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -42798,6 +42798,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 17173,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f5bbbad65d1b5274b85eca9ac52f71edb2c59530",
+          "message": "test: write the CSV contract once, so parallel tests never read it truncated\n\ncsv_contract() rewrote one shared file on every call, and a test reading it\nwhile another rewrote it saw an empty file (\"EOF while parsing\").\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T16:07:12+11:00",
+          "tree_id": "74b79a6ea8c183235fbed041c10a6f7793206aef",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f5bbbad65d1b5274b85eca9ac52f71edb2c59530"
+        },
+        "date": 1793855587217,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 23897,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21250,
             "unit": "requests per second",
             "extra": "engines 4"
           }
