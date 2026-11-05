@@ -1,3 +1,13 @@
+## 0.2.1 (2026-11-05)
+
+### Fixes
+
+#### Bindings know `with_binary_body` and `with_generators`
+
+The generated protocol bindings' vocabulary lists the two `pact_ffi` calls
+`consumer-session/add-pact-interaction` now makes (ADR 0070). Nothing in either SDK calls them yet;
+pact-jvm's facade will (S2.5b).
+
 ## 0.2.0 (2026-11-04)
 
 The SDK runs janus-engine 0.4.4, where it ran 0.4.3: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.4) says what changed.
