@@ -2,7 +2,7 @@
 //! (ADR 0002). Every scenario is written once against [`Client`], so what differs between the
 //! embeddings' numbers is the embedding and nothing else.
 
-use pact_janus_component_http::HttpTransport;
+use pact_janus_component_http::{HttpTransport, status};
 use pact_janus_component_json::JsonContent;
 use pact_janus_hooks_host::{ExecHooks, HttpHooks};
 use pact_janus_kernel::component::TransportComponent;
@@ -57,8 +57,9 @@ impl Client {
 
 // ------------------------------------------------------------------ native, in-process
 
-/// The engine in the host's own process, wired the way the `janus` CLI wires it (cli/src/engine.rs):
-/// the HTTP transport, the JSON content component, and the `exec` and `http` hook implementations.
+/// The engine in the host's own process, wired the way the `janus` CLI wires it (cli/src/register.rs):
+/// the HTTP transport and matcher, the JSON content component, and the `exec` and `http` hook
+/// implementations.
 /// The lower bound — what the work costs with no boundary to cross.
 pub struct Native(Engine);
 
@@ -69,6 +70,13 @@ impl Native {
     let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
     engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
     engine.declare_in_tree("content", "json", "1.0.0");
+    // An upgraded contract's `Content-Type` is the HTTP component's `http:media-type` (ADR 0071).
+    engine.register_matcher(
+      status::NAME,
+      "1.0.0",
+      status::ACTIONS,
+      Arc::new(status::HttpMatcher::new()),
+    );
     engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
     engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
     Native(engine)
