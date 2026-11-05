@@ -188,7 +188,9 @@ Three sources are the source of truth and take precedence over this file when th
 > S2.15: an example that is octets is served as octets, not as its base64 text: a slot whose
 > shape's example is `base64` is generated as octets and recorded as `base64`. S2.16 (ADR 0071):
 > `janus upgrade` writes a `Content-Type` with no rule as the HTTP component's `http:media-type`,
-> compared as a media type as v1–v4 compare it. S2.13
+> compared as a media type as v1–v4 compare it. S1.38 (ADR 0072): `integer` and `decimal` read a
+> number's kind from how it is written, as today's verifiers do, so `100.0` is a decimal and not an
+> integer; equality still holds `100` and `100.0` to be one value. S2.13
 > (ADR 0069): a transport holds every arming of its kind until its variant is reported, and an
 > arrival goes to the arming it matches best (most plan actions passed, then first armed), or fails
 > the closest; the facade's `executeTest` serves every interaction pact-js would serve.

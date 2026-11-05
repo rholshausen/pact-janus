@@ -1537,6 +1537,21 @@ SDK implements it, and the SDK specification covers only the consumer side.
   `integer` and `decimal` keep their meaning. An ADR decides it, with corpus cases on both sides.
   *Exit:* S1.1's harness has a fixture whose provider answers `100.0` and `100` to `decimal` and
   `integer` rules, with no entry for it; `OkHttpTest` runs on the facade.
+  *Done 2026-11-05*, as [ADR 0072](decisions/0072-read-a-numbers-kind-from-how-it-is-written.md)
+  decides, and not as this item proposed: a check in the legacy compiler alone cannot reach an
+  upgraded contract or the facade's mock, which compile from shapes.
+  - A number is an integer when written with no fraction or exponent and in 64 bits, and a decimal
+    otherwise: contract-file spec §2.4's classification, and serde_json's, which today's verifier
+    reads. One function decides it (`plan::is_written_integer`), and `match:integer`,
+    `match:decimal`, subsumption's value membership and the provider-shape recorder ask it. The shape
+    spec's `decimal` already read the written form (§4.2); `integer` now does too, and equality is
+    unchanged. The legacy compiler is unchanged.
+  - `corpora/shapes/number-kinds-as-written/` and `corpora/legacy/upgrade-number-kinds/`, each with a
+    `-mismatch` twin, pin it in a shape and in a pact and its upgraded contract.
+  - S1.1's `matching-rules/number-kinds` fixture answers `decimal`, `integer` and `number` rules with
+    `100.0`, `100`, `100.00` and `1e2`, with mutations, and has no entry in either ledger. Before the
+    change it had three disagreements.
+  - `OkHttpTest` runs on the facade, and its contract matches `janus upgrade` of pact-jvm's pact.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
@@ -1765,8 +1780,7 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
       `compareContracts` task compares each contract they write with `janus upgrade` of the pact
       pact-jvm 4.7.8 wrote (`src/test/resources/pact-jvm/`), as documents, and every one matches but
       two, each recorded with its reason.
-    - Four tests waited on S2.16, which has landed, and `OkHttpTest` waits on S1.38 too. The build
-      excludes it, naming that item.
+    - Four tests waited on S2.16, and `OkHttpTest` on S1.38 too. Both have landed, and all four run.
     - Not foreseen:
       - pact-jvm hands a message test the message as its builder built it, with its examples and
         their own types (a `10L` stays a `Long`), so the facade does too (ADR 0070 decision 5, as
@@ -1781,7 +1795,7 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
         clients send. The engine compares a `Content-Type` as written, so consumer tests fail that
         pass today: S2.16 brings S3.3's media-type half and S3.4 forward.
       - An IPv6 mock's `base-url` had no brackets.
-    - Left: S1.38, the pact-jvm section of `consumer-test-migration.md`, and the facade jar in the
+    - Left: the pact-jvm section of `consumer-test-migration.md`, and the facade jar in the
       JVM SDK's release check and release notes.
   - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
