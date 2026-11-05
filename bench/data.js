@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793839474914,
+  "lastUpdate": 1793839476816,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -41736,6 +41736,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20577,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "1905d3630dc30cd8b14e5d938473348a4d60a0f4",
+          "message": "feat: S2.5b pact-jvm's Java DSL and JUnit 5 extension on the facade, in progress\n\nsdks/jvm/facade is a new jar, janus-facade: pact-jvm's rule and generator\nmodel, the PactDslWithProvider chain, PactDslJsonBody, PactDslJsonArray,\nboth root values, PactXmlBuilder, FormPostBuilder, MessagePactBuilder with\nMetadataBuilder and PactConsumerTestExt, ported from pact-jvm at\n1928f2247 (4.7.8; consumer/, consumer/junit5/, core/model/ and\ncore/support/.../regex/), and pact-jvm's LambdaDsl Java copied with its\npackage changed. Each builder builds the example, rules and generators\npact-jvm's builds and submits them through add-pact-interaction\n(ADR 0070). The SDK's Engine lets the facade send frames.\n\n28 of pact-jvm's Java consumer/junit5 test classes run on it with their\nimports changed, with test-only stand-ins for pact-jvm's SimpleHttp and\nJsonParser. compareContracts compares each contract they write with janus\nupgrade of the pact pact-jvm wrote (src/test/resources/pact-jvm/), and all\nmatch but two recorded exceptions. Four tests wait on S2.16 (and one on\nS1.38), excluded by the build until they land.\n\nADR 0070 amended: decision 3 draws a regex example as pact-jvm does,\nseeded by the pattern, rather than refusing; decision 5 hands a message\ntest the message as built. Plan: S2.5b's progress, S2.16 (S3.3's\nmedia-type half and S3.4 brought forward), S1.38 (a v1-v4 number's kind\nis how it is written).\n\nThinness budgets raised:\n- JVM idiomatic: 2300 -> 2400 (the Engine class the facade sends through)\n- JVM facade: new layer, 9600 (pact-jvm's DSL surface; it is at 9383)\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T11:38:55+11:00",
+          "tree_id": "b0a7172b024ebae143a6c0185969fa142e72ebbf",
+          "url": "https://github.com/rholshausen/pact-janus/commit/1905d3630dc30cd8b14e5d938473348a4d60a0f4"
+        },
+        "date": 1793839476335,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 33151,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 29617,
             "unit": "requests per second",
             "extra": "engines 4"
           }
