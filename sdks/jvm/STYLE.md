@@ -255,7 +255,8 @@ Interaction getOrder = janus.interaction("get an order")
 ## Packaging and distribution
 
 - Coordinates `io.pact.janus:janus-sdk` and `io.pact.janus:janus-bindings`, at the version in
-  `gradle.properties`. Released as files on a GitHub release tagged `jvm-sdk/v<version>` (ADR 0060):
+  `gradle.properties`, and `io.pact.janus:janus-facade`, pact-jvm's consumer DSL over the SDK (S2.5b,
+  ADR 0070), which only a suite moving from pact-jvm adds. Released as files on a GitHub release tagged `jvm-sdk/v<version>` (ADR 0060):
   each module's jar, sources jar, Ivy descriptor and POM (`./gradlew releaseFiles`). Gradle reads
   them in place through an `ivy` repository; Maven installs them with `install:install-file`.
   `release-check/` is a project outside the SDK that resolves them as a user would, which

@@ -1769,7 +1769,7 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     and use these DSLs run on the facade. Each records the contract `janus upgrade` writes from the
     pact pact-jvm wrote. Excepted are the tests that ask for TLS or name a mock server implementation,
     which are refused by name (ADR 0066 decision 6), and those S2.5d holds.
-    *Built so far (2026-11-05)*:
+    *Done 2026-11-05*, as ADR 0070 decides:
     - `sdks/jvm/facade` is the facade's jar: pact-jvm's rule and generator model, the
       `PactDslWithProvider` chain, `PactDslJsonBody`, `PactDslJsonArray`, both root values,
       `PactXmlBuilder`, `FormPostBuilder`, `MessagePactBuilder` with `MetadataBuilder`, the
@@ -1781,6 +1781,14 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
       pact-jvm 4.7.8 wrote (`src/test/resources/pact-jvm/`), as documents, and every one matches but
       two, each recorded with its reason.
     - Four tests waited on S2.16, and `OkHttpTest` on S1.38 too. Both have landed, and all four run.
+      Of the module's other Java tests, the two that ask for TLS and the one that names a mock server
+      implementation are refused by name, and the six on pact-jvm's V4 `PactBuilder` are S2.5d's.
+    - [`consumer-test-migration.md`](consumer-test-migration.md)'s pact-jvm section gives each
+      primitive's verdict: the extension and its annotations, the builders, and the matchers, as the
+      conversion decides them. JUnit 4's consumer support is `dropped`, as are the refused calls.
+    - `release-check/` adds `janus-facade` from the release files and runs a pact-jvm consumer test on
+      it, and the `jvm-sdk` change file is its changelog entry. The facade needs `with_binary_body`
+      and `with_generators`, which v0.4.4 predates, so the release waits for the engine's next pin.
     - Not foreseen:
       - pact-jvm hands a message test the message as its builder built it, with its examples and
         their own types (a `10L` stays a `Long`), so the facade does too (ADR 0070 decision 5, as
@@ -1795,8 +1803,12 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
         clients send. The engine compares a `Content-Type` as written, so consumer tests fail that
         pass today: S2.16 brings S3.3's media-type half and S3.4 forward.
       - An IPv6 mock's `base-url` had no brackets.
-    - Left: the pact-jvm section of `consumer-test-migration.md`, and the facade jar in the
-      JVM SDK's release check and release notes.
+      - Writing the migration note found `MetadataBuilder`'s `dateExpression`, `timeExpression` and
+        `datetimeExpression` unported, which no ported test calls. They are ported now.
+      - pact-jvm's `unorderedArray` and its bounded forms write an `ignore-order` rule, which neither
+        the engine nor today's Rust verifier has. `janus upgrade` makes the array an `each-like` and
+        reports nothing, where a rule it cannot map should be `rule-unmapped`. It is S2.17, and the
+        migration note's row is `dropped`.
   - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
     message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
@@ -1862,6 +1874,14 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
     of S2.5b's four excluded tests run: `OkHttpTest` waits on S1.38 alone.
   - [`consumer-test-migration.md`](consumer-test-migration.md)'s message `contentType` row is
     `kept`.
+- **S2.17 A v1–v4 rule `upgrade` cannot map is reported** — **S**, found by S2.5b. A v1–v4 rule the
+  pact model reads as a plugin's, such as pact-jvm's `ignore-order` (`unorderedArray`), reaches
+  `janus upgrade` on an array, which makes the array an `each-like` of its first element and reports
+  nothing. Today's Rust verifier fails the rule as a plugin it does not have, so the contract passes a
+  reply that today fails. Contract-file spec §8.2 says a rule with no shape equivalent is a
+  `rule-unmapped` finding, never a silent guess, on an array as anywhere else.
+  *Exit:* a corpus case upgrades an `ignore-order` rule with a `rule-unmapped` finding, and S1.1's
+  harness has a fixture for it with no upgrade-ledger entry, or one naming the ADR that decides it.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -2301,6 +2321,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S1.38 | A v1–v4 `decimal` or `integer` rule decides by a number's value, not by how it is written | found by S2.5b |
 | S2.16 | A `Content-Type` is compared as written, not as a media type | S3.3 and S3.4, brought forward by S2.5b |
 | S2.5d | pact-jvm's Groovy, Spock and Kotlin DSLs and its V4 `PactBuilder` have no facade | split from S2.5b |
+| S2.17 | A v1–v4 rule read as a plugin's, such as `ignore-order`, upgrades on an array to an `each-like` with no finding | found by S2.5b |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |

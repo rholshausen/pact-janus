@@ -194,6 +194,12 @@ Three sources are the source of truth and take precedence over this file when th
 > (ADR 0069): a transport holds every arming of its kind until its variant is reported, and an
 > arrival goes to the arming it matches best (most plan actions passed, then first armed), or fails
 > the closest; the facade's `executeTest` serves every interaction pact-js would serve.
+> S2.5b (ADR 0070): `janus-facade` (`sdks/jvm/facade`) is pact-jvm's Java DSL and JUnit 5 consumer
+> extension, ported under `io.pact.janus.facade.`, building what pact-jvm builds and submitting it as
+> `add-pact-interaction` calls. pact-jvm's Java `consumer/junit5` tests run on it, their imports
+> changed, and `compareContracts` holds each contract to `janus upgrade` of pact-jvm's pact;
+> `consumer-test-migration.md` has each primitive's verdict. S2.17, an unmappable rule on an array
+> upgraded with no finding, is new.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -224,7 +230,8 @@ sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/g
                  its protocol bindings (task 6.1), src/engine/pin.ts its copy of the engine pin;
                  release-check/ installs a release outside the repository and uses it (S1.36)
 sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bindings` project
-                 holds its protocol bindings (task 6.1); release-check/ as for TypeScript
+                 holds its protocol bindings (task 6.1), and `facade` pact-jvm's consumer DSL
+                 (S2.5b, ADR 0070); release-check/ as for TypeScript
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
 sdks/engine-release.json  The released janus-engine an SDK runs when it is told no other: a
                  version and a SHA-256 per target triple (ADR 0029, ADR 0060)

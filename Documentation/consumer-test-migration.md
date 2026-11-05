@@ -1,14 +1,19 @@
 # Moving a consumer test to Janus
 
-How a consumer test written with pact-js moves to Janus. Staged plan S2.5a built it, and
+How a consumer test written with pact-js or pact-jvm moves to Janus. Staged plan S2.5a built
+pact-js's, and
 [ADR 0066](decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)
-decides how, and S2.5c added pact-js's message consumer API to it. pact-jvm's is S2.5b. A provider
-test has its own note: [`provider-test-migration.md`](provider-test-migration.md).
+decides how; S2.5c added pact-js's message consumer API to it. S2.5b built pact-jvm's, for its Java
+DSL under JUnit 5, as
+[ADR 0070](decisions/0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md)
+decides. A provider test has its own note: [`provider-test-migration.md`](provider-test-migration.md).
 
-Today's builders record the calls they would have made to `pact_ffi`, and the engine makes those
-calls itself. It then converts the interaction they build as `janus upgrade` converts a pact's
+Today's builders hand the engine the calls `pact_ffi` would make to build their interaction:
+pact-js's record the calls they make, and pact-jvm's, which call no FFI, build what pact-jvm builds
+and submit it as those calls. The engine makes the calls itself, then converts the interaction they
+build as `janus upgrade` converts a pact's
 ([contract-file spec §8](specs/contract-file/spec.md#8-converting-v1v4-pacts)). So a test
-records the contract `janus upgrade` would write from the pact pact-js writes today, and
+records the contract `janus upgrade` would write from the pact the library writes today, and
 [S1.1's harness](../corpora/verifier/README.md) already holds those to the pact's verdicts. The test
 runs once, against the interaction's example, as it does today. A test that wants variants (an
 `optional` field shown both present and absent) moves to the Janus DSL.
@@ -21,9 +26,12 @@ Each row is one of three things, as ADR 0066 decision 5 decides them:
 - **dropped**: refused by name, or a matcher whose rule converts with something lost, with what to do
   instead.
 
-pact-js's own consumer examples run on this facade in this repository's tests
+pact-js's own consumer examples run on its facade in this repository's tests
 (`sdks/typescript/test/examples`), each beside its provider test. Each records what `janus upgrade`
 makes of the pact pact-js wrote, and each provider verifies the contract its consumer test recorded.
+pact-jvm's own JUnit 5 consumer tests run on its facade (`sdks/jvm/facade/src/test`), their imports
+changed, and each contract they record is compared with what `janus upgrade` makes of the pact
+pact-jvm 4.7.8 wrote running the same test.
 
 ## pact-js
 
@@ -130,3 +138,140 @@ they do. Its verdict is what the conversion does with the rule it writes.
 | `url`, `url2` | `regex`, as pact-js's. The mock serves the example URL, not its own address, since no generator writes the mock's URL yet. A `RegExp` fragment is refused, since pact-js generated its example with `randexp`: pass `regex(pattern, example)` | dropped |
 | `matchingRules(rules)` and PactV3's `with*MatchingRules` | Converted as a pact's rules at those paths are | kept |
 | `reify`, `extractPayload`, `isMatcher` | The same | kept |
+
+## pact-jvm (JUnit 5)
+
+Add `io.pact.janus:janus-facade` beside `janus-sdk`, from the same release (ADR 0060), and replace
+`au.com.dius.pact.` with `io.pact.janus.facade.` in the suite's imports. Nothing else changes for a
+test written in the Java DSL:
+
+```java
+// before
+import au.com.dius.pact.consumer.MockServer;
+import au.com.dius.pact.consumer.dsl.PactDslJsonBody;
+import au.com.dius.pact.consumer.dsl.PactDslWithProvider;
+import au.com.dius.pact.consumer.junit5.PactConsumerTestExt;
+import au.com.dius.pact.consumer.junit5.PactTestFor;
+import au.com.dius.pact.core.model.RequestResponsePact;
+import au.com.dius.pact.core.model.annotations.Pact;
+// after
+import io.pact.janus.facade.consumer.MockServer;
+import io.pact.janus.facade.consumer.dsl.PactDslJsonBody;
+import io.pact.janus.facade.consumer.dsl.PactDslWithProvider;
+import io.pact.janus.facade.consumer.junit5.PactConsumerTestExt;
+import io.pact.janus.facade.consumer.junit5.PactTestFor;
+import io.pact.janus.facade.core.model.RequestResponsePact;
+import io.pact.janus.facade.core.model.annotations.Pact;
+
+@ExtendWith(PactConsumerTestExt.class)
+@PactTestFor(providerName = "UserProvider")
+class UserClientTest {
+  @Pact(consumer = "UserConsumer")
+  RequestResponsePact aUser(PactDslWithProvider builder) {
+    return builder
+        .given("a user with ID 1 exists")
+        .uponReceiving("a GET request for user 1")
+        .path("/users/1")
+        .method("GET")
+        .willRespondWith()
+        .status(200)
+        .body(new PactDslJsonBody().integerType("id", 1).stringType("name", "Alice"))
+        .toPact();
+  }
+
+  @Test
+  void fetchesAUser(MockServer mockServer) throws IOException {
+    User user = new UserServiceClient(mockServer.getUrl()).getUser(1);
+    assertEquals(1, user.id());
+  }
+}
+```
+
+The facade's classes are pact-jvm's Java DSL, ported with their names (ADR 0070 decision 4): each
+builds the example, rules and generators pact-jvm's builds, and the facade depends on nothing of
+pact-jvm's. Each test starts the engine (`JANUS_ENGINE`, else the one the SDK was released with)
+and ends it. When a conversion loses something, the test prints the engine's finding to stderr,
+prefixed `pact-janus:` and naming the interaction.
+
+A `Content-Type` the test wrote without a matcher is compared as a media type, as pact-jvm compared
+it: pact-jvm's own `application/json; charset=UTF-8` and a client's `application/json` agree (S2.16,
+[ADR 0071](decisions/0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md)).
+Any other header the test wrote without a matcher is compared as written.
+
+### The extension and its annotations
+
+| pact-jvm | Janus | Verdict |
+|---|---|---|
+| `@ExtendWith(PactConsumerTestExt.class)`, `@PactConsumerTest` | The same | kept |
+| `@Pact(consumer, provider)` on a method taking `PactDslWithProvider` or `MessagePactBuilder`, returning `RequestResponsePact`, `MessagePact` or `V4Pact` | The same | kept |
+| A `@Pact` method taking pact-jvm's V4 `PactBuilder` or `SynchronousMessagePactBuilder` | Refused by name: those builders are staged plan S2.5d | dropped |
+| `@PactTestFor(providerName, pactMethod, pactMethods, pactVersion, providerType)`, on the class or the method | The same. `pactVersion` is the pact version the builders build to, V4 unless named | kept |
+| `@PactTestFor(hostInterface, port)`, `@MockServerConfig(hostInterface, port, providerName)`, `@MockServers` | The mock's address, `${name}` read from a system property, else the environment, as pact-jvm reads it. An IPv6 mock's URL has its brackets | kept |
+| Several providers in one test: `pactMethods` naming each provider's methods, `@ForProvider` on each parameter | The same: one mock for each provider, each recording its own contract | kept |
+| `@PactTestFor(https = true)`, its `keyStore*` options, `@MockServerConfig(tls, keyStore*)` | Refused by name: the mock serves plain HTTP | dropped |
+| `@PactTestFor(mockServerImplementation)`, `@MockServerConfig(implementation)` | Refused by name: the engine runs its own mock | dropped |
+| `@MockServerConfig(registryEntry, transportConfig)` | Accepted, no effect: they configure a pact plugin's transport, and Janus cannot load pact plugins ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)) | dropped |
+| The injected `MockServer` | `getUrl()` and `getPort()`. The members pact-jvm's extension calls itself, such as `validateMockServerState`, are not provided | adapted |
+| The injected `RequestResponsePact` or `V4Pact` | The same | kept |
+| A message test's `List<Message>` (a V4 pact's `List<V4Interaction.AsynchronousMessage>`), `MessagePact` or `V4Pact` | The same: each message as its builder built it, its metadata keeping its values' own types. No mock is started ([ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)) | kept |
+| The test runs once, against each interaction's example | The same. Every interaction of the test's pact is served, each as often as the test calls it, and a request two interactions match goes to the more specific ([ADR 0069](decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md)) | kept |
+| A request that did not match, or an interaction never called | The test fails with pact-jvm's message, "The following mismatched requests occurred" or "The following requests were not received", and no contract is written | kept |
+| A test that throws | Its error is the test's failure, what the mock found is printed beside it, and no contract is written ([ADR 0064](decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)) | kept |
+| `@Pact` methods no test ran | The class fails, naming them, unless the method or its test is `@Disabled` | kept |
+| `@PactIgnore` | The same: the extension leaves the test alone | kept |
+| `@PactDirectory`, `pact.rootDir`, else `build/pacts` under Gradle and `target/pacts` otherwise | Where the contract is written, as `<consumer>-<provider>.janus.json`: a Janus contract, not a pact. Test classes recording one pair merge into one file, as pact-jvm's do, and an interaction recorded two ways is a `contract-conflict` ([ADR 0065](decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md)). `pact.writer.overwrite` is not read. A run should clear the directory first | adapted |
+| JUnit 4: `PactProviderRule`, `PactProviderRuleMk2`, `@PactVerification`, `ConsumerPactTest` | Not provided: JUnit 4 is not supported (S2.4). Move the test to JUnit 5's `PactConsumerTestExt` first | dropped |
+| `ConsumerPactRunnerKt.runConsumerTest` | Not provided: run the test under `PactConsumerTestExt` | dropped |
+
+### The builders
+
+| pact-jvm | Janus | Verdict |
+|---|---|---|
+| `ConsumerPactBuilder.consumer(name).hasPactWith(provider)`, `pactSpecVersion` | The same | kept |
+| `given(state)`, `given(state, params)`, several states | The same | kept |
+| `uponReceiving`, `path`, `method`, `query`, `encodedQuery`, `headers`, `setDefaultRequestValues`, `setDefaultResponseValues` | The same | kept |
+| `matchPath`, `matchHeader`, `matchQuery`, `queryMatchingDate`, `queryMatchingTime`, `queryMatchingDatetime` and their ISO forms, given an example | `regex`, anchored, and the date and time rules with their format | kept |
+| The same with no example, and `stringMatcher(name, regex)` with none | The example is drawn from the pattern as pact-jvm draws it, but seeded by the pattern, so every run records the same example where pact-jvm drew a new one (ADR 0070 decision 3) | adapted |
+| `body(...)`: a `DslPart`, a `String`, a `JSONObject`, an XML `Document`, bytes with a content type; `bodyWithSingleQuotes` | The same. A body no generator fills is served as the octets pact-jvm wrote, so a test comparing its text sees pact-jvm's | kept |
+| `body(FormPostBuilder)` | A form body, its rules and generators by parameter ([ADR 0038](decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)) | kept |
+| `body(PactXmlBuilder)` | An XML body, with its attributes, `eachLike` and namespaces ([ADR 0039](decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)) | kept |
+| `withBinaryData(bytes, contentType)` | The same: served and recorded as octets | kept |
+| `withFileUpload(partName, fileName, contentType, bytes)` | The same, but with a boundary derived from the part rather than drawn at random, so a test records the same bytes on every run | adapted |
+| `bodyMatchingContentType(contentType, example)` | `content-type`, checked against the octets ([ADR 0049](decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)) | kept |
+| `headerFromProviderState`, `pathFromProviderState`, `queryParameterFromProviderState` | The example, with a `ProviderState` generator a verifier fills from the state's values | kept |
+| `willRespondWith()`: `status`, `headers`, `matchHeader`, `matchSetCookie`, `body` and the rest as for the request | The same | kept |
+| `successStatus()`, `clientErrorStatus()`, `serverErrorStatus()`, `nonErrorStatus()`, `errorStatus()`, `informationStatus()`, `redirectStatus()`, `statusCodes(list)` | `http:status-class` | kept |
+| Several interactions in one pact, chained by `given` or `uponReceiving` after `willRespondWith` | The same | kept |
+| `comment()`, `addMetadataValue()` | Accepted, no effect: a contract records neither | dropped |
+| `MessagePactBuilder`: `consumer`, `hasPactWith`, `given`, `expectsToReceive`, `withContent` (a `DslPart`, a `String` or bytes, with a content type), `withMetadata` (a `Map` or a `MetadataBuilder`) | The same calls, a V3 message pact's unless `pactVersion` says otherwise | kept |
+| A message's `contentType` metadata | Compared as a media type, as pact-jvm compared it (ADR 0071) | kept |
+| `PactDslJsonBody.pluginValue()` | Not provided: Janus cannot load pact plugins (ADR 0045) | dropped |
+| pact-jvm's V4 `PactBuilder`, `MultipartBuilder`, and its Groovy, Spock and Kotlin DSLs | Not yet: staged plan S2.5d | dropped |
+
+### The matchers
+
+`PactDslJsonBody`, `PactDslJsonArray`, `PactDslJsonRootValue`, `PactDslRootValue`, the `LambdaDsl`
+over them and `MetadataBuilder` write pact-jvm's rules and generators. A row's verdict is what the
+conversion does with them.
+
+| pact-jvm | The contract | Verdict |
+|---|---|---|
+| `stringType`, `like`, `numberType`, `booleanType`, and their plural forms | `type`, or `number` and `boolean` | kept |
+| `integerType`, `decimalType` | `integer` and `decimal`, a number's kind read from how it is written, as pact-jvm reads it ([ADR 0072](decisions/0072-read-a-numbers-kind-from-how-it-is-written.md)) | kept |
+| Any of these with no example | pact-jvm's fixed example, as `100` for `integerType`, with its random generator, which the mock fills fresh on every reply ([ADR 0048](decisions/0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md)) | kept |
+| `stringValue`, `numberValue`, `booleanValue`, `equalTo`, and a member with no rule | `equality` | kept |
+| `stringMatcher`, `uuid`, `hexValue`, `ipAddress` | `regex`, anchored, since pact-jvm's patterns match the whole value (S1.18) | kept |
+| `integerMatching`, `decimalMatching`, `numberMatching` | The number's kind and the anchored `regex`, both held | kept |
+| `date`, `time`, `datetime`, `timestamp`, `localDate`, and `dateExpression`, `timeExpression`, `datetimeExpression` | `date`, `time`, `datetime`, with the format. Generators, an expression's too, are filled as pact-jvm fills them | kept |
+| `includesStr`, `nullValue` | `include`, `null` | kept |
+| `valueFromProviderState` | `type`, with a `ProviderState` generator a verifier fills from the state's values | kept |
+| `eachLike`, `minArrayLike`, `maxArrayLike`, `minMaxArrayLike`, `eachArrayLike` and its bounded forms | `each-like`, with `min` and `max` where given | kept |
+| `array()` with no rule | An exact `array`, as pact-jvm compared it | kept |
+| `arrayContaining(…)` | `contains`, which needs a distinct element for each variant, where pact-jvm let one element satisfy two | adapted |
+| `eachKeyLike`, `eachValueLike`, `eachValueMatching`, `eachKeyMappedToAnArrayLike` | `each-entry` | kept |
+| `eachKeyMatching(matcher)` | `each-entry` with the keys held to the rule and the values open: pact-jvm also compared each member the example names, which `each-entry` cannot say | dropped |
+| `and(name, value, matchers…)` | Every rule, as one shape | kept |
+| `or(name, value, matchers…)` | The first rule alone, reported as `rule-combination-or`: a shape has no union of rules yet | dropped |
+| `unorderedArray`, `unorderedMinArray`, `unorderedMaxArray`, `unorderedMinMaxArray` and their `newUnordered…` forms | An `each-like` of the first element, with nothing reported. pact-jvm's `ignore-order` rule has no conversion, and today's Rust verifier fails it as a plugin it does not have. Staged plan S2.17 reports it | dropped |
+| `matchUrl`, `matchUrl2` | `regex`, as pact-jvm's. The mock serves the example URL, not its own address, since no generator writes the mock's URL yet: the finding says so | dropped |
+| `PactDslRootValue` (a text body), `PactDslJsonRootValue` (a JSON value at the root) | The same rules at the root | kept |
