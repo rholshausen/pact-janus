@@ -1536,7 +1536,7 @@ SDK implements it, and the SDK specification covers only the consumer side.
   rule to a check on the number as written, which the document model keeps; the shape language's own
   `integer` and `decimal` keep their meaning. An ADR decides it, with corpus cases on both sides.
   *Exit:* S1.1's harness has a fixture whose provider answers `100.0` and `100` to `decimal` and
-  `integer` rules, with no entry for it; `OkHttpTest` runs on the facade once S2.16 has landed.
+  `integer` rules, with no entry for it; `OkHttpTest` runs on the facade.
 - **S1.16 Other ecosystems** wait for their SDK in stage 6, or wrap the CLI (S1.13's table is their
   migration note).
 
@@ -1765,8 +1765,8 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
       `compareContracts` task compares each contract they write with `janus upgrade` of the pact
       pact-jvm 4.7.8 wrote (`src/test/resources/pact-jvm/`), as documents, and every one matches but
       two, each recorded with its reason.
-    - Four tests wait on S2.16, and one of them on S1.38 too. The build excludes them, naming those
-      items.
+    - Four tests waited on S2.16, which has landed, and `OkHttpTest` waits on S1.38 too. The build
+      excludes it, naming that item.
     - Not foreseen:
       - pact-jvm hands a message test the message as its builder built it, with its examples and
         their own types (a `10L` stays a `Long`), so the facade does too (ADR 0070 decision 5, as
@@ -1781,8 +1781,8 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
         clients send. The engine compares a `Content-Type` as written, so consumer tests fail that
         pass today: S2.16 brings S3.3's media-type half and S3.4 forward.
       - An IPv6 mock's `base-url` had no brackets.
-    - Left: S2.16 and S1.38, the pact-jvm section of `consumer-test-migration.md`, and the facade
-      jar in the JVM SDK's release check and release notes.
+    - Left: S1.38, the pact-jvm section of `consumer-test-migration.md`, and the facade jar in the
+      JVM SDK's release check and release notes.
   - **S2.5c pact-js messages** — **S**, after S2.12 and S2.14. `addAsynchronousInteraction`,
     `addSynchronousInteraction`, `MessageConsumerPact` and the body handlers, in the facade, as the
     message calls pact-js makes (ADR 0066 decision 1). pact-jvm's message pacts are S2.5b's, on the
@@ -1831,6 +1831,23 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   List-valued headers stay in S3.3. An ADR decides the operator's semantics against today's mocks.
   *Exit:* the four `consumer/junit5` tests S2.5b's build excludes for it run; the pact-js examples'
   provider tests and S1.1's upgrade ledger lose their `Content-Type` entries.
+  *Done 2026-11-05*, as [ADR 0071](decisions/0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md) decides:
+  - The built-in HTTP component runs `http:media-type`, whose member `type` is the media type
+    expected: the same type and subtype, in any case, and each of its parameters with an equal value,
+    others allowed. It is `legacy:header-value`'s comparison, but for case with no parameters, which
+    RFC 6838 makes insensitive.
+  - `janus upgrade` writes a `Content-Type` with no rule as `http:media-type`, in a request, a response
+    and a message's metadata, and the interaction requires `http`. Its finding is a `rule-narrowed`
+    note, as `http:status-class`'s is.
+  - `corpora/shapes/http-media-type/` and its `-mismatch` twin pin the operator; `corpora/contracts/`
+    pins the upgraded bytes. A pact's own header still compiles to `legacy:header-value`, and
+    `upgrade_agreement.rs`, which runs every legacy case both ways, lost its two `Content-Type`
+    disagreements (`v3-xml-body`, `v3-message`).
+  - S1.1's upgrade ledger lost its 16 S3.4 entries, and the harness agrees on every other verdict.
+    The pact-js examples' provider tests verify the contracts their consumer tests record, and three
+    of S2.5b's four excluded tests run: `OkHttpTest` waits on S1.38 alone.
+  - [`consumer-test-migration.md`](consumer-test-migration.md)'s message `contentType` row is
+    `kept`.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.

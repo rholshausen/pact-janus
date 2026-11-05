@@ -186,7 +186,9 @@ Three sources are the source of truth and take precedence over this file when th
 > consumer API (`addAsynchronousInteraction`, `addSynchronousInteraction`, `MessageConsumerPact`, the
 > body handlers), whose builders record the `pact_ffi` message calls `add-pact-interaction` now makes.
 > S2.15: an example that is octets is served as octets, not as its base64 text: a slot whose
-> shape's example is `base64` is generated as octets and recorded as `base64`. S2.13
+> shape's example is `base64` is generated as octets and recorded as `base64`. S2.16 (ADR 0071):
+> `janus upgrade` writes a `Content-Type` with no rule as the HTTP component's `http:media-type`,
+> compared as a media type as v1–v4 compare it. S2.13
 > (ADR 0069): a transport holds every arming of its kind until its variant is reported, and an
 > arrival goes to the arming it matches best (most plan actions passed, then first armed), or fails
 > the closest; the facade's `executeTest` serves every interaction pact-js would serve.
