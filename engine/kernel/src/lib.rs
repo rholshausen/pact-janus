@@ -18,6 +18,7 @@ pub mod legacy;
 pub mod persisted;
 pub mod plan;
 pub mod protocol;
+pub mod redaction;
 pub mod shape;
 pub mod subsumption;
 pub mod variant;

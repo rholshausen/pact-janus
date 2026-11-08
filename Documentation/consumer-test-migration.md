@@ -18,6 +18,18 @@ records the contract `janus upgrade` would write from the pact the library write
 runs once, against the interaction's example, as it does today. A test that wants variants (an
 `optional` field shown both present and absent) moves to the Janus DSL.
 
+One thing a recorded contract does differently from a pact: it never holds a credential
+([ADR 0074](decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)). An
+`Authorization`, `Proxy-Authorization` or `Cookie` request header, or a `Set-Cookie` response
+header, is recorded as `"[redacted]"`, and the contract lists it under `redacted`
+([contract-file spec §5.6](specs/contract-file/spec.md#56-redacted-members)). The test itself runs as
+before: the mock still matches the header the test declared. A provider then verifies with a token
+of its own, through a request filter or `--header`, as pact's advice has always been. A test whose
+provider accepts one fixed fake token keeps it: the Janus DSL's `redaction: { keep:
+["request.headers.authorization"] }`, or `withKept` in the JVM SDK. `add` names other members to
+redact, an `x-api-key` header or a body's `password`. The facades take no option: they redact the
+defaults, as `janus upgrade` does.
+
 Each row is one of three things, as ADR 0066 decision 5 decides them:
 
 - **kept**: spelled and behaving as today. A matcher's rule converts with nothing lost.

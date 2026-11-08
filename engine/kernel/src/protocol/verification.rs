@@ -337,9 +337,8 @@ impl Filter {
   }
 }
 
-/// The default transport kind for an interaction that records none. Contract-file spec §4.3 makes
-/// the binding optional, and the whole prototype's default is HTTP.
-const DEFAULT_TRANSPORT_KIND: &str = "http";
+use crate::common::DEFAULT_TRANSPORT_KIND;
+use crate::redaction::{self, Member, Redaction, Secrets};
 
 // ---------------------------------------------------------------------------------------------
 // Request documents (spec §8.3, `schemas/v1/verification.schema.json`).
@@ -634,10 +633,10 @@ impl Source {
     }
   }
 
-  fn prepare(&self, index: usize, contributions: &Contributions) -> Prepared {
+  fn prepare(&self, index: usize, contributions: &Contributions, redaction: &Redaction) -> Prepared {
     match self {
-      Source::Janus(contract) => prepare_janus(contract, index, &self.format(), contributions),
-      Source::Legacy(pact) => prepare_legacy(pact, index, &self.format()),
+      Source::Janus(contract) => prepare_janus(contract, index, &self.format(), contributions, redaction),
+      Source::Legacy(pact) => prepare_legacy(pact, index, &self.format(), redaction),
     }
   }
 }
@@ -782,6 +781,8 @@ pub(crate) struct Run {
 pub(crate) struct RunComponents {
   pub content: Option<Arc<dyn ContentComponent>>,
   pub contributions: Arc<Contributions>,
+  /// What nothing the run reports repeats (ADR 0074 decision 7): each transport's credentials.
+  pub redaction: Redaction,
 }
 
 /// What a run verifies: documents already read, or a broker to fetch them from inside the run
@@ -1042,6 +1043,7 @@ fn run(
   let RunComponents {
     content,
     contributions,
+    redaction,
   } = components;
   let interactions: usize = sources.iter().map(Source::interactions).sum();
   let variants: usize = sources.iter().map(Source::variants).sum();
@@ -1104,7 +1106,7 @@ fn run(
           continue;
         }
         let flow = verify_prepared(
-          source.prepare(index, &contributions),
+          source.prepare(index, &contributions, &redaction),
           &mut RunContext {
             targets: &targets,
             content: content.as_deref(),
@@ -1681,6 +1683,13 @@ struct Ready {
   content_types: ContentTypes,
   /// Emitted before this variant's exchange starts, so a warning precedes the result it qualifies.
   warnings: Vec<Value>,
+  /// The members whose values nothing reported repeats (ADR 0074 decision 7).
+  redacted: Vec<Member>,
+  /// The strings under them in the interaction itself: its examples and its recorded values.
+  secrets: Secrets,
+  /// The members the contract recorded redacted, which a failed result names when no
+  /// `before-request` hook replaced them (ADR 0074 decision 6).
+  recorded_redacted: Vec<Member>,
   /// The `interaction` document a hook's occurrence carries (lifecycle-hooks spec §3.2), with this
   /// variant's states already resolved.
   interaction: Value,
@@ -1688,8 +1697,19 @@ struct Ready {
 
 /// A Janus contract's interaction (plan tasks 5.1–5.3): compiled from its recorded shapes, one
 /// replay per recorded variant.
-fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions: &Contributions) -> Prepared {
+fn prepare_janus(
+  contract: &Contract,
+  index: usize,
+  format: &str,
+  contributions: &Contributions,
+  redaction: &Redaction,
+) -> Prepared {
   let interaction = &contract.interactions[index];
+  let recorded_redacted = redaction::recorded_members(interaction);
+  let redacted = redaction::union(
+    &redaction.reported(interaction.transport.as_ref().map(|t| t.kind.as_str())),
+    &recorded_redacted,
+  );
   let reference = interaction_ref(contract, index, interaction, format);
   let transport = interaction
     .transport
@@ -1749,6 +1769,9 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         }));
       }
       let request = recorded_parts(variant);
+      let mut secrets = Secrets::default();
+      secrets.collect_shapes(&redacted, &interaction.parts);
+      secrets.collect_parts(&redacted, &variant.parts);
       let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
       let mut hooked = json!({
         "description": interaction.description,
@@ -1786,6 +1809,9 @@ fn prepare_janus(contract: &Contract, index: usize, format: &str, contributions:
         fresh: fresh_parts(&interaction.parts),
         legacy: false,
         warnings,
+        redacted: redacted.clone(),
+        secrets,
+        recorded_redacted: recorded_redacted.clone(),
         interaction: hooked,
       }))
     })
@@ -1891,10 +1917,12 @@ fn produced_resolver(
 /// itself would assert nothing (the same rule the shape path follows, [`drive`]). That has a
 /// pleasant consequence: a request body in a content type design 3.5 cannot compile still replays,
 /// byte for byte, instead of failing an interaction whose response is perfectly checkable.
-fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
+fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str, redaction: &Redaction) -> Prepared {
   let interaction = match &pact.interactions[index] {
     PactInteraction::Http(http) => http,
-    PactInteraction::Message(message) => return prepare_legacy_message(pact, message, index, format),
+    PactInteraction::Message(message) => {
+      return prepare_legacy_message(pact, message, index, format, redaction);
+    }
     PactInteraction::NeedsPlugins(needs) => return refuse_plugin_interaction(pact, needs, index, format),
   };
   let states = legacy_states(&interaction.provider_states);
@@ -1925,6 +1953,12 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
   };
 
   let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+  // A pact is not redacted, but nothing a run reports repeats its credentials (ADR 0074 decision 7).
+  let redacted = redaction.reported(Some(&transport));
+  let request = legacy_pact::request_parts(&interaction.request);
+  let mut secrets = Secrets::default();
+  secrets.collect_parts(&redacted, &request);
+  secrets.collect_parts(&redacted, &legacy_pact::response_parts(&interaction.response));
   Prepared {
     reference,
     transport,
@@ -1939,11 +1973,14 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str) -> Prepared {
       // replays the recorded octets, so it declares nothing.
       content_types: legacy_pact::response_types(&response),
       states,
-      request: legacy_pact::request_parts(&interaction.request),
+      request,
       generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
       fresh: BTreeMap::new(),
       legacy: true,
       warnings: Vec::new(),
+      redacted,
+      secrets,
+      recorded_redacted: Vec::new(),
       interaction: json!({
         "description": interaction.description,
         "states": states_json,
@@ -1997,6 +2034,7 @@ fn prepare_legacy_message(
   message: &MessageInteraction,
   index: usize,
   format: &str,
+  redaction: &Redaction,
 ) -> Prepared {
   let states = legacy_states(&message.provider_states);
   let reference = legacy_reference(
@@ -2060,6 +2098,10 @@ fn prepare_legacy_message(
       fresh: BTreeMap::new(),
       legacy: true,
       warnings: Vec::new(),
+      // A message's kind declares no credentials unless a transport of that kind does.
+      redacted: redaction.reported(Some(&transport)),
+      secrets: Secrets::default(),
+      recorded_redacted: Vec::new(),
       interaction: json!({
         "description": message.description,
         "states": states_json,
@@ -2450,15 +2492,25 @@ fn drive_exchange(
     )));
   }
 
-  drive(
+  // What the contract recorded redacted and no hook replaced is sent as recorded (ADR 0074 decision
+  // 6): a failed result names it, since a provider that wanted a credential is the likely reason.
+  let unreplaced = redaction::still_redacted(&exchange.ready.recorded_redacted, &request);
+  let mut secrets = exchange.ready.secrets.clone();
+  secrets.collect_parts(&exchange.ready.redacted, &request);
+  let mut driven = drive(
     exchange,
     request,
     target,
     ctx.content,
     ctx.actions,
     ctx.executed_plans,
+    secrets,
   )
-  .map_err(Stopped::Failed)
+  .map_err(Stopped::Failed)?;
+  if !unreplaced.is_empty() && driven.payload["status"] == "failed" {
+    driven.payload["redacted"] = json!(unreplaced);
+  }
+  Ok(driven)
 }
 
 /// What a `produce-message` exchange came to.
@@ -2505,6 +2557,7 @@ fn produce(
     ctx.content,
     ctx.actions,
     ctx.executed_plans,
+    exchange.ready.secrets.clone(),
   ))
 }
 
@@ -2739,6 +2792,7 @@ fn drive(
   content: Option<&dyn ContentComponent>,
   actions: &dyn ActionApplier,
   executed_plans: Reporting,
+  secrets: Secrets,
 ) -> Result<Driven, Value> {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
@@ -2808,6 +2862,7 @@ fn drive(
     content,
     actions,
     executed_plans,
+    secrets,
   ))
 }
 
@@ -2824,10 +2879,13 @@ fn score(
   content: Option<&dyn ContentComponent>,
   actions: &dyn ActionApplier,
   executed_plans: Reporting,
+  mut secrets: Secrets,
 ) -> Driven {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
   let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
+  // What the provider answered under a redacted member is a secret too (ADR 0074 decision 7).
+  secrets.collect_parts(&exchange.ready.redacted, &reply);
   // `match:content-type` reads the reply's own octets and labels (staged plan S1.10, ADR 0049): by
   // the declared or labelled type on the contract path, by detection on the v1–v4 path.
   let detection = content.map(|content| crate::component::ContentDetection {
@@ -2836,7 +2894,7 @@ fn score(
     declared: Some(&exchange.ready.content_types),
     by_label: !exchange.ready.legacy,
   });
-  let executed = execute_with(
+  let mut executed = execute_with(
     &exchange.ready.plan,
     &resolver,
     detection
@@ -2844,6 +2902,8 @@ fn score(
       .map(|detection| detection as &dyn plan::ContentDetector),
     Some(actions),
   );
+  // Before anything is built from it, so no mismatch, executed plan or event repeats a credential.
+  secrets.scrub_executed(&mut executed);
   let response = find_container(&executed, answering).unwrap_or(&executed);
   let (status, mismatches) = outcome(response);
 
@@ -2870,11 +2930,13 @@ fn score(
   // request failing, when the verdict never looked at it. A v1–v4 plan is the response alone, so
   // this is also what makes the two paths read the same.
   let executed = executed_plans.wants(matched).then(|| {
+    let mut plan = plan::plan_json(&exchange.ready.plan);
+    secrets.scrub_json(&mut plan);
     let mut event = json!({
       "interaction": reference,
       "variant": variant,
       "status": if matched { "verified" } else { "failed" },
-      "plan": plan::plan_json(&exchange.ready.plan),
+      "plan": plan,
     });
     executed_plans.display(&mut event, "text", &plan::render_executed_marked(response));
     event

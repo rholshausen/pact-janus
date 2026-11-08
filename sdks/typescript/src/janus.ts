@@ -37,7 +37,18 @@ export interface JanusConfig {
    * engine's answer, at the first `execute`.
    */
   components?: readonly ComponentDeclaration[];
+  /**
+   * What the contract records redacted (ADR 0074). The transport already redacts the credentials it
+   * declares: HTTP's `authorization`, `proxy-authorization` and `cookie` request headers and the
+   * `set-cookie` response header. `add` names more members by path (`request.headers.x-api-key`,
+   * `request.body.password`); `keep` names ones to record as they are, a fixed token the provider's
+   * test environment accepts. Handed to the engine as written.
+   */
+  redaction?: Redaction;
 }
+
+/** Members a contract records redacted, by path: a part, a slot, then member names. */
+export type Redaction = protocol.Redaction;
 
 /** One declared component (component-interfaces `component-config.schema.json`). */
 export interface ComponentDeclaration {
@@ -201,6 +212,7 @@ export class Janus {
           consumer: { name: this.#config.consumer },
           provider: { name: this.#config.provider },
           ...(this.#config.components === undefined ? {} : { components: this.#config.components.map(resolved) }),
+          ...(this.#config.redaction === undefined ? {} : { redaction: this.#config.redaction }),
         },
       })
     ).session;

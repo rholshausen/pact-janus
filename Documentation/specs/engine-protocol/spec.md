@@ -594,6 +594,13 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   a component that cannot be loaded — no loader for its source, a failed handshake, a name that
   collides — fails the `create` with `component-unavailable` naming it. They belong to the session
   and end with it.
+  `config.redaction` is `{ add?, keep? }`, each a list of paths (`request.headers.x-api-key`;
+  contract-file spec §5.6): `add` names members the contract records redacted beyond the ones the
+  transport declares as credentials (component-interfaces spec §5.8), and `keep` names members to
+  record as they are, a fixed token a provider's test environment accepts. A path that does not parse
+  fails the `create` with `malformed-frame`, whose `details.problems` point at it. Nothing the session
+  reports, a rejected request's mismatches included, repeats a value found under a member the
+  transport declares or `add` names, kept or not ([ADR 0074](../../decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)).
 - **`add-interaction`**: submits one complete interaction specification. The engine
   validates it and compiles what it needs; a rejected spec is a structured error
   (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
@@ -1163,13 +1170,19 @@ treat push as a latency upgrade, not a second semantics.
 
 ### 9.6 Event kinds (v1)
 
-All on the verification stream; the vocabulary is open and grows without a version bump:
+All on the verification stream; the vocabulary is open and grows without a version bump. No event
+repeats a credential: every string found under a member the transport declares as one
+(component-interfaces spec §5.8), or that a contract recorded redacted, in the interaction, the
+request sent or the reply, is replaced by `[redacted]` wherever it would appear, in a mismatch, an
+executed plan or the plan beside it (ADR 0074). `verification/explain` does the same with its
+subject and its `values`.
+
 
 | Kind | Payload | Notes |
 |---|---|---|
 | `verification/started` | run description (contract count, provider) | first event |
 | `verification/interaction-started` | interaction ref, variant | |
-| `verification/interaction-result` | interaction ref, variant, status, mismatches | one per interaction × variant |
+| `verification/interaction-result` | interaction ref, variant, status, mismatches; and, when it failed, `redacted`, the request's members the contract recorded redacted that no `before-request` hook replaced (ADR 0074) | one per interaction × variant |
 | `verification/hook` | hook point, outcome (design 2.7) | hook activity is events, per the RFC |
 | `verification/warning` | a `code`, the interaction ref and variant, and what the code needs: `state-resolution-disagreement` (`resolved`, `recorded`), `generator-failed` (`target`, `generator`, `message`; ADR 0034), `state-unhandled` (`state`, `message`; ADR 0058) | before the result it qualifies; a warning never changes a verdict |
 | `verification/report` | `text`, a block of whole lines a host prints as it arrives followed by a line break, and `text-segments` for a host that declared `segments` (§2.7) | when `options.report` asks (ADR 0059): after each event worth a line of the run's report (the start, each result with its states, mismatches and the hook that failed it, warnings, fetches, publications, executed plans), and the summary's line before the terminal event. The layout is the engine's, so every host prints the same report |

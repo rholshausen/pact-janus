@@ -28,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "consumer",
     "provider",
-    "components"
+    "components",
+    "redaction"
 })
 public class SessionConfig {
 
@@ -57,6 +58,15 @@ public class SessionConfig {
     @JsonProperty("components")
     @JsonPropertyDescription("The project's declared components, **resolved** by the host's loader (spec.md \u00a78.2, lifecycle-hooks spec \u00a77.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create \u2014 not the first interaction that needs one \u2014 when one cannot be loaded. A session's components are its own and end with it.")
     private List<Map<String, Object>> components;
+    /**
+     * Redaction
+     * <p>
+     * What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md §8.2, contract-file spec §5.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.
+     * 
+     */
+    @JsonProperty("redaction")
+    @JsonPropertyDescription("What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md \u00a78.2, contract-file spec \u00a75.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.")
+    private Redaction redaction;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -126,6 +136,28 @@ public class SessionConfig {
         this.components = components;
     }
 
+    /**
+     * Redaction
+     * <p>
+     * What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md §8.2, contract-file spec §5.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.
+     * 
+     */
+    @JsonProperty("redaction")
+    public Redaction getRedaction() {
+        return redaction;
+    }
+
+    /**
+     * Redaction
+     * <p>
+     * What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md §8.2, contract-file spec §5.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.
+     * 
+     */
+    @JsonProperty("redaction")
+    public void setRedaction(Redaction redaction) {
+        this.redaction = redaction;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -152,6 +184,10 @@ public class SessionConfig {
         sb.append('=');
         sb.append(((this.components == null)?"<null>":this.components));
         sb.append(',');
+        sb.append("redaction");
+        sb.append('=');
+        sb.append(((this.redaction == null)?"<null>":this.redaction));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -167,6 +203,7 @@ public class SessionConfig {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.redaction == null)? 0 :this.redaction.hashCode()));
         result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
@@ -183,7 +220,7 @@ public class SessionConfig {
             return false;
         }
         SessionConfig rhs = ((SessionConfig) other);
-        return (((((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))));
+        return ((((((this.redaction == rhs.redaction)||((this.redaction!= null)&&this.redaction.equals(rhs.redaction)))&&((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))));
     }
 
 }

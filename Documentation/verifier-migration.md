@@ -231,6 +231,8 @@ hooks:
 | A state call that gets a 5xx, 408 or 429 is tried again, up to eight times in all, waiting from 1 s and doubling (about two minutes before an endpoint that keeps failing fails) | Tried three times in all, waiting 100 ms and then 1 s. `client.retries` on the hook changes the count. **Differs** deliberately: today's count came with the broker's retries, not from a decision about state calls (ADR 0044). Fixture `state-callbacks/fails-once` |
 | A state call is bounded by `--request-timeout` | Each attempt is bounded by the hook's `timeout-ms`, default 5000 ms |
 | An interaction with a provider state and no state-change URL is verified, with a warning that the state was ignored | Verified; no `state-setup` hook runs |
+| A pact's `Authorization` header is sent as the pact recorded it | The same for a pact. A Janus contract records `Authorization`, `Proxy-Authorization` and `Cookie` as `"[redacted]"`, and that is sent unless a `before-request` hook or `--header` replaces it; a failed result lists each one no hook replaced. **Differs** for contracts only ([ADR 0074](decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)) |
+| Mismatches and logs show every header and body value as received | No report repeats a value found under a credential header, the provider's `Set-Cookie` included: each is `[redacted]` in mismatches, executed plans and `janus explain --executed` (ADR 0074) |
 
 ## Logging, reports and output
 

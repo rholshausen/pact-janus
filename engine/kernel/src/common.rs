@@ -43,6 +43,10 @@ pub struct Requirement {
   pub min_version: Option<u64>,
 }
 
+/// The default transport kind for an interaction that records none. Contract-file spec §4.3 makes
+/// the binding optional, and the whole prototype's default is HTTP.
+pub(crate) const DEFAULT_TRANSPORT_KIND: &str = "http";
+
 /// Part name -> slot name -> the media type of that slot's content (contract-file spec §5.5, ADR
 /// 0020). A decode instruction, not a constraint: it names the content component that turns the
 /// slot's octets into the document its shape applies to. A slot with no entry is undeclared.

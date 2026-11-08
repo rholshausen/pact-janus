@@ -158,6 +158,13 @@ class ContractTest {
 
 ## Differences from today's verdicts
 
+- **A credential header in a Janus contract.** A contract records the `Authorization`, `Cookie` and
+  `Proxy-Authorization` request headers as `"[redacted]"`, and a verifier sends what was recorded
+  ([ADR 0074](decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)). A
+  provider that checks them supplies its own with a request filter, as pact's advice has always been;
+  a failed interaction names each redacted header no filter replaced. A pact verified as it stands is
+  sent as it stands.
+
 - **A `ProviderState` generator on the expected response.** pact-jvm generates the expected response
   from the provider-state values too, so a `Location` header recorded as `/users/666` with a
   generator from `${userId}` verifies against `/users/666554433`. Today's `pact_verifier_cli`, which

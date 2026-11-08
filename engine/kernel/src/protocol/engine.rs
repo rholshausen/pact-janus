@@ -32,6 +32,7 @@ use crate::contract::files::{self, ContractWriter};
 use crate::hooks::ConfigLoader;
 use crate::hooks::{ConfigError, HookInvoker, HookRunner, ScriptHooks};
 use crate::legacy::upgrade;
+use crate::redaction::{Redaction, SessionRedaction};
 use crate::subsumption::CheckError;
 use crate::variant::VariantError;
 use serde::de::DeserializeOwned;
@@ -488,14 +489,44 @@ impl Engine {
       Ok(scope) => scope,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    let chosen = match SessionRedaction::parse(create.config.redaction.as_ref(), "/config/redaction") {
+      Ok(chosen) => chosen,
+      Err(problems) => {
+        let said: Vec<String> = problems
+          .iter()
+          .map(|problem| format!("{}: {}", problem.pointer, problem.message))
+          .collect();
+        let mut error = EngineError::malformed_frame(format!(
+          "'config.redaction' names a path that is not one: {}",
+          said.join("; ")
+        ));
+        error.details = Some(Box::new(json!({ "problems": problems })));
+        return ResponseFrame::err(id, error);
+      }
+    };
+    let redaction = self.redaction(Some(&scope), chosen);
     let session = self.sessions.create(
       create.config.consumer,
       create.config.provider,
       create.config.policy,
       scope,
+      redaction,
       self.test_verdicts,
     );
     ResponseFrame::ok(id, json!({ "session": session }))
+  }
+
+  /// What the engine redacts in `scope` (ADR 0074): each transport kind's declared credentials, a
+  /// transport the project declared ahead of the embedding's own, and a session's own choices.
+  fn redaction(&self, scope: Option<&Scope>, chosen: SessionRedaction) -> Redaction {
+    let mut kinds: Vec<&String> = self.transports.keys().collect();
+    kinds.sort();
+    kinds.into_iter().fold(Redaction::new(chosen), |redaction, kind| {
+      let transport = scope
+        .and_then(|scope| scope.transport(kind))
+        .unwrap_or_else(|| Arc::clone(&self.transports[kind]));
+      redaction.with_transport(kind, transport.as_ref())
+    })
   }
 
   fn handle_add_interaction(&mut self, id: String, body: Value) -> ResponseFrame {
@@ -882,6 +913,7 @@ impl Engine {
     let components = verification::RunComponents {
       content: scope.content(),
       contributions: scope.contributions(),
+      redaction: self.redaction(Some(&scope), SessionRedaction::default()),
     };
     let sources = match (fetch, client) {
       (Some(fetch), Some(client)) => verification::Sources::Broker(Box::new(verification::BrokerFetch {
@@ -991,21 +1023,23 @@ impl Engine {
       .and_then(|options| options.get("plan"))
       .and_then(Value::as_bool)
       .unwrap_or(false);
+    // Nothing an explanation shows repeats a credential (ADR 0074 decision 7).
+    let redaction = self.redaction(Some(&scope), SessionRedaction::default());
+    let secrets = explain::secrets(&req.interaction, req.values.as_ref(), &redaction);
     let mut result = json!({});
-    super::display::put(
-      &mut result,
-      "text",
-      &crate::plan::render_pretty_marked(&plan),
-      self.segments,
-    );
+    let mut text = crate::plan::render_pretty_marked(&plan);
+    text.map_texts(|text| secrets.scrub(text));
+    super::display::put(&mut result, "text", &text, self.segments);
     if want_plan {
       result["plan"] = crate::plan::plan_json(&plan);
+      secrets.scrub_json(&mut result["plan"]);
     }
     if let Some(values) = &req.values {
-      let executed = match explain::execute(&plan, values, req.encoded.as_ref(), &scope) {
+      let mut executed = match explain::execute(&plan, values, req.encoded.as_ref(), &scope) {
         Ok(executed) => executed,
         Err(err) => return ResponseFrame::err(id, explain_error(err)),
       };
+      secrets.scrub_executed(&mut executed);
       let (status, mismatches) = crate::plan::outcome(&executed);
       result["executed"] = json!({
         "status": match status {
@@ -1143,6 +1177,7 @@ impl Engine {
     };
     let options = upgrade::Options {
       exclude_pending: req.options.exclude_pending,
+      redaction: self.redaction(None, SessionRedaction::default()),
     };
     let pact = match crate::contract::text::document(&req.pact, "/pact") {
       Ok(pact) => pact,

@@ -495,6 +495,25 @@ S1.7, closing kernel-boundary review findings 8 and 9):
 Every transport the engine serves or drives with declares them; an in-tree one does so in code
 (§9.1), as it declares its content slots.
 
+### 5.8 Which members carry credentials
+
+A contract is published, and a run's report lands in CI logs, so neither repeats a credential an
+interaction carried ([ADR 0074](../../decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)).
+Which members carry one is the transport's knowledge, as its content slots are, so a transport
+**declares** them, as `credential-members` in its `TransportContribution`: part name → slot name →
+member names. The built-in HTTP transport's are the credentials HTTP defines:
+
+```json sketch
+{ "request": { "headers": ["authorization", "proxy-authorization", "cookie"] },
+  "response": { "headers": ["set-cookie"] } }
+```
+
+The engine compares the names ignoring ASCII case. It records each such member's values as a
+placeholder in a contract (contract-file spec §5.6), unless a consumer session keeps it, and replaces
+every value it finds under one wherever it would appear in a report (engine-protocol spec §8.3). A
+transport that declares none has nothing redacted by default; a session can still name members of its
+own. An in-tree transport declares them in code (§9.1).
+
 ## 6. The content interface
 
 Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).

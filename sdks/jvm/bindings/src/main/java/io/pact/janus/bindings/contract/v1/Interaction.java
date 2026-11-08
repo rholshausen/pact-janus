@@ -32,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "parts",
     "content-types",
     "requires",
+    "redacted",
     "selection"
 })
 public class Interaction {
@@ -84,6 +85,13 @@ public class Interaction {
     @JsonProperty("requires")
     @JsonPropertyDescription("Components this interaction cannot be matched without (spec.md \u00a77). A verifier collects the union across interactions before it starts.")
     private List<Requirement> requires;
+    /**
+     * The members whose values the writer replaced by a placeholder because they carry credentials (spec.md §5.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.
+     * 
+     */
+    @JsonProperty("redacted")
+    @JsonPropertyDescription("The members whose values the writer replaced by a placeholder because they carry credentials (spec.md \u00a75.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.")
+    private List<java.lang.String> redacted;
     /**
      * RecordedSelection
      * <p>
@@ -218,6 +226,24 @@ public class Interaction {
     }
 
     /**
+     * The members whose values the writer replaced by a placeholder because they carry credentials (spec.md §5.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.
+     * 
+     */
+    @JsonProperty("redacted")
+    public List<java.lang.String> getRedacted() {
+        return redacted;
+    }
+
+    /**
+     * The members whose values the writer replaced by a placeholder because they carry credentials (spec.md §5.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.
+     * 
+     */
+    @JsonProperty("redacted")
+    public void setRedacted(List<java.lang.String> redacted) {
+        this.redacted = redacted;
+    }
+
+    /**
      * RecordedSelection
      * <p>
      * Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).
@@ -279,6 +305,10 @@ public class Interaction {
         sb.append('=');
         sb.append(((this.requires == null)?"<null>":this.requires));
         sb.append(',');
+        sb.append("redacted");
+        sb.append('=');
+        sb.append(((this.redacted == null)?"<null>":this.redacted));
+        sb.append(',');
         sb.append("selection");
         sb.append('=');
         sb.append(((this.selection == null)?"<null>":this.selection));
@@ -299,6 +329,7 @@ public class Interaction {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.selection == null)? 0 :this.selection.hashCode()));
+        result = ((result* 31)+((this.redacted == null)? 0 :this.redacted.hashCode()));
         result = ((result* 31)+((this.parts == null)? 0 :this.parts.hashCode()));
         result = ((result* 31)+((this.description == null)? 0 :this.description.hashCode()));
         result = ((result* 31)+((this.transport == null)? 0 :this.transport.hashCode()));
@@ -318,7 +349,7 @@ public class Interaction {
             return false;
         }
         Interaction rhs = ((Interaction) other);
-        return (((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
+        return ((((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.redacted == rhs.redacted)||((this.redacted!= null)&&this.redacted.equals(rhs.redacted))))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
     }
 
 }

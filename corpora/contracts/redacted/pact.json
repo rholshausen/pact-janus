@@ -1,0 +1,32 @@
+{
+  "consumer": { "name": "web-app" },
+  "provider": { "name": "orders" },
+  "interactions": [
+    {
+      "description": "get an order, signed in",
+      "request": {
+        "method": "GET",
+        "path": "/orders/1",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.recorded",
+          "Cookie": "session=recorded-session",
+          "Accept": "application/json"
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": { "matchers": [ { "match": "regex", "regex": "Bearer .+" } ] }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Set-Cookie": "session=renewed-session; HttpOnly"
+        },
+        "body": { "id": 1 }
+      }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "3.0.0" } }
+}

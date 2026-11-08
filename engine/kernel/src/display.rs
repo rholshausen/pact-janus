@@ -151,6 +151,14 @@ impl Marked {
     &self.segments
   }
 
+  /// Each piece's text rewritten by `f`, its kind kept: how a value is kept out of a report wherever
+  /// it was quoted (ADR 0074).
+  pub fn map_texts(&mut self, f: impl Fn(&str) -> String) {
+    for segment in &mut self.segments {
+      segment.text = f(&segment.text);
+    }
+  }
+
   pub fn is_empty(&self) -> bool {
     self.segments.is_empty()
   }

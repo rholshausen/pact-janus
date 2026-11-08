@@ -102,6 +102,15 @@ final class CaseRunner {
     if (testCase.path("janus").path("overwrite-contract").asBoolean(false)) {
       options = options.withContractOverwrite(true);
     }
+    JsonNode redaction = testCase.path("janus").path("redaction");
+    if (redaction.path("add").isArray()) {
+      options = options.withRedacted(Suite.MAPPER.convertValue(
+          redaction.path("add"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+    }
+    if (redaction.path("keep").isArray()) {
+      options = options.withKept(Suite.MAPPER.convertValue(
+          redaction.path("keep"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+    }
     JsonNode components = testCase.path("janus").path("components");
     if (components.isArray()) {
       options = options.withComponents(Suite.MAPPER.convertValue(

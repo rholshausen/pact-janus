@@ -20,6 +20,23 @@
               "type": "array",
               "description": "The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.",
               "items": { "type": "object" }
+            },
+            "redaction": {
+              "title": "Redaction",
+              "type": "object",
+              "description": "What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md §8.2, contract-file spec §5.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.",
+              "properties": {
+                "add": {
+                  "type": "array",
+                  "description": "Members to record redacted, and never to report, beyond the transport's.",
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "keep": {
+                  "type": "array",
+                  "description": "Members to record as they are, though the transport or 'add' names them: a fixed token a provider's test environment accepts. A kept value is still never reported.",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
             }
           }
         }

@@ -132,6 +132,21 @@ export interface Create {
   [k: string]: unknown;
 }
 
+/**
+ * What the contract records redacted beyond the members the transport declares as credentials, and which of those it records as they are (spec.md §8.2, contract-file spec §5.6, ADR 0074). Each entry is a path: a part, a slot, then member names, as a plan path is spelled without its '$.'. A path that does not parse fails the create with 'malformed-frame'.
+ */
+export interface Redaction {
+  /**
+   * Members to record redacted, and never to report, beyond the transport's.
+   */
+  add?: string[];
+  /**
+   * Members to record as they are, though the transport or 'add' names them: a fixed token a provider's test environment accepts. A kept value is still never reported.
+   */
+  keep?: string[];
+  [k: string]: unknown;
+}
+
 export interface SessionConfig {
   consumer: Party;
   provider: Party;
@@ -141,6 +156,7 @@ export interface SessionConfig {
   components?: {
     [k: string]: unknown;
   }[];
+  redaction?: Redaction;
   [k: string]: unknown;
 }
 

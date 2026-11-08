@@ -68,6 +68,10 @@ pub struct Interaction {
   pub content_types: Option<ContentTypes>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub requires: Option<Vec<Requirement>>,
+  /// The members whose values the writer redacted (contract-file spec §5.6, ADR 0074), as paths:
+  /// `request.headers.authorization`. Absent when there were none.
+  #[serde(skip_serializing_if = "Option::is_none", default)]
+  pub redacted: Option<Vec<String>>,
   pub selection: RecordedSelection,
 }
 

@@ -35,6 +35,7 @@ export const FindingCode = {
   PendingExcluded: "pending-excluded",
   InteractionDropped: "interaction-dropped",
   ResponsesDropped: "responses-dropped",
+  ValueRedacted: "value-redacted",
 } as const;
 
 /**

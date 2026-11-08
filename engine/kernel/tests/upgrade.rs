@@ -964,6 +964,7 @@ fn a_pending_interaction_converts_without_its_flag_by_default() {
 fn a_pending_interaction_is_left_out_when_asked() {
   let options = upgrade::Options {
     exclude_pending: true,
+    ..upgrade::Options::default()
   };
   let upgraded = upgrade::pact_with("test", &with_a_pending_interaction(), &options).expect("converts");
   assert_eq!(descriptions(&upgraded), vec!["a message", "built"]);

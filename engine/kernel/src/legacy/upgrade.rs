@@ -112,6 +112,10 @@ pub struct Options {
   /// Leave every pending interaction out of the contract, rather than converting it without its
   /// flag (ADR 0051). Each one left out is a `pending-excluded` finding.
   pub exclude_pending: bool,
+  /// What the contract records redacted (ADR 0074 decision 5): the transport's credentials. Each
+  /// member redacted is a `value-redacted` finding. The default redacts nothing, which is what
+  /// `add-pact-interaction` asks for: its session redacts the contract it writes.
+  pub redaction: crate::redaction::Redaction,
 }
 
 /// Convert a v1–v4 pact document to a Janus contract, with the default [`Options`].
@@ -212,7 +216,24 @@ pub fn pact_with(source: &str, doc: &Value, options: &Options) -> Result<Upgrade
       legacy_pact::PactInteraction::NeedsPlugins(_) => continue,
     };
     match converted {
-      Ok(converted) => interactions.push(converted),
+      Ok(mut converted) => {
+        let kind = converted.transport.as_ref().map(|t| t.kind.clone());
+        let members = options.redaction.recorded(kind.as_deref());
+        for path in crate::redaction::redact_interaction(&mut converted, &members) {
+          conversion.finding(Finding::new(
+            "value-redacted",
+            "note",
+            at.clone(),
+            format!(
+              "'{path}' carries a credential, so the contract records '{}' in its place, and a \
+               verifier sends that unless a request filter or the provider's headers replace it. The \
+               pact is unchanged (ADR 0074)",
+              crate::redaction::PLACEHOLDER
+            ),
+          ));
+        }
+        interactions.push(converted)
+      }
       Err(mut found) => problems.append(&mut found),
     }
   }
@@ -321,6 +342,7 @@ impl Conversion {
       // bytes are what an undeclared slot already means (staged plan S1.25).
       content_types: (!content_types.is_empty()).then_some(content_types),
       requires: (!requires.is_empty()).then_some(requires),
+      redacted: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),
@@ -412,6 +434,7 @@ impl Conversion {
       parts,
       content_types: (!content_types.is_empty()).then_some(content_types),
       requires: (!requires.is_empty()).then_some(requires),
+      redacted: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),

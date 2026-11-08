@@ -609,6 +609,14 @@ sends them back out.**
   `report-data: true`** (§10.2). This refines design 2.6 §8.2's "opaque hook output surfaced to the host":
   the surfacing is opt-in, because the fetch-a-token hook is precisely the one whose output must not
   appear in CI logs.
+- **The values an interaction carries are covered too**
+  ([ADR 0074](../../decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)).
+  A member a transport declares as a credential (component-interfaces spec §5.8) — the `authorization`
+  header a `before-request` hook signs, the `set-cookie` a provider answers with — is recorded in a
+  contract as a placeholder (contract-file spec §5.6), and every value found under one is replaced
+  wherever a report would repeat it: an executed plan, a mismatch, `explain --executed` (engine-protocol
+  spec §8.3). A hook report never held one: it names the paths a hook changed, never their values
+  (§10.2).
 - A hook that logs a secret has logged it (§9.3's `janus.log` writes what it is given). The engine cannot
   fix that, and this specification does not pretend otherwise.
 

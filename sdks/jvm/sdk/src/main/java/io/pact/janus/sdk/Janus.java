@@ -9,6 +9,7 @@ import io.pact.janus.bindings.protocol.v1.Finalise;
 import io.pact.janus.bindings.protocol.v1.FinaliseResult;
 import io.pact.janus.bindings.protocol.v1.InteractionResult;
 import io.pact.janus.bindings.protocol.v1.Party;
+import io.pact.janus.bindings.protocol.v1.Redaction;
 import io.pact.janus.bindings.protocol.v1.RefusedInteraction;
 import io.pact.janus.bindings.protocol.v1.ReportVariant;
 import io.pact.janus.bindings.protocol.v1.ReportVariantResult;
@@ -273,6 +274,12 @@ public final class Janus implements AutoCloseable {
       config.setProvider(party(provider));
       if (!options.components().isEmpty()) {
         config.setComponents(options.components().stream().map(Janus::resolved).toList());
+      }
+      if (options.redacted() != null || options.kept() != null) {
+        Redaction redaction = new Redaction();
+        redaction.setAdd(options.redacted());
+        redaction.setKeep(options.kept());
+        config.setRedaction(redaction);
       }
       create.setConfig(config);
       session = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class).getSession();

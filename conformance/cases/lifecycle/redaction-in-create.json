@@ -1,0 +1,29 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/redaction-in-create",
+  "category": "lifecycle",
+  "title": "A named redaction travels in 'consumer-session/create' as 'config.redaction', as written.",
+  "covers": ["session.janus.redaction-in-create"],
+  "why": "behavioural spec 'janus': when the options name a redaction, 'consumer-session/create' carries it as 'config.redaction', as written. The SDK parses no path and redacts nothing itself: which members carry credentials is the transport's to declare, and redacting them the engine's (ADR 0074).",
+  "note": "The paths are spelled as a user would, one with a capital, one quoted: an SDK that normalised either would send something else.",
+  "janus": {
+    "redaction": { "add": ["request.headers.x-api-key", "request.body['user.password']"], "keep": ["request.headers.Authorization"] }
+  },
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base"] }
+    }
+  ],
+  "expect": {
+    "frames": {
+      "consumer-session/create": {
+        "config": {
+          "consumer": { "name": "web-app" },
+          "provider": { "name": "orders-api" },
+          "redaction": { "add": ["request.headers.x-api-key", "request.body['user.password']"], "keep": ["request.headers.Authorization"] }
+        }
+      }
+    }
+  }
+}

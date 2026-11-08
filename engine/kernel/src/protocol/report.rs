@@ -126,6 +126,18 @@ impl Reporter {
       text.text_plain(": ");
       text.append(marked(mismatch, "message"));
     }
+    // A credential the contract recorded redacted was sent as its placeholder (ADR 0074 decision 6).
+    for path in payload["redacted"].as_array().into_iter().flatten() {
+      if let Some(path) = path.as_str() {
+        text.text_plain(format!("\n{DETAIL}"));
+        text.text_as(Kind::Path, path);
+        text.text_plain(": ");
+        text.text_as(
+          Kind::Quiet,
+          "recorded redacted and sent as recorded; supply one with a request filter or --header",
+        );
+      }
+    }
     // The hook's error is the result's: said once, after which hook it was.
     if let Some(hook) = self.held_hook.take() {
       text.text_plain(format!("\n{DETAIL}{}", hook_line(&hook)));
@@ -605,6 +617,23 @@ mod tests {
        \x20         given a product exists\n\
        \x20         $.response.status: Expected 200 to equal 404\n\
        \x20         auth at before-request: failed"
+    );
+  }
+
+  #[test]
+  fn a_result_says_which_redacted_members_were_sent_as_recorded() {
+    let result = json!({
+      "interaction": { "description": "get an order", "format": "janus-contract/1" },
+      "variant": "base", "status": "failed",
+      "mismatches": [ { "path": "$.response.status", "message": "Expected 401 to equal 200" } ],
+      "redacted": ["request.headers.authorization"],
+    });
+    assert_eq!(
+      text(&mut reporter(), "verification/interaction-result", result),
+      "  FAILED  get an order [base]\n\
+       \x20         $.response.status: Expected 401 to equal 200\n\
+       \x20         request.headers.authorization: recorded redacted and sent as recorded; supply one with \
+       a request filter or --header"
     );
   }
 

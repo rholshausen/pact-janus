@@ -28,6 +28,7 @@ use crate::interaction_spec;
 use crate::legacy::compile::compile_interaction;
 use crate::legacy::pact as legacy_pact;
 use crate::plan::{self, Assignment, CapturedValues, Executed, Plan, RuntimeValue};
+use crate::redaction::{self, Member, Redaction, Secrets};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -197,6 +198,83 @@ fn janus(document: &Value, index: usize, variant: Option<&str>, scope: &Scope) -
     }
   }
   Ok(contributions.compile(&spec, &interaction.parts, &assignment, Some(&recorded.id)))
+}
+
+/// The secrets an explanation never repeats (ADR 0074 decision 7): the strings under a redacted member
+/// in the subject and in the captured values. The members are the transport's credentials and, for a
+/// contract, the ones it recorded redacted.
+pub fn secrets(subject: &Subject, values: Option<&Map<String, Value>>, redaction: &Redaction) -> Secrets {
+  let mut secrets = Secrets::default();
+  let kind_of = |document: &Value| {
+    document
+      .pointer("/transport/kind")
+      .and_then(Value::as_str)
+      .map(str::to_string)
+  };
+  let members = match (subject.kind.as_str(), &subject.spec, &subject.contract) {
+    ("spec", Some(spec), _) => {
+      let members = redaction.reported(kind_of(spec).as_deref());
+      secrets.collect_shapes(&members, &super::session::raw_parts(spec));
+      members
+    }
+    ("contract-interaction", _, Some(document)) => {
+      let index = subject.index.unwrap_or(0);
+      let janus = document
+        .get("$format")
+        .and_then(Value::as_str)
+        .is_some_and(|format| crate::persisted::CONTRACT_FORMAT.reads(format));
+      let interaction = document
+        .get("interactions")
+        .or_else(|| document.get("messages"))
+        .and_then(|interactions| interactions.get(index));
+      match (janus, interaction) {
+        (true, Some(interaction)) => {
+          let recorded: Vec<Member> = interaction
+            .get("redacted")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|path| path.as_str().and_then(|path| Member::parse(path).ok()))
+            .collect();
+          let members = redaction::union(&redaction.reported(kind_of(interaction).as_deref()), &recorded);
+          secrets.collect_shapes(&members, &super::session::raw_parts(interaction));
+          for variant in interaction
+            .pointer("/selection/variants")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+          {
+            if let Some(Value::Object(parts)) = variant.get("parts") {
+              for (part, slots) in parts {
+                for (slot, value) in slots.as_object().into_iter().flatten() {
+                  if matches!(value.get("encoded").and_then(Value::as_str), None | Some("json"))
+                    && let Some(content) = value.get("content")
+                  {
+                    secrets.collect(&members, &[Some(part), Some(slot)], content);
+                  }
+                }
+              }
+            }
+          }
+          members
+        }
+        // A v1–v4 interaction holds its parts by name: `request.headers`, `response.headers`.
+        (false, Some(interaction)) => {
+          let members = redaction.reported(None);
+          secrets.collect(&members, &[], interaction);
+          members
+        }
+        _ => Vec::new(),
+      }
+    }
+    _ => Vec::new(),
+  };
+  for (path, value) in values.into_iter().flatten() {
+    let steps = redaction::steps(path);
+    let at: Vec<Option<&str>> = steps.iter().map(Option::as_deref).collect();
+    secrets.collect(&members, &at, value);
+  }
+  secrets
 }
 
 /// What `verify` checks before a run starts (component-interfaces spec §2.3): every requirement, and

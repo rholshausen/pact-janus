@@ -83,6 +83,7 @@ fn sample_contract() -> Contract {
       parts,
       content_types: None,
       requires: None,
+      redacted: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),

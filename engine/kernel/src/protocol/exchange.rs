@@ -53,6 +53,10 @@ pub(crate) struct ArmedExchange {
   pub fresh: Arc<BTreeMap<String, crate::contract::ShapePart>>,
   /// The variant's resolved provider-state parameters, which a reply's generators read.
   pub provider_state: Arc<serde_json::Map<String, Value>>,
+  /// The members whose values a mismatch never repeats, and the strings under them in the
+  /// interaction's own examples (ADR 0074 decision 7).
+  pub redacted: Arc<Vec<crate::redaction::Member>>,
+  pub secrets: Arc<crate::redaction::Secrets>,
 }
 
 /// Shared between `serve_variant` (arms) and this module's background loop (matches, replies,
@@ -271,9 +275,13 @@ pub(crate) fn handle_arrival(
   let Candidate {
     armed,
     status,
-    mismatches,
+    mut mismatches,
     ..
   } = best(candidates).expect("an arrival is matched against at least one arming");
+  // What the consumer sent under a redacted member is a secret, whichever arming it went to.
+  let mut secrets = (*armed.secrets).clone();
+  secrets.collect_parts(&armed.redacted, &inbound.parts);
+  secrets.scrub_mismatches(&mut mismatches);
 
   // The one line plan task 4.6's report leans on: `RUST_LOG=debug` names the variant a failure
   // belongs to, which nothing else on this loop's own thread does — a consumer's own crash

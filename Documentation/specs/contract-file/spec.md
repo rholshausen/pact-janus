@@ -466,6 +466,39 @@ bytes were spelled. So the type is declared beside the parts, nested the same wa
   engine with no `text/csv` content component, and SHOULD say so in `requires` (§7) so the union check
   fails the run before it starts rather than at the first body.
 
+### 5.6 Redacted members
+
+A contract is published to a broker many people read, so it never holds a credential the test
+happened to send ([ADR 0074](../../decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)).
+Which members carry credentials is the transport's to say (component-interfaces spec §5.8): the
+built-in HTTP transport names the request's `authorization`, `proxy-authorization` and `cookie`
+headers and the response's `set-cookie`. A consumer session adds members and keeps some
+(engine-protocol spec §8.2), and `janus upgrade` redacts the transport's (§8.4's `value-redacted`).
+
+```json sketch
+{ "description": "get an order",
+  "parts": { "request": { "headers": { "shape": "object", "members": {
+      "authorization": { "shape": "type", "example": ["[redacted]"] } } } } },
+  "redacted": ["request.headers.authorization"] }
+```
+
+- **A member is named by a path**: a part, a slot, then member names, spelled as a plan path is without
+  its `$.`, with a name quoted `['a.b']` when it needs to be. Names are compared ignoring ASCII case. A
+  member step that meets an array applies to each element.
+- **Under a redacted member, nothing the test sent is recorded.** Every recorded value and every
+  shape's `example` is replaced, keeping its kind and structure: a string becomes `"[redacted]"`, a
+  number `0`, a boolean `false`; objects and arrays keep their member names and lengths. An `equality`
+  becomes a `type`. Patterns, bounds and generators are kept. A path into a slot recorded as octets
+  replaces the slot's whole value.
+- **An example there need not be admitted by its node** (shape spec §3.3), since nothing produces from
+  it: a verifier replays the recorded value, and matches a response by the node's constraint.
+- **`redacted` lists the paths the writer redacted**, sorted. It is absent when there were none, so an
+  interaction with no credential is written exactly as it was before this section existed.
+- **A verifier replays the placeholder** unless a `before-request` hook or the transport replaces it,
+  and a failed result names the redacted members no hook replaced (engine-protocol spec §8.3). A
+  provider that checks credentials in its tests supplies its own, as it does today with a request
+  filter.
+
 ## 6. Provider states
 
 A state carries its literal parameters in `params` and its variant-bound parameters in a sibling
@@ -651,6 +684,7 @@ distinguish), and `note` (neither, and still worth reading).
 | `pending-excluded` | `lossy` | the conversion was asked to leave pending interactions out (`upgrade/pact`'s `exclude-pending`), and this one was: the contract says nothing about it (ADR 0051) |
 | `interaction-dropped` | `lossy` | an interaction could not be converted at all: one that needs a pact plugin, named in the message (ADR 0045), or one that is neither HTTP nor a message |
 | `responses-dropped` | `lossy` | a synchronous message expects more than one response, and the contract records the first; today's verifier fails it for expecting more (ADR 0067) |
+| `value-redacted` | `note` | a member that carries a credential (§5.6) is recorded as a placeholder, which a verifier sends unless something replaces it; the pact is unchanged (ADR 0074) |
 
 An empty `findings` list is a claim, and a strong one: the conversion was exact. No interaction with an
 HTTP request can make it, because `request-query-opened` is raised for every one — the loss is real

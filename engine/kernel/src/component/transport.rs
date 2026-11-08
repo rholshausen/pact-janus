@@ -124,6 +124,13 @@ pub trait TransportComponent: ::std::marker::Send + ::std::marker::Sync {
   /// Which part starts an exchange and which answers it: the in-tree form of
   /// `TransportContribution.exchange-parts`.
   fn exchange_parts(&self) -> ExchangeParts;
+  /// Which members of which slots carry credentials (component-interfaces spec §5.8, ADR 0074), as
+  /// part name -> slot name -> member names: what the engine redacts from a contract and a report
+  /// unless a session keeps it. The in-tree form of `TransportContribution.credential-members`; none
+  /// unless a transport says so.
+  fn credential_members(&self) -> crate::redaction::CredentialMembers {
+    crate::redaction::CredentialMembers::new()
+  }
   fn start(&self, req: Start) -> Result<StartResult, ComponentError>;
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError>;
   fn send(&self, req: Send) -> Result<SendResult, ComponentError>;

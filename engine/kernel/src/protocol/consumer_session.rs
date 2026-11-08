@@ -18,6 +18,10 @@ pub struct SessionConfig {
   /// The session-wide sampling policy layer (variant-semantics spec §3.8 layer 2).
   #[serde(default)]
   pub policy: Option<Value>,
+  /// What a contract records redacted beyond the transport's credentials, and which of those it keeps
+  /// (ADR 0074 decision 3): `{ add, keep }`, each a list of paths.
+  #[serde(default)]
+  pub redaction: Option<Value>,
   /// The project's declared components, as the host's loader resolved them (spec §8.2,
   /// component-interfaces spec §10.2). Loaded before `create` answers.
   #[serde(default)]

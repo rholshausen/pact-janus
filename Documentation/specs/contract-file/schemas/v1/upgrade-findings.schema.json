@@ -40,7 +40,8 @@
             "pending-dropped",
             "pending-excluded",
             "interaction-dropped",
-            "responses-dropped"
+            "responses-dropped",
+            "value-redacted"
           ]
         },
         "kind": {

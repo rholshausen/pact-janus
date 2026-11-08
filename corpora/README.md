@@ -71,7 +71,9 @@ readability:
 `contracts/` pins how a contract is written, not how one matches (contract-file spec §2.4, ADR 0063):
 each case is a `pact.json` and the `contract.janus.json` that `upgrade/pact` writes for it, compared
 byte for byte by `engine/kernel/tests/contract_text.rs`. `numbers/` holds every way a number is
-spelled, and `strings/` every way a string is escaped. A dependency that moves a spelling fails it;
+spelled, and `strings/` every way a string is escaped. `redacted/` is a pact whose credential headers
+are recorded as placeholders, a regex keeping its pattern and an `equality` becoming a `type`, and
+listed under `redacted` (contract-file spec §5.6, ADR 0074). A dependency that moves a spelling fails it;
 a deliberate move changes the case in the same commit, and needs a change file, since every contract
 holding that spelling gets a new hash at a broker.
 

@@ -29,6 +29,7 @@ use pact_janus_kernel::component::{
   PollInboundResult, Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult,
   TransportComponent,
 };
+use pact_janus_kernel::redaction::CredentialMembers;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
@@ -190,6 +191,25 @@ impl TransportComponent for HttpTransport {
       initiating: "request".to_string(),
       answering: Some("response".to_string()),
     }
+  }
+
+  /// The credentials HTTP itself defines (ADR 0074 decision 2): `Authorization` and
+  /// `Proxy-Authorization` (RFC 9110 §11.6.2, §11.7.2) and `Cookie` on a request, `Set-Cookie` on a
+  /// response (RFC 6265 §4). Header names are lower-case, as this transport presents them.
+  fn credential_members(&self) -> CredentialMembers {
+    let headers = |names: &[&str]| {
+      std::collections::BTreeMap::from([(
+        "headers".to_string(),
+        names.iter().map(|name| name.to_string()).collect::<Vec<_>>(),
+      )])
+    };
+    CredentialMembers::from([
+      (
+        "request".to_string(),
+        headers(&["authorization", "proxy-authorization", "cookie"]),
+      ),
+      ("response".to_string(), headers(&["set-cookie"])),
+    ])
   }
 
   fn start(&self, req: Start) -> Result<StartResult, ComponentError> {

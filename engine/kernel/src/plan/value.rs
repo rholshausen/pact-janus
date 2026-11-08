@@ -115,7 +115,7 @@ pub fn member_path(base: &str, name: &str) -> String {
 }
 
 /// A quoted member's name, and what follows its closing `']`.
-fn unquote(quoted: &str) -> (String, &str) {
+pub fn unquote(quoted: &str) -> (String, &str) {
   let mut name = String::new();
   let mut chars = quoted.char_indices();
   while let Some((at, c)) = chars.next() {

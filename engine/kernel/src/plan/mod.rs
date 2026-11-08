@@ -29,4 +29,4 @@ pub use render::{
 };
 pub use resolve::{CapturedValues, ContentDetector, Resolver};
 pub use tokens::{Token, TokenKind, tokens};
-pub use value::{RuntimeValue, is_written_integer, member_path, navigate};
+pub use value::{RuntimeValue, is_written_integer, member_path, navigate, unquote};

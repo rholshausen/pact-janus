@@ -6,6 +6,7 @@ export {
   Janus,
   type JanusConfig,
   type ComponentDeclaration,
+  type Redaction,
   type Mock,
   type Variant,
   type Closure,

@@ -97,6 +97,7 @@ mod tests {
       )]),
       content_types: None,
       requires: None,
+      redacted: None,
       selection: RecordedSelection {
         variants: vec![],
         report: BTreeMap::new(),

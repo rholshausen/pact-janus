@@ -130,6 +130,14 @@
             "answering": { "type": "string", "minLength": 1 }
           }
         },
+        "credential-members": {
+          "type": "object",
+          "description": "Which members of which slots carry credentials (spec.md §5.8, ADR 0074), as part name -> slot name -> member names, compared ignoring ASCII case: the engine records their values as a placeholder in a contract, unless a session keeps them, and never repeats them in a report. HTTP's are the request's 'authorization', 'proxy-authorization' and 'cookie' headers and the response's 'set-cookie'. Absent means none.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
         "roles": {
           "type": "array",
           "description": "Which roles it supports: 'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1). A transport may support both.",

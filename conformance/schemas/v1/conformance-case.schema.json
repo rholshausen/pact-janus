@@ -45,6 +45,10 @@
         "overwrite-contract": {
           "type": "boolean",
           "description": "Handed to 'janus' as its option to overwrite the contract file rather than merge into it (ADR 0065)."
+        },
+        "redaction": {
+          "type": "object",
+          "description": "Handed to 'janus' as its redaction option, 'add' and 'keep' each a list of paths (ADR 0074)."
         }
       },
       "additionalProperties": false

@@ -62,6 +62,11 @@
           "description": "Components this interaction cannot be matched without (spec.md §7). A verifier collects the union across interactions before it starts.",
           "items": { "$ref": "#/$defs/Requirement" }
         },
+        "redacted": {
+          "type": "array",
+          "description": "The members whose values the writer replaced by a placeholder because they carry credentials (spec.md §5.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "selection": { "$ref": "#/$defs/RecordedSelection" }
       }
     },

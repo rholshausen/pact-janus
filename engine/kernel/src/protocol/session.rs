@@ -11,6 +11,7 @@ use crate::contract::{self, Contract, Party};
 use crate::error::Problem;
 use crate::interaction_spec::{self, InteractionSpec, InteractionSpecError};
 use crate::plan::{self, Assignment, Plan};
+use crate::redaction::{self, Redaction};
 use crate::variant::generate::Generated;
 use crate::variant::{Selected, SelectionReport, VariantError, generate, params, select};
 use serde_json::Value;
@@ -251,6 +252,8 @@ pub(crate) struct ConsumerSession {
   verdicts_required: bool,
   /// Every `add-interaction` this session refused, as `finalise`'s `refused` lists them.
   refused: Vec<Value>,
+  /// What its contract records redacted and its mismatches never repeat (ADR 0074).
+  redaction: Arc<Redaction>,
 }
 
 /// Why `add-interaction` refused an interaction: it is malformed (`interaction-invalid`), or it
@@ -273,6 +276,7 @@ impl ConsumerSession {
     provider: Party,
     policy: Option<Value>,
     scope: Scope,
+    redaction: Redaction,
     verdicts_required: bool,
   ) -> Self {
     ConsumerSession {
@@ -286,6 +290,7 @@ impl ConsumerSession {
       scope,
       verdicts_required,
       refused: Vec::new(),
+      redaction: Arc::new(redaction),
     }
   }
 
@@ -644,6 +649,10 @@ impl ConsumerSession {
     }
 
     if let (Some(kind), Some(request_plan)) = (passive_kind, &arming.request_plan) {
+      let redacted = Arc::new(self.redaction.reported(Some(&kind)));
+      let mut secrets = redaction::Secrets::default();
+      secrets.collect_shapes(&redacted, &entry.raw_parts);
+      let secrets = Arc::new(secrets);
       for run in self.transports.iter().filter(|run| run.kind == kind) {
         let mut state = run.exchange.state.lock().expect("exchange state lock poisoned");
         state.arm(ArmedExchange {
@@ -654,6 +663,8 @@ impl ConsumerSession {
           content_types: Arc::clone(&entry.content_types),
           fresh: Arc::clone(&entry.fresh),
           provider_state: Arc::clone(&arming.provider_state),
+          redacted: Arc::clone(&redacted),
+          secrets: Arc::clone(&secrets),
         });
       }
     }
@@ -846,18 +857,23 @@ impl ConsumerSession {
         })
         .collect();
 
-      interactions.push(contract::Interaction {
+      let mut interaction = contract::Interaction {
         description: entry.spec.description.clone(),
         transport: entry.spec.transport.clone(),
         states: entry.spec.states.clone(),
         parts: entry.raw_parts.clone(),
         content_types: entry.spec.content_types.clone(),
         requires: entry.spec.requires.clone(),
+        redacted: None,
         selection: contract::RecordedSelection {
           variants,
           report: report_to_map(&selected.report),
         },
-      });
+      };
+      // Credentials are never recorded (ADR 0074 decision 4), unless the session kept them.
+      let kind = entry.spec.transport.as_ref().map(|t| t.kind.as_str());
+      redaction::redact_interaction(&mut interaction, &self.redaction.recorded(kind));
+      interactions.push(interaction);
     }
 
     // Identity order (contract-file spec §2.4, ADR 0065), before the check, so its pointers are
@@ -999,13 +1015,14 @@ impl SessionStore {
     provider: Party,
     policy: Option<Value>,
     scope: Scope,
+    redaction: Redaction,
     verdicts_required: bool,
   ) -> String {
     self.next_session += 1;
     let id = format!("cs-{}", self.next_session);
     self.sessions.insert(
       id.clone(),
-      ConsumerSession::new(consumer, provider, policy, scope, verdicts_required),
+      ConsumerSession::new(consumer, provider, policy, scope, redaction, verdicts_required),
     );
     id
   }
@@ -1043,8 +1060,22 @@ mod tests {
   #[test]
   fn session_ids_are_distinct_and_stable() {
     let mut store = SessionStore::default();
-    let a = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
-    let b = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let a = store.create(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
+    let b = store.create(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     assert_ne!(a, b);
     assert!(store.get_mut(&a).is_some());
     assert!(store.get_mut(&b).is_some());
@@ -1052,7 +1083,14 @@ mod tests {
 
   #[test]
   fn handles_are_allocated_in_submission_order() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let spec = serde_json::json!({
       "description": "a request for an order",
       "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
@@ -1073,7 +1111,14 @@ mod tests {
   #[test]
   fn end_removes_the_session() {
     let mut store = SessionStore::default();
-    let id = store.create(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let id = store.create(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     assert!(store.end(&id).is_some());
     assert!(store.get_mut(&id).is_none());
     assert!(store.end(&id).is_none());
@@ -1112,14 +1157,28 @@ mod tests {
 
   #[test]
   fn contract_is_none_when_variants_was_never_called() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     session.add_interaction(&degenerate_interaction()).unwrap();
     assert_eq!(session.contract().unwrap(), None);
   }
 
   #[test]
   fn contract_is_withheld_until_every_selected_variant_is_verified() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &handle);
     assert_eq!(
@@ -1142,7 +1201,14 @@ mod tests {
   /// every later arming shares that work rather than repeating it.
   #[test]
   fn re_arming_a_variant_reuses_what_its_first_arming_built() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
 
@@ -1165,7 +1231,14 @@ mod tests {
 
   #[test]
   fn contract_is_withheld_if_any_selected_variant_failed() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     assert_eq!(
@@ -1185,7 +1258,14 @@ mod tests {
 
   #[test]
   fn contract_records_only_exercised_variants_with_their_concrete_parts() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {
@@ -1233,7 +1313,14 @@ mod tests {
 
   #[test]
   fn contract_records_a_states_literal_params_per_variant() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let interaction = serde_json::json!({
       "description": "an order exists",
       "states": [ { "name": "an order exists", "params": { "id": "42" } } ],
@@ -1255,7 +1342,14 @@ mod tests {
 
   #[test]
   fn results_reports_per_variant_status_after_exercising() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     session.record_exercised(&handle, &ids[0], ExchangeOutcome::Verified);
@@ -1283,7 +1377,14 @@ mod tests {
 
   #[test]
   fn contract_rejects_duplicate_interaction_identity() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let h1 = session.add_interaction(&degenerate_interaction()).unwrap();
     let h2 = session.add_interaction(&degenerate_interaction()).unwrap();
     variant_ids(&mut session, &h1);
@@ -1300,7 +1401,14 @@ mod tests {
 
   #[test]
   fn a_session_built_contract_round_trips_through_canonical_bytes() {
-    let mut session = ConsumerSession::new(party("web-app"), party("order-api"), None, Scope::none(), false);
+    let mut session = ConsumerSession::new(
+      party("web-app"),
+      party("order-api"),
+      None,
+      Scope::none(),
+      Redaction::default(),
+      false,
+    );
     let handle = session.add_interaction(&widened_interaction()).unwrap();
     let ids = variant_ids(&mut session, &handle);
     for id in &ids {
