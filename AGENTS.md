@@ -198,8 +198,11 @@ Three sources are the source of truth and take precedence over this file when th
 > extension, ported under `io.pact.janus.facade.`, building what pact-jvm builds and submitting it as
 > `add-pact-interaction` calls. pact-jvm's Java `consumer/junit5` tests run on it, their imports
 > changed, and `compareContracts` holds each contract to `janus upgrade` of pact-jvm's pact;
-> `consumer-test-migration.md` has each primitive's verdict. S2.17, an unmappable rule on an array
-> upgraded with no finding, is new.
+> `consumer-test-migration.md` has each primitive's verdict. S2.17 (ADR 0073): a rule `pact_models`
+> reads as a plugin's, in a pact that names no plugin (pact-jvm's `ignore-order`), upgrades to the
+> `pact` component's operator of its name, with no requirement, so its interaction fails by name as
+> the pact does, reported as `rule-unmapped`. S2.18, an `OR` failed by an alternative it did not need,
+> is new.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

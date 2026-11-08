@@ -1882,6 +1882,36 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   `rule-unmapped` finding, never a silent guess, on an array as anywhere else.
   *Exit:* a corpus case upgrades an `ignore-order` rule with a `rule-unmapped` finding, and S1.1's
   harness has a fixture for it with no upgrade-ledger entry, or one naming the ADR that decides it.
+  *Done 2026-11-08*, as [ADR 0073](decisions/0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md) decides:
+  - `janus upgrade` writes a rule `pact_models` reads as a plugin's, in a pact that names no plugin, as
+    the `pact` component's operator of the same name, its configuration as members:
+    `{ "shape": "pact:ignore-order", "min": 1, "example": [...] }`. Nothing provides it, and no
+    requirement is written, so it fails its interaction by name, as today's verifier and `janus verify`
+    fail the pact, and the rest of the contract verifies. It is `rule-unmapped`, once, where the rule
+    is, on an array or a scalar. As one alternative of an `OR` beside others it never matches, and is
+    left out.
+  - `corpora/legacy/v4-ignore-order-mismatch/` fails the rule on the direct path, and the upgrade
+    agreement test reaches the same verdict on its contract. The mismatches differ, so it is not an
+    `upgrade-` case: the finding and the operator are pinned in `engine/kernel/tests/upgrade.rs`.
+  - S1.1's fixture `matching-rules/ignore-order` has pact-jvm's four forms, answered in the pact's
+    order and in another. Today's verifier, `janus verify` and the upgraded contract agree on every
+    one, with no ledger entry.
+  - pact-jvm's `ArrayUnorderedTest` puts `unorderedArray` in a request, which the facade's mock now
+    refuses by name. It is no longer ported, as the tests that ask for TLS are not, and the migration
+    note's row says to rewrite with `eachLike` or `arrayContaining`.
+  - Not foreseen: the fixture's `OR` of `ignore-order` and `type`, which today passes by `type`, fails
+    `janus verify`. Any `OR` whose first alternative fails does. It is S2.18, and the fixture's
+    entries in both ledgers name it.
+- **S2.18 A failed alternative of an `OR` that passed is not a mismatch** — **S**, found by S2.17.
+  The legacy compiler makes a v1–v4 `combine: "OR"` a `flow:or`, which succeeds when any alternative
+  does (plan-grammar spec §2.4). But the interpreter's outcome collects every error in the executed
+  plan, the failed alternatives' included, so `janus verify` fails a value its `OR` admits whenever an
+  earlier alternative failed. Today's verifier passes it. XML's `notEmpty` (`flow:or` over children
+  and text) has the same flaw. The outcome should collect what an `OR` that passed ran no further,
+  and every alternative's mismatch when it failed.
+  *Exit:* corpus cases in which an `OR`'s first alternative fails and a later one passes, from a pact
+  and on XML text with no children, both matched; the S2.18 entries for `matching-rules/ignore-order`
+  leave both ledgers.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
@@ -2322,6 +2352,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.16 | A `Content-Type` is compared as written, not as a media type | S3.3 and S3.4, brought forward by S2.5b |
 | S2.5d | pact-jvm's Groovy, Spock and Kotlin DSLs and its V4 `PactBuilder` have no facade | split from S2.5b |
 | S2.17 | A v1–v4 rule read as a plugin's, such as `ignore-order`, upgrades on an array to an `each-like` with no finding | found by S2.5b |
+| S2.18 | A failed alternative of an `OR` that passed is counted as a mismatch, so `janus verify` fails what today passes | found by S2.17 |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |
