@@ -205,7 +205,9 @@ Three sources are the source of truth and take precedence over this file when th
 > alternative it did not need; those stay in the executed plan and are not mismatches. S2.8 (ADR 0074):
 > a transport declares its credential members (HTTP: `authorization`, `proxy-authorization`, `cookie`,
 > `set-cookie`); a contract records them as `"[redacted]"` and lists them under `redacted`, unless a
-> session's `config.redaction` keeps them, and no report repeats a value found under one.
+> session's `config.redaction` keeps them, and no report repeats a value found under one. S2.10
+> (ADR 0075): an XML element's `#text` is its text as written, CDATA contents included, and `#trimmed`
+> beside it is today's reading, which the v1–v4 compiler and `janus upgrade` compare.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

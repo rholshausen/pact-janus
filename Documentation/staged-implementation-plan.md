@@ -1976,6 +1976,23 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* corpus cases in which a contract's XML text with surrounding whitespace, and a CDATA section
   with it, matches only text written the same way; the legacy harness and S1.1's verdicts unchanged;
   S1.25's XML cases still reach their pact's verdict.
+  *Done 2026-11-08* ([ADR 0075](decisions/0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md)):
+  - An element's `#text` is its text as written: every text node joined, a CDATA section as its
+    contents, nothing trimmed. Text that only indents child elements is not text, so a pretty-printed
+    body and a compact one decode alike (component-interfaces spec §6.1).
+  - Beside it, `#trimmed` is today's reading: each text node trimmed, then joined. `sxd-document` makes
+    a CDATA section and every reference a node of its own, so `<a>1 &lt; 2</a>` reads `1<2`. That is
+    why the legacy compiler needs a member of its own, not text joined as written. The legacy compiler
+    and `janus upgrade` compare `#trimmed`, so no v1–v4 verdict moved. A pact's generator on text fills
+    an optional `#text` that upgrade adds beside it, since `encode` writes `#text`.
+  - No second parser was needed: `sxd-document` already reports each text node untrimmed, CDATA
+    contents included. Only knowing which node was CDATA would need one, and `encode` writes CDATA
+    contents as escaped text, which every XML reader reads as the same characters.
+  - `corpora/shapes/xml-text-as-written/` and its `-mismatch` twin are the exit's cases.
+    `engine/kernel/tests/xml_text.rs` shows a mock serving text as written, and a CDATA request body
+    matching only text written as its contents are. The legacy XML corpus cases changed only in naming
+    `#trimmed`, and `v3-xml-body/` gained a reply item with whitespace around its text. The legacy
+    harness passes, S1.25's XML cases reach their pact's verdict, and S1.1's verdicts are unchanged.
 - **S2.11 Contracts from several test files, merged** — **M**, split from S2.1 by ADR 0063. pact-js
   and pact-jvm merge every test file's interactions into one pact file, under a file lock, unless told
   to overwrite. A Janus SDK writes one contract per session and overwrites, so when several test files
