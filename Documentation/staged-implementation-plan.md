@@ -1912,6 +1912,16 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   *Exit:* corpus cases in which an `OR`'s first alternative fails and a later one passes, from a pact
   and on XML text with no children, both matched; the S2.18 entries for `matching-rules/ignore-order`
   leave both ledgers.
+  *Done 2026-11-08*:
+  - The outcome collects nothing under a `flow:or` that passed. Its failed alternatives stay in the
+    executed plan, which `explain --executed` shows, and plan-grammar spec §2.4 says they are not
+    mismatches. A `flow:or` that fails still reports every alternative's.
+  - `corpora/legacy/v3-or-first-alternative-fails/` and `v3-xml-not-empty-text/` match, and fail
+    without the change; `v3-or-every-alternative-fails-mismatch/` reports both alternatives.
+  - The two S2.18 entries leave both ledgers, and the whole S1.1 corpus moved no other verdict.
+  - The upgrade agreement test lists `v3-or-first-alternative-fails` as a known difference: `upgrade`
+    keeps an `OR`'s first rule and reports `rule-combination-or` (contract-file spec §8.2), so its
+    contract fails what the pact now passes.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.

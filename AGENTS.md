@@ -201,8 +201,8 @@ Three sources are the source of truth and take precedence over this file when th
 > `consumer-test-migration.md` has each primitive's verdict. S2.17 (ADR 0073): a rule `pact_models`
 > reads as a plugin's, in a pact that names no plugin (pact-jvm's `ignore-order`), upgrades to the
 > `pact` component's operator of its name, with no requirement, so its interaction fails by name as
-> the pact does, reported as `rule-unmapped`. S2.18, an `OR` failed by an alternative it did not need,
-> is new.
+> the pact does, reported as `rule-unmapped`. S2.18: a `flow:or` that passed is not failed by an
+> alternative it did not need; those stay in the executed plan and are not mismatches.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
