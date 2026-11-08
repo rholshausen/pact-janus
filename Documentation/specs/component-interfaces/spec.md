@@ -559,12 +559,19 @@ name, holding the root element. An element is an object of:
 - `#namespace`, its namespace URI, when it is in one;
 - `@<name>`, each attribute's value as a string, in name order. A namespaced attribute is written
   `@{<uri>}<local>`. Namespace declarations are not attributes;
-- `#text`, its text nodes, each trimmed, then joined. It is absent when that is empty;
+- `#text`, its text as written: every text node joined, a CDATA section as its contents and a
+  reference as its character, nothing trimmed. It is absent when that is empty, and when the element
+  has child elements and its text is only whitespace, which indents them
+  ([ADR 0075](../../decisions/0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md));
+- `#trimmed`, its text as today's verifier reads it: each text node trimmed, then joined, where a
+  CDATA section and each reference are nodes of their own. It is absent when that is empty. The v1–v4
+  compiler and `janus upgrade` compare it;
 - `<local name>`, an array of its child elements with that local name, in document order. There is
   one member per name, in the order the names first appear.
 
-Its `encode` writes an element's text before its children, declares a namespace where it changes,
-and writes a number or a boolean as its text. Comments, processing instructions, namespace prefixes
+Its `encode` writes an element's text before its children: its `#text`, or its `#trimmed` when it has
+no `#text`. A CDATA section is written as escaped text. It declares a namespace where it changes, and
+writes a number or a boolean as its text. Comments, processing instructions, namespace prefixes
 and the order between differently named children are not part of the document.
 
 Every engine also has a built-in `multipart` component for every `multipart/*` type, registered after

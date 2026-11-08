@@ -41,13 +41,13 @@
           $.response.body.orders
         ),
         :"$.orders" (
-          :"$.orders.#text" (
+          :"$.orders.#trimmed" (
             %flow:if (
               %check:exists (
-                $.response.body.orders.#text
+                $.response.body.orders.#trimmed
               ),
               %match:equality (
-                $.response.body.orders.#text,
+                $.response.body.orders.#trimmed,
                 ''
               )
             )
@@ -75,13 +75,13 @@
                   'shipped'
                 )
               ),
-              :"$.orders.order[*].#text" (
+              :"$.orders.order[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text
+                    ~>.#trimmed
                   ),
                   %match:type (
-                    ~>.#text,
+                    ~>.#trimmed,
                     ''
                   )
                 )
@@ -97,9 +97,9 @@
                   %expect:object (
                     ~>
                   ),
-                  :"$.orders.order[*].item[*].#text" (
+                  :"$.orders.order[*].item[*].#trimmed" (
                     %match:regex (
-                      ~>.#text,
+                      ~>.#trimmed,
                       '^(?:[a-z]+)$'
                     )
                   ),

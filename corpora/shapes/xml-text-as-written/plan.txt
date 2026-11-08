@@ -1,0 +1,76 @@
+(
+  :"get a note" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$.note" (
+          %expect:object (
+            $.response.body.note
+          ),
+          :"$.note.from" (
+            %expect:array (
+              $.response.body.note.from
+            ),
+            %expect:count (
+              $.response.body.note.from,
+              1
+            ),
+            :"$.note.from[0]" (
+              %expect:object (
+                $.response.body.note.from[0]
+              ),
+              :"$.note.from[0].#trimmed" (
+                %match:equality (
+                  $.response.body.note.from[0].#trimmed,
+                  'Bea'
+                )
+              )
+            )
+          ),
+          :"$.note.script" (
+            %expect:array (
+              $.response.body.note.script
+            ),
+            %expect:count (
+              $.response.body.note.script,
+              1
+            ),
+            :"$.note.script[0]" (
+              %expect:object (
+                $.response.body.note.script[0]
+              ),
+              :"$.note.script[0].#text" (
+                %match:equality (
+                  $.response.body.note.script[0].#text,
+                  ' if (a < b) { go(); } '
+                )
+              )
+            )
+          ),
+          :"$.note.to" (
+            %expect:array (
+              $.response.body.note.to
+            ),
+            %expect:count (
+              $.response.body.note.to,
+              1
+            ),
+            :"$.note.to[0]" (
+              %expect:object (
+                $.response.body.note.to[0]
+              ),
+              :"$.note.to[0].#text" (
+                %match:equality (
+                  $.response.body.note.to[0].#text,
+                  '  Ada  '
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

@@ -111,7 +111,7 @@
         :"$.note[0]" (
           %flow:if (
             %legacy:mime-part (
-              $.response.body.note[0] => {'headers': {'content-disposition': 'form-data; name="note"; filename="n.xml"', 'content-type': 'application/xml'}, 'filename': 'n.xml', 'body': {'note': {'@lang': 'fr', '#text': 'hi'}}},
+              $.response.body.note[0] => {'headers': {'content-disposition': 'form-data; name="note"; filename="n.xml"', 'content-type': 'application/xml'}, 'filename': 'n.xml', 'body': {'note': {'@lang': 'fr', '#text': 'hi', '#trimmed': 'hi'}}},
               'file',
               'note'
             ) => BOOL(true),
@@ -132,7 +132,7 @@
                 ) => BOOL(true),
                 %flow:and (
                   %expect:object (
-                    $.response.body.note[0].body.note => {'@lang': 'fr', '#text': 'hi'}
+                    $.response.body.note[0].body.note => {'@lang': 'fr', '#text': 'hi', '#trimmed': 'hi'}
                   ) => BOOL(true),
                   :"$.note[0].body.note" (
                     :"$.note[0].body.note.@lang" (
@@ -141,9 +141,9 @@
                         '^(?:[a-z]{2})$'
                       ) => BOOL(true)
                     ) => BOOL(true),
-                    :"$.note[0].body.note.#text" (
+                    :"$.note[0].body.note.#trimmed" (
                       %match:equality (
-                        $.response.body.note[0].body.note.#text => 'hi',
+                        $.response.body.note[0].body.note.#trimmed => 'hi',
                         'hi'
                       ) => BOOL(true)
                     ) => BOOL(true)

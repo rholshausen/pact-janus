@@ -135,9 +135,9 @@
                         '^(?:[a-z]{2})$'
                       )
                     ),
-                    :"$.note[0].body.note.#text" (
+                    :"$.note[0].body.note.#trimmed" (
                       %match:equality (
-                        $.response.body.note[0].body.note.#text,
+                        $.response.body.note[0].body.note.#trimmed,
                         'hi'
                       )
                     )

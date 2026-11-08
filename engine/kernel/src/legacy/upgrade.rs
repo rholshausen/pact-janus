@@ -1521,14 +1521,16 @@ impl Conversion {
       );
     }
 
-    // Text, compared whether or not the pact has any.
-    let expected = match element_members.get(legacy_xml::TEXT) {
+    // Text, compared whether or not the pact has any, as today's verifier reads it: the element's
+    // `#trimmed` (ADR 0075), so whitespace around text counts no more than it did. A pact's rules
+    // still name it `#text`.
+    let expected = match element_members.get(legacy_xml::TRIMMED) {
       Some(RuntimeValue::String(text)) => text.clone(),
       _ => String::new(),
     };
     let mut text_fragments = fragments.to_vec();
     text_fragments.push(legacy_xml::TEXT.to_string());
-    let text_at = at.push("", &format!("/members/{}", legacy_xml::TEXT));
+    let text_at = at.push("", &format!("/members/{}", legacy_xml::TRIMMED));
     let text = match best_rule(ctx.rules, &text_fragments, false) {
       Some((list, cascaded)) => {
         let example = Value::String(expected.clone());
@@ -1546,7 +1548,7 @@ impl Conversion {
           Some(self.shape_for(Some(list), &example, &text_at, Text::Yes))
         }
       }
-      // The component writes no `#text` that would be empty, so the pact's empty text is none.
+      // The component writes no `#trimmed` that would be empty, so the pact's empty text is none.
       None if expected.is_empty() => Some(json!({ "shape": "forbidden" })),
       None => {
         self.frozen(&text_at, 1);
@@ -1554,7 +1556,7 @@ impl Conversion {
       }
     };
     if let Some(text) = text {
-      members.insert(legacy_xml::TEXT.to_string(), text);
+      members.insert(legacy_xml::TRIMMED.to_string(), text);
     }
 
     // Children, a group per name, by name.
@@ -2152,6 +2154,9 @@ impl Conversion {
       let mut placed = 0;
       if let Some(slot_shape) = part.get_mut(slot) {
         for target in &targets {
+          if body == Some(BodyKindShaped::Xml) {
+            with_xml_text(slot_shape, target);
+          }
           if let Some(Value::Object(shape)) = slot_shape.pointer_mut(target)
             && shape.get("shape").and_then(Value::as_str) != Some("forbidden")
           {
@@ -2294,6 +2299,32 @@ fn form_target(shape: &Value, tokens: &[PathToken]) -> Option<String> {
   shape.pointer(&target).map(|_| target)
 }
 
+/// Where `target` is an XML element's `#text` (`…/members/#text/of`, from [`xml_targets`]) and the
+/// element has none, the `#text` a generator fills: optional, admitting any text, its example the
+/// `#trimmed` beside it. It constrains nothing the `#trimmed` does not.
+fn with_xml_text(slot_shape: &mut Value, target: &str) {
+  let suffix = format!("/members/{}/of", legacy_xml::TEXT);
+  let Some(element) = target.strip_suffix(&suffix) else {
+    return;
+  };
+  let Some(Value::Object(members)) = slot_shape.pointer_mut(&format!("{element}/members")) else {
+    return;
+  };
+  if members.contains_key(legacy_xml::TEXT) {
+    return;
+  }
+  let example = members
+    .get(legacy_xml::TRIMMED)
+    .and_then(|trimmed| trimmed.get("example").or_else(|| trimmed.pointer("/of/example")))
+    .and_then(Value::as_str)
+    .unwrap_or_default()
+    .to_string();
+  members.insert(
+    legacy_xml::TEXT.to_string(),
+    json!({ "shape": "optional", "of": { "shape": "string", "example": example } }),
+  );
+}
+
 /// The values an XML body's generator names (`XmlHandler`): its path goes element by element from the
 /// root, every child of a name, and ends at an attribute (`@name`) or the text (`#text`). Names are
 /// matched by local name, since ADR 0039's document keeps no prefixes.
@@ -2328,7 +2359,13 @@ fn xml_targets(shape: &Value, tokens: &[PathToken]) -> Vec<String> {
           }
         }
       } else if *field == legacy_xml::TEXT && last {
-        next.push(format!("{at}/members/{}", legacy_xml::TEXT));
+        // The text is compared as `#trimmed`, but the component writes `#text` when an element has
+        // it, as a decoded reply does: so the generator fills a `#text` that admits any text, which
+        // `with_xml_text` adds beside a `#trimmed` that can be filled.
+        let trimmed = shape.pointer(&format!("{at}/members/{}", legacy_xml::TRIMMED));
+        if trimmed.is_some_and(|trimmed| trimmed.get("shape").and_then(Value::as_str) != Some("forbidden")) {
+          next.push(format!("{at}/members/{}/of", legacy_xml::TEXT));
+        }
       } else {
         let group = format!("{at}/members/{}", escape_pointer(&local(field)));
         match shape

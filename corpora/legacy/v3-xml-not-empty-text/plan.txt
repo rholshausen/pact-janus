@@ -48,12 +48,12 @@
               )
             ),
             %expect:not-empty (
-              $.response.body.note.#text
+              $.response.body.note.#trimmed
             )
           ),
-          :"$.note.#text" (
+          :"$.note.#trimmed" (
             %expect:not-empty (
-              $.response.body.note.#text
+              $.response.body.note.#trimmed
             )
           )
         )

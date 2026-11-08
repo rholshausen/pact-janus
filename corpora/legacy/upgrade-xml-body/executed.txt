@@ -34,7 +34,7 @@
           'application/xml'
         ) => BOOL(true),
         %expect:object (
-          $.response.body.note => {'#namespace': 'urn:notes', '@lang': 'fr', '@{urn:x}rev': '2', '@extra': 'x', 'to': [{'#text': 'Ada'}], 'line': [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]}
+          $.response.body.note => {'#namespace': 'urn:notes', '@lang': 'fr', '@{urn:x}rev': '2', '@extra': 'x', 'to': [{'#text': 'Ada', '#trimmed': 'Ada'}], 'line': [{'#text': 'uno', '#trimmed': 'uno'}, {'#text': 'dos', '#trimmed': 'dos'}, {'#text': 'tres', '#trimmed': 'tres'}]}
         ) => BOOL(true),
         :"$.note" (
           %match:equality (
@@ -53,91 +53,91 @@
               '2'
             ) => BOOL(true)
           ) => BOOL(true),
-          :"$.note.#text" (
+          :"$.note.#trimmed" (
             %flow:if (
               %check:exists (
-                $.response.body.note.#text => ABSENT
+                $.response.body.note.#trimmed => ABSENT
               ) => BOOL(false),
               %match:equality (
-                $.response.body.note.#text,
+                $.response.body.note.#trimmed,
                 ''
               )
             ) => BOOL(true)
           ) => BOOL(true),
           %expect:not-empty (
-            $.response.body.note.line => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]
+            $.response.body.note.line => [{'#text': 'uno', '#trimmed': 'uno'}, {'#text': 'dos', '#trimmed': 'dos'}, {'#text': 'tres', '#trimmed': 'tres'}]
           ) => BOOL(true),
           %flow:for-each (
             ** (
-              $.response.body.note.line => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}]
-            ) => [{'#text': 'uno'}, {'#text': 'dos'}, {'#text': 'tres'}],
+              $.response.body.note.line => [{'#text': 'uno', '#trimmed': 'uno'}, {'#text': 'dos', '#trimmed': 'dos'}, {'#text': 'tres', '#trimmed': 'tres'}]
+            ) => [{'#text': 'uno', '#trimmed': 'uno'}, {'#text': 'dos', '#trimmed': 'dos'}, {'#text': 'tres', '#trimmed': 'tres'}],
             :"$.note.line[*]" (
               %expect:object (
-                ~> => {'#text': 'uno'}
+                ~> => {'#text': 'uno', '#trimmed': 'uno'}
               ) => BOOL(true),
-              :"$.note.line[*].#text" (
+              :"$.note.line[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => 'uno'
+                    ~>.#trimmed => 'uno'
                   ) => BOOL(true),
                   %match:type (
-                    ~>.#text => 'uno',
+                    ~>.#trimmed => 'uno',
                     'one'
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'#text': 'uno'}
+                ~> => {'#text': 'uno', '#trimmed': 'uno'}
               ) => BOOL(true)
             ) => BOOL(true),
             :"$.note.line[*]" (
               %expect:object (
-                ~> => {'#text': 'dos'}
+                ~> => {'#text': 'dos', '#trimmed': 'dos'}
               ) => BOOL(true),
-              :"$.note.line[*].#text" (
+              :"$.note.line[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => 'dos'
+                    ~>.#trimmed => 'dos'
                   ) => BOOL(true),
                   %match:type (
-                    ~>.#text => 'dos',
+                    ~>.#trimmed => 'dos',
                     'one'
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'#text': 'dos'}
+                ~> => {'#text': 'dos', '#trimmed': 'dos'}
               ) => BOOL(true)
             ) => BOOL(true),
             :"$.note.line[*]" (
               %expect:object (
-                ~> => {'#text': 'tres'}
+                ~> => {'#text': 'tres', '#trimmed': 'tres'}
               ) => BOOL(true),
-              :"$.note.line[*].#text" (
+              :"$.note.line[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => 'tres'
+                    ~>.#trimmed => 'tres'
                   ) => BOOL(true),
                   %match:type (
-                    ~>.#text => 'tres',
+                    ~>.#trimmed => 'tres',
                     'one'
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'#text': 'tres'}
+                ~> => {'#text': 'tres', '#trimmed': 'tres'}
               ) => BOOL(true)
             ) => BOOL(true)
           ) => BOOL(true),
           %expect:size (
-            $.response.body.note.to => [{'#text': 'Ada'}],
+            $.response.body.note.to => [{'#text': 'Ada', '#trimmed': 'Ada'}],
             1,
             NULL
           ) => BOOL(true),
           :"$.note.to[0]" (
-            :"$.note.to[0].#text" (
+            :"$.note.to[0].#trimmed" (
               %match:equality (
-                $.response.body.note.to[0].#text => 'Ada',
+                $.response.body.note.to[0].#trimmed => 'Ada',
                 'Ada'
               ) => BOOL(true)
             ) => BOOL(true)

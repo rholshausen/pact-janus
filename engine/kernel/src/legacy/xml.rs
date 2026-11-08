@@ -7,8 +7,10 @@
 //! The model, which the component's module docs give in full: an object with one member, the root
 //! element's local name, holding the root element. An element is an object of `#namespace` (when it
 //! is in one), `@<name>` per attribute (Clark notation, `@{<uri>}<local>`, when namespaced, in name
-//! order), `#text` (its text nodes trimmed and joined, when not empty), and an array of child
-//! elements per local name, in the order the names first appear.
+//! order), `#text` (its text as written, when not empty and not only indentation between child
+//! elements), `#trimmed` (its text nodes trimmed and joined, when not empty: today's verifier's
+//! reading, which the v1–v4 compiler compares; ADR 0075), and an array of child elements per local
+//! name, in the order the names first appear.
 
 use crate::plan::RuntimeValue;
 use indexmap::IndexMap;
@@ -17,8 +19,12 @@ use sxd_document::dom::{ChildOfElement, Element};
 /// The member holding an element's namespace URI.
 pub const NAMESPACE: &str = "#namespace";
 
-/// The member holding an element's text.
+/// The member holding an element's text, as written.
 pub const TEXT: &str = "#text";
+
+/// The member holding an element's text as today's verifier reads it: each text node trimmed, then
+/// joined. What the v1–v4 compiler and `janus upgrade` compare.
+pub const TRIMMED: &str = "#trimmed";
 
 /// The namespace namespace declarations are in.
 const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
@@ -66,15 +72,23 @@ fn element(element: Element<'_>) -> RuntimeValue {
     members.insert(name, RuntimeValue::String(value));
   }
   let children = element.children();
-  let text: String = children
+  let nodes: Vec<&str> = children
     .iter()
     .filter_map(|child| match child {
-      ChildOfElement::Text(text) => Some(text.text().trim()),
+      ChildOfElement::Text(text) => Some(text.text()),
       _ => None,
     })
     .collect();
-  if !text.is_empty() {
+  let text = nodes.concat();
+  let has_elements = children
+    .iter()
+    .any(|child| matches!(child, ChildOfElement::Element(_)));
+  if !text.is_empty() && !(has_elements && text.trim().is_empty()) {
     members.insert(TEXT.to_string(), RuntimeValue::String(text));
+  }
+  let trimmed: String = nodes.iter().map(|node| node.trim()).collect();
+  if !trimmed.is_empty() {
+    members.insert(TRIMMED.to_string(), RuntimeValue::String(trimmed));
   }
   for child in children.into_iter().filter_map(|child| child.element()) {
     let entry = members

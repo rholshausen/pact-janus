@@ -1,0 +1,102 @@
+{
+  "description": "a contract's XML text is compared as written (ADR 0075): text with whitespace around it, and a CDATA section's contents, which the XML component decodes `<script><![CDATA[ if (a < b) { go(); } ]]></script>` to, match text written the same way; a member shaped on `#trimmed`, each text node trimmed as today's verifier reads text, matches whatever whitespace is around it",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a note",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "note": {
+                "shape": "object",
+                "members": {
+                  "to": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#text": {
+                            "shape": "equality",
+                            "example": "  Ada  "
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "script": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#text": {
+                            "shape": "equality",
+                            "example": " if (a < b) { go(); } "
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "from": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#trimmed": {
+                            "shape": "equality",
+                            "example": "Bea"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/xml"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/xml"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "note": {
+        "to": [
+          {
+            "#text": "  Ada  ",
+            "#trimmed": "Ada"
+          }
+        ],
+        "script": [
+          {
+            "#text": " if (a < b) { go(); } ",
+            "#trimmed": "if (a < b) { go(); }"
+          }
+        ],
+        "from": [
+          {
+            "#text": "\n    Bea\n  ",
+            "#trimmed": "Bea"
+          }
+        ]
+      }
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

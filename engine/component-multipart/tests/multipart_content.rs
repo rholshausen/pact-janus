@@ -135,7 +135,7 @@ fn each_part_is_decoded_by_its_own_type_through_the_built_in_components() {
   assert_eq!(body_of("order"), Some(document(json!({ "id": 1 }))));
   assert_eq!(
     body_of("note"),
-    Some(document(json!({ "note": { "#text": "hi" } })))
+    Some(document(json!({ "note": { "#text": "hi", "#trimmed": "hi" } })))
   );
   assert_eq!(body_of("query"), Some(document(json!({ "a": ["1", "2"] }))));
   assert_eq!(body_of("raw"), Some(RuntimeValue::Bytes(vec![0xff, 0xfe])));

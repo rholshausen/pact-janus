@@ -38,30 +38,40 @@
       ) => BOOL(true),
       :body (
         %expect:object (
-          $.response.body.orders => {'#namespace': 'urn:orders', 'order': [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]}
+          $.response.body.orders => {'#namespace': 'urn:orders', 'order': [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]}]}
         ) => BOOL(true),
         :"$.orders" (
-          :"$.orders.#text" (
+          :"$.orders.#trimmed" (
             %flow:if (
               %check:exists (
-                $.response.body.orders.#text => ABSENT
+                $.response.body.orders.#trimmed => ABSENT
               ) => BOOL(false),
               %match:equality (
-                $.response.body.orders.#text,
+                $.response.body.orders.#trimmed,
                 ''
               )
             ) => BOOL(true)
           ) => BOOL(true),
           %expect:not-empty (
-            $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]
+            $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]}]
           ) => BOOL(true),
           %flow:for-each (
             ** (
-              $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}]
-            ) => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}],
+              $.response.body.orders.order => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]}]
+            ) => [{'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]}, {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]}],
             :"$.orders.order[*]" (
               %expect:object (
-                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]}
+                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]}
               ) => BOOL(true),
               :"$.orders.order[*].@id" (
                 %legacy:parses-as (
@@ -75,61 +85,73 @@
                   'shipped'
                 ) => BOOL(true)
               ) => BOOL(true),
-              :"$.orders.order[*].#text" (
+              :"$.orders.order[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => ABSENT
+                    ~>.#trimmed => ABSENT
                   ) => BOOL(false),
                   %match:type (
-                    ~>.#text,
+                    ~>.#trimmed,
                     ''
                   )
                 ) => BOOL(true)
               ) => BOOL(true),
               %expect:not-empty (
-                ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]
+                ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]
               ) => BOOL(true),
               %flow:for-each (
                 ** (
-                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]
-                ) => [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}],
+                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]
+                ) => [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}],
                 :"$.orders.order[*].item[*]" (
                   %expect:object (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'pear'}
+                    ~> => {'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}
                   ) => BOOL(true),
-                  :"$.orders.order[*].item[*].#text" (
+                  :"$.orders.order[*].item[*].#trimmed" (
                     %match:regex (
-                      ~>.#text => 'pear',
+                      ~>.#trimmed => 'pear',
                       '^(?:[a-z]+)$'
                     ) => BOOL(true)
                   ) => BOOL(true),
                   %legacy:xml-only-children (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'pear'}
+                    ~> => {'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}
                   ) => BOOL(true)
                 ) => BOOL(true),
                 :"$.orders.order[*].item[*]" (
                   %expect:object (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'plum'}
+                    ~> => {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}
                   ) => BOOL(true),
-                  :"$.orders.order[*].item[*].#text" (
+                  :"$.orders.order[*].item[*].#trimmed" (
                     %match:regex (
-                      ~>.#text => 'plum',
+                      ~>.#trimmed => 'plum',
                       '^(?:[a-z]+)$'
                     ) => BOOL(true)
                   ) => BOOL(true),
                   %legacy:xml-only-children (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'plum'}
+                    ~> => {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear'}, {'#namespace': 'urn:orders', '#text': 'plum'}]},
+                ~> => {'#namespace': 'urn:orders', '@id': '17', '@status': 'packed', 'item': [{'#namespace': 'urn:orders', '#text': 'pear', '#trimmed': 'pear'}, {'#namespace': 'urn:orders', '#text': '
+      plum
+    ', '#trimmed': 'plum'}]},
                 'item'
               ) => BOOL(true)
             ) => BOOL(true),
             :"$.orders.order[*]" (
               %expect:object (
-                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]}
+                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]}
               ) => BOOL(true),
               :"$.orders.order[*].@id" (
                 %legacy:parses-as (
@@ -143,41 +165,41 @@
                   'shipped'
                 ) => BOOL(true)
               ) => BOOL(true),
-              :"$.orders.order[*].#text" (
+              :"$.orders.order[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => ABSENT
+                    ~>.#trimmed => ABSENT
                   ) => BOOL(false),
                   %match:type (
-                    ~>.#text,
+                    ~>.#trimmed,
                     ''
                   )
                 ) => BOOL(true)
               ) => BOOL(true),
               %expect:not-empty (
-                ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig'}]
+                ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]
               ) => BOOL(true),
               %flow:for-each (
                 ** (
-                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig'}]
-                ) => [{'#namespace': 'urn:orders', '#text': 'fig'}],
+                  ~>.item => [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]
+                ) => [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}],
                 :"$.orders.order[*].item[*]" (
                   %expect:object (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'fig'}
+                    ~> => {'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}
                   ) => BOOL(true),
-                  :"$.orders.order[*].item[*].#text" (
+                  :"$.orders.order[*].item[*].#trimmed" (
                     %match:regex (
-                      ~>.#text => 'fig',
+                      ~>.#trimmed => 'fig',
                       '^(?:[a-z]+)$'
                     ) => BOOL(true)
                   ) => BOOL(true),
                   %legacy:xml-only-children (
-                    ~> => {'#namespace': 'urn:orders', '#text': 'fig'}
+                    ~> => {'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig'}]},
+                ~> => {'#namespace': 'urn:orders', '@id': '18', '@priority': 'high', '@status': 'shipped', 'item': [{'#namespace': 'urn:orders', '#text': 'fig', '#trimmed': 'fig'}]},
                 'item'
               ) => BOOL(true)
             ) => BOOL(true)

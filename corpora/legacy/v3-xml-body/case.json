@@ -1,5 +1,5 @@
 {
-  "description": "a v3 XML response body compared element by element (ADR 0039): a type rule on a repeated child compares every order against the pact's first, an integer rule reads an attribute's text, a regex reaches each item's text, the reply's extra attribute is allowed in a response, and its root, in a namespace the pact does not name, matches by its local name",
+  "description": "a v3 XML response body compared element by element (ADR 0039): a type rule on a repeated child compares every order against the pact's first, an integer rule reads an attribute's text, a regex reaches each item's text, the reply's extra attribute is allowed in a response, and its root, in a namespace the pact does not name, matches by its local name; an item's text with whitespace around it is compared as today's verifier reads it, as its `#trimmed` (ADR 0075)",
   "input": {
     "kind": "pact-interaction",
     "pact": {
@@ -69,8 +69,36 @@
       "orders": {
         "#namespace": "urn:orders",
         "order": [
-          { "#namespace": "urn:orders", "@id": "17", "@status": "packed", "item": [{ "#namespace": "urn:orders", "#text": "pear" }, { "#namespace": "urn:orders", "#text": "plum" }] },
-          { "#namespace": "urn:orders", "@id": "18", "@priority": "high", "@status": "shipped", "item": [{ "#namespace": "urn:orders", "#text": "fig" }] }
+          {
+            "#namespace": "urn:orders",
+            "@id": "17",
+            "@status": "packed",
+            "item": [
+              {
+                "#namespace": "urn:orders",
+                "#text": "pear",
+                "#trimmed": "pear"
+              },
+              {
+                "#namespace": "urn:orders",
+                "#text": "\n      plum\n    ",
+                "#trimmed": "plum"
+              }
+            ]
+          },
+          {
+            "#namespace": "urn:orders",
+            "@id": "18",
+            "@priority": "high",
+            "@status": "shipped",
+            "item": [
+              {
+                "#namespace": "urn:orders",
+                "#text": "fig",
+                "#trimmed": "fig"
+              }
+            ]
+          }
         ]
       }
     }

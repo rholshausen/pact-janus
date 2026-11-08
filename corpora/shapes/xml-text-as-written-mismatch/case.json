@@ -1,0 +1,114 @@
+{
+  "description": "a contract's XML text is compared as written (ADR 0075): the same text without the whitespace around it, and a CDATA section's contents trimmed, are mismatches, while a member shaped on `#trimmed` still matches",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get a note",
+      "parts": {
+        "response": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "note": {
+                "shape": "object",
+                "members": {
+                  "to": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#text": {
+                            "shape": "equality",
+                            "example": "  Ada  "
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "script": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#text": {
+                            "shape": "equality",
+                            "example": " if (a < b) { go(); } "
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "from": {
+                    "shape": "array",
+                    "entries": [
+                      {
+                        "shape": "object",
+                        "members": {
+                          "#trimmed": {
+                            "shape": "equality",
+                            "example": "Bea"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "content-types": {
+        "response": {
+          "body": "application/xml"
+        }
+      },
+      "requires": [
+        {
+          "component": "content/xml"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.response.body": {
+      "note": {
+        "to": [
+          {
+            "#text": "Ada",
+            "#trimmed": "Ada"
+          }
+        ],
+        "script": [
+          {
+            "#text": "if (a < b) { go(); }",
+            "#trimmed": "if (a < b) { go(); }"
+          }
+        ],
+        "from": [
+          {
+            "#text": "Bea",
+            "#trimmed": "Bea"
+          }
+        ]
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.note.script[0].#text",
+        "message": "Expected 'if (a < b) { go(); }' to equal ' if (a < b) { go(); } '",
+        "action": "match:equality"
+      },
+      {
+        "path": "$.response.body.note.to[0].#text",
+        "message": "Expected 'Ada' to equal '  Ada  '",
+        "action": "match:equality"
+      }
+    ]
+  }
+}

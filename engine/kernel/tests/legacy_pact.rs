@@ -141,9 +141,9 @@ fn an_xml_body_is_read_into_its_elements() {
     Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({
       "Message": {
         "Head": [{ "Server": [{
-          "Name": [{ "#text": "server_name" }],
-          "Version": [{ "#text": "server_version" }],
-          "Timestamp": [{ "#text": "server_timestamp" }]
+          "Name": [{ "#text": "server_name", "#trimmed": "server_name" }],
+          "Version": [{ "#text": "server_version", "#trimmed": "server_version" }],
+          "Timestamp": [{ "#text": "server_timestamp", "#trimmed": "server_timestamp" }]
         }] }],
         "Body": [{ "Result": [{ "@state": "SUCCESS" }] }]
       }
@@ -199,7 +199,7 @@ fn body_of(response: serde_json::Value) -> Result<Option<LegacyBody>, String> {
   Some(LegacyBody::Form(RuntimeValue::from_json(&json!({ "b": ["2", "x y"], "a": ["1"] })))))]
 #[case::xml(
   json!({ "status": 200, "headers": { "Content-Type": "application/xml" }, "body": "<a x=\"1\"><b>t</b><b/></a>" }),
-  Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "a": { "@x": "1", "b": [{ "#text": "t" }, {}] } })))))]
+  Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "a": { "@x": "1", "b": [{ "#text": "t", "#trimmed": "t" }, {}] } })))))]
 #[case::xml_suffix(
   json!({ "status": 200, "headers": { "Content-Type": "application/atom+xml" }, "body": "<feed/>" }),
   Some(LegacyBody::Xml(RuntimeValue::from_json(&json!({ "feed": {} })))))]

@@ -594,7 +594,9 @@ JSON is walked as the table says, and declares its type in `content-types` (§5.
 since every engine reads JSON (ADR 0048). A text body that is UTF-8, a form, XML and multipart declare
 their type and require the built-in component that reads it. Their shapes are over
 that component's document: text as one value at `$`, a form as each name's values, XML element by
-element, multipart part by part. A binary body, or text that is not UTF-8, is bytes with a base64
+element, its text as `#trimmed` so whitespace around it counts no more than it did
+([ADR 0075](../../decisions/0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md)),
+multipart part by part. A binary body, or text that is not UTF-8, is bytes with a base64
 example, left undeclared. A number or boolean rule on text (an attribute, a form, query or header value,
 a path) becomes the pattern v1–v4 read the text by (`rule-as-pattern`). When the pact names no
 `Content-Type` header, its check that the reply's type agrees with its body's becomes an `optional`

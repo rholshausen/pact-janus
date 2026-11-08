@@ -567,7 +567,13 @@ fn a_contracts_form_and_xml_bodies_are_generated() {
   let document = pact_janus_kernel::legacy::xml::document(requests[0].body.as_bytes()).expect("XML");
   assert_eq!(
     document.to_json(),
-    json!({ "a": { "@id": "7", "b": [{ "#text": "8" }], "c": [{ "#text": "as is" }] } })
+    json!({
+      "a": {
+        "@id": "7",
+        "b": [{ "#text": "8", "#trimmed": "8" }],
+        "c": [{ "#text": "as is", "#trimmed": "as is" }]
+      }
+    })
   );
 }
 

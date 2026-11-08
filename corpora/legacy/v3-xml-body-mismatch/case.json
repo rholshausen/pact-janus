@@ -54,8 +54,18 @@
         "#namespace": "urn:other",
         "@gift": "yes",
         "@id": "one",
-        "item": [{ "#text": "plum" }],
-        "note": [{ "#text": "leave at the door" }]
+        "item": [
+          {
+            "#text": "plum",
+            "#trimmed": "plum"
+          }
+        ],
+        "note": [
+          {
+            "#text": "leave at the door",
+            "#trimmed": "leave at the door"
+          }
+        ]
       }
     },
     "$.response.status": 201
@@ -79,12 +89,12 @@
         "action": "expect:count"
       },
       {
-        "path": "$.request.body.order.item[0].#text",
+        "path": "$.request.body.order.item[0].#trimmed",
         "message": "Expected 'plum' to equal 'apple'",
         "action": "match:equality"
       },
       {
-        "path": "$.request.body.order.item[1].#text",
+        "path": "$.request.body.order.item[1].#trimmed",
         "message": "Expected <absent> to equal 'pear'",
         "action": "match:equality"
       },

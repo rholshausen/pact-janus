@@ -1724,14 +1724,15 @@ fn compile_xml_element(
     nodes.push(Node::container(Some(member_path(label, key)), vec![node]));
   }
 
-  // Text, compared whether or not the pact has any.
-  let expected_text = match members.get(xml::TEXT) {
+  // Text, compared whether or not the pact has any, as today's verifier reads it: the element's
+  // `#trimmed` (ADR 0075). A pact's rules still name it `#text`.
+  let expected_text = match members.get(xml::TRIMMED) {
     Some(RuntimeValue::String(text)) => text.clone(),
     _ => String::new(),
   };
   let mut text_fragments = fragments.to_vec();
   text_fragments.push(xml::TEXT.to_string());
-  let text = at.member_quoted(xml::TEXT);
+  let text = at.member_quoted(xml::TRIMMED);
   let text_node = match best_rule(ctx.category, &text_fragments, false) {
     Some((list, cascaded)) => {
       let example = Literal::string(&expected_text);
@@ -1747,7 +1748,7 @@ fn compile_xml_element(
         rule
       }
     }
-    // The XML component leaves out a `#text` that would be empty, so text that is there is not
+    // The XML component leaves out a `#trimmed` that would be empty, so text that is there is not
     // empty, and is compared with the empty string the pact has.
     None if expected_text.is_empty() => Node::action(
       "flow:if",
@@ -1765,7 +1766,7 @@ fn compile_xml_element(
     ),
   };
   nodes.push(Node::container(
-    Some(member_path(label, xml::TEXT)),
+    Some(member_path(label, xml::TRIMMED)),
     vec![text_node],
   ));
 
@@ -1833,7 +1834,11 @@ fn compile_xml_element(
       members
         .keys()
         .filter(|key| !key.starts_with('#'))
-        .chain([&xml::TEXT.to_string(), &xml::NAMESPACE.to_string()])
+        .chain([
+          &xml::TEXT.to_string(),
+          &xml::TRIMMED.to_string(),
+          &xml::NAMESPACE.to_string(),
+        ])
         .map(|key| Node::value(Literal::string(key))),
     );
     nodes.push(Node::action("legacy:only-entries", only));
@@ -1902,7 +1907,7 @@ fn xml_element_rule(list: &RuleList, cascaded: bool, name: &str, at: &Cursor) ->
         "flow:or",
         vec![
           Node::action("expect:not-empty", vec![children()]),
-          Node::action("expect:not-empty", vec![at.member_quoted(xml::TEXT).resolve()]),
+          Node::action("expect:not-empty", vec![at.member_quoted(xml::TRIMMED).resolve()]),
         ],
       ),
       other => Node::action(

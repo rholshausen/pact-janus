@@ -38,22 +38,22 @@
       ) => BOOL(true),
       :body (
         %expect:object (
-          $.response.body.note => {'#text': 'goodbye'}
+          $.response.body.note => {'#text': 'goodbye', '#trimmed': 'goodbye'}
         ) => BOOL(true),
         :"$.note" (
           %flow:or (
             %expect:not-empty (
               %legacy:xml-children (
-                $.response.body.note => {'#text': 'goodbye'}
+                $.response.body.note => {'#text': 'goodbye', '#trimmed': 'goodbye'}
               ) => []
             ) => ERROR(Expected a non-empty value but got []),
             %expect:not-empty (
-              $.response.body.note.#text => 'goodbye'
+              $.response.body.note.#trimmed => 'goodbye'
             ) => BOOL(true)
           ) => BOOL(true),
-          :"$.note.#text" (
+          :"$.note.#trimmed" (
             %expect:not-empty (
-              $.response.body.note.#text => 'goodbye'
+              $.response.body.note.#trimmed => 'goodbye'
             ) => BOOL(true)
           ) => BOOL(true)
         ) => BOOL(true)

@@ -9,8 +9,14 @@
 //! - `@<name>`, each attribute's value, in name order, since XML gives attributes no order and the
 //!   parser keeps none. A namespaced attribute is named in Clark notation, `@{<uri>}<local>`.
 //!   Namespace declarations are not attributes;
-//! - `#text`, its text: each text node trimmed, then joined, as today's verifier reads it. Absent
-//!   when that is empty;
+//! - `#text`, its text as written: every text node joined, a CDATA section's contents and each
+//!   reference's character included, nothing trimmed. Absent when that is empty, and when the
+//!   element has child elements and its text is only whitespace, the indentation between them
+//!   (ADR 0075);
+//! - `#trimmed`, its text as today's verifier reads it: each text node trimmed, then joined, where
+//!   `sxd-document` makes a CDATA section and each reference a node of its own. Absent when that is
+//!   empty. The v1–v4 compiler and `janus upgrade` compare it, and a contract that does not care
+//!   about whitespace around text may too;
 //! - `<local name>`, an array of the child elements with that local name, in document order, one
 //!   member per name in the order the name first appears.
 //!
@@ -34,8 +40,11 @@ pub const MEDIA_TYPE: &str = "application/xml";
 /// The member holding an element's namespace URI.
 pub const NAMESPACE: &str = "#namespace";
 
-/// The member holding an element's text.
+/// The member holding an element's text, as written.
 pub const TEXT: &str = "#text";
+
+/// The member holding an element's text as today's verifier reads it: each text node trimmed.
+pub const TRIMMED: &str = "#trimmed";
 
 /// The namespace the `xml` prefix is bound to, which is never declared.
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
@@ -117,15 +126,12 @@ fn element(element: Element<'_>) -> RuntimeValue {
     members.insert(name, RuntimeValue::String(value));
   }
   let children = element.children();
-  let text: String = children
-    .iter()
-    .filter_map(|child| match child {
-      ChildOfElement::Text(text) => Some(text.text().trim()),
-      _ => None,
-    })
-    .collect();
-  if !text.is_empty() {
+  let (text, trimmed) = text_of(&children);
+  if let Some(text) = text {
     members.insert(TEXT.to_string(), RuntimeValue::String(text));
+  }
+  if let Some(trimmed) = trimmed {
+    members.insert(TRIMMED.to_string(), RuntimeValue::String(trimmed));
   }
   for child in children.into_iter().filter_map(|child| child.element()) {
     let entry = members
@@ -136,6 +142,27 @@ fn element(element: Element<'_>) -> RuntimeValue {
     }
   }
   RuntimeValue::Object(members)
+}
+
+/// An element's `#text` and `#trimmed` (module docs), from its children.
+fn text_of(children: &[ChildOfElement<'_>]) -> (Option<String>, Option<String>) {
+  let nodes: Vec<&str> = children
+    .iter()
+    .filter_map(|child| match child {
+      ChildOfElement::Text(text) => Some(text.text()),
+      _ => None,
+    })
+    .collect();
+  let text: String = nodes.concat();
+  let trimmed: String = nodes.iter().map(|node| node.trim()).collect();
+  let has_elements = children
+    .iter()
+    .any(|child| matches!(child, ChildOfElement::Element(_)));
+  let indentation = has_elements && text.trim().is_empty();
+  (
+    Some(text).filter(|text| !text.is_empty() && !indentation),
+    Some(trimmed).filter(|trimmed| !trimmed.is_empty()),
+  )
 }
 
 /// A name in Clark notation: `{<uri>}<local>`, or the local name alone when it is in no namespace.
@@ -156,7 +183,9 @@ pub fn split_clark(name: &str) -> (Option<&str>, &str) {
 
 /// An XML document (module docs) as a body. The root element and every element in a namespace
 /// declare it as the default namespace where it changes, a namespaced attribute's namespace gets a
-/// generated prefix, and an element's text comes before its children.
+/// generated prefix, and an element's text comes before its children: its `#text`, or its
+/// `#trimmed` when it has none, as a contract `janus upgrade` wrote has. A CDATA section was read as
+/// text, and is written as escaped text, which every XML reader reads as the same characters.
 pub fn write(document: &RuntimeValue) -> Result<String, String> {
   let RuntimeValue::Object(members) = document else {
     return Err("an XML document is an object with one member, its root element".to_string());
@@ -201,6 +230,7 @@ fn write_element(
   let mut prefixes: Vec<&str> = Vec::new();
   let mut attributes = String::new();
   let mut text = None;
+  let mut trimmed = None;
   let mut children = Vec::new();
   for (key, value) in members {
     if let Some(attribute) = key.strip_prefix('@') {
@@ -225,6 +255,8 @@ fn write_element(
       attributes.push_str(&format!(" {qualified}=\"{}\"", escape(&value)));
     } else if key == TEXT {
       text = Some(scalar_text(value).ok_or_else(|| format!("the text of '{name}' must be text"))?);
+    } else if key == TRIMMED {
+      trimmed = Some(scalar_text(value).ok_or_else(|| format!("the text of '{name}' must be text"))?);
     } else if key == NAMESPACE {
       continue;
     } else if key.starts_with('#') {
@@ -238,6 +270,7 @@ fn write_element(
   }
   out.push_str(&attributes);
 
+  let text = text.or(trimmed);
   if text.is_none() && children.is_empty() {
     out.push_str("/>");
     return Ok(());

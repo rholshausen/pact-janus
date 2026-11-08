@@ -30,7 +30,7 @@
       ) => BOOL(true),
       :body (
         %expect:object (
-          $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum'}], 'note': [{'#text': 'leave at the door'}]}
+          $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum', '#trimmed': 'plum'}], 'note': [{'#text': 'leave at the door', '#trimmed': 'leave at the door'}]}
         ) => BOOL(true),
         :"$.order" (
           %match:equality (
@@ -43,52 +43,55 @@
               'integer'
             ) => ERROR(Expected 'one' to match an integer number)
           ) => BOOL(false),
-          :"$.order.#text" (
+          :"$.order.#trimmed" (
             %flow:if (
               %check:exists (
-                $.request.body.order.#text => ABSENT
+                $.request.body.order.#trimmed => ABSENT
               ) => BOOL(false),
               %match:equality (
-                $.request.body.order.#text,
+                $.request.body.order.#trimmed,
                 ''
               )
             ) => BOOL(true)
           ) => BOOL(true),
           %expect:count (
-            $.request.body.order.item => [{'#text': 'plum'}],
+            $.request.body.order.item => [{'#text': 'plum', '#trimmed': 'plum'}],
             2
           ) => ERROR(Expected exactly 2 items but got 1),
           :"$.order.item[0]" (
-            :"$.order.item[0].#text" (
+            :"$.order.item[0].#trimmed" (
               %match:equality (
-                $.request.body.order.item[0].#text => 'plum',
+                $.request.body.order.item[0].#trimmed => 'plum',
                 'apple'
               ) => ERROR(Expected 'plum' to equal 'apple')
             ) => BOOL(false),
             %legacy:only-entries (
-              $.request.body.order.item[0] => {'#text': 'plum'},
+              $.request.body.order.item[0] => {'#text': 'plum', '#trimmed': 'plum'},
               '#text',
+              '#trimmed',
               '#namespace'
             ) => BOOL(true)
           ) => BOOL(false),
           :"$.order.item[1]" (
-            :"$.order.item[1].#text" (
+            :"$.order.item[1].#trimmed" (
               %match:equality (
-                $.request.body.order.item[1].#text => ABSENT,
+                $.request.body.order.item[1].#trimmed => ABSENT,
                 'pear'
               ) => ERROR(Expected <absent> to equal 'pear')
             ) => BOOL(false),
             %legacy:only-entries (
               $.request.body.order.item[1] => ABSENT,
               '#text',
+              '#trimmed',
               '#namespace'
             ) => ERROR(Expected an object but got <absent>)
           ) => BOOL(false),
           %legacy:only-entries (
-            $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum'}], 'note': [{'#text': 'leave at the door'}]},
+            $.request.body.order => {'#namespace': 'urn:other', '@gift': 'yes', '@id': 'one', 'item': [{'#text': 'plum', '#trimmed': 'plum'}], 'note': [{'#text': 'leave at the door', '#trimmed': 'leave at the door'}]},
             '@id',
             'item',
             '#text',
+            '#trimmed',
             '#namespace'
           ) => ERROR(Unexpected member(s): @gift, note)
         ) => BOOL(false)

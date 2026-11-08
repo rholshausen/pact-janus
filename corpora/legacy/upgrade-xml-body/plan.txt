@@ -53,13 +53,13 @@
               '2'
             )
           ),
-          :"$.note.#text" (
+          :"$.note.#trimmed" (
             %flow:if (
               %check:exists (
-                $.response.body.note.#text
+                $.response.body.note.#trimmed
               ),
               %match:equality (
-                $.response.body.note.#text,
+                $.response.body.note.#trimmed,
                 ''
               )
             )
@@ -75,13 +75,13 @@
               %expect:object (
                 ~>
               ),
-              :"$.note.line[*].#text" (
+              :"$.note.line[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text
+                    ~>.#trimmed
                   ),
                   %match:type (
-                    ~>.#text,
+                    ~>.#trimmed,
                     'one'
                   )
                 )
@@ -97,9 +97,9 @@
             NULL
           ),
           :"$.note.to[0]" (
-            :"$.note.to[0].#text" (
+            :"$.note.to[0].#trimmed" (
               %match:equality (
-                $.response.body.note.to[0].#text,
+                $.response.body.note.to[0].#trimmed,
                 'Ada'
               )
             )

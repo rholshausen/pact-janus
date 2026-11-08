@@ -43,13 +43,13 @@
               'integer'
             )
           ),
-          :"$.order.#text" (
+          :"$.order.#trimmed" (
             %flow:if (
               %check:exists (
-                $.request.body.order.#text
+                $.request.body.order.#trimmed
               ),
               %match:equality (
-                $.request.body.order.#text,
+                $.request.body.order.#trimmed,
                 ''
               )
             )
@@ -59,28 +59,30 @@
             2
           ),
           :"$.order.item[0]" (
-            :"$.order.item[0].#text" (
+            :"$.order.item[0].#trimmed" (
               %match:equality (
-                $.request.body.order.item[0].#text,
+                $.request.body.order.item[0].#trimmed,
                 'apple'
               )
             ),
             %legacy:only-entries (
               $.request.body.order.item[0],
               '#text',
+              '#trimmed',
               '#namespace'
             )
           ),
           :"$.order.item[1]" (
-            :"$.order.item[1].#text" (
+            :"$.order.item[1].#trimmed" (
               %match:equality (
-                $.request.body.order.item[1].#text,
+                $.request.body.order.item[1].#trimmed,
                 'pear'
               )
             ),
             %legacy:only-entries (
               $.request.body.order.item[1],
               '#text',
+              '#trimmed',
               '#namespace'
             )
           ),
@@ -89,6 +91,7 @@
             '@id',
             'item',
             '#text',
+            '#trimmed',
             '#namespace'
           )
         )

@@ -246,6 +246,28 @@ fn reply(headers: Value, body: Value) -> Value {
   values
 }
 
+/// An XML document as the component decodes one (ADR 0075): every element's `#text` with the
+/// `#trimmed` beside it.
+fn as_decoded(mut document: Value) -> Value {
+  fn walk(value: &mut Value) {
+    match value {
+      Value::Object(members) => {
+        if let Some(Value::String(text)) = members.get("#text") {
+          let trimmed = text.trim().to_string();
+          if !trimmed.is_empty() {
+            members.insert("#trimmed".to_string(), json!(trimmed));
+          }
+        }
+        members.values_mut().for_each(walk);
+      }
+      Value::Array(items) => items.iter_mut().for_each(walk),
+      _ => {}
+    }
+  }
+  walk(&mut document);
+  document
+}
+
 const MATCHED: Status = Status::Matched;
 const MISMATCHED: Status = Status::Mismatched;
 
@@ -470,11 +492,11 @@ fn an_xml_body_reaches_the_pacts_verdict_upgraded() {
     }
     reply(
       json!({ "content-type": "application/xml" }),
-      json!({ "order": {
+      as_decoded(json!({ "order": {
         "#namespace": "urn:o", "@id": id, "@{urn:x}rev": rev,
         "total": [{ "#text": total }], "note": [note_element],
         "item": items,
-      } }),
+      } })),
     )
   };
   let items = json!([{ "#text": "c" }, { "#text": "d" }, { "#text": "e" }]);

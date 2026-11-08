@@ -405,6 +405,9 @@ An XML body is walked as today's verifier walks one, over the XML component's do
 spec §6.1): each element by the rule at its path or by its name, then its attributes, its text and its
 children, grouped by name, with rules found by pact's own paths (`$.a.b['@c']`, `['#text']`, no index)
 ([ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
+An element's text is compared as its `#trimmed`, each text node trimmed, as today's verifier reads it,
+though a pact's rules name it `['#text']`
+([ADR 0075](../../decisions/0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md)).
 A multipart body is compared as today's verifier compares one, over the multipart component's document
 (component-interfaces spec §6.1): each of the pact's parts against the reply's first part of its name,
 or its unnamed part at the same position among the unnamed ones; then the part's headers, and its body,

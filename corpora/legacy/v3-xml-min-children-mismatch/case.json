@@ -58,7 +58,8 @@
             "@id": "1",
             "item": [
               {
-                "#text": "apple"
+                "#text": "apple",
+                "#trimmed": "apple"
               }
             ]
           }

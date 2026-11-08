@@ -38,31 +38,31 @@
       ) => BOOL(true),
       :body (
         %expect:object (
-          $.response.body.orders => {'order': [{'@id': '1', 'item': [{'#text': 'apple'}]}]}
+          $.response.body.orders => {'order': [{'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]}]}
         ) => BOOL(true),
         :"$.orders" (
-          :"$.orders.#text" (
+          :"$.orders.#trimmed" (
             %flow:if (
               %check:exists (
-                $.response.body.orders.#text => ABSENT
+                $.response.body.orders.#trimmed => ABSENT
               ) => BOOL(false),
               %match:equality (
-                $.response.body.orders.#text,
+                $.response.body.orders.#trimmed,
                 ''
               )
             ) => BOOL(true)
           ) => BOOL(true),
           %expect:not-empty (
-            $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple'}]}]
+            $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]}]
           ) => BOOL(true),
           %flow:for-each (
             ** (
-              $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple'}]}]
-            ) => [{'@id': '1', 'item': [{'#text': 'apple'}]}],
+              $.response.body.orders.order => [{'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]}]
+            ) => [{'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]}],
             :"$.orders.order[*]" (
               %expect:size (
                 %legacy:xml-children (
-                  ~> => {'@id': '1', 'item': [{'#text': 'apple'}]}
+                  ~> => {'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]}
                 ) => ['item'],
                 2,
                 NULL
@@ -73,46 +73,46 @@
                   '1'
                 ) => BOOL(true)
               ) => BOOL(true),
-              :"$.orders.order[*].#text" (
+              :"$.orders.order[*].#trimmed" (
                 %flow:if (
                   %check:exists (
-                    ~>.#text => ABSENT
+                    ~>.#trimmed => ABSENT
                   ) => BOOL(false),
                   %match:type (
-                    ~>.#text,
+                    ~>.#trimmed,
                     ''
                   )
                 ) => BOOL(true)
               ) => BOOL(true),
               %expect:not-empty (
-                ~>.item => [{'#text': 'apple'}]
+                ~>.item => [{'#text': 'apple', '#trimmed': 'apple'}]
               ) => BOOL(true),
               %flow:for-each (
                 ** (
-                  ~>.item => [{'#text': 'apple'}]
-                ) => [{'#text': 'apple'}],
+                  ~>.item => [{'#text': 'apple', '#trimmed': 'apple'}]
+                ) => [{'#text': 'apple', '#trimmed': 'apple'}],
                 :"$.orders.order[*].item[*]" (
                   %expect:object (
-                    ~> => {'#text': 'apple'}
+                    ~> => {'#text': 'apple', '#trimmed': 'apple'}
                   ) => BOOL(true),
-                  :"$.orders.order[*].item[*].#text" (
+                  :"$.orders.order[*].item[*].#trimmed" (
                     %flow:if (
                       %check:exists (
-                        ~>.#text => 'apple'
+                        ~>.#trimmed => 'apple'
                       ) => BOOL(true),
                       %match:type (
-                        ~>.#text => 'apple',
+                        ~>.#trimmed => 'apple',
                         'apple'
                       ) => BOOL(true)
                     ) => BOOL(true)
                   ) => BOOL(true),
                   %legacy:xml-only-children (
-                    ~> => {'#text': 'apple'}
+                    ~> => {'#text': 'apple', '#trimmed': 'apple'}
                   ) => BOOL(true)
                 ) => BOOL(true)
               ) => BOOL(true),
               %legacy:xml-only-children (
-                ~> => {'@id': '1', 'item': [{'#text': 'apple'}]},
+                ~> => {'@id': '1', 'item': [{'#text': 'apple', '#trimmed': 'apple'}]},
                 'item'
               ) => BOOL(true)
             ) => BOOL(false)

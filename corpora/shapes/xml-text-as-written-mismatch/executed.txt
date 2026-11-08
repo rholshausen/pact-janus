@@ -1,0 +1,76 @@
+(
+  :"get a note" (
+    :response (
+      :body (
+        %expect:object (
+          $.response.body => {'note': {'to': [{'#text': 'Ada', '#trimmed': 'Ada'}], 'script': [{'#text': 'if (a < b) { go(); }', '#trimmed': 'if (a < b) { go(); }'}], 'from': [{'#text': 'Bea', '#trimmed': 'Bea'}]}}
+        ) => BOOL(true),
+        :"$.note" (
+          %expect:object (
+            $.response.body.note => {'to': [{'#text': 'Ada', '#trimmed': 'Ada'}], 'script': [{'#text': 'if (a < b) { go(); }', '#trimmed': 'if (a < b) { go(); }'}], 'from': [{'#text': 'Bea', '#trimmed': 'Bea'}]}
+          ) => BOOL(true),
+          :"$.note.from" (
+            %expect:array (
+              $.response.body.note.from => [{'#text': 'Bea', '#trimmed': 'Bea'}]
+            ) => BOOL(true),
+            %expect:count (
+              $.response.body.note.from => [{'#text': 'Bea', '#trimmed': 'Bea'}],
+              1
+            ) => BOOL(true),
+            :"$.note.from[0]" (
+              %expect:object (
+                $.response.body.note.from[0] => {'#text': 'Bea', '#trimmed': 'Bea'}
+              ) => BOOL(true),
+              :"$.note.from[0].#trimmed" (
+                %match:equality (
+                  $.response.body.note.from[0].#trimmed => 'Bea',
+                  'Bea'
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.note.script" (
+            %expect:array (
+              $.response.body.note.script => [{'#text': 'if (a < b) { go(); }', '#trimmed': 'if (a < b) { go(); }'}]
+            ) => BOOL(true),
+            %expect:count (
+              $.response.body.note.script => [{'#text': 'if (a < b) { go(); }', '#trimmed': 'if (a < b) { go(); }'}],
+              1
+            ) => BOOL(true),
+            :"$.note.script[0]" (
+              %expect:object (
+                $.response.body.note.script[0] => {'#text': 'if (a < b) { go(); }', '#trimmed': 'if (a < b) { go(); }'}
+              ) => BOOL(true),
+              :"$.note.script[0].#text" (
+                %match:equality (
+                  $.response.body.note.script[0].#text => 'if (a < b) { go(); }',
+                  ' if (a < b) { go(); } '
+                ) => ERROR(Expected 'if (a < b) { go(); }' to equal ' if (a < b) { go(); } ')
+              ) => BOOL(false)
+            ) => BOOL(false)
+          ) => BOOL(false),
+          :"$.note.to" (
+            %expect:array (
+              $.response.body.note.to => [{'#text': 'Ada', '#trimmed': 'Ada'}]
+            ) => BOOL(true),
+            %expect:count (
+              $.response.body.note.to => [{'#text': 'Ada', '#trimmed': 'Ada'}],
+              1
+            ) => BOOL(true),
+            :"$.note.to[0]" (
+              %expect:object (
+                $.response.body.note.to[0] => {'#text': 'Ada', '#trimmed': 'Ada'}
+              ) => BOOL(true),
+              :"$.note.to[0].#text" (
+                %match:equality (
+                  $.response.body.note.to[0].#text => 'Ada',
+                  '  Ada  '
+                ) => ERROR(Expected 'Ada' to equal '  Ada  ')
+              ) => BOOL(false)
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

@@ -22,7 +22,10 @@ readability:
   orders compared as equal (ADR 0037); and `member-name-quoted/`, members whose names a path segment
   cannot hold (a dot, a brace, a quote, no name at all), each resolved by a quoted segment (ADR 0047). `number-kinds-as-written/` and its `-mismatch` twin are `integer` and `decimal` reading a
   number's kind from how it is written, `100.0`, `1e2` and `-0` being decimals, while `equality` holds
-  `100` and `100.0` to be one value (ADR 0072).
+  `100` and `100.0` to be one value (ADR 0072). `xml-text-as-written/` and its `-mismatch` twin are a contract's XML
+  text compared as written: whitespace around it, and a CDATA section's contents, match only text
+  written the same way, while a member shaped on `#trimmed` matches whatever whitespace is around it
+  (ADR 0075).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
@@ -41,7 +44,9 @@ readability:
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`
   are form bodies, compiled as a query string (ADR 0038). `v3-xml-body/` and `v3-xml-body-mismatch/` are
-  XML bodies, walked element by element over the XML component's document, and `v3-type-rule-on-text/`
+  XML bodies, walked element by element over the XML component's document, their text compared as
+  `#trimmed`, today's reading, so `v3-xml-body/`'s item with whitespace around it matches (ADR 0075),
+  and `v3-type-rule-on-text/`
   a type rule read against text, as today's verifier reads it (ADR 0039); `v3-xml-min-children-mismatch/`
   a minimum on an element's children, a mismatch located at the element though the action that counts
   them is not a resolve (staged plan S1.30). `v3-multipart-body/` and

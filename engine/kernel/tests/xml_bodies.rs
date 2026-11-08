@@ -46,6 +46,20 @@ fn the_legacy_reader_and_the_xml_component_read_every_body_alike() {
     "expected the specification cases' XML, found {}",
     bodies.len()
   );
+  // And text each reads two ways, as written and trimmed (ADR 0075): whitespace around it, a CDATA
+  // section, references, mixed content, and indentation between children.
+  bodies.extend(
+    [
+      "<a>  Ada  </a>",
+      "<a><![CDATA[ x < y ]]></a>",
+      "<a> one <![CDATA[ two ]]> three </a>",
+      "<a>1 &lt; 2 &#38; 3</a>",
+      "<a> text <b/> more <!-- c --> end </a>",
+      "<a>\n  <b> x </b>\n  <c/>\n</a>",
+      "<a>   </a>",
+    ]
+    .map(String::from),
+  );
 
   let mut compared = 0;
   for body in &bodies {

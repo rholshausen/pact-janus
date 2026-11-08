@@ -31,9 +31,12 @@ fn an_element_is_its_attributes_text_and_children_keyed_by_name() {
         "@age": "3",
         "@name": "Mary",
         "favouriteColours": [{
-          "favouriteColour": [ { "#text": "red" }, { "#text": "blue" } ]
+          "favouriteColour": [
+            { "#text": "red", "#trimmed": "red" },
+            { "#text": "blue", "#trimmed": "blue" }
+          ]
         }],
-        "note": [ { "#text": "teeth" } ]
+        "note": [ { "#text": "teeth", "#trimmed": "teeth" } ]
       }
     })))
   );
@@ -52,14 +55,80 @@ fn children_keep_the_order_they_arrived_in_and_attributes_are_in_name_order() {
 }
 
 #[test]
-fn text_is_each_text_node_trimmed_then_joined_and_absent_when_empty() {
+fn text_is_kept_as_written_and_trimmed_is_each_text_node_trimmed_then_joined() {
   assert_eq!(
     parse(b"<a> one <b/> two <![CDATA[ <three> ]]><!-- not text --></a>"),
+    Ok(document(json!({
+      "a": { "#text": " one  two  <three> ", "#trimmed": "onetwo<three>", "b": [ {} ] }
+    })))
+  );
+  // A reference is a text node of its own to `sxd-document`, so today's verifier trims around it.
+  assert_eq!(
+    parse(b"<a>1 &lt; 2</a>"),
+    Ok(document(json!({ "a": { "#text": "1 < 2", "#trimmed": "1<2" } })))
+  );
+}
+
+#[test]
+fn a_cdata_section_is_its_contents_as_written() {
+  assert_eq!(
+    parse(b"<a><![CDATA[  if (a < b) { &amp; }  ]]></a>"),
+    Ok(document(json!({
+      "a": { "#text": "  if (a < b) { &amp; }  ", "#trimmed": "if (a < b) { &amp; }" }
+    })))
+  );
+}
+
+#[test]
+fn whitespace_is_text_unless_it_only_indents_child_elements() {
+  assert_eq!(
+    parse(b"<a>  \n  </a>"),
+    Ok(document(json!({ "a": { "#text": "  \n  " } })))
+  );
+  assert_eq!(
+    parse(b"<a>\n  <b/>\n  <c> x </c>\n</a>"),
     Ok(document(
-      json!({ "a": { "#text": "onetwo<three>", "b": [ {} ] } })
+      json!({ "a": { "b": [ {} ], "c": [ { "#text": " x ", "#trimmed": "x" } ] } })
     ))
   );
-  assert_eq!(parse(b"<a>  \n  </a>"), Ok(document(json!({ "a": {} }))));
+  assert_eq!(parse(b"<a></a>"), Ok(document(json!({ "a": {} }))));
+}
+
+#[test]
+fn text_as_written_is_written_back_as_it_was_read() {
+  let body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a>  one &lt; two  </a>";
+  let parsed = parse(body.as_bytes()).expect("parses");
+  assert_eq!(write(&parsed).as_deref(), Ok(body));
+  // A CDATA section is written as escaped text, which reads back as the same characters.
+  let cdata = parse(b"<a><![CDATA[ x < y ]]></a>").expect("parses");
+  let written = write(&cdata).expect("writes");
+  assert_eq!(
+    written,
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a> x &lt; y </a>"
+  );
+  // Its text reads back as written. Its `#trimmed` does not: `sxd-document` splits text at a
+  // reference, and today's verifier trims each piece.
+  assert_eq!(
+    parse(written.as_bytes()),
+    Ok(document(
+      json!({ "a": { "#text": " x < y ", "#trimmed": "x<y" } })
+    ))
+  );
+  assert_eq!(
+    cdata,
+    document(json!({ "a": { "#text": " x < y ", "#trimmed": "x < y" } }))
+  );
+}
+
+#[test]
+fn an_element_with_only_trimmed_text_writes_it() {
+  assert_eq!(
+    write(&document(
+      json!({ "a": { "#trimmed": "x", "b": [ { "#text": " y ", "#trimmed": "y" } ] } })
+    ))
+    .as_deref(),
+    Ok("<?xml version=\"1.0\" encoding=\"UTF-8\"?><a>x<b> y </b></a>")
+  );
 }
 
 #[test]
@@ -76,7 +145,9 @@ fn a_namespace_is_a_member_and_a_prefix_is_not_kept() {
         "@{urn:names}name": "Mary",
         "favouriteNumbers": [{
           "#namespace": "urn:alligators",
-          "favouriteNumber": [ { "#namespace": "urn:favourite:numbers", "#text": "1" } ]
+          "favouriteNumber": [
+            { "#namespace": "urn:favourite:numbers", "#text": "1", "#trimmed": "1" }
+          ]
         }]
       }
     })))
@@ -201,7 +272,7 @@ fn it_decodes_a_slot_and_encodes_a_document_back() {
     .expect("decodes");
   assert_eq!(
     decoded.document,
-    document(json!({ "a": { "b": [ { "#text": "1" } ] } }))
+    document(json!({ "a": { "b": [ { "#text": "1", "#trimmed": "1" } ] } }))
   );
 
   let encoded = xml
