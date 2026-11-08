@@ -90,6 +90,7 @@ superseding ADR instead.
 | [0071](0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md) | Compare a `Content-Type` as a media type, with the HTTP component's `http:media-type` | accepted |
 | [0072](0072-read-a-numbers-kind-from-how-it-is-written.md) | Read a number's kind from how it is written | accepted |
 | [0073](0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md) | Name a rule nobody implements as the `pact` component's operator, and fail by it | accepted |
+| [0074](0074-redact-credentials-from-what-the-engine-records-and-reports.md) | Redact credentials from what the engine records and reports | accepted |
 
 ## Decision backlog
 
