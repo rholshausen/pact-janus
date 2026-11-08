@@ -1934,6 +1934,25 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 - **S2.8 Secrets in recorded contracts** — **S**. A consumer test that sends a real token records it.
   The lifecycle-hooks redaction rules extend to the recorded contract and to `explain --executed`
   output, and the SDK specification says which headers and members are redacted by default.
+  *Done 2026-11-08* ([ADR 0074](decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)):
+  - A transport declares which members carry credentials (`credential-members`, component-interfaces
+    spec §5.8). The HTTP transport's are the request's `authorization`, `proxy-authorization` and
+    `cookie` headers and the response's `set-cookie`. The kernel names none.
+  - A contract the engine writes records each one's values and examples as `"[redacted]"` (a number
+    `0`, a boolean `false`), an `equality` there as a `type`, and lists the paths under `redacted`
+    (contract-file spec §5.6). An interaction with no credential is written as before. `upgrade/pact`
+    does the same, reporting `value-redacted`; `add-pact-interaction` is redacted by its session.
+  - A consumer session's `config.redaction` is `{ add, keep }`: `keep` records a fixed token as it
+    is. Both SDKs' `janus` options take it and pass it as written (conformance case
+    `lifecycle/redaction-in-create`); the SDK specification says what is redacted by default.
+  - A verifier sends what was recorded. A failed result lists, as `redacted`, the redacted request
+    members no `before-request` hook replaced, and the report says how to supply them.
+  - No report repeats a value found under a credential member: mismatches, executed plans, the plan
+    beside them, `explain`'s `text` and `executed`, and a consumer session's mismatches. Lifecycle-hooks
+    spec §7.3 says so.
+  - `corpora/contracts/redacted/` pins how a redacted contract is written, and
+    `engine/kernel/tests/redaction.rs` covers recording, keeping, the mock, `explain` and a run. S1.1's
+    harness moved no verdict: its two fixtures with an `Authorization` header replace it with `--header`.
 - **S2.9 The SDKs graduate** (ADR 0027) — **M**. The TypeScript SDK moves into pact-js and the JVM
   SDK into pact-jvm, each as that package's next major version, with its conformance driver, its
   thinness classification and its generated bindings, running S0.11's gates against the pinned engine

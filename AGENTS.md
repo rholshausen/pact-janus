@@ -202,7 +202,10 @@ Three sources are the source of truth and take precedence over this file when th
 > reads as a plugin's, in a pact that names no plugin (pact-jvm's `ignore-order`), upgrades to the
 > `pact` component's operator of its name, with no requirement, so its interaction fails by name as
 > the pact does, reported as `rule-unmapped`. S2.18: a `flow:or` that passed is not failed by an
-> alternative it did not need; those stay in the executed plan and are not mismatches.
+> alternative it did not need; those stay in the executed plan and are not mismatches. S2.8 (ADR 0074):
+> a transport declares its credential members (HTTP: `authorization`, `proxy-authorization`, `cookie`,
+> `set-cookie`); a contract records them as `"[redacted]"` and lists them under `redacted`, unless a
+> session's `config.redaction` keeps them, and no report repeats a value found under one.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
