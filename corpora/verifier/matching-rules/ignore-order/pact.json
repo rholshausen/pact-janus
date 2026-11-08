@@ -1,0 +1,235 @@
+{
+  "consumer": {
+    "name": "orders-consumer"
+  },
+  "provider": {
+    "name": "orders-provider"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "tags in any order, answered in the pact's",
+      "request": {
+        "method": "GET",
+        "path": "/tags"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "tags": [
+              "red",
+              "green",
+              "blue"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.tags": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "ignore-order"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "tags in any order, answered in another",
+      "request": {
+        "method": "GET",
+        "path": "/tags/reordered"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "tags": [
+              "red",
+              "green",
+              "blue"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.tags": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "ignore-order"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "line items in any order, at least one",
+      "request": {
+        "method": "GET",
+        "path": "/items"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "items": [
+              {
+                "sku": "A-1",
+                "quantity": 2
+              },
+              {
+                "sku": "B-2",
+                "quantity": 1
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "ignore-order",
+                  "min": 1
+                }
+              ]
+            },
+            "$.items[*].sku": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "sizes in any order, between one and three",
+      "request": {
+        "method": "GET",
+        "path": "/sizes"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "sizes": [
+              "S",
+              "M"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.sizes": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "ignore-order",
+                  "min": 1,
+                  "max": 3
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Synchronous/HTTP",
+      "description": "colours in any order, or of the example's type",
+      "request": {
+        "method": "GET",
+        "path": "/colours"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "colours": [
+              "red",
+              "green"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.colours": {
+              "combine": "OR",
+              "matchers": [
+                {
+                  "match": "ignore-order"
+                },
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}

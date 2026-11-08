@@ -1,0 +1,73 @@
+(
+  :"get an order's line items" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/order',
+          '/order'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type => ABSENT,
+          'application/json'
+        ) => BOOL(true),
+        :"$.items" (
+          %flow:error (
+            'legacy matching rule \'ignore-order\' is not yet supported by the compiled plan'
+          ) => ERROR(legacy matching rule 'ignore-order' is not yet supported by the compiled plan),
+          %flow:for-each (
+            ** (
+              $.response.body.items => [{'sku': 'A-1', 'quantity': 2}, {'sku': 'B-2', 'quantity': 1}]
+            ) => [{'sku': 'A-1', 'quantity': 2}, {'sku': 'B-2', 'quantity': 1}],
+            :"$.items[*]" (
+              :"$.items[*].quantity" (
+                %match:integer (
+                  ~>.quantity => 2
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[*].sku" (
+                %flow:error (
+                  'legacy matching rule \'ignore-order\' is not yet supported by the compiled plan'
+                ) => ERROR(legacy matching rule 'ignore-order' is not yet supported by the compiled plan)
+              ) => BOOL(false)
+            ) => BOOL(false),
+            :"$.items[*]" (
+              :"$.items[*].quantity" (
+                %match:integer (
+                  ~>.quantity => 1
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.items[*].sku" (
+                %flow:error (
+                  'legacy matching rule \'ignore-order\' is not yet supported by the compiled plan'
+                ) => ERROR(legacy matching rule 'ignore-order' is not yet supported by the compiled plan)
+              ) => BOOL(false)
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

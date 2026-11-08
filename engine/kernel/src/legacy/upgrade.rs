@@ -1310,6 +1310,10 @@ impl Conversion {
         .collect();
       return json!({ "shape": "array", "entries": entries });
     };
+    let list = without_unmatched_alternatives(list);
+    if let Some((name, values)) = plugin_rule(&list) {
+      return self.plugin_rule_shape(name, values, &Value::Array(items.to_vec()), &ctx.at);
+    }
     if let Some(MatchingRule::ArrayContains(variants)) = list.rules.first() {
       return self.contains_shape(items, variants, ctx);
     }
@@ -1843,6 +1847,10 @@ impl Conversion {
       self.frozen(at, 1);
       return json!({ "shape": "equality", "example": example });
     };
+    let list = without_unmatched_alternatives(list);
+    if let Some((name, values)) = plugin_rule(&list) {
+      return self.plugin_rule_shape(name, values, example, at);
+    }
     let rule = match list.rules.len() {
       0 => {
         self.frozen(at, 1);
@@ -1912,6 +1920,37 @@ impl Conversion {
         json!({ "shape": "equality", "example": example })
       }
     }
+  }
+
+  /// A rule `pact_models` reads as a plugin's, in a pact that names no plugin (ADR 0073): today's
+  /// verifier fails it, and so does the legacy compiler. The contract names it as the `pact`
+  /// component's operator, its configuration as members, so it fails the interaction by name too,
+  /// until an engine provides it. Nothing below it is walked: the rule is the position's whole
+  /// shape, as it is the pact's.
+  fn plugin_rule_shape(&mut self, name: &str, values: &Value, example: &Value, at: &Where) -> Value {
+    let operator = format!("{}:{name}", PactGenerators::NAME);
+    self.finding(Finding::at(
+      "rule-unmapped",
+      "lossy",
+      at,
+      format!(
+        "the matching rule '{name}' is not one today's Rust verifier or this engine implements, and \
+         the pact names no plugin that provides it, so both fail it; the contract names it \
+         '{operator}', which fails the interaction by name as the pact does. Rewrite the position as \
+         a shape that says what the rule asked for"
+      ),
+    ));
+    let mut node = Map::new();
+    node.insert("shape".to_string(), json!(operator));
+    if let Value::Object(values) = values {
+      for (member, value) in values {
+        if !matches!(member.as_str(), "shape" | "example" | "encoded" | "generator") {
+          node.insert(member.clone(), value.clone());
+        }
+      }
+    }
+    node.insert("example".to_string(), example.clone());
+    Value::Object(node)
   }
 
   /// One `example-frozen-as-equality` note per *position group* rather than per position: a
@@ -2735,6 +2774,28 @@ fn cardinality(list: &RuleList) -> (u64, Option<u64>) {
     }
   }
   (1, None)
+}
+
+/// The first rule `pact_models` read as a plugin's (ADR 0073), by its name and configuration.
+fn plugin_rule(list: &RuleList) -> Option<(&str, &Value)> {
+  list.rules.iter().find_map(|rule| match rule {
+    MatchingRule::Plugin { name, values } => Some((name.as_str(), values)),
+    _ => None,
+  })
+}
+
+/// An OR's alternatives without the rules `pact_models` read as a plugin's, when any other is left.
+/// Today's verifier fails such a rule wherever it is applied, so as an alternative it never matches
+/// and decides nothing (ADR 0073). An AND of one, or an OR of nothing else, is left whole.
+fn without_unmatched_alternatives(list: RuleList) -> RuleList {
+  let is_plugin = |rule: &MatchingRule| matches!(rule, MatchingRule::Plugin { .. });
+  if list.rule_logic != RuleLogic::Or || list.rules.iter().all(is_plugin) {
+    return list;
+  }
+  RuleList {
+    rules: list.rules.into_iter().filter(|rule| !is_plugin(rule)).collect(),
+    ..list
+  }
 }
 
 /// Contract-file spec §8.2's table, row by row. `None` means no shape equivalent — the caller

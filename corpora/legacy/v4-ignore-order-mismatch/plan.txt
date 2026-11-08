@@ -1,0 +1,61 @@
+(
+  :"get an order's line items" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/order'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
+        :"$.items" (
+          %flow:error (
+            'legacy matching rule \'ignore-order\' is not yet supported by the compiled plan'
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              :"$.items[*].quantity" (
+                %match:integer (
+                  ~>.quantity
+                )
+              ),
+              :"$.items[*].sku" (
+                %flow:error (
+                  'legacy matching rule \'ignore-order\' is not yet supported by the compiled plan'
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

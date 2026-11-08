@@ -53,6 +53,10 @@ readability:
   messages, compared as today's verifier compares one: metadata key by key, the contents' content type,
   then the contents (ADR 0046). A message's plan is rooted at the `message` part a `produce-message`
   hook produces, and its case names the interaction by its position in the pact, as every case does.
+  `v4-ignore-order-mismatch/` is pact-jvm's `ignore-order`, a rule `pact_models` reads as a plugin's,
+  which fails as today's verifier fails it; its upgraded contract names it `pact:ignore-order`, which
+  fails by name, so the two reach one verdict with different mismatches, and it is not an `upgrade-`
+  case (ADR 0073).
   `v4-status-class/` and its `-mismatch` twin are a v4 `statusCode` rule, compiled from the pact and
   from its upgraded contract to the built-in HTTP component's `http:status-class`, which the corpus
   runner registers as the native engine does (ADR 0057). `shapes/http-media-type/` and its

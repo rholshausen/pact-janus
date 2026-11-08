@@ -131,7 +131,10 @@ interaction of a pact it did not fetch is `absent` there too.
   values (`$.chips.*.amount`), which pact_verifier_cli 1.3.5 ignores and pact-reference#586 makes it
   apply: a tripwire for moving the pin to a verifier with that fix. `status-code` is v4's `statusCode`
   rule on a response's status (S1.35, ADR 0057): every class and a list of codes, one reply outside its
-  class, and mutations that step each status past its class's edge.
+  class, and mutations that step each status past its class's edge. `ignore-order` is pact-jvm's
+  `unorderedArray` rule, with and without its bounds, which both verifiers fail as a plugin's rule
+  nobody provides, and the upgraded contract fails by name as `pact:ignore-order` (S2.17, ADR 0073).
+  Beside `type` in an `OR`, it decides nothing, which `janus verify` gets wrong until S2.18.
 - `messages/`: message pacts (S1.7, ADR 0046): pact-js's message example, an asynchronous event under
   matchers with its queue in its metadata, answered by the provider's own message factory; pact-jvm's
   v3 message, v4 message with metadata rules, and v4 synchronous message; a v4 pact that mixes an HTTP

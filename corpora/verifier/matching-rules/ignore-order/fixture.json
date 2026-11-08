@@ -1,0 +1,132 @@
+{
+  "description": "pact-jvm's `unorderedArray` rules, `ignore-order` with and without `min` and `max`, which pact_models reads as a plugin's rule. Today's verifier fails it, as janus verify does, and the contract janus upgrade writes names it `pact:ignore-order`, which fails by name too (staged plan S2.17, ADR 0073). As an alternative of an OR beside `type`, it decides nothing: the reply passes by the other",
+  "source": "pact-jvm's MatchingRules.kt (`ignore-order`, `min-ignore-order`, `max-ignore-order`, `min-max-ignore-order`), the rules `unorderedArray` and its sized forms write; staged plan S2.17",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/tags"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "tags": [
+                "red",
+                "green",
+                "blue"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/tags/reordered"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "tags": [
+                "blue",
+                "red",
+                "green"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/items"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "items": [
+                {
+                  "quantity": 2,
+                  "sku": "A-1"
+                },
+                {
+                  "quantity": 1,
+                  "sku": "B-2"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/sizes"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "sizes": [
+                "S",
+                "M"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/colours"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "colours": [
+                "blue",
+                "yellow",
+                "black"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

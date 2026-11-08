@@ -335,6 +335,98 @@ fn an_or_combination_is_reported_as_its_own_kind_of_loss() {
   assert_eq!(find(&upgraded.findings, "rule-combination-or").kind, "lossy");
 }
 
+/// pact-jvm's `unorderedMinArray` writes `ignore-order` with a `min`. `pact_models` reads it as a
+/// plugin's rule, and today's verifier fails it, as `janus verify` does. Staged plan S2.17 and ADR
+/// 0073: the contract names it as the `pact` component's operator, so it fails by name too, and
+/// says so once, at the array, where it once became an `each-like` of the first element with
+/// nothing reported. What the pact declares below the array is not walked: the rule is the whole
+/// shape, as it is the pact's.
+#[test]
+fn an_ignore_order_rule_on_an_array_is_named_and_reported_at_the_array() {
+  let response = json!({
+    "status": 200, "body": { "items": [ { "sku": "A-1", "quantity": 2 }, { "sku": "B-2", "quantity": 1 } ] },
+    "matchingRules": { "body": {
+      "$.items": { "matchers": [ { "match": "ignore-order", "min": 1 } ] },
+      "$.items[*].quantity": { "matchers": [ { "match": "integer" } ] }
+    } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), response));
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body")["members"]["items"],
+    json!({
+      "shape": "pact:ignore-order",
+      "min": 1,
+      "example": [ { "sku": "A-1", "quantity": 2 }, { "sku": "B-2", "quantity": 1 } ]
+    })
+  );
+  let unmapped: Vec<&Finding> = upgraded
+    .findings
+    .iter()
+    .filter(|f| f.code == "rule-unmapped")
+    .collect();
+  assert_eq!(
+    unmapped.len(),
+    1,
+    "reported once, not at each element: {unmapped:?}"
+  );
+  assert_eq!(unmapped[0].kind, "lossy");
+  assert_eq!(unmapped[0].path, "/interactions/0/response/body/items");
+  assert_eq!(
+    unmapped[0].target.as_deref(),
+    Some("/interactions/0/parts/response/body/members/items")
+  );
+  assert!(
+    unmapped[0].message.contains("'pact:ignore-order'"),
+    "{}",
+    unmapped[0].message
+  );
+  assert_eq!(
+    upgraded.contract.interactions[0].requires, None,
+    "no requirement, which would end the whole run before anything ran"
+  );
+}
+
+/// The same holds for a scalar: a rule `pact_models` does not know fails today wherever it is.
+#[test]
+fn a_plugin_rule_on_a_scalar_is_named_too() {
+  let response = json!({
+    "status": 200, "body": { "card": "4111111111111111" },
+    "matchingRules": { "body": { "$.card": { "matchers": [ { "match": "credit-card", "scheme": "visa" } ] } } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), response));
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body")["members"]["card"],
+    json!({ "shape": "pact:credit-card", "scheme": "visa", "example": "4111111111111111" })
+  );
+  assert_eq!(
+    find(&upgraded.findings, "rule-unmapped").path,
+    "/interactions/0/response/body/card"
+  );
+}
+
+/// As one alternative of an OR, such a rule never matches, so it decides nothing and is left out:
+/// the reply passes by the other, as it does today.
+#[test]
+fn a_plugin_rule_beside_another_in_an_or_decides_nothing() {
+  let response = json!({
+    "status": 200, "body": { "colours": [ "red", "green" ] },
+    "matchingRules": { "body": { "$.colours": { "combine": "OR", "matchers": [
+      { "match": "ignore-order" }, { "match": "type" }
+    ] } } }
+  });
+  let upgraded = upgrade(&pact_with(get_slash(), response));
+  assert_eq!(
+    shape(&upgraded, 0, "response", "body")["members"]["colours"]["shape"],
+    json!("each-like")
+  );
+  assert!(
+    !codes(&upgraded.findings).contains(&"rule-unmapped")
+      && !codes(&upgraded.findings).contains(&"rule-combination-or"),
+    "{:?}",
+    codes(&upgraded.findings)
+  );
+}
+
 /// A dropped generator is lossy but never dangerous: it weakens what the contract can *produce*,
 /// never what it *accepts*, and the message says so.
 #[test]
