@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794097958428,
+  "lastUpdate": 1794097960504,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -44922,6 +44922,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20301,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "22da5186ada0e653a8aacf915a989c676108b078",
+          "message": "feat: S2.17 a rule nobody implements upgrades to an operator that fails by name\n\njanus upgrade, and so add-pact-interaction, writes a v1-v4 rule that\npact_models reads as a plugin's, in a pact that names no plugin, as the\npact component's operator of its name, with the rule's configuration as\nmembers (ADR 0073): pact-jvm's ignore-order becomes pact:ignore-order.\nNothing provides it and no requirement is written, so its interaction\nfails by name, as today's verifier and janus verify fail the pact, and\nthe rest of the contract verifies. It is rule-unmapped, once, where the\nrule is; an array no longer becomes an each-like of its first element\nwith nothing reported. As one alternative of an OR beside others it never\nmatches, and is left out.\n\ncorpora/legacy/v4-ignore-order-mismatch fails the rule directly, and the\nupgrade agreement test reaches the same verdict on its contract. S1.1's\nmatching-rules/ignore-order fixture has pact-jvm's four forms, on which\nall three verdicts agree. Its OR of ignore-order and type found S2.18: an\nOR failed by an alternative it did not need. Its entries in both ledgers\nname it.\n\npact-jvm's ArrayUnorderedTest puts unorderedArray in a request, which the\nfacade's mock now refuses by name, so it is no longer ported (removed in\n44bc7f9, which picked up the staged deletion); the migration note's row\nsays to rewrite with eachLike or arrayContaining.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-08T11:22:53+11:00",
+          "tree_id": "dcff353fb3bcad4230f22f4667bccd7193c6c599",
+          "url": "https://github.com/rholshausen/pact-janus/commit/22da5186ada0e653a8aacf915a989c676108b078"
+        },
+        "date": 1794097959963,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 30581,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27663,
             "unit": "requests per second",
             "extra": "engines 4"
           }
