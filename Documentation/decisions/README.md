@@ -55,7 +55,7 @@ superseding ADR instead.
 | [0036](0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md) | Read text bodies through a text component, and bodies no component claims as bytes | accepted |
 | [0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md) | Carry member order through the engine, and decide nothing by it | accepted |
 | [0038](0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md) | Read form bodies as a query string, through a built-in form component | accepted |
-| [0039](0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md) | Read XML bodies by element name, through a built-in XML component | accepted |
+| [0039](0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md) | Read XML bodies by element name, through a built-in XML component | accepted; decision 2 amended by 0075 |
 | [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted |
 | [0041](0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md) | Refuse a filter that names no recorded variant, and report a narrowed run as filtered | accepted |
 | [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
@@ -91,6 +91,7 @@ superseding ADR instead.
 | [0072](0072-read-a-numbers-kind-from-how-it-is-written.md) | Read a number's kind from how it is written | accepted |
 | [0073](0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md) | Name a rule nobody implements as the `pact` component's operator, and fail by it | accepted |
 | [0074](0074-redact-credentials-from-what-the-engine-records-and-reports.md) | Redact credentials from what the engine records and reports | accepted |
+| [0075](0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md) | Keep XML text as written, beside the text today's verifier reads | accepted |
 
 ## Decision backlog
 

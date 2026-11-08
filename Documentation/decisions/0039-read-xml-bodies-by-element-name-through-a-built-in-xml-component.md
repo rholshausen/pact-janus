@@ -1,6 +1,7 @@
 # 0039 — Read XML bodies by element name, through a built-in XML component
 
-- **Status**: accepted
+- **Status**: accepted; decision 2's `#text` amended by [ADR 0075](0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md),
+  which keeps it as written and adds `#trimmed`, today's reading
 - **Date**: 2026-10-22
 - **Plan tasks**: S1.22 (the build); S1.25 (`janus upgrade`, which this leaves as it was); S1.23
   (multipart, whose parts reuse it)
