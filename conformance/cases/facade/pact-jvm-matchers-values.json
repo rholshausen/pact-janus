@@ -1,0 +1,219 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-matchers-values",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's single-value matchers are served as their examples and recorded as the conversion of their rules.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`stringType`, `like`, `numberType`, `booleanType`, and their plural forms"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`integerType`, `decimalType`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "Any of these with no example" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`stringValue`, `numberValue`, `booleanValue`, `equalTo`, and a member with no rule"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`stringMatcher`, `uuid`, `hexValue`, `ipAddress`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`integerMatching`, `decimalMatching`, `numberMatching`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`date`, `time`, `datetime`, `timestamp`, `localDate`, and `dateExpression`, `timeExpression`, `datetimeExpression`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`includesStr`, `nullValue`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`valueFromProviderState`" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`and(name, value, matchers…)` whose rules one subsumes, as a `regex` does a string's `type`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`and(name, value, matchers…)` whose rules none subsumes"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: the type matchers and their plural forms are `type`, or `number` and `boolean`; `integerType` and `decimalType` read a number's kind from how it is written (ADR 0072); with no example, pact-jvm's fixed example with its random generator; the value matchers are `equality`; the patterns are anchored `regex`; the number patterns hold the kind and the pattern both; dates and times have their format; `includesStr` and `nullValue` are `include` and `null`; `valueFromProviderState` is `type` with a `ProviderState` generator; `and` of rules one subsumes is that rule, and of rules none subsumes is its first, reported `rule-unmapped`.",
+  "note": "`district`'s `and` keeps its regex and loses its `include`, the dropped row's loss. A member with no rule is facade/pact-jvm-bodies' JSON string. The date expressions and `timestamp` are facade/pact-jvm-date-expressions'.",
+  "subjects": { "jvm": "PactJvmMatchersValues.java" },
+  "expect": {
+    "tests": [{ "test": "servesEachExample" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order of dates",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/3", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "delivered": { "example": "2026-11-20", "format": "yyyy-MM-dd", "shape": "date" },
+                      "due": { "example": "2025-11-09", "format": "yyyy-MM-dd", "shape": "date" },
+                      "placed": {
+                        "example": "2025-11-09T12:00:00",
+                        "format": "yyyy-MM-dd'T'HH:mm:ss",
+                        "shape": "datetime"
+                      },
+                      "slot": { "example": "12:00", "format": "HH:mm", "shape": "time" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of patterned values",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/2", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "code": { "example": "123-45", "pattern": "^(?:\\d{3}-\\d{2})$", "shape": "regex" },
+                      "colour": { "example": "3F", "pattern": "^(?:[0-9a-fA-F]+)$", "shape": "regex" },
+                      "comment": { "example": "fragile", "shape": "include", "substring": "fragile" },
+                      "count": { "example": 12, "shape": "integer" },
+                      "coupon": { "example": null, "shape": "equality" },
+                      "customer": {
+                        "example": 42,
+                        "generator": {
+                          "name": "pact:ProviderState",
+                          "config": { "dataType": "INTEGER", "expression": "${customerId}" }
+                        },
+                        "shape": "type"
+                      },
+                      "district": { "example": "AB1", "pattern": "^(?:[A-Z]{2}\\d)$", "shape": "regex" },
+                      "origin": { "example": "127.0.0.1", "pattern": "^(?:(\\d{1,3}\\.)+\\d{1,3})$", "shape": "regex" },
+                      "postcode": { "example": "AB1 2CD", "pattern": "^(?:[A-Z]{2}\\d \\d[A-Z]{2})$", "shape": "regex" },
+                      "price": { "example": 9.99, "shape": "decimal" },
+                      "rate": { "example": 1.5, "shape": "number" },
+                      "ref": {
+                        "example": "ce118b6e-d8e1-11e7-9296-cec278b6b50a",
+                        "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+                        "shape": "regex"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of typed values",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "channel": { "example": "web", "shape": "equality" },
+                      "currency": { "example": "EUR", "shape": "equality" },
+                      "express": { "example": false, "shape": "equality" },
+                      "first": {
+                        "example": "string",
+                        "generator": { "name": "pact:RandomString", "config": { "size": 20 } },
+                        "shape": "type"
+                      },
+                      "gift": { "example": true, "shape": "type" },
+                      "height": {
+                        "example": 100,
+                        "generator": { "name": "pact:RandomInt", "config": { "max": 2147483647, "min": 0 } },
+                        "shape": "number"
+                      },
+                      "id": { "example": 1, "shape": "integer" },
+                      "last": {
+                        "example": "string",
+                        "generator": { "name": "pact:RandomString", "config": { "size": 20 } },
+                        "shape": "type"
+                      },
+                      "lines": {
+                        "example": 100,
+                        "generator": { "name": "pact:RandomInt", "config": { "max": 2147483647, "min": 0 } },
+                        "shape": "integer"
+                      },
+                      "note": { "example": "fragile", "shape": "type" },
+                      "paid": { "example": true, "shape": "type" },
+                      "sku": { "example": "A-1", "shape": "type" },
+                      "tax": {
+                        "example": 100.0,
+                        "generator": { "name": "pact:RandomDecimal", "config": { "digits": 10 } },
+                        "shape": "decimal"
+                      },
+                      "total": { "example": 9.99, "shape": "decimal" },
+                      "version": { "example": 3, "shape": "equality" },
+                      "weight": { "example": 2, "shape": "number" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

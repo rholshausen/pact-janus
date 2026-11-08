@@ -1,0 +1,51 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-mock-server-config",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "The mock's address is @MockServerConfig's or @PactTestFor's, its port read from a system property.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@ExtendWith(PactConsumerTestExt.class)`, `@PactConsumerTest`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@PactTestFor(hostInterface, port)`, `@MockServerConfig(hostInterface, port, providerName)`, `@MockServers`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: `@PactConsumerTest` is the same as the extension; `@PactTestFor(hostInterface, port)` and `@MockServerConfig(hostInterface, port, providerName)` are the mock's address, `${name}` read from a system property, else the environment, as pact-jvm reads it.",
+  "subjects": { "jvm": "PactJvmMockServerConfig.java" },
+  "expect": {
+    "tests": [{ "test": "mockServerConfigsAddress" }, { "test": "pactTestForsAddress" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "ping the mock at its address",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/ping", "shape": "equality" }
+                },
+                "response": { "status": { "example": 204, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "pong the mock at the method's address",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/pong", "shape": "equality" }
+                },
+                "response": { "status": { "example": 204, "shape": "equality" } }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

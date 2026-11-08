@@ -165,10 +165,29 @@ export interface LiveProvider {
   }[];
 }
 
+/** One test a subject has, and how it must end (ADR 0076 decision 1). */
+export interface TestExpectation {
+  test: string;
+  /** The test must fail, its error's message holding each of these. */
+  fails?: string[];
+}
+
+/** A contract file a subject's run wrote, as a step's `contract` compares it. */
+export interface ContractExpectation {
+  written?: boolean;
+  content?: { interactions?: Record<string, unknown>[] };
+}
+
 export interface Case {
   $format: string;
   id: string;
-  category: "translation" | "lifecycle" | "variants" | "live" | "provider";
+  category: "translation" | "lifecycle" | "variants" | "live" | "provider" | "facade";
+  /** A facade case's facade (ADR 0076 decision 2). */
+  facade?: string;
+  /** A facade case's migration-note rows. The driver does not read them; the lint does. */
+  rows?: { note: string; row: string }[];
+  /** Language -> a test written in it, beside the case. */
+  subjects?: Record<string, string>;
   title: string;
   covers: string[];
   why?: string;
@@ -182,6 +201,11 @@ export interface Case {
   provider?: LiveProvider;
   steps?: Step[];
   expect?: {
+    tests?: TestExpectation[];
+    suite?: { fails?: string[] };
+    contracts?: Record<string, ContractExpectation>;
+    output?: { stdout?: string[]; stderr?: string[] };
+    "engine-log"?: string[];
     spec?: Record<string, unknown>;
     at?: Record<string, unknown>;
     refused?: boolean;
@@ -201,8 +225,34 @@ export interface Case {
   };
 }
 
-/** Every case in the corpus, in id order — the order a report lists them in. */
+/** This SDK's language, as its report names it and `conformance/facades.json` names a facade's. */
+export const LANGUAGE = "typescript";
+
+/** The facades whose cases this SDK runs: those `conformance/facades.json` gives its language (ADR 0076). */
+export function facadesShipped(): Set<string> {
+  const document = JSON.parse(readFileSync(join(suiteRoot, "facades.json"), "utf8")) as {
+    facades: Record<string, { language: string }>;
+  };
+  return new Set(Object.entries(document.facades).filter(([, f]) => f.language === LANGUAGE).map(([name]) => name));
+}
+
+/** The file a case's subject in this language is: beside the case. */
+export function subjectPath(testCase: Case): string | undefined {
+  const file = testCase.subjects?.[LANGUAGE];
+  return file === undefined ? undefined : join(suiteRoot, "cases", testCase.category, file);
+}
+
+/**
+ * Every case this SDK runs, in id order — the order a report lists them in: every case that is not
+ * a facade's, and every case of each facade this language ships (ADR 0076 decision 2).
+ */
 export function loadCases(): Case[] {
+  const shipped = facadesShipped();
+  return loadCorpus().filter((testCase) => testCase.facade === undefined || shipped.has(testCase.facade));
+}
+
+/** Every case in the corpus, in id order. */
+export function loadCorpus(): Case[] {
   const root = join(suiteRoot, "cases");
   const cases: Case[] = [];
   for (const category of readdirSync(root)) {

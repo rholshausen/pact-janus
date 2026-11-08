@@ -1,0 +1,115 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-several-interactions",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "One executeTest serves every interaction added since the last, each as often as the test calls it, and withCompleteRequest throws.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "Several interactions before one `executeTest`, or one interaction called twice"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`withCompleteRequest()`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `Pact`'s `executeTest` serves every interaction added since its last `executeTest`, each as often as the test calls it (ADR 0069); `withCompleteRequest()` throws, as pact-js's does.",
+  "subjects": { "typescript": "pact-js-several-interactions.ts" },
+  "expect": {
+    "tests": [
+      { "test": "servesEveryInteractionAddedSinceTheLast" },
+      { "test": "withCompleteRequestThrows", "fails": ["withCompleteRequest is not implemented"] }
+    ],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get order 1",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 1, "shape": "integer" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "get order 2",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/2", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 2, "shape": "integer" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "get order 3",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/3", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 3, "shape": "integer" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

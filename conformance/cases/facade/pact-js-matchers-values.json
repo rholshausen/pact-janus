@@ -1,0 +1,215 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-matchers-values",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's single-value matchers are served as their examples and recorded as the conversion of their rules.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/consumer-test-migration.md", "row": "`like(v)` on a value, `string`, `boolean`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`like(v)` on an object" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`integer`, `decimal`, `number`" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`includes`, `nullValue`, `equal`, `contentType`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`reify`, `extractPayload`, `isMatcher`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `like` on a value is `type`, and on an object the object written out with `type` at each position; `integer`, `decimal` and `number` are the kind, with a random value on every reply when there is no example; `includes`, `nullValue`, `equal` and `contentType` are `include`, `null`, `equality` and `content-type`; `reify`, `extractPayload` and `isMatcher` are the same.",
+  "subjects": { "typescript": "pact-js-matchers-values.ts" },
+  "expect": {
+    "tests": [
+      { "test": "likeOnAValue" },
+      { "test": "likeOnAnObject" },
+      { "test": "numbers" },
+      { "test": "includesNullEqualContentType" },
+      { "test": "reifyExtractPayloadIsMatcher" }
+    ],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order like an example",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "type" },
+                      "customer": { "members": { "name": { "example": "Ada", "shape": "type" } }, "shape": "object" },
+                      "tags": { "items": { "example": "new", "shape": "type" }, "min": 0, "shape": "each-like" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of numbers",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "integer" },
+                      "total": { "example": 9.99, "shape": "decimal" },
+                      "weight": { "example": 2, "shape": "number" },
+                      "lines": {
+                        "example": 101,
+                        "generator": { "name": "pact:RandomInt", "config": { "max": 10, "min": 0 } },
+                        "shape": "integer"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of the other values",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "note": { "example": "fragile", "shape": "include", "substring": "fragile" },
+                      "coupon": { "example": null, "shape": "null" },
+                      "currency": { "example": "EUR", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of typed values",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "sku": { "example": "A-1", "shape": "type" },
+                      "name": { "example": "Widget", "shape": "type" },
+                      "paid": { "example": true, "shape": "type" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order's invoice of a content type",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1/invoice", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "content-type": "application/pdf",
+                    "encoded": "base64",
+                    "example": "JVBERi0xLjQgaW52b2ljZQ==",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/pdf",
+                            "example": "application/pdf"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

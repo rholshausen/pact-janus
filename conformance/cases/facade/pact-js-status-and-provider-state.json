@@ -1,0 +1,82 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-status-and-provider-state",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "matchStatus with a list of statuses is recorded as http:status-class, and fromProviderState as a type with a ProviderState generator.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`willRespondWith(status, builder)`, with `matchStatus(…)` as the status"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`matchStatus(status, class or list)`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`fromProviderState(expression, example)`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `matchStatus(status, class or list)` is `http:status-class`; `fromProviderState(expression, example)` is `type`, with a `ProviderState` generator a verifier fills from the state's values.",
+  "subjects": { "typescript": "pact-js-status-and-provider-state.ts" },
+  "expect": {
+    "tests": [{ "test": "matchStatusWithAList" }, { "test": "fromProviderStateValues" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "cancel an order, accepted or done",
+              "parts": {
+                "request": {
+                  "method": { "example": "DELETE", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": { "status": { "shape": "http:status-class", "codes": [202, 204], "example": 202 } }
+              }
+            },
+            {
+              "description": "get the order the state made",
+              "states": [{ "name": "an order exists", "params": { "id": 42 } }],
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": {
+                    "example": "/orders/42",
+                    "generator": { "name": "pact:ProviderState", "config": { "expression": "/orders/${id}" } },
+                    "shape": "type"
+                  }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "id": {
+                        "example": 42,
+                        "generator": { "name": "pact:ProviderState", "config": { "expression": "${id}" } },
+                        "shape": "type"
+                      },
+                      "lines": { "example": 1, "shape": "integer" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

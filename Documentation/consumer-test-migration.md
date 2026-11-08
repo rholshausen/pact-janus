@@ -38,6 +38,12 @@ Each row is one of three things, as ADR 0066 decision 5 decides them:
 - **dropped**: refused by name, or a matcher whose rule converts with something lost, with what to do
   instead.
 
+Every **kept** row is a case of the SDK conformance suite: a test written as a user of the facade
+writes one, under [`conformance/cases/facade/`](../conformance/cases/facade), which the SDK that ships the
+facade runs in its build. The suite's lint reads the rows here, and fails a `kept` row no case names
+Each case pins the contract its test recorded, read against the row, so a
+rule that stops converting with nothing lost fails it ([ADR 0076](decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)).
+
 pact-js's own consumer examples run on its facade in this repository's tests
 (`sdks/typescript/test/examples`), each beside its provider test. Each records what `janus upgrade`
 makes of the pact pact-js wrote, and each provider verifies the contract its consumer test recorded.
@@ -106,14 +112,14 @@ without a matcher is compared as written.
 | A request that was missing or did not match | `executeTest` rejects, "Test failed for the following reasons", naming the interaction or each mismatch, and no contract is written | kept |
 | `given(state, params?)`, `uponReceiving(description)` | The same | kept |
 | `withRequest(method, path, builder)`: `query`, `headers`, `jsonBody`, `xmlBody`, `binaryFile`, `body`, `matchingRules` | The same calls | kept |
-| `multipartBody(contentType, file, part, boundary?)` | The same, but with no boundary the engine derives one from the part rather than drawing one at random, so a test records the same bytes on every run. The part's `Content-Type` is the one given, where pact-js guessed one from the file's extension | adapted |
+| `multipartBody(contentType, file, part, boundary?)`, and `PactV3`'s `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload` | The same calls, and the same bytes on every run: with no boundary the engine derives one from the part rather than drawing one at random. The part's `Content-Type` is the one given, where pact-js guessed one from the file's extension. The contract asserts nothing about the body's parts (`body-not-parsed`), since `pact_ffi` writes the body's type without its boundary, which only the `Content-Type` header names. The test runs as before; until S2.20 reads the boundary from the header, a provider is held to the header's pattern alone | dropped |
 | `willRespondWith(status, builder)`, with `matchStatus(…)` as the status | The same | kept |
 | `addGraphQLInteraction()`: `withOperation`, `withVariables`, `withRequest`, `withQuery`, `withMutation` | The same, the query a whitespace-tolerant pattern as pact-js writes it. A query is not parsed: an invalid one is not refused at the call. A parsed document is read from its source text (`loc.source.body`, which `gql` sets) | adapted |
 | `pending()` | Accepted, no effect: a contract has no pending interactions, and the broker decides ([ADR 0051](decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md)) | dropped |
 | `comment()`, `testName()`, `reference()` | Accepted, no effect: a contract records none of them | dropped |
 | `withCompleteRequest()` | Throws, as pact-js's does | kept |
 | `usingPlugin()`, on an interaction or a message, and so `withPluginContents` and `startTransport` | Refused by name: Janus cannot load pact plugins ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)) | dropped |
-| `PactV3`: `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, `withRequestBinaryFile`, `withResponseBinaryFile`, `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload`, `withRequestMatchingRules`, `withResponseMatchingRules`, `executeTest` | The same calls, in pact-js's order | kept |
+| `PactV3`: `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, `withRequestBinaryFile`, `withResponseBinaryFile`, `withRequestMatchingRules`, `withResponseMatchingRules`, `executeTest` | The same calls, in pact-js's order | kept |
 | Several interactions before one `executeTest`, or one interaction called twice | The same: `PactV3`'s `executeTest` serves every interaction added since the last, and `Pact`'s every one added since its last `executeTest`, each as often as the test calls it ([ADR 0069](decisions/0069-keep-an-arming-until-its-variant-is-reported-and-give-an-arrival-to-the-arming-it-matches-best.md)). A request two interactions match goes to the more specific | kept |
 | `addAsynchronousInteraction()`: `given`, `expectsToReceive(description, builder)`, `withJSONContent`, `withMetadata`, `withMatchingRules`, `executeTest` | The same calls. `executeTest`'s function is handed the message, `{ contents: { content }, metadata }`, its JSON contents as their document and any other as text, and no mock is started ([ADR 0067](decisions/0067-record-a-message-as-an-emissive-interaction-and-hand-it-to-the-test-when-nothing-delivers-it.md)) | kept |
 | A message's `contentType` metadata | Compared as a media type, as pact-js compared it (ADR 0071). A message that names none has its contents' type checked as today's verifier checks it | kept |
@@ -206,7 +212,10 @@ and ends it. When a conversion loses something, the test prints the engine's fin
 prefixed `pact-janus:` and naming the interaction.
 
 A `Content-Type` the test wrote without a matcher is compared as a media type, as pact-jvm compared
-it: pact-jvm's own `application/json; charset=UTF-8` and a client's `application/json` agree (S2.16,
+it: the same type, in any case, with each parameter it names, and others allowed. So a client's
+`application/json; charset=UTF-8` meets a pact's `application/json`, and a client's `application/json`
+does not meet the `application/json; charset=UTF-8` pact-jvm's builders write for a JSON body, in
+pact-jvm's mock or the facade's (S2.16,
 [ADR 0071](decisions/0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md)).
 Any other header the test wrote without a matcher is compared as written.
 
@@ -244,18 +253,19 @@ Any other header the test wrote without a matcher is compared as written.
 | `uponReceiving`, `path`, `method`, `query`, `encodedQuery`, `headers`, `setDefaultRequestValues`, `setDefaultResponseValues` | The same | kept |
 | `matchPath`, `matchHeader`, `matchQuery`, `queryMatchingDate`, `queryMatchingTime`, `queryMatchingDatetime` and their ISO forms, given an example | `regex`, anchored, and the date and time rules with their format | kept |
 | The same with no example, and `stringMatcher(name, regex)` with none | The example is drawn from the pattern as pact-jvm draws it, but seeded by the pattern, so every run records the same example where pact-jvm drew a new one (ADR 0070 decision 3) | adapted |
-| `body(...)`: a `DslPart`, a `String`, a `JSONObject`, an XML `Document`, bytes with a content type; `bodyWithSingleQuotes` | The same. A body no generator fills is served as the octets pact-jvm wrote, so a test comparing its text sees pact-jvm's | kept |
+| `body(...)`: a `DslPart`, a `String` with a content type or without, an XML `Document`; `bodyWithSingleQuotes` | The same. A body no generator fills is served as the octets pact-jvm wrote, so a test comparing its text sees pact-jvm's | kept |
+| `body(JSONObject)`, `withContent(JSONObject)`, and a content type given as HttpCore's `ContentType` | Not taken: the facade depends on neither org.json nor HttpCore. Pass the object's `toString()`, and the content type as a `String` | dropped |
 | `body(FormPostBuilder)` | A form body, its rules and generators by parameter ([ADR 0038](decisions/0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md)) | kept |
 | `body(PactXmlBuilder)` | An XML body, with its attributes, `eachLike` and namespaces ([ADR 0039](decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)) | kept |
 | `withBinaryData(bytes, contentType)` | The same: served and recorded as octets | kept |
 | `withFileUpload(partName, fileName, contentType, bytes)` | The same, but with a boundary derived from the part rather than drawn at random, so a test records the same bytes on every run | adapted |
-| `bodyMatchingContentType(contentType, example)` | `content-type`, checked against the octets ([ADR 0049](decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)) | kept |
+| `bodyMatchingContentType(contentType, example)` | `content-type`, checked against the octets ([ADR 0049](decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)). Over a JSON example the rule is pact-jvm's at `$`, which reaches each value, as a v1–v4 rule at `$` does | kept |
 | `headerFromProviderState`, `pathFromProviderState`, `queryParameterFromProviderState` | The example, with a `ProviderState` generator a verifier fills from the state's values | kept |
 | `willRespondWith()`: `status`, `headers`, `matchHeader`, `matchSetCookie`, `body` and the rest as for the request | The same | kept |
 | `successStatus()`, `clientErrorStatus()`, `serverErrorStatus()`, `nonErrorStatus()`, `errorStatus()`, `informationStatus()`, `redirectStatus()`, `statusCodes(list)` | `http:status-class` | kept |
 | Several interactions in one pact, chained by `given` or `uponReceiving` after `willRespondWith` | The same | kept |
 | `comment()`, `addMetadataValue()` | Accepted, no effect: a contract records neither | dropped |
-| `MessagePactBuilder`: `consumer`, `hasPactWith`, `given`, `expectsToReceive`, `withContent` (a `DslPart`, a `String` or bytes, with a content type), `withMetadata` (a `Map` or a `MetadataBuilder`) | The same calls, a V3 message pact's unless `pactVersion` says otherwise | kept |
+| `MessagePactBuilder`: `consumer`, `hasPactWith`, `given`, `expectsToReceive`, `withContent` (a `DslPart`, a `PactXmlBuilder`, or a `String` with a content type), `withMetadata` (a `Map` or a `MetadataBuilder`) | The same calls, a V3 message pact's unless `pactVersion` says otherwise | kept |
 | A message's `contentType` metadata | Compared as a media type, as pact-jvm compared it (ADR 0071) | kept |
 | `PactDslJsonBody.pluginValue()` | Not provided: Janus cannot load pact plugins (ADR 0045) | dropped |
 | pact-jvm's V4 `PactBuilder`, `MultipartBuilder`, and its Groovy, Spock and Kotlin DSLs | Not yet: staged plan S2.5d | dropped |
@@ -275,15 +285,18 @@ conversion does with them.
 | `stringMatcher`, `uuid`, `hexValue`, `ipAddress` | `regex`, anchored, since pact-jvm's patterns match the whole value (S1.18) | kept |
 | `integerMatching`, `decimalMatching`, `numberMatching` | The number's kind and the anchored `regex`, both held | kept |
 | `date`, `time`, `datetime`, `timestamp`, `localDate`, and `dateExpression`, `timeExpression`, `datetimeExpression` | `date`, `time`, `datetime`, with the format. Generators, an expression's too, are filled as pact-jvm fills them | kept |
-| `includesStr`, `nullValue` | `include`, `null` | kept |
+| `includesStr`, `nullValue` | `include`, and an `equality` with `null`: pact-jvm writes no rule for a null | kept |
 | `valueFromProviderState` | `type`, with a `ProviderState` generator a verifier fills from the state's values | kept |
 | `eachLike`, `minArrayLike`, `maxArrayLike`, `minMaxArrayLike`, `eachArrayLike` and its bounded forms | `each-like`, with `min` and `max` where given | kept |
 | `array()` with no rule | An exact `array`, as pact-jvm compared it | kept |
 | `arrayContaining(…)` | `contains`, which needs a distinct element for each variant, where pact-jvm let one element satisfy two | adapted |
-| `eachKeyLike`, `eachValueLike`, `eachValueMatching`, `eachKeyMappedToAnArrayLike` | `each-entry` | kept |
+| `eachKeyLike`, `eachValueLike`, `eachKeyMappedToAnArrayLike` | `each-entry` | kept |
+| `eachValueMatching` | The example's entry, with the rules under its `*` path: pact-jvm and today's verifier apply them to the keys the example names, and allow others | kept |
 | `eachKeyMatching(matcher)` | `each-entry` with the keys held to the rule and the values open: pact-jvm also compared each member the example names, which `each-entry` cannot say | dropped |
-| `and(name, value, matchers…)` | Every rule, as one shape | kept |
+| `and(name, value, matchers…)` whose rules one subsumes, as a `regex` does a string's `type` | That rule, which admits only what all of them do | kept |
+| `and(name, value, matchers…)` whose rules none subsumes | Its first rule, reported `rule-unmapped`: a shape has one operator, and none says what both do ([contract-file spec §8.2](specs/contract-file/spec.md#82-matching-rules-become-shapes)). Write the one rule that says it all, or check the rest in the test | dropped |
 | `or(name, value, matchers…)` | The first rule alone, reported as `rule-combination-or`: a shape has no union of rules yet | dropped |
 | `unorderedArray`, `unorderedMinArray`, `unorderedMaxArray`, `unorderedMinMaxArray` and their `newUnordered…` forms | `pact:ignore-order`, an operator nothing provides, reported as `rule-unmapped`. Today's Rust verifier fails pact-jvm's `ignore-order` rule as a plugin it does not have, so the contract fails it by name too: the mock refuses a request that uses it, and a provider's verification fails a response that does ([ADR 0073](decisions/0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md)). Rewrite it with `eachLike`, or `arrayContaining` if each element must be there | dropped |
 | `matchUrl`, `matchUrl2` | `regex`, as pact-jvm's. The mock serves the example URL, not its own address, since no generator writes the mock's URL yet: the finding says so | dropped |
-| `PactDslRootValue` (a text body), `PactDslJsonRootValue` (a JSON value at the root) | The same rules at the root | kept |
+| `PactDslRootValue` (a text body) under a text `Content-Type`, `PactDslJsonRootValue` (a JSON value at the root) | The same rules at the root | kept |
+| `PactDslRootValue` with no `Content-Type` | pact-jvm labels the text JSON, which it is not, so the contract asserts nothing about it (`body-not-parsed`). Name its type with `headers` | dropped |

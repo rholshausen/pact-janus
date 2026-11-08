@@ -23,12 +23,17 @@ cases/lifecycle/                          what the SDK sends, and what it does w
 cases/variants/                           which variants the closure runs on, and what a failure does
 cases/live/                               the real engine: derived dimensions, contract content, and a provider run
 cases/provider/                           a provider verification: what the SDK sends, and what its handlers answer
+cases/facade/                             a compatibility facade's spellings, each a test in the facade's language
+facades.json                              each facade, the language whose SDK ships it, and the notes that classify it
 ```
 
 The first four groups are SDK spec §7's four categories, which ADR 0017 fixes as the minimum
 coverage: DSL→interaction-spec translation, session lifecycle, variant iteration, and
 contract-output equivalence. `provider` is the provider side (staged plan S1.14, ADR 0055): a
-verifier, its state handlers and request filters, and one `verify`.
+verifier, its state handlers and request filters, and one `verify`. `facade` is the compatibility
+facades (staged plan S2.6, [ADR 0076](../Documentation/decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)):
+pact-js's API over the TypeScript SDK and pact-jvm's over the JVM SDK, one case per group of their
+migration notes' rows.
 
 Every case names, in `covers`, the conformance ids from
 [`behavioural-spec.json`](../Documentation/specs/sdk-specification/behavioural-spec.json) it is the
@@ -131,6 +136,43 @@ real engine would during the run: it finds the entry by point and name in the `v
 loopback interface, and the verifier's `provider-url` is the driver's. Its `routes` may be empty: a case that verifies only
 messages has no request for a provider to answer.
 
+### 3.1 A case with a subject
+
+Some spellings cannot be data: a compatibility facade's, which exist in one language only and lean on
+its annotations, lambdas and overloads, and a language's own types, such as a pattern compiled with
+flags. A case for one names a **subject**, a test written in that language, in a file beside the case
+(`subjects`: language → file name; ADR 0076). Its expectation stays data, and stays the corpus's.
+
+- A **TypeScript** subject is a module whose exported async functions are its tests. The driver calls
+  each test the case names, in the case's order, with a context `{ dir, engine? }`: the directory the
+  run's contracts go to, and, when the case has an `engine` script, that scripted engine, which a
+  facade that takes an `engine` option is handed as a user's test hands it one. The module imports the
+  SDK by its package name, `pact-janus`, `pact-janus/pact` or `pact-janus/verifier`, which Vitest
+  resolves to this tree's sources. A case that expects `engine-log` runs in a child Vitest, whose
+  standard error is the engine's too, with neither `RUST_LOG` nor `LOG_LEVEL` set.
+- A **JVM** subject is a JUnit Jupiter test class in the default package, its file named after it. The
+  driver compiles it against the test class path and runs it through the JUnit Platform, with
+  `pact.rootDir` naming the run's contract directory, where pact-jvm's users name theirs.
+
+A subject is written as a user of the thing under test writes a test, from the row or the sentence it
+covers. A subject that does what no user would, so that its case passes, is the driver that helps of
+§2, and fails review.
+
+A **facade case** (`category: "facade"`) names its `facade`, a name `facades.json` gives, and has one
+subject, in the language that ships it. Its `covers` is empty, and `rows` names the migration-note rows
+it is the scenario for, each by its note and its first cell, verbatim. The lint reads the notes: a row
+a note gives the verdict `kept` that no case names fails it, as an uncovered conformance id does, and
+so does a row a case names that its note does not have. A case may name `adapted` and `dropped` rows
+too. Rewording a row's first cell means changing the cases that name it, in the same commit.
+
+What shows a row `kept` is the content the facade recorded (ADR 0076 decision 4): the case pins each
+contract the run wrote, by interaction content, reviewed against the row, so a rule that converted with
+a judgement or a loss fails it. A recording whose example the run makes afresh, a date from today, is
+checked as `written` and no more, and the case says so in `note`.
+
+Any other case with subjects has one per language that runs the corpus, and a driver fails it when its
+language has none: `translation/regex-flags-refused` is one.
+
 ## 4. What a case can expect
 
 Per step (`expect` inside a step):
@@ -147,6 +189,16 @@ or `refused` (the chain never becomes a document, because the DSL refuses it at 
 for translation; `ops` (every operation sent, in order), `frames` (operation → members its request
 body must carry), `engine-closed`, `dimensions` (dimension ids the engine's variants must assign)
 and `variant-count`.
+
+For a case with a subject, also: `tests`, every test the subject has, each passing or, with `fails`,
+failing with an error whose message holds each of its strings (a JUnit test is named by its method, a
+dynamic test by its display name, and a test the case does not name fails it); `suite`, the subject
+failing beyond its tests, as a JUnit class does in an extension's `afterAll`; `contracts`, each file the
+run wrote, by name, `written` and `content` as a step's `contract` compares them, a file the case does
+not name failing it; `output`, strings the run's `stdout` and `stderr` hold, the subject's and the
+SDK's; and `engine-log`, strings the engine's log holds, its standard error or the events the SDK hands
+its language's logging, each written `<LEVEL> <message>`. Against a scripted engine, `ops`, `frames`,
+`hooks` and `invocations` are a provider case's.
 
 For a provider case, also: `outcome` (how `verify` ended: `"ok"`, `verification-failed` with the
 results it names as `failed`, `engine-error` with its `code`, or `refused`, the SDK refusing the call
@@ -180,7 +232,9 @@ the `detail` the checker prints. A live case that wrote a contract carries the S
 in lower-case hex, and `check` fails when two SDKs' reports give one case different digests
 (ADR 0063 decision 6). The report is a build artifact (`target/conformance/`), not a checked-in file — what
 is checked in is the corpus, and what CI asserts is that each language's run accounted for every
-case in it.
+case in it that is the language's: every case that is not a facade's, and every case of each facade
+`facades.json` gives its `sdk.language` (ADR 0076 decision 2). A report that leaves one out, or runs
+another language's facade case, fails.
 
 ## 6. Expected content, and how it was captured
 
@@ -190,6 +244,12 @@ writes each live case's content in the form `contract.content` expects), then re
 against the contract spec before being checked in. That keeps commitment 1 of ADR 0017 — no SDK is
 the reference implementation for another — while still giving each SDK something fixed to be
 compared against. A change to it is an engine or contract-format change, and is reviewed as one.
+
+A facade case's `contracts` were captured the same way, by its own language's driver: the TypeScript
+driver's record mode for pact-js's, and the JVM driver's (`JANUS_CONFORMANCE_RECORD=<dir> ./gradlew
+:sdk:test --tests '*ConformanceTest*'`) for pact-jvm's, which write each file's content in the form
+`contracts` expects. Each was read against the row it covers before it was checked in: that is what
+makes the pin say the row is `kept` (ADR 0076 decision 4).
 
 ## 7. When a case and an SDK disagree
 

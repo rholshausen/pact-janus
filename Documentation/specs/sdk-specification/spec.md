@@ -229,8 +229,8 @@ verify()
 is the same path as frames. A test framework's integration reports that one run, and today's provider
 APIs are spelled over it ([ADR 0056](../../decisions/0056-provider-test-integrations-message-producers-a-junit-extension-and-a-pact-js-shaped-verifier.md),
 staged plan S1.15): JUnit 5 as one dynamic test per interaction result as it arrives, and pact-js's
-`Verifier` as a facade whose options become the documents above. Each primitive's `facade` entries
-classify today's spellings.
+`Verifier` as a facade whose options become the documents above. The provider migration note's rows
+classify today's spellings (§6.2).
 
 ## 5. The per-language style-guide skeleton
 
@@ -283,7 +283,17 @@ suite* already depends on.
 
 ### 6.2 Where the mapping lives
 
-A primitive's optional `facade` array names the old-DSL names it replaces:
+A facade's verdicts are rows of its language's migration note, whatever the facade maps onto:
+[`consumer-test-migration.md`](../../consumer-test-migration.md) and
+[`provider-test-migration.md`](../../provider-test-migration.md), one row per spelling, with its
+verdict. They are written there once, where a user moving a suite reads them, and every row whose
+verdict is `kept` has a conformance case that runs it (§7,
+[ADR 0076](../../decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)).
+
+A primitive's optional `facade` array was this design's first form for them, for a facade that maps
+onto primitives. No facade uses it: the provider primitives' entries, written before their facades
+existed, disagreed with the provider note on four spellings, and were removed when S2.6 made the
+note's rows load-bearing. The schema keeps the member, so the form below remains valid:
 
 ```json primitive
 { "id": "any-of",
@@ -316,10 +326,11 @@ calls and converts the interaction as `upgrade/pact` converts a pact's
 [ADR 0066](../../decisions/0066-let-a-compatibility-facade-submit-todays-builder-calls-and-convert-them-as-upgrade-does.md)).
 So the conversion is decided once, in the engine, for every such SDK, and none of it is the SDK's.
 
-§6.1's verdicts then describe what the conversion does with the rule an old primitive writes.
-**`kept`**: it converts with no `lossy` or `judgement` finding (contract-file spec §8.4). **`adapted`**:
-it converts with a `judgement`, which the migration note states. **`dropped`**: it is refused, or
-converts with a `lossy` finding, and the note says what to write instead. The verdicts are published
+§6.1's verdicts then describe what the conversion does with the rule an old primitive writes, read
+at the rule's own position: an HTTP interaction always carries `request-query-opened`, which no rule
+causes. **`kept`**: it converts with no `lossy` or `judgement` finding there (contract-file spec §8.4).
+**`adapted`**: it converts with a `judgement`, which the migration note states. **`dropped`**: it is
+refused, or converts with a `lossy` finding, and the note says what to write instead. The verdicts are published
 in the language's migration note, not in `facade` arrays, since the facade maps onto `pact` steps
 rather than onto a primitive. Where §6.2's worked example and a conversion disagree, as for composite
 `like`, which `upgrade` writes out position by position, a facade of this kind follows the conversion.
@@ -356,6 +367,14 @@ A fifth category covers the provider side (staged plan S1.14, ADR 0055): what a 
 `verify`, its source and options as given, a configuration loaded through the engine, its handlers as
 loopback hook entries named by kind and position, message producers among them (ADR 0056) — what
 its endpoint answers the engine, and what a run's status makes of the test.
+
+A sixth covers the compatibility facades (staged plan S2.6, ADR 0076). A facade is one language's
+spelling of another library's API, so its cases are tests written in that language, beside the case,
+and run by the SDK that ships the facade; their expectations stay data. Every migration-note row whose
+verdict is `kept` (§6.2) has one, and what it pins is the content the facade recorded, reviewed against
+the row. **An SDK that ships a facade is conformant only when it also passes every case of that facade.**
+The same mechanism carries a spelling of the language's own that data cannot, such as `regex`'s refusal
+of a pattern's out-of-band flags, with a test in every language.
 
 Conformance says nothing about idiomatic quality — a conformant SDK can still have an awkward, unpleasant
 API — and nothing about thinness by itself: a suite that only samples scenarios cannot, by construction,

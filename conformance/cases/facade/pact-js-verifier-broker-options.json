@@ -1,0 +1,75 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-verifier-broker-options",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's Verifier options for a broker, publishing, filtering and the provider's transport become one verify frame's source, options and target.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/provider-test-migration.md", "row": "`providerBaseUrl`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`consumerVersionSelectors`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`consumerVersionTags`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`enablePending`, `includeWipPactsSince`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`providerVersionBranch`, `providerBranch`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`providerVersionTags`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`failIfNoPactsFound: false`" },
+    {
+      "note": "Documentation/provider-test-migration.md",
+      "row": "`publishVerificationResult`, `providerVersion`, `buildUrl`"
+    },
+    { "note": "Documentation/provider-test-migration.md", "row": "`consumerFilters`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`customProviderHeaders`" },
+    {
+      "note": "Documentation/provider-test-migration.md",
+      "row": "`disableSslVerification`, `validateSSL: false`"
+    },
+    { "note": "Documentation/provider-test-migration.md", "row": "`pactBrokerUrl`, `provider`" },
+    {
+      "note": "Documentation/provider-test-migration.md",
+      "row": "`pactBrokerToken`, `pactBrokerUsername`, `pactBrokerPassword`"
+    }
+  ],
+  "why": "provider-test-migration.md, pact-js: each option is the member of a protocol document S1.13 maps today's CLI option to — the HTTP transport's `base-url`, `headers` and `client.tls.insecure`, the broker source's selectors, pending and work-in-progress pacts, branch, tags and `require-pacts`, and the run's `publish` and `filter.consumers`.",
+  "subjects": { "typescript": "pact-js-verifier-broker-options.ts" },
+  "engine": {},
+  "expect": {
+    "tests": [{ "test": "brokerOptions" }],
+    "frames": {
+      "verification/verify": {
+        "source": {
+          "kind": "broker",
+          "broker": { "url": "https://broker.example", "auth": { "kind": "bearer", "token": "t0k3n" } },
+          "provider": "orders-api",
+          "consumer-version-selectors": [{ "mainBranch": true }, { "tag": "prod", "latest": true }],
+          "include-pending": true,
+          "provider-branch": "main",
+          "provider-tags": ["release"],
+          "include-wip-since": "2026-01-01",
+          "require-pacts": false
+        },
+        "target": {
+          "transports": [
+            {
+              "transport": "http",
+              "options": {
+                "headers": { "X-Api-Key": "k-1" },
+                "client": { "tls": { "insecure": true } },
+                "base-url": "http://127.0.0.1:8080"
+              }
+            }
+          ]
+        },
+        "options": {
+          "report": {},
+          "filter": { "consumers": ["web-app"] },
+          "publish": {
+            "provider-version": "1.2.3",
+            "branch": "main",
+            "tags": ["release"],
+            "build-url": "https://ci.example/1"
+          }
+        }
+      }
+    }
+  }
+}

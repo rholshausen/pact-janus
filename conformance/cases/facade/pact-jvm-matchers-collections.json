@@ -1,0 +1,241 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-matchers-collections",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's array and map matchers, an array with no rule, and root values are served as their examples and recorded as the conversion of their rules.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`eachLike`, `minArrayLike`, `maxArrayLike`, `minMaxArrayLike`, `eachArrayLike` and its bounded forms"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`array()` with no rule" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`eachKeyLike`, `eachValueLike`, `eachKeyMappedToAnArrayLike`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`eachValueMatching`" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`PactDslRootValue` (a text body) under a text `Content-Type`, `PactDslJsonRootValue` (a JSON value at the root)"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: `eachLike` and its bounded and nested forms are `each-like` with `min` and `max`; `array()` with no rule is an exact `array`; the key and value matchers are `each-entry`, and `eachValueMatching` the example's entry with the rules under its `*` path; root values, a text one under a text `Content-Type`, have the same rules at the root.",
+  "subjects": { "jvm": "PactJvmMatchersCollections.java" },
+  "expect": {
+    "tests": [{ "test": "servesEachExample" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order count",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/count", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "example": 12, "shape": "integer" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order's status as text",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1/status", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "example": "open", "pattern": "^(?:open|closed)$", "shape": "regex" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [{ "shape": "http:media-type", "type": "text/plain", "example": "text/plain" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "orders by key",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/by-id", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "byId": {
+                        "min": 0,
+                        "shape": "each-entry",
+                        "values": { "members": { "total": { "example": 10, "shape": "integer" } }, "shape": "object" }
+                      },
+                      "codes": {
+                        "members": {
+                          "first": {
+                            "members": { "code": { "example": "A-1", "pattern": "^(?:[A-Z]-\\d+)$", "shape": "regex" } },
+                            "shape": "object"
+                          }
+                        },
+                        "shape": "object"
+                      },
+                      "labels": { "min": 0, "shape": "each-entry", "values": { "example": "new", "shape": "type" } },
+                      "lines": {
+                        "min": 0,
+                        "shape": "each-entry",
+                        "values": {
+                          "items": { "members": { "qty": { "example": 1, "shape": "integer" } }, "shape": "object" },
+                          "min": 0,
+                          "shape": "each-like"
+                        }
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "orders of every array",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "any": {
+                        "items": { "members": { "id": { "example": 1, "shape": "integer" } }, "shape": "object" },
+                        "min": 1,
+                        "shape": "each-like"
+                      },
+                      "between": {
+                        "items": { "members": { "sku": { "example": "C-3", "shape": "type" } }, "shape": "object" },
+                        "max": 4,
+                        "min": 1,
+                        "shape": "each-like"
+                      },
+                      "exact": {
+                        "entries": [
+                          { "example": "first", "shape": "equality" },
+                          { "example": "second", "shape": "equality" }
+                        ],
+                        "shape": "array"
+                      },
+                      "few": {
+                        "items": { "members": { "sku": { "example": "B-2", "shape": "type" } }, "shape": "object" },
+                        "max": 3,
+                        "min": 0,
+                        "shape": "each-like"
+                      },
+                      "some": {
+                        "items": { "members": { "sku": { "example": "A-1", "shape": "type" } }, "shape": "object" },
+                        "min": 2,
+                        "shape": "each-like"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "orders of nested arrays",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/batches", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "entries": [
+                      {
+                        "items": { "items": { "example": "A-1", "shape": "type" }, "min": 2, "shape": "each-like" },
+                        "min": 1,
+                        "shape": "each-like"
+                      }
+                    ],
+                    "shape": "array"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "application/json; charset=UTF-8",
+                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

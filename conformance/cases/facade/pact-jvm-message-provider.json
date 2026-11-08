@@ -1,0 +1,12 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-message-provider",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "A provider test's @ProvidesMessage method is asked for each message, with today's request for it.",
+  "covers": [],
+  "rows": [{ "note": "Documentation/provider-test-migration.md", "row": "`@PactVerifyProvider(description)`" }],
+  "why": "provider-test-migration.md, pact-jvm: `@PactVerifyProvider(description)` is `@ProvidesMessage(description)`, a method taking no parameter or today's request for the message as a `Map`.",
+  "subjects": { "jvm": "PactJvmMessageProvider.java" },
+  "expect": { "tests": [{ "test": "web-app: an order placed event" }] }
+}

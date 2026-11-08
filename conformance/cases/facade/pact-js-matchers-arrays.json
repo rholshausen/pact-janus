@@ -1,0 +1,155 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-matchers-arrays",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's array and map matchers are served as their examples and recorded as each-like and each-entry.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`eachLike(v, min)`, `atLeastOneLike`, `atLeastLike`, `constrainedArrayLike`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`atMostLike(v, max)`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`eachKeyLike`, `eachValueMatches`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `eachLike`, `atLeastOneLike`, `atLeastLike` and `constrainedArrayLike` are `each-like` with `min`, and `max` where given; `atMostLike` is `each-like` with `min: 0`; `eachKeyLike` and `eachValueMatches` are `each-entry`.",
+  "subjects": { "typescript": "pact-js-matchers-arrays.ts" },
+  "expect": {
+    "tests": [{ "test": "eachLikeAndAtLeast" }, { "test": "atMostLikeHasNoMinimum" }, { "test": "eachKeyAndValue" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "orders by key",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "byId": {
+                        "min": 0,
+                        "shape": "each-entry",
+                        "values": { "members": { "total": { "example": 10, "shape": "integer" } }, "shape": "object" }
+                      },
+                      "codes": {
+                        "min": 0,
+                        "shape": "each-entry",
+                        "values": { "example": "A-1", "pattern": "^(?:^[A-Z]-\\d+$)$", "shape": "regex" }
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "orders with a maximum",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "recent": {
+                        "items": { "members": { "id": { "example": 1, "shape": "type" } }, "shape": "object" },
+                        "max": 5,
+                        "min": 0,
+                        "shape": "each-like"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "orders with minimums",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "any": {
+                        "items": { "members": { "id": { "example": 1, "shape": "integer" } }, "shape": "object" },
+                        "min": 1,
+                        "shape": "each-like"
+                      },
+                      "two": { "items": { "example": "x", "shape": "type" }, "min": 2, "shape": "each-like" },
+                      "one": { "items": { "example": "y", "shape": "type" }, "min": 1, "shape": "each-like" },
+                      "three": { "items": { "example": "z", "shape": "type" }, "min": 3, "shape": "each-like" },
+                      "between": {
+                        "items": { "example": "w", "shape": "type" },
+                        "max": 3,
+                        "min": 1,
+                        "shape": "each-like"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

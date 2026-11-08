@@ -1,0 +1,93 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-several-providers",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "One test against two providers has a mock for each, configured by @MockServers and injected by @ForProvider, and records each provider's contract.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "Several providers in one test: `pactMethods` naming each provider's methods, `@ForProvider` on each parameter"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@PactTestFor(hostInterface, port)`, `@MockServerConfig(hostInterface, port, providerName)`, `@MockServers`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: several providers in one test, `pactMethods` naming each provider's methods and `@ForProvider` on each parameter, are the same — one mock for each provider, each recording its own contract; `@MockServers` configures them.",
+  "subjects": { "jvm": "PactJvmSeveralProviders.java" },
+  "expect": {
+    "tests": [{ "test": "asksBothProviders" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get an order's sku",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "sku": { "example": "A-1", "shape": "equality" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "web-app-stock-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get a sku's stock",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/stock/A-1", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "level": { "example": 3, "shape": "equality" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

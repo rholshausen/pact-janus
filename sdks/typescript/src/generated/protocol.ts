@@ -447,6 +447,10 @@ export interface VariantResult {
     [k: string]: unknown;
   }[];
   test?: TestVerdict;
+  /**
+   * false when the test was reported failed and nothing exercised the variant: the report decides 'status', and this says what 'not-exercised' would have, so a host can show it beside the test's own failure (spec.md §8.2). Absent otherwise.
+   */
+  exercised?: boolean;
   [k: string]: unknown;
 }
 

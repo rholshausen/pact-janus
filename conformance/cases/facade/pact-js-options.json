@@ -1,0 +1,92 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-options",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "The V4 builder's spec decides the pact version its calls build to, and host and port the mock's address.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/consumer-test-migration.md", "row": "`spec`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`host`, `port`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `spec` is the pact version the calls build to — from V3, a binary body gets a content-type rule, as pact-js's does; `host` and `port` are the mock's address.",
+  "subjects": { "typescript": "pact-js-options.ts" },
+  "expect": {
+    "tests": [{ "test": "specV2" }, { "test": "specV3" }, { "test": "hostAndPort" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "ping the mock at its address",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/ping", "shape": "equality" }
+                },
+                "response": { "status": { "example": 204, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "upload octets to a V2 pact",
+              "parts": {
+                "request": {
+                  "body": { "encoded": "base64", "example": "AAECAw==", "shape": "equality" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/octet-stream",
+                            "example": "application/octet-stream"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/receipts", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "upload octets to a V3 pact",
+              "parts": {
+                "request": {
+                  "body": {
+                    "content-type": "application/octet-stream",
+                    "encoded": "base64",
+                    "example": "AAECAw==",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/octet-stream",
+                            "example": "application/octet-stream"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/receipts", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

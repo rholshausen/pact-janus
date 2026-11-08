@@ -19,6 +19,15 @@ function engineUnderTest(): string {
 }
 
 export default defineConfig({
+  resolve: {
+    // A conformance case's subject (ADR 0076) imports the SDK as a user's test does, by its package
+    // name, from outside this directory: these are its entry points, from this tree's sources.
+    alias: [
+      { find: /^pact-janus$/, replacement: resolve(import.meta.dirname, "src/index.ts") },
+      { find: /^pact-janus\/pact$/, replacement: resolve(import.meta.dirname, "src/facade/pact.ts") },
+      { find: /^pact-janus\/verifier$/, replacement: resolve(import.meta.dirname, "src/facade/verifier.ts") },
+    ],
+  },
   test: {
     include: ["test/**/*.test.ts"],
     // The suites test/frameworks.test.ts runs under Jest and Vitest, as a user's project runs them.

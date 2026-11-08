@@ -1,0 +1,320 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-bodies",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "Each body pact-jvm's builders take is served as the test sends it and recorded as its pact converts.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`body(...)`: a `DslPart`, a `String` with a content type or without, an XML `Document`; `bodyWithSingleQuotes`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`body(FormPostBuilder)`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`body(PactXmlBuilder)`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`withBinaryData(bytes, contentType)`" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`bodyMatchingContentType(contentType, example)`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: `body` with a `DslPart`, a `String` with a content type or without, an XML `Document`, and `bodyWithSingleQuotes`, are the same; a form body has its rules by parameter (ADR 0038); a `PactXmlBuilder` body is XML (ADR 0039); binary data is served and recorded as octets; `bodyMatchingContentType` is `content-type`, checked against the octets (ADR 0049), at each value of a JSON example, as pact-jvm's rule at `$` reaches them.",
+  "note": "pact-jvm's builders declare a JSON, XML or form body's charset, ISO-8859-1 for XML and forms as HttpCore's types do, and its mock requires it, as the facade's does: the test sends it.",
+  "subjects": { "jvm": "PactJvmBodies.java" },
+  "expect": {
+    "tests": [{ "test": "sendsEachBody" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get JSON of its content type",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/typed", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "sku": { "content-type": "application/json", "example": "A-1", "shape": "content-type" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "post JSON in single quotes",
+              "parts": {
+                "request": {
+                  "body": { "members": { "sku": { "example": "A-1", "shape": "equality" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "of": {
+                          "entries": [
+                            {
+                              "example": "application/json",
+                              "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                              "shape": "regex"
+                            }
+                          ],
+                          "shape": "array"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/quoted", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post a DslPart",
+              "parts": {
+                "request": {
+                  "body": { "members": { "sku": { "example": "A-1", "shape": "type" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json; charset=UTF-8",
+                            "example": "application/json; charset=UTF-8"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/dsl", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post a JSON string",
+              "parts": {
+                "request": {
+                  "body": { "members": { "sku": { "example": "A-1", "shape": "equality" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "of": {
+                          "entries": [
+                            {
+                              "example": "application/json",
+                              "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                              "shape": "regex"
+                            }
+                          ],
+                          "shape": "array"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/json", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post a built XML body",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": {
+                      "order": {
+                        "members": {
+                          "#trimmed": { "shape": "forbidden" },
+                          "sku": {
+                            "entries": [
+                              {
+                                "members": { "#trimmed": { "example": "A-1", "shape": "equality" } },
+                                "shape": "object"
+                              }
+                            ],
+                            "shape": "array"
+                          }
+                        },
+                        "shape": "object"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/xml; charset=ISO-8859-1",
+                            "example": "application/xml; charset=ISO-8859-1"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/xml", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post a form",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": {
+                      "quantity": { "entries": [{ "example": "2", "shape": "equality" }], "shape": "array" },
+                      "sku": {
+                        "entries": [{ "example": "A-1", "pattern": "^(?:[A-Z]-\\d+)$", "shape": "regex" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/x-www-form-urlencoded; charset=ISO-8859-1",
+                            "example": "application/x-www-form-urlencoded; charset=ISO-8859-1"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/form", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post an XML document",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": {
+                      "order": {
+                        "members": {
+                          "@id": { "example": "1", "shape": "equality" },
+                          "#trimmed": { "shape": "forbidden" }
+                        },
+                        "shape": "object"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/xml; charset=ISO-8859-1",
+                            "example": "application/xml; charset=ISO-8859-1"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/document", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post binary data",
+              "parts": {
+                "request": {
+                  "body": {
+                    "content-type": "application/octet-stream",
+                    "encoded": "base64",
+                    "example": "AQID",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/octet-stream",
+                            "example": "application/octet-stream"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/binary", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "post text with its type",
+              "parts": {
+                "request": {
+                  "body": { "example": "sku=A-1", "shape": "equality" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [{ "shape": "http:media-type", "type": "text/plain", "example": "text/plain" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/text", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

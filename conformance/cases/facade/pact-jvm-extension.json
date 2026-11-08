@@ -1,0 +1,119 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-extension",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's JUnit 5 extension serves each test's pact once, from a @Pact method returning a RequestResponsePact or a V4Pact, and injects it.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@ExtendWith(PactConsumerTestExt.class)`, `@PactConsumerTest`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@Pact(consumer, provider)` on a method taking `PactDslWithProvider` or `MessagePactBuilder`, returning `RequestResponsePact`, `MessagePact` or `V4Pact`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@PactTestFor(providerName, pactMethod, pactMethods, pactVersion, providerType)`, on the class or the method"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "The injected `RequestResponsePact` or `V4Pact`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "The test runs once, against each interaction's example"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`given(state)`, `given(state, params)`, several states"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "Several interactions in one pact, chained by `given` or `uponReceiving` after `willRespondWith`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: the extension, `@Pact` methods and `@PactTestFor` on the class or the method are the same; the injected pact is the same; the test runs once, against each interaction's example; `given` with and without parameters, and several states, are the same; several interactions chain in one pact.",
+  "subjects": { "jvm": "PactJvmExtension.java" },
+  "expect": {
+    "tests": [{ "test": "getsOrders" }, { "test": "cancelsAnOrder" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "cancel an order",
+              "parts": {
+                "request": {
+                  "method": { "example": "DELETE", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": { "status": { "example": 204, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "get an order",
+              "states": [{ "name": "an order exists", "params": { "id": 1 } }, { "name": "the customer is known" }],
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 1, "shape": "equality" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "list no orders",
+              "states": [{ "name": "no orders exist" }],
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "entries": [], "shape": "array" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-request-bodies",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "Each request body the V4 builder takes, and its matching rules, is served as the test sends it and recorded as its pact converts.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`withRequest(method, path, builder)`: `query`, `headers`, `jsonBody`, `xmlBody`, `binaryFile`, `body`, `matchingRules`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`matchingRules(rules)` and PactV3's `with*MatchingRules`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `withRequest(method, path, builder)` with `query`, `headers`, `jsonBody`, `xmlBody`, `binaryFile`, `body` and `matchingRules` is kept: the same calls. `matchingRules(rules)` is converted as a pact's rules at those paths are.",
+  "note": "`query` and `headers` are facade/pact-js-http-interaction's. A type rule on an XML element's text records no constraint on it, as `janus upgrade` converts pact-js's own XML example.",
+  "subjects": { "typescript": "pact-js-request-bodies.ts" },
+  "expect": {
+    "tests": [
+      { "test": "jsonBody" },
+      { "test": "xmlBody" },
+      { "test": "binaryFile" },
+      { "test": "body" },
+      { "test": "matchingRules" }
+    ],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "create an order from JSON",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": {
+                      "sku": { "example": "A-1", "shape": "type" },
+                      "quantity": { "example": 2, "shape": "integer" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "create an order from XML",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": {
+                      "order": {
+                        "members": {
+                          "#trimmed": { "shape": "forbidden" },
+                          "sku": { "entries": [{ "members": {}, "shape": "object" }], "shape": "array" }
+                        },
+                        "shape": "object"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/xml",
+                            "example": "application/xml"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "create an order from text",
+              "parts": {
+                "request": {
+                  "body": { "content-type": "text/plain", "example": "sku=A-1", "shape": "content-type" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [{ "shape": "http:media-type", "type": "text/plain", "example": "text/plain" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "create an order with rules",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": { "sku": { "example": "A-1", "pattern": "^(?:^[A-Z]-\\d+$)$", "shape": "regex" } },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            },
+            {
+              "description": "upload a receipt file",
+              "parts": {
+                "request": {
+                  "body": {
+                    "content-type": "application/pdf",
+                    "encoded": "base64",
+                    "example": "JVBERi0xLjQgYSByZWNlaXB0",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/pdf",
+                            "example": "application/pdf"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/receipts", "shape": "equality" }
+                },
+                "response": { "status": { "example": 201, "shape": "equality" } }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

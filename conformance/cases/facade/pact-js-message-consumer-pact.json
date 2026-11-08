@@ -1,0 +1,107 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-message-consumer-pact",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "MessageConsumerPact's message is handed to its handler as pact-js hands it, and recorded when the handler resolves.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`MessageConsumerPact`: `given`, `expectsToReceive`, `withContent`, `withTextContent`, `withMetadata`, `verify(handler)`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`withContent(contentType, buffer)` on a message, `MessageConsumerPact`'s `withBinaryContent`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`synchronousBodyHandler`, `asynchronousBodyHandler`, `v4SynchronousBodyHandler`, `v4AsynchronousBodyHandler`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `MessageConsumerPact`'s calls are kept, a V3 message pact's; the handler is handed `{ description, providerStates, contents, metadata }`, and the contract is written when it resolves; `withBinaryContent` hands the octets as a `Buffer`.",
+  "subjects": { "typescript": "pact-js-message-consumer-pact.ts" },
+  "expect": {
+    "tests": [{ "test": "jsonContent" }, { "test": "textContent" }, { "test": "binaryContent" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order cancelled message",
+              "states": [{ "name": "an order was cancelled", "params": { "id": 3 } }],
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 3, "shape": "equality" },
+                      "reason": { "example": "out of stock", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "queue": { "example": "orders", "shape": "equality" },
+                      "contentType": {
+                        "of": {
+                          "example": "application/json",
+                          "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order label message",
+              "parts": {
+                "message": {
+                  "body": { "encoded": "base64", "example": "AQID", "shape": "equality" },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "of": {
+                          "example": "application/octet-stream",
+                          "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:octet\\-stream)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order note message",
+              "states": [{ "name": "an order was noted" }],
+              "parts": {
+                "message": {
+                  "body": { "example": "call before delivery", "shape": "equality" },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "of": {
+                          "example": "text/plain",
+                          "pattern": "^\\s*(?i:text)/(?:[^;]*\\+)?(?i:plain)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

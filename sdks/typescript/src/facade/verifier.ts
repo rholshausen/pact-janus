@@ -1,5 +1,5 @@
-// pact-js's provider API over the Janus `Verifier` (ADR 0056 decision 4; the behavioural spec's
-// 'facade' entries for 'verifier', 'state-handler', 'request-filter', 'message-producer', 'verify').
+// pact-js's provider API over the Janus `Verifier` (ADR 0056 decision 4; each option's verdict is a
+// row of Documentation/provider-test-migration.md, and each kept one a conformance case, ADR 0076).
 // `import { Verifier } from "pact-janus/verifier"` in place of "@pact-foundation/pact": each option
 // becomes the member of a protocol document S1.13 maps today's CLI option to, and each handler a
 // handler of the Janus verifier. It decides nothing about a verdict, and imports no test framework,

@@ -1,0 +1,16 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/regex-flags-refused",
+  "category": "translation",
+  "title": "A pattern compiled with flags its text cannot carry is refused at the call; one without them is accepted.",
+  "covers": ["shape.regex.flags-refused"],
+  "why": "behavioural spec 'regex': a pattern the language represents with out-of-band options — flags, modifiers — that the pattern text cannot carry is refused at the call, before any document is built: silently dropping an option would change what the pattern means.",
+  "note": "A flag belongs to a language's own pattern type (a RegExp, a java.util.regex.Pattern), which data cannot spell, so each language has a subject (ADR 0076 decision 5). How a language refuses is the style guide's business: the case checks that the call fails and that its error names the flags.",
+  "subjects": { "typescript": "regex-flags-refused.ts", "jvm": "RegexFlagsRefused.java" },
+  "expect": {
+    "tests": [
+      { "test": "patternWithFlags", "fails": ["flags"] },
+      { "test": "patternWithoutFlags" }
+    ]
+  }
+}

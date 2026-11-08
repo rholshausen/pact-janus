@@ -1,0 +1,25 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-verify-provider",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's Verifier verifies a provider from pact files, setting up each state through its handler, warning of a state with none, and rejecting a failed run.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/provider-test-migration.md", "row": "`new Verifier(options).verifyProvider()`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`providerBaseUrl`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`pactUrls` (files)" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`stateHandlers`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "A state with no handler" }
+  ],
+  "why": "provider-test-migration.md, pact-js: `verifyProvider()` resolves with the run's result, and rejects with `VerificationFailedError` naming each failed interaction; `pactUrls` files are read by the SDK and sent inline; `stateHandlers` is a handler per state name, a function or `{ setup, teardown }`; a state with no handler runs with no setup, with a `state-unhandled` warning in the run's report, which the SDK prints on standard output (ADR 0059), and on the result's `warnings` (ADR 0058).",
+  "subjects": { "typescript": "pact-js-verify-provider.ts" },
+  "expect": {
+    "tests": [
+      { "test": "verifiesWithStateHandlers" },
+      { "test": "aStateWithNoHandlerWarns" },
+      { "test": "aFailedVerificationRejects", "fails": ["get an order"] }
+    ],
+    "output": { "stdout": ["warn    state-unhandled: no state-setup hook handles the provider state 'orders exist'"] }
+  }
+}

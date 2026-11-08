@@ -747,6 +747,11 @@ impl ConsumerSession {
     }
     if let Some(report) = entry.reports.get(variant_id) {
       result.insert("test".to_string(), report.to_json());
+      // A failed report hides `not-exercised`, which a host shows beside the test's own error, as
+      // today's libraries print a missing request beside it (ADR 0076's pact-js and pact-jvm cases).
+      if !report.passed && !entry.exercised.contains_key(variant_id) {
+        result.insert("exercised".to_string(), Value::Bool(false));
+      }
     }
     (status, Value::Object(result))
   }

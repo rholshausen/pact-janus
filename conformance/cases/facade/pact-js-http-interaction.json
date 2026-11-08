@@ -1,0 +1,116 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-http-interaction",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "An HTTP interaction built with PactV4, or Pact, is served once to the test and recorded as its pact converts.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`new Pact(options)`, `new PactV4(options)`, `new PactV3(options)`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`consumer`, `provider`" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`addInteraction()` … `.executeTest(fn)`" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`given(state, params?)`, `uponReceiving(description)`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`willRespondWith(status, builder)`, with `matchStatus(…)` as the status"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `addInteraction()` … `.executeTest(fn)` is kept — the test runs once, against the interaction's example, and `executeTest` resolves with what it returned; `given`, `uponReceiving` and `willRespondWith` are the same calls.",
+  "subjects": { "typescript": "pact-js-http-interaction.ts" },
+  "expect": {
+    "tests": [{ "test": "servesTheInteractionOnce" }, { "test": "recordsUnderTheNamePact" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get an order",
+              "states": [{ "name": "an order exists", "params": { "id": 1 } }],
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" },
+                  "query": {
+                    "members": {
+                      "fields": { "entries": [{ "example": "id,total", "shape": "equality" }], "shape": "array" }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "integer" },
+                      "total": { "example": 9.5, "shape": "type" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "shape": "http:status-class", "class": "success", "example": 200 }
+                }
+              }
+            },
+            {
+              "description": "list no orders",
+              "states": [{ "name": "no orders exist" }],
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "entries": [], "shape": "array" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

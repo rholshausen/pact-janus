@@ -12,6 +12,11 @@ Each row is one of three things:
 - **adapted**: the same thing, spelled or done differently, as the row says.
 - **dropped**: refused by name, with what to do instead.
 
+Every **kept** row is a case of the SDK conformance suite: a test written as a user of the facade
+writes one, under [`conformance/cases/facade/`](../conformance/cases/facade), which the SDK that ships the
+facade runs in its build. The suite's lint reads the rows here, and fails a `kept` row no case names
+([ADR 0076](decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)).
+
 pact-js's and pact-jvm's own provider examples run on these integrations in this repository's tests
 (`sdks/typescript/test/examples`, `sdks/jvm/.../PactJvmExamplesTest.java`). Their pacts are
 fixtures in [the verifier corpus](../corpora/verifier/README.md), where today's verifier and
@@ -70,7 +75,7 @@ own `Verifier` (`import { Verifier } from "pact-janus"`), which takes the protoc
 | `customProviderHeaders` | The HTTP transport's `headers`, as a map or as `"Name: value"` lines | kept |
 | `disableSslVerification`, `validateSSL: false` | The HTTP transport's `client.tls.insecure` | kept |
 | `stateHandlers` | A state handler per name, a function or `{ setup, teardown }`. What a setup returns is the provider-state values a `ProviderState` generator reads | kept |
-| A state with no handler | The exchange runs with no setup, with a `state-unhandled` warning on standard error and on the result's `warnings`, as pact-js warns ([ADR 0058](decisions/0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md)). The SDK's own `Verifier` with `options: { "unhandled-states": "fail" }` fails it instead | kept |
+| A state with no handler | The exchange runs with no setup, with a `state-unhandled` warning in the run's report, which the SDK prints on standard output ([ADR 0059](decisions/0059-the-engine-writes-a-verification-runs-report.md)), and on the result's `warnings`, as pact-js warns ([ADR 0058](decisions/0058-a-provider-state-no-hook-sets-up-is-a-warning-or-a-failure-by-choice.md)). The SDK's own `Verifier` with `options: { "unhandled-states": "fail" }` fails it instead | kept |
 | `requestFilter` | An Express-style middleware `(req, res, next)`, called with the request's method, path, URL, headers, query and body. Only the headers it leaves on `req` reach the provider, because a filter must say what it changes before the run (lifecycle-hooks spec §4.3). A middleware that answers the request itself fails the exchange | adapted |
 | `messageProviders` | A message producer per description. It receives today's request for the message: its description, provider states, and a synchronous message's request | kept |
 | `providerWithMetadata(fn, metadata)` | The message's metadata. A `contentType` in it labels the body. A body with none is JSON, as pact-js's proxy writes it | kept |

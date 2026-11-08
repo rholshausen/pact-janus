@@ -1,0 +1,20 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-provider",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "A provider test's @State methods set up and tear down each state, and a failed interaction fails its own test with its mismatches.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/provider-test-migration.md", "row": "`@State(value, action)`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "A failed interaction" }
+  ],
+  "why": "provider-test-migration.md, pact-jvm: `@State` methods, taking the state's parameters as a `Map` and returning provider-state values, with `action = TEARDOWN` the teardown, are kept; a failed interaction's test fails with the result's mismatches.",
+  "subjects": { "jvm": "PactJvmProvider.java" },
+  "expect": {
+    "tests": [
+      { "test": "web-app: get an order" },
+      { "test": "web-app: get an archived order", "fails": ["$.response.status"] }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-date-expressions",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's date, time and datetime expressions, and a timestamp, are served as the examples pact-jvm generates and recorded.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`date`, `time`, `datetime`, `timestamp`, `localDate`, and `dateExpression`, `timeExpression`, `datetimeExpression`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: `timestamp` and the `dateExpression`, `timeExpression` and `datetimeExpression` matchers are `date`, `time` and `datetime` with the format, their generators filled as pact-jvm fills them.",
+  "note": "Each example is a date pact-jvm generates from today, so the contract is checked as written and not by its content.",
+  "subjects": { "jvm": "PactJvmDateExpressions.java" },
+  "expect": {
+    "tests": [{ "test": "servesTodaysExamples" }],
+    "contracts": { "web-app-orders-api.janus.json": { "written": true } }
+  }
+}

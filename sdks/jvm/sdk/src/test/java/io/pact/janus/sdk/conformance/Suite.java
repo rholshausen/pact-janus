@@ -34,8 +34,27 @@ final class Suite {
     return configured != null ? Path.of(configured) : Path.of("../../../conformance").toAbsolutePath().normalize();
   }
 
-  /** Every case in the corpus, in id order — the order a report lists them in. */
+  /** This SDK's language, as its report names it and {@code conformance/facades.json} names a facade's. */
+  static final String LANGUAGE = "jvm";
+
+  /**
+   * Every case this SDK runs, in id order — the order a report lists them in: every case that is not a
+   * facade's, and every case of each facade this language ships (ADR 0076 decision 2).
+   */
   static List<JsonNode> cases() {
+    JsonNode facades;
+    try {
+      facades = MAPPER.readTree(Files.readString(root().resolve("facades.json"))).path("facades");
+    } catch (IOException e) {
+      throw new UncheckedIOException("reading the conformance suite's facades.json", e);
+    }
+    return corpus().stream()
+        .filter(c -> !c.has("facade") || LANGUAGE.equals(facades.path(c.path("facade").asText()).path("language").asText()))
+        .toList();
+  }
+
+  /** Every case in the corpus, in id order. */
+  static List<JsonNode> corpus() {
     Path cases = root().resolve("cases");
     List<JsonNode> loaded = new ArrayList<>();
     try (Stream<Path> categories = Files.list(cases)) {
@@ -133,6 +152,56 @@ final class Suite {
       return true;
     }
     return equal(expected, actual);
+  }
+
+  /**
+   * Interaction content, and nothing else (ADR 0017): each interaction by description, compared on
+   * the members the case names — {@code states}, {@code parts}, {@code selection}. {@code metadata}
+   * and the parties are facts about the SDK that wrote the file, deliberately outside content
+   * identity.
+   */
+  static void checkContent(JsonNode expected, JsonNode actual, String where, List<String> failures) {
+    JsonNode recorded = actual == null ? MAPPER.createArrayNode() : actual.path("interactions");
+    JsonNode wanted = expected.path("interactions");
+    if (recorded.size() != wanted.size()) {
+      failures.add(where + ": the contract records " + recorded.size() + " interactions, and the case expects "
+          + wanted.size());
+    }
+    for (JsonNode interaction : wanted) {
+      String description = interaction.path("description").asText();
+      JsonNode found = null;
+      for (JsonNode candidate : recorded) {
+        if (description.equals(candidate.path("description").asText())) {
+          found = candidate;
+          break;
+        }
+      }
+      if (found == null) {
+        failures.add(where + ": the contract records no interaction '" + description + "'");
+        continue;
+      }
+      for (var member : interaction.properties()) {
+        if (!equal(member.getValue(), found.get(member.getKey()))) {
+          failures.add(where + ": '" + description + "' recorded a different '" + member.getKey() + "'\n  expected: "
+              + show(member.getValue()) + "\n  actual:   " + show(found.get(member.getKey())));
+        }
+      }
+    }
+  }
+
+  /** A contract's interaction content, in the form a case's {@code content} expects it (ADR 0017). */
+  static ObjectNode contentOf(JsonNode document) {
+    ObjectNode content = MAPPER.createObjectNode();
+    ArrayNode interactions = content.putArray("interactions");
+    for (JsonNode interaction : document.path("interactions")) {
+      ObjectNode kept = interactions.addObject();
+      for (String member : List.of("description", "states", "parts", "selection")) {
+        if (interaction.has(member)) {
+          kept.set(member, interaction.get(member));
+        }
+      }
+    }
+    return content;
   }
 
   static String show(JsonNode node) {

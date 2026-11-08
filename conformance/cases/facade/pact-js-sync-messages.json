@@ -1,0 +1,65 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-sync-messages",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "A synchronous message's response metadata is accepted and records nothing, as pact_ffi writes none.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "A synchronous message's response `withMetadata`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: a synchronous message's response `withMetadata` is accepted with no effect, as pact-js's: `pact_ffi` writes no synchronous message's metadata.",
+  "subjects": { "typescript": "pact-js-sync-messages.ts" },
+  "expect": {
+    "tests": [{ "test": "responseMetadataAccepted" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "ask for an order's status",
+              "states": [{ "name": "an order exists" }],
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "equality" },
+                      "status": { "example": "shipped", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "shape": "http:media-type",
+                        "type": "application/json",
+                        "example": "application/json"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "request": {
+                  "body": { "members": { "id": { "example": 1, "shape": "equality" } }, "shape": "object" },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "shape": "http:media-type",
+                        "type": "application/json",
+                        "example": "application/json"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

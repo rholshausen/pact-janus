@@ -263,8 +263,9 @@ export async function run<T>(
     const write = { path: resolve(opts.dir ?? "./pacts", `${opts.consumer}-${opts.provider}.janus.json`), mode: "merge" };
     const finalised = await engine.call(Op.ConsumerSessionFinalise, { session, write });
 
-    // What the mock found wanting: an interaction never called, or a request it did not match.
-    const wanting = results.filter(({ result }) => result.status === "not-exercised" || (result.mismatches ?? []).length > 0);
+    // What the mock found wanting: an interaction never called, or a request it did not match. A
+    // failed test's report decides its status, and `exercised` still says nothing called it.
+    const wanting = results.filter(({ result }) => missing(result) || (result.mismatches ?? []).length > 0);
     if (failure) {
       // As pact-js: the test's own error, with what the mock found written beside it.
       if (wanting.length > 0) {
@@ -285,10 +286,15 @@ export async function run<T>(
   }
 }
 
+/** Whether nothing called the mock for this result's variant. */
+function missing(result: protocol.VariantResult): boolean {
+  return result.status === "not-exercised" || result.exercised === false;
+}
+
 /** What pact-js says when the mock found the test wanting: each interaction's missing request or mismatches. */
 function failureReport(wanting: { description: string; result: protocol.VariantResult }[]): string {
   const said = wanting.flatMap(({ description, result }) =>
-    result.status === "not-exercised"
+    missing(result)
       ? [`Missing request: the interaction '${description}' was expected, but not received`]
       : (result.mismatches ?? []).map((m) => `'${description}': ${m.path === undefined ? "" : `${String(m.path)}: `}${String(m.message ?? JSON.stringify(m))}`),
   );

@@ -1,0 +1,20 @@
+{
+  "$format": "janus-conformance-facades/1",
+  "$comment": "The compatibility facades the suite has cases for (ADR 0076 decision 2): each facade's language, whose SDK ships it and runs its cases, and the section of each migration note that gives its spellings' verdicts. A note is named by its path in the repository.",
+  "facades": {
+    "pact-js": {
+      "language": "typescript",
+      "notes": {
+        "Documentation/consumer-test-migration.md": "pact-js",
+        "Documentation/provider-test-migration.md": "pact-js"
+      }
+    },
+    "pact-jvm": {
+      "language": "jvm",
+      "notes": {
+        "Documentation/consumer-test-migration.md": "pact-jvm (JUnit 5)",
+        "Documentation/provider-test-migration.md": "pact-jvm (JUnit 5)"
+      }
+    }
+  }
+}

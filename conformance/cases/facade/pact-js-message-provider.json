@@ -1,0 +1,19 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-message-provider",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's MessageProviderPact asks each message provider for its message, with today's request, and providerWithMetadata labels it.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/provider-test-migration.md",
+      "row": "`new MessageProviderPact(options).verify()`"
+    },
+    { "note": "Documentation/provider-test-migration.md", "row": "`messageProviders`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`providerWithMetadata(fn, metadata)`" }
+  ],
+  "why": "provider-test-migration.md, pact-js: `MessageProviderPact.verify()` is the same; `messageProviders` is a message producer per description, which receives today's request for the message; `providerWithMetadata`'s metadata is the message's, and a `contentType` in it labels the body, which with none is JSON.",
+  "subjects": { "typescript": "pact-js-message-provider.ts" },
+  "expect": { "tests": [{ "test": "producesEachMessage" }] }
+}

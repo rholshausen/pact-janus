@@ -19,6 +19,7 @@ import type { Case, Exchange, InteractionScript, Outcome, Received, StepExpectat
 import { equal, pointer, show, subset } from "./compare.js";
 import { buildInteraction } from "./dsl.js";
 import { runProvider } from "./provider.js";
+import { runSubject } from "./subject.js";
 import { CONSUMER, PROVIDER, ScriptedPipe } from "./scripted-engine.js";
 
 export interface CaseResult {
@@ -34,7 +35,9 @@ export async function runCase(testCase: Case): Promise<CaseResult> {
   const failures: string[] = [];
   let digest: string | undefined;
   try {
-    if (testCase.category === "translation") {
+    if (testCase.subjects !== undefined) {
+      await runSubject(testCase, failures);
+    } else if (testCase.category === "translation") {
       await runTranslation(testCase, failures);
     } else if (testCase.verifier) {
       await runProvider(testCase, failures);
@@ -254,7 +257,7 @@ function checkReceived(expected: Received[] | undefined, handed: ReceivedMessage
  * the members the case names — `states`, `parts`, `selection`. `metadata` and the parties are facts
  * about the SDK that wrote the file, deliberately outside content identity.
  */
-function checkContent(
+export function checkContent(
   expected: { interactions?: Record<string, unknown>[] },
   actual: Record<string, unknown> | undefined,
   where: string,
@@ -330,6 +333,16 @@ async function record(testCase: Case, document: Record<string, unknown> | undefi
   if (!directory || !document) {
     return;
   }
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, `${testCase.id.replace("/", "-")}.json`),
+    `${JSON.stringify(contentOf(document), null, 2)}\n`,
+    "utf8",
+  );
+}
+
+/** A contract's interaction content, in the form a case's `contract.content` expects it (ADR 0017). */
+export function contentOf(document: Record<string, unknown>): { interactions: Record<string, unknown>[] } {
   const interactions = ((document.interactions ?? []) as Record<string, unknown>[]).map(
     ({ description, states, parts, selection }) => ({
       description,
@@ -338,12 +351,7 @@ async function record(testCase: Case, document: Record<string, unknown> | undefi
       ...(selection === undefined ? {} : { selection }),
     }),
   );
-  await mkdir(directory, { recursive: true });
-  await writeFile(
-    join(directory, `${testCase.id.replace("/", "-")}.json`),
-    `${JSON.stringify({ interactions }, null, 2)}\n`,
-    "utf8",
-  );
+  return { interactions };
 }
 
 async function readContract(directory: string): Promise<{ written: boolean; text?: string; document?: Record<string, unknown> }> {

@@ -29,7 +29,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "variant",
     "status",
     "mismatches",
-    "test"
+    "test",
+    "exercised"
 })
 public class VariantResult {
 
@@ -63,6 +64,13 @@ public class VariantResult {
      */
     @JsonProperty("test")
     private TestVerdict test;
+    /**
+     * false when the test was reported failed and nothing exercised the variant: the report decides 'status', and this says what 'not-exercised' would have, so a host can show it beside the test's own failure (spec.md §8.2). Absent otherwise.
+     * 
+     */
+    @JsonProperty("exercised")
+    @JsonPropertyDescription("false when the test was reported failed and nothing exercised the variant: the report decides 'status', and this says what 'not-exercised' would have, so a host can show it beside the test's own failure (spec.md \u00a78.2). Absent otherwise.")
+    private Boolean exercised;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -146,6 +154,24 @@ public class VariantResult {
         this.test = test;
     }
 
+    /**
+     * false when the test was reported failed and nothing exercised the variant: the report decides 'status', and this says what 'not-exercised' would have, so a host can show it beside the test's own failure (spec.md §8.2). Absent otherwise.
+     * 
+     */
+    @JsonProperty("exercised")
+    public Boolean getExercised() {
+        return exercised;
+    }
+
+    /**
+     * false when the test was reported failed and nothing exercised the variant: the report decides 'status', and this says what 'not-exercised' would have, so a host can show it beside the test's own failure (spec.md §8.2). Absent otherwise.
+     * 
+     */
+    @JsonProperty("exercised")
+    public void setExercised(Boolean exercised) {
+        this.exercised = exercised;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -176,6 +202,10 @@ public class VariantResult {
         sb.append('=');
         sb.append(((this.test == null)?"<null>":this.test));
         sb.append(',');
+        sb.append("exercised");
+        sb.append('=');
+        sb.append(((this.exercised == null)?"<null>":this.exercised));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -191,10 +221,11 @@ public class VariantResult {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
         result = ((result* 31)+((this.mismatches == null)? 0 :this.mismatches.hashCode()));
-        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.exercised == null)? 0 :this.exercised.hashCode()));
         result = ((result* 31)+((this.test == null)? 0 :this.test.hashCode()));
+        result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
+        result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.status == null)? 0 :this.status.hashCode()));
         return result;
     }
@@ -208,7 +239,7 @@ public class VariantResult {
             return false;
         }
         VariantResult rhs = ((VariantResult) other);
-        return ((((((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant)))&&((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.test == rhs.test)||((this.test!= null)&&this.test.equals(rhs.test))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
+        return (((((((this.mismatches == rhs.mismatches)||((this.mismatches!= null)&&this.mismatches.equals(rhs.mismatches)))&&((this.exercised == rhs.exercised)||((this.exercised!= null)&&this.exercised.equals(rhs.exercised))))&&((this.test == rhs.test)||((this.test!= null)&&this.test.equals(rhs.test))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
     }
 
 }

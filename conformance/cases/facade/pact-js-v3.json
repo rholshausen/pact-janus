@@ -1,0 +1,256 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-v3",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "PactV3's builder, its binary files, multipart uploads and matching rules, are served and recorded as its pact converts.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`new Pact(options)`, `new PactV4(options)`, `new PactV3(options)`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`PactV3`: `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, `withRequestBinaryFile`, `withResponseBinaryFile`, `withRequestMatchingRules`, `withResponseMatchingRules`, `executeTest`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`matchingRules(rules)` and PactV3's `with*MatchingRules`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`multipartBody(contentType, file, part, boundary?)`, and `PactV3`'s `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `PactV3`'s `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, its binary-file and matching-rule calls and `executeTest` are kept: the same calls, in pact-js's order. Its multipart uploads are dropped: the same calls and bytes, and a contract that asserts nothing about the body's parts.",
+  "note": "The multipart interaction records no body shape, only the header's pattern: `pact_ffi` writes the body's type without its boundary (S2.20).",
+  "subjects": { "typescript": "pact-js-v3.ts" },
+  "expect": {
+    "tests": [
+      { "test": "theBuilderInOrder" },
+      { "test": "addInteraction" },
+      { "test": "binaryFiles" },
+      { "test": "multipartUploads" },
+      { "test": "matchingRules" }
+    ],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "create an order with V3 rules",
+              "parts": {
+                "request": {
+                  "body": {
+                    "members": { "sku": { "example": "A-1", "pattern": "^(?:^[A-Z]-\\d+$)$", "shape": "regex" } },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 1, "shape": "integer" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 201, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "exchange PDFs from V3",
+              "parts": {
+                "request": {
+                  "body": {
+                    "content-type": "application/pdf",
+                    "encoded": "base64",
+                    "example": "JVBERi0xLjQgYW4gb3JkZXI=",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/pdf",
+                            "example": "application/pdf"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/receipts", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "content-type": "application/pdf",
+                    "encoded": "base64",
+                    "example": "JVBERi0xLjQgYSByZWNlaXB0",
+                    "shape": "content-type"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/pdf",
+                            "example": "application/pdf"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 201, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "get order 7 from V3",
+              "states": [{ "name": "an order exists", "params": { "id": 7 } }],
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/7", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "members": { "id": { "example": 7, "shape": "type" } }, "shape": "object" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "list orders from V3",
+              "states": [{ "name": "no orders exist" }],
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" }
+                },
+                "response": {
+                  "body": { "entries": [], "shape": "array" },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "upload an order file from V3",
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "multipart/form-data; boundary=order-boundary",
+                            "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "POST", "shape": "equality" },
+                  "path": { "example": "/uploads", "shape": "equality" }
+                },
+                "response": {
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "example": "multipart/form-data; boundary=receipt-boundary",
+                            "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 201, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

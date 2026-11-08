@@ -1,0 +1,136 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-messages",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's message pacts are handed to the test as a List<Message>, a MessagePact or a V4 pact's messages, with no mock, and recorded as their pacts convert.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`@Pact(consumer, provider)` on a method taking `PactDslWithProvider` or `MessagePactBuilder`, returning `RequestResponsePact`, `MessagePact` or `V4Pact`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "A message test's `List<Message>` (a V4 pact's `List<V4Interaction.AsynchronousMessage>`), `MessagePact` or `V4Pact`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`MessagePactBuilder`: `consumer`, `hasPactWith`, `given`, `expectsToReceive`, `withContent` (a `DslPart`, a `PactXmlBuilder`, or a `String` with a content type), `withMetadata` (a `Map` or a `MetadataBuilder`)"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "A message's `contentType` metadata" }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: a message test's `List<Message>`, `MessagePact` or a V4 pact's messages are the same, each message as its builder built it, and no mock is started (ADR 0067); `MessagePactBuilder`'s calls are the same, a V3 message pact's unless `pactVersion` says otherwise; a message's `contentType` metadata is compared as a media type (ADR 0071).",
+  "subjects": { "jvm": "PactJvmMessages.java" },
+  "expect": {
+    "tests": [
+      { "test": "aListOfMessages" },
+      { "test": "aMessagePact" },
+      { "test": "anXmlMessage" },
+      { "test": "aV4PactsMessages" }
+    ],
+    "contracts": {
+      "web-app-orders-events.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order label",
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": {
+                      "label": {
+                        "members": {
+                          "#trimmed": { "shape": "forbidden" },
+                          "sku": {
+                            "entries": [
+                              {
+                                "members": { "#trimmed": { "example": "A-1", "shape": "equality" } },
+                                "shape": "object"
+                              }
+                            ],
+                            "shape": "array"
+                          }
+                        },
+                        "shape": "object"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": { "shape": "http:media-type", "type": "application/xml", "example": "application/xml" }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order note",
+              "parts": {
+                "message": {
+                  "body": { "example": "call before delivery", "shape": "equality" },
+                  "metadata": {
+                    "members": {
+                      "contentType": { "shape": "http:media-type", "type": "text/plain", "example": "text/plain" },
+                      "queue": { "example": "notes", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order placed event",
+              "states": [{ "name": "an order was placed", "params": { "id": 1 } }],
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "integer" },
+                      "sku": { "example": "A-1", "shape": "type" }
+                    },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "shape": "http:media-type",
+                        "type": "application/json; charset=UTF-8",
+                        "example": "application/json; charset=UTF-8"
+                      },
+                      "topic": { "example": "orders", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order shipped event",
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": { "status": { "example": "shipped", "shape": "equality" } },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "shape": "http:media-type",
+                        "type": "application/json",
+                        "example": "application/json"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

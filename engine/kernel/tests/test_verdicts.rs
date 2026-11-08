@@ -194,6 +194,27 @@ fn a_variant_its_test_never_sent_is_not_exercised_in_the_report() {
   assert_eq!(reported["ok"]["result"]["status"], "not-exercised");
 }
 
+/// A failed report decides the status, and hides `not-exercised`; `exercised: false` says it still,
+/// so a host can say nothing called the mock beside the test's own error (ADR 0076's facade cases).
+#[test]
+fn a_failed_test_that_sent_nothing_says_so_beside_its_failure() {
+  let mut session = Session::start(json!({ "test-verdicts": {} }));
+  let base = session.variants[0].clone();
+  session.serve(&base);
+
+  let reported = session.report(&base, "failed", Some("Error: the client broke"));
+  assert_eq!(
+    reported["ok"]["result"],
+    json!({ "variant": base, "status": "failed", "exercised": false,
+            "test": { "status": "failed", "reason": "Error: the client broke" } })
+  );
+  let finalised = session.finalise();
+  assert_eq!(
+    finalised["results"][0]["variants"][0]["exercised"], false,
+    "{finalised}"
+  );
+}
+
 #[test]
 fn a_failed_test_withholds_the_contract_though_every_exchange_verified() {
   // Task 4.6's careless client: it crashes whenever shippedAt is absent, and every exchange matches.

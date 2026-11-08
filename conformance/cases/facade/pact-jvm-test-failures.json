@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-test-failures",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "A request the mock did not match, an interaction never called and a test that throws fail their tests as pact-jvm's do; a @Pact method no test ran fails the class; @PactIgnore leaves a test alone.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "A request that did not match, or an interaction never called"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "A test that throws" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`@Pact` methods no test ran" },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`@PactIgnore`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "pact-jvm's logs, through SLF4J" }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: a request that did not match, or an interaction never called, fails the test with pact-jvm's message; a test that throws fails with its own error, what the mock found printed beside it; neither records a contract; `@Pact` methods no test ran fail the class; `@PactIgnore` is left alone. provider-test-migration.md: the engine's logs go through SLF4J to the logger `io.pact.janus.engine` (ADR 0061).",
+  "note": "The engine's warning of the request it did not match is the log line: the JVM suite runs with RUST_LOG=warn.",
+  "subjects": { "jvm": "PactJvmTestFailures.java" },
+  "expect": {
+    "tests": [
+      { "test": "requestMismatched", "fails": ["The following mismatched requests occurred"] },
+      { "test": "requestMissing", "fails": ["The following requests were not received"] },
+      { "test": "testThrows", "fails": ["the client could not read the order"] },
+      { "test": "ignored" }
+    ],
+    "suite": {
+      "fails": [
+        "The following methods annotated with @Pact were not executed during the test: PactJvmTestFailures.unused"
+      ]
+    },
+    "contracts": {},
+    "output": { "stderr": ["The following requests were not received:\nget an order for a test that throws"] },
+    "engine-log": ["WARN pact_janus_kernel::protocol::exchange: request did not match the armed variant"]
+  }
+}

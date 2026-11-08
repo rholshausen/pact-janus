@@ -44,7 +44,9 @@ final class CaseRunner {
   static Suite.Result run(JsonNode testCase) {
     CaseRunner runner = new CaseRunner(testCase);
     try {
-      if ("translation".equals(testCase.path("category").asText())) {
+      if (testCase.has("subjects")) {
+        SubjectRunner.run(testCase, runner.failures);
+      } else if ("translation".equals(testCase.path("category").asText())) {
         runner.translation();
       } else if (testCase.has("verifier")) {
         ProviderRunner.run(testCase, runner.failures);
@@ -274,39 +276,9 @@ final class CaseRunner {
     }
   }
 
-  /**
-   * Interaction content, and nothing else (ADR 0017): each interaction by description, compared on
-   * the members the case names — {@code states}, {@code parts}, {@code selection}. {@code metadata}
-   * and the parties are facts about the SDK that wrote the file, deliberately outside content
-   * identity.
-   */
+  /** Interaction content, and nothing else (ADR 0017), as {@link Suite#checkContent} compares it. */
   private void checkContent(JsonNode expected, JsonNode actual, String where) {
-    JsonNode recorded = actual == null ? Suite.MAPPER.createArrayNode() : actual.path("interactions");
-    JsonNode wanted = expected.path("interactions");
-    if (recorded.size() != wanted.size()) {
-      failures.add(where + ": the contract records " + recorded.size() + " interactions, and the case expects "
-          + wanted.size());
-    }
-    for (JsonNode interaction : wanted) {
-      String description = interaction.path("description").asText();
-      JsonNode found = null;
-      for (JsonNode candidate : recorded) {
-        if (description.equals(candidate.path("description").asText())) {
-          found = candidate;
-          break;
-        }
-      }
-      if (found == null) {
-        failures.add(where + ": the contract records no interaction '" + description + "'");
-        continue;
-      }
-      for (var member : interaction.properties()) {
-        if (!Suite.equal(member.getValue(), found.get(member.getKey()))) {
-          failures.add(where + ": '" + description + "' recorded a different '" + member.getKey() + "'\n  expected: "
-              + Suite.show(member.getValue()) + "\n  actual:   " + Suite.show(found.get(member.getKey())));
-        }
-      }
-    }
+    Suite.checkContent(expected, actual, where, failures);
   }
 
   private boolean matches(JsonNode expected, Outcome actual) {

@@ -1,0 +1,147 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-matchers-patterns",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "pact-js's pattern matchers are recorded as anchored patterns, and its date and time matchers with their formats.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`regex`, `email`, `ipv4Address`, `ipv6Address`, `iso8601Date`, `iso8601DateTime`, `iso8601DateTimeWithMillis`, `iso8601Time`, `rfc1123Timestamp`, `hexadecimal`, `uuid`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "`datetime`, `timestamp`, `date`, `time`" }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `regex`, `email`, the address, ISO-8601, RFC 1123, hexadecimal and UUID matchers are `regex`, anchored, since pact-js's patterns match the whole value (S1.18); `datetime`, `timestamp`, `date` and `time` are `datetime`, `date` and `time`, with the format.",
+  "subjects": { "typescript": "pact-js-matchers-patterns.ts" },
+  "expect": {
+    "tests": [{ "test": "patterns" }, { "test": "datesAndTimes" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order of dates and times",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "placed": {
+                        "example": "2026-11-09T10:00:00",
+                        "format": "yyyy-MM-dd'T'HH:mm:ss",
+                        "shape": "datetime"
+                      },
+                      "stamped": {
+                        "example": "2026-11-09 10:00:00",
+                        "format": "yyyy-MM-dd HH:mm:ss",
+                        "shape": "datetime"
+                      },
+                      "due": { "example": "2026-11-20", "format": "yyyy-MM-dd", "shape": "date" },
+                      "slot": { "example": "09:30", "format": "HH:mm", "shape": "time" }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "an order of patterned values",
+              "parts": {
+                "request": {
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/1", "shape": "equality" }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "code": { "example": "123-45", "pattern": "^(?:\\d{3}-\\d{2})$", "shape": "regex" },
+                      "email": {
+                        "example": "ada@example.com",
+                        "pattern": "^(?:^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$)$",
+                        "shape": "regex"
+                      },
+                      "ipv4": { "example": "10.0.0.1", "pattern": "^(?:^(\\d{1,3}\\.)+\\d{1,3}$)$", "shape": "regex" },
+                      "ipv6": {
+                        "example": "::1",
+                        "pattern": "^(?:^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$)$",
+                        "shape": "regex"
+                      },
+                      "date": {
+                        "example": "2026-11-09",
+                        "pattern": "^(?:^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))?)$)$",
+                        "shape": "regex"
+                      },
+                      "dateTime": {
+                        "example": "2026-11-09T10:00:00Z",
+                        "pattern": "^(?:^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z)$)$",
+                        "shape": "regex"
+                      },
+                      "dateTimeMillis": {
+                        "example": "2026-11-09T10:00:00.123Z",
+                        "pattern": "^(?:^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$)$",
+                        "shape": "regex"
+                      },
+                      "time": {
+                        "example": "T10:00:00",
+                        "pattern": "^(?:^(T\\d\\d:\\d\\d(:\\d\\d)?(\\.\\d+)?(([+-]\\d\\d:\\d\\d)|Z)?)?$)$",
+                        "shape": "regex"
+                      },
+                      "rfc1123": {
+                        "example": "Mon, 09 Nov 2026 10:00:00 +0000",
+                        "pattern": "^(?:^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s\\d{2}\\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s\\d{4}\\s\\d{2}:\\d{2}:\\d{2}\\s(\\+|-)\\d{4}$)$",
+                        "shape": "regex"
+                      },
+                      "hex": { "example": "3F", "pattern": "^(?:^[0-9a-fA-F]+$)$", "shape": "regex" },
+                      "id": {
+                        "example": "ce118b6e-d8e1-11e7-9296-cec278b6b50a",
+                        "pattern": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+                        "shape": "regex"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "headers": {
+                    "members": {
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

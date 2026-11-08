@@ -1,0 +1,281 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-jvm-request-builder",
+  "category": "facade",
+  "facade": "pact-jvm",
+  "title": "pact-jvm's request and response builders, from ConsumerPactBuilder, are served as the test sends each request and recorded as their pact converts.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`ConsumerPactBuilder.consumer(name).hasPactWith(provider)`, `pactSpecVersion`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`uponReceiving`, `path`, `method`, `query`, `encodedQuery`, `headers`, `setDefaultRequestValues`, `setDefaultResponseValues`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`matchPath`, `matchHeader`, `matchQuery`, `queryMatchingDate`, `queryMatchingTime`, `queryMatchingDatetime` and their ISO forms, given an example"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`headerFromProviderState`, `pathFromProviderState`, `queryParameterFromProviderState`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`willRespondWith()`: `status`, `headers`, `matchHeader`, `matchSetCookie`, `body` and the rest as for the request"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`successStatus()`, `clientErrorStatus()`, `serverErrorStatus()`, `nonErrorStatus()`, `errorStatus()`, `informationStatus()`, `redirectStatus()`, `statusCodes(list)`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-jvm: `ConsumerPactBuilder` and its request and response calls are the same; the regex forms, given an example, are an anchored `regex` and the date and time rules with their format; values from provider state are their examples with a `ProviderState` generator; the status classes are `http:status-class`.",
+  "subjects": { "jvm": "PactJvmRequestBuilder.java" },
+  "expect": {
+    "tests": [{ "test": "sendsEachRequest" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "get orders by pattern",
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      },
+                      "x-tenant": {
+                        "entries": [{ "example": "acme", "pattern": "^(?:[a-z]+)$", "shape": "regex" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders/7", "pattern": "^(?:/orders/\\d+)$", "shape": "regex" },
+                  "query": {
+                    "members": {
+                      "after": {
+                        "entries": [
+                          {
+                            "example": "2026-11-01T09:30:00Z",
+                            "format": "yyyy-MM-dd'T'HH:mm:ssXXX",
+                            "shape": "datetime"
+                          }
+                        ],
+                        "shape": "array"
+                      },
+                      "at": {
+                        "entries": [{ "example": "09:30", "format": "HH:mm", "shape": "time" }],
+                        "shape": "array"
+                      },
+                      "from": {
+                        "entries": [{ "example": "2026-11-01", "format": "yyyy-MM-dd", "shape": "date" }],
+                        "shape": "array"
+                      },
+                      "on": {
+                        "entries": [{ "example": "2026-11-02", "format": "yyyy-MM-dd", "shape": "date" }],
+                        "shape": "array"
+                      },
+                      "since": {
+                        "entries": [
+                          {
+                            "example": "2026-11-01T09:30:00",
+                            "format": "yyyy-MM-dd'T'HH:mm:ss",
+                            "shape": "datetime"
+                          }
+                        ],
+                        "shape": "array"
+                      },
+                      "sort": {
+                        "entries": [{ "example": "asc", "pattern": "^(?:asc|desc)$", "shape": "regex" }],
+                        "shape": "array"
+                      },
+                      "until": {
+                        "entries": [{ "example": "10:00:00", "format": "HH:mm:ss", "shape": "time" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "response": {
+                  "headers": {
+                    "members": {
+                      "cache-control": { "entries": [{ "example": "no-store", "shape": "equality" }], "shape": "array" },
+                      "etag": {
+                        "entries": [{ "example": "\"abc\"", "pattern": "^(?:\"\\w+\")$", "shape": "regex" }],
+                        "shape": "array"
+                      },
+                      "set-cookie": {
+                        "entries": [
+                          {
+                            "example": "[redacted]",
+                            "pattern": "^(?:\\Qsession=\\E[0-9a-f]+)$",
+                            "shape": "regex"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "shape": "http:status-class", "codes": [200, 203], "example": 200 }
+                }
+              }
+            },
+            {
+              "description": "get the order the state made",
+              "states": [{ "name": "an order exists", "params": { "id": 42 } }],
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      },
+                      "x-order": {
+                        "entries": [
+                          {
+                            "example": "42",
+                            "generator": {
+                              "name": "pact:ProviderState",
+                              "config": { "dataType": "STRING", "expression": "${id}" }
+                            },
+                            "shape": "equality"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": {
+                    "example": "/orders/42",
+                    "generator": {
+                      "name": "pact:ProviderState",
+                      "config": { "dataType": "STRING", "expression": "/orders/${id}" }
+                    },
+                    "shape": "equality"
+                  },
+                  "query": {
+                    "members": {
+                      "expand": {
+                        "entries": [
+                          {
+                            "example": "lines",
+                            "generator": {
+                              "name": "pact:ProviderState",
+                              "config": { "dataType": "STRING", "expression": "${expand}" }
+                            },
+                            "shape": "equality"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "response": {
+                  "headers": {
+                    "members": {
+                      "cache-control": { "entries": [{ "example": "no-store", "shape": "equality" }], "shape": "array" }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "shape": "http:status-class", "class": "client-error", "example": 400 }
+                }
+              }
+            },
+            {
+              "description": "search orders",
+              "states": [{ "name": "orders exist" }],
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      },
+                      "x-request-id": { "entries": [{ "example": "r-1", "shape": "equality" }], "shape": "array" }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" },
+                  "query": {
+                    "members": {
+                      "page": { "entries": [{ "example": "2", "shape": "equality" }], "shape": "array" },
+                      "status": { "entries": [{ "example": "open", "shape": "equality" }], "shape": "array" }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "response": {
+                  "body": { "entries": [], "shape": "array" },
+                  "headers": {
+                    "members": {
+                      "cache-control": { "entries": [{ "example": "no-store", "shape": "equality" }], "shape": "array" },
+                      "content-type": {
+                        "entries": [
+                          {
+                            "shape": "http:media-type",
+                            "type": "application/json",
+                            "example": "application/json"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "example": 200, "shape": "equality" }
+                }
+              }
+            },
+            {
+              "description": "search orders by encoded query",
+              "parts": {
+                "request": {
+                  "headers": {
+                    "members": {
+                      "accept": {
+                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "method": { "example": "GET", "shape": "equality" },
+                  "path": { "example": "/orders", "shape": "equality" },
+                  "query": {
+                    "members": { "q": { "entries": [{ "example": "a b", "shape": "equality" }], "shape": "array" } },
+                    "shape": "object"
+                  }
+                },
+                "response": {
+                  "headers": {
+                    "members": {
+                      "cache-control": { "entries": [{ "example": "no-store", "shape": "equality" }], "shape": "array" }
+                    },
+                    "shape": "object"
+                  },
+                  "status": { "shape": "http:status-class", "class": "success", "example": 200 }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

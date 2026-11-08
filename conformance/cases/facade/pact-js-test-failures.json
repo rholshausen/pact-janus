@@ -1,0 +1,39 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-test-failures",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "A test that throws, an interaction never called, and a request the mock did not match fail executeTest as pact-js's does, and record no contract.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/consumer-test-migration.md", "row": "A test that throws" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "A request that was missing or did not match"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: a test that throws has its error rethrown, with what the mock found printed beside it; a request that was missing or did not match rejects `executeTest`, \"Test failed for the following reasons\", naming the interaction or each mismatch; and no contract is written.",
+  "subjects": { "typescript": "pact-js-test-failures.ts" },
+  "expect": {
+    "tests": [
+      { "test": "testThrows", "fails": ["the client could not read the order"] },
+      {
+        "test": "requestMissing",
+        "fails": [
+          "Test failed for the following reasons",
+          "Missing request: the interaction 'get an order nobody asks for' was expected, but not received"
+        ]
+      },
+      {
+        "test": "requestMismatched",
+        "fails": ["Test failed for the following reasons", "'get an order at the wrong path'"]
+      }
+    ],
+    "contracts": { "web-app-orders-api.janus.json": { "written": false } },
+    "output": {
+      "stderr": [
+        "Missing request: the interaction 'get an order for a test that throws' was expected, but not received"
+      ]
+    }
+  }
+}

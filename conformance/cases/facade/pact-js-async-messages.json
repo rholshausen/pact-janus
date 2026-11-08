@@ -1,0 +1,132 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-async-messages",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "An asynchronous message is handed to the test with no mock, its contents as JSON, as octets, or through a body handler.",
+  "covers": [],
+  "rows": [
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`addAsynchronousInteraction()`: `given`, `expectsToReceive(description, builder)`, `withJSONContent`, `withMetadata`, `withMatchingRules`, `executeTest`"
+    },
+    { "note": "Documentation/consumer-test-migration.md", "row": "A message's `contentType` metadata" },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`withContent(contentType, buffer)` on a message, `MessageConsumerPact`'s `withBinaryContent`"
+    },
+    {
+      "note": "Documentation/consumer-test-migration.md",
+      "row": "`synchronousBodyHandler`, `asynchronousBodyHandler`, `v4SynchronousBodyHandler`, `v4AsynchronousBodyHandler`"
+    }
+  ],
+  "why": "consumer-test-migration.md, pact-js: `addAsynchronousInteraction()`'s calls are kept, and `executeTest`'s function is handed the message, its JSON contents as their document and octets as a `Buffer`, with no mock started (ADR 0067); a message's `contentType` metadata is compared as a media type (ADR 0071).",
+  "note": "`MessageConsumerPact`'s `withBinaryContent`, and the V3 body handlers, are facade/pact-js-message-consumer-pact's.",
+  "subjects": { "typescript": "pact-js-async-messages.ts" },
+  "expect": {
+    "tests": [{ "test": "jsonContents" }, { "test": "octetContents" }, { "test": "bodyHandlers" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "an order delivered event",
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": { "event": { "example": "an order delivered event", "shape": "equality" } },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "of": {
+                          "example": "application/json",
+                          "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order image event",
+              "parts": {
+                "message": {
+                  "body": { "encoded": "base64", "example": "iVBORw==", "shape": "equality" },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "of": {
+                          "example": "image/png",
+                          "pattern": "^\\s*(?i:image)/(?:[^;]*\\+)?(?i:png)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order placed event",
+              "states": [{ "name": "an order was placed", "params": { "id": 1 } }],
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": {
+                      "id": { "example": 1, "shape": "integer" },
+                      "sku": { "example": "A-1", "shape": "type" }
+                    },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "shape": "http:media-type",
+                        "type": "application/json; charset=utf-8",
+                        "example": "application/json; charset=utf-8"
+                      },
+                      "topic": { "example": "orders", "shape": "equality" }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            },
+            {
+              "description": "an order shipped event",
+              "parts": {
+                "message": {
+                  "body": {
+                    "members": { "event": { "example": "an order shipped event", "shape": "equality" } },
+                    "shape": "object"
+                  },
+                  "metadata": {
+                    "members": {
+                      "contentType": {
+                        "of": {
+                          "example": "application/json",
+                          "pattern": "^\\s*(?i:application)/(?:[^;]*\\+)?(?i:json)\\s*(?:;.*)?$",
+                          "shape": "regex"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

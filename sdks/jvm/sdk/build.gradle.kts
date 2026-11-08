@@ -37,6 +37,7 @@ dependencies {
   testImplementation("ch.qos.logback:logback-classic:1.5.18")
   // The integration's own tests launch small JUnit classes and inspect the outcome.
   testImplementation("org.junit.platform:junit-platform-launcher")
+  testImplementation(project(":facade"))
   // Spock specifications run beside the Jupiter tests, through Spock's own JUnit Platform engine:
   // FrameworksTest shows the SDK used from Spock, which needs nothing of it but its public API.
   testImplementation("org.spockframework:spock-core:2.5-groovy-4.0")
@@ -124,7 +125,11 @@ tasks.test {
   // unpacked janus-spec.tar.gz, when it names one (staged plan S0.11) — and where this run's report
   // goes for `janus-sdk-gates conformance check` to read.
   val spec = System.getenv("JANUS_SPEC")?.takeIf { it.isNotEmpty() }?.let(::File) ?: repoRoot
+  // The conformance driver's record mode (conformance README §6), when it is asked for.
+  System.getenv("JANUS_CONFORMANCE_RECORD")?.let { environment("JANUS_CONFORMANCE_RECORD", it) }
   systemProperty("janus.conformance.suite", spec.resolve("conformance").path)
+  // The cases are the tests' input: a changed case, or a subject beside it, runs the suite again.
+  inputs.dir(spec.resolve("conformance")).withPropertyName("conformanceSuite").withPathSensitivity(PathSensitivity.RELATIVE)
   systemProperty("janus.conformance.report",
       System.getenv("JANUS_CONFORMANCE_REPORT") ?: repoRoot.resolve("target/conformance/jvm.json").path)
   testLogging {

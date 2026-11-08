@@ -1,0 +1,16 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "facade/pact-js-log-level",
+  "category": "facade",
+  "facade": "pact-js",
+  "title": "logLevel, on a consumer test and on a verification, is how much the engine logs on its standard error.",
+  "covers": [],
+  "rows": [
+    { "note": "Documentation/consumer-test-migration.md", "row": "`logLevel`" },
+    { "note": "Documentation/provider-test-migration.md", "row": "`logLevel`" }
+  ],
+  "why": "consumer-test-migration.md and provider-test-migration.md, pact-js: `logLevel` is how much the engine logs on its standard error, as `LOG_LEVEL` sets it too; `RUST_LOG` overrides both (ADR 0061).",
+  "note": "The driver runs this case with neither RUST_LOG nor LOG_LEVEL set, so logLevel alone decides.",
+  "subjects": { "typescript": "pact-js-log-level.ts" },
+  "expect": { "tests": [{ "test": "consumerAtDebug" }, { "test": "verifierAtDebug" }], "engine-log": ["DEBUG"] }
+}

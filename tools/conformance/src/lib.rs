@@ -9,9 +9,12 @@
 //!   behavioural specification, and — the load-bearing one — every conformance id in the
 //!   behavioural specification covered by at least one case. An id with no case is a hole in what
 //!   "conformant" guarantees (ADR 0017's "Harder"), so it fails here rather than being discovered
-//!   later by two SDKs quietly disagreeing.
+//!   later by two SDKs quietly disagreeing. It holds the compatibility facades' cases to their
+//!   migration notes too (ADR 0076 decision 3): every row a note gives the verdict `kept` is named by
+//!   a case of its facade, and every row a case names is in the note.
 //! - [`check`] reads the reports SDK runs produce and decides whether each language passed: every
-//!   case in the corpus accounted for, and passed. That is what makes "this SDK is conformant" a
+//!   case in the corpus that is the language's to run accounted for, and passed: every case that is
+//!   not a facade's, and every case of each facade the language ships (ADR 0076 decision 2). That is what makes "this SDK is conformant" a
 //!   claim a build makes rather than a maintainer asserts. Across the reports, a live case whose
 //!   contract two SDKs wrote with different bytes fails too: neither SDK writes a contract, so
 //!   they cannot differ (ADR 0063 decision 6).
@@ -96,6 +99,118 @@ pub fn load_cases(suite: &Path) -> Result<Vec<Case>, String> {
   Ok(cases)
 }
 
+/// A compatibility facade (ADR 0076 decision 2), as `conformance/facades.json` gives it: the
+/// language whose SDK ships it and runs its cases, and the section of each migration note that gives
+/// its spellings' verdicts.
+pub struct Facade {
+  pub language: String,
+  /// Note path, relative to the repository -> the heading of the facade's section in it.
+  pub notes: BTreeMap<String, String>,
+}
+
+/// Every facade the suite has cases for, by name.
+pub fn load_facades(suite: &Path) -> Result<BTreeMap<String, Facade>, String> {
+  let path = suite.join("facades.json");
+  let text = fs::read_to_string(&path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+  let document: Value =
+    serde_json::from_str(&text).map_err(|e| format!("{}: not JSON: {e}", path.display()))?;
+  if document["$format"].as_str() != Some("janus-conformance-facades/1") {
+    return Err(format!(
+      "{}: not a facade list ('$format' is {})",
+      path.display(),
+      document["$format"]
+    ));
+  }
+  let mut facades = BTreeMap::new();
+  for (name, facade) in document["facades"]
+    .as_object()
+    .ok_or_else(|| format!("{}: no 'facades' object", path.display()))?
+  {
+    let language = facade["language"]
+      .as_str()
+      .ok_or_else(|| format!("{}: facade '{name}' names no 'language'", path.display()))?;
+    let notes = facade["notes"]
+      .as_object()
+      .into_iter()
+      .flatten()
+      .filter_map(|(note, section)| section.as_str().map(|s| (note.clone(), s.to_string())))
+      .collect();
+    facades.insert(
+      name.clone(),
+      Facade {
+        language: language.to_string(),
+        notes,
+      },
+    );
+  }
+  Ok(facades)
+}
+
+/// One row of a migration note's tables: its first cell, verbatim, and its verdict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Row {
+  pub cell: String,
+  pub verdict: String,
+}
+
+/// The verdicts a migration note gives (SDK spec §6.1).
+const VERDICTS: [&str; 3] = ["kept", "adapted", "dropped"];
+
+/// The rows of every table under the `## <section>` heading of a migration note, up to the next
+/// `## ` heading: each row whose last cell is a verdict. `None` when the note has no such section.
+pub fn note_rows(text: &str, section: &str) -> Option<Vec<Row>> {
+  let mut rows = Vec::new();
+  let mut inside = false;
+  let mut found = false;
+  for line in text.lines() {
+    if let Some(heading) = line.strip_prefix("## ") {
+      inside = heading.trim() == section;
+      found |= inside;
+      continue;
+    }
+    if !inside || !line.starts_with('|') {
+      continue;
+    }
+    let cells = table_cells(line);
+    if let (Some(first), Some(last)) = (cells.first(), cells.last())
+      && cells.len() > 1
+      && VERDICTS.contains(&last.as_str())
+    {
+      rows.push(Row {
+        cell: first.clone(),
+        verdict: last.clone(),
+      });
+    }
+  }
+  found.then_some(rows)
+}
+
+/// A Markdown table row's cells, trimmed. A `|` inside a code span does not end a cell.
+fn table_cells(line: &str) -> Vec<String> {
+  let mut cells = Vec::new();
+  let mut cell = String::new();
+  let mut code = false;
+  for c in line.trim().trim_start_matches('|').chars() {
+    match c {
+      '`' => {
+        code = !code;
+        cell.push(c);
+      }
+      '|' if !code => cells.push(std::mem::take(&mut cell).trim().to_string()),
+      _ => cell.push(c),
+    }
+  }
+  if !cell.trim().is_empty() {
+    cells.push(cell.trim().to_string());
+  }
+  cells
+}
+
+/// The facade a case belongs to, if it is a facade's.
+fn facade_of(case: &Case) -> Option<&str> {
+  case.document["facade"].as_str()
+}
+
 /// Conformance id -> the primitive that names it, from the canonical behavioural specification.
 pub fn behavioural_ids(spec: &Path) -> Result<BTreeMap<String, String>, String> {
   let text = fs::read_to_string(spec).map_err(|e| format!("reading {}: {e}", spec.display()))?;
@@ -166,6 +281,19 @@ pub fn lint(suite: &Path, behavioural_spec: &Path) -> Report {
     }
   }
 
+  for case in &cases {
+    for (language, file) in case.document["subjects"].as_object().into_iter().flatten() {
+      let file = file.as_str().unwrap_or_default();
+      if !case.path.with_file_name(file).is_file() {
+        report.problem(format!(
+          "{}: its {language} subject '{file}' is not beside it",
+          relative(&case.path, suite)
+        ));
+      }
+    }
+  }
+  lint_facades(suite, &cases, &mut report);
+
   let ids = match behavioural_ids(behavioural_spec) {
     Ok(ids) => ids,
     Err(problem) => {
@@ -211,6 +339,118 @@ pub fn lint(suite: &Path, behavioural_spec: &Path) -> Report {
   report
 }
 
+/// The facades' cases against `facades.json` and the migration notes (ADR 0076 decisions 2 and 3):
+/// each case names a facade the list has, a subject in its language alone, and rows its notes have;
+/// and every row a note gives the verdict `kept` is named by a case of its facade. The notes are read
+/// from the repository `suite` is in.
+fn lint_facades(suite: &Path, cases: &[Case], report: &mut Report) {
+  let facades = match load_facades(suite) {
+    Ok(facades) => facades,
+    Err(problem) => {
+      report.problem(problem);
+      return;
+    }
+  };
+  let root = suite.parent().unwrap_or(suite);
+  // (facade, note) -> its rows, read once.
+  let mut rows: BTreeMap<(&str, &str), Vec<Row>> = BTreeMap::new();
+  for (name, facade) in &facades {
+    for (note, section) in &facade.notes {
+      let path = root.join(note);
+      let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(problem) => {
+          report.problem(format!("facade '{name}': reading {note}: {problem}"));
+          continue;
+        }
+      };
+      match note_rows(&text, section) {
+        Some(found) => {
+          let mut seen = BTreeSet::new();
+          for row in &found {
+            if !seen.insert(row.cell.as_str()) {
+              report.problem(format!(
+                "{note}, '## {section}': two rows are '{}', and a case names a row by its first cell",
+                row.cell
+              ));
+            }
+          }
+          rows.insert((name.as_str(), note.as_str()), found);
+        }
+        None => report.problem(format!("facade '{name}': {note} has no '## {section}' section")),
+      }
+    }
+  }
+
+  let mut covered: BTreeSet<(&str, &str, &str)> = BTreeSet::new();
+  let mut facade_cases = 0usize;
+  for case in cases {
+    let relative_path = relative(&case.path, suite);
+    let Some(name) = facade_of(case) else {
+      continue;
+    };
+    facade_cases += 1;
+    let Some(facade) = facades.get(name) else {
+      report.problem(format!("{relative_path}: facade '{name}' is not in facades.json"));
+      continue;
+    };
+    let languages: Vec<&String> = case.document["subjects"]
+      .as_object()
+      .map(|subjects| subjects.keys().collect())
+      .unwrap_or_default();
+    if languages != [&facade.language] {
+      report.problem(format!(
+        "{relative_path}: a '{name}' case has one subject, in {}, the language that ships it; it has {languages:?}",
+        facade.language
+      ));
+    }
+    for entry in case.document["rows"].as_array().into_iter().flatten() {
+      let note = entry["note"].as_str().unwrap_or_default();
+      let cell = entry["row"].as_str().unwrap_or_default();
+      let Some(note_rows) = rows.get(&(name, note)) else {
+        report.problem(format!(
+          "{relative_path}: names a row of {note}, which facades.json does not give '{name}'"
+        ));
+        continue;
+      };
+      match note_rows.iter().find(|row| row.cell == cell) {
+        Some(row) => {
+          covered.insert((name, note, row.cell.as_str()));
+        }
+        None => report.problem(format!(
+          "{relative_path}: names the row '{cell}', which {note}'s '## {}' section does not have",
+          facade.notes[note]
+        )),
+      }
+    }
+  }
+
+  let mut kept = 0usize;
+  for ((name, note), found) in &rows {
+    for row in found.iter().filter(|row| row.verdict == "kept") {
+      kept += 1;
+      if !covered.contains(&(*name, *note, row.cell.as_str())) {
+        report.problem(format!(
+          "{note}, '## {}': the row '{}' is kept, and no '{name}' case names it: a kept spelling no build checks is a claim (ADR 0076)",
+          facades[*name].notes[*note], row.cell
+        ));
+      }
+    }
+  }
+  let reached = covered
+    .iter()
+    .filter(|(name, note, cell)| {
+      rows[&(*name, *note)]
+        .iter()
+        .any(|row| row.cell == *cell && row.verdict == "kept")
+    })
+    .count();
+  report.note(format!(
+    "{facade_cases} facade cases cover {reached} of the migration notes' {kept} kept rows, for {} facades",
+    facades.len()
+  ));
+}
+
 /// An SDK's run report against the corpus: every case accounted for, and passed.
 pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
   let mut report = Report::default();
@@ -221,7 +461,26 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
       return report;
     }
   };
-  let expected: BTreeSet<&str> = cases.iter().map(|case| case.id.as_str()).collect();
+  let facades = match load_facades(suite) {
+    Ok(facades) => facades,
+    Err(problem) => {
+      report.problem(problem);
+      return report;
+    }
+  };
+  // The language whose SDK runs a case: none for a case that is not a facade's, which every SDK runs.
+  let shipped_by = |case: &Case| -> Option<String> {
+    facade_of(case).map(|name| {
+      facades.get(name).map_or_else(
+        || format!("(no language: '{name}' is not in facades.json)"),
+        |f| f.language.clone(),
+      )
+    })
+  };
+  let corpus: BTreeMap<&str, Option<String>> = cases
+    .iter()
+    .map(|case| (case.id.as_str(), shipped_by(case)))
+    .collect();
   // Each case's written contract, by SDK, as the SHA-256 its report gives.
   let mut digests: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
   if reports.is_empty() {
@@ -248,6 +507,13 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
       .as_str()
       .unwrap_or("(unnamed SDK)")
       .to_string();
+    let language = document["sdk"]["language"].as_str().unwrap_or_default();
+    // Every case that is not a facade's, and every case of each facade this language ships.
+    let expected: BTreeSet<&str> = corpus
+      .iter()
+      .filter(|(_, shipped)| shipped.as_deref().is_none_or(|by| by == language))
+      .map(|(id, _)| *id)
+      .collect();
     if document["$format"].as_str() != Some("janus-conformance-report/1") {
       report.problem(format!(
         "{}: not a conformance report ('$format' is {})",
@@ -270,10 +536,14 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
           .or_default()
           .push((sdk.clone(), digest.to_string()));
       }
-      if !expected.contains(id) {
-        report.problem(format!(
+      match corpus.get(id) {
+        None => report.problem(format!(
           "{sdk}: reported '{id}', which is not a case in this corpus"
-        ));
+        )),
+        Some(Some(by)) if by != language => report.problem(format!(
+          "{sdk}: reported '{id}', a case of a facade {by} ships, and this report's language is '{language}'"
+        )),
+        _ => {}
       }
       match entry["status"].as_str() {
         Some("passed") => passed += 1,
@@ -289,7 +559,7 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
     }
     for id in expected.difference(&reported) {
       report.problem(format!(
-        "{sdk}: did not run '{id}' — every case in the corpus runs in every language, or the claim is not conformance"
+        "{sdk}: did not run '{id}' — every case in the corpus runs in every language whose SDK it is for, or the claim is not conformance"
       ));
     }
     report.note(format!("{sdk}: {passed} of {} cases passed", expected.len()));

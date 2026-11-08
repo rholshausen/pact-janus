@@ -104,48 +104,57 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
       }
     }
 
-    const verify = pipe?.bodyOf("verification/verify");
-    const hooks = (verify?.target as { hooks?: unknown } | undefined)?.hooks;
-    if (expected.ops && pipe && !equal(expected.ops, pipe.ops)) {
-      failures.push(`the operations sent differ\n  expected: ${show(expected.ops)}\n  actual:   ${show(pipe.ops)}`);
-    }
-    for (const [op, body] of Object.entries(expected.frames ?? {})) {
-      if (!subset(body, pipe?.bodyOf(op))) {
-        failures.push(`the '${op}' frame body\n  expected (a subset of): ${show(body)}\n  actual: ${show(pipe?.bodyOf(op))}`);
-      }
-    }
-    if (expected["engine-closed"] !== undefined && pipe && pipe.closed !== expected["engine-closed"]) {
-      failures.push(`the engine was ${pipe.closed ? "" : "not "}ended, and the case expects it ${expected["engine-closed"] ? "" : "not "}to be`);
-    }
-    if (expected.hooks !== undefined) {
-      const actual = hooks === undefined ? null : normalised(hooks);
-      if (!equal(expected.hooks, actual)) {
-        failures.push(`target.hooks differs\n  expected: ${show(expected.hooks)}\n  actual:   ${show(actual)}`);
-      }
-    }
+    await checkEngine(expected, pipe, failures);
     if (expected["config-loaded"]) {
       const path = pipe?.bodyOf("config/load")?.path;
       if (path !== configFile) {
         failures.push(`config/load carried ${show(path)}, and the case expects the file's absolute path ${show(configFile)}`);
       }
     }
-    if (expected.invocations !== undefined && !equal(expected.invocations, pipe?.invocations)) {
-      failures.push(`the endpoint's answers differ\n  expected: ${show(expected.invocations)}\n  actual:   ${show(pipe?.invocations)}`);
-    }
     const wanted = expected["handler-calls"];
     if (wanted !== undefined && (wanted.length !== calls.length || !wanted.every((call, i) => subset(call, calls[i])))) {
       failures.push(`the handlers were called differently\n  expected: ${show(wanted)}\n  actual:   ${show(calls)}`);
     }
-    if (expected["endpoint-closed"]) {
-      const url = loopbackUrl(hooks);
-      if (url === undefined) {
-        failures.push("the verify frame names no loopback endpoint to check");
-      } else if (await answers(url)) {
-        failures.push(`the endpoint at ${url} still answers after verify ended`);
-      }
-    }
   } finally {
     await provider?.close();
+  }
+}
+
+/**
+ * What a case expects of the scripted engine a run used (README §4): the operations and frames it
+ * was sent, whether it was ended, the verify frame's hooks, what the SDK's endpoint answered each
+ * `invoke`, and whether the endpoint was closed after.
+ */
+export async function checkEngine(expected: NonNullable<Case["expect"]>, pipe: ScriptedPipe | undefined, failures: string[]): Promise<void> {
+  const verify = pipe?.bodyOf("verification/verify");
+  const hooks = (verify?.target as { hooks?: unknown } | undefined)?.hooks;
+  if (expected.ops && pipe && !equal(expected.ops, pipe.ops)) {
+    failures.push(`the operations sent differ\n  expected: ${show(expected.ops)}\n  actual:   ${show(pipe.ops)}`);
+  }
+  for (const [op, body] of Object.entries(expected.frames ?? {})) {
+    if (!subset(body, pipe?.bodyOf(op))) {
+      failures.push(`the '${op}' frame body\n  expected (a subset of): ${show(body)}\n  actual: ${show(pipe?.bodyOf(op))}`);
+    }
+  }
+  if (expected["engine-closed"] !== undefined && pipe && pipe.closed !== expected["engine-closed"]) {
+    failures.push(`the engine was ${pipe.closed ? "" : "not "}ended, and the case expects it ${expected["engine-closed"] ? "" : "not "}to be`);
+  }
+  if (expected.hooks !== undefined) {
+    const actual = hooks === undefined ? null : normalised(hooks);
+    if (!equal(expected.hooks, actual)) {
+      failures.push(`target.hooks differs\n  expected: ${show(expected.hooks)}\n  actual:   ${show(actual)}`);
+    }
+  }
+  if (expected.invocations !== undefined && !equal(expected.invocations, pipe?.invocations)) {
+    failures.push(`the endpoint's answers differ\n  expected: ${show(expected.invocations)}\n  actual:   ${show(pipe?.invocations)}`);
+  }
+  if (expected["endpoint-closed"]) {
+    const url = loopbackUrl(hooks);
+    if (url === undefined) {
+      failures.push("the verify frame names no loopback endpoint to check");
+    } else if (await answers(url)) {
+      failures.push(`the endpoint at ${url} still answers after verify ended`);
+    }
   }
 }
 

@@ -124,7 +124,8 @@ public final class ProviderSession implements MockServer {
       }
       Map<String, Object> result = (Map<String, Object>) engine.send(RequestFrameOp.CONSUMER_SESSION_REPORT_VARIANT,
           report).get("result");
-      if ("not-exercised".equals(result.get("status"))) {
+      // A failed test's report decides its status, and `exercised` still says nothing called it.
+      if ("not-exercised".equals(result.get("status")) || Boolean.FALSE.equals(result.get("exercised"))) {
         notReceived.add(one.description());
       }
       for (Map<String, Object> mismatch : (List<Map<String, Object>>) result.getOrDefault("mismatches", List.of())) {

@@ -740,7 +740,10 @@ A variant's status in `results`, and in `report-variant`'s answer, is decided in
 when its test was reported failed; `failed` when its exchange failed, with the engine's `mismatches`;
 `not-exercised` when nothing exercised it (variant-semantics spec §4.2); `not-reported` when the host
 declared `test-verdicts` (§5.3) and no report arrived; otherwise `verified`. A reported variant's result
-carries the report as `test: { status, reason? }`. An interaction is `failed` when any of its variants
+carries the report as `test: { status, reason? }`. A variant whose test was reported failed, and which
+nothing exercised, also carries `exercised: false`: the report decides its status, and a host still
+learns that nothing called the mock, which today's libraries print beside the test's own failure (staged
+plan S2.6). An interaction is `failed` when any of its variants
 failed, else `not-exercised` when any was not exercised, else `not-reported` when any was not reported,
 else `verified`. In a session created by a host that declared `test-verdicts`, an `add-interaction` the
 session refused also withholds the contract, and `finalise` lists each refusal, in order, as `refused`:
