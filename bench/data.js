@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794107225718,
+  "lastUpdate": 1794107227711,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -45984,6 +45984,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20184,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "aafc10086dd574e6303a53024f24cd04a6cccb57",
+          "message": "docs: S2.10 is done\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-08T14:03:18+11:00",
+          "tree_id": "98e161ffb01f4978555df859aea85e427191c93e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/aafc10086dd574e6303a53024f24cd04a6cccb57"
+        },
+        "date": 1794107227212,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 53785,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 48033,
             "unit": "requests per second",
             "extra": "engines 4"
           }
