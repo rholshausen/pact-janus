@@ -196,6 +196,14 @@ fn collect_mismatches(executed: &Executed, enclosing_action: Option<&str>, out: 
       action: action_name.map(str::to_string),
     });
   }
+  // A `flow:or` that passed (spec §2.4) needed only the alternative that did: the ones that failed
+  // before it are kept for a reader of the executed plan, and are not mismatches (staged plan S2.18).
+  // One that failed reports every alternative's.
+  if matches!(&executed.kind, ExecutedKind::Action { name, .. } if name == "flow:or")
+    && executed.result.as_ref().is_some_and(truthy)
+  {
+    return;
+  }
   for child in children_of(executed) {
     collect_mismatches(child, action_name, out);
   }

@@ -1,0 +1,79 @@
+{
+  "description": "a v3 `OR` none of whose alternatives passes reports each one's mismatch (staged plan S2.18)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /thing",
+          "request": {
+            "method": "GET",
+            "path": "/thing"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "id": "xxx"
+            },
+            "matchingRules": {
+              "body": {
+                "$.id": {
+                  "combine": "OR",
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "x+"
+                    },
+                    {
+                      "match": "type"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/thing",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "id": 7
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.id",
+        "message": "Expected '7' to match '^(?:x+)$'",
+        "action": "match:regex"
+      },
+      {
+        "path": "$.response.body.id",
+        "message": "Expected a string but got 7",
+        "action": "match:type"
+      }
+    ]
+  }
+}

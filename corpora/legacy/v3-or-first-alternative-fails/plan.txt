@@ -1,0 +1,55 @@
+(
+  :"get /thing" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/thing'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.id" (
+          %flow:or (
+            %match:regex (
+              $.response.body.id,
+              '^(?:x+)$'
+            ),
+            %match:type (
+              $.response.body.id,
+              'xxx'
+            )
+          )
+        )
+      )
+    )
+  )
+)

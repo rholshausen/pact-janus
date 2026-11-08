@@ -142,13 +142,6 @@
       "reason": "ADR 0051: the message is pending, so its failure does not fail the pact's run; a contract has no pending interactions (pending is the broker's to decide), so the upgrade converts it without its flag and reports pending-dropped. janus upgrade --exclude-pending leaves it out instead"
     },
     {
-      "case": "matching-rules/ignore-order",
-      "key": "0/4",
-      "pact": "fail",
-      "contract": "pass",
-      "reason": "S2.18: an OR of an ignore-order rule and type, which the reply passes by type. The legacy compiler makes the OR a flow:or that succeeds, but the outcome counts its failed first alternative's error as a mismatch, as it does for any OR whose first alternative fails; the contract has the type alone, since ADR 0073 drops an alternative today's verifier always fails, and passes it"
-    },
-    {
       "case": "messages/pact-jvm-synchronous",
       "key": "run",
       "pact": "pass",

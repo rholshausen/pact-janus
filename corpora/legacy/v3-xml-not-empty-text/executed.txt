@@ -1,0 +1,63 @@
+(
+  :"get /thing" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/thing',
+          '/thing'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/xml',
+            'application/xml'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        %expect:object (
+          $.response.body.note => {'#text': 'goodbye'}
+        ) => BOOL(true),
+        :"$.note" (
+          %flow:or (
+            %expect:not-empty (
+              %legacy:xml-children (
+                $.response.body.note => {'#text': 'goodbye'}
+              ) => []
+            ) => ERROR(Expected a non-empty value but got []),
+            %expect:not-empty (
+              $.response.body.note.#text => 'goodbye'
+            ) => BOOL(true)
+          ) => BOOL(true),
+          :"$.note.#text" (
+            %expect:not-empty (
+              $.response.body.note.#text => 'goodbye'
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

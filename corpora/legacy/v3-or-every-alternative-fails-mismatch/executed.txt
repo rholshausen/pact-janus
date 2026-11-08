@@ -1,0 +1,55 @@
+(
+  :"get /thing" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/thing',
+          '/thing'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.id" (
+          %flow:or (
+            %match:regex (
+              $.response.body.id => 7,
+              '^(?:x+)$'
+            ) => ERROR(Expected '7' to match '^(?:x+)$'),
+            %match:type (
+              $.response.body.id => 7,
+              'xxx'
+            ) => ERROR(Expected a string but got 7)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

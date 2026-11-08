@@ -57,6 +57,10 @@ readability:
   which fails as today's verifier fails it; its upgraded contract names it `pact:ignore-order`, which
   fails by name, so the two reach one verdict with different mismatches, and it is not an `upgrade-`
   case (ADR 0073).
+  `v3-or-first-alternative-fails/` is an `OR` a later alternative passes, and `v3-xml-not-empty-text/`
+  an element's `notEmpty` met by its text, an `OR` too: neither is failed by an alternative it did not
+  need, and `v3-or-every-alternative-fails-mismatch/` reports each alternative's mismatch (staged plan
+  S2.18).
   `v4-status-class/` and its `-mismatch` twin are a v4 `statusCode` rule, compiled from the pact and
   from its upgraded contract to the built-in HTTP component's `http:status-class`, which the corpus
   runner registers as the native engine does (ADR 0057). `shapes/http-media-type/` and its

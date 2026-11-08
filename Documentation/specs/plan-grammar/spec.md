@@ -167,6 +167,11 @@ owns them, except where an action is **lazy** — `flow:if` evaluates its condit
 `flow:or` stops at the first success — and every lazy action MUST declare it (§4.2), because a reader of an
 executed plan needs to know whether an unannotated node was skipped or never reached.
 
+A `flow:or` that succeeds needed only the alternative that did. The alternatives that failed before it
+stay in the executed plan, with their `error` results, so a reader sees what was tried, but they are
+**not mismatches**: the interaction's mismatches are the `error` results that decided its verdict, and
+these did not. A `flow:or` that fails reports every alternative's (staged plan S2.18).
+
 Values reach the plan through **resolvers**. A `resolve` node holds a path — `$.query`,
 `$.body.items`, `$.headers.content-type` — resolved against the interaction context by the transport
 and content components that own those parts. The kernel does not know what a header is; it knows how

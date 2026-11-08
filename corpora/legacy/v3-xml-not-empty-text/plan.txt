@@ -1,0 +1,63 @@
+(
+  :"get /thing" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/thing'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/xml'
+          )
+        )
+      ),
+      :body (
+        %expect:object (
+          $.response.body.note
+        ),
+        :"$.note" (
+          %flow:or (
+            %expect:not-empty (
+              %legacy:xml-children (
+                $.response.body.note
+              )
+            ),
+            %expect:not-empty (
+              $.response.body.note.#text
+            )
+          ),
+          :"$.note.#text" (
+            %expect:not-empty (
+              $.response.body.note.#text
+            )
+          )
+        )
+      )
+    )
+  )
+)

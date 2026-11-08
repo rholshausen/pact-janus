@@ -1,0 +1,63 @@
+{
+  "description": "a v3 `notEmpty` rule on an XML element is satisfied by its text when it has no children: an `OR` over its children and its text, the first of which fails (ADR 0039, staged plan S2.18)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get /thing",
+          "request": {
+            "method": "GET",
+            "path": "/thing"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/xml"
+            },
+            "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><note>hello</note>",
+            "matchingRules": {
+              "body": {
+                "$.note": {
+                  "matchers": [
+                    {
+                      "match": "notEmpty"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/thing",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/xml",
+    "$.response.body": {
+      "note": {
+        "#text": "goodbye"
+      }
+    }
+  },
+  "result": {
+    "status": "matched",
+    "mismatches": []
+  }
+}

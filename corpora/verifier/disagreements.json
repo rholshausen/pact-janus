@@ -86,13 +86,6 @@
       "reason": "ADR 0043: the reply adds a parameter (version=2) to the pact's application/json; charset=UTF-8, which the header check allows, and janus verify checks the pact's type once, there; today's verifier checks it again before comparing the body, requiring exactly the pact's parameters, and fails"
     },
     {
-      "case": "matching-rules/ignore-order",
-      "key": "0/4",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S2.18: an OR of an ignore-order rule and type, which the reply passes by type. The legacy compiler makes the OR a flow:or that succeeds, but the outcome counts its failed first alternative's error as a mismatch, as it does for any OR whose first alternative fails; today passes it by type"
-    },
-    {
       "case": "messages/error-status",
       "key": "run",
       "today": "pass",

@@ -24,6 +24,9 @@ const KNOWN: &[(&str, &str)] = &[
   // A size rule on an XML element counts its children of every name, which no shape counts: the
   // upgrade drops it, saying so.
   ("v3-xml-min-children-mismatch", "rule-unmapped"),
+  // An OR of rules a shape cannot name as a union: the upgrade keeps the first, which fails where a
+  // later alternative passes, saying so.
+  ("v3-or-first-alternative-fails", "rule-combination-or"),
 ];
 
 fn corpus() -> PathBuf {
