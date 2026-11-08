@@ -69,7 +69,7 @@ first draft of something that will be rewritten against the final specification.
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite does not yet cover test-framework integrations, the compatibility facade or per-language refusals (conformance report §7.2; S2.6) |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite covers the compatibility facades and per-language refusals since S2.6, and not yet the Janus DSL's test-framework integrations (conformance report §7.2; S2.19) |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
 | **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); start its background work through its embedding, never `thread::spawn` itself (ADR 0062; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
@@ -1925,6 +1925,49 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
 - **S2.6 The conformance suite extended** — **M**, to the things it does not cover (conformance
   report §7.2): the test-framework integrations, the facade, and per-language refusals (ADR 0019).
   *Exit:* every facade primitive classified `kept` has a conformance case.
+  *Done 2026-11-09* ([ADR 0076](decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)):
+  - A case may name a subject: a test in one language, beside the case, for a spelling data cannot
+    carry. A TypeScript subject's exported functions are its tests; a JVM subject is a JUnit class the
+    driver compiles and runs through the JUnit Platform. The expectation stays data: each test's
+    outcome, the contracts written, what was printed, the engine's log, and a scripted engine's frames.
+  - A `facade` case belongs to a facade `conformance/facades.json` names, with the language that ships
+    it, and is run by that SDK alone: `check` holds each report to the cases its language runs. The
+    verdicts are the migration notes' rows, which the lint reads: a `kept` row no case names fails it.
+    The behavioural specification's `facade` arrays, which disagreed with the provider note on four
+    spellings, are gone.
+  - 30 facade cases, 18 of pact-js's and 12 of pact-jvm's, cover the notes' 98 `kept` rows. Each pins
+    the contracts its facade recorded, captured by its language's record mode and read against its
+    rows, so a rule that stops converting exactly fails it. `translation/regex-flags-refused` is the
+    first per-language refusal, `shape.regex.flags-refused`, with a subject in each language.
+  - Not foreseen: in both facades, a test that threw without calling the mock printed nothing beside
+    its error, since a failed report hid `not-exercised`. A result now also says `exercised: false`
+    (engine-protocol spec §8.2), and both print the missing request, as pact-js and pact-jvm do.
+  - Not foreseen: a multipart body `pact_ffi` builds converts with `body-not-parsed`, since its type
+    names no boundary. Reading the header's is not enough on its own: a text part's type cannot then be
+    checked from its octets, and pact-js's own multipart example fails. PactV3's multipart calls join
+    `multipartBody`'s row, `dropped`, and S2.20 reads them.
+  - The cases corrected rows: pact-jvm's `body(JSONObject)` and `ContentType` overloads, which the facade
+    does not take, are a `dropped` row; `withContent` takes no bytes, in pact-jvm or the facade; an
+    `and(...)` whose rules none subsumes, and a `PactDslRootValue` with no `Content-Type`, convert with a
+    loss and are `dropped`; `nullValue`, `eachValueMatching` and `bodyMatchingContentType` say what they
+    convert to; a `state-unhandled` warning is in the report on standard output (ADR 0059); and the
+    `Content-Type` paragraph had its direction backwards.
+  - The Janus DSL's own test-framework integrations are S2.19.
+- **S2.19 The Janus DSL's test-framework integrations in the conformance suite** — **M**, deferred by
+  S2.6 (ADR 0076 decision 6). That a framework's hook finalises the session, that a failed test fails
+  its variant, and that a withheld contract fails the suite are each SDK's own tests today (S2.4a's
+  `frameworks.test.ts`, S2.4b's `FrameworksTest`). Cases with a subject per language and framework,
+  Jest and Vitest, JUnit 5 and Spock, need drivers that run the framework as a user's project does.
+  *Exit:* every integration a `STYLE.md` names has a case, and both SDKs pass them.
+- **S2.20 A multipart body `pact_ffi` built, read by its header's boundary** — **M**, found by S2.6.
+  `pact_ffi` writes a multipart body's type as `multipart/form-data`, without the boundary its
+  `Content-Type` header names, so `upgrade`, and the facades, which convert as it does, assert nothing
+  about its parts (`body-not-parsed`). Taking the header's boundary is not enough on its own: a part's
+  `content-type` check then runs on the part's octets, text is not detected from octets
+  (component-interfaces spec §6.5), and a text part pact-js's mock accepts is refused. A part's type is
+  read from its own label, as ADR 0049 reads a slot's, and an ADR decides it.
+  *Exit:* pact-js's multipart example and `facade/pact-js-v3`'s upload record their parts and run, and
+  the multipart row of `consumer-test-migration.md` is `kept`.
 - **S2.7 The rename, when the name is decided** — **S**, blocked on §7.1 (S0.9), and **not** a stage
   2 exit condition: if the answer has not come, stage 2 ships its major version under the codename.
   When it comes, S0.5's rehearsed change runs for real, and the persisted identifiers follow S0.5's
@@ -2400,6 +2443,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S2.17 | A v1–v4 rule read as a plugin's, such as `ignore-order`, upgrades on an array to an `each-like` with no finding | found by S2.5b |
 | S2.18 | A failed alternative of an `OR` that passed is counted as a mismatch, so `janus verify` fails what today passes | found by S2.17 |
 | S2.6 | The conformance suite does not cover test-framework integrations, the facade or per-language refusals | conformance report §7.2 |
+| S2.19 | The conformance suite does not cover the Janus DSL's test-framework integrations | deferred by S2.6; ADR 0076 decision 6 |
+| S2.20 | A multipart body `pact_ffi` builds names its boundary only on the header, so its parts convert with nothing asserted | found by S2.6 |
 | S2.7 | The rename itself, whenever §7.1 answers; contracts and components already published under the codename must stay readable | ADR 0011; §7.1 |
 | S2.10 | A Janus contract's XML text is trimmed as today's verifier trims a pact's, CDATA sections included | found in review of S1.22; ADR 0039 decision 2 |
 | S2.11 | A Janus SDK overwrites the contract, so of several test files recording one pair, the last wins | ADR 0063 decision 7 |

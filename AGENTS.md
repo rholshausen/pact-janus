@@ -207,7 +207,13 @@ Three sources are the source of truth and take precedence over this file when th
 > `set-cookie`); a contract records them as `"[redacted]"` and lists them under `redacted`, unless a
 > session's `config.redaction` keeps them, and no report repeats a value found under one. S2.10
 > (ADR 0075): an XML element's `#text` is its text as written, CDATA contents included, and `#trimmed`
-> beside it is today's reading, which the v1–v4 compiler and `janus upgrade` compare.
+> beside it is today's reading, which the v1–v4 compiler and `janus upgrade` compare. S2.6 (ADR 0076):
+> a conformance case may name a subject, a test in one language beside it, for a spelling data cannot
+> carry; a `facade` case is run by the SDK whose language `conformance/facades.json` gives its facade,
+> and the lint holds every `kept` row of the migration notes to a case naming it. 30 facade cases
+> cover pact-js's and pact-jvm's 98 `kept` rows, pinning what each recorded. A failed test's result
+> also says `exercised: false` when nothing called the mock, which both facades print. S2.19 (the Janus
+> DSL's framework integrations) and S2.20 (multipart bodies `pact_ffi` builds) are new.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -249,7 +255,8 @@ corpora/         Golden corpora: (spec or pact, expected plan, expected result);
 conformance/     The SDK conformance suite (task 6.4): one corpus of cases every SDK runs, in its
                  own language, against a pinned engine — ADR 0017's definition of "conformant".
                  Each SDK's driver lives with its tests; `tools/conformance` checks the corpus
-                 and the reports a run writes
+                 and the reports a run writes. cases/facade/ holds the compatibility facades'
+                 cases, each a test in its facade's language beside its JSON (ADR 0076)
 samples/         Demo subjects (workspace members), e.g. samples/order-service — the sample
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
                  endpoint, used by verification tests, M3 and M5. Its pacts/ holds the v3
@@ -343,8 +350,13 @@ with `--spec <dir>`; `JANUS_SPEC` tells the SDKs' own drivers the same. Either m
 unpacked `janus-spec.tar.gz` from a release, whose paths are the repository's (S0.11, ADR 0030).
 
 A conformance id in `behavioural-spec.json` with no case fails the lint, and a case that fails in
-either language fails CI. When a case and an SDK disagree and the specification does not settle it,
-change `behavioural-spec.json` first — `conformance/README.md` §7.
+either language fails CI. So does a row of `consumer-test-migration.md` or `provider-test-migration.md`
+whose verdict is `kept` and which no `facade` case names (ADR 0076): the lint matches a row by its first
+cell, verbatim, so rewording one means changing the cases that name it. A facade case's subject is a
+test in the facade's language (`.ts` beside the JSON for pact-js, a JUnit class for pact-jvm); its
+pinned contracts are captured with `JANUS_CONFORMANCE_RECORD=<dir>` and read against the row first.
+When a case and an SDK disagree and the specification does not settle it, change
+`behavioural-spec.json` first — `conformance/README.md` §7.
 
 The thinness audit (plan task 6.5) is the other claim made into a command: every SDK source file
 must be classified into a layer in its SDK's `thinness.json` (`sdks/<sdk>/thinness.json`, paths
