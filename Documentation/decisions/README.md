@@ -89,6 +89,7 @@ superseding ADR instead.
 | [0070](0070-port-pact-jvms-java-dsl-into-the-facade-and-submit-what-it-builds-as-ffi-calls.md) | Port pact-jvm's Java DSL into the facade, and submit what it builds as `pact_ffi` calls | accepted |
 | [0071](0071-compare-a-content-type-as-a-media-type-with-the-http-components-http-media-type.md) | Compare a `Content-Type` as a media type, with the HTTP component's `http:media-type` | accepted |
 | [0072](0072-read-a-numbers-kind-from-how-it-is-written.md) | Read a number's kind from how it is written | accepted |
+| [0073](0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md) | Name a rule nobody implements as the `pact` component's operator, and fail by it | accepted |
 
 ## Decision backlog
 
