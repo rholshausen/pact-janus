@@ -213,7 +213,9 @@ Three sources are the source of truth and take precedence over this file when th
 > and the lint holds every `kept` row of the migration notes to a case naming it. 30 facade cases
 > cover pact-js's and pact-jvm's 98 `kept` rows, pinning what each recorded. A failed test's result
 > also says `exercised: false` when nothing called the mock, which both facades print. S2.19 (the Janus
-> DSL's framework integrations) and S2.20 (multipart bodies `pact_ffi` builds) are new.
+> DSL's framework integrations) is new. S2.20 (ADR 0077): a multipart body `pact_ffi` builds is split at
+> its header's boundary, and an optional `content/label` operation lets the multipart component say a
+> part's own `Content-Type`, which `match:content-type` on a part's body reads before detecting.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

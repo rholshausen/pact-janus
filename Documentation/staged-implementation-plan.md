@@ -1968,6 +1968,26 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   read from its own label, as ADR 0049 reads a slot's, and an ADR decides it.
   *Exit:* pact-js's multipart example and `facade/pact-js-v3`'s upload record their parts and run, and
   the multipart row of `consumer-test-migration.md` is `kept`.
+  *Done 2026-11-09* ([ADR 0077](decisions/0077-match-a-multipart-parts-content-type-against-its-own-label.md)),
+  but for the row's verdict:
+  - A multipart body whose type names no boundary is split at the one its `Content-Type` header names,
+    as today's verifier splits it (`get_multipart_boundary`). `corpora/legacy/v4-multipart-boundary-on-header/`
+    and its `-mismatch` twin pin it, and fail without the change; the upgrade agreement test runs both
+    through their upgraded contracts too.
+  - The content interface has an optional `content/label` operation: the component that decodes a slot
+    says what a member of its document is labelled. The multipart component answers a part's own
+    `Content-Type` for its body. On the contract path, `match:content-type` on a member reads that label
+    before detecting (`engine/kernel/tests/multipart_part_types.rs`), as it reads a whole slot's. The
+    v1–v4 path still sniffs.
+  - pact-js's multipart example runs and records what `janus upgrade` makes of pact-js's pact, parts and
+    all; `facade/pact-js-v3` pins its upload's parts, request and response, and reads the reply as a
+    multipart body.
+  - Not as the exit said: the row is `adapted`, as it was before S2.6, and not `kept`. ADR 0066 decision
+    7's two differences stand (a boundary derived from the part, and the part's type the one given), and
+    a `kept` row behaves as today.
+  - Not foreseen: on the v1–v4 path, a multipart reply's text part with a `contentType` rule still
+    fails where today's verifier sniffs `text/plain`. No fixture has one, since `pact_ffi` builds request
+    bodies; ADR 0049's tripwire covers it.
 - **S2.7 The rename, when the name is decided** — **S**, blocked on §7.1 (S0.9), and **not** a stage
   2 exit condition: if the answer has not come, stage 2 ships its major version under the codename.
   When it comes, S0.5's rehearsed change runs for real, and the persisted identifiers follow S0.5's
