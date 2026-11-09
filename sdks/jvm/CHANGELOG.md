@@ -1,3 +1,24 @@
+## 0.2.2 (2026-11-09)
+
+### Features
+
+#### `JanusOptions` takes the members to redact and to keep
+
+`JanusOptions.withRedacted(paths)` names, by path, members the contract records redacted beyond the
+credentials the transport declares (`request.headers.x-api-key`), and `withKept(paths)` ones it records
+as they are (`request.headers.authorization`, for a fixed token the provider's test environment
+accepts). They are passed to the engine as written, as `config.redaction` (ADR 0074). With an engine
+that has S2.8, a contract records `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` as
+`"[redacted]"` whether or not they are given.
+
+### Fixes
+
+#### A pact-jvm test that throws prints the request it never sent
+
+`janus-facade`'s JUnit 5 extension, when a test throws without calling the mock, now prints "The
+following requests were not received" with the interaction beside the test's own failure, as pact-jvm
+does. It reads the engine's `exercised: false` (staged plan S2.6), so it needs an engine that writes it.
+
 ## 0.2.1 (2026-11-05)
 
 The SDK runs janus-engine 0.4.5, where it ran 0.4.4: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.5) says what changed.
