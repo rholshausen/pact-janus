@@ -27,8 +27,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
   Apply, ApplyResult, Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader,
-  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Loaded,
-  MatcherComponent, SlotValue, media_type_matches,
+  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Label,
+  LabelResult, Loaded, MatcherComponent, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::persisted::Persisted;
 use pact_janus_kernel::plan::RuntimeValue;
@@ -668,6 +668,19 @@ impl ContentComponent for WasmComponent {
         .and_then(Value::as_str)
         .map(str::to_string),
       confidence: result.get("confidence").and_then(Value::as_f64),
+    })
+  }
+
+  fn label(&self, req: Label) -> Result<LabelResult, ComponentError> {
+    let result = self.instance_call(
+      "content/label",
+      json!({ "content-type": req.content_type, "value": slot_json(&req.value)?, "at": req.at }),
+    )?;
+    Ok(LabelResult {
+      media_type: result
+        .get("media-type")
+        .and_then(Value::as_str)
+        .map(str::to_string),
     })
   }
 }

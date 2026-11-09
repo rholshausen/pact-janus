@@ -132,6 +132,34 @@ pub fn unquote(quoted: &str) -> (String, &str) {
   (name, "")
 }
 
+/// A relative path suffix (`.file[0].body`, `['']`, the syntax [`navigate`] walks) as a JSON
+/// pointer (`/file/0/body`, RFC 6901), the form a component reads a member's place in its document
+/// in (component-interfaces spec §6.5). `None` when the suffix is not one [`navigate`] could walk.
+pub fn pointer(suffix: &str) -> Option<String> {
+  let mut pointer = String::new();
+  let mut suffix = suffix;
+  while !suffix.is_empty() {
+    let segment = if let Some(after_dot) = suffix.strip_prefix('.') {
+      let end = after_dot.find(['.', '[']).unwrap_or(after_dot.len());
+      let (member, remaining) = after_dot.split_at(end);
+      suffix = remaining;
+      member.to_string()
+    } else if let Some(quoted) = suffix.strip_prefix("['") {
+      let (member, remaining) = unquote(quoted);
+      suffix = remaining;
+      member
+    } else {
+      let (index, rest) = suffix.strip_prefix('[')?.split_once(']')?;
+      index.parse::<usize>().ok()?;
+      suffix = rest;
+      index.to_string()
+    };
+    pointer.push('/');
+    pointer.push_str(&segment.replace('~', "~0").replace('/', "~1"));
+  }
+  Some(pointer)
+}
+
 /// Navigate `value` by a relative path suffix built from `.member`, `['member']` and `[index]`
 /// segments (e.g. `.sku`, `[0]`, `.payment.dueDate`, `['@{urn:names}name']`) — the syntax
 /// [`super::path`], [`member_path`] and the compilers' `Cursor`s use. An empty suffix returns

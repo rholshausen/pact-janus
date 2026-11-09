@@ -1,5 +1,6 @@
 //! A v1–v4 multipart body as parts (ADR 0040 decision 5): split as today's verifier splits one, with
-//! `multer` at the boundary the body's content type names, read by `mime`. Each part is then read by its
+//! `multer` at the boundary the body's content type names, read by `mime`, or its `Content-Type`
+//! header's when the type names none, as `pact_ffi` writes one (ADR 0077). Each part is then read by its
 //! own type, as a body is ([`super::pact`]), and compared by the legacy compiler as today's
 //! `match_mime_multipart` compares it.
 //!

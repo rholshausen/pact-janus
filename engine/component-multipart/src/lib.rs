@@ -25,7 +25,7 @@ use pact_janus_component_text::TextContent;
 use pact_janus_component_xml::XmlContent;
 use pact_janus_kernel::component::{
   Compile, CompileResult, ComponentError, ContentComponent, Decode, DecodeResult, Detect, DetectResult,
-  Encode, EncodeResult, SlotValue, media_type_matches,
+  Encode, EncodeResult, Label, LabelResult, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::Value;
@@ -498,5 +498,48 @@ impl ContentComponent for MultipartContent {
   /// A multipart body is recognised by its declared type and boundary, not its octets (spec §6.5).
   fn detect(&self, _req: Detect) -> Result<DetectResult, ComponentError> {
     Err(ComponentError::operation_unsupported("content/detect"))
+  }
+
+  /// A part's `body` is labelled by the part's own `Content-Type` (ADR 0077), the type it was decoded
+  /// by: `/<name>/<index>/body`. Nothing else in the document carries a label, and a part with no
+  /// type has none.
+  fn label(&self, req: Label) -> Result<LabelResult, ComponentError> {
+    let document = self
+      .decode(Decode {
+        content_type: req.content_type,
+        value: req.value,
+        options: None,
+      })?
+      .document;
+    let segments: Vec<String> = req
+      .at
+      .split('/')
+      .skip(1)
+      .map(|segment| segment.replace("~1", "/").replace("~0", "~"))
+      .collect();
+    let media_type = match segments.as_slice() {
+      [name, index, body] if body == BODY => match &document {
+        RuntimeValue::Object(names) => index
+          .parse::<usize>()
+          .ok()
+          .and_then(|index| match names.get(name) {
+            Some(RuntimeValue::Array(parts)) => parts.get(index),
+            _ => None,
+          })
+          .and_then(|part| match part {
+            RuntimeValue::Object(members) => match members.get(HEADERS) {
+              Some(RuntimeValue::Object(headers)) => match headers.get("content-type") {
+                Some(RuntimeValue::String(content_type)) => Some(content_type.clone()),
+                _ => None,
+              },
+              _ => None,
+            },
+            _ => None,
+          }),
+        _ => None,
+      },
+      _ => None,
+    };
+    Ok(LabelResult { media_type })
   }
 }

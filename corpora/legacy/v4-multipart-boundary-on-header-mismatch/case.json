@@ -1,0 +1,100 @@
+{
+  "description": "a v4 multipart body whose type names no boundary, as pact_ffi writes one, is split at the boundary its Content-Type header names, and a field that is not by its rule is refused — staged plan S2.20",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "description": "get an upload",
+          "request": {
+            "method": "GET",
+            "path": "/upload"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "content": "--b\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nMary\r\n--b\r\nContent-Disposition: form-data; name=\"order\"; filename=\"o.json\"\r\nContent-Type: application/json\r\n\r\n{\"id\": 1}\r\n--b--\r\n",
+              "contentType": "multipart/form-data",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.name": {
+                  "matchers": [
+                    {
+                      "match": "regex",
+                      "regex": "[A-Z][a-z]+"
+                    }
+                  ]
+                },
+                "$.order.id": {
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "Content-Type": "multipart/form-data; boundary=b"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/upload",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.body": {
+      "name": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"name\""
+          },
+          "body": "ada"
+        }
+      ],
+      "order": [
+        {
+          "headers": {
+            "content-disposition": "form-data; name=\"order\"; filename=\"p.json\"",
+            "content-type": "application/json"
+          },
+          "filename": "p.json",
+          "body": {
+            "id": 42,
+            "gift": true
+          }
+        }
+      ]
+    },
+    "$.response.headers.content-type": "multipart/form-data; boundary=b"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.name[0].body",
+        "message": "Expected 'ada' to match '^(?:[A-Z][a-z]+)$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}

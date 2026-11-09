@@ -377,7 +377,9 @@ string parsing as an ISO-8601 datetime, date or time respectively.
 Versioning 2.0.0. **`content-type`** admits octet sequences detected as the named content type by the
 content-detection rules of the content components in play; it is the one operator that inspects octets
 rather than a decoded document by design. A slot's declared or labelled type is its type, and detection
-only answers where it has neither (component-interfaces spec §6.5).
+only answers where it has neither (component-interfaces spec §6.5). So is a member's label, where the
+slot's component gives its members labels of their own, as a multipart part's body has its part's
+`Content-Type` (§6.5, ADR 0077).
 
 ### 4.3 Structural operators, and the must-ignore default
 

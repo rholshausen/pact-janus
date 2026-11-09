@@ -702,7 +702,25 @@ pub(super) fn legacy_body(part: &dyn HttpPart) -> Result<Option<LegacyBody>, Uns
     OptionalBody::Null | OptionalBody::Empty => return Ok(Some(LegacyBody::Empty)),
     OptionalBody::Present(bytes, _, _) => bytes,
   };
-  read_body(bytes, &part_content_type(part), "body").map(Some)
+  read_body(bytes, &framing_type(part), "body").map(Some)
+}
+
+/// The type a body's octets are split by: [`part_content_type`], but a multipart type that names no
+/// `boundary` takes the one its `Content-Type` header names, when that header is the same type with
+/// one. `pact_ffi` writes a multipart body's type without its boundary, which only the header names,
+/// and today's verifier splits the body at the header's boundary (`get_multipart_boundary`), so the
+/// boundary frames the octets and is not part of what the body's type declares (ADR 0047, staged
+/// plan S2.20).
+fn framing_type(part: &dyn HttpPart) -> ContentType {
+  let declared = part_content_type(part);
+  if BodyKind::of(&declared) != BodyKind::Multipart || declared.attributes.contains_key("boundary") {
+    return declared;
+  }
+  part
+    .lookup_content_type()
+    .and_then(|header| ContentType::parse(header.as_str()).ok())
+    .filter(|header| header.base_type() == declared.base_type() && header.attributes.contains_key("boundary"))
+    .unwrap_or(declared)
 }
 
 /// Octets read by their content type ([`BodyKind`]) into a document: JSON is parsed, a form is its

@@ -72,7 +72,10 @@ export async function multipartUploads({ dir }: { dir: string }): Promise<void> 
     const form = new FormData();
     form.append("order", new Blob(["sku=A-1"], { type: "text/plain" }), "order.txt");
     const answer = await fetch(`${mock.url}/uploads`, { method: "POST", body: form });
-    assert.equal(answer.status, 201, await answer.text());
+    assert.equal(answer.status, 201);
+    const receipt = (await answer.formData()).get("receipt");
+    assert.ok(receipt instanceof Blob, "the reply is a multipart body with a 'receipt' part");
+    assert.equal(await receipt.text(), "sku=A-1");
   });
 }
 

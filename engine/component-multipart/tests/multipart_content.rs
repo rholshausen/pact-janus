@@ -4,7 +4,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_component_multipart::{MultipartContent, RawPart, parse, split};
-use pact_janus_kernel::component::{ContentComponent, Decode, Encode, SlotValue};
+use pact_janus_kernel::component::{ContentComponent, Decode, Encode, Label, SlotValue};
 use pact_janus_kernel::plan::RuntimeValue;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
@@ -380,4 +380,44 @@ fn a_document_a_contract_recorded_decodes_as_it_is() {
     })
     .expect("decodes");
   assert_eq!(decoded.document, document(recorded));
+}
+
+/// What `label` answers for the member at `at` of a body declared `multipart/mixed` with no boundary,
+/// labelled with [`MIXED_TYPE`].
+fn label(at: &str) -> Option<String> {
+  MultipartContent::new()
+    .label(Label {
+      content_type: "multipart/mixed".to_string(),
+      value: octets(MIXED.as_bytes(), MIXED_TYPE),
+      at: at.to_string(),
+    })
+    .expect("labels")
+    .media_type
+}
+
+#[rstest]
+#[case("//0/body", Some("text/plain"))]
+#[case("//1/body", Some("application/octet-stream"))]
+#[case("//2/body", None)]
+#[case("//0", None)]
+#[case("//0/headers", None)]
+#[case("/missing/0/body", None)]
+fn a_parts_body_is_labelled_by_its_own_content_type_and_nothing_else_is(
+  #[case] at: &str,
+  #[case] expected: Option<&str>,
+) {
+  assert_eq!(label(at).as_deref(), expected);
+}
+
+#[test]
+fn a_part_with_no_type_labels_nothing() {
+  let body = form_data(&[("Content-Disposition: form-data; name=\"note\"", b"hello")]);
+  let labelled = MultipartContent::new()
+    .label(Label {
+      content_type: "multipart/form-data; boundary=XyZ".to_string(),
+      value: octets(&body, "multipart/form-data; boundary=XyZ"),
+      at: "/note/0/body".to_string(),
+    })
+    .expect("labels");
+  assert_eq!(labelled.media_type, None);
 }

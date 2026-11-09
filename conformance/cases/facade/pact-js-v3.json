@@ -23,8 +23,8 @@
       "row": "`multipartBody(contentType, file, part, boundary?)`, and `PactV3`'s `withRequestMultipartFileUpload`, `withResponseMultipartFileUpload`"
     }
   ],
-  "why": "consumer-test-migration.md, pact-js: `PactV3`'s `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, its binary-file and matching-rule calls and `executeTest` are kept: the same calls, in pact-js's order. Its multipart uploads are dropped: the same calls and bytes, and a contract that asserts nothing about the body's parts.",
-  "note": "The multipart interaction records no body shape, only the header's pattern: `pact_ffi` writes the body's type without its boundary (S2.20).",
+  "why": "consumer-test-migration.md, pact-js: `PactV3`'s `given`, `uponReceiving`, `withRequest`, `willRespondWith`, `addInteraction`, its binary-file and matching-rule calls and `executeTest` are kept: the same calls, in pact-js's order. Its multipart uploads are adapted: the same calls, with a boundary derived from the part, and each part recorded.",
+  "note": "Each multipart part's body is a `content-type` of its file's type, matched against the part's own `Content-Type` (ADR 0077); the body is split at the boundary the header names, as today's verifier splits it.",
   "subjects": { "typescript": "pact-js-v3.ts" },
   "expect": {
     "tests": [
@@ -210,6 +210,29 @@
               "description": "upload an order file from V3",
               "parts": {
                 "request": {
+                  "body": {
+                    "members": {
+                      "order": {
+                        "entries": [
+                          {
+                            "members": {
+                              "filename": { "example": "order.txt", "shape": "type" },
+                              "headers": {
+                                "members": {
+                                  "content-type": { "of": { "example": "text/plain", "shape": "equality" }, "shape": "optional" }
+                                },
+                                "shape": "object"
+                              },
+                              "body": { "content-type": "text/plain", "example": "sku=A-1", "shape": "content-type" }
+                            },
+                            "shape": "object"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
                   "headers": {
                     "members": {
                       "content-type": {
@@ -229,6 +252,29 @@
                   "path": { "example": "/uploads", "shape": "equality" }
                 },
                 "response": {
+                  "body": {
+                    "members": {
+                      "receipt": {
+                        "entries": [
+                          {
+                            "members": {
+                              "filename": { "example": "order.txt", "shape": "type" },
+                              "headers": {
+                                "members": {
+                                  "content-type": { "of": { "example": "text/plain", "shape": "equality" }, "shape": "optional" }
+                                },
+                                "shape": "object"
+                              },
+                              "body": { "content-type": "text/plain", "example": "sku=A-1", "shape": "content-type" }
+                            },
+                            "shape": "object"
+                          }
+                        ],
+                        "shape": "array"
+                      }
+                    },
+                    "shape": "object"
+                  },
                   "headers": {
                     "members": {
                       "content-type": {

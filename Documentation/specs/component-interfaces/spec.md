@@ -524,6 +524,7 @@ Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).
 | `content/encode` | `{ content-type, document, options? }` → `{ value }` |
 | `content/compile` | `{ content-type, shape, path }` → `{ fragment? }` |
 | `content/detect` | `{ value, hint? }` → `{ media-type?, confidence? }` |
+| `content/label` | `{ content-type, value, at }` → `{ media-type? }` |
 
 `value` in `decode` and `encode` is a `SlotValue` (§4): octets in, octets out.
 
@@ -679,6 +680,16 @@ type the interaction declares for it, else the type it arrived labelled with, el
 registry detects from its octets, asking each component in turn ([ADR 0049](../../decisions/0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md)). A v1–v4 `contentType`
 matcher is the exception, by specification: it sniffs the octets whatever their label, as today's
 verifier does.
+
+A member of a slot's document can carry a label of its own: a multipart part's body is decoded by the
+part's own `Content-Type`. `label` answers it, asked of the component that decodes the slot, with the
+slot's type and octets and a JSON pointer to the member. The built-in multipart component answers a
+part's `Content-Type` for its `body` (`/<name>/<index>/body`), and nothing for any other member or for
+a part with no type. So `match:content-type` on a member reads its label first, as a whole slot's is
+read, and detects from the member as it stands only when it has none
+([ADR 0077](../../decisions/0077-match-a-multipart-parts-content-type-against-its-own-label.md)). A
+v1–v4 `contentType` matcher still sniffs. `label` is optional: a component whose documents carry no
+labels of their own answers `operation-unsupported`, which means the member has none.
 
 ## 7. The matcher interface
 

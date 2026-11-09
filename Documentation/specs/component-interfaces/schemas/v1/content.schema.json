@@ -111,6 +111,27 @@
         "media-type": { "type": "string" },
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
       }
+    },
+    "Label": {
+      "title": "Label",
+      "description": "What does the document 'decode' makes of 'value' under 'content-type' label the member at 'at' with? For the shape language's content-type operator on a member of a slot's document: a multipart part's body is labelled by the part's own Content-Type (spec.md §6.5, ADR 0077). Optional; a component whose documents carry no labels of their own answers operation-unsupported.",
+      "type": "object",
+      "required": ["content-type", "value", "at"],
+      "properties": {
+        "content-type": { "type": "string", "description": "The slot's type, as 'decode' is given it." },
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
+        "at": { "type": "string", "description": "A JSON pointer (RFC 6901) to the member, in the document 'decode' makes of 'value'." }
+      }
+    },
+    "LabelResult": {
+      "title": "LabelResult",
+      "type": "object",
+      "properties": {
+        "media-type": {
+          "type": "string",
+          "description": "The member's own type. Absent when it carries none, and the engine then detects one from the member as it stands."
+        }
+      }
     }
   }
 }

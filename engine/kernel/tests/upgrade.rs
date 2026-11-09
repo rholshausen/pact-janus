@@ -649,6 +649,50 @@ fn a_body_a_built_in_component_reads_declares_its_type(
   );
 }
 
+/// Staged plan S2.20: `pact_ffi` writes a multipart body's type without its boundary, which only the
+/// `Content-Type` header names. The body is split at the header's, as today's verifier splits it, so
+/// its parts are shaped: a `contentType` rule on a part becomes a `content-type` on its body, matched
+/// against the part's own label (ADR 0077).
+#[test]
+fn a_multipart_body_whose_type_names_no_boundary_is_split_at_its_headers() {
+  let body = "--b\r\nContent-Disposition: form-data; name=\"file\"; filename=\"f.txt\"\r\n\
+              Content-Type: text/plain\r\n\r\nhello\r\n--b--\r\n";
+  let upgraded = upgrade(&json!({
+    "consumer": { "name": "c" },
+    "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Synchronous/HTTP",
+      "description": "an upload",
+      "request": {
+        "method": "POST",
+        "path": "/upload",
+        "headers": { "Content-Type": ["multipart/form-data; boundary=b"] },
+        "body": { "content": body, "contentType": "multipart/form-data", "encoded": false },
+        "matchingRules": { "body": { "$.file": { "matchers": [{ "match": "contentType", "value": "text/plain" }] } } }
+      },
+      "response": { "status": 204 }
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  }));
+  assert!(
+    !codes(&upgraded.findings).contains(&"body-not-parsed"),
+    "{:?}",
+    codes(&upgraded.findings)
+  );
+  let interaction = &upgraded.contract.interactions[0];
+  assert_eq!(
+    interaction
+      .content_types
+      .as_ref()
+      .map(|types| types["request"]["body"].as_str()),
+    Some("multipart/form-data")
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "request", "body")["members"]["file"]["entries"][0]["members"]["body"],
+    json!({ "shape": "content-type", "content-type": "text/plain", "example": "hello" })
+  );
+}
+
 /// Octets no component claims are left undeclared, which an undeclared slot already means (ADR 0036
 /// decision 2), and shaped as bytes with a base64 example.
 #[test]

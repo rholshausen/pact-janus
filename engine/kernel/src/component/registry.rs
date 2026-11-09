@@ -12,6 +12,7 @@
 
 use super::content::{
   Compile, CompileResult, ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult,
+  Label, LabelResult,
 };
 use super::error::ComponentError;
 use std::sync::Arc;
@@ -76,6 +77,11 @@ impl ContentComponent for ContentRegistry {
 
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
     self.routed(&req.content_type)?.compile(req)
+  }
+
+  /// A member's label is the decoding component's to give: the call goes where `decode` would.
+  fn label(&self, req: Label) -> Result<LabelResult, ComponentError> {
+    self.routed(&req.content_type)?.label(req)
   }
 
   /// Detection resolves an *absent* type (spec §6.5), so there is nothing to route on: the first
