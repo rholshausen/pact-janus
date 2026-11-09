@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794183278795,
+  "lastUpdate": 1794183280813,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -46338,6 +46338,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 48033,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2f9ef07b963ef8a149316845f07e13524121e1ed",
+          "message": "docs: S2.6 is done\n\nS2.6's Done entry, and two new items: S2.19, the Janus DSL's test-framework\nintegrations in the conformance suite, deferred by S2.6; and S2.20, a\nmultipart body pact_ffi builds, read by its header's boundary, found by it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T10:58:42+11:00",
+          "tree_id": "b53a1e9b81167016c2c9eb7786f4014887f3e236",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2f9ef07b963ef8a149316845f07e13524121e1ed"
+        },
+        "date": 1794183280236,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 25900,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 34959,
             "unit": "requests per second",
             "extra": "engines 4"
           }
