@@ -212,9 +212,12 @@ Three sources are the source of truth and take precedence over this file when th
 > carry; a `facade` case is run by the SDK whose language `conformance/facades.json` gives its facade,
 > and the lint holds every `kept` row of the migration notes to a case naming it. 30 facade cases
 > cover pact-js's and pact-jvm's 98 `kept` rows, pinning what each recorded. A failed test's result
-> also says `exercised: false` when nothing called the mock, which both facades print. S2.19 (the Janus
-> DSL's framework integrations) is new. S2.20 (ADR 0077): a multipart body `pact_ffi` builds is split at
-> its header's boundary, and an optional `content/label` operation lets the multipart component say a
+> also says `exercised: false` when nothing called the mock, which both facades print. S2.19 (ADR 0078):
+> the test-framework integrations are conformance cases, a `framework` case's subjects keyed by the
+> frameworks `conformance/frameworks.json` names (Jest from CommonJS and as ES modules, Vitest, JUnit 5,
+> Spock). Each driver runs a subject in a project of its own, through the framework's own runner, in a
+> process of its own; the consumer suite's contract has one set of bytes from all five. S2.20
+> (ADR 0077): a multipart body `pact_ffi` builds is split at its header's boundary, and an optional `content/label` operation lets the multipart component say a
 > part's own `Content-Type`, which `match:content-type` on a part's body reads before detecting.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
@@ -258,7 +261,9 @@ conformance/     The SDK conformance suite (task 6.4): one corpus of cases every
                  own language, against a pinned engine — ADR 0017's definition of "conformant".
                  Each SDK's driver lives with its tests; `tools/conformance` checks the corpus
                  and the reports a run writes. cases/facade/ holds the compatibility facades'
-                 cases, each a test in its facade's language beside its JSON (ADR 0076)
+                 cases, each a test in its facade's language beside its JSON (ADR 0076), and
+                 cases/framework/ the test-framework integrations' cases, a test file per
+                 framework that frameworks.json names (ADR 0078)
 samples/         Demo subjects (workspace members), e.g. samples/order-service — the sample
                  provider (task 5.6) with deliberate variance, auth and a v3 provider-state
                  endpoint, used by verification tests, M3 and M5. Its pacts/ holds the v3
@@ -357,7 +362,12 @@ whose verdict is `kept` and which no `facade` case names (ADR 0076): the lint ma
 cell, verbatim, so rewording one means changing the cases that name it. A facade case's subject is a
 test in the facade's language (`.ts` beside the JSON for pact-js, a JUnit class for pact-jvm); its
 pinned contracts are captured with `JANUS_CONFORMANCE_RECORD=<dir>` and read against the row first.
-When a case and an SDK disagree and the specification does not settle it, change
+A `framework` case's subjects are keyed by framework (ADR 0078): a `.test.cjs`, `.test.mjs` or
+`.test.ts` file Jest or Vitest runs, a JUnit class, or a Spock specification, each written as that
+framework's users write a test, naming its tests alike across frameworks (`@DisplayName` on JUnit).
+The drivers run each in a scratch project through the framework's own command line or a forked JVM,
+so these cases take seconds, not milliseconds. A framework `frameworks.json` names that no case runs
+fails the lint. When a case and an SDK disagree and the specification does not settle it, change
 `behavioural-spec.json` first — `conformance/README.md` §7.
 
 The thinness audit (plan task 6.5) is the other claim made into a command: every SDK source file

@@ -69,7 +69,7 @@ first draft of something that will be rewritten against the final specification.
 | Janus part | Verdict | Why, and what it needs |
 |---|---|---|
 | **Specifications and schemas** (`Documentation/specs/`: engine protocol, shape language, variant semantics, plan grammar, contract file, component interfaces, lifecycle hooks, subsumption check, SDK specification) | **Graduates**, as the v1 drafts of the executable specification | Every one was implemented against, and every change since Phase 2 was made in the spec first. They need community review, and the open items in §5 folded in. Where they live is a community question (§7). The SDK specification covers the consumer side only; the provider side is S1.14 |
-| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite covers the compatibility facades and per-language refusals since S2.6, and not yet the Janus DSL's test-framework integrations (conformance report §7.2; S2.19) |
+| **Golden corpora, conformance suite, and their checkers** (`corpora/`, `conformance/`, `tools/schema-compat`, `tools/corpus`, `tools/conformance`, `tools/thinness`) | **Graduates** | These are what "conformant" and "compatible" mean. The pact-specification test cases the legacy harness runs should join them; since S1.22 it runs all 741 and skips none. The conformance suite covers the compatibility facades and per-language refusals since S2.6, and the Janus DSL's test-framework integrations since S2.19 |
 | **The protocol-level test client** (`cli/tests/janus-engine-node`) | **Graduates**, as the engine's own protocol suite | It drives `janus-engine` frame by frame with no SDK in the way, which is the test the protocol's compatibility policy (engine-protocol spec §11) needs and the SDK suite cannot give |
 | **Kernel** (`engine/kernel`: plan compiler and interpreter, legacy v1–v4 compiler, shapes, variants, subsumption, contract model, upgrade, protocol dispatcher) | **Graduates**, with hardening | About 17,000 lines, all of it under the specs and corpora. The interpreter and plan grammar are the pact-reference v2 engine, forked with provenance (ADR 0004). Before it is the real kernel: rename its actions to plan grammar v1 (ADR 0026; S0.1); remove the two HTTP-shaped assumptions (kernel-boundary review 8, 9; S1.7); move the permanently HTTP-shaped legacy compiler behind a marked boundary (kernel-boundary review 3, 6; S1.11); start its background work through its embedding, never `thread::spawn` itself (ADR 0062; S2.1); cache per-variant plans (finding 28; S2.3) |
 | **Built-in JSON content, OAuth2 hook, hooks host** | **Graduate** | Small, specified, tested. The hooks host needs credential redaction reviewed for production (S1.9), and the kernel's content-detector slot needs to become a registry so `match:content-type` runs in live exchanges and verification (S1.10) |
@@ -1959,6 +1959,27 @@ The RFC's second migration step: SDKs ship MkII as a new major version.
   `frameworks.test.ts`, S2.4b's `FrameworksTest`). Cases with a subject per language and framework,
   Jest and Vitest, JUnit 5 and Spock, need drivers that run the framework as a user's project does.
   *Exit:* every integration a `STYLE.md` names has a case, and both SDKs pass them.
+  *Done 2026-11-09* ([ADR 0078](decisions/0078-run-a-test-framework-integrations-conformance-cases-in-a-project-of-their-own.md)):
+  - A `framework` case is a scenario an integration must pass. Its subjects are keyed by framework,
+    each a test file as that framework's users write one. `conformance/frameworks.json` names the five
+    frameworks, `jest-commonjs`, `jest-esm`, `vitest`, `junit5` and `spock`, with each one's language
+    and the style-guide sections that describe it. The lint fails a framework no case names, and
+    `check` holds each report to the framework cases with a subject in its language.
+  - Each driver runs a subject in a project of its own, through the framework's own runner, in a
+    process of its own, so the contract goes to the default `contracts` and the after-all hook is the
+    framework's. The TypeScript driver installs the built package and runs Jest's and Vitest's command
+    lines with their JSON reporters. The JVM driver compiles a class with `javac`, or a specification
+    with Groovy's compiler, and runs the JUnit Platform's launcher in a forked JVM.
+  - There are five cases with 17 subjects. A consumer suite, a suite whose contract is withheld, and a
+    provider test run in all five frameworks. JUnit 5's test per variant and `JanusProviderExtension`'s
+    test per interaction run in JUnit 5 alone. The consumer suite's contract has the same bytes from all
+    five frameworks in both languages, held there by the reports' digests.
+  - The cases fail when an integration does not finalise: with `finalise` taken out of Vitest's
+    `useJanus`, or out of `JanusExtension`, the consumer suite and the withheld suite fail for that
+    framework alone.
+  - The SDKs' own framework tests keep only what one subject cannot show (ADR 0078 decision 6). Those
+    are test files run at once merging into one contract (S2.11), and pact-js's verifier under Jest.
+    The JVM build no longer compiles Groovy itself: Spock is a test dependency the driver compiles with.
 - **S2.20 A multipart body `pact_ffi` built, read by its header's boundary** — **M**, found by S2.6.
   `pact_ffi` writes a multipart body's type as `multipart/form-data`, without the boundary its
   `Content-Type` header names, so `upgrade`, and the facades, which convert as it does, assert nothing
