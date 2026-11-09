@@ -1,6 +1,6 @@
 # 0076 — Write a facade's conformance cases as tests in its own language, and read its verdicts from its migration note
 
-- **Status**: accepted; amends [ADR 0017](0017-sdk-conformance-is-suite-passing-not-prose-matching.md)
+- **Status**: accepted; extended by [ADR 0078](0078-run-a-test-framework-integrations-conformance-cases-in-a-project-of-their-own.md); amends [ADR 0017](0017-sdk-conformance-is-suite-passing-not-prose-matching.md)
   (what a case is, and which cases an SDK runs) and SDK spec §6.2–§6.3 (where a facade's verdicts live)
 - **Date**: 2026-11-09
 - **Plan tasks**: S2.6; S2.19 (the test-framework integrations, which this decision's subjects make possible)

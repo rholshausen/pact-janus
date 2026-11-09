@@ -92,8 +92,9 @@ superseding ADR instead.
 | [0073](0073-name-a-rule-nobody-implements-as-the-pact-components-operator-and-fail-by-it.md) | Name a rule nobody implements as the `pact` component's operator, and fail by it | accepted |
 | [0074](0074-redact-credentials-from-what-the-engine-records-and-reports.md) | Redact credentials from what the engine records and reports | accepted |
 | [0075](0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md) | Keep XML text as written, beside the text today's verifier reads | accepted |
-| [0076](0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md) | Write a facade's conformance cases as tests in its own language, and read its verdicts from its migration note | accepted |
+| [0076](0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md) | Write a facade's conformance cases as tests in its own language, and read its verdicts from its migration note | accepted; extended by 0078 |
 | [0077](0077-match-a-multipart-parts-content-type-against-its-own-label.md) | Match a multipart part's content type against its own label | accepted |
+| [0078](0078-run-a-test-framework-integrations-conformance-cases-in-a-project-of-their-own.md) | Run a test-framework integration's conformance cases in a project of their own, through the framework's own runner | accepted |
 
 ## Decision backlog
 
