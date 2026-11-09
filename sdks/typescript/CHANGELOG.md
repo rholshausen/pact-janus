@@ -1,3 +1,25 @@
+## 0.2.2 (2026-11-09)
+
+### Features
+
+#### `Janus` takes a `redaction` option
+
+`new Janus({ ..., redaction: { add, keep } })` names, by path, members the contract records redacted
+beyond the credentials the transport declares (`add: ["request.headers.x-api-key"]`), and ones it
+records as they are (`keep: ["request.headers.authorization"]`, for a fixed token the provider's test
+environment accepts). It is passed to the engine as written, as `config.redaction` (ADR 0074). With
+an engine that has S2.8, a contract records `Authorization`, `Proxy-Authorization`, `Cookie` and
+`Set-Cookie` as `"[redacted]"` whether or not the option is given.
+
+### Fixes
+
+#### A pact-js test that throws prints the request it never sent
+
+`pact-janus/pact`'s `executeTest`, when the test throws without calling the mock, now prints
+"Missing request: the interaction '…' was expected, but not received" beside rethrowing the test's
+error, as pact-js does. It reads the engine's `exercised: false` (staged plan S2.6), so it needs an
+engine that writes it.
+
 ## 0.2.1 (2026-11-05)
 
 The SDK runs janus-engine 0.4.5, where it ran 0.4.4: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.4.5) says what changed.

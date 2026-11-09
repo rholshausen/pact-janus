@@ -1,3 +1,122 @@
+## 0.5.0 (2026-11-09)
+
+### Breaking Changes
+
+#### Contracts and reports never repeat a credential
+
+A contract the engine writes records the values of members that carry credentials as `"[redacted]"`
+(a number as `0`, a boolean as `false`), and lists their paths in the interaction's new `redacted`
+member (contract-file spec §5.6, ADR 0074, staged plan S2.8). Which members those are is the
+transport's to declare, as `credential-members` in its contribution: the built-in HTTP transport
+declares the request's `authorization`, `proxy-authorization` and `cookie` headers and the response's
+`set-cookie`. Under a redacted member an `equality` becomes a `type`, so the contract says a value of
+that kind was sent; patterns and bounds are kept. An interaction with no credential is written exactly
+as before.
+
+`consumer-session/create` takes `config.redaction`, `{ add, keep }`, each a list of paths
+(`request.headers.x-api-key`): `add` redacts more members and `keep` records a fixed token as it is. A
+path that does not parse fails the create with `malformed-frame`. `upgrade/pact` redacts the HTTP
+transport's members and reports each as `value-redacted`; `add-pact-interaction` is redacted by its
+session's choice.
+
+A verifier sends what was recorded. A provider that checks credentials supplies its own with a
+`before-request` hook or the HTTP transport's `headers`; a failed result names each redacted request
+member no hook replaced, as `redacted`, and the report says how to supply it.
+
+No report repeats a value found under a credential member, in the interaction, the request sent or
+the reply: mismatches, `verification/executed-plan` and the plan beside it, `verification/explain`'s
+`text`, `plan` and `executed`, and a consumer session's mismatches each show `[redacted]` instead.
+
+This is `major`: a provider that relied on a contract replaying the token its consumer recorded must
+now supply one, or its consumer keeps the header.
+
+#### The conformance suite runs the test-framework integrations
+
+The conformance suite has a `framework` category (staged plan S2.19, ADR 0078). A framework case is a
+scenario an SDK's test-framework integration must pass, such as "a withheld contract fails the suite".
+Its `subjects` are keyed by framework, each a test file as that framework's users write one.
+`conformance/frameworks.json` names the frameworks: `jest-commonjs`, `jest-esm` and `vitest` for
+TypeScript, and `junit5` and `spock` for the JVM. A case's `project` member names files the driver
+writes into the subject's project before it runs.
+
+A driver runs each subject in its language in a project of its own, through the framework's own
+runner, in a process of its own, and holds every run to the case's one expectation. When the subjects
+write a contract, the report carries its digest, as a live case's does. `janus-sdk-gates conformance
+check` now expects every framework case with a subject in a report's language, so an SDK in either
+language must run them to move to this release. An SDK in another language runs none of them. The lint
+fails a framework no case names.
+
+#### A contract's XML text is its text as written
+
+The built-in XML component's document gives an element's `#text` as written: every text node joined,
+a CDATA section as its contents and a reference as its character, nothing trimmed (component-interfaces
+spec §6.1, ADR 0075, staged plan S2.10). So a contract that declares `<to>  Ada  </to>` matches only
+text with that whitespace around it, and its mock serves the whitespace. An element whose text only
+indents its child elements has no `#text`, so a pretty-printed body and a compact one decode alike.
+
+Beside it, every element now has `#trimmed`, the text as today's verifier reads it: each text node
+trimmed, then joined. The v1–v4 compiler compares `#trimmed`, so no pact's verdict moves, though its
+plans and mismatches name `#trimmed` where they named `#text`. `janus upgrade` shapes an XML body's
+text as `#trimmed` too. A contract it wrote before this release shapes `#text`, which whitespace
+around a reply's text now fails: upgrade the pact again. `encode` writes `#text`, or `#trimmed` when an
+element has no `#text`, and writes a CDATA section's contents as escaped text.
+
+### Features
+
+#### A failed test's result says when nothing called the mock
+
+A variant whose test was reported failed, and which nothing exercised, now also carries
+`exercised: false` in its `VariantResult`, from `consumer-session/report-variant` and `finalise`
+alike (engine-protocol spec §8.2). The report still decides its status, `failed`, as before; the new
+member says what `not-exercised` would have, so a host can print a missing request beside the test's
+own error, as pact-js and pact-jvm do. Nothing else in a result changes.
+
+The conformance suite grows a `facade` category (staged plan S2.6, ADR 0076): a case may name a
+subject, a test in one language beside it, which the SDK of that language runs, and `check` holds each
+report to the cases its `sdk.language` runs, the cases of the facades `conformance/facades.json` gives
+it included. `janus-spec.tar.gz` carries the subjects and `facades.json`. A new conformance id,
+`shape.regex.flags-refused`, has a case with a subject in each language. The behavioural
+specification's `facade` arrays are gone: a facade's verdicts are its migration note's rows.
+
+#### A multipart part's content type is its own label, and a `pact_ffi` multipart body is split at its header's boundary
+
+A v1–v4 multipart body whose type names no `boundary`, as `pact_ffi` writes one, is split at the
+boundary its `Content-Type` header names, as today's verifier splits it. `janus upgrade` and
+`consumer-session/add-pact-interaction` now shape its parts, where they wrote it with
+`body-not-parsed` and asserted nothing about them (staged plan S2.20, ADR 0077).
+
+The content interface gains an optional operation, `content/label` (`{ content-type, value, at }` →
+`{ media-type? }`, component-interfaces spec §6.5): what a slot's component labels a member of its
+document with. The built-in multipart component answers a part's own `Content-Type` for its `body`. On
+the contract path, `match:content-type` on a member of a slot reads that label first, as it reads a
+whole slot's, and detects from the member only when it has none, so a `text/plain` part matches a
+`content-type` of `text/plain`. An out-of-tree component that does not implement the operation answers
+`operation-unsupported`, and its members are detected as before. The v1–v4 path still sniffs.
+
+### Fixes
+
+#### An `OR` that passes is not failed by an alternative it did not need
+
+A v1–v4 `combine: "OR"` passed by a later alternative failed `janus verify` whenever an earlier one
+failed, where today's verifier passes it: the alternative that failed was reported as a mismatch,
+though the `OR` succeeded (staged plan S2.18). It is kept in the executed plan, which `explain
+--executed` shows, and is no longer a mismatch; an `OR` none of whose alternatives passes still
+reports each one's. The same held for an XML element's `notEmpty` rule, satisfied by the element's
+text when it has no children, which now passes.
+
+#### A rule nobody implements upgrades to an operator that fails by name
+
+`janus upgrade` and `add-pact-interaction` write a v1–v4 rule that `pact_models` reads as a plugin's,
+in a pact that names no plugin, as the `pact` component's operator of the same name, with the rule's
+configuration as members: pact-jvm's `ignore-order` becomes `{ "shape": "pact:ignore-order", "min": 1,
+"example": [...] }` (ADR 0073, staged plan S2.17). Nothing provides it, and no requirement is written,
+so the interaction fails by name, as today's verifier and `janus verify` fail the pact, and the rest of
+the contract verifies. It is reported once, as `rule-unmapped`, where the rule is. On an array it was an
+`each-like` of the first element with nothing reported, which admitted replies today fails and refused
+the pact's own example; on a scalar it was `equality` on the example. As one alternative of an `OR`
+beside others, it is left out, since it never matches. A consumer test whose request uses pact-jvm's
+`unorderedArray` is now refused by name at the mock. A pact verified as a pact is unchanged.
+
 ## 0.4.5 (2026-11-05)
 
 ### Features
