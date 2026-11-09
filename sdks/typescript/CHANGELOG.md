@@ -1,5 +1,7 @@
 ## 0.2.2 (2026-11-09)
 
+The SDK runs janus-engine 0.5.0, where it ran 0.4.5: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.5.0) says what changed.
+
 ### Features
 
 #### `Janus` takes a `redaction` option
