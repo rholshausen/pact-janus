@@ -24,7 +24,9 @@ cases/variants/                           which variants the closure runs on, an
 cases/live/                               the real engine: derived dimensions, contract content, and a provider run
 cases/provider/                           a provider verification: what the SDK sends, and what its handlers answer
 cases/facade/                             a compatibility facade's spellings, each a test in the facade's language
+cases/framework/                          a test-framework integration, each subject a test file one framework runs
 facades.json                              each facade, the language whose SDK ships it, and the notes that classify it
+frameworks.json                           each test framework, its language, its subjects' suffix, and its style guide
 ```
 
 The first four groups are SDK spec §7's four categories, which ADR 0017 fixes as the minimum
@@ -33,7 +35,10 @@ contract-output equivalence. `provider` is the provider side (staged plan S1.14,
 verifier, its state handlers and request filters, and one `verify`. `facade` is the compatibility
 facades (staged plan S2.6, [ADR 0076](../Documentation/decisions/0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md)):
 pact-js's API over the TypeScript SDK and pact-jvm's over the JVM SDK, one case per group of their
-migration notes' rows.
+migration notes' rows. `framework` is the test-framework integrations (staged plan S2.19,
+[ADR 0078](../Documentation/decisions/0078-run-a-test-framework-integrations-conformance-cases-in-a-project-of-their-own.md)):
+Jest, from CommonJS and as ES modules, and Vitest for TypeScript; JUnit 5 and Spock for the JVM. Each
+case is one scenario, with a test file per framework that can spell it.
 
 Every case names, in `covers`, the conformance ids from
 [`behavioural-spec.json`](../Documentation/specs/sdk-specification/behavioural-spec.json) it is the
@@ -173,6 +178,34 @@ checked as `written` and no more, and the case says so in `note`.
 Any other case with subjects has one per language that runs the corpus, and a driver fails it when its
 language has none: `translation/regex-flags-refused` is one.
 
+### 3.2 A framework case
+
+A **framework case** (`category: "framework"`) is a scenario a test-framework integration must pass,
+such as "a withheld contract fails the suite" (ADR 0078). Its `subjects` are keyed by framework, each a
+name [`frameworks.json`](frameworks.json) gives, and each file is a test file that framework runs, with
+the suffix the list gives it: `.test.cjs` for `jest-commonjs`, `.test.mjs` for `jest-esm`, `.test.ts`
+for `vitest`, a `.java` JUnit Jupiter class for `junit5`, and a `.groovy` specification for `spock`.
+A subject is written against the SDK's public entry points, as that framework's users write a test, and
+configures nothing a user's test would not: it names no contract directory, so its contract goes where
+the SDK writes one by default.
+
+The driver runs each subject in its language in a **project of its own**, through the **framework's own
+runner**, in a **process of its own**. The project directory is the run's working directory, and
+`project` writes files into it first, each by its path: a string as it is, anything else as JSON (a pact
+for a provider test).
+
+- **TypeScript**: the package is built and installed into the project's `node_modules`, as a user
+  installs it, and Jest or Vitest runs from its command line with its JSON reporter, Jest with Node's
+  `--experimental-vm-modules`.
+- **JVM**: the subject is compiled against the test class path, by `javac` or by Groovy's compiler with
+  Spock's transforms, and a forked JVM runs the JUnit Platform's launcher on it, whose Jupiter and Spock
+  engines discover it, as Gradle's test worker does.
+
+Every subject's run is held to the case's one expectation, so a case's subjects name their tests alike:
+a JUnit test by `@DisplayName`, as its users name a test in words. A case names a subject for every
+framework that can spell its scenario, and only those: JUnit 5's test per variant and its provider
+extension's test per interaction are JUnit 5's alone. The lint fails a framework that no case names.
+
 ## 4. What a case can expect
 
 Per step (`expect` inside a step):
@@ -191,14 +224,23 @@ body must carry), `engine-closed`, `dimensions` (dimension ids the engine's vari
 and `variant-count`.
 
 For a case with a subject, also: `tests`, every test the subject has, each passing or, with `fails`,
-failing with an error whose message holds each of its strings (a JUnit test is named by its method, a
-dynamic test by its display name, and a test the case does not name fails it); `suite`, the subject
+failing with an error whose message holds each of its strings (a JUnit test is named by its method, or
+by its `@DisplayName` when it has one, a dynamic test by its display name, and a test the case does not
+name fails it); `suite`, the subject
 failing beyond its tests, as a JUnit class does in an extension's `afterAll`; `contracts`, each file the
 run wrote, by name, `written` and `content` as a step's `contract` compares them, a file the case does
 not name failing it; `output`, strings the run's `stdout` and `stderr` hold, the subject's and the
 SDK's; and `engine-log`, strings the engine's log holds, its standard error or the events the SDK hands
 its language's logging, each written `<LEVEL> <message>`. Against a scripted engine, `ops`, `frames`,
 `hooks` and `invocations` are a provider case's.
+
+For a framework case, each subject's run is checked against all of these but `engine-log`, which a
+process of its own does not hand the driver. `suite` is the test file's or class's own failure: the
+file's error in Vitest's report, the file's "Test suite failed to run" in Jest's, and the class's
+container in JUnit's and Spock's. `contracts` are the files in the project's `contracts`. Run by Jest or
+Vitest, the framework's exit status must also say what the case does: a failure when a test or the suite
+is expected to fail, and success otherwise. And when the subjects write a contract, every one of them in
+a language must write the same bytes.
 
 For a provider case, also: `outcome` (how `verify` ended: `"ok"`, `verification-failed` with the
 results it names as `failed`, `engine-error` with its `code`, or `refused`, the SDK refusing the call
@@ -232,9 +274,11 @@ the `detail` the checker prints. A live case that wrote a contract carries the S
 in lower-case hex, and `check` fails when two SDKs' reports give one case different digests
 (ADR 0063 decision 6). The report is a build artifact (`target/conformance/`), not a checked-in file — what
 is checked in is the corpus, and what CI asserts is that each language's run accounted for every
-case in it that is the language's: every case that is not a facade's, and every case of each facade
-`facades.json` gives its `sdk.language` (ADR 0076 decision 2). A report that leaves one out, or runs
-another language's facade case, fails.
+case in it that is the language's: every case that is not a facade's or a framework's, every case of
+each facade `facades.json` gives its `sdk.language` (ADR 0076 decision 2), and every framework case with
+a subject for a framework `frameworks.json` gives that language (ADR 0078 decision 5). A report that
+leaves one out, or runs another language's case, fails. A framework case whose subjects wrote a contract
+carries its digest too, so two languages' integrations are held to one file.
 
 ## 6. Expected content, and how it was captured
 
@@ -249,7 +293,9 @@ A facade case's `contracts` were captured the same way, by its own language's dr
 driver's record mode for pact-js's, and the JVM driver's (`JANUS_CONFORMANCE_RECORD=<dir> ./gradlew
 :sdk:test --tests '*ConformanceTest*'`) for pact-jvm's, which write each file's content in the form
 `contracts` expects. Each was read against the row it covers before it was checked in: that is what
-makes the pin say the row is `kept` (ADR 0076 decision 4).
+makes the pin say the row is `kept` (ADR 0076 decision 4). A framework case's `contracts` are captured by either
+driver's record mode, which writes what each subject's run wrote: the subjects of one case write the
+same file, and the report's digest holds the other language to it.
 
 ## 7. When a case and an SDK disagree
 

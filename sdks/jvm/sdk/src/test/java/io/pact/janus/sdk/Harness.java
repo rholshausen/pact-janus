@@ -17,7 +17,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
 /**
- * Runs a JUnit test class, or a Spock specification, the way a build would, and records what
+ * Runs a JUnit test class the way a build would, and records what
  * happened to every test and container — so the integrations themselves can be tested: that {@code finalise} runs after a
  * failing test, that a withheld contract fails the class, that each variant is its own test.
  *
@@ -36,10 +36,7 @@ final class Harness {
     return run(selectClass(testClass));
   }
 
-  /**
-   * A class by its name: a Spock specification, which the JUnit Platform runs through Spock's own
-   * engine, is compiled after the Java tests, so they cannot name it as a class.
-   */
+  /** A class by its name. */
   static List<Outcome> run(String testClass) {
     return run(List.of(selectClass(testClass)), false);
   }

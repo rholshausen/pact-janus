@@ -1,0 +1,26 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "framework/withheld-contract-fails-the-suite",
+  "category": "framework",
+  "title": "A failing variant fails the test that ran it and no other; the integration still finalises, and the withheld contract fails the suite.",
+  "covers": ["session.execute.failing-variant-fails-build", "session.finalise.always-runs", "session.finalise.failed-test-withholds-contract", "session.finalise.withheld-contract-fails-build"],
+  "why": "behavioural spec 'execute': a failed variant fails that variant only, and 'execute' then fails, naming every failed variant by label and id with its cause. 'finalise': the test-framework integration MUST run 'finalise' after the suite's last 'execute', including when an 'execute' failed; when the result carries no contract, it fails, naming every interaction and variant whose status is not 'verified'.",
+  "note": "The client reads 'shippedAt' as if it were always there, so the boundary variant without it fails the first test, and the engine withholds the contract that test reported (ADR 0064). How a framework reports a suite's own failure is its business: the case checks that the file or class failed beyond its tests, saying why, and that the run as a whole failed.",
+  "subjects": {
+    "jest-commonjs": "withheld-contract.test.cjs",
+    "jest-esm": "withheld-contract.test.mjs",
+    "vitest": "withheld-contract.test.ts",
+    "junit5": "WithheldContractTest.java",
+    "spock": "WithheldContractSpec.groovy"
+  },
+  "expect": {
+    "tests": [
+      { "test": "reads when an order shipped", "fails": ["get an order", "response.body.shippedAt#presence=absent"] },
+      { "test": "deletes an order" }
+    ],
+    "suite": { "fails": ["No contract", "get an order", "response.body.shippedAt#presence=absent"] },
+    "contracts": {
+      "web-app-orders-api.janus.json": { "written": false }
+    }
+  }
+}

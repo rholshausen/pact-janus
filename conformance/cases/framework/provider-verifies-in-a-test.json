@@ -1,0 +1,40 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "framework/provider-verifies-in-a-test",
+  "category": "framework",
+  "title": "A provider verified inside a test passes it, its state set up by the test's handler, and the run's report printed.",
+  "covers": ["verification.verify.verified-passes", "verification.verify.engine-calls-handlers", "verification.verify.report-printed"],
+  "why": "behavioural spec 'verify': 'verified' returns the result; the engine calls each handler the verifier declared, over the loopback endpoint, during the run; each 'verification/report' event's text is written to the process's standard output as it arrives (ADR 0059), so a passing provider test says what it verified. 'verifier': the provider side imports no framework, so a test in any framework calls it (the style guides).",
+  "note": "The provider answers 404 until the state handler has stored the order, so the run verifies only if the handler ran inside the framework's test, with the parameters the pact gives. The pact is a v3 one, as a provider moving from today's verifier has.",
+  "subjects": {
+    "jest-commonjs": "provider-verification.test.cjs",
+    "jest-esm": "provider-verification.test.mjs",
+    "vitest": "provider-verification.test.ts",
+    "junit5": "ProviderVerificationTest.java",
+    "spock": "ProviderVerificationSpec.groovy"
+  },
+  "project": {
+    "pacts/web-app-orders-api.json": {
+      "consumer": { "name": "web-app" },
+      "provider": { "name": "orders-api" },
+      "interactions": [
+        {
+          "description": "get an order",
+          "providerStates": [{ "name": "an order exists", "params": { "id": 42 } }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "headers": { "Content-Type": "application/json" },
+            "body": { "id": 42, "status": "shipped" },
+            "matchingRules": { "body": { "$.status": { "matchers": [{ "match": "type" }] } } }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    }
+  },
+  "expect": {
+    "tests": [{ "test": "verifies the orders API" }],
+    "output": { "stdout": ["Verifying 1 interaction in 1 document", "get an order", "given an order exists", "VERIFIED: 1 verified, 0 failed (1 interaction)"] }
+  }
+}

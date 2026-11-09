@@ -31,7 +31,8 @@ describe("the SDK conformance suite", () => {
           throw new Error(`${testCase.id} — ${testCase.title}\n${result.detail}`);
         }
       },
-      30_000,
+      // A framework case builds the package once and runs a framework per subject (ADR 0078).
+      testCase.category === "framework" ? 180_000 : 30_000,
     );
   }
 });

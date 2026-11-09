@@ -49,7 +49,7 @@ final class SubjectRunner {
   private SubjectRunner() {}
 
   /** One test or container the run finished, by display name. */
-  private record Outcome(String name, boolean container, String error) {}
+  record Outcome(String name, boolean container, String error) {}
 
   static void run(JsonNode testCase, List<String> failures) throws Exception {
     String file = testCase.path("subjects").path(Suite.LANGUAGE).asText(null);
@@ -118,7 +118,7 @@ final class SubjectRunner {
   }
 
   /** Compiles the subject into {@code classes}; the compiler's diagnostics when it does not compile. */
-  private static String compile(Path source, Path classes) {
+  static String compile(Path source, Path classes) {
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     if (compiler == null) {
       return "no Java compiler: the JVM suite runs on a JDK (ADR 0076)";
@@ -156,14 +156,14 @@ final class SubjectRunner {
   }
 
   /** A test's name: a method's own, without the parameter types JUnit displays; a dynamic test's display name. */
-  private static String name(TestIdentifier id) {
+  static String name(TestIdentifier id) {
     return id.getSource().filter(MethodSource.class::isInstance).map(source -> ((MethodSource) source).getMethodName())
         .filter(method -> id.getDisplayName().startsWith(method + "("))
         .orElse(id.getDisplayName());
   }
 
   /** A failure's message, with each cause's beneath it: a JUnit extension wraps what it reports. */
-  private static String message(Throwable error) {
+  static String message(Throwable error) {
     StringBuilder text = new StringBuilder(String.valueOf(error));
     for (Throwable cause = error.getCause(); cause != null && cause != error; cause = cause.getCause()) {
       text.append("\ncaused by: ").append(cause);
@@ -171,7 +171,7 @@ final class SubjectRunner {
     return text.toString();
   }
 
-  private static void checkTests(JsonNode expect, List<Outcome> outcomes, List<String> failures) {
+  static void checkTests(JsonNode expect, List<Outcome> outcomes, List<String> failures) {
     Map<String, Outcome> tests = new TreeMap<>();
     for (Outcome outcome : outcomes) {
       if (!outcome.container()) {
@@ -223,9 +223,10 @@ final class SubjectRunner {
   }
 
   /** The contracts the run wrote, each file against the case's {@code contracts}; one it does not name fails it. */
-  private static void checkContracts(JsonNode testCase, Path directory, List<String> failures) throws IOException {
+  static void checkContracts(JsonNode testCase, Path directory, List<String> failures) throws IOException {
     Map<String, JsonNode> written = new TreeMap<>();
-    try (Stream<Path> files = Files.list(directory)) {
+    // A framework's run writes into the project's contracts, which a run that wrote nothing has not made.
+    try (Stream<Path> files = Files.isDirectory(directory) ? Files.list(directory) : Stream.empty()) {
       for (Path file : files.filter(p -> p.toString().endsWith(".json")).toList()) {
         written.put(file.getFileName().toString(), Suite.MAPPER.readTree(Files.readString(file)));
       }

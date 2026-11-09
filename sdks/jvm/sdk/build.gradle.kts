@@ -5,8 +5,6 @@
 
 plugins {
   `java-library`
-  // For the Spock specifications under src/test/groovy; the SDK itself has no Groovy.
-  groovy
 }
 
 java {
@@ -38,8 +36,9 @@ dependencies {
   // The integration's own tests launch small JUnit classes and inspect the outcome.
   testImplementation("org.junit.platform:junit-platform-launcher")
   testImplementation(project(":facade"))
-  // Spock specifications run beside the Jupiter tests, through Spock's own JUnit Platform engine:
-  // FrameworksTest shows the SDK used from Spock, which needs nothing of it but its public API.
+  // The conformance suite's Spock subjects (ADR 0078): the driver compiles each with Groovy's compiler,
+  // Spock's transforms applied, and runs it through Spock's own JUnit Platform engine. The SDK itself
+  // has no Groovy and needs nothing of Spock but its public API.
   testImplementation("org.spockframework:spock-core:2.5-groovy-4.0")
   testImplementation("org.apache.groovy:groovy:4.0.33")
 }

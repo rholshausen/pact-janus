@@ -44,7 +44,9 @@ final class CaseRunner {
   static Suite.Result run(JsonNode testCase) {
     CaseRunner runner = new CaseRunner(testCase);
     try {
-      if (testCase.has("subjects")) {
+      if ("framework".equals(testCase.path("category").asText())) {
+        runner.contractSha256 = FrameworkRunner.run(testCase, runner.failures);
+      } else if (testCase.has("subjects")) {
         SubjectRunner.run(testCase, runner.failures);
       } else if ("translation".equals(testCase.path("category").asText())) {
         runner.translation();

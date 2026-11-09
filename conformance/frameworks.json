@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-frameworks/1",
+  "$comment": "The test frameworks the SDKs integrate with, which the suite's framework cases run (ADR 0078): each framework's language, whose SDK runs its subjects; the suffix a subject for it has; and the style guide, by its path in the repository, with the sections of it that describe the integration. The lint fails a framework no case names.",
+  "frameworks": {
+    "jest-commonjs": {
+      "language": "typescript",
+      "subject": ".test.cjs",
+      "style": { "guide": "sdks/typescript/STYLE.md", "sections": ["Test-framework integration"] }
+    },
+    "jest-esm": {
+      "language": "typescript",
+      "subject": ".test.mjs",
+      "style": { "guide": "sdks/typescript/STYLE.md", "sections": ["Test-framework integration"] }
+    },
+    "vitest": {
+      "language": "typescript",
+      "subject": ".test.ts",
+      "style": { "guide": "sdks/typescript/STYLE.md", "sections": ["Test-framework integration"] }
+    },
+    "junit5": {
+      "language": "jvm",
+      "subject": ".java",
+      "style": {
+        "guide": "sdks/jvm/STYLE.md",
+        "sections": ["Test-framework integration", "Provider test-framework integration"]
+      }
+    },
+    "spock": {
+      "language": "jvm",
+      "subject": ".groovy",
+      "style": {
+        "guide": "sdks/jvm/STYLE.md",
+        "sections": ["Test-framework integration", "Provider test-framework integration"]
+      }
+    }
+  }
+}

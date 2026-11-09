@@ -175,9 +175,11 @@ Interaction getOrder = janus.interaction("get an order")
   only of a block's own statements.
 - **JUnit 4 is not supported.** It is legacy; a project with JUnit 4 tests runs them beside JUnit 5
   ones on the JUnit Platform's vintage engine.
-- `FrameworksTest` runs a consumer suite, a suite whose contract is withheld and a provider test
-  under JUnit 5 and under Spock, against the real engine. The suites are `io.pact.janus.sdk.frameworks`,
-  which uses only the public API.
+- The conformance suite's framework cases hold each integration to this (ADR 0078): a consumer suite,
+  a suite whose contract is withheld, and a provider test, each a JUnit class and a Spock specification
+  run by the JUnit Platform in a JVM of its own, and JUnit 5's test per variant and
+  `JanusProviderExtension`'s test per interaction (`conformance/cases/framework/`). `FrameworksTest`
+  runs what one class cannot show: classes run at once merging into one contract.
 
 ## Provider verification
 

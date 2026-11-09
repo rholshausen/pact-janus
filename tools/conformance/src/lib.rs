@@ -11,10 +11,13 @@
 //!   "conformant" guarantees (ADR 0017's "Harder"), so it fails here rather than being discovered
 //!   later by two SDKs quietly disagreeing. It holds the compatibility facades' cases to their
 //!   migration notes too (ADR 0076 decision 3): every row a note gives the verdict `kept` is named by
-//!   a case of its facade, and every row a case names is in the note.
+//!   a case of its facade, and every row a case names is in the note. And it holds the framework
+//!   cases to `conformance/frameworks.json` (ADR 0078): every framework the list names has a case.
 //! - [`check`] reads the reports SDK runs produce and decides whether each language passed: every
 //!   case in the corpus that is the language's to run accounted for, and passed: every case that is
-//!   not a facade's, and every case of each facade the language ships (ADR 0076 decision 2). That is what makes "this SDK is conformant" a
+//!   not a facade's or a framework's, every case of each facade the language ships (ADR 0076
+//!   decision 2), and every framework case with a subject in the language (ADR 0078 decision 5).
+//!   That is what makes "this SDK is conformant" a
 //!   claim a build makes rather than a maintainer asserts. Across the reports, a live case whose
 //!   contract two SDKs wrote with different bytes fails too: neither SDK writes a contract, so
 //!   they cannot differ (ADR 0063 decision 6).
@@ -144,6 +147,62 @@ pub fn load_facades(suite: &Path) -> Result<BTreeMap<String, Facade>, String> {
     );
   }
   Ok(facades)
+}
+
+/// A test framework an SDK integrates with (ADR 0078 decision 1), as `conformance/frameworks.json`
+/// gives it: the language whose SDK runs its subjects, the suffix a subject for it has, and the style
+/// guide that describes the integration, with the sections of it that do.
+pub struct Framework {
+  pub language: String,
+  pub subject: String,
+  /// The style guide's path, relative to the repository.
+  pub guide: String,
+  pub sections: Vec<String>,
+}
+
+/// Every framework the suite's framework cases run, by name.
+pub fn load_frameworks(suite: &Path) -> Result<BTreeMap<String, Framework>, String> {
+  let path = suite.join("frameworks.json");
+  let text = fs::read_to_string(&path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+  let document: Value =
+    serde_json::from_str(&text).map_err(|e| format!("{}: not JSON: {e}", path.display()))?;
+  if document["$format"].as_str() != Some("janus-conformance-frameworks/1") {
+    return Err(format!(
+      "{}: not a framework list ('$format' is {})",
+      path.display(),
+      document["$format"]
+    ));
+  }
+  let mut frameworks = BTreeMap::new();
+  for (name, framework) in document["frameworks"]
+    .as_object()
+    .ok_or_else(|| format!("{}: no 'frameworks' object", path.display()))?
+  {
+    let member = |key: &str| {
+      framework[key]
+        .as_str()
+        .map(String::from)
+        .ok_or_else(|| format!("{}: framework '{name}' names no '{key}'", path.display()))
+    };
+    frameworks.insert(
+      name.clone(),
+      Framework {
+        language: member("language")?,
+        subject: member("subject")?,
+        guide: framework["style"]["guide"]
+          .as_str()
+          .map(String::from)
+          .ok_or_else(|| format!("{}: framework '{name}' names no style guide", path.display()))?,
+        sections: framework["style"]["sections"]
+          .as_array()
+          .into_iter()
+          .flatten()
+          .filter_map(|section| section.as_str().map(String::from))
+          .collect(),
+      },
+    );
+  }
+  Ok(frameworks)
 }
 
 /// One row of a migration note's tables: its first cell, verbatim, and its verdict.
@@ -286,13 +345,14 @@ pub fn lint(suite: &Path, behavioural_spec: &Path) -> Report {
       let file = file.as_str().unwrap_or_default();
       if !case.path.with_file_name(file).is_file() {
         report.problem(format!(
-          "{}: its {language} subject '{file}' is not beside it",
+          "{}: its '{language}' subject '{file}' is not beside it",
           relative(&case.path, suite)
         ));
       }
     }
   }
   lint_facades(suite, &cases, &mut report);
+  lint_frameworks(suite, &cases, &mut report);
 
   let ids = match behavioural_ids(behavioural_spec) {
     Ok(ids) => ids,
@@ -451,6 +511,109 @@ fn lint_facades(suite: &Path, cases: &[Case], report: &mut Report) {
   ));
 }
 
+/// The framework cases against `frameworks.json` (ADR 0078 decision 5): each subject is keyed by a
+/// framework the list has, and has its suffix; every framework is named by a case; and each style
+/// guide the list names has its sections, when the guide is in the tree (it leaves with its SDK, S2.9).
+fn lint_frameworks(suite: &Path, cases: &[Case], report: &mut Report) {
+  let frameworks = match load_frameworks(suite) {
+    Ok(frameworks) => frameworks,
+    Err(problem) => {
+      report.problem(problem);
+      return;
+    }
+  };
+  let root = suite.parent().unwrap_or(suite);
+  for (name, framework) in &frameworks {
+    let Ok(text) = fs::read_to_string(root.join(&framework.guide)) else {
+      continue;
+    };
+    for section in &framework.sections {
+      if !text
+        .lines()
+        .any(|line| line.strip_prefix("## ").is_some_and(|h| h.trim() == section))
+      {
+        report.problem(format!(
+          "framework '{name}': {} has no '## {section}' section",
+          framework.guide
+        ));
+      }
+    }
+  }
+
+  let mut named: BTreeSet<&str> = BTreeSet::new();
+  let mut framework_cases = 0usize;
+  let mut subjects = 0usize;
+  for case in cases.iter().filter(|case| case.category == "framework") {
+    framework_cases += 1;
+    let relative_path = relative(&case.path, suite);
+    for (key, file) in case.document["subjects"].as_object().into_iter().flatten() {
+      subjects += 1;
+      let file = file.as_str().unwrap_or_default();
+      let Some(framework) = frameworks.get(key) else {
+        report.problem(format!(
+          "{relative_path}: a framework case's subjects are keyed by framework, and '{key}' is not in frameworks.json"
+        ));
+        continue;
+      };
+      named.insert(key);
+      if !file.ends_with(&framework.subject) {
+        report.problem(format!(
+          "{relative_path}: its '{key}' subject '{file}' is not a {} file",
+          framework.subject
+        ));
+      }
+    }
+    if !case.document["expect"]["engine-log"].is_null() {
+      report.problem(format!(
+        "{relative_path}: a framework subject runs in a process of its own, and its driver reads no engine log ('engine-log')"
+      ));
+    }
+  }
+  for name in frameworks.keys() {
+    if !named.contains(name.as_str()) {
+      report.problem(format!(
+        "framework '{name}' has no case: an integration no case runs is a claim (ADR 0078)"
+      ));
+    }
+  }
+  report.note(format!(
+    "{framework_cases} framework cases run {subjects} subjects, for {} frameworks",
+    frameworks.len()
+  ));
+}
+
+/// The languages whose SDKs run a case: `None` for every SDK; a facade's language for its case; and
+/// for a framework case, the languages of the frameworks it has subjects for (ADR 0078 decision 5).
+/// A name neither list has is a language no report has, so the case is run by none and the lint says why.
+fn runs_in(
+  case: &Case,
+  facades: &BTreeMap<String, Facade>,
+  frameworks: &BTreeMap<String, Framework>,
+) -> Option<BTreeSet<String>> {
+  if let Some(name) = facade_of(case) {
+    return Some(
+      [facades.get(name).map_or_else(
+        || format!("(no language: '{name}' is not in facades.json)"),
+        |f| f.language.clone(),
+      )]
+      .into(),
+    );
+  }
+  (case.category == "framework").then(|| {
+    case.document["subjects"]
+      .as_object()
+      .into_iter()
+      .flatten()
+      .map(|(key, _)| {
+        frameworks.get(key).map_or_else(
+          || format!("(no language: '{key}' is not in frameworks.json)"),
+          |f| f.language.clone(),
+        )
+      })
+      .collect()
+  })
+}
+
 /// An SDK's run report against the corpus: every case accounted for, and passed.
 pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
   let mut report = Report::default();
@@ -468,18 +631,16 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
       return report;
     }
   };
-  // The language whose SDK runs a case: none for a case that is not a facade's, which every SDK runs.
-  let shipped_by = |case: &Case| -> Option<String> {
-    facade_of(case).map(|name| {
-      facades.get(name).map_or_else(
-        || format!("(no language: '{name}' is not in facades.json)"),
-        |f| f.language.clone(),
-      )
-    })
+  let frameworks = match load_frameworks(suite) {
+    Ok(frameworks) => frameworks,
+    Err(problem) => {
+      report.problem(problem);
+      return report;
+    }
   };
-  let corpus: BTreeMap<&str, Option<String>> = cases
+  let corpus: BTreeMap<&str, Option<BTreeSet<String>>> = cases
     .iter()
-    .map(|case| (case.id.as_str(), shipped_by(case)))
+    .map(|case| (case.id.as_str(), runs_in(case, &facades, &frameworks)))
     .collect();
   // Each case's written contract, by SDK, as the SHA-256 its report gives.
   let mut digests: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
@@ -508,10 +669,11 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
       .unwrap_or("(unnamed SDK)")
       .to_string();
     let language = document["sdk"]["language"].as_str().unwrap_or_default();
-    // Every case that is not a facade's, and every case of each facade this language ships.
+    // Every case every SDK runs, every case of each facade this language ships, and every framework
+    // case with a subject for one of this language's frameworks.
     let expected: BTreeSet<&str> = corpus
       .iter()
-      .filter(|(_, shipped)| shipped.as_deref().is_none_or(|by| by == language))
+      .filter(|(_, by)| by.as_ref().is_none_or(|by| by.contains(language)))
       .map(|(id, _)| *id)
       .collect();
     if document["$format"].as_str() != Some("janus-conformance-report/1") {
@@ -540,8 +702,9 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
         None => report.problem(format!(
           "{sdk}: reported '{id}', which is not a case in this corpus"
         )),
-        Some(Some(by)) if by != language => report.problem(format!(
-          "{sdk}: reported '{id}', a case of a facade {by} ships, and this report's language is '{language}'"
+        Some(Some(by)) if !by.contains(language) => report.problem(format!(
+          "{sdk}: reported '{id}', a case for {}, and this report's language is '{language}'",
+          by.iter().cloned().collect::<Vec<_>>().join(" and ")
         )),
         _ => {}
       }
@@ -579,7 +742,7 @@ pub fn check(suite: &Path, reports: &[PathBuf]) -> Report {
   }
   if !digests.is_empty() {
     report.note(format!(
-      "{} live contract(s) compared byte for byte across the reports",
+      "{} contract(s) compared byte for byte across the reports",
       digests.len()
     ));
   }

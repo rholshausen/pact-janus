@@ -1,8 +1,8 @@
-// The test-framework integrations (STYLE.md, "Test-framework integration"; staged plan S2.4a): the
-// suites in test/frameworks, run by Jest (from CommonJS and as ES modules) and by Vitest in a scratch
-// project the built package is installed in, as a user's suites run. Each runner's own JSON report
-// says what passed: a variant that fails, fails the test that ran it, and a withheld contract fails
-// the suite while the passing suites' contracts are written.
+// What the conformance suite's framework cases (ADR 0078) cannot show, each needing more than one test
+// file or a facade: the suites in test/frameworks, run by Jest and by Vitest in a scratch project the
+// built package is installed in, as a user's suites run. Each runner's own JSON report says what passed.
+// Test files Vitest runs in workers of their own merge into one contract (S2.11, ADR 0065), and pact-js's
+// verifier, from pact-janus/verifier, runs under Jest from CommonJS, as pact-js's provider tests do.
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -19,11 +19,11 @@ type Report = {
     name: string;
     status: string;
     message: string;
-    assertionResults: { title: string; status: string; failureMessages: string[] }[];
+    assertionResults: { title: string; status: string }[];
   }[];
 };
 
-/** A report by test file: its status, its message, and each test's status and failure. */
+/** A report by test file: its status, its message, and each test's status. */
 function byFile(report: Report) {
   return Object.fromEntries(
     report.testResults.map((file) => [
@@ -32,7 +32,6 @@ function byFile(report: Report) {
         status: file.status,
         message: file.message,
         tests: Object.fromEntries(file.assertionResults.map((t) => [t.title, t.status])),
-        failures: file.assertionResults.flatMap((t) => t.failureMessages).join("\n"),
       },
     ]),
   );
@@ -41,11 +40,11 @@ function byFile(report: Report) {
 let root: string;
 
 /** Runs `script` in the scratch project, and reads the JSON report it wrote. */
-async function run(script: string, args: string[], flags: string[]): Promise<{ status: number | null; report: Report }> {
+async function run(script: string, args: string[]): Promise<ReturnType<typeof byFile>> {
   const out = join(root, `${basename(script)}.json`);
   // Vitest marks its own workers through the environment, which a nested Vitest must not inherit.
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("VITEST")));
-  const ran = spawnSync(process.execPath, [...flags, resolve(script), ...args, "--outputFile", out], {
+  const ran = spawnSync(process.execPath, [resolve(script), ...args, "--outputFile", out], {
     cwd: root,
     env,
     encoding: "utf8",
@@ -53,12 +52,7 @@ async function run(script: string, args: string[], flags: string[]): Promise<{ s
   if (!existsSync(out)) {
     throw new Error(`${script} wrote no report:\n${ran.stdout}\n${ran.stderr}`);
   }
-  return { status: ran.status, report: JSON.parse(await readFile(out, "utf8")) as Report };
-}
-
-async function contract(consumer: string): Promise<string | undefined> {
-  const path = join(root, "contracts", `${consumer}-orders-api.janus.json`);
-  return existsSync(path) ? readFile(path, "utf8") : undefined;
+  return byFile(JSON.parse(await readFile(out, "utf8")) as Report);
 }
 
 beforeAll(async () => {
@@ -70,98 +64,42 @@ beforeAll(async () => {
   await symlink(resolve("node_modules", "vitest"), join(root, "node_modules", "vitest"), "junction");
 }, 120_000);
 
-describe.each([
-  {
-    framework: "Jest",
-    script: join("node_modules", "jest", "bin", "jest.js"),
-    args: ["--ci", "--json", "--config", "jest.config.cjs"],
-    flags: ["--experimental-vm-modules", "--disable-warning=ExperimentalWarning"],
-    suites: [
-      { files: "jest/*.test.cjs", ext: ".test.cjs", consumer: "jest-cjs" },
-      { files: "jest/*.test.mjs", ext: ".test.mjs", consumer: "jest-esm" },
-    ],
-  },
-  {
-    framework: "Vitest",
-    script: join("node_modules", "vitest", "vitest.mjs"),
-    args: ["run", "--reporter=json", "--config", "vitest.config.mjs"],
-    flags: [],
-    suites: [{ files: "vitest/*.test.ts", ext: ".test.ts", consumer: "vitest" }],
-  },
-])("under $framework", ({ framework, script, args, flags, suites }) => {
-  let files: ReturnType<typeof byFile>;
-  let status: number | null;
-
-  beforeAll(async () => {
-    const ran = await run(script, args, flags);
-    status = ran.status;
-    files = byFile(ran.report);
+describe("under Jest", () => {
+  it("runs pact-js's provider test from CommonJS", async () => {
+    const files = await run(join("node_modules", "jest", "bin", "jest.js"), ["--ci", "--json", "--config", "jest.config.cjs"]);
+    expect(files["pact-js-verifier.test.cjs"]).toMatchObject({
+      status: "passed",
+      tests: { "satisfies UserConsumer's pact": "passed" },
+    });
   }, 120_000);
-
-  it("fails the run, for the suites whose contracts are withheld", () => {
-    expect(status).toBe(1);
-  });
-
-  // Staged plan S2.11, ADR 0065: test files in workers of their own, each with an engine of its own,
-  // merge into one contract file.
-  if (framework === "Vitest") {
-    it("merges two files' interactions into one contract, the bytes one file recording both writes", async () => {
-      for (const file of ["merged-orders.test.ts", "merged-deletes.test.ts", "merged-together.test.ts"]) {
-        expect(files[file]?.status, file).toBe("passed");
-      }
-      const merged = await readFile(join(root, "contracts", "vitest-merged-orders-api.janus.json"), "utf8");
-      const together = await readFile(join(root, "contracts", "together", "vitest-merged-orders-api.janus.json"), "utf8");
-      expect(merged).toBe(together);
-      const recorded = JSON.parse(merged).interactions.map((i: { description: string }) => i.description);
-      expect(recorded).toEqual(["delete an order", "get an order"]);
-    });
-
-    it("fails the second file to record an interaction differently, naming it, and keeps the first's", async () => {
-      const outcomes = ["conflict-ok.test.ts", "conflict-accepted.test.ts"].map((file) => files[file]);
-      expect(outcomes.map((outcome) => outcome?.status).sort()).toEqual(["failed", "passed"]);
-      const failed = outcomes.find((outcome) => outcome?.status === "failed");
-      expect(failed?.message).toContain("'create an order'");
-      const kept = JSON.parse(await readFile(join(root, "contracts", "vitest-conflicting-orders-api.janus.json"), "utf8"));
-      expect(kept.interactions).toHaveLength(1);
-    });
-  }
-
-  for (const { ext, consumer } of suites) {
-    describe(`from *${ext}`, () => {
-      it("passes a consumer suite, and writes its contract", async () => {
-        expect(files[`consumer${ext}`]).toMatchObject({ status: "passed", tests: { "gets an order": "passed" } });
-        const written = JSON.parse((await contract(consumer)) ?? "{}");
-        expect(written.interactions.map((i: { description: string }) => i.description)).toEqual(["get an order"]);
-      });
-
-      it("fails the test that ran a failing variant, and only that one", () => {
-        const withheld = files[`withheld${ext}`];
-        expect(withheld?.tests).toEqual({ "reads when an order shipped": "failed", "deletes an order": "passed" });
-        expect(withheld?.failures).toContain("shippedAt=absent");
-      });
-
-      it("fails the suite whose contract is withheld, and writes none", async () => {
-        const withheld = files[`withheld${ext}`];
-        expect(withheld?.status).toBe("failed");
-        expect(withheld?.message).toContain("No contract written:");
-        expect(await contract(`${consumer}-careless`)).toBeUndefined();
-      });
-
-      it("passes a provider test", () => {
-        expect(files[`provider${ext}`]).toMatchObject({
-          status: "passed",
-          tests: { "satisfies UserConsumer's pact": "passed" },
-        });
-      });
-    });
-  }
 });
 
-it("writes the same contract whichever framework and module system ran the suite", async () => {
-  const consumers = ["jest-cjs", "jest-esm", "vitest"];
-  const [first, ...rest] = await Promise.all(
-    consumers.map(async (consumer) => (await contract(consumer))?.replaceAll(`"${consumer}"`, '"web-app"')),
-  );
-  expect(first).toBeDefined();
-  expect(rest).toEqual([first, first]);
+// Staged plan S2.11, ADR 0065: test files in workers of their own, each with an engine of its own,
+// merge into one contract file.
+describe("under Vitest", () => {
+  let files: ReturnType<typeof byFile>;
+
+  beforeAll(async () => {
+    files = await run(join("node_modules", "vitest", "vitest.mjs"), ["run", "--reporter=json", "--config", "vitest.config.mjs"]);
+  }, 120_000);
+
+  it("merges two files' interactions into one contract, the bytes one file recording both writes", async () => {
+    for (const file of ["merged-orders.test.ts", "merged-deletes.test.ts", "merged-together.test.ts"]) {
+      expect(files[file]?.status, file).toBe("passed");
+    }
+    const merged = await readFile(join(root, "contracts", "vitest-merged-orders-api.janus.json"), "utf8");
+    const together = await readFile(join(root, "contracts", "together", "vitest-merged-orders-api.janus.json"), "utf8");
+    expect(merged).toBe(together);
+    const recorded = JSON.parse(merged).interactions.map((i: { description: string }) => i.description);
+    expect(recorded).toEqual(["delete an order", "get an order"]);
+  });
+
+  it("fails the second file to record an interaction differently, naming it, and keeps the first's", async () => {
+    const outcomes = ["conflict-ok.test.ts", "conflict-accepted.test.ts"].map((file) => files[file]);
+    expect(outcomes.map((outcome) => outcome?.status).sort()).toEqual(["failed", "passed"]);
+    const failed = outcomes.find((outcome) => outcome?.status === "failed");
+    expect(failed?.message).toContain("'create an order'");
+    const kept = JSON.parse(await readFile(join(root, "contracts", "vitest-conflicting-orders-api.janus.json"), "utf8"));
+    expect(kept.interactions).toHaveLength(1);
+  });
 });

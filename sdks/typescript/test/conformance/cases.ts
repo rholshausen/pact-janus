@@ -181,13 +181,15 @@ export interface ContractExpectation {
 export interface Case {
   $format: string;
   id: string;
-  category: "translation" | "lifecycle" | "variants" | "live" | "provider" | "facade";
+  category: "translation" | "lifecycle" | "variants" | "live" | "provider" | "facade" | "framework";
   /** A facade case's facade (ADR 0076 decision 2). */
   facade?: string;
   /** A facade case's migration-note rows. The driver does not read them; the lint does. */
   rows?: { note: string; row: string }[];
-  /** Language -> a test written in it, beside the case. */
+  /** Language -> a test written in it, beside the case; in a framework case, framework -> a test file it runs. */
   subjects?: Record<string, string>;
+  /** A framework case's files, written into each subject's project before it runs (ADR 0078). */
+  project?: Record<string, unknown>;
   title: string;
   covers: string[];
   why?: string;
@@ -236,6 +238,28 @@ export function facadesShipped(): Set<string> {
   return new Set(Object.entries(document.facades).filter(([, f]) => f.language === LANGUAGE).map(([name]) => name));
 }
 
+/** A test framework an SDK integrates with, as `conformance/frameworks.json` gives it (ADR 0078). */
+export interface Framework {
+  language: string;
+  subject: string;
+}
+
+/** Every framework the framework cases run, by name. */
+export function frameworks(): Record<string, Framework> {
+  const document = JSON.parse(readFileSync(join(suiteRoot, "frameworks.json"), "utf8")) as {
+    frameworks: Record<string, Framework>;
+  };
+  return document.frameworks;
+}
+
+/** A framework case's subjects in this language: each framework's name and its file, beside the case. */
+export function frameworkSubjects(testCase: Case): { framework: string; file: string }[] {
+  const known = frameworks();
+  return Object.entries(testCase.subjects ?? {})
+    .filter(([framework]) => known[framework]?.language === LANGUAGE)
+    .map(([framework, file]) => ({ framework, file: join(suiteRoot, "cases", testCase.category, file) }));
+}
+
 /** The file a case's subject in this language is: beside the case. */
 export function subjectPath(testCase: Case): string | undefined {
   const file = testCase.subjects?.[LANGUAGE];
@@ -244,11 +268,16 @@ export function subjectPath(testCase: Case): string | undefined {
 
 /**
  * Every case this SDK runs, in id order — the order a report lists them in: every case that is not
- * a facade's, and every case of each facade this language ships (ADR 0076 decision 2).
+ * a facade's or a framework's, every case of each facade this language ships (ADR 0076 decision 2),
+ * and every framework case with a subject for one of this language's frameworks (ADR 0078 decision 5).
  */
 export function loadCases(): Case[] {
   const shipped = facadesShipped();
-  return loadCorpus().filter((testCase) => testCase.facade === undefined || shipped.has(testCase.facade));
+  return loadCorpus().filter((testCase) =>
+    testCase.category === "framework"
+      ? frameworkSubjects(testCase).length > 0
+      : testCase.facade === undefined || shipped.has(testCase.facade),
+  );
 }
 
 /** Every case in the corpus, in id order. */

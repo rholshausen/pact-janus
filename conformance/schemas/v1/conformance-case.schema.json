@@ -10,11 +10,11 @@
     "id": {
       "type": "string",
       "description": "Unique case id, '<category>/<name>', matching the file's path under cases/.",
-      "pattern": "^(translation|lifecycle|variants|live|provider|facade)/[a-z0-9-]+$"
+      "pattern": "^(translation|lifecycle|variants|live|provider|facade|framework)/[a-z0-9-]+$"
     },
     "category": {
-      "enum": ["translation", "lifecycle", "variants", "live", "provider", "facade"],
-      "description": "translation: what a DSL chain builds, no engine. lifecycle and variants: what the SDK sends and does, against the case's own scripted engine. provider: a provider verification ('verifier', 'verify'), against the case's own scripted engine. live: against the real pinned engine, a consumer's steps or a provider's verification. facade: a compatibility facade's spellings (ADR 0076), run by the SDK that ships the facade, through a subject in its language."
+      "enum": ["translation", "lifecycle", "variants", "live", "provider", "facade", "framework"],
+      "description": "translation: what a DSL chain builds, no engine. lifecycle and variants: what the SDK sends and does, against the case's own scripted engine. provider: a provider verification ('verifier', 'verify'), against the case's own scripted engine. live: against the real pinned engine, a consumer's steps or a provider's verification. facade: a compatibility facade's spellings (ADR 0076), run by the SDK that ships the facade, through a subject in its language. framework: a test-framework integration (ADR 0078), each subject a test file one framework runs, in a project of its own, through that framework's own runner."
     },
     "title": { "type": "string", "description": "One line, in the present tense: what the SDK must do." },
     "covers": {
@@ -51,9 +51,14 @@
     },
     "subjects": {
       "type": "object",
-      "description": "Language -> a file beside this case: a test written in that language, for a spelling data cannot carry (ADR 0076 decision 1). 'typescript': a module whose exported async functions are its tests. 'jvm': a JUnit Jupiter test class, its file named after it. A facade case has one, in its facade's language; any other case that has subjects has one per language, and a driver fails it when its language has none.",
+      "description": "Language -> a file beside this case: a test written in that language, for a spelling data cannot carry (ADR 0076 decision 1). 'typescript': a module whose exported async functions are its tests. 'jvm': a JUnit Jupiter test class, its file named after it. A facade case has one, in its facade's language; any other case that has subjects has one per language, and a driver fails it when its language has none. In a framework case, the keys are frameworks instead, each a name conformance/frameworks.json gives, and each file a test file that framework runs, with the suffix the list gives it (ADR 0078).",
       "minProperties": 1,
-      "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9_-]+\\.(ts|java)$" }
+      "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9_-]+(\\.test)?\\.(ts|cjs|mjs|java|groovy)$" }
+    },
+    "project": {
+      "type": "object",
+      "description": "Framework cases: files the driver writes into each subject's project before it runs, by path relative to the project (ADR 0078 decision 3). A string is written as it is; any other value as its JSON text.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$" }
     },
     "interaction": { "$ref": "#/$defs/InteractionScript" },
     "janus": {
@@ -113,6 +118,11 @@
     {
       "if": { "properties": { "category": { "const": "provider" } }, "required": ["category"] },
       "then": { "required": ["verifier", "expect"] }
+    },
+    {
+      "if": { "properties": { "category": { "const": "framework" } }, "required": ["category"] },
+      "then": { "required": ["subjects", "expect"] },
+      "else": { "properties": { "project": false } }
     }
   ],
   "$defs": {
@@ -526,7 +536,7 @@
         },
         "suite": {
           "type": "object",
-          "description": "Cases with subjects: the subject as a whole, beyond its tests: a JUnit class, whose own failure is the class container's. With 'fails', it must fail as a test with 'fails' must. Absent: it must not fail.",
+          "description": "Cases with subjects: the subject as a whole, beyond its tests: a JUnit class, whose own failure is the class container's; in a framework case, the test file's or class's own failure, as its framework reports it (ADR 0078 decision 4). With 'fails', it must fail as a test with 'fails' must. Absent: it must not fail.",
           "properties": {
             "fails": { "type": "array", "items": { "type": "string" } }
           },
@@ -534,7 +544,7 @@
         },
         "contracts": {
           "type": "object",
-          "description": "Cases with subjects: file name -> the contract file the run wrote in its contract directory, 'written' and 'content' as a step's 'contract' compares them. A file the run wrote that the case does not name fails it.",
+          "description": "Cases with subjects: file name -> the contract file the run wrote in its contract directory, 'written' and 'content' as a step's 'contract' compares them; in a framework case, the project's 'contracts', where the SDK writes by default. A file the run wrote that the case does not name fails it.",
           "additionalProperties": {
             "type": "object",
             "properties": {
@@ -556,7 +566,7 @@
         "engine-log": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Cases with subjects: what the engine's log must hold, each string somewhere in it. The log is the engine's standard error, or the events the SDK hands its language's logging (SLF4J on the JVM, ADR 0061), each written '<LEVEL> <message>'."
+          "description": "Cases with subjects, but for framework cases, whose subjects run in a process of their own: what the engine's log must hold, each string somewhere in it. The log is the engine's standard error, or the events the SDK hands its language's logging (SLF4J on the JVM, ADR 0061), each written '<LEVEL> <message>'."
         },
         "spec": {
           "type": "object",

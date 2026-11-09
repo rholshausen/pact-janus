@@ -39,18 +39,37 @@ final class Suite {
 
   /**
    * Every case this SDK runs, in id order — the order a report lists them in: every case that is not a
-   * facade's, and every case of each facade this language ships (ADR 0076 decision 2).
+   * facade's or a framework's, every case of each facade this language ships (ADR 0076 decision 2), and
+   * every framework case with a subject for one of this language's frameworks (ADR 0078 decision 5).
    */
   static List<JsonNode> cases() {
-    JsonNode facades;
-    try {
-      facades = MAPPER.readTree(Files.readString(root().resolve("facades.json"))).path("facades");
-    } catch (IOException e) {
-      throw new UncheckedIOException("reading the conformance suite's facades.json", e);
-    }
+    JsonNode facades = read("facades.json").path("facades");
     return corpus().stream()
-        .filter(c -> !c.has("facade") || LANGUAGE.equals(facades.path(c.path("facade").asText()).path("language").asText()))
+        .filter(c -> "framework".equals(c.path("category").asText())
+            ? !frameworkSubjects(c).isEmpty()
+            : !c.has("facade") || LANGUAGE.equals(facades.path(c.path("facade").asText()).path("language").asText()))
         .toList();
+  }
+
+  /** A framework case's subjects in this language: framework name -> its file, in the case's order (ADR 0078). */
+  static Map<String, String> frameworkSubjects(JsonNode testCase) {
+    JsonNode frameworks = read("frameworks.json").path("frameworks");
+    Map<String, String> subjects = new java.util.LinkedHashMap<>();
+    testCase.path("subjects").properties().forEach(subject -> {
+      if (LANGUAGE.equals(frameworks.path(subject.getKey()).path("language").asText())) {
+        subjects.put(subject.getKey(), subject.getValue().asText());
+      }
+    });
+    return subjects;
+  }
+
+  /** One of the suite's own lists, beside its cases. */
+  private static JsonNode read(String name) {
+    try {
+      return MAPPER.readTree(Files.readString(root().resolve(name)));
+    } catch (IOException e) {
+      throw new UncheckedIOException("reading the conformance suite's " + name, e);
+    }
   }
 
   /** Every case in the corpus, in id order. */

@@ -1,0 +1,85 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "framework/consumer-suite",
+  "category": "framework",
+  "title": "A suite's tests pass, the integration finalises its one session after the last of them, and the contract is written to the default directory.",
+  "covers": ["session.finalise.always-runs", "session.finalise.writes-contract-when-verified", "session.finalise.names-contract-file", "session.execute.one-session-per-suite"],
+  "why": "behavioural spec 'finalise': the test-framework integration MUST run 'finalise' after the suite's last 'execute'; the contract is in '<contract directory>/<consumer>-<provider>.janus.json', the directory 'contracts' under the working directory by default ('janus'). 'execute': one session per suite, and 'finalise' writes all of a suite's interactions into one contract.",
+  "note": "Each subject is a user's test file, run by its framework in a project of its own (ADR 0078). Every one of them writes the same contract, and the report carries its digest, so the languages are held to one file too.",
+  "subjects": {
+    "jest-commonjs": "consumer-suite.test.cjs",
+    "jest-esm": "consumer-suite.test.mjs",
+    "vitest": "consumer-suite.test.ts",
+    "junit5": "ConsumerSuiteTest.java",
+    "spock": "ConsumerSuiteSpec.groovy"
+  },
+  "expect": {
+    "tests": [{ "test": "gets an order" }, { "test": "deletes an order" }],
+    "contracts": {
+      "web-app-orders-api.janus.json": {
+        "content": {
+          "interactions": [
+            {
+              "description": "delete an order",
+              "parts": {
+                "request": {
+                  "method": {
+                    "example": "DELETE",
+                    "shape": "equality"
+                  },
+                  "path": {
+                    "example": "/orders/42",
+                    "shape": "equality"
+                  }
+                },
+                "response": {
+                  "status": {
+                    "example": 204,
+                    "shape": "equality"
+                  }
+                }
+              }
+            },
+            {
+              "description": "get an order",
+              "parts": {
+                "request": {
+                  "method": {
+                    "example": "GET",
+                    "shape": "equality"
+                  },
+                  "path": {
+                    "example": "/orders/42",
+                    "shape": "equality"
+                  }
+                },
+                "response": {
+                  "body": {
+                    "members": {
+                      "id": {
+                        "example": 42,
+                        "shape": "integer"
+                      },
+                      "shippedAt": {
+                        "of": {
+                          "example": "2026-07-30",
+                          "shape": "string"
+                        },
+                        "shape": "optional"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "status": {
+                    "example": 200,
+                    "shape": "equality"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -18,6 +18,7 @@ import {
 import type { Case, Exchange, InteractionScript, Outcome, Received, StepExpectation } from "./cases.js";
 import { equal, pointer, show, subset } from "./compare.js";
 import { buildInteraction } from "./dsl.js";
+import { runFramework } from "./framework.js";
 import { runProvider } from "./provider.js";
 import { runSubject } from "./subject.js";
 import { CONSUMER, PROVIDER, ScriptedPipe } from "./scripted-engine.js";
@@ -35,7 +36,9 @@ export async function runCase(testCase: Case): Promise<CaseResult> {
   const failures: string[] = [];
   let digest: string | undefined;
   try {
-    if (testCase.subjects !== undefined) {
+    if (testCase.category === "framework") {
+      digest = await runFramework(testCase, failures);
+    } else if (testCase.subjects !== undefined) {
       await runSubject(testCase, failures);
     } else if (testCase.category === "translation") {
       await runTranslation(testCase, failures);

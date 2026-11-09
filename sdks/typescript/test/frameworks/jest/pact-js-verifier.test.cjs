@@ -1,4 +1,4 @@
-// A provider test in CommonJS, as a pact-js user's is: pact-js's Verifier, from pact-janus/verifier.
+// pact-js's provider test, in CommonJS as most of them are, run by Jest: its Verifier, from pact-janus/verifier.
 const { createServer } = require("node:http");
 const { afterAll, beforeAll, expect, test } = require("@jest/globals");
 const { Verifier } = require("pact-janus/verifier");

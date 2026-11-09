@@ -30,7 +30,7 @@ export interface SubjectRun {
   tests: { test: string; error?: string }[];
   /** The subject's exported functions the case does not name. */
   unnamed: string[];
-  /** Why the subject could not be loaded at all. */
+  /** How the subject failed beyond its tests: it could not be loaded, or, run by a framework, the file's own failure. */
   suite?: string;
   stdout: string;
   stderr: string;
@@ -56,8 +56,22 @@ export async function runSubject(testCase: Case, failures: string[]): Promise<vo
     run = await runTests(testCase, file, { dir, ...(pipe ? { engine: () => pipe } : {}) });
   }
 
-  if (run.suite !== undefined) {
-    failures.push(`the subject could not be loaded: ${run.suite}`);
+  checkRun(testCase, run, failures);
+  await checkContracts(testCase, dir, failures);
+  for (const part of (expected["engine-log"] ?? []).filter((part) => !engineLog.includes(part))) {
+    failures.push(`the engine's log does not hold ${show(part)}:\n${engineLog}`);
+  }
+  await checkEngine(expected, pipe, failures);
+}
+
+/**
+ * What a subject's run did against the case: how each test ended, how the subject as a whole ended,
+ * and what the run printed. A framework run (ADR 0078) is held to the same.
+ */
+export function checkRun(testCase: Case, run: SubjectRun, failures: string[]): void {
+  const expected = testCase.expect ?? {};
+  if (run.suite !== undefined && expected.suite?.fails === undefined) {
+    failures.push(`the subject failed, beyond its tests: ${run.suite}`);
   }
   for (const name of run.unnamed) {
     failures.push(`the subject has a test '${name}' the case does not name`);
@@ -78,21 +92,21 @@ export async function runSubject(testCase: Case, failures: string[]): Promise<vo
       }
     }
   }
-  if (expected.suite?.fails !== undefined && run.suite === undefined) {
-    failures.push(`the subject loaded, and the case expects it to fail with ${show(expected.suite.fails)}`);
+  if (expected.suite?.fails !== undefined) {
+    if (run.suite === undefined) {
+      failures.push(`the subject did not fail, and the case expects it to, with ${show(expected.suite.fails)}`);
+    } else {
+      for (const part of expected.suite.fails.filter((part) => !run.suite?.includes(part))) {
+        failures.push(`the subject failed without saying ${show(part)}: ${run.suite}`);
+      }
+    }
   }
-
-  await checkContracts(testCase, dir, failures);
   for (const [stream, parts] of Object.entries(expected.output ?? {})) {
     const text = stream === "stdout" ? run.stdout : run.stderr;
     for (const part of parts.filter((part) => !text.includes(part))) {
       failures.push(`the run's ${stream} does not hold ${show(part)}:\n${text}`);
     }
   }
-  for (const part of (expected["engine-log"] ?? []).filter((part) => !engineLog.includes(part))) {
-    failures.push(`the engine's log does not hold ${show(part)}:\n${engineLog}`);
-  }
-  await checkEngine(expected, pipe, failures);
 }
 
 /**
@@ -133,9 +147,9 @@ export async function runTests(testCase: Case, file: string, context: SubjectCon
 }
 
 /** The contracts the run wrote, each file against the case's `contracts`; one it does not name fails it. */
-async function checkContracts(testCase: Case, dir: string, failures: string[]): Promise<void> {
+export async function checkContracts(testCase: Case, dir: string, failures: string[]): Promise<void> {
   const expected = testCase.expect?.contracts;
-  const written = (await readdir(dir)).filter((name) => name.endsWith(".json")).sort();
+  const written = existsSync(dir) ? (await readdir(dir)).filter((name) => name.endsWith(".json")).sort() : [];
   const documents: Record<string, Record<string, unknown>> = {};
   for (const name of written) {
     documents[name] = JSON.parse(await readFile(join(dir, name), "utf8")) as Record<string, unknown>;

@@ -1,0 +1,48 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "framework/provider-extension-test-per-interaction",
+  "category": "framework",
+  "title": "JUnit 5's provider extension makes each interaction a test of its own: a verified one passes, a failed one fails with its mismatches.",
+  "covers": ["verification.verify.engine-calls-handlers", "verification.verify.failed-run-fails"],
+  "why": "behavioural spec 'verify': the engine calls each handler the verifier declared during the run, and a failed run fails, naming each result whose status is 'failed'. The JVM style guide, 'Provider test-framework integration' (ADR 0056 decision 3): each interaction result is a dynamic test named '<consumer>: <description>'; 'verified' passes, and anything else fails, with the result's mismatches or error.",
+  "note": "JUnit 5 alone has this spelling: a framework with dynamic tests, and the extension the JVM SDK ships for it. The other frameworks verify a provider in one test (framework/provider-verifies-in-a-test).",
+  "subjects": {
+    "junit5": "ProviderExtensionTest.java"
+  },
+  "project": {
+    "pacts/web-app-orders-api.json": {
+      "consumer": { "name": "web-app" },
+      "provider": { "name": "orders-api" },
+      "interactions": [
+        {
+          "description": "get an order",
+          "providerStates": [{ "name": "an order exists", "params": { "id": 42 } }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "headers": { "Content-Type": "application/json" },
+            "body": { "id": 42, "status": "shipped" },
+            "matchingRules": { "body": { "$.status": { "matchers": [{ "match": "type" }] } } }
+          }
+        },
+        {
+          "description": "get an order's invoice",
+          "providerStates": [{ "name": "an order exists", "params": { "id": 42 } }],
+          "request": { "method": "GET", "path": "/orders/42/invoice" },
+          "response": {
+            "status": 200,
+            "headers": { "Content-Type": "application/json" },
+            "body": { "order": 42, "total": 10 }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    }
+  },
+  "expect": {
+    "tests": [
+      { "test": "web-app: get an order" },
+      { "test": "web-app: get an order's invoice", "fails": ["get an order's invoice", "$.response.status"] }
+    ]
+  }
+}

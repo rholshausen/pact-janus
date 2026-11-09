@@ -121,9 +121,13 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 - With another framework, use `new Janus(config)` and call `await janus.finalise()` yourself, in
   whatever after-all hook the framework has.
 - The provider side imports no framework (`Verifier`, `pact-janus/verifier`), so it runs under Jest
-  and Vitest alike. `test/frameworks.test.ts` runs a consumer suite, a suite whose contract is
-  withheld and a provider test under Jest, from CommonJS and as ES modules, and under Vitest, from
-  the built package as a user installs it.
+  and Vitest alike.
+- The conformance suite's framework cases hold each integration to this (ADR 0078): a consumer suite,
+  a suite whose contract is withheld, and a provider test, each a test file Jest runs from CommonJS
+  and as ES modules, and Vitest runs, in a project the built package is installed in as a user
+  installs it (`conformance/cases/framework/`). `test/frameworks.test.ts` runs what one file cannot
+  show: Vitest files in workers of their own merging into one contract, and pact-js's verifier under
+  Jest.
 - `engine: { command }` names the `janus-engine` executable, else `JANUS_ENGINE` does, else the SDK
   runs the engine it was released with, fetched on first use, as the JVM SDK does.
 
