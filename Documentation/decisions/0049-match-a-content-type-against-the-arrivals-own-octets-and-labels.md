@@ -1,6 +1,7 @@
 # 0049 — Match a content type against the arrival's own octets and labels
 
-- **Status**: accepted
+- **Status**: accepted; extended by [ADR 0077](0077-match-a-multipart-parts-content-type-against-its-own-label.md)
+  (a member of a slot's document is read by its own label)
 - **Date**: 2026-10-25
 - **Plan tasks**: S1.10
 - **Evidence**: `cli/tests/cli.rs`'s `a_content_type_shape_is_matched_against_the_replys_octets_through_janus_verify`,

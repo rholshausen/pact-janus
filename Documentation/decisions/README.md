@@ -65,7 +65,7 @@ superseding ADR instead.
 | [0046](0046-ask-a-provider-for-a-message-through-produce-message-and-let-the-transport-name-its-parts.md) | Ask a provider for a message through `produce-message`, and let the transport name its parts | accepted |
 | [0047](0047-upgrade-a-body-into-its-components-document-and-check-its-type-on-the-header.md) | Upgrade a body into its component's document, and check its type on the header | accepted; amended by 0048 |
 | [0048](0048-carry-generators-on-shapes-and-fill-fresh-values-where-a-value-is-produced.md) | Carry generators on shapes, and fill fresh values where a value is produced | accepted |
-| [0049](0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md) | Match a content type against the arrival's own octets and labels | accepted |
+| [0049](0049-match-a-content-type-against-the-arrivals-own-octets-and-labels.md) | Match a content type against the arrival's own octets and labels | accepted; extended by 0077 |
 | [0050](0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md) | `explain` compiles what a run compiles, and runs captured values | accepted |
 | [0051](0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md) | Leave pending out of the contract, and let upgrade exclude pending interactions | accepted |
 | [0052](0052-declare-a-components-registry-credential-in-its-source.md) | Declare a component's registry credential in its source | accepted |
@@ -93,6 +93,7 @@ superseding ADR instead.
 | [0074](0074-redact-credentials-from-what-the-engine-records-and-reports.md) | Redact credentials from what the engine records and reports | accepted |
 | [0075](0075-keep-xml-text-as-written-beside-the-text-todays-verifier-reads.md) | Keep XML text as written, beside the text today's verifier reads | accepted |
 | [0076](0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md) | Write a facade's conformance cases as tests in its own language, and read its verdicts from its migration note | accepted |
+| [0077](0077-match-a-multipart-parts-content-type-against-its-own-label.md) | Match a multipart part's content type against its own label | accepted |
 
 ## Decision backlog
 
