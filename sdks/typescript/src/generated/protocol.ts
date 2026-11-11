@@ -129,6 +129,10 @@ export interface ResolvedConfig {
 
 export interface Create {
   config: SessionConfig;
+  /**
+   * Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md §9.6, staged plan S3.5): what a host surfaces while its test is running.
+   */
+  events?: boolean;
   [k: string]: unknown;
 }
 
@@ -162,6 +166,10 @@ export interface SessionConfig {
 
 export interface CreateResult {
   session: string;
+  /**
+   * The session's event stream, when 'create' asked for 'events' (spec.md §9.6).
+   */
+  stream?: string;
   [k: string]: unknown;
 }
 

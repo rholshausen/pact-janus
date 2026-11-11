@@ -1,0 +1,29 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "lifecycle/asks-for-exchange-events",
+  "category": "lifecycle",
+  "title": "'consumer-session/create' asks for the session's stream, and an engine that names none is polled for nothing.",
+  "covers": ["session.execute.asks-for-exchange-events"],
+  "why": "behavioural spec 'execute': 'create' carries 'events': true, and the SDK drains the stream only when the answer names one (engine-protocol spec §9.6, staged plan S3.5). This engine's 'create' answers with a session alone, as one that predates the stream would, so the SDK sends exactly what it sent before.",
+  "note": "How many polls a closure's run makes depends on how long it runs, so no case counts them when the engine does name a stream; live/exchange-events-logged checks what the SDK does with the events.",
+  "steps": [
+    {
+      "execute": { "interaction": { "description": "get an order", "request": { "method": "GET", "path": "/orders/42" } } },
+      "expect": { "outcome": "ok", "closure-calls": ["base"] }
+    }
+  ],
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "consumer-session/create",
+      "consumer-session/add-interaction",
+      "consumer-session/start-transport",
+      "consumer-session/variants",
+      "consumer-session/serve-variant",
+      "consumer-session/report-variant"
+    ],
+    "frames": {
+      "consumer-session/create": { "events": true, "config": { "consumer": { "name": "web-app" }, "provider": { "name": "orders-api" } } }
+    }
+  }
+}

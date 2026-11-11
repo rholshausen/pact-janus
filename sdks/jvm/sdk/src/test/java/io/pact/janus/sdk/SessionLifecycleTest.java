@@ -94,7 +94,8 @@ class SessionLifecycleTest {
         "consumer-session/start-transport", "consumer-session/variants", "consumer-session/serve-variant",
         "consumer-session/report-variant", "consumer-session/serve-variant", "consumer-session/report-variant",
         "consumer-session/finalise"), engine.ops());
-    assertEquals(MAPPER.readTree("{\"config\":{\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"}}}"),
+    // `events`: this test has an SLF4J provider, so what the mock does has somewhere to be logged.
+    assertEquals(MAPPER.readTree("{\"events\":true,\"config\":{\"consumer\":{\"name\":\"web-app\"},\"provider\":{\"name\":\"orders-api\"}}}"),
         engine.body("consumer-session/create"));
     assertEquals(MAPPER.readTree(MAPPER.writeValueAsString(interaction.toDocument())),
         engine.body("consumer-session/add-interaction").get("interaction"));

@@ -235,7 +235,11 @@ Three sources are the source of truth and take precedence over this file when th
 > `http:list`. A contract writes a component operator's members by name. S3.4 (ADR 0083): v1–v4 read
 > parameters only in `Accept` and `Content-Type`, as media types element by element; the legacy compiler
 > now does (`legacy:header-value`, and `legacy:header-text` for every other header), and `janus upgrade`
-> writes an `Accept` of one media type as `http:media-type`.
+> writes an `Accept` of one media type as `http:media-type`. S3.5 (ADR 0084): a consumer session
+> created with `events: true` tells each request its mock receives as a `consumer-session/exchange`
+> event, which both SDKs log while the test runs; Spock (`where: variant << janus.variants(i)`),
+> Vitest and Jest as ES modules (`await janus.variants(i, closure)`) make each variant a test of its
+> own, as JUnit 5's `@TestFactory` does.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

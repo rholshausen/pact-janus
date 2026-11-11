@@ -5,7 +5,7 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { protocol } from "../src/generated/index.js";
 import {
   ContractWithheldError,
@@ -108,9 +108,72 @@ describe("execute", () => {
       "consumer-session/report-variant",
     ]);
     expect(pipe.bodies[0]).toMatchObject({ "protocol-versions": [1], capabilities: { "contract-text": {}, "test-verdicts": {} } });
-    expect(pipe.bodies[1]).toEqual({ config: { consumer: { name: "web-app" }, provider: { name: "orders-api" } } });
+    expect(pipe.bodies[1]).toEqual({ events: true, config: { consumer: { name: "web-app" }, provider: { name: "orders-api" } } });
     expect(pipe.bodies[5]).toEqual({ session: "s-1", handle: "i-1", variant: "base" });
     expect(pipe.bodies[6]).toEqual({ session: "s-1", handle: "i-1", variant: "base", status: "passed" });
+  });
+
+  it("drains the session's stream while a closure runs, and logs each exchange (session.execute.logs-exchange-events)", async () => {
+    const told = [
+      { kind: "consumer-session/exchange", payload: { transport: "t-1", handle: "i-1", variant: "a", status: "mismatched", mismatches: [{ path: "$.request.path", message: "Expected '/orders/7' to equal '/orders/42'" }] } },
+      { kind: "consumer-session/exchange", payload: { transport: "t-1", handle: "i-1", variant: "a", status: "matched" } },
+      { kind: "consumer-session/exchange", payload: { transport: "t-1", status: "unmatched" } },
+    ];
+    let polls = 0;
+    const pipe = new ScriptedPipe(
+      {
+        "consumer-session/create": () => ({ ok: { session: "s-1", stream: "s-9" } }),
+        "events/poll": (body) => {
+          expect(body).toEqual({ streams: ["s-9"], "wait-ms": 0 });
+          polls += 1;
+          const events = told.splice(0, 1).map((event, i) => ({ stream: "s-9", seq: polls + i, ...event }));
+          return { ok: { events } };
+        },
+      },
+      ["a"],
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+    try {
+      await janusOver(pipe, { logLevel: "debug" }).execute(janusOver(pipe).interaction("get an order"), async () => {
+        // Long enough for the polls the closure's run makes to say what the mock did, before it ends.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(warn).toHaveBeenCalledWith(
+          "pact-janus: 'get an order' [label of a [a]]: the request did not match\n    $.request.path: Expected '/orders/7' to equal '/orders/42'",
+        );
+      });
+      expect(debug).toHaveBeenCalledWith("pact-janus: 'get an order' [label of a [a]]: the request matched");
+      expect(warn).toHaveBeenCalledWith("pact-janus: a request arrived with no variant armed for it, and the mock refused it");
+      // The last drain comes before the variant is reported.
+      expect(pipe.ops.lastIndexOf("events/poll")).toBeLessThan(pipe.ops.indexOf("consumer-session/report-variant"));
+    } finally {
+      warn.mockRestore();
+      debug.mockRestore();
+    }
+  });
+
+  it("asks for the session's stream, and polls nothing when the engine answers with none (session.execute.asks-for-exchange-events)", async () => {
+    const pipe = new ScriptedPipe();
+    await janusOver(pipe).execute(janusOver(pipe).interaction("x"), () => new Promise((resolve) => setTimeout(resolve, 150)));
+    expect(pipe.bodies[pipe.ops.indexOf("consumer-session/create")]).toMatchObject({ events: true });
+    expect(pipe.ops).not.toContain("events/poll");
+  });
+
+  it("logs nothing below the test's log level, and a failed poll is not the closure's verdict", async () => {
+    const pipe = new ScriptedPipe({
+      "consumer-session/create": () => ({ ok: { session: "s-1", stream: "s-9" } }),
+      "events/poll": () => ({ error: { code: "stream-not-found", category: "request", message: "no stream 's-9'" } }),
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await janusOver(pipe, { logLevel: "error" }).execute(janusOver(pipe).interaction("x"), noop);
+      expect(warn).not.toHaveBeenCalled();
+      await janusOver(pipe).execute(janusOver(pipe).interaction("x"), noop);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("could not read the mock's exchanges"));
+      expect(pipe.ops.filter((op) => op === "events/poll")).toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("reports each closure's verdict once it ends, with what a failing one threw (session.execute.reports-each-variant)", async () => {

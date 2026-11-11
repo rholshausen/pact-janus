@@ -39,6 +39,11 @@
               }
             }
           }
+        },
+        "events": {
+          "type": "boolean",
+          "default": false,
+          "description": "Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md §9.6, staged plan S3.5): what a host surfaces while its test is running."
         }
       }
     },
@@ -47,7 +52,12 @@
       "type": "object",
       "required": ["session"],
       "properties": {
-        "session": { "type": "string", "minLength": 1 }
+        "session": { "type": "string", "minLength": 1 },
+        "stream": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The session's event stream, when 'create' asked for 'events' (spec.md §9.6)."
+        }
       }
     },
     "AddInteraction": {

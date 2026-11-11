@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -24,7 +25,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "config"
+    "config",
+    "events"
 })
 public class Create {
 
@@ -37,6 +39,13 @@ public class Create {
      */
     @JsonProperty("config")
     private SessionConfig config;
+    /**
+     * Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md §9.6, staged plan S3.5): what a host surfaces while its test is running.
+     * 
+     */
+    @JsonProperty("events")
+    @JsonPropertyDescription("Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md \u00a79.6, staged plan S3.5): what a host surfaces while its test is running.")
+    private Boolean events;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -64,6 +73,24 @@ public class Create {
         this.config = config;
     }
 
+    /**
+     * Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md §9.6, staged plan S3.5): what a host surfaces while its test is running.
+     * 
+     */
+    @JsonProperty("events")
+    public Boolean getEvents() {
+        return events;
+    }
+
+    /**
+     * Tell each request a started transport receives, and what became of it, on a stream the result names, until 'finalise' ends it (spec.md §9.6, staged plan S3.5): what a host surfaces while its test is running.
+     * 
+     */
+    @JsonProperty("events")
+    public void setEvents(Boolean events) {
+        this.events = events;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -82,6 +109,10 @@ public class Create {
         sb.append('=');
         sb.append(((this.config == null)?"<null>":this.config));
         sb.append(',');
+        sb.append("events");
+        sb.append('=');
+        sb.append(((this.events == null)?"<null>":this.events));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -97,8 +128,9 @@ public class Create {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.config == null)? 0 :this.config.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.config == null)? 0 :this.config.hashCode()));
+        result = ((result* 31)+((this.events == null)? 0 :this.events.hashCode()));
         return result;
     }
 
@@ -111,7 +143,7 @@ public class Create {
             return false;
         }
         Create rhs = ((Create) other);
-        return (((this.config == rhs.config)||((this.config!= null)&&this.config.equals(rhs.config)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.config == rhs.config)||((this.config!= null)&&this.config.equals(rhs.config))))&&((this.events == rhs.events)||((this.events!= null)&&this.events.equals(rhs.events))));
     }
 
 }

@@ -174,6 +174,16 @@ export function engineEnvironment(env: NodeJS.ProcessEnv, logLevel: string | und
   return { ...env, RUST_LOG: known };
 }
 
+/**
+ * How much the SDK itself logs, as the engine's level is chosen (ADR 0061): the `logLevel` option,
+ * else `LOG_LEVEL`, else `warn`, as one of `trace`, `debug`, `info`, `warn`, `error` or `off`. A level
+ * it does not know is `warn`: starting the engine refuses it, and says why.
+ */
+export function sdkLogLevel(env: NodeJS.ProcessEnv, logLevel: string | undefined): string {
+  const level = logLevel?.trim() ? logLevel : env.LOG_LEVEL;
+  return LOG_LEVELS[level?.trim().toLowerCase() ?? ""] ?? "warn";
+}
+
 /** What pointed the SDK at the executable it tried, as the error names it. */
 export type EngineSource = "engine.command" | "JANUS_ENGINE" | "release";
 

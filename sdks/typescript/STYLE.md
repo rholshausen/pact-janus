@@ -124,6 +124,20 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   file's "Test suite failed to run", and Vitest as the file's error.
 - A variant that fails throws from `execute`, so it fails the test that ran it in either framework,
   and the file's other tests are unaffected.
+- **Each variant a test of its own** (staged plan S3.5): `await janus.variants(interaction, closure)`
+  on the `Janus` `useJanus` returns registers one test per variant the engine selects, named
+  `label [id]` (`base` for the base variant), with the framework's own `test`. A failing variant fails
+  only its own test, with its closure's error, or the engine's verdict when the closure passed and the
+  engine did not verify the variant, and the engine withholds the contract. The engine selects the
+  variants, so they are known only after an `await`: Vitest takes it at the top level of a test file or
+  inside an async `describe`, and Jest at the top level of an ES module test file. Jest from CommonJS
+  cannot register a test after an `await`, and has `execute` alone. `variantTests` on any `Janus` answers
+  the same tests as `{ name, run }`, for another framework that registers tests that late.
+- **What the mock made of each request is logged while the test runs** (behavioural spec 'execute',
+  engine-protocol spec §9.6): `pact-janus: 'get an order' [shippedAt=absent [response.body…]]: the
+  request did not match`, then each mismatch, through `console.warn`, so Vitest and Jest show it under
+  the test that ran it; a request that matched through `console.debug`. The test's `logLevel`, else
+  `LOG_LEVEL`, else `warn`, decides which are shown, as it decides the engine's.
 - `pact-janus/jest` takes `afterAll` from `@jest/globals`, which Jest's runtime provides to every
   module it loads, so it works with `injectGlobals: false` and needs no package installed beside
   Jest. It is CommonJS and ES modules alike; Jest runs ES module test files only under Node's
@@ -241,4 +255,4 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 
 | Primitive | Deviation | Reason |
 |---|---|---|
-| `execute` | Each selected variant is a line in `execute`'s failure, not a separately reported test | Vitest cannot add tests to a test that is already running, and naming variants at collection time would need an engine session before any test runs. The failure message names every failed variant by label and id, which task 4.6 found is what makes a failing variant identifiable (SDK spec §5 SHOULD). |
+| `execute` | Within one test, each selected variant is a line in `execute`'s failure, not a separately reported test; `variants` makes each a test of its own where the framework allows (above) | Vitest and Jest cannot add tests to a test that is already running. `variants` registers them before any test runs, once the engine has selected them, which Jest from CommonJS cannot. The failure message names every failed variant by label and id, which task 4.6 found is what makes a failing variant identifiable (SDK spec §5 SHOULD). |

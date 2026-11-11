@@ -101,6 +101,28 @@ impl Stream {
     self.append(kind.into(), payload, true);
   }
 
+  /// Append the terminal event now, whatever the buffer holds, and release a producer waiting for
+  /// room: what it was appending is dropped, since the work it reports on has ended. For work the
+  /// dispatch thread ends itself, which must not wait on a host to drain the stream first: a consumer
+  /// session's `finalise` (spec §9.6).
+  pub fn close(&self, kind: impl Into<String>, payload: Value) {
+    let mut inner = self.inner.lock().expect("stream mutex poisoned");
+    if inner.produced_last {
+      return;
+    }
+    inner.next_seq += 1;
+    let event = Event {
+      stream: self.id.clone(),
+      seq: inner.next_seq,
+      kind: kind.into(),
+      payload,
+      last: true,
+    };
+    inner.produced_last = true;
+    inner.pending.push_back(event);
+    self.change.notify_all();
+  }
+
   /// Follow each event appended from here with what `observer` says of it (ADR 0059).
   pub fn observe(&self, observer: Box<dyn Observer>) {
     *self.observer.lock().expect("observer mutex poisoned") = Some(observer);
@@ -139,9 +161,14 @@ impl Stream {
       );
       return;
     }
-    while inner.pending.len() >= BUFFER_CAP {
+    while inner.pending.len() >= BUFFER_CAP && !inner.produced_last {
       tracing::debug!(stream = %self.id, cap = BUFFER_CAP, "event buffer full, pausing the producer");
       inner = self.change.wait(inner).expect("stream mutex poisoned");
+    }
+    if inner.produced_last {
+      // Closed while this producer waited for room ([`Stream::close`]).
+      tracing::debug!(stream = %self.id, kind = %kind, "the stream was closed; event dropped");
+      return;
     }
     inner.next_seq += 1;
     let event = Event {
@@ -233,6 +260,25 @@ mod tests {
 
   fn payload(n: u64) -> Value {
     json!({ "n": n })
+  }
+
+  #[test]
+  fn closing_a_full_stream_releases_its_producer_and_ends_it() {
+    let stream = Arc::new(Stream::new("s-1"));
+    for n in 0..BUFFER_CAP as u64 {
+      stream.emit("tick", payload(n));
+    }
+    let producer = {
+      let stream = Arc::clone(&stream);
+      std::thread::spawn(move || stream.emit("tick", payload(9999)))
+    };
+    stream.close("done", json!({}));
+    producer.join().expect("the producer was released");
+    let events = stream.drain(BUFFER_CAP + 2);
+    assert_eq!(events.len(), BUFFER_CAP + 1, "the waiting event was dropped");
+    let last = events.last().expect("events");
+    assert!(last.last && last.kind == "done", "{last:?}");
+    assert!(stream.ended());
   }
 
   #[test]

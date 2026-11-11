@@ -231,7 +231,9 @@ failing beyond its tests, as a JUnit class does in an extension's `afterAll`; `c
 run wrote, by name, `written` and `content` as a step's `contract` compares them, a file the case does
 not name failing it; `output`, strings the run's `stdout` and `stderr` hold, the subject's and the
 SDK's; and `engine-log`, strings the engine's log holds, its standard error or the events the SDK hands
-its language's logging, each written `<LEVEL> <message>`. Against a scripted engine, `ops`, `frames`,
+its language's logging, each written `<LEVEL> <message>` (TypeScript's logging is the console, so
+what the SDK hands it is in the log too, as written). A `live` case may name subjects in place of
+`steps`, for what only a language's own test can show, such as what the SDK logs while one runs. Against a scripted engine, `ops`, `frames`,
 `hooks` and `invocations` are a provider case's.
 
 For a framework case, each subject's run is checked against all of these but `engine-log`, which a

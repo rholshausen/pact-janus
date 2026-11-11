@@ -1,12 +1,13 @@
-// framework/junit5-test-per-variant, under JUnit 5: a @TestFactory returns janus.variants, so each
-// variant the engine selects is a test of its own. The client reads shippedAt as if it were always
-// there, so the variant without it fails with the closure's own exception, the base passes, and the withheld contract fails the class.
+// framework/test-per-variant, under JUnit 5: a @TestFactory returns janus.variants, so each variant the
+// engine selects is a test of its own. The client reads shippedAt as if it were always there, so the
+// variant without it fails with the closure's own exception, the base passes, and the withheld contract
+// fails the class.
 import static io.pact.janus.sdk.Shapes.integer;
 import static io.pact.janus.sdk.Shapes.json;
 import static io.pact.janus.sdk.Shapes.map;
 import static io.pact.janus.sdk.Shapes.optional;
 import static io.pact.janus.sdk.Shapes.string;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pact.janus.sdk.Interaction;
@@ -38,7 +39,7 @@ class VariantTestsTest {
     return janus.variants(getOrder, (mock, variant) -> {
       HttpRequest request = HttpRequest.newBuilder(URI.create(mock.url() + "/orders/42")).GET().build();
       Map<?, ?> order = new ObjectMapper().readValue(http.send(request, HttpResponse.BodyHandlers.ofString()).body(), Map.class);
-      assertEquals("2026", ((String) order.get("shippedAt")).substring(0, 4));
+      assertNotNull(order.get("shippedAt"), "shippedAt is missing");
     });
   }
 }

@@ -3,7 +3,11 @@
 //! there is no per-object cleanup call (spec §7.1).
 
 use super::background::{Background, SpawnError, Task};
+use super::events::Stream;
 use super::exchange::{self, ArmedExchange, Exchange};
+
+/// The terminal event of a consumer session's stream (spec §9.6), which `finalise` appends.
+pub(crate) const FINISHED_EVENT: &str = "consumer-session/finished";
 use super::scope::Scope;
 use crate::common::{ContentTypes, declared_type};
 use crate::component::{ComponentError, Parts, Start, Stop, TransportComponent, Unavailable};
@@ -254,6 +258,9 @@ pub(crate) struct ConsumerSession {
   refused: Vec<Value>,
   /// What its contract records redacted and its mismatches never repeat (ADR 0074).
   redaction: Arc<Redaction>,
+  /// The stream each arrival's outcome is told on, when `create` asked for one (spec §9.6, staged
+  /// plan S3.5). `finalise` closes it.
+  events: Option<Arc<Stream>>,
 }
 
 /// Why `add-interaction` refused an interaction: it is malformed (`interaction-invalid`), or it
@@ -291,6 +298,20 @@ impl ConsumerSession {
       verdicts_required,
       refused: Vec::new(),
       redaction: Arc::new(redaction),
+      events: None,
+    }
+  }
+
+  /// Tell each arrival's outcome on `events` (spec §9.6), from the next transport started.
+  pub fn watch(&mut self, events: Arc<Stream>) {
+    self.events = Some(events);
+  }
+
+  /// End the session's stream, if it has one, with its terminal event. It never waits on the host:
+  /// an exchange waiting for room is released, and what it would have told is dropped.
+  pub fn close_events(&self) {
+    if let Some(events) = &self.events {
+      events.close(FINISHED_EVENT, serde_json::json!({}));
     }
   }
 
@@ -458,7 +479,7 @@ impl ConsumerSession {
       .map_err(StartTransportError::Component)?;
 
     let stop = Arc::new(AtomicBool::new(false));
-    let exchange = Arc::new(Exchange::default());
+    let exchange = Arc::new(Exchange::new(self.events.clone()));
     let thread_component = Arc::clone(&component);
     let thread_stop = Arc::clone(&stop);
     let thread_exchange = Arc::clone(&exchange);
@@ -1057,6 +1078,7 @@ impl SessionStore {
   /// them — a host that wanted results would have finalised first.
   pub fn end_all(&mut self) {
     for (_, mut session) in self.sessions.drain() {
+      session.close_events();
       session.stop_transports();
     }
   }

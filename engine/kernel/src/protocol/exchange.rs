@@ -16,6 +16,7 @@
 //! that target waits on (ADR 0062 decision 7).
 
 use super::contributions::Contributions;
+use super::events::Stream;
 use super::session::{ExchangeOutcome, Exercised, Payload};
 use super::wire::{encode_slot, find_container, mismatch_json, octets_slot, parts_resolver, plain_slot};
 use crate::common::ContentTypes;
@@ -93,13 +94,36 @@ impl ExchangeState {
 pub(crate) struct Exchange {
   pub state: Mutex<ExchangeState>,
   settled: Condvar,
+  /// The session's event stream, when its host asked for one (spec §9.6, staged plan S3.5): each
+  /// arrival's outcome is a `consumer-session/exchange` event, which the host surfaces while its test
+  /// runs, so the engine's own log says it only at `debug`.
+  events: Option<Arc<Stream>>,
 }
+
+/// The kind of event an arrival's outcome is (spec §9.6).
+pub(crate) const EXCHANGE_EVENT: &str = "consumer-session/exchange";
 
 /// How long `report-variant` waits for an exchange under way to be recorded. The exchange waits only
 /// on the transport's `reply` or `dispose`, so this bounds a transport that never returns.
 const SETTLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 impl Exchange {
+  /// An exchange whose arrivals are told on `events`, when the session has a stream.
+  pub fn new(events: Option<Arc<Stream>>) -> Self {
+    Exchange {
+      events,
+      ..Exchange::default()
+    }
+  }
+
+  /// Tell the host what became of an arrival, when it asked (spec §9.6). Called with no lock held: a
+  /// full stream waits for the host to drain it.
+  fn tell(&self, payload: Value) {
+    if let Some(events) = &self.events {
+      events.emit(EXCHANGE_EVENT, payload);
+    }
+  }
+
   /// Wait until no exchange of `handle`'s `variant` is under way, then take its recorded outcome and
   /// disarm it if it is still armed (ADR 0064 decision 1). `None` when nothing was recorded for it.
   pub fn settle(&self, handle: &str, variant: &str) -> Option<Exercised> {
@@ -228,13 +252,18 @@ pub(crate) fn handle_arrival(
     // Plan task 4.6's own finding: this is the one line that names an arrival at all when
     // nothing was armed for it — without it, a request that missed its `serve-variant` window
     // entirely (a race, a typo'd variant id upstream) leaves no trace anywhere.
-    tracing::warn!(instance, event = %inbound.event, "inbound request arrived with nothing armed; answering unmatched");
+    if exchange.events.is_some() {
+      tracing::debug!(instance, event = %inbound.event, "inbound request arrived with nothing armed; answering unmatched");
+    } else {
+      tracing::warn!(instance, event = %inbound.event, "inbound request arrived with nothing armed; answering unmatched");
+    }
     let _ = transport.dispose(Dispose {
       instance: instance.to_string(),
       event: inbound.event,
       disposition: "unmatched".to_string(),
       details: None,
     });
+    exchange.tell(serde_json::json!({ "transport": instance, "status": "unmatched" }));
     return;
   }
 
@@ -299,7 +328,11 @@ pub(crate) fn handle_arrival(
           None => mismatch.message.clone(),
         })
         .collect();
-      tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, mismatches = ?said, "request did not match the armed variant")
+      if exchange.events.is_some() {
+        tracing::debug!(instance, handle = %armed.handle, variant = %armed.variant_id, mismatches = ?said, "request did not match the armed variant")
+      } else {
+        tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, mismatches = ?said, "request did not match the armed variant")
+      }
     }
   }
 
@@ -343,8 +376,8 @@ pub(crate) fn handle_arrival(
   // A variant is verified only if the consumer actually got the response it was armed with: a
   // request that matched but whose reply never reached the client (the client gave up, or the
   // connection was unusable) exercised nothing the consumer could have handled.
-  let (exchange_outcome, recorded) = match (status, delivered) {
-    (Status::Matched, Ok(_)) => (ExchangeOutcome::Verified, Vec::new()),
+  let (exchange_outcome, recorded, told) = match (status, delivered) {
+    (Status::Matched, Ok(_)) => (ExchangeOutcome::Verified, Vec::new(), "matched"),
     (Status::Matched, Err(err)) => {
       tracing::warn!(instance, handle = %armed.handle, variant = %armed.variant_id, error = %err.message, "the matched request's response could not be delivered");
       (
@@ -353,6 +386,7 @@ pub(crate) fn handle_arrival(
           "message": format!("the request matched, but its response could not be delivered to the consumer: {}", err.message),
           "action": "transport:reply",
         })],
+        "undelivered",
       )
     }
     (Status::Mismatched, _) => (
@@ -361,8 +395,18 @@ pub(crate) fn handle_arrival(
         .iter()
         .map(|mismatch| mismatch_json(mismatch, false))
         .collect(),
+      "mismatched",
     ),
   };
+  let mut event = serde_json::json!({
+    "transport": instance,
+    "handle": armed.handle,
+    "variant": armed.variant_id,
+    "status": told,
+  });
+  if !recorded.is_empty() {
+    event["mismatches"] = Value::from(recorded.clone());
+  }
   let mut state = exchange.state.lock().expect("exchange state lock poisoned");
   state.in_flight.clear();
   let exercised = Exercised {
@@ -381,6 +425,7 @@ pub(crate) fn handle_arrival(
   }
   drop(state);
   exchange.settled.notify_all();
+  exchange.tell(event);
 }
 
 /// The armed reply, with every position the answering part's shapes give a generator filled with a

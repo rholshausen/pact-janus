@@ -160,6 +160,18 @@ Interaction getOrder = janus.interaction("get an order")
   `variants(message, test)`. Both
   share one implementation (`Janus.begin` / `Janus.run`), so they make the same protocol calls in the
   same order.
+- **Spock runs a variant per row** (staged plan S3.5): `janus.variants(interaction)` in a feature's
+  `where:` block answers one `VariantRun` per selected variant, and `janus.run(variant) { mock, v -> }`
+  in its body runs it: `serve-variant`, the closure, `report-variant`. A feature named `"#variant"`
+  unrolls into one iteration per variant, named `label [id]`, as JUnit's dynamic tests are; a failing
+  row fails with the closure's own exception or the engine's verdict. A message's variants are
+  `MessageVariantRun`s, run with a `MessageTest`: a type of their own, so Groovy reads the closure as
+  the one kind of test the row can run.
+- **What the mock made of each request is logged while the test runs** (behavioural spec 'execute',
+  engine-protocol spec §9.6): to the SLF4J logger `io.pact.janus.engine`, the engine's own, a request
+  the mock rejected at `warn` (`'get an order' [base]: the request did not match`, then each mismatch)
+  and one that matched at `debug`. With no SLF4J provider there is nowhere to send them, so the SDK does
+  not ask the engine for them, and the engine's own warning on its stderr says it instead.
 - **The contract file is the engine's to write** (ADR 0065). `finalise` sends `write`:
   `contractFile()`, made absolute, and `merge`, or `overwrite` with
   `JanusOptions.withContractOverwrite(true)`. It returns the path the engine answered and opens no

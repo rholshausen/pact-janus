@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -24,7 +25,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "session"
+    "session",
+    "stream"
 })
 public class CreateResult {
 
@@ -35,6 +37,13 @@ public class CreateResult {
      */
     @JsonProperty("session")
     private String session;
+    /**
+     * The session's event stream, when 'create' asked for 'events' (spec.md §9.6).
+     * 
+     */
+    @JsonProperty("stream")
+    @JsonPropertyDescription("The session's event stream, when 'create' asked for 'events' (spec.md \u00a79.6).")
+    private String stream;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -58,6 +67,24 @@ public class CreateResult {
         this.session = session;
     }
 
+    /**
+     * The session's event stream, when 'create' asked for 'events' (spec.md §9.6).
+     * 
+     */
+    @JsonProperty("stream")
+    public String getStream() {
+        return stream;
+    }
+
+    /**
+     * The session's event stream, when 'create' asked for 'events' (spec.md §9.6).
+     * 
+     */
+    @JsonProperty("stream")
+    public void setStream(String stream) {
+        this.stream = stream;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -76,6 +103,10 @@ public class CreateResult {
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
         sb.append(',');
+        sb.append("stream");
+        sb.append('=');
+        sb.append(((this.stream == null)?"<null>":this.stream));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -91,8 +122,9 @@ public class CreateResult {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.stream == null)? 0 :this.stream.hashCode()));
+        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
         return result;
     }
 
@@ -105,7 +137,7 @@ public class CreateResult {
             return false;
         }
         CreateResult rhs = ((CreateResult) other);
-        return (((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.stream == rhs.stream)||((this.stream!= null)&&this.stream.equals(rhs.stream))))&&((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session))));
     }
 
 }

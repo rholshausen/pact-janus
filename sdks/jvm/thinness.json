@@ -33,6 +33,8 @@
       "sdk/src/main/java/io/pact/janus/sdk/Mock.java",
       "sdk/src/main/java/io/pact/janus/sdk/Variant.java",
       "sdk/src/main/java/io/pact/janus/sdk/VariantFailure.java",
+      "sdk/src/main/java/io/pact/janus/sdk/VariantRun.java",
+      "sdk/src/main/java/io/pact/janus/sdk/MessageVariantRun.java",
       "sdk/src/main/java/io/pact/janus/sdk/EngineClient.java",
       "sdk/src/main/java/io/pact/janus/sdk/ContractWithheldException.java",
       "sdk/src/main/java/io/pact/janus/sdk/ExecuteFailedException.java",
@@ -73,7 +75,7 @@
     ]
   },
   "budgets": {
-    "idiomatic": 2450,
+    "idiomatic": 2650,
     "embedding": 600,
     "loopback": 100,
     "integration": 280,

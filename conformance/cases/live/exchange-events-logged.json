@@ -1,0 +1,14 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/exchange-events-logged",
+  "category": "live",
+  "title": "A request the mock rejects is logged at warn while the test runs, naming the interaction, the variant and the mismatch, against the real engine.",
+  "covers": ["session.execute.logs-exchange-events"],
+  "why": "behavioural spec 'execute': while each closure runs, the SDK drains the session's stream and hands each 'consumer-session/exchange' event to its language's logging, a 'mismatched' one at warn, naming the interaction as '<description>' [<variant>] and each mismatch's path and message (engine-protocol spec §9.6, staged plan S3.5).",
+  "note": "The logging is each language's own, which data cannot run, so each language has a subject (ADR 0076 decision 5). The client asks for the wrong order and ignores the rejection, so the engine's verdict fails the variant.",
+  "subjects": { "typescript": "exchange-events-logged.ts", "jvm": "ExchangeEventsLogged.java" },
+  "expect": {
+    "tests": [{ "test": "aRejectedRequestIsLogged", "fails": ["get an order"] }],
+    "engine-log": ["'get an order' [base]: the request did not match", "$.request.path: "]
+  }
+}

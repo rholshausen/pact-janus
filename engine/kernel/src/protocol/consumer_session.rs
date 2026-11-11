@@ -9,6 +9,9 @@ use serde_json::Value;
 #[derive(Debug, Deserialize)]
 pub struct Create {
   pub config: SessionConfig,
+  /// Tell each arrival's outcome on a stream the answer names (spec §9.6, staged plan S3.5).
+  #[serde(default)]
+  pub events: bool,
 }
 
 #[derive(Debug, Deserialize)]

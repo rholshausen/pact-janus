@@ -54,6 +54,7 @@ await janus.execute(getOrder, async (mock, variant) => {
 | `request`, `response` | `.request({ method, path, query, headers, body })` | `.request(r -> r.method(..).path(..))` | An HTTP exchange's parts |
 | `message-contents`, `message-request` | `.contents({ metadata, body })`, `.request(..)` | `.contents(m -> ..)`, `.request(m -> ..)` | A message's parts |
 | `execute` | `janus.execute(i, async (mock, variant) => ..)` | `janus.execute(i, (mock, variant) -> ..)` | Runs the test once per selected variant |
+| `execute`, a test per variant | `await janus.variants(i, async (mock, variant) => ..)` (Vitest; Jest as ES modules) | `janus.variants(i, (mock, variant) -> ..)` from a `@TestFactory`; Spock: `where: variant << janus.variants(i)` and `janus.run(variant) { mock, v -> .. }` | Each selected variant a test of its own, named `label [id]` (ADR 0084) |
 | `finalise` | `janus.finalise()`, or the integration | `janus.finalise()`, or the extension | Writes the contract |
 | `literal` | a plain value | a plain value | Exactly this value |
 | `json`, `content` | `json(doc)`, `content(type, doc)` | `Shapes.json(..)`, `Shapes.content(..)` | A body, and its media type |

@@ -113,7 +113,7 @@
     },
     {
       "if": { "properties": { "category": { "const": "live" } }, "required": ["category"] },
-      "then": { "anyOf": [{ "required": ["steps"] }, { "required": ["verifier", "provider", "expect"] }] }
+      "then": { "anyOf": [{ "required": ["steps"] }, { "required": ["verifier", "provider", "expect"] }, { "required": ["subjects", "expect"] }] }
     },
     {
       "if": { "properties": { "category": { "const": "provider" } }, "required": ["category"] },

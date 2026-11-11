@@ -577,7 +577,7 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
 
 | Operation | Body → Result |
 |---|---|
-| `consumer-session/create` | `{ config }` → `{ session }` |
+| `consumer-session/create` | `{ config, events? }` → `{ session, stream? }` |
 | `consumer-session/add-interaction` | `{ session, interaction }` → `{ handle }` |
 | `consumer-session/add-pact-interaction` | `{ session, pact }` → `{ handle, findings? }` |
 | `consumer-session/variants` | `{ session, handle }` → `{ variants }` |
@@ -601,6 +601,10 @@ Schema: [`schemas/v1/consumer-session.schema.json`](schemas/v1/consumer-session.
   fails the `create` with `malformed-frame`, whose `details.problems` point at it. Nothing the session
   reports, a rejected request's mismatches included, repeats a value found under a member the
   transport declares or `add` names, kept or not ([ADR 0074](../../decisions/0074-redact-credentials-from-what-the-engine-records-and-reports.md)).
+  `events: true` asks the engine to tell each request the session's transports receive, and what
+  became of it, on a stream the answer names as `stream` (§9.6, staged plan S3.5): what a host
+  surfaces while its test is still running, which `report-variant`'s answer says only once the test
+  has ended. Without it, the session has no stream.
 - **`add-interaction`**: submits one complete interaction specification. The engine
   validates it and compiles what it needs; a rejected spec is a structured error
   (`interaction-invalid`) whose `details` carry positions a DSL can surface — errors good
@@ -1117,12 +1121,12 @@ Schema: [`schemas/v1/events.schema.json`](schemas/v1/events.schema.json).
 ### 9.1 Streams
 
 A **stream** is an ordered sequence of events produced by work inside one session. v1 defines
-two producers, the verification run and the broker session's publication (§8.7); surfacing
-consumer-session transport activity the same way is the obvious next stream and, being a new
-operation plus event kinds, needs no protocol-version bump when it arrives.
+two producers, the verification run and the broker session's publication (§8.7).
+A consumer session whose `create` asked for `events` is the third (§8.2, staged plan S3.5): its
+transports' activity, from `create` until `finalise`.
 Stream ids are engine-assigned opaque strings, scoped to their session and handed to the
 host in the result of the operation that started the work (`verification/verify`,
-`broker/publish-contracts`). A stream
+`broker/publish-contracts`, `consumer-session/create`). A stream
 ends when its final event has been *delivered*; polling an unknown or ended stream is
 answered with error `stream-not-found`.
 
@@ -1173,7 +1177,8 @@ treat push as a latency upgrade, not a second semantics.
 
 ### 9.6 Event kinds (v1)
 
-All on the verification stream; the vocabulary is open and grows without a version bump. No event
+On the verification stream, but for the broker and consumer-session kinds, each on its own session's
+stream; the vocabulary is open and grows without a version bump. No event
 repeats a credential: every string found under a member the transport declares as one
 (component-interfaces spec §5.8), or that a contract recorded redacted, in the interaction, the
 request sent or the reply, is replaced by `[redacted]` wherever it would appear, in a mismatch, an
@@ -1195,6 +1200,8 @@ subject and its `values`.
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 | `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
 | `broker/finished` | the outcome: `status` (`published` or `failed`), the broker (its URL, without credentials), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed | carries `last: true`; ends the broker session |
+| `consumer-session/exchange` | `transport`, the instance that received the request; `status`: `matched` (answered with its variant's reply), `mismatched` (rejected), `undelivered` (matched, but its reply could not be delivered) or `unmatched` (nothing was armed, so it was refused); and but for `unmatched`, the `handle` and `variant` it went to (§8.2, ADR 0069), with `mismatches` when it did not match or was not delivered, redacted as `report-variant`'s are | one per request a started transport receives, once its outcome is recorded, in a session whose `create` asked for `events` (staged plan S3.5). A host that reads them says what each was while the test runs, so the engine logs its own account of each only at `debug` |
+| `consumer-session/finished` | `{}` | carries `last: true`; `finalise` appends it, and an exchange still waiting for room in the stream is released, its event dropped, since `finalise` waits on no host |
 
 The summary document the terminal event carries is the document a report is written from, so it
 names **who the run was about**: `consumers` and `providers`, positionally parallel, one entry per

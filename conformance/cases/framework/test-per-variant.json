@@ -1,0 +1,25 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "framework/test-per-variant",
+  "category": "framework",
+  "title": "Where the framework can register a test once the engine has selected the variants, each variant is a test of its own: a failing variant fails only its own test, and the withheld contract fails the suite.",
+  "covers": ["session.execute.closure-per-selected-variant", "session.execute.failing-variant-fails-build", "session.finalise.withheld-contract-fails-build"],
+  "why": "behavioural spec 'execute': the closure runs once per selected variant, and a failed variant fails that variant only. 'finalise': when the result carries no contract, it fails, naming every interaction and variant whose status is not 'verified'. The style guides, 'Test-framework integration': each variant is a test named 'label [id]', or 'base' for the base variant — under JUnit 5, janus.variants returned from a @TestFactory; under Spock, a feature whose where: block is janus.variants, each row run with janus.run; under Vitest and Jest as ES modules, await janus.variants at the top level of the test file (staged plan S3.5).",
+  "note": "Jest from CommonJS cannot register a test after an await, so it has 'execute' alone, which runs every variant within one test under every framework (framework/withheld-contract-fails-the-suite).",
+  "subjects": {
+    "junit5": "VariantTestsTest.java",
+    "spock": "VariantTestsSpec.groovy",
+    "vitest": "test-per-variant.test.ts",
+    "jest-esm": "test-per-variant.test.mjs"
+  },
+  "expect": {
+    "tests": [
+      { "test": "base" },
+      { "test": "shippedAt=absent [response.body.shippedAt#presence=absent]", "fails": ["shippedAt is missing"] }
+    ],
+    "suite": { "fails": ["No contract", "get an order", "response.body.shippedAt#presence=absent"] },
+    "contracts": {
+      "web-app-orders-api.janus.json": { "written": false }
+    }
+  }
+}

@@ -213,7 +213,10 @@ function runIsolated(testCase: Case, dir: string): { run: SubjectRun; engineLog:
   if (!existsSync(out)) {
     throw new Error(`the child run wrote nothing to ${out}:\n${ran.stdout}\n${ran.stderr}`);
   }
-  return { run: JSON.parse(readFileSync(out, "utf8")) as SubjectRun, engineLog: ran.stderr };
+  const run = JSON.parse(readFileSync(out, "utf8")) as SubjectRun;
+  // The engine's standard error, and what the SDK handed the console, its language's logging: the
+  // exchanges it logs (behavioural spec 'execute'), which the child captured as the subject's.
+  return { run, engineLog: `${ran.stderr}\n${run.stderr}\n${run.stdout}` };
 }
 
 /** Replaces the console and the process's streams while a subject runs, keeping what they are given. */

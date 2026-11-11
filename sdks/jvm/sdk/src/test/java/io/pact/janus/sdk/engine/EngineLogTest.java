@@ -116,8 +116,8 @@ class EngineLogTest {
   }
 
   @Test
-  @DisplayName("a real engine's warning reaches the logger, through the test's own SLF4J provider")
-  void aRealEnginesWarning(@TempDir Path contracts) {
+  @DisplayName("what a real engine's mock made of a request reaches the logger at warn, said once, by the SDK")
+  void aRealEnginesMismatch(@TempDir Path contracts) {
     logger.setLevel(Level.WARN);
     Janus janus = Janus.of("web-app", "orders-api", JanusOptions.defaults().withContractDirectory(contracts));
     assertThrows(ExecuteFailedException.class, () -> janus.execute(
@@ -125,8 +125,12 @@ class EngineLogTest {
         (mock, variant) -> HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create(mock.url() + "/pong")).GET().build(), HttpResponse.BodyHandlers.discarding())));
     assertThrows(ContractWithheldException.class, janus::finalise);
-    assertTrue(messages().stream().anyMatch(message ->
-        message.startsWith("WARN pact_janus_kernel::protocol::exchange: request did not match the armed variant")),
+    // The SDK says it while the test runs (engine-protocol spec §9.6), so the engine says it only at
+    // debug. The engine's own warnings reach the logger end to end in facade/pact-jvm-test-failures,
+    // whose facade asks for no events.
+    assertTrue(messages().contains("WARN 'ping' [base]: the request did not match\n    $.request.path: Expected '/pong' to equal '/ping'"),
+        messages().toString());
+    assertTrue(messages().stream().noneMatch(message -> message.contains("request did not match the armed variant")),
         messages().toString());
   }
 }

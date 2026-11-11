@@ -144,6 +144,8 @@ export const EventKind = {
   VerificationFinished: "verification/finished",
   BrokerPublished: "broker/published",
   BrokerFinished: "broker/finished",
+  ConsumerSessionExchange: "consumer-session/exchange",
+  ConsumerSessionFinished: "consumer-session/finished",
 } as const;
 
 /**

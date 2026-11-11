@@ -2345,6 +2345,22 @@ The RFC's answer to optional fields, delivered to users.
   framework registers tests dynamically, a per-variant result list where it does not, and the exchange
   loop's match decision as an event a host can surface while the run is going (variant ergonomics
   report, recommendations 1–3).
+  *Done 2026-11-11* ([ADR 0084](decisions/0084-tell-what-the-mock-made-of-each-request-while-the-test-runs-and-make-each-variant-a-test-where-the-framework-can.md)):
+  - Recommendation 2 was already `execute`: every variant runs, and its one failure names each failed
+    variant with the engine's mismatches (ADR 0064).
+  - One test per variant: JUnit 5 had it. Spock's `where:` block takes `janus.variants(interaction)`
+    and its body `janus.run(variant) { mock, v -> }`. Vitest and Jest as ES modules take
+    `await janus.variants(interaction, closure)` at a file's top level. Jest from CommonJS cannot
+    register a test after an `await`, and keeps `execute`. `framework/test-per-variant` runs all four.
+  - The match decision is an event: `consumer-session/create` takes `events: true` and answers with a
+    stream of `consumer-session/exchange` events, one per request, which `finalise` ends without
+    waiting on the host. Both SDKs drain it while each closure runs, without holding the engine, and
+    log each, a rejected request at warn, naming the interaction and the variant
+    (`live/exchange-events-logged`). The engine then says it only at debug.
+  - Not foreseen: Groovy cannot choose between two `run` overloads that differ only in the closure's
+    interface, so a message's rows are a `MessageVariantRun` of their own. And a stream whose host
+    stops draining blocks its producer, which `finalise` would have deadlocked on, so it closes the
+    stream rather than append to it.
 - **S3.6 Generators in the DSL** — **S**. Split from S1.19 on 2026-10-25. A shape carries a generator
   and a mock fills it fresh on every exchange (ADR 0048), but no DSL can attach one, so a consumer
   suite writes no generated value unless it hands the engine an interaction specification. A DSL

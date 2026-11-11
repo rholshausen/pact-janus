@@ -513,7 +513,16 @@ impl Engine {
       redaction,
       self.test_verdicts,
     );
-    ResponseFrame::ok(id, json!({ "session": session }))
+    if !create.events {
+      return ResponseFrame::ok(id, json!({ "session": session }));
+    }
+    // Each arrival's outcome as an event (spec §9.6, staged plan S3.5), until `finalise`.
+    let stream = self.open_stream();
+    let stream_id = stream.id().to_string();
+    if let Some(created) = self.sessions.get_mut(&session) {
+      created.watch(stream);
+    }
+    ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
   }
 
   /// What the engine redacts in `scope` (ADR 0074): each transport kind's declared credentials, a
@@ -691,6 +700,9 @@ impl Engine {
     let Some(mut session) = self.sessions.end(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
+    // Closed first, so an exchange waiting for the host to drain the stream does not hold up the
+    // transports stopping.
+    session.close_events();
     session.stop_transports();
     // The session has ended either way: a `write` with no writer to do it is refused whether or not
     // there is a contract, so a host learns it from its first finalise.

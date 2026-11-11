@@ -100,6 +100,7 @@ superseding ADR instead.
 | [0081](0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md) | Write a correlation the consumer relies on as a `one-of`, and split a provider object by its discriminator | accepted |
 | [0082](0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md) | Compare a list-valued header as its elements, when the contract says it is a list | accepted |
 | [0083](0083-compare-accept-and-content-type-as-media-types-and-every-other-headers-parameters-as-text.md) | Compare `Accept` and `Content-Type` as media types, and every other header's parameters as text | accepted |
+| [0084](0084-tell-what-the-mock-made-of-each-request-while-the-test-runs-and-make-each-variant-a-test-where-the-framework-can.md) | Tell what the mock made of each request while the test runs, and make each variant a test where the framework can | accepted |
 
 ## Decision backlog
 

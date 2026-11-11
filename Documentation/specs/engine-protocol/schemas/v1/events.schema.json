@@ -30,7 +30,9 @@
             "verification/published",
             "verification/finished",
             "broker/published",
-            "broker/finished"
+            "broker/finished",
+            "consumer-session/exchange",
+            "consumer-session/finished"
           ]
         },
         "payload": { "type": "object" },

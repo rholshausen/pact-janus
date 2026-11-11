@@ -5,10 +5,13 @@ import io.pact.janus.bindings.protocol.v1.AddInteractionResult;
 import io.pact.janus.bindings.protocol.v1.ContractWrite;
 import io.pact.janus.bindings.protocol.v1.Create;
 import io.pact.janus.bindings.protocol.v1.CreateResult;
+import io.pact.janus.bindings.protocol.v1.Event;
 import io.pact.janus.bindings.protocol.v1.Finalise;
 import io.pact.janus.bindings.protocol.v1.FinaliseResult;
 import io.pact.janus.bindings.protocol.v1.InteractionResult;
 import io.pact.janus.bindings.protocol.v1.Party;
+import io.pact.janus.bindings.protocol.v1.Poll;
+import io.pact.janus.bindings.protocol.v1.PollResult;
 import io.pact.janus.bindings.protocol.v1.Redaction;
 import io.pact.janus.bindings.protocol.v1.RefusedInteraction;
 import io.pact.janus.bindings.protocol.v1.ReportVariant;
@@ -38,6 +41,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLoggerFactory;
 
 /**
  * The {@code janus} primitive: the SDK configured for one consumer/provider pair, which every other
@@ -61,8 +70,19 @@ public final class Janus implements AutoCloseable {
   private final String provider;
   private final JanusOptions options;
 
+  /**
+   * Where what the mock made of each request is logged, as it happens (behavioural spec 'execute'):
+   * the engine's own logger, whose level a project already sets (ADR 0061).
+   */
+  private static final Logger EXCHANGES = LoggerFactory.getLogger("io.pact.janus.engine");
+
+  /** How often the session's stream is drained while a test runs. */
+  private static final long POLL_EVERY_MS = 100;
+
   private EngineClient engine;
   private String session;
+  /** The session's event stream, when the engine answered {@code create} with one. */
+  private String stream;
   private Mock mock;
   /** Every interaction added in the open session, by handle. */
   private final Map<String, Execution> executions = new LinkedHashMap<>();
@@ -160,6 +180,50 @@ public final class Janus implements AutoCloseable {
     if (!failures.isEmpty()) {
       throw new ExecuteFailedException(run.description(), failures, run.variants().size());
     }
+  }
+
+  /**
+   * {@code execute} as data, for a framework that runs a test once per row, as Spock's {@code where:}
+   * does: submits {@code interaction} now, so an invalid one fails before any row runs, and answers
+   * each variant the engine selects, in its order, for {@link #run(VariantRun, VariantTest)}.
+   */
+  public List<VariantRun> variants(Interaction interaction) {
+    Execution run = begin(interaction);
+    return run.variants().stream().map(variant -> new VariantRun(run, variant)).toList();
+  }
+
+  /** {@link #variants(Interaction)} for a message, each run with {@link #run(MessageVariantRun, MessageTest)}. */
+  public List<MessageVariantRun> variants(MessageInteraction message) {
+    Execution run = begin(message);
+    return run.variants().stream().map(variant -> new MessageVariantRun(run, variant)).toList();
+  }
+
+  /**
+   * Runs one of {@link #variants(Interaction)}: {@code serve-variant}, {@code test}, then
+   * {@code report-variant}. It fails with the test's own exception, or the engine's verdict when the
+   * engine did not verify the variant (ADR 0064), and the engine withholds the contract.
+   */
+  public void run(VariantRun variant, VariantTest test) {
+    Objects.requireNonNull(test, "test");
+    VariantFailure failure = run(variant.execution(), variant.variant(), test);
+    if (failure != null) {
+      throw Janus.<RuntimeException>rethrown(failure.cause());
+    }
+  }
+
+  /** {@link #run(VariantRun, VariantTest)} for a message: {@code test} is handed its message. */
+  public void run(MessageVariantRun variant, MessageTest test) {
+    Objects.requireNonNull(test, "test");
+    VariantFailure failure = run(variant.execution(), variant.variant(), test);
+    if (failure != null) {
+      throw Janus.<RuntimeException>rethrown(failure.cause());
+    }
+  }
+
+  /** {@code thrown} as it is, checked or not, as the test that threw it would have thrown it. */
+  @SuppressWarnings("unchecked")
+  private static <T extends Throwable> T rethrown(Throwable thrown) throws T {
+    throw (T) thrown;
   }
 
   /**
@@ -282,7 +346,14 @@ public final class Janus implements AutoCloseable {
         config.setRedaction(redaction);
       }
       create.setConfig(config);
-      session = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class).getSession();
+      // What the mock makes of each request, said while the test runs; with no SLF4J provider it
+      // would be said to nobody, so the engine's own log keeps saying it (engine-protocol spec §9.6).
+      if (!(LoggerFactory.getILoggerFactory() instanceof NOPLoggerFactory)) {
+        create.setEvents(true);
+      }
+      CreateResult created = client.call(RequestFrameOp.CONSUMER_SESSION_CREATE, create, CreateResult.class);
+      session = created.getSession();
+      stream = created.getStream();
     }
     AddInteraction add = new AddInteraction();
     add.setSession(session);
@@ -352,6 +423,7 @@ public final class Janus implements AutoCloseable {
       served = engine.call(RequestFrameOp.CONSUMER_SESSION_SERVE_VARIANT, serve, ServeVariantResult.class);
     }
     Throwable thrown = null;
+    Runnable watching = watch();
     try {
       test.run(served);
     } catch (JanusEmbeddingException e) {
@@ -363,6 +435,8 @@ public final class Janus implements AutoCloseable {
         Thread.currentThread().interrupt();
       }
       thrown = t;
+    } finally {
+      watching.run();
     }
     VariantResult result;
     synchronized (this) {
@@ -382,6 +456,108 @@ public final class Janus implements AutoCloseable {
       return null;
     }
     return new VariantFailure(variant, result, thrown != null ? thrown : notVerified(result));
+  }
+
+  /**
+   * Drains the session's stream every {@link #POLL_EVERY_MS} on a thread of its own while a test runs,
+   * logging each event, and answers what stops it, which drains once more. A poll never waits, so the
+   * engine is never held; one that fails ends the watch, said at warn, and is not the test's verdict.
+   */
+  private Runnable watch() {
+    String watched;
+    synchronized (this) {
+      watched = stream;
+    }
+    if (watched == null) {
+      return () -> {};
+    }
+    CountDownLatch stopped = new CountDownLatch(1);
+    AtomicBoolean failed = new AtomicBoolean();
+    Thread poller = new Thread(() -> {
+      try {
+        do {
+          drain(watched, failed);
+        } while (!stopped.await(POLL_EVERY_MS, TimeUnit.MILLISECONDS));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }, "janus-exchanges");
+    poller.setDaemon(true);
+    poller.start();
+    return () -> {
+      stopped.countDown();
+      try {
+        poller.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      drain(watched, failed);
+    };
+  }
+
+  /** One {@code events/poll} of {@code watched}, each event logged. */
+  private void drain(String watched, AtomicBoolean failed) {
+    if (failed.get()) {
+      return;
+    }
+    List<String[]> lines = new ArrayList<>();
+    synchronized (this) {
+      if (engine == null || !watched.equals(stream)) {
+        return;
+      }
+      Poll poll = new Poll();
+      poll.setStreams(List.of(watched));
+      poll.setWaitMs(0L);
+      List<Event> events;
+      try {
+        events = engine.call(RequestFrameOp.EVENTS_POLL, poll, PollResult.class).getEvents();
+      } catch (RuntimeException e) {
+        failed.set(true);
+        EXCHANGES.warn("could not read the mock's exchanges, so they are not logged: {}", e.getMessage());
+        return;
+      }
+      for (Event event : events == null ? List.<Event>of() : events) {
+        String[] line = told(event);
+        if (line != null) {
+          lines.add(line);
+        }
+      }
+    }
+    for (String[] line : lines) {
+      if (line[0].equals("debug")) {
+        EXCHANGES.debug(line[1]);
+      } else {
+        EXCHANGES.warn(line[1]);
+      }
+    }
+  }
+
+  /** A {@code consumer-session/exchange} event as its level and its line (engine-protocol spec §9.6). */
+  private String[] told(Event event) {
+    if (!"consumer-session/exchange".equals(event.getKind()) || event.getPayload() == null) {
+      return null;
+    }
+    Map<String, Object> payload = event.getPayload();
+    String status = String.valueOf(payload.get("status"));
+    if (status.equals("unmatched")) {
+      return new String[] {"warn", "a request arrived with no variant armed for it, and the mock refused it"};
+    }
+    String handle = String.valueOf(payload.get("handle"));
+    String variantId = String.valueOf(payload.get("variant"));
+    Execution run = executions.get(handle);
+    Variant variant = run == null ? null : run.variant(variantId);
+    StringBuilder text = new StringBuilder("'").append(run == null ? handle : run.description()).append("' [")
+        .append(variant == null ? variantId : variant.displayName()).append("]: ")
+        .append(switch (status) {
+          case "matched" -> "the request matched";
+          case "mismatched" -> "the request did not match";
+          case "undelivered" -> "the request matched, but its reply could not be delivered";
+          default -> "the request was " + status;
+        });
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> mismatches = (List<Map<String, Object>>) payload.get("mismatches");
+    appendMismatches(text, mismatches, "\n    ");
+    return new String[] {status.equals("matched") ? "debug" : "warn", text.toString()};
   }
 
   private void requireOpen(Execution run) {
@@ -446,6 +622,7 @@ public final class Janus implements AutoCloseable {
     EngineClient client = engine;
     engine = null;
     session = null;
+    stream = null;
     mock = null;
     executions.clear();
     if (client != null) {
