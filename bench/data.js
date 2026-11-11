@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794378791290,
+  "lastUpdate": 1794378793175,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -49170,6 +49170,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 49882,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "e1157d5d1aa5d3a589b43c571ec0c30a42f4e3c0",
+          "message": "fix: S3.4 compare Accept and Content-Type as media types, and every other header's parameters as text\n\nToday's verifier reads parameters only in Accept and Content-Type\n(pact_models::headers::PARAMETERISED_HEADERS), comparing Accept element by\nelement. Two new S1.1 fixtures found the legacy compiler read them in every\nheader and compared an Accept list as one value, and that janus upgrade\nstill wrote an Accept as equality (ADR 0083).\n\n- Accept and Content-Type compile to legacy:header-value, now element by\n  element; every other header to a new legacy:header-text.\n- janus upgrade writes an Accept of one media type as http:media-type; the\n  parameters judgement is left only on an Accept of several elements.\n- ADR 0082 decision 5 amended; three legacy corpus cases, the verifier\n  fixtures headers/parameters and headers/parameters-exact, and three facade\n  cases' pinned contracts updated.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T17:17:12+11:00",
+          "tree_id": "0dc98c8fdf679ee99b9ba70de67ce563f3c78a30",
+          "url": "https://github.com/rholshausen/pact-janus/commit/e1157d5d1aa5d3a589b43c571ec0c30a42f4e3c0"
+        },
+        "date": 1794378792754,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 19574,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19953,
             "unit": "requests per second",
             "extra": "engines 4"
           }
