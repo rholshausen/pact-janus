@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794367370619,
+  "lastUpdate": 1794367373077,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -48462,6 +48462,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27542,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d082bdc90d6d9a1972b8e5b86c1c5df610527cba",
+          "message": "feat: S3.2 exclude in both SDKs, and the native DSL put to review\n\nThe prototype's DSL already had every primitive S3.2 lists but `exclude`\n(ADR 0080). It is now on both SDKs' interaction and message builders,\nspecified first in behavioural-spec.json and held to four conformance\ncases. It writes the interaction's `policy.exclude` and checks nothing:\nthe engine resolves its references when the interaction is added.\n\n`exclude` is the only sampling-policy member the DSL spells (S3.2's\ndecision under ADR 0080 decision 2); the rest can be added later as a\nminor change. Documentation/native-dsl-review.md puts the whole native\nsurface to the community before stage 3 freezes it.\n\nThe TypeScript SDK's idiomatic budget rises from 980 to 1000 code lines:\n`exclude` is a new primitive's translation, about 14 lines, and nothing\nin it belongs in the engine or the protocol.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T14:17:00+11:00",
+          "tree_id": "904979ce725e355dbb93d41fd90db13b44102279",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d082bdc90d6d9a1972b8e5b86c1c5df610527cba"
+        },
+        "date": 1794367372341,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 20776,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19570,
             "unit": "requests per second",
             "extra": "engines 4"
           }
