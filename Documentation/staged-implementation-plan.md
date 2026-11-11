@@ -2254,8 +2254,29 @@ The RFC's answer to optional fields, delivered to users.
 - **S3.1 The DSL decisions, first** (gate D) — **S**: whether an array admits `[]` by default
   (finding 2); how to exclude combinations a provider cannot produce (finding 35); how correlated
   fields are written, `oneOf` or independent members. Each is an ADR before S3.2 starts.
+  *Done 2026-11-11* (ADRs [0079](decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md),
+  [0080](decisions/0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md) and
+  [0081](decisions/0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md)):
+  - `eachLike`'s `min` stays 1, and the DSL has one array operator: `{ min: 0 }` says a list may be
+    empty. A default of 0 would add no variants, but the base variant would serve `[]` for every list.
+    `janus upgrade` writes a bare v1–v4 `type` on an array as `min: 0`, as v1–v4 read it, so pact-jvm's
+    `eachLike` keeps its meaning through the facade. Its `rule-narrowed` finding is gone, and
+    `corpora/legacy/upgrade-array-any-length/` holds both paths to `[]`.
+  - A list that may be empty is exercised with an element first. Its default point is `min+1`, and its
+    interior is gated by every point with an element, gates on one dimension being alternatives. The
+    empty variant assigns nothing inside the list, so no pair is counted for it. Before, four of seven
+    variants of such a list served `[]`, and two pairs were counted for them alone. That replaces variant
+    semantics §3.3's vacuous-coverage rule, which no engine implemented. Selections of spaces with no
+    `min: 0` list do not change.
+  - An interaction specification has a `policy` member, §3.8's third layer. The engine validates it and
+    resolves its references at `add-interaction`, applies it at `variants`, and the contract records it
+    with full ids. An exclusion is reported with its reason under `exhaustive` too, which it was not.
+    S3.2's `exclude` writes it.
+  - A correlation the consumer relies on is a `oneOf`, and an exclusion is for a combination it handles
+    that the provider cannot produce. The subsumption walk splits a provider object whose discriminator
+    is an `equality` or an `any-of` by the consumer's alternatives, where it answered `unknown`.
 - **S3.2 The native DSL** — **L**: `optional`, `anyOf`, `oneOf`, `eachLike`, `forbidden`,
-  `whenVariant` and `variantCases`, designed with the community, specified first, then implemented in
+  `whenVariant`, `variantCases` and `exclude` (ADR 0080), designed with the community, specified first, then implemented in
   both SDKs under the conformance suite.
 - **S3.3 `http:media-type` and list-valued headers** (finding 1) — **M**, as namespaced operators the
   HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again. The

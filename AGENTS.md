@@ -219,6 +219,13 @@ Three sources are the source of truth and take precedence over this file when th
 > process of its own; the consumer suite's contract has one set of bytes from all five. S2.20
 > (ADR 0077): a multipart body `pact_ffi` builds is split at its header's boundary, and an optional `content/label` operation lets the multipart component say a
 > part's own `Content-Type`, which `match:content-type` on a part's body reads before detecting.
+> Stage 3 has started. S3.1 (gate D) decided the DSL's defaults. ADR 0079: `eachLike` is at least one
+> element unless it says `{ min: 0 }`, and `janus upgrade` writes a bare v1–v4 array `type` as `min: 0`.
+> A list that may be empty is exercised with an element first, and its empty variant has no interior,
+> gates on one dimension being alternatives. ADR 0080: an interaction specification's `policy` is
+> §3.8's third layer, resolved at `add-interaction` and recorded in the contract, which S3.2's
+> `exclude` writes. ADR 0081: a correlation the consumer relies on is a `oneOf`, and the subsumption
+> walk splits a provider object by the consumer's alternatives.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
