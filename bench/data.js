@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794376525568,
+  "lastUpdate": 1794376527381,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -48816,6 +48816,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19570,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9004978f0ede177d9be41de2c95039282f26f1af",
+          "message": "feat: S3.3 list-valued headers, as the HTTP component's http:list\n\nADR 0082: a header is compared as a list only where the contract says so,\nwith the HTTP component's `http:list` (`elements`, in order), which matches\nhowever the field lines frame them. The transport never splits a header,\nand joins HTTP/2 and HTTP/3 Cookie crumbs with \"; \". Both SDKs spell it\n`headerList(...)`, accepted only as a header's value, with three new\nconformance ids and four cases; the review note asks about it.\n\n`janus upgrade` writes `http:list` for a header v1-v4 compare as a list,\nand a header's rule as an `each-like` of it. The legacy compiler applies a\nheader's rule to each value, as today's verifier does, which closes S1.1's\nrepeated-header disagreement; `headers/list-values` is a new fixture.\n\nA contract now writes a component operator's members by name (ADR 0082\ndecision 7, amending ADR 0037), since two SDKs built `http:list` in\ndifferent orders and wrote different bytes.\n\nThinness budgets: TypeScript idiomatic 1000 -> 1050, JVM idiomatic\n2400 -> 2450. `headerList` adds a marker class, its helper and two\nrefusals in each SDK, none of it matching logic or orchestration.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T16:51:05+11:00",
+          "tree_id": "74155d0cc7599cdb741d0332d8bd1c17800c2b72",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9004978f0ede177d9be41de2c95039282f26f1af"
+        },
+        "date": 1794376526864,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 70329,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 49882,
             "unit": "requests per second",
             "extra": "engines 4"
           }
