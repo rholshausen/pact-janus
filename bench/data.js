@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794381646066,
+  "lastUpdate": 1794381648095,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -49524,6 +49524,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19953,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "29b26434e7a8ec7b019b0e25b0f65bbc9a00461d",
+          "message": "feat: S3.5 what the mock made of each request as events, and a test per variant in each framework\n\nADR 0084, the variant ergonomics report's recommendations 1-3.\n\n- consumer-session/create takes events: true and answers with a stream of\n  consumer-session/exchange events, one per request a started transport\n  receives; finalise ends it with consumer-session/finished, closing it\n  without waiting on the host. The engine's own line drops to debug for a\n  watched session.\n- Both SDKs drain the stream while each closure runs (wait-ms 0, every\n  100 ms, and once before report-variant) and log each event: a rejected\n  request at warn, naming the interaction and the variant. The JVM asks only\n  when an SLF4J provider is bound.\n- Spock: where: variant << janus.variants(i), janus.run(variant) { .. };\n  Vitest and Jest as ES modules: await janus.variants(i, closure). Jest from\n  CommonJS keeps execute. framework/test-per-variant replaces the JUnit-only\n  case; lifecycle/asks-for-exchange-events and live/exchange-events-logged\n  are new.\n\nThinness budgets raised: TypeScript idiomatic 1050 -> 1150 and embedding\n390 -> 400, JVM idiomatic 2450 -> 2650, for the stream watcher and its log\nline, the per-variant entry points, and Spock's VariantRun and\nMessageVariantRun (Groovy cannot choose between run overloads that differ\nonly in the closure's interface). It is protocol calls and presentation;\nno matching logic moved into an SDK.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T18:15:09+11:00",
+          "tree_id": "4f9b4970e35ffa0ad7678aad96137dc01891640d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/29b26434e7a8ec7b019b0e25b0f65bbc9a00461d"
+        },
+        "date": 1794381647668,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 20024,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19814,
             "unit": "requests per second",
             "extra": "engines 4"
           }
