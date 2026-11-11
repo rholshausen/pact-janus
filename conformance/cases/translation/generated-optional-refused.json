@@ -1,0 +1,17 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/generated-optional-refused",
+  "category": "translation",
+  "title": "'generated' of an 'optional' is refused at the call: the generator belongs on the value it wraps.",
+  "covers": ["shape.generated.one-value-only"],
+  "why": "behavioural spec 'generated' (ADR 0085): a generator produces one value, never absence, and 'optional''s presence is the running variant's choice, which a generator would overwrite. The author writes 'optional(generated(...))'.",
+  "interaction": {
+    "description": "a generator on a value that may be absent",
+    "response": {
+      "body": {
+        "token": { "$": "generated", "args": [{ "$": "optional", "args": [{ "$": "string", "args": ["t"] }] }, "pact:Uuid"] }
+      }
+    }
+  },
+  "expect": { "refused": true }
+}

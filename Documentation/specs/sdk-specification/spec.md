@@ -137,8 +137,9 @@ primitive's semantics.
 ### 3.2 Fields, and why each exists
 
 - **`produces`** names what protocol/document construct the primitive compiles to — a shape operator
-  (design 2.2), a protocol operation (design 2.1), or a member path within the interaction-spec document
-  (plan task 3.2). It is an array because a primitive like `execute` produces a *sequence* of protocol
+  (design 2.2), a member every shape node may carry, written on a node the primitive is given rather than
+  a node of its own (`shape-member`: `generated` writes `generator`), a protocol operation (design 2.1),
+  a member path within the interaction-spec document (plan task 3.2), or a verification's hook entry. It is an array because a primitive like `execute` produces a *sequence* of protocol
   calls, not one document. Naming it structurally, rather than only in prose, is what lets a regenerating
   agent (§8) find every primitive touching a given protocol member when that member's own design changes.
 - **`signature`** names parameters by **role**, not by per-language type: `example-value`,
@@ -224,6 +225,13 @@ SDK's guidance repeats them:
   alternative naming the members that come with it. An exclusion leaves the contract admitting the
   combination, so it is only for a combination the consumer handles and the provider cannot produce
   ([ADR 0081](../../decisions/0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md)).
+
+And one since (staged plan S3.6):
+
+- **A fresh value is the engine's, and the contract records the example.** `generated(string(id),
+  'pact:Uuid')` names a generator the engine asks each time it produces the value, a mock's reply or a
+  verifier's request; no SDK runs a generator, and no recorded value is random
+  ([ADR 0085](../../decisions/0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md)).
 
 The provider side is the same idea one run long ([ADR 0055](../../decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md),
 staged plan S1.14):
@@ -323,7 +331,7 @@ note's rows load-bearing. The schema keeps the member, so the form below remains
   "facade": [
     { "from": "like(v) with a custom generator function returning one of several fixed literals at random",
       "status": "dropped",
-      "reason": "a random per-run generator defeats deterministic recording (ADR 0008's 'no randomness, anywhere' applies just as much to a consumer's own generators as to the sampler) and never declared its alternative set anywhere the engine could see. Migrates to anyOf(...) naming the same literals, now sampled deterministically per variant instead of chosen at random once." } ] }
+      "reason": "a random per-run generator defeats deterministic recording (ADR 0008's 'no randomness, anywhere' applies just as much to a consumer's own generators as to the sampler) and never declared its alternative set anywhere the engine could see. Migrates to anyOf(...) naming the same literals, now sampled deterministically per variant instead of chosen at random once. A value that must be fresh rather than one of several, a new id on every reply, migrates to generated(...) (ADR 0085): the engine produces it and the contract records the example." } ] }
 ```
 
 [`examples/compatibility-facade-mapping.md`](examples/compatibility-facade-mapping.md) works through a

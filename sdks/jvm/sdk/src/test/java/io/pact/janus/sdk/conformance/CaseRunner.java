@@ -406,5 +406,9 @@ final class CaseRunner {
       throw new AssertionError(exchange.path("method").asText() + " " + uri + ": the mock answered "
           + response.statusCode() + ", not " + exchange.path("expect-status").asInt() + ": " + response.body());
     }
+    if (exchange.has("expect-body") && !Suite.MAPPER.readTree(response.body()).equals(exchange.get("expect-body"))) {
+      throw new AssertionError(exchange.path("method").asText() + " " + uri + ": the mock served "
+          + response.body() + ", not " + exchange.get("expect-body"));
+    }
   }
 }

@@ -1,0 +1,194 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/generated-served-fresh",
+  "category": "live",
+  "title": "The mock serves a generator's value, and the contract records the example.",
+  "covers": [
+    "shape.generated.served-fresh"
+  ],
+  "why": "behavioural spec 'generated' (ADR 0048 decisions 2 and 4): a mock fills each generated position of its reply when it serves it, and records the example, so recording twice writes one contract. The generators here are configured to produce one value, 'pact:RandomInt' from 7 to 7 and 'pact:Regex' of a literal, so the case can say what was served; that a value is fresh on every exchange is the engine's own test (consumer_flow.rs).",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order with generated values",
+          "request": {
+            "method": "GET",
+            "path": "/orders/42"
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": {
+                "$": "generated",
+                "args": [
+                  {
+                    "$": "integer",
+                    "args": [
+                      1
+                    ]
+                  },
+                  "pact:RandomInt"
+                ],
+                "options": {
+                  "min": 7,
+                  "max": 7
+                }
+              },
+              "reference": {
+                "$": "generated",
+                "args": [
+                  {
+                    "$": "string",
+                    "args": [
+                      "ORD-1"
+                    ]
+                  },
+                  "pact:Regex"
+                ],
+                "options": {
+                  "regex": "ORD-42"
+                }
+              },
+              "status": "PLACED"
+            }
+          }
+        },
+        "closure": {
+          "exchange": {
+            "method": "GET",
+            "path": "/orders/42",
+            "expect-status": 200,
+            "expect-body": {
+              "id": 7,
+              "reference": "ORD-42",
+              "status": "PLACED"
+            }
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok"
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "content": {
+            "interactions": [
+              {
+                "description": "an order with generated values",
+                "parts": {
+                  "request": {
+                    "method": {
+                      "example": "GET",
+                      "shape": "equality"
+                    },
+                    "path": {
+                      "example": "/orders/42",
+                      "shape": "equality"
+                    }
+                  },
+                  "response": {
+                    "body": {
+                      "members": {
+                        "id": {
+                          "example": 1,
+                          "generator": {
+                            "name": "pact:RandomInt",
+                            "config": {
+                              "min": 7,
+                              "max": 7
+                            }
+                          },
+                          "shape": "integer"
+                        },
+                        "reference": {
+                          "example": "ORD-1",
+                          "generator": {
+                            "name": "pact:Regex",
+                            "config": {
+                              "regex": "ORD-42"
+                            }
+                          },
+                          "shape": "string"
+                        },
+                        "status": {
+                          "example": "PLACED",
+                          "shape": "equality"
+                        }
+                      },
+                      "shape": "object"
+                    },
+                    "status": {
+                      "example": 200,
+                      "shape": "equality"
+                    }
+                  }
+                },
+                "selection": {
+                  "variants": [
+                    {
+                      "id": "base",
+                      "origin": "base",
+                      "assignment": [],
+                      "parts": {
+                        "request": {
+                          "method": {
+                            "content": "GET"
+                          },
+                          "path": {
+                            "content": "/orders/42"
+                          }
+                        },
+                        "response": {
+                          "body": {
+                            "content": {
+                              "id": 1,
+                              "reference": "ORD-1",
+                              "status": "PLACED"
+                            }
+                          },
+                          "status": {
+                            "content": 200
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "report": {
+                    "algorithm": "janus-ipog-v1",
+                    "boundaries": true,
+                    "budgets": {
+                      "exhaustive-threshold": 8,
+                      "max-variants": 50
+                    },
+                    "coverage": {
+                      "covered": 0,
+                      "dropped": 0,
+                      "removed": 0,
+                      "targets": 0
+                    },
+                    "selected": 1,
+                    "space": {
+                      "dimensions": 0,
+                      "exact": true,
+                      "size": 1
+                    },
+                    "strategy": "exhaustive"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "variant-count": 1
+  }
+}

@@ -122,6 +122,13 @@ SDK (plan task 6.3); what that turned up is in
   value or the literal rules refuse it with an `IllegalArgumentException` naming where it was written
   (behavioural spec `header-list`, ADR 0082). Its elements are varargs, as `anyOf`'s options are, each
   spelled by the header-value rule. A `List` keeps meaning several field lines.
+- `Shapes.generated(of, generator)` and `Shapes.generated(of, generator, config)` return a
+  `ShapeNode`: the node `of` compiles to, copied, so the `ShapeNode` passed in is unchanged, with its
+  `generator` (behavioural spec `generated`, ADR 0085). An overload without `config` is "not given";
+  `config` is a `Map<String, ?>` checked for JSON-ness and written in the map's order, a `Map.of` in key
+  order (see Deviations). A structural helper's result, a map or a list is refused with an
+  `IllegalArgumentException` naming the operator, suggesting `optional(generated(...))` for an
+  `optional` or `nullable`.
 - Components are `JanusOptions.withComponents(List<Map<String, ?>>)`: the project configuration's
   own declarations, as plain maps (checked for JSON-ness, not for meaning). The SDK does not read
   `consumer.janus.yaml` — see the TypeScript style guide's reason, which is the same one.

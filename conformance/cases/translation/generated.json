@@ -1,0 +1,63 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/generated",
+  "category": "translation",
+  "title": "'generated' writes a generator on the node of the value it wraps, wherever that value is: a path, a header's value, a body's member, inside 'optional'.",
+  "covers": ["shape.generated.member-on-the-node"],
+  "why": "behavioural spec 'generated' (ADR 0085): it compiles 'of' by the literal rules and writes the node with { name, config }, 'config' only when given and as given, so it is not a node of its own. A plain path is 'equality' with a generator, which a verifier fills from a provider state; a header's value keeps its one-element list, whose element carries the generator; 'optional(generated(...))' generates the value when it is there.",
+  "interaction": {
+    "description": "an order fetched by the id a provider state gives",
+    "request": {
+      "method": "GET",
+      "path": { "$": "generated", "args": ["/orders/42", "pact:ProviderState"], "options": { "expression": "/orders/${id}" } },
+      "headers": { "X-Request-Id": { "$": "generated", "args": [{ "$": "string", "args": ["r-1"] }, "pact:Uuid"] } }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "id": { "$": "generated", "args": [{ "$": "integer", "args": [42] }, "pact:RandomInt"], "options": { "min": 1, "max": 99 } },
+        "note": { "$": "optional", "args": [{ "$": "generated", "args": [{ "$": "string", "args": ["n"] }, "pact:RandomString"], "options": { "size": 8 } }] }
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "an order fetched by the id a provider state gives",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": {
+            "shape": "equality",
+            "example": "/orders/42",
+            "generator": { "name": "pact:ProviderState", "config": { "expression": "/orders/${id}" } }
+          },
+          "headers": {
+            "shape": "object",
+            "members": {
+              "x-request-id": {
+                "shape": "each-like",
+                "items": { "shape": "string", "example": "r-1", "generator": { "name": "pact:Uuid" } },
+                "min": 1,
+                "max": 1
+              }
+            }
+          }
+        },
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": { "shape": "integer", "example": 42, "generator": { "name": "pact:RandomInt", "config": { "min": 1, "max": 99 } } },
+              "note": {
+                "shape": "optional",
+                "of": { "shape": "string", "example": "n", "generator": { "name": "pact:RandomString", "config": { "size": 8 } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

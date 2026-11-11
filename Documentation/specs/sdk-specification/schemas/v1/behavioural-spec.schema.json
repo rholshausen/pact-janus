@@ -80,7 +80,7 @@
       "properties": {
         "kind": {
           "type": "string",
-          "x-known-values": ["shape-operator", "protocol-operation", "spec-member", "hook-entry"]
+          "x-known-values": ["shape-operator", "protocol-operation", "spec-member", "hook-entry", "shape-member"]
         },
         "operator": {
           "type": "string",
@@ -97,6 +97,10 @@
         "point": {
           "type": "string",
           "description": "kind 'hook-entry': the lifecycle point (design 2.7 §3) of the hook entry this primitive writes into a verification's target.hooks, e.g. 'state-setup' (ADR 0055)."
+        },
+        "member": {
+          "type": "string",
+          "description": "kind 'shape-member': a member any shape node may carry (design 2.2 §3) that this primitive writes on the node it is given, rather than a node of its own, e.g. 'generator' (ADR 0085)."
         }
       },
       "allOf": [
@@ -115,6 +119,10 @@
         {
           "if": { "required": ["kind"], "properties": { "kind": { "const": "hook-entry" } } },
           "then": { "required": ["kind", "point"] }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "shape-member" } } },
+          "then": { "required": ["kind", "member"] }
         }
       ]
     },

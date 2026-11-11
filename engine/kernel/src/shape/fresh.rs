@@ -4,13 +4,19 @@
 //! admitted; the recorded value is still the variant's evidence (ADR 0048).
 //!
 //! The walk is the shape's own: an `object`'s members, an `array`'s entries by position, every
-//! element an `each-like` holds, every value an `each-entry` holds, and the value an `optional` or
-//! `nullable` wraps when there is one. A `contains` entry claims some element, and which is not
-//! known until it is matched, so nothing below one is filled. A node with a generator is filled, and nothing
-//! below it is walked: the generated value replaced it. What a component is, or what its
-//! configuration means, is not known here.
+//! element an `each-like` holds, every value an `each-entry` holds, the value an `optional` or
+//! `nullable` wraps when there is one, and the `one-of` alternative whose discriminator the value
+//! binds (ADR 0085). A `contains` entry claims some element, and which is not known until it is
+//! matched, so nothing below one is filled. A node with a generator is filled, and nothing below it
+//! is walked: the generated value replaced it. What a component is, or what its configuration means,
+//! is not known here.
+//!
+//! [`check`] is the other half: when an interaction is added, every generator its shapes name is
+//! asked for once, so a name no component provides, or a configuration it refuses, is the author's
+//! error then, rather than a recorded value served in silence on every exchange (ADR 0085).
 
 use crate::component::{Generate, GeneratorComponent};
+use crate::error::{Problem, push_pointer_segment};
 use crate::plan::member_path;
 use serde_json::{Map, Value, json};
 
@@ -113,7 +119,123 @@ pub fn fill(shape: &Value, value: &mut Value, at: &str, fresh: &Fresh<'_>, failu
         fill(of, value, at, fresh, failures);
       }
     }
+    ("one-of", value @ Value::Object(_)) => {
+      if let Some(alternative) = bound_alternative(node, value) {
+        fill(alternative, value, at, fresh, failures);
+      }
+    }
     _ => {}
+  }
+}
+
+/// The `one-of` alternative `value` is, by the literal its discriminator member binds (shape spec
+/// §5.4): each alternative is an `object`, perhaps wrapped in `nullable`, whose discriminator member
+/// is that literal's node. `None` when no alternative binds the value's.
+fn bound_alternative<'a>(node: &'a Map<String, Value>, value: &Value) -> Option<&'a Value> {
+  let discriminator = node.get("discriminator").and_then(Value::as_str)?;
+  let bound = value.get(discriminator)?;
+  node
+    .get("alternatives")
+    .and_then(Value::as_object)?
+    .values()
+    .find(|alternative| {
+      let object = match alternative.get("shape").and_then(Value::as_str) {
+        Some("nullable") => alternative.get("of"),
+        _ => Some(*alternative),
+      };
+      object
+        .and_then(|object| object.get("members"))
+        .and_then(|members| members.get(discriminator))
+        .and_then(|literal| literal.get("example"))
+        == Some(bound)
+    })
+}
+
+/// The members of a shape node that hold shapes, by how many: a map of them, a list of them, or one.
+const SHAPE_MAPS: [&str; 2] = ["members", "alternatives"];
+const SHAPE_LISTS: [&str; 1] = ["entries"];
+const SHAPE_ONES: [&str; 4] = ["items", "keys", "values", "of"];
+
+/// Every generator `shape` names, anywhere in it, asked for once on the consumer's side with its
+/// node's example (ADR 0085). One whose member is not `{ name, config }`, whose name no component
+/// provides (`unknown-generator`), or whose configuration its component refuses (`invalid-config`)
+/// is a problem at `pointer`'s node's `generator`. A generator that answers with an error of another
+/// kind, one that needs a provider state, say, is the exchange's to report, as it is today. A
+/// component operator's own members are its own, and are not walked.
+pub fn check(shape: &Value, pointer: &str, generators: &dyn GeneratorComponent, problems: &mut Vec<Problem>) {
+  let Value::Object(node) = shape else {
+    return;
+  };
+  if let Some(generator) = node.get(GENERATOR) {
+    let mut at = pointer.to_string();
+    push_pointer_segment(&mut at, GENERATOR);
+    if let Some(message) = refusal(generator, node.get("example"), generators) {
+      problems.push(Problem { pointer: at, message });
+    }
+  }
+  let operator = node.get("shape").and_then(Value::as_str).unwrap_or_default();
+  if operator.contains(':') {
+    return;
+  }
+  for member in SHAPE_MAPS {
+    if let Some(Value::Object(shapes)) = node.get(member) {
+      for (name, child) in shapes {
+        let mut at = pointer.to_string();
+        push_pointer_segment(&mut at, member);
+        push_pointer_segment(&mut at, name);
+        check(child, &at, generators, problems);
+      }
+    }
+  }
+  for member in SHAPE_LISTS {
+    if let Some(Value::Array(shapes)) = node.get(member) {
+      for (index, child) in shapes.iter().enumerate() {
+        check(
+          child,
+          &format!("{pointer}/{member}/{index}"),
+          generators,
+          problems,
+        );
+      }
+    }
+  }
+  for member in SHAPE_ONES {
+    if let Some(child) = node.get(member) {
+      check(child, &format!("{pointer}/{member}"), generators, problems);
+    }
+  }
+}
+
+/// Why `generator` cannot be asked, if it cannot.
+fn refusal(
+  generator: &Value,
+  example: Option<&Value>,
+  generators: &dyn GeneratorComponent,
+) -> Option<String> {
+  let Some(name) = generator.get("name").and_then(Value::as_str) else {
+    return Some(
+      "a generator is { name, config }, and 'name' is the generator's, '<component>:<generator>'".into(),
+    );
+  };
+  let config = generator.get("config");
+  if config.is_some_and(|config| !config.is_object()) {
+    return Some(format!(
+      "generator '{name}': 'config' is an object, the generator's own configuration"
+    ));
+  }
+  let asked = generators.generate(Generate {
+    generator: name.to_string(),
+    config: config.cloned(),
+    context: Some(json!({
+      "example": example.cloned().unwrap_or(Value::Null),
+      "side": "consumer",
+      "provider-state": {},
+    })),
+  });
+  match asked {
+    Err(error) if error.code == "unknown-generator" => Some(error.message),
+    Err(error) if error.code == "invalid-config" => Some(format!("generator '{name}': {}", error.message)),
+    _ => None,
   }
 }
 
@@ -183,5 +305,88 @@ mod tests {
     assert!(!has_generators(
       &json!({ "shape": "object", "members": { "a": { "shape": "any" } } })
     ));
+  }
+
+  #[test]
+  fn a_one_of_fills_the_alternative_its_discriminator_binds() {
+    let shape = json!({ "shape": "one-of", "discriminator": "type", "alternatives": {
+      "card": { "shape": "object", "members": {
+        "type": { "shape": "equality", "example": "card" },
+        "token": { "shape": "string", "example": "t", "generator": { "name": "test:card" } } } },
+      "invoice": { "shape": "nullable", "of": { "shape": "object", "members": {
+        "type": { "shape": "equality", "example": "invoice" },
+        "number": { "shape": "string", "example": "n", "generator": { "name": "test:invoice" } } } } },
+    } });
+    let state = Map::new();
+    let fresh = Fresh {
+      generators: &Naming,
+      side: "consumer",
+      provider_state: &state,
+    };
+    let mut failures = Vec::new();
+
+    let mut card = json!({ "type": "card", "token": "t" });
+    fill(&shape, &mut card, "$.body", &fresh, &mut failures);
+    assert_eq!(
+      card["token"],
+      json!("test:card from \"t\" on the \"consumer\" side")
+    );
+
+    let mut invoice = json!({ "type": "invoice", "number": "n" });
+    fill(&shape, &mut invoice, "$.body", &fresh, &mut failures);
+    assert_eq!(
+      invoice["number"],
+      json!("test:invoice from \"n\" on the \"consumer\" side")
+    );
+
+    let mut neither = json!({ "type": "cash", "token": "t" });
+    fill(&shape, &mut neither, "$.body", &fresh, &mut failures);
+    assert_eq!(neither, json!({ "type": "cash", "token": "t" }));
+    assert_eq!(failures, vec![]);
+  }
+
+  #[test]
+  fn every_generator_a_shape_names_is_asked_for_when_it_is_checked() {
+    use crate::component::PactGenerators;
+    let shape = json!({ "shape": "object", "members": {
+      "id": { "shape": "string", "example": "x", "generator": { "name": "pact:Uuid" } },
+      "typo": { "shape": "string", "example": "x", "generator": { "name": "pact:Uiud" } },
+      "a/b": { "shape": "string", "example": "x", "generator": { "name": "pact:Regex" } },
+      "items": { "shape": "each-like", "items": { "shape": "integer", "example": 1,
+        "generator": { "name": "pact:RandomInt", "config": [1, 2] } } },
+      "state": { "shape": "string", "example": "x",
+        "generator": { "name": "pact:ProviderState", "config": { "expression": "${id}" } } },
+      "pay": { "shape": "one-of", "discriminator": "t", "alternatives": { "a": { "shape": "object", "members": {
+        "t": { "shape": "equality", "example": "a" },
+        "n": { "shape": "string", "example": "n", "generator": { "nom": "pact:Uuid" } } } } } },
+      "list": { "shape": "http:list", "elements": ["a"], "example": ["a"],
+        "of": { "generator": { "name": "pact:Uiud" } } },
+    } });
+    let mut problems = Vec::new();
+    check(&shape, "/parts/response/body", &PactGenerators, &mut problems);
+    assert_eq!(
+      problems,
+      vec![
+        Problem {
+          pointer: "/parts/response/body/members/typo/generator".to_string(),
+          message: "no generator 'pact:Uiud'".to_string(),
+        },
+        Problem {
+          pointer: "/parts/response/body/members/a~1b/generator".to_string(),
+          message: "generator 'pact:Regex': 'Regex' is missing a member it needs (regex)".to_string(),
+        },
+        Problem {
+          pointer: "/parts/response/body/members/items/items/generator".to_string(),
+          message: "generator 'pact:RandomInt': 'config' is an object, the generator's own configuration"
+            .to_string(),
+        },
+        Problem {
+          pointer: "/parts/response/body/members/pay/alternatives/a/members/n/generator".to_string(),
+          message:
+            "a generator is { name, config }, and 'name' is the generator's, '<component>:<generator>'"
+              .to_string(),
+        },
+      ]
+    );
   }
 }

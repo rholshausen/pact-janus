@@ -213,8 +213,15 @@ what is produced, never what is admitted, and the example is still what a contra
 a fresh value into its reply each time it serves one, and a verifier into the request it sends
 (variant semantics §5.2). The positions filled are those the shape walks: an `object`'s members, an
 `array`'s entries, every element of an `each-like`, every value of an `each-entry`, and what an
-`optional` or `nullable` wraps when it is there. Nothing below a `contains` entry is filled, since which
-element it claims is known only once it is matched.
+`optional` or `nullable` wraps when it is there, and the `one-of` alternative whose discriminator literal
+the value binds. Nothing below a `contains` entry is filled, since which element it claims is known only
+once it is matched.
+
+An engine asks each generator an interaction names once when the interaction is added, and refuses one
+it cannot ask with `interaction-invalid` naming the node's `generator`: a member that is not `{ name,
+config }`, a name no component provides, or a configuration its component refuses
+([ADR 0085](../../decisions/0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md)). A DSL names a generator on the node of one value (SDK specification,
+`generated`).
 
 ### 3.5 Component operators and namespacing
 

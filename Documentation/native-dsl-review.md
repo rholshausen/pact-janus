@@ -66,6 +66,7 @@ await janus.execute(getOrder, async (mock, variant) => {
 | `forbidden` | `forbidden()` | `Shapes.forbidden()` | Must be absent |
 | `each-like` | `eachLike(items, { min?, max? })` | `Shapes.eachLike(items[, Cardinality.min(0)])` | A list of like elements: variants at its bounds |
 | `header-list` | `headerList(a, b, ..)`, as a header's value | `Shapes.headerList(..)`, as a header's value | A header that is a list: its elements, however the field lines frame them |
+| `generated` | `generated(of, "pact:Uuid", config?)` | `Shapes.generated(of, "pact:Uuid"[, config])` | A value the engine produces fresh where it is produced; the contract records the example |
 
 The provider side (`verifier`, `state`, `requestFilter`, `message`, `verify`) is specified in the same
 document and is outside this review, because it carries today's provider APIs through their facades.
@@ -88,7 +89,10 @@ ask for.
   `headerList("application/json", "text/plain")` matches `a, b`, `a,b` or two field lines. A plain
   string or list is compared as the header's field lines, exactly, and no header is split by its name.
 - **A recorded example is never random** ([ADR 0008](decisions/0008-deterministic-pairwise-variant-sampling.md)).
-  A generated value is the engine's, declared on the shape (S3.6, not yet in the DSL).
+  A generated value is the engine's, named on the value with `generated` ([ADR 0085](decisions/0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md)): a mock
+  fills it into each reply and a verifier into its request, and the contract records the example. It
+  wraps one value, a plain scalar or a value helper, never a node whose value a variant chooses, and the
+  engine refuses a generator nothing provides when the interaction is added.
 
 ## 3. Open questions
 
@@ -125,6 +129,13 @@ ask for.
    which would need the shape language to look inside a component's operator. *Would you rather a
    list of strings meant the list, with `Set-Cookie` the exception? Do you write patterns on
    `Accept`?*
+
+8. **Is one `generated` with a generator's name enough, or do you want `uuid()` and friends?** S3.6
+   added it after the rest of this note ([ADR 0085](decisions/0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md)). The name is the component's,
+   `generated(string("a1b2"), "pact:Uuid")`, so a component's own generator needs no new helper; the
+   facades keep pact-js's and pact-jvm's named ones. *Would named helpers for the `pact` generators
+   read better in a native test, and is a generator on a list's elements, rather than the list, what you
+   would write?*
 
 ## 4. After the review
 

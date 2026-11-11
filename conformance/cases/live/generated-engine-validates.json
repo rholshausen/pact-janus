@@ -1,0 +1,23 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/generated-engine-validates",
+  "category": "live",
+  "title": "A generator no component provides is refused by the engine when the interaction is added, not by the SDK.",
+  "covers": ["shape.generated.engine-validates"],
+  "why": "behavioural spec 'generated' (ADR 0085): the SDK checks nothing about the generator. The engine asks each one once at 'add-interaction', and refuses a name no component provides with 'interaction-invalid' naming the node's 'generator', where it would otherwise serve the recorded value on every exchange.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order whose token names a generator nothing provides",
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": { "token": { "$": "generated", "args": [{ "$": "string", "args": ["t"] }, "pact:Uiud"] } }
+          }
+        }
+      },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    }
+  ]
+}

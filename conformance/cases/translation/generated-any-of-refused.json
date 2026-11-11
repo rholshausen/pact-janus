@@ -1,0 +1,17 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/generated-any-of-refused",
+  "category": "translation",
+  "title": "'generated' of an 'any-of' is refused at the call: the running variant chooses its value.",
+  "covers": ["shape.generated.one-value-only"],
+  "why": "behavioural spec 'generated' (ADR 0085): an 'any-of' contributes a dimension whose point is the value the mock serves, and a generator would serve its own instead, so no variant of the dimension would be served as selected.",
+  "interaction": {
+    "description": "a generator on a value a variant chooses",
+    "response": {
+      "body": {
+        "status": { "$": "generated", "args": [{ "$": "any-of", "args": ["PENDING", "SHIPPED"] }, "pact:Regex"], "options": { "regex": "PENDING|SHIPPED" } }
+      }
+    }
+  },
+  "expect": { "refused": true }
+}

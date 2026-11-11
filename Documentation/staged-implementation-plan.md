@@ -2370,6 +2370,26 @@ The RFC's answer to optional fields, delivered to users.
   value and the recording stays the example.
   *Exit:* the consumer conformance case for a served generated value that S1.19's exit named, passing
   in both SDKs.
+  *Done 2026-11-12* ([ADR 0085](decisions/0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md)):
+  - `generated(of, generator, config?)` is the primitive, in the behavioural specification and both
+    SDKs: the node `of` compiles to, with `generator: { name, config }`. It is not a node of its own, so
+    it goes wherever its value may: a path, a header, a body's member, a message's metadata. The
+    generator's name is its component's, `pact:Uuid`; the DSL has no helper per generator, and the
+    review note asks whether it should, as an eighth question.
+  - It wraps one value, a plain scalar or a value helper. A node whose value the running variant
+    chooses (`anyOf`, `optional`, `eachLike`, ...) is refused at the call, since the generator would
+    serve its own value for every variant; `optional(generated(...))` is the spelling.
+  - `live/generated-served-fresh` is the exit's case: the mock serves the generator's value and the
+    contract records the example, in both SDKs, byte for byte. Four more cases cover the node and the
+    refusals, and live cases can now say what a mock served (`expect-body`).
+  - Not foreseen: the engine asked a generator only when it produced a value, so a misspelt
+    `pact:Uiud` was a log line on every exchange and the example was served in silence. `add-interaction`
+    now asks each generator once and refuses one nothing provides, or configured as its component
+    cannot use, as `interaction-invalid` at the node's `generator`. And ADR 0048's walk did not go into
+    a `one-of`, which no upgraded pact has and the native DSL does: it now fills the alternative whose
+    discriminator the value binds.
+  - The behavioural specification's `produces` gains a `shape-member` kind, for a primitive that writes
+    a member on a node it is given.
 
 **Done when** the RFC's consumer example runs natively in both SDKs, the demo runs on them, and the DSL
 is frozen as the major version's surface.

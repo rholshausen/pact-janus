@@ -491,7 +491,8 @@
         "query": { "type": "string", "description": "The query string, without '?'." },
         "headers": { "type": "object", "additionalProperties": { "type": "string" } },
         "body": { "description": "A JSON body, sent as application/json." },
-        "expect-status": { "type": "integer" }
+        "expect-status": { "type": "integer" },
+        "expect-body": { "description": "The reply's body, read as JSON, compared whole: what the mock served, a generator's fresh value included." }
       },
       "additionalProperties": false
     },

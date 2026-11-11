@@ -48,7 +48,9 @@ replays by example. Two questions the plan leaves open:
 6. **The walk is the shape's.** An `object`'s members, an `array`'s entries by position, every element
    an `each-like` holds, every value an `each-entry` holds, and the value an `optional` or `nullable`
    wraps. A `contains` entry's element is not known until it is matched, so nothing below one is filled.
-   A node with a generator is replaced, and nothing below it is walked.
+   A node with a generator is replaced, and nothing below it is walked. *Amended 2026-11-12*
+   ([ADR 0085](0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md) decision 5): and the `one-of` alternative whose discriminator literal the value
+   binds, which the native DSL can write.
 7. **The upgrade places each generator where today's verifier generates it.** A path, status or
    query parameter's every value, a header's first value, and a body position by its path: through
    JSON members and entries (`*` and `[*]` reaching every one, or an `each-like`'s template), a form

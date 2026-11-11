@@ -349,6 +349,22 @@ impl ConsumerSession {
         &raw_parts,
       )
       .map_err(AddInteractionError::Unavailable)?;
+    // So is every generator its shapes name (ADR 0085): one no component provides, or configured as
+    // its component cannot use, would otherwise serve the recorded value on every exchange, saying
+    // so only in a log.
+    let mut problems = Vec::new();
+    for (part, slots) in &raw_parts {
+      for (slot, shape) in slots {
+        let mut pointer = String::new();
+        crate::error::push_pointer_segment(&mut pointer, "parts");
+        crate::error::push_pointer_segment(&mut pointer, part);
+        crate::error::push_pointer_segment(&mut pointer, slot);
+        crate::shape::fresh::check(shape, &pointer, &crate::component::PactGenerators, &mut problems);
+      }
+    }
+    if !problems.is_empty() {
+      return Err(InteractionSpecError { problems }.into());
+    }
     // Variant-bound state bindings are validated here and nowhere later (variant-semantics spec
     // §6.5): the reference resolves against this interaction's variant space, which does not exist
     // until the shapes parse, and the author is looking at the DSL that produced it right now.

@@ -391,4 +391,7 @@ async function send(baseUrl: string, exchange: Exchange): Promise<void> {
   if (expected !== undefined && response.status !== expected) {
     throw new Error(`${exchange.method} ${url}: the mock answered ${response.status}, not ${expected}: ${body}`);
   }
+  if ("expect-body" in exchange && !equal(JSON.parse(body), exchange["expect-body"])) {
+    throw new Error(`${exchange.method} ${url}: the mock served ${body}, not ${JSON.stringify(exchange["expect-body"])}`);
+  }
 }

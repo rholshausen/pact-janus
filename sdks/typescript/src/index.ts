@@ -49,6 +49,7 @@ export {
   nullable,
   forbidden,
   eachLike,
+  generated,
 } from "./shapes.js";
 export {
   Verifier,

@@ -13,6 +13,7 @@ import {
   decimal,
   eachLike,
   forbidden,
+  generated,
   headerList,
   integer,
   json,
@@ -34,7 +35,7 @@ import {
 import type { HelperCall, InteractionScript, MessageSlotsScript, MultiValue } from "./cases.js";
 
 /** Primitive id (behavioural-spec.json) -> how this SDK spells it. */
-const helpers: Record<string, (args: unknown[], options: Record<string, number>) => Shape | Template> = {
+const helpers: Record<string, (args: unknown[], options: Record<string, unknown> | undefined) => Shape | Template> = {
   literal: (args) => template(args[0]),
   json: (args) => json(template(args[0])),
   // Not a shape — it names a whole slot — but a case writes it where a body goes, as a call, like
@@ -55,7 +56,10 @@ const helpers: Record<string, (args: unknown[], options: Record<string, number>)
   optional: (args) => optional(template(args[0])),
   nullable: (args) => nullable(template(args[0])),
   forbidden: () => forbidden(),
-  "each-like": (args, options) => eachLike(template(args[0]), options),
+  "each-like": (args, options) => eachLike(template(args[0]), (options ?? {}) as { min?: number; max?: number }),
+  // The generator's configuration is the case's options bag, given or not, as written.
+  generated: (args, options) =>
+    options === undefined ? generated(template(args[0]), args[1] as string) : generated(template(args[0]), args[1] as string, options),
   // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
   "header-list": (args) => headerList(...(args as (string | number | boolean)[])) as unknown as Template,
 };
@@ -79,7 +83,7 @@ function call(helperCall: HelperCall): Shape | Template {
   if (!helper) {
     throw new Error(`the case names a shape primitive this SDK does not implement: '${helperCall.$}'`);
   }
-  return helper(helperCall.args ?? [], helperCall.options ?? {});
+  return helper(helperCall.args ?? [], helperCall.options);
 }
 
 /** The chain a case scripts, built with this SDK's builder, one call per member. */

@@ -768,6 +768,36 @@ fn a_generated_response_value_is_fresh_each_exchange_and_the_example_is_recorded
   );
 }
 
+/// A generator nothing provides is the author's error when the interaction is added (ADR 0085), not a
+/// recorded value the mock serves on every exchange with a line in its log.
+#[test]
+fn a_generator_no_component_provides_is_refused_when_the_interaction_is_added() {
+  let mut engine = engine_with_real_components();
+  hello(&mut engine);
+  let created = send(
+    &mut engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "c" }, "provider": { "name": "p" } } }),
+  );
+  let session = created["ok"]["session"].as_str().unwrap().to_string();
+  let mut interaction = order_interaction();
+  interaction["parts"]["response"]["body"] = json!({ "shape": "object", "members": {
+    "token": { "shape": "string", "example": "t", "generator": { "name": "pact:Uiud" } } } });
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  assert_eq!(added["error"]["code"], "interaction-invalid", "{added}");
+  assert_eq!(
+    added["error"]["details"]["problems"],
+    json!([{ "pointer": "/parts/response/body/members/token/generator", "message": "no generator 'pact:Uiud'" }]),
+    "{added}"
+  );
+}
+
 /// An order whose `status` and `shippedAt` vary independently, and an exclusion on the interaction
 /// that a shipped order has a shipping date, written as the DSL writes it: short references.
 fn order_interaction_excluding_shipped_without_a_date() -> Value {

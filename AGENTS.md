@@ -239,7 +239,10 @@ Three sources are the source of truth and take precedence over this file when th
 > created with `events: true` tells each request its mock receives as a `consumer-session/exchange`
 > event, which both SDKs log while the test runs; Spock (`where: variant << janus.variants(i)`),
 > Vitest and Jest as ES modules (`await janus.variants(i, closure)`) make each variant a test of its
-> own, as JUnit 5's `@TestFactory` does.
+> own, as JUnit 5's `@TestFactory` does. S3.6 (ADR 0085): `generated(of, "pact:Uuid", config?)` in both
+> SDKs names a generator on one value, which a mock fills fresh in each reply while the contract records
+> the example; `add-interaction` refuses a generator nothing provides, and a `one-of`'s alternative is
+> filled too.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

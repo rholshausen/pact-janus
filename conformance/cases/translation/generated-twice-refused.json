@@ -1,0 +1,20 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/generated-twice-refused",
+  "category": "translation",
+  "title": "'generated' of a 'generated' result is refused at the call: a value has one generator.",
+  "covers": ["shape.generated.one-value-only"],
+  "why": "behavioural spec 'generated' (ADR 0085): a node carries one 'generator' member, so a second would replace the first where nobody could see it.",
+  "interaction": {
+    "description": "two generators on one value",
+    "response": {
+      "body": {
+        "id": {
+          "$": "generated",
+          "args": [{ "$": "generated", "args": [{ "$": "string", "args": ["i"] }, "pact:Uuid"] }, "pact:RandomString"]
+        }
+      }
+    }
+  },
+  "expect": { "refused": true }
+}

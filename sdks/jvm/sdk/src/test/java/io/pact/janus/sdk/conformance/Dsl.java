@@ -93,6 +93,10 @@ final class Dsl {
       case "each-like" -> Shapes.eachLike(template(args.path(0)), cardinality(options));
       // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
       case "header-list" -> Shapes.headerList(literals(args).toArray());
+      // The generator's configuration is the case's options bag, given or not, as written.
+      case "generated" -> node.has("options")
+          ? Shapes.generated(template(args.path(0)), args.path(1).asText(), literalMap(options))
+          : Shapes.generated(template(args.path(0)), args.path(1).asText());
       default -> throw new IllegalArgumentException(
           "the case names a shape primitive this SDK does not implement: '" + primitive + "'");
     };

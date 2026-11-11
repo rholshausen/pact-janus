@@ -110,6 +110,12 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   options are, each spelled by the header-value rule. A query value or anything `compile` reads
   refuses it at run time (behavioural spec `header-list`, ADR 0082). A plain list keeps meaning
   several field lines.
+- `generated(of, generator, config?)` returns a `Shape`: the node `of` compiles to, copied, with its
+  `generator` (behavioural spec `generated`, ADR 0085). The generator's name is a string, as the
+  component spells it (`"pact:Uuid"`), and `config` a plain object, written as given; the SDK has no
+  helper per generator. `of` is typed `Template`, as every nested shape is, so a structural helper's
+  result or a map type-checks and is refused at run time with a `TypeError` saying which operator it
+  was, suggesting `optional(generated(...))` for an `optional` or `nullable`.
 - Components are the `components` member of `JanusConfig`, a list of `ComponentDeclaration`s — the
   project configuration's own document, typed loosely because its vocabulary is open. The SDK does
   not read `consumer.janus.yaml`: a YAML parser would be the SDK's first runtime dependency, and the

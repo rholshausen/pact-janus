@@ -18,7 +18,7 @@ export const suiteRoot = join(specRoot, "conformance");
 export interface HelperCall {
   $: string;
   args?: unknown[];
-  options?: Record<string, number>;
+  options?: Record<string, unknown>;
 }
 
 /** What a case may write as a header or query value — including one the rule refuses. */
@@ -65,6 +65,7 @@ export interface Exchange {
   headers?: Record<string, string>;
   body?: unknown;
   "expect-status"?: number;
+  "expect-body"?: unknown;
 }
 
 export interface Outcome {

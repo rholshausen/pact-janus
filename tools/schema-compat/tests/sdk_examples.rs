@@ -160,6 +160,8 @@ fn produces_entries_carry_only_their_own_kinds_sibling() {
     ("shape-operator", "operator"),
     ("protocol-operation", "operation"),
     ("spec-member", "path"),
+    ("hook-entry", "point"),
+    ("shape-member", "member"),
   ];
   let mut checked = 0;
   for (context, _marker, value) in blocks() {
