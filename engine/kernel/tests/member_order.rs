@@ -221,12 +221,14 @@ fn a_contract_read_and_written_again_keeps_its_bytes() {
   assert_eq!(written(&read), bytes);
 }
 
+/// ADR 0082 decision 7: a component reads its members by name, so they are written by name, and two
+/// SDKs that build the node in different orders write the same bytes. The kernel does not interpret
+/// a member's value (shape spec §3.5), so each is written as it arrived.
 #[test]
-fn a_component_operators_members_are_kept_as_written() {
+fn a_component_operators_members_are_written_by_name_and_their_values_as_written() {
   let node = json!({ "shape": "csv:row", "zeta": 1, "alpha": { "y": 1, "x": 2 } });
   assert_eq!(
     shape::canonical(&node).to_string(),
-    node.to_string(),
-    "the kernel does not interpret it (shape spec §3.5), so it does not reorder it"
+    r#"{"alpha":{"y":1,"x":2},"shape":"csv:row","zeta":1}"#
   );
 }

@@ -72,14 +72,13 @@
                   "headers": {
                     "members": {
                       "content-type": {
-                        "entries": [
-                          {
-                            "example": "application/json; charset=UTF-8",
-                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "application/json; charset=UTF-8",
+                          "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"
@@ -127,14 +126,13 @@
                   "headers": {
                     "members": {
                       "content-type": {
-                        "entries": [
-                          {
-                            "example": "application/json; charset=UTF-8",
-                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "application/json; charset=UTF-8",
+                          "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"
@@ -195,14 +193,13 @@
                   "headers": {
                     "members": {
                       "content-type": {
-                        "entries": [
-                          {
-                            "example": "application/json; charset=UTF-8",
-                            "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "application/json; charset=UTF-8",
+                          "pattern": "^(?:application/json(;\\s?charset=[\\w\\-]+)?)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"

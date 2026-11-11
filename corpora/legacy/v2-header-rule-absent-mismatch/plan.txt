@@ -1,0 +1,51 @@
+(
+  :"get the test header" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/one'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.X-TEST" (
+          %expect:not-empty (
+            $.response.headers.x-test
+          ),
+          %flow:for-each (
+            ** (
+              $.response.headers.x-test
+            ),
+            :"$.X-TEST[*]" (
+              %match:regex (
+                ~>,
+                '^(?:\\d{1,4})$'
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

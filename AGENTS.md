@@ -228,7 +228,11 @@ Three sources are the source of truth and take precedence over this file when th
 > walk splits a provider object by the consumer's alternatives. S3.2 is built: both SDKs' builders have
 > `exclude(when, reason)`, the one sampling-policy member the DSL spells, and
 > `Documentation/native-dsl-review.md` puts the whole native surface to the community before it
-> freezes.
+> freezes. S3.3 (ADR 0082): a header is a list only where its shape says so, with the HTTP
+> component's `http:list` (`headerList(...)` in both SDKs), which matches its elements however the
+> field lines frame them; the transport never splits a header, and joins HTTP/2 `Cookie` crumbs. A
+> v1–v4 header's rule applies to each of its values, and `janus upgrade` writes a list header as
+> `http:list`. A contract writes a component operator's members by name.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

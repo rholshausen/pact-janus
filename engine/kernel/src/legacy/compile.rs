@@ -558,6 +558,41 @@ pub(crate) const STATUS_CLASS: &str = "http:status-class";
 /// the built-in HTTP component's media-type comparison, which `legacy:header-value` makes of a pact.
 pub(crate) const MEDIA_TYPE: &str = "http:media-type";
 
+/// The component operator a header v1–v4 compare as a list becomes in an upgraded contract (ADR 0082):
+/// the built-in HTTP component's, its `elements` the elements expected.
+pub(crate) const LIST: &str = "http:list";
+
+/// The elements of a list-valued header as `http:list` reads them (ADR 0082 decision 2): its values
+/// joined with commas, split at each comma outside a quoted string, whitespace around each element
+/// dropped, and empty elements ignored. The HTTP component holds the same rule
+/// (`pact_janus_component_http::list::elements`), which checks every element written here is one.
+pub(crate) fn list_elements(values: &[String]) -> Vec<String> {
+  let mut elements = Vec::new();
+  let mut push = |text: &str| {
+    let element = text.trim_matches([' ', '\t']);
+    if !element.is_empty() {
+      elements.push(element.to_string());
+    }
+  };
+  for value in values {
+    let (mut start, mut quoted, mut escaped) = (0, false, false);
+    for (at, c) in value.char_indices() {
+      if escaped {
+        escaped = false;
+      } else if quoted && c == '\\' {
+        escaped = true;
+      } else if c == '"' {
+        quoted = !quoted;
+      } else if c == ',' && !quoted {
+        push(&value[start..at]);
+        start = at + 1;
+      }
+    }
+    push(&value[start..]);
+  }
+  elements
+}
+
 /// What `http:status-class` reads, as the compiled plan and an upgraded contract both write it
 /// (ADR 0057): `class`, one of the seven classes by its lower-case name, or `codes`, the statuses
 /// allowed.
@@ -678,24 +713,41 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
       let lower_name = name.to_ascii_lowercase();
       let fragments = vec!["$".to_string(), lower_name.clone()];
       let resolve = Node::resolve(format!("$.{}.{lower_name}", path::root(part, "headers")));
+      let label = format!("$.{}.{name}", path::root(part, "headers"));
       let example = Value::String(value.clone());
-      let node = match best_rule(category.as_ref(), &fragments, true) {
+      let nodes = match best_rule(category.as_ref(), &fragments, true) {
+        // A header's rule applies to each of its values, as today's verifier applies it
+        // (`compare_lists_with_matchingrules`, ADR 0082 decision 6): the header must be there, and
+        // every value it carries must satisfy the rule.
         Some((list, cascaded)) => {
-          rule_list_node(&list, cascaded, resolve, &Literal::from_json(&example), Text::Yes)
+          let item = rule_list_node(
+            &list,
+            cascaded,
+            Node::resolve_current("~>".to_string()),
+            &Literal::from_json(&example),
+            Text::Yes,
+          );
+          vec![
+            Node::action("expect:not-empty", vec![resolve.clone()]),
+            Node::action(
+              "flow:for-each",
+              vec![
+                Node::splat(vec![resolve]),
+                Node::container(Some(path::each_like_item(&label)), vec![item]),
+              ],
+            ),
+          ]
         }
         // The v1-v4 default header comparison (module docs): not plain string equality — a
         // multi-valued (comma-separated) header tolerates whitespace around the commas, and a
         // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
         // extra actual parameters allowed. Legacy-only: no shape operator needs this.
-        None => Node::action(
+        None => vec![Node::action(
           "legacy:header-value",
           vec![resolve, Node::value(Literal::from_json(&example))],
-        ),
+        )],
       };
-      Node::container(
-        Some(format!("$.{}.{name}", path::root(part, "headers"))),
-        vec![node],
-      )
+      Node::container(Some(label), nodes)
     })
     .collect()
 }

@@ -44,9 +44,19 @@
       ),
       :headers (
         :"$.X-Ratio" (
-          %legacy:parses-as (
-            $.request.headers.x-ratio,
-            'number'
+          %expect:not-empty (
+            $.request.headers.x-ratio
+          ),
+          %flow:for-each (
+            ** (
+              $.request.headers.x-ratio
+            ),
+            :"$.X-Ratio[*]" (
+              %legacy:parses-as (
+                ~>,
+                'number'
+              )
+            )
           )
         )
       )

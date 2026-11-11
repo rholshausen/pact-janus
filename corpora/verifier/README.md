@@ -125,6 +125,9 @@ interaction of a pact it did not fetch is `absent` there too.
   time against the reply's type written without the space, and `content-type-extra-parameter`, a reply
   that adds a parameter the header check allows and today's second check does not; both deliberate
   differences (S1.26, ADR 0043).
+- `headers/`: headers v1–v4 compare as lists, framed by the reply another way than the pact writes
+  them (S3.3, ADR 0082): `list-values`, a `Vary` with no space after its comma and a `Cache-Control`
+  sent as two field lines, which the upgraded contract compares as `http:list`.
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
   match and that do not, and mutations. `each-value-nested` puts rules below an `eachValue` matcher's

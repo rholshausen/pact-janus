@@ -33,9 +33,10 @@ fn corpus() -> PathBuf {
   PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpora/legacy")
 }
 
-/// The case's values as each path's verifier reads a reply. A legacy plan reads one string per header,
-/// `$.<part>.headers.<name>`, as the case gives them; a shape reads the `{name: [value]}` slot the HTTP
-/// transport produces, which it always produces, with no header in it when there is none.
+/// The case's values as each path's verifier reads a reply. A legacy plan reads a header at
+/// `$.<part>.headers.<name>`, as the case gives it: one string, or its values as a list (ADR 0082);
+/// a shape reads the `{name: [line]}` slot the HTTP transport produces, which it always produces, with
+/// no header in it when there is none. A list is the header's lines, one per value.
 fn captured(values: &Map<String, Value>, encoded: &Map<String, Value>, legacy: bool) -> CapturedValues {
   use base64::Engine as _;
   let mut headers: BTreeMap<String, Map<String, Value>> = BTreeMap::from([
@@ -49,10 +50,14 @@ fn captured(values: &Map<String, Value>, encoded: &Map<String, Value>, legacy: b
       (parts.next(), parts.next(), parts.next(), parts.next())
       && !legacy
     {
-      headers
-        .entry(part.to_string())
-        .or_default()
-        .insert(name.to_string(), json!([value]));
+      headers.entry(part.to_string()).or_default().insert(
+        name.to_string(),
+        if value.is_array() {
+          value.clone()
+        } else {
+          json!([value])
+        },
+      );
       continue;
     }
     let value = match encoded.get(path).and_then(Value::as_str) {

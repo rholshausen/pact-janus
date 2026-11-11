@@ -82,7 +82,7 @@
     "$.request.path": "/upload",
     "$.request.query": {},
     "$.response.status": 200,
-    "$.response.headers.content-type": "multipart/form-data; boundary=other",
+    "$.response.headers.content-type": ["multipart/form-data; boundary=other"],
     "$.response.body": {
       "extra": [
         {

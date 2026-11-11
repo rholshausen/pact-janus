@@ -44,9 +44,19 @@
       ) => BOOL(false),
       :headers (
         :"$.X-Ratio" (
-          %legacy:parses-as (
-            $.request.headers.x-ratio => '1e-3',
-            'number'
+          %expect:not-empty (
+            $.request.headers.x-ratio => ['1e-3']
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.request.headers.x-ratio => ['1e-3']
+            ) => ['1e-3'],
+            :"$.X-Ratio[*]" (
+              %legacy:parses-as (
+                ~> => '1e-3',
+                'number'
+              ) => BOOL(true)
+            ) => BOOL(true)
           ) => BOOL(true)
         ) => BOOL(true)
       ) => BOOL(true)

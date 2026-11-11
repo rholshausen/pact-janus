@@ -1,0 +1,29 @@
+(
+  :"get orders as a list" (
+    :request (
+      :headers (
+        %expect:object (
+          $.request.headers => {'accept': ['text/plain', 'application/json'], 'x-ids': ['1, 2, 3']}
+        ) => BOOL(true),
+        :"$.accept" (
+          %http:list (
+            $.request.headers.accept => ['text/plain', 'application/json'],
+            {'elements': ['application/json', 'text/plain']}
+          ) => ERROR(Expected the list 'application/json, text/plain' but was 'text/plain, application/json')
+        ) => BOOL(false),
+        :"$.vary" (
+          %http:list (
+            $.request.headers.vary => ABSENT,
+            {'elements': ['Accept', 'Origin']}
+          ) => ERROR(Expected the list 'Accept, Origin' but the header was absent)
+        ) => BOOL(false),
+        :"$.x-ids" (
+          %http:list (
+            $.request.headers.x-ids => ['1, 2, 3'],
+            {'elements': ['1', '2']}
+          ) => ERROR(Expected the list '1, 2' but was '1, 2, 3')
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

@@ -104,6 +104,12 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   its own class, and `RequestParts.body`/`ResponseParts.body` are the only members typed to accept
   one (`Template | Content`). Anywhere else the type checker refuses it, and `compile` refuses it at
   run time for a caller that cast around the types (behavioural spec `content`, ADR 0019).
+- `headerList(...elements)` returns a `HeaderList`, for the same reason: it describes a header's field
+  lines, so `RequestParts.headers` and `ResponseParts.headers` are the only members typed to accept one
+  (`HeaderValue`, which is `MultiValue | HeaderList`). Its elements are rest parameters, as `anyOf`'s
+  options are, each spelled by the header-value rule. A query value or anything `compile` reads
+  refuses it at run time (behavioural spec `header-list`, ADR 0082). A plain list keeps meaning
+  several field lines.
 - Components are the `components` member of `JanusConfig`, a list of `ComponentDeclaration`s — the
   project configuration's own document, typed loosely because its vocabulary is open. The SDK does
   not read `consumer.janus.yaml`: a YAML parser would be the SDK's first runtime dependency, and the

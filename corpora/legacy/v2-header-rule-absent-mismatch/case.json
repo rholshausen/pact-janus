@@ -1,0 +1,58 @@
+{
+  "description": "a header with a rule must be sent (ADR 0082 decision 6): a reply with no X-TEST fails, though there is no value for the rule to fail",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get the test header",
+          "request": {
+            "method": "GET",
+            "path": "/one"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "X-TEST": "1"
+            },
+            "matchingRules": {
+              "$.headers.X-TEST": {
+                "match": "regex",
+                "regex": "\\d{1,4}"
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "2.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/one",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": {}
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.headers.x-test",
+        "message": "Expected a non-empty value but got <absent>",
+        "action": "expect:not-empty"
+      }
+    ]
+  }
+}

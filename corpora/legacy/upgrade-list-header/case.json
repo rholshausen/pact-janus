@@ -1,0 +1,131 @@
+{
+  "description": "a header v1-v4 compare as a list, with no rule, upgrades to http:list of its elements (ADR 0082 decision 5): Accept, which pact_models splits, X-Ids, a value with a comma, and Vary in the reply each match however the header frames them, one line with no spaces or one field line per element, on both paths",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get orders as a list",
+          "request": {
+            "method": "GET",
+            "path": "/orders",
+            "headers": {
+              "Accept": "application/json, text/plain",
+              "X-Ids": "1, 2"
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Vary": "Accept, Origin"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "also-compiled-from": {
+    "kind": "spec",
+    "spec": {
+      "description": "get orders as a list",
+      "parts": {
+        "request": {
+          "headers": {
+            "members": {
+              "accept": {
+                "shape": "http:list",
+                "elements": [
+                  "application/json",
+                  "text/plain"
+                ],
+                "example": [
+                  "application/json, text/plain"
+                ]
+              },
+              "x-ids": {
+                "shape": "http:list",
+                "elements": [
+                  "1",
+                  "2"
+                ],
+                "example": [
+                  "1, 2"
+                ]
+              }
+            },
+            "shape": "object"
+          },
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders",
+            "shape": "equality"
+          }
+        },
+        "response": {
+          "headers": {
+            "members": {
+              "vary": {
+                "shape": "http:list",
+                "elements": [
+                  "Accept",
+                  "Origin"
+                ],
+                "example": [
+                  "Accept, Origin"
+                ]
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "requires": [
+        {
+          "component": "http"
+        }
+      ]
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders",
+    "$.request.query": {},
+    "$.request.headers": {
+      "accept": [
+        "application/json,text/plain"
+      ],
+      "x-ids": [
+        "1",
+        "2"
+      ]
+    },
+    "$.response.status": 200,
+    "$.response.headers": {
+      "vary": [
+        "Accept,  Origin"
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

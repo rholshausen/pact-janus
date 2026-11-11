@@ -1254,16 +1254,16 @@ pub fn response_parts(response: &HttpResponse) -> Parts {
   parts
 }
 
-/// A reply's header slots as the single-valued captures design 3.5's compiled plans resolve
-/// against: `$.<part>.headers.<lower-cased name>`, one string per name.
+/// A reply's header slots as design 3.5's compiled plans resolve them: `$.<part>.headers.<lower-cased
+/// name>`, the header's values as today's verifier reads them (`pact_verifier`'s `extract_headers`):
+/// each field line the transport presented, split on commas when `pact_models` knows the header to be
+/// a list (`parse_header`), and trimmed.
 ///
-/// The wire form is `{name: [value, …]}` (component-interfaces spec §4's own worked example) and
-/// the *expected* side went through [`convert_headers`], which joins a repeated header with
-/// `", "`. This is that same join on the actual side, so a legacy plan compares a header value
-/// against a header value rather than a string against a list. Layered over the generic
-/// [`parts_resolver`](crate::protocol) captures rather than replacing them: `CapturedValues`
-/// resolves against the longest captured prefix, so these win for header paths and change nothing
-/// else.
+/// The wire form is `{name: [line, …]}` (component-interfaces spec §4's own worked example), and a line
+/// may hold several of a list header's values. A header's rule applies to each value, as today's
+/// (ADR 0082 decision 6), and `legacy:header-value` compares their join. Layered over the generic
+/// [`parts_resolver`](crate::protocol) captures rather than replacing them: `CapturedValues` resolves
+/// against the longest captured prefix, so these win for header paths and change nothing else.
 ///
 /// Permanently HTTP-shaped, like the rest of this module — v1–v4 pacts are HTTP documents by
 /// specification, and the compiler that reads them says so in its own module docs.
@@ -1277,13 +1277,18 @@ pub fn header_captures(resolver: CapturedValues, parts: &Parts) -> CapturedValue
       continue;
     };
     for (name, value) in headers {
-      let text = match value {
-        Value::Array(values) => values.iter().map(header_text).collect::<Vec<_>>().join(", "),
-        other => header_text(other),
+      let lines = match value {
+        Value::Array(lines) => lines.iter().map(header_text).collect::<Vec<_>>(),
+        other => vec![header_text(other)],
       };
+      let values = lines
+        .iter()
+        .flat_map(|line| pact_models::headers::parse_header(name, line))
+        .map(RuntimeValue::String)
+        .collect();
       resolver = resolver.capture(
         format!("$.{part_name}.headers.{}", name.to_ascii_lowercase()),
-        RuntimeValue::String(text),
+        RuntimeValue::Array(values),
       );
     }
   }

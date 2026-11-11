@@ -42,6 +42,16 @@ public final class Shapes {
     return new Content(mediaType, document);
   }
 
+  /**
+   * {@code header-list}: a header whose value is a list — these elements, in order, however the
+   * header frames them, one field line or several, with any spacing around the commas (ADR 0082).
+   * Each element is written as a header value is. Accepted only as a request or response header's
+   * value.
+   */
+  public static HeaderList headerList(Object... elements) {
+    return new HeaderList(Arrays.asList(elements));
+  }
+
   // ---------------------------------------------------------------------------------------------
   // kind predicates
 

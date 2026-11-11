@@ -1,0 +1,55 @@
+(
+  :"get orders as a list" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/orders',
+          '/orders'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Accept" (
+          %legacy:header-value (
+            $.request.headers.accept => ['application/json,text/plain'],
+            'application/json, text/plain'
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.X-Ids" (
+          %legacy:header-value (
+            $.request.headers.x-ids => ['1', '2'],
+            '1, 2'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Vary" (
+          %legacy:header-value (
+            $.response.headers.vary => ['Accept,  Origin'],
+            'Accept, Origin'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

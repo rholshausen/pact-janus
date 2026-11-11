@@ -117,6 +117,11 @@ SDK (plan task 6.3); what that turned up is in
   rule refuse it with an `IllegalArgumentException` naming where it was written (behavioural spec
   `content`, ADR 0019). It cannot be refused at compile time without overloading `body`, and one
   `Object` parameter is what every other slot takes.
+- `Shapes.headerList(Object... elements)` returns a `HeaderList`, for the same reason: it describes a
+  header's field lines, so `header(name, value)` is the only member that accepts one, and a query
+  value or the literal rules refuse it with an `IllegalArgumentException` naming where it was written
+  (behavioural spec `header-list`, ADR 0082). Its elements are varargs, as `anyOf`'s options are, each
+  spelled by the header-value rule. A `List` keeps meaning several field lines.
 - Components are `JanusOptions.withComponents(List<Map<String, ?>>)`: the project configuration's
   own declarations, as plain maps (checked for JSON-ness, not for meaning). The SDK does not read
   `consumer.janus.yaml` — see the TypeScript style guide's reason, which is the same one.

@@ -1,0 +1,69 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/header-list-any-framing",
+  "category": "live",
+  "title": "A 'header-list' header matches a consumer that frames the list another way.",
+  "covers": [
+    "shape.header-list.any-framing"
+  ],
+  "why": "behavioural spec 'header-list' (ADR 0082 decision 2): the engine's http:list admits a header whose field lines, joined with commas, split into the elements, so a consumer that sends 'application/json,text/plain' on one line with no space matches a header declared as the two elements. Written as a plain value, the same request would fail: the line is not 'application/json, text/plain'. One variant, since the operator contributes no dimension.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order list for a client that accepts two types",
+          "request": {
+            "method": "GET",
+            "path": "/orders",
+            "headers": {
+              "Accept": {
+                "$": "header-list",
+                "args": [
+                  "application/json",
+                  "text/plain"
+                ]
+              }
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Vary": {
+                "$": "header-list",
+                "args": [
+                  "Accept",
+                  "Origin"
+                ]
+              }
+            }
+          }
+        },
+        "closure": {
+          "exchange": {
+            "method": "GET",
+            "path": "/orders",
+            "headers": {
+              "Accept": "application/json,text/plain"
+            },
+            "expect-status": 200
+          }
+        }
+      },
+      "expect": {
+        "outcome": "ok"
+      }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true
+        }
+      }
+    }
+  ],
+  "expect": {
+    "variant-count": 1
+  }
+}

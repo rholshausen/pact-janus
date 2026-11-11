@@ -506,6 +506,78 @@ fn serves_http_2_with_prior_knowledge() {
   );
 }
 
+/// ADR 0082 decision 1: a header is presented as its field lines, never split, in every version. An
+/// HTTP/2 client may split `Cookie` into crumbs, which are joined with "; " as RFC 9113 §8.2.3 says;
+/// any other repeated header stays one line per field line.
+#[test]
+fn http_2_cookie_crumbs_are_joined_and_other_field_lines_are_kept() {
+  let transport = std::sync::Arc::new(HttpTransport::new());
+  let (host, port) = start_serve(&transport, "t-h2-crumbs");
+  transport
+    .start(Start {
+      instance: "t-h2-crumbs-drive".to_string(),
+      kind: "http".to_string(),
+      role: "drive".to_string(),
+      options: Some(json!({
+        "base-url": format!("http://{host}:{port}"),
+        "client": { "http-version": "2" },
+      })),
+    })
+    .expect("the drive options are valid");
+
+  let client = {
+    let transport = std::sync::Arc::clone(&transport);
+    std::thread::spawn(move || {
+      let mut request = pact_janus_kernel::component::Part::new();
+      for (name, value) in [
+        ("method", json!("GET")),
+        ("path", json!("/orders")),
+        (
+          "headers",
+          json!({ "cookie": ["a=1", "b=2"], "accept": ["text/plain", "application/json, */*"] }),
+        ),
+      ] {
+        request.insert(
+          name.to_string(),
+          SlotValue {
+            content: value,
+            encoded: None,
+            content_type: None,
+          },
+        );
+      }
+      let mut parts = Parts::new();
+      parts.insert("request".to_string(), request);
+      transport.send(pact_janus_kernel::component::Send {
+        instance: "t-h2-crumbs-drive".to_string(),
+        parts,
+        await_reply: true,
+        timeout_ms: Some(5_000),
+      })
+    })
+  };
+
+  let polled = transport
+    .poll_inbound(PollInbound {
+      instance: "t-h2-crumbs".to_string(),
+      timeout_ms: 5_000,
+    })
+    .unwrap()
+    .inbound
+    .expect("the HTTP/2 request arrives");
+  let headers = &polled.parts["request"]["headers"].content;
+  assert_eq!(headers["cookie"], json!(["a=1; b=2"]));
+  assert_eq!(headers["accept"], json!(["text/plain", "application/json, */*"]));
+  transport
+    .reply(Reply {
+      instance: "t-h2-crumbs".to_string(),
+      event: polled.event,
+      parts: response_parts(200, "application/json", b"{}"),
+    })
+    .expect("the reply is delivered");
+  client.join().unwrap().expect("the mock answered over HTTP/2");
+}
+
 /// A recorded `Content-Length` belongs to the recorded body. The body served decides the framing,
 /// so a declared one is not repeated.
 #[test]

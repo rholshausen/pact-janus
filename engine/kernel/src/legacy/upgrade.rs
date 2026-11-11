@@ -26,9 +26,10 @@
 //! `kernel-boundary-review.md`'s findings 3 and 6 asked that the module tree say so (S1.11).
 
 use super::compile::{
-  LegacyBody, LegacyPart, MEDIA_TYPE, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text,
+  LIST, LegacyBody, LegacyPart, MEDIA_TYPE, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text,
   anchored_pattern, best_rule, definition_rules, each_value_category, form_parameters, is_whole_equality,
-  namespace_of, only_element, rerooted, rules_for, status_class, type_rule_names, type_rule_reaches,
+  list_elements, namespace_of, only_element, rerooted, rules_for, status_class, type_rule_names,
+  type_rule_reaches,
 };
 use super::multipart as legacy_multipart;
 use super::pact::{
@@ -922,15 +923,21 @@ impl Conversion {
     self.shape_for(list.map(|(list, _)| list), example, at, Text::of(example))
   }
 
-  /// Headers, in the document form a transport actually produces: `{name: [value, …]}` — so an
-  /// `object` of `array`s, never a flat string map (component-interfaces spec §4).
+  /// Headers, in the document form a transport actually produces: `{name: [line, …]}` — so an
+  /// `object` whose members describe each header's field lines, never a flat string map
+  /// (component-interfaces spec §4). Each header is written as v1–v4 compare it (ADR 0082):
   ///
-  /// A header with no rule is where this conversion is least exact, and it says so. v1–v4 compare
-  /// a header value with their own defaulted comparison — MIME parameters as a set, whitespace
-  /// around commas ignored (plan-grammar spec §4.4's `legacy:header-value`) — and the shape
-  /// language has no operator for that: `header:parse` is its eventual answer and no component
-  /// contributes it yet. `equality` is strictly narrower, which is a judgement worth a finding
-  /// rather than a silent tightening.
+  /// - with a rule on the header, the rule applies to each value, so the member is an `each-like` of
+  ///   the rule's shape, at least one value;
+  /// - with rules on its values one by one, each value is its own entry, as for a query parameter;
+  /// - a `Content-Type` with no rule is a media type (ADR 0071);
+  /// - another header with no rule that v1–v4 compare as a list, because `pact_models` read several
+  ///   values or a value has a comma, is `http:list` of its elements;
+  /// - any other is its value, exactly.
+  ///
+  /// A value with parameters is where the conversion is least exact, and it says so: v1–v4 compare
+  /// the parameters of a value with no rule as a set, extra ones allowed, and only a `Content-Type`
+  /// has an operator for that.
   fn headers_slot(
     &mut self,
     rules: &MatchingRules,
@@ -942,28 +949,73 @@ impl Conversion {
       .iter()
       .map(|(name, values)| (name.to_ascii_lowercase(), values.clone()))
       .collect();
-    let before = self.findings.len();
     let category = rules_for(rules, "header");
+    let mut members = Map::new();
     let mut media_type = false;
-    let slot = self.multi_map_slot(category.as_ref(), &headers, true, at, Some(&mut media_type));
+    let mut list = false;
+    let mut parameters = false;
+    for (name, values) in &headers {
+      let escaped = escape_pointer(name);
+      let member = at.push(&format!("/{escaped}"), &format!("/members/{escaped}"));
+      let whole = best_rule(category.as_ref(), &["$".to_string(), name.clone()], true);
+      let by_value = (0..values.len()).any(|index| {
+        best_rule(
+          category.as_ref(),
+          &["$".to_string(), name.clone(), index.to_string()],
+          true,
+        )
+        .is_some()
+      });
+      let shape = if let Some((rule, _)) = whole {
+        let example = Value::String(values.first().cloned().unwrap_or_default());
+        let item = member.push("/0", "/items");
+        let items = self.shape_for(Some(rule), &example, &item, Text::Yes);
+        json!({ "shape": "each-like", "items": items, "min": 1 })
+      } else if by_value || name == "content-type" {
+        let one = BTreeMap::from([(name.clone(), values.clone())]);
+        let slot = self.multi_map_slot(category.as_ref(), &one, true, at, Some(&mut media_type));
+        slot["members"][name.as_str()].clone()
+      } else if values.len() > 1 || values.iter().any(|value| value.contains(',')) {
+        list = true;
+        parameters |= values.iter().any(|value| value.contains(';'));
+        let joined = values.join(", ");
+        json!({ "shape": LIST, "elements": list_elements(values), "example": [joined] })
+      } else {
+        parameters |= values.iter().any(|value| value.contains(';'));
+        let one = BTreeMap::from([(name.clone(), values.clone())]);
+        let slot = self.multi_map_slot(category.as_ref(), &one, true, at, None);
+        slot["members"][name.as_str()].clone()
+      };
+      members.insert(name.clone(), shape);
+    }
     if media_type {
       self.media_type_written(at, decl);
     }
-    if self.findings[before..]
-      .iter()
-      .any(|f| f.code == "example-frozen-as-equality")
-    {
+    if list {
+      decl.require("http");
+      self.finding(Finding::at(
+        "rule-narrowed",
+        "note",
+        at,
+        "a header with no matching rule that v1–v4 compare as a list became the component operator \
+         'http:list', which compares its elements however the header frames them, as v1–v4 do; the \
+         interaction now requires the 'http' component, which a verifier reports by name if it is \
+         not loaded"
+          .to_string(),
+      ));
+    }
+    if parameters {
       self.finding(Finding::at(
         "rule-narrowed",
         "judgement",
         at,
-        "header values with no matching rule became exact `equality` constraints; v1–v4 compared \
-         them more loosely (MIME parameters as a set, whitespace around commas ignored), and the \
-         shape language has no operator for that comparison yet"
+        "header values with parameters and no matching rule are compared exactly; v1–v4 compared \
+         their parameters as a set, extra ones allowed, and only a Content-Type has an operator \
+         for that"
           .to_string(),
       ));
     }
-    slot
+    json!({ "shape": "object", "members": members })
   }
 
   /// A `{name: [value, …]}` slot — headers, query parameters and a form body have the same document

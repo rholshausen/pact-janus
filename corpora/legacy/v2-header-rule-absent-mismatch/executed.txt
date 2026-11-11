@@ -1,0 +1,45 @@
+(
+  :"get the test header" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/one',
+          '/one'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.X-TEST" (
+          %expect:not-empty (
+            $.response.headers.x-test => ABSENT
+          ) => ERROR(Expected a non-empty value but got <absent>),
+          %flow:for-each (
+            ** (
+              $.response.headers.x-test => ABSENT
+            ) => []
+          ) => BOOL(true)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

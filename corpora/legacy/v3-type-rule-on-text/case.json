@@ -67,7 +67,7 @@
     "$.request.method": "GET",
     "$.request.path": "/orders",
     "$.request.query": { "page": ["3"], "size": ["many"] },
-    "$.request.headers.x-ratio": "1e-3",
+    "$.request.headers.x-ratio": ["1e-3"],
     "$.response.status": 200
   },
   "result": {

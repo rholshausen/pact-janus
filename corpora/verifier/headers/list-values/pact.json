@@ -1,0 +1,36 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "orders"
+  },
+  "interactions": [
+    {
+      "description": "get the orders, cacheable by type",
+      "request": {
+        "method": "GET",
+        "path": "/orders",
+        "headers": {
+          "Accept": "application/json, text/plain"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Vary": "Accept, Origin",
+          "Cache-Control": "no-store, max-age=0"
+        },
+        "body": {
+          "orders": []
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

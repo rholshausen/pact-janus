@@ -514,6 +514,28 @@ every value it finds under one wherever it would appear in a report (engine-prot
 transport that declares none has nothing redacted by default; a session can still name members of its
 own. An in-tree transport declares them in code (§9.1).
 
+### 5.9 How the built-in HTTP transport presents a header
+
+The `headers` slot is a map of lower-cased name to the header's **field lines**, in the order they
+arrived, each as sent, so a header is never split on commas and two field lines are never joined
+([ADR 0082](../../decisions/0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md)).
+Whether a comma separates the elements of a list or is a character in one value depends on the
+header's definition (RFC 9110 §5.6.1), and a shape says which it means, with `http:list` below.
+
+The field lines are the same in every HTTP version, with one exception. HTTP/2 and HTTP/3 let a client
+split `Cookie` into crumbs, one field line each, which are joined with `"; "` before the value leaves
+the protocol (RFC 9113 §8.2.3, RFC 9114 §4.2.1). A served request's `cookie` is that one line, as
+HTTP/1.1 sends it.
+
+`http:list`, which the HTTP component runs as a matcher, as it runs `http:status-class` and
+`http:media-type` (§9.1), compares a header as a list. Its member `elements` is the elements expected, in
+order. It admits a header whose field lines, joined with commas, split into exactly those elements:
+split at each comma outside a quoted string (RFC 9110 §5.6.4), with spaces and tabs around each element
+dropped and empty elements ignored. So `a, b`, `a,b`, `a, , b` and the two field lines `a` and `b` are
+all `elements: ["a", "b"]`. An element compares exactly, and an absent header fails. An element written that is not
+one, because it has a comma outside quotes, whitespace around it or no text, is the
+operator's invalid configuration. Its example is the elements joined with `", "`, as one field line.
+
 ## 6. The content interface
 
 Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).

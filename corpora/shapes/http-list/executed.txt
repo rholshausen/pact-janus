@@ -1,0 +1,29 @@
+(
+  :"get orders as a list" (
+    :request (
+      :headers (
+        %expect:object (
+          $.request.headers => {'accept': ['application/json, text/plain'], 'x-ids': ['1,,2,'], 'vary': ['Accept', 'Origin']}
+        ) => BOOL(true),
+        :"$.accept" (
+          %http:list (
+            $.request.headers.accept => ['application/json, text/plain'],
+            {'elements': ['application/json', 'text/plain']}
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.vary" (
+          %http:list (
+            $.request.headers.vary => ['Accept', 'Origin'],
+            {'elements': ['Accept', 'Origin']}
+          ) => BOOL(true)
+        ) => BOOL(true),
+        :"$.x-ids" (
+          %http:list (
+            $.request.headers.x-ids => ['1,,2,'],
+            {'elements': ['1', '2']}
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

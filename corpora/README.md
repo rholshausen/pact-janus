@@ -73,7 +73,12 @@ readability:
   runner registers as the native engine does (ADR 0057). `shapes/http-media-type/` and its
   `-mismatch` twin are the same component's `http:media-type`, which `janus upgrade` writes for a
   `Content-Type` with no rule (ADR 0071); a pact's own header goes through `legacy:header-value`, which
-  reads headers in another form, so they are spec cases.
+  reads headers in another form, so they are spec cases. `shapes/http-list/` and its `-mismatch` twin
+  are its `http:list`, a header compared as the elements of a list however its field lines frame them,
+  and `legacy/upgrade-list-header/` the headers v1–v4 compare as lists, which `janus upgrade` writes as
+  one (ADR 0082). `v2-header-rule-each-value/`, its `-mismatch` twin and `v2-header-rule-absent-mismatch/`
+  are a header's rule applied to each of its values, as today's verifier applies it, the header itself
+  required.
 
 `contracts/` pins how a contract is written, not how one matches (contract-file spec §2.4, ADR 0063):
 each case is a `pact.json` and the `contract.janus.json` that `upgrade/pact` writes for it, compared

@@ -39,6 +39,20 @@ export class Content {
   }
 }
 
+/**
+ * A header whose value is a list, compared as its elements however its field lines frame them
+ * (behavioural spec 'header-list', ADR 0082). Not a shape — the list is a fact about a header's field
+ * lines — so it is its own class, and only a request or response header accepts one.
+ */
+export class HeaderList {
+  readonly elements: readonly unknown[];
+
+  /** @internal A HeaderList comes from `headerList()`. */
+  constructor(elements: readonly unknown[]) {
+    this.elements = elements;
+  }
+}
+
 /** JSON values, as a DSL author writes them where a shape is expected. */
 export type Template = Shape | string | number | boolean | null | readonly Template[] | { readonly [k: string]: Template };
 
@@ -55,6 +69,12 @@ export function compile(template: Template): shape.Shape {
     throw new TypeError(
       "content() declares a whole slot's media type, so it belongs directly in a request or response " +
         "body — a member of a document has no content type of its own",
+    );
+  }
+  if ((template as unknown) instanceof HeaderList) {
+    throw new TypeError(
+      "headerList() describes an HTTP header's field lines, so it belongs directly as a request or " +
+        "response header's value — nothing else has field lines",
     );
   }
   if (template === null || typeof template !== "object") {
@@ -82,6 +102,12 @@ export const json = (document: Template): Shape => new Shape(compile(document));
  * engine's answer, at `execute`.
  */
 export const content = (mediaType: string, document: Template): Content => new Content(mediaType, document);
+
+/**
+ * A header whose value is a list: these elements, in order, however the header frames them — one
+ * field line or several, with any spacing around the commas (behavioural spec 'header-list').
+ */
+export const headerList = (...elements: (string | number | boolean)[]): HeaderList => new HeaderList(elements);
 
 export const integer = (example: number): Shape => withExample("integer", example);
 export const number = (example: number): Shape => withExample("number", example);

@@ -30,9 +30,19 @@
       ) => BOOL(true),
       :headers (
         :"$.Content-Type" (
-          %match:regex (
-            $.response.headers.content-type => 'multipart/form-data; boundary=other',
-            '^(?:multipart/form-data; boundary=.*)$'
+          %expect:not-empty (
+            $.response.headers.content-type => ['multipart/form-data; boundary=other']
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.headers.content-type => ['multipart/form-data; boundary=other']
+            ) => ['multipart/form-data; boundary=other'],
+            :"$.Content-Type[*]" (
+              %match:regex (
+                ~> => 'multipart/form-data; boundary=other',
+                '^(?:multipart/form-data; boundary=.*)$'
+              ) => BOOL(true)
+            ) => BOOL(true)
           ) => BOOL(true)
         ) => BOOL(true)
       ) => BOOL(true),

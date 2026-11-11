@@ -1156,7 +1156,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
     "legacy:header-value" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
-      match as_text(&value) {
+      match as_header_text(&value) {
         None => failed(
           vec![Marked::plain("Expected a string but got "), shown(&value)],
           locus(children),
@@ -1325,7 +1325,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
     "legacy:body-type" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
-      match as_text(&value) {
+      match as_header_text(&value) {
         None if matches!(value, RuntimeValue::Absent | RuntimeValue::Null) => {
           NodeResult::Value(RuntimeValue::Bool(true))
         }
@@ -1618,6 +1618,19 @@ fn as_text(value: &RuntimeValue) -> Option<String> {
     RuntimeValue::String(s) => Some(s.clone()),
     RuntimeValue::Bytes(bytes) => std::str::from_utf8(bytes).ok().map(str::to_string),
     _ => None,
+  }
+}
+
+/// A header's text, for the legacy actions that compare a header whole: [`as_text`], or a header's
+/// values joined with `", "`, which is how a v1–v4 reply's headers are captured (ADR 0082 decision 6).
+fn as_header_text(value: &RuntimeValue) -> Option<String> {
+  match value {
+    RuntimeValue::Array(values) => values
+      .iter()
+      .map(as_text)
+      .collect::<Option<Vec<_>>>()
+      .map(|values| values.join(", ")),
+    other => as_text(other),
   }
 }
 

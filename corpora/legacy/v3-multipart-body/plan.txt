@@ -30,9 +30,19 @@
       ),
       :headers (
         :"$.Content-Type" (
-          %match:regex (
-            $.response.headers.content-type,
-            '^(?:multipart/form-data; boundary=.*)$'
+          %expect:not-empty (
+            $.response.headers.content-type
+          ),
+          %flow:for-each (
+            ** (
+              $.response.headers.content-type
+            ),
+            :"$.Content-Type[*]" (
+              %match:regex (
+                ~>,
+                '^(?:multipart/form-data; boundary=.*)$'
+              )
+            )
           )
         )
       ),

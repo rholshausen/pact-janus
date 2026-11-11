@@ -1,0 +1,97 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/header-list",
+  "category": "translation",
+  "title": "'header-list' is the header's member itself: the HTTP component's http:list, its elements spelled as header values, and one field line as its example.",
+  "covers": [
+    "shape.header-list.compiled-on-the-header"
+  ],
+  "why": "behavioural spec 'header-list' (ADR 0082): it compiles to { shape: 'http:list', elements, example: [elements joined with ', '] } as the header's member, not inside the one-element list a value gets, because the operator reads the header's field lines. A whole number is spelled as a header value is, '2'.",
+  "interaction": {
+    "description": "a request that accepts two types",
+    "request": {
+      "headers": {
+        "Accept": {
+          "$": "header-list",
+          "args": [
+            "application/json",
+            "text/plain"
+          ]
+        },
+        "X-Versions": {
+          "$": "header-list",
+          "args": [
+            1,
+            2
+          ]
+        }
+      }
+    },
+    "response": {
+      "headers": {
+        "Vary": {
+          "$": "header-list",
+          "args": [
+            "Accept",
+            "Origin"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "a request that accepts two types",
+      "transport": {
+        "kind": "http",
+        "mode": "passive"
+      },
+      "parts": {
+        "request": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "accept": {
+                "shape": "http:list",
+                "elements": [
+                  "application/json",
+                  "text/plain"
+                ],
+                "example": [
+                  "application/json, text/plain"
+                ]
+              },
+              "x-versions": {
+                "shape": "http:list",
+                "elements": [
+                  "1",
+                  "2"
+                ],
+                "example": [
+                  "1, 2"
+                ]
+              }
+            }
+          }
+        },
+        "response": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "vary": {
+                "shape": "http:list",
+                "elements": [
+                  "Accept",
+                  "Origin"
+                ],
+                "example": [
+                  "Accept, Origin"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

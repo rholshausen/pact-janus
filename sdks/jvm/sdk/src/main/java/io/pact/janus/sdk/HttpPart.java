@@ -60,7 +60,33 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
   }
 
   Shape headersShape() {
-    return valueLists(headers, part + ".headers");
+    Map<String, Shape> members = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> e : headers.entrySet()) {
+      String where = part + ".headers." + e.getKey();
+      members.put(e.getKey(), e.getValue() instanceof HeaderList list
+          ? headerList(list, where)
+          : valueList(e.getValue(), where));
+    }
+    Shape shape = Literals.node(ShapeShape.OBJECT);
+    shape.setMembers(members);
+    return shape;
+  }
+
+  /**
+   * {@code header-list}: the HTTP component's {@code http:list}, written as the header's member
+   * itself, its elements each spelled as a header value is, and its example the one field line a
+   * mock serves (ADR 0082).
+   */
+  private static Shape headerList(HeaderList list, String where) {
+    List<String> elements = new ArrayList<>();
+    int i = 0;
+    for (Object element : list.elements()) {
+      elements.add(text(element, where + "[" + i++ + "]"));
+    }
+    Shape shape = Literals.node("http:list");
+    shape.setAdditionalProperty("elements", elements);
+    shape.setExample(List.of(String.join(", ", elements)));
+    return shape;
   }
 
   /** The HTTP transport carries headers and query parameters as a map of name to a list of values. */
@@ -77,6 +103,10 @@ abstract class HttpPart<SELF extends HttpPart<SELF>> {
   private static Shape valueList(Object value, String where) {
     if (value instanceof Content) {
       throw Content.misplaced(where);
+    }
+    if (value instanceof HeaderList) {
+      throw new IllegalArgumentException(where + ": headerList() describes an HTTP header's field lines;"
+          + " a query parameter has none");
     }
     if (value instanceof ShapeNode node) {
       return listed(node.binding());

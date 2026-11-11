@@ -190,6 +190,33 @@ pub(crate) fn status_only(status: u16) -> Answer {
   response
 }
 
+/// HTTP/2 and HTTP/3 let a client split `Cookie` into crumbs, one field line each, which are joined
+/// with `"; "` before the value leaves the protocol (RFC 9113 §8.2.3, RFC 9114 §4.2.1). A request's
+/// `cookie` then reads the same in every version (ADR 0082 decision 1). The joined line takes the
+/// first crumb's place.
+fn joined_cookie_crumbs(headers: Vec<(String, String)>) -> Vec<(String, String)> {
+  let crumbs: Vec<&str> = headers
+    .iter()
+    .filter(|(name, _)| name.eq_ignore_ascii_case("cookie"))
+    .map(|(_, value)| value.as_str())
+    .collect();
+  if crumbs.len() < 2 {
+    return headers;
+  }
+  let joined = crumbs.join("; ");
+  let mut out = Vec::with_capacity(headers.len());
+  let mut placed = false;
+  for (name, value) in headers {
+    if !name.eq_ignore_ascii_case("cookie") {
+      out.push((name, value));
+    } else if !placed {
+      out.push((name, joined.clone()));
+      placed = true;
+    }
+  }
+  out
+}
+
 /// A request as the `request` part (component-interfaces spec §5.5): method, path and query as
 /// sent, headers by lower-cased name, and the body's octets.
 fn request_parts(head: &http::request::Parts, body: &Bytes) -> Parts {
@@ -206,6 +233,10 @@ fn request_parts(head: &http::request::Parts, body: &Bytes) -> Parts {
       )
     })
     .collect();
+  let headers = match head.version {
+    http::Version::HTTP_2 | http::Version::HTTP_3 => joined_cookie_crumbs(headers),
+    _ => headers,
+  };
   let headers_slot = multi_map_slot(
     headers
       .iter()

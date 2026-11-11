@@ -1,0 +1,84 @@
+{
+  "description": "`http:list` compares a list's elements in order, and fails a header that is absent (ADR 0082 decision 2): text/plain before application/json is another Accept, a third element is another X-Ids, and there is no Vary",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get orders as a list",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "request": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "accept": {
+                "shape": "http:list",
+                "elements": [
+                  "application/json",
+                  "text/plain"
+                ],
+                "example": [
+                  "application/json, text/plain"
+                ]
+              },
+              "x-ids": {
+                "shape": "http:list",
+                "elements": [
+                  "1",
+                  "2"
+                ],
+                "example": [
+                  "1, 2"
+                ]
+              },
+              "vary": {
+                "shape": "http:list",
+                "elements": [
+                  "Accept",
+                  "Origin"
+                ],
+                "example": [
+                  "Accept, Origin"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.headers": {
+      "accept": [
+        "text/plain",
+        "application/json"
+      ],
+      "x-ids": [
+        "1, 2, 3"
+      ]
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.headers.accept",
+        "message": "Expected the list 'application/json, text/plain' but was 'text/plain, application/json'",
+        "action": "http:list"
+      },
+      {
+        "path": "$.request.headers.vary",
+        "message": "Expected the list 'Accept, Origin' but the header was absent",
+        "action": "http:list"
+      },
+      {
+        "path": "$.request.headers.x-ids",
+        "message": "Expected the list '1, 2' but was '1, 2, 3'",
+        "action": "http:list"
+      }
+    ]
+  }
+}

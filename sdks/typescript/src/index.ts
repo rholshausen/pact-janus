@@ -22,15 +22,18 @@ export {
   type RequestParts,
   type ResponseParts,
   type MultiValue,
+  type HeaderValue,
   type Spellable,
   type ExcludedPoints,
 } from "./interaction.js";
 export {
   Shape,
   Content,
+  HeaderList,
   type Template,
   json,
   content,
+  headerList,
   integer,
   number,
   decimal,

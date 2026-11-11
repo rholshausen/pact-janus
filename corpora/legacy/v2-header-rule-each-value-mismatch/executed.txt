@@ -1,0 +1,57 @@
+(
+  :"get the test header" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/one',
+          '/one'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.X-TEST" (
+          %expect:not-empty (
+            $.response.headers.x-test => ['1', '10000']
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.headers.x-test => ['1', '10000']
+            ) => ['1', '10000'],
+            :"$.X-TEST[*]" (
+              %match:regex (
+                ~> => '1',
+                '^(?:\\d{1,4})$'
+              ) => BOOL(true)
+            ) => BOOL(true),
+            :"$.X-TEST[*]" (
+              %match:regex (
+                ~> => '10000',
+                '^(?:\\d{1,4})$'
+              ) => ERROR(Expected '10000' to match '^(?:\d{1,4})$')
+            ) => BOOL(false)
+          ) => BOOL(false)
+        ) => BOOL(false)
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

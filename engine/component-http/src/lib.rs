@@ -16,9 +16,11 @@
 //! per served instance (ADR 0062 decision 5), serving HTTP/1.1 and HTTP/2.
 
 mod drive;
+pub mod list;
 mod media_type;
 mod serve;
 pub mod status;
+pub use list::LIST;
 pub use media_type::MEDIA_TYPE;
 
 use base64::Engine;

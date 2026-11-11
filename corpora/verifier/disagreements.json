@@ -2,20 +2,6 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
-      "case": "compatibility-suite/v2/01-supports-matching-rules-for-the-response-headers-positive-case",
-      "key": "0/0",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 1000) reaches the plan as one list, and one match:regex judges it, as a whole value since S1.18, so it fails \\d{1,4}; today applies the rule to each value, and both pass"
-    },
-    {
-      "case": "compatibility-suite/v2/01-supports-matching-rules-for-the-response-headers-positive-case",
-      "key": "run",
-      "today": "pass",
-      "janus": "fail",
-      "reason": "S3.3: a repeated header (X-TEST: 1, X-TEST: 1000) reaches the plan as one list, and one match:regex judges it, as a whole value since S1.18, so it fails \\d{1,4}; today applies the rule to each value, and both pass"
-    },
-    {
       "case": "generators/form-body",
       "key": "run",
       "today": "fail",

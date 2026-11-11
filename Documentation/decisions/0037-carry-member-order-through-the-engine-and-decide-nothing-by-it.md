@@ -58,7 +58,11 @@ so a document a content component decodes cannot reach it. Form and XML need tha
    recorded slot's content, a state's parameter values — is written as it arrived. What the kernel
    does not interpret, a component operator's node and a `generator`, is kept as written. So a
    contract whose members were already in name order writes the same bytes as before. A contract
-   whose members were not changes once, to say what its author wrote.
+   whose members were not changes once, to say what its author wrote. *Amended 2026-11-11*
+   ([ADR 0082](0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md)
+   decision 7): a component operator's members are written by name, since its component reads them by
+   name, and each member's value as it arrived. Two SDKs that build `http:list` in different orders
+   wrote different contracts.
 5. **The legacy compiler compiles a document, not JSON.** A v1–v4 body is `LegacyBody::Document`,
    holding the runtime value: a JSON document, a text body as a string, a binary body as bytes. The
    compiler walks that value, so a document decoded by a form or XML component reaches it as a JSON

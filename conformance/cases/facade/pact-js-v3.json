@@ -236,14 +236,13 @@
                   "headers": {
                     "members": {
                       "content-type": {
-                        "entries": [
-                          {
-                            "example": "multipart/form-data; boundary=order-boundary",
-                            "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "multipart/form-data; boundary=order-boundary",
+                          "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"
@@ -278,14 +277,13 @@
                   "headers": {
                     "members": {
                       "content-type": {
-                        "entries": [
-                          {
-                            "example": "multipart/form-data; boundary=receipt-boundary",
-                            "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "multipart/form-data; boundary=receipt-boundary",
+                          "pattern": "^(?:multipart/form-data;(\\s*charset=[^;]*;)?\\s*boundary=.*)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"

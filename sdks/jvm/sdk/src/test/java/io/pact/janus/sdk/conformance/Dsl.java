@@ -91,6 +91,8 @@ final class Dsl {
       case "nullable" -> Shapes.nullable(template(args.path(0)));
       case "forbidden" -> Shapes.forbidden();
       case "each-like" -> Shapes.eachLike(template(args.path(0)), cardinality(options));
+      // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
+      case "header-list" -> Shapes.headerList(literals(args).toArray());
       default -> throw new IllegalArgumentException(
           "the case names a shape primitive this SDK does not implement: '" + primitive + "'");
     };

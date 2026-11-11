@@ -64,6 +64,7 @@ await janus.execute(getOrder, async (mock, variant) => {
 | `optional`, `nullable` | `optional(of)`, `nullable(of)` | `Shapes.optional(..)`, `Shapes.nullable(..)` | May be absent, may be null: a variant each way |
 | `forbidden` | `forbidden()` | `Shapes.forbidden()` | Must be absent |
 | `each-like` | `eachLike(items, { min?, max? })` | `Shapes.eachLike(items[, Cardinality.min(0)])` | A list of like elements: variants at its bounds |
+| `header-list` | `headerList(a, b, ..)`, as a header's value | `Shapes.headerList(..)`, as a header's value | A header that is a list: its elements, however the field lines frame them |
 
 The provider side (`verifier`, `state`, `requestFilter`, `message`, `verify`) is specified in the same
 document and is outside this review, because it carries today's provider APIs through their facades.
@@ -82,6 +83,9 @@ ask for.
   not two independent members and an exclusion.
 - **Nothing is inferred from a plain value**: it is matched exactly (the `literal` rule). Kinds,
   patterns and optionality each need their helper.
+- **A header is a list only where the contract says so** ([ADR 0082](decisions/0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md)).
+  `headerList("application/json", "text/plain")` matches `a, b`, `a,b` or two field lines. A plain
+  string or list is compared as the header's field lines, exactly, and no header is split by its name.
 - **A recorded example is never random** ([ADR 0008](decisions/0008-deterministic-pairwise-variant-sampling.md)).
   A generated value is the engine's, declared on the shape (S3.6, not yet in the DSL).
 
@@ -113,6 +117,13 @@ ask for.
 6. **Is each language's spelling natural there?** For example, Java's `exclude` takes
    `List<Map.Entry<String, String>>`, Java's parts are configured in lambdas, and TypeScript's
    `variantCases` takes its default as an optional third argument.
+7. **Is `headerList` the right spelling for a list header, and are exact elements enough?** S3.3
+   added it after the rest of this note (ADR 0082). A header is a list only where the author writes
+   `headerList`; `accept: "application/json, text/plain"` is still one exact field line. Its
+   elements compare exactly, in order, with no shape per element (a pattern per media type, say),
+   which would need the shape language to look inside a component's operator. *Would you rather a
+   list of strings meant the list, with `Set-Cookie` the exception? Do you write patterns on
+   `Accept`?*
 
 ## 4. After the review
 

@@ -2300,6 +2300,31 @@ The RFC's answer to optional fields, delivered to users.
   pull requests. The trouble is HTTP/1.x's comma-joined values, which only some headers define as
   lists; HTTP/2 and later carry each field line separately and define field values precisely. So the
   semantics are specified per HTTP version, and checked against those reports, before they change.
+  *Done 2026-11-11* ([ADR 0082](decisions/0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md)):
+  - The reports were pact-jvm's and pact-reference's header history since 2019. They split every header
+    on commas, then exempted single-value names, then (2025–2026) split only twelve known list names,
+    and pact-jvm fixed a regex on `Accept`'s whole value last week. Each fix let the matcher guess, from
+    a header's name, what the author meant. So no header is a list because of its name: the contract
+    says so.
+  - The HTTP transport presents a header as its field lines, never split, in every version. HTTP/2 and
+    HTTP/3 `Cookie` crumbs are joined with `"; "`, as RFC 9113 §8.2.3 and RFC 9114 §4.2.1 require
+    (component-interfaces spec §5.9).
+  - The HTTP component contributes `http:list`, whose `elements` are a list's elements in order. It
+    admits a header whose field lines, joined with commas and split outside quoted strings, are those
+    elements, so `a, b`, `a,b` and two field lines all match. Both SDKs spell it `headerList(...)`,
+    accepted only as a header's value; a plain list keeps meaning field lines, which `Set-Cookie`
+    needs. Three conformance ids cover it, and the review note asks about it as a seventh question.
+  - `janus upgrade` writes `http:list` for a header v1–v4 compare as a list with no rule: one
+    `pact_models` split, or a value with a comma. Its `rule-narrowed` judgement is left only for a value
+    with parameters. A header's rule applies to each of its values, in the legacy compiler (a
+    `flow:for-each` over values split as today's verifier splits them) and in the upgrade (an
+    `each-like` of the rule, at least one). S1.1's repeated-header entries are gone, and
+    `headers/list-values` is a new fixture both paths pass.
+  - Not foreseen: the engine wrote a component operator's node as it arrived, so two SDKs building
+    `http:list` in different orders wrote different contracts. A component node's members are now
+    written by name, their values as they arrived, which reorders an existing `http:media-type` node
+    the next time its contract is written. An upgraded contract with a header rule also gains that
+    `each-like`'s cardinality dimension in its recorded space, though it still runs base-only.
 - **S3.4 `upgrade` without the media-type narrowing** — **S**. It already reports the narrowing; with
   S3.3 it stops making it. Moved to S2.16, with S3.3's media-type half.
 - **S3.5 Variant failure reporting in each test framework** — **M**: one test per variant where the

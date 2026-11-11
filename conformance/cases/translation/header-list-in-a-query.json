@@ -1,0 +1,27 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/header-list-in-a-query",
+  "category": "translation",
+  "title": "'header-list' given as a query value is refused at the call.",
+  "covers": [
+    "shape.header-list.headers-only"
+  ],
+  "why": "behavioural spec 'header-list' (ADR 0019, ADR 0082): the list is a fact about an HTTP header's field lines, which a query parameter does not have, so it is refused at the call rather than built into a document no transport presents.",
+  "interaction": {
+    "description": "a header list where no header is",
+    "request": {
+      "query": {
+        "status": {
+          "$": "header-list",
+          "args": [
+            "new",
+            "open"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "refused": true
+  }
+}

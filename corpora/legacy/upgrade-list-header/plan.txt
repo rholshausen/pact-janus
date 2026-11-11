@@ -1,0 +1,55 @@
+(
+  :"get orders as a list" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Accept" (
+          %legacy:header-value (
+            $.request.headers.accept,
+            'application/json, text/plain'
+          )
+        ),
+        :"$.X-Ids" (
+          %legacy:header-value (
+            $.request.headers.x-ids,
+            '1, 2'
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Vary" (
+          %legacy:header-value (
+            $.response.headers.vary,
+            'Accept, Origin'
+          )
+        )
+      )
+    )
+  )
+)

@@ -235,8 +235,10 @@ fn the_single_example_becomes_the_sole_base_variant() {
   );
   assert_eq!(selection.report["strategy"], json!("base-only"));
   assert_eq!(selection.report["selected"], json!(1));
-  assert_eq!(selection.report["space"]["size"], json!(1));
-  assert_eq!(selection.report["space"]["dimensions"], json!(0));
+  // The one dimension is the reply's `Content-Type`, whose rule applies to each value it is sent
+  // with, at least one (ADR 0082 decision 6): the base variant sends it once.
+  assert_eq!(selection.report["space"]["size"], json!(2));
+  assert_eq!(selection.report["space"]["dimensions"], json!(1));
 
   // Both examples ride with it — the pact's own request and response, byte for byte.
   let parts = &selection.variants[0].parts;
@@ -548,17 +550,70 @@ fn an_opened_request_query_is_reported_with_or_without_a_query_in_the_pact() {
   );
 }
 
-/// Header values with no rule are where this conversion is least exact: v1–v4 compared them with
-/// their own defaulted comparison, and `equality` is strictly narrower.
+/// A header value with parameters and no rule is where this conversion is least exact: v1–v4
+/// compared its parameters as a set, and `equality` is strictly narrower.
 #[test]
 fn narrowing_a_header_comparison_to_equality_is_a_judgement_not_a_silent_tightening() {
   let upgraded = upgrade(&pact_with(
     get_slash(),
-    json!({ "status": 200, "headers": { "X-Accept-Version": "1, 2" } }),
+    json!({ "status": 200, "headers": { "X-Format": "csv; header=present", "X-Trace": "abc" } }),
   ));
   let finding = find(&upgraded.findings, "rule-narrowed");
   assert_eq!(finding.kind, "judgement");
-  assert!(finding.message.contains("MIME parameters"), "{}", finding.message);
+  assert!(finding.message.contains("parameters"), "{}", finding.message);
+
+  let plain = upgrade(&pact_with(
+    get_slash(),
+    json!({ "status": 200, "headers": { "X-Trace": "abc" } }),
+  ));
+  assert!(
+    !plain.findings.iter().any(|f| f.code == "rule-narrowed"),
+    "a value with no parameters and no comma is compared exactly, as v1–v4 compare it"
+  );
+}
+
+/// ADR 0082 decision 5: a header v1–v4 compare as a list, with no rule, becomes `http:list` of its
+/// elements, which the interaction then requires: `Accept`, which `pact_models` splits, and a value
+/// with a comma, which v1–v4 compare ignoring the whitespace around it.
+#[test]
+fn a_header_compared_as_a_list_becomes_the_http_components_list() {
+  let upgraded = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/", "headers": { "Accept": "application/json, text/plain" } }),
+    json!({ "status": 200, "headers": { "X-Accept-Version": "1,2" } }),
+  ));
+  assert_eq!(
+    shape(&upgraded, 0, "request", "headers")["members"]["accept"],
+    json!({ "shape": "http:list", "elements": ["application/json", "text/plain"],
+            "example": ["application/json, text/plain"] })
+  );
+  assert_eq!(
+    shape(&upgraded, 0, "response", "headers")["members"]["x-accept-version"],
+    json!({ "shape": "http:list", "elements": ["1", "2"], "example": ["1,2"] })
+  );
+  let finding = find(&upgraded.findings, "rule-narrowed");
+  assert_eq!(finding.kind, "note");
+  assert!(finding.message.contains("http:list"), "{}", finding.message);
+  let requires = upgraded.contract.interactions[0]
+    .requires
+    .as_ref()
+    .expect("requires");
+  assert!(requires.iter().any(|r| r.component == "http"));
+}
+
+/// ADR 0082 decision 6: a rule on a header applies to each value it is sent with, as today's
+/// verifier applies it, so the header is an `each-like` of the rule's shape.
+#[test]
+fn a_rule_on_a_header_applies_to_each_of_its_values() {
+  let upgraded = upgrade(&pact_with(
+    get_slash(),
+    json!({ "status": 200, "headers": { "X-Test": "1" },
+            "matchingRules": { "header": { "X-Test": { "matchers": [ { "match": "regex", "regex": "\\d{1,4}" } ] } } } }),
+  ));
+  assert_eq!(
+    shape(&upgraded, 0, "response", "headers")["members"]["x-test"],
+    json!({ "shape": "each-like", "min": 1,
+            "items": { "shape": "regex", "pattern": "^(?:\\d{1,4})$", "example": "1" } })
+  );
 }
 
 /// ADR 0071: a `Content-Type` with no rule is compared as a media type, as v1–v4 compare it, by the

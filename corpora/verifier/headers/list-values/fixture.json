@@ -1,0 +1,41 @@
+{
+  "description": "Headers v1-v4 compare as lists, framed by the reply another way: Vary on one line with no space after its comma, and Cache-Control as two field lines. Today's verifier passes them, ignoring whitespace around commas and splitting the headers it knows are lists; janus verify passes the pact, and the contract it upgrades into compares each as http:list (ADR 0082)",
+  "source": "staged plan S3.3; pact_models::headers::parse_header and pact_matching's header comparison",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/orders"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ],
+            "Vary": [
+              "Accept,Origin"
+            ],
+            "Cache-Control": [
+              "no-store",
+              "max-age=0"
+            ]
+          },
+          "body": {
+            "json": {
+              "orders": []
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

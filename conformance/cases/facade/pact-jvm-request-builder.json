@@ -50,8 +50,9 @@
                         "shape": "array"
                       },
                       "x-tenant": {
-                        "entries": [{ "example": "acme", "pattern": "^(?:[a-z]+)$", "shape": "regex" }],
-                        "shape": "array"
+                        "items": { "example": "acme", "pattern": "^(?:[a-z]+)$", "shape": "regex" },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"
@@ -109,18 +110,18 @@
                     "members": {
                       "cache-control": { "entries": [{ "example": "no-store", "shape": "equality" }], "shape": "array" },
                       "etag": {
-                        "entries": [{ "example": "\"abc\"", "pattern": "^(?:\"\\w+\")$", "shape": "regex" }],
-                        "shape": "array"
+                        "items": { "example": "\"abc\"", "pattern": "^(?:\"\\w+\")$", "shape": "regex" },
+                        "min": 1,
+                        "shape": "each-like"
                       },
                       "set-cookie": {
-                        "entries": [
-                          {
-                            "example": "[redacted]",
-                            "pattern": "^(?:\\Qsession=\\E[0-9a-f]+)$",
-                            "shape": "regex"
-                          }
-                        ],
-                        "shape": "array"
+                        "items": {
+                          "example": "[redacted]",
+                          "pattern": "^(?:\\Qsession=\\E[0-9a-f]+)$",
+                          "shape": "regex"
+                        },
+                        "min": 1,
+                        "shape": "each-like"
                       }
                     },
                     "shape": "object"

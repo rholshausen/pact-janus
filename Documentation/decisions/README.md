@@ -98,6 +98,7 @@ superseding ADR instead.
 | [0079](0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md) | Keep `each-like`'s minimum at one, and exercise a list that may be empty with an element first | accepted |
 | [0080](0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md) | Write an exclusion on the interaction, as its own sampling policy | accepted |
 | [0081](0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md) | Write a correlation the consumer relies on as a `one-of`, and split a provider object by its discriminator | accepted |
+| [0082](0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md) | Compare a list-valued header as its elements, when the contract says it is a list | accepted |
 
 ## Decision backlog
 

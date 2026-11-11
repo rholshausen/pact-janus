@@ -3,7 +3,7 @@
 // call — `execute` submits it.
 
 import type { contract, shape } from "./generated/index.js";
-import { compile, Content, Shape, type Template } from "./shapes.js";
+import { compile, Content, HeaderList, Shape, type Template } from "./shapes.js";
 
 /** A header or query value the rule can spell: a string, a whole number, or a boolean (ADR 0019). */
 export type Spellable = string | number | boolean;
@@ -11,17 +11,20 @@ export type Spellable = string | number | boolean;
 /** A header or query parameter: one value, several values, or a shape its one value must match. */
 export type MultiValue = Spellable | readonly Spellable[] | Shape;
 
+/** A header: a query parameter's values, or a list its field lines frame (`headerList`, ADR 0082). */
+export type HeaderValue = MultiValue | HeaderList;
+
 export interface RequestParts {
   method?: Template;
   path?: Template;
   query?: { readonly [name: string]: MultiValue };
-  headers?: { readonly [name: string]: MultiValue };
+  headers?: { readonly [name: string]: HeaderValue };
   body?: Template | Content;
 }
 
 export interface ResponseParts {
   status?: Template;
-  headers?: { readonly [name: string]: MultiValue };
+  headers?: { readonly [name: string]: HeaderValue };
   body?: Template | Content;
 }
 
@@ -242,7 +245,7 @@ function slots(members: Record<string, Template | undefined>): Record<string, sh
  */
 function multiValueSlot(
   slot: string,
-  members: { readonly [name: string]: MultiValue } | undefined,
+  members: { readonly [name: string]: HeaderValue } | undefined,
   spell: (name: string) => string,
 ): Record<string, shape.Shape> {
   if (members === undefined) {
@@ -264,6 +267,15 @@ function multiValueSlot(
           "value has no content type of its own",
       );
     }
+    if (value instanceof HeaderList) {
+      if (slot !== "headers") {
+        throw new TypeError(
+          `${slot}.${spelled}: headerList() describes an HTTP header's field lines; a query parameter has none`,
+        );
+      }
+      compiled[spelled] = headerList(value, `${slot}.${spelled}`);
+      continue;
+    }
     compiled[spelled] =
       value instanceof Shape
         ? listed(compile(value))
@@ -273,6 +285,16 @@ function multiValueSlot(
           };
   }
   return { [slot]: { shape: "object", members: compiled } };
+}
+
+/**
+ * `headerList` (behavioural spec 'header-list'): the HTTP component's `http:list`, written as the
+ * header's member itself, its elements each spelled as a header value is, and its example the one
+ * field line a mock serves.
+ */
+function headerList(list: HeaderList, where: string): shape.Shape {
+  const elements = list.elements.map((element, index) => text(element, `${where}[${index}]`));
+  return { shape: "http:list", elements, example: [elements.join(", ")] } as shape.Shape;
 }
 
 /**

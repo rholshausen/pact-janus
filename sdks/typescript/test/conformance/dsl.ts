@@ -13,6 +13,7 @@ import {
   decimal,
   eachLike,
   forbidden,
+  headerList,
   integer,
   json,
   nullable,
@@ -55,6 +56,8 @@ const helpers: Record<string, (args: unknown[], options: Record<string, number>)
   nullable: (args) => nullable(template(args[0])),
   forbidden: () => forbidden(),
   "each-like": (args, options) => eachLike(template(args[0]), options),
+  // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
+  "header-list": (args) => headerList(...(args as (string | number | boolean)[])) as unknown as Template,
 };
 
 /** A case's template: plain JSON as written, an object carrying `$` as the helper call it names. */

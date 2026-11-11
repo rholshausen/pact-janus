@@ -244,7 +244,9 @@ Namespacing rules, matching the plan grammar's (design 2.4):
 The HTTP status matcher of today's model is the worked case: `status-code` is *not* a core operator,
 because the kernel knows nothing about HTTP. It arrives as `http:status-class`, contributed by the
 transport component that knows what a status class is. A `Content-Type` compared as a media type is the
-second: `http:media-type`, whose member `type` is the media type expected (ADR 0071).
+second: `http:media-type`, whose member `type` is the media type expected (ADR 0071). A header compared
+as the elements of a list is the third: `http:list`, whose member `elements` is the elements expected
+(ADR 0082).
 
 ### 3.6 Where shapes attach
 
@@ -267,6 +269,12 @@ Illustrative only — an HTTP response part, with the interaction frame belongin
 Note what is *not* special: a header slot holds a list because HTTP headers are multi-valued, and
 `each-like` handles it with no header-specific operator. Query parameters are the same. The kernel
 boundary holds (plan task 3.8) because the shape language never learned what a header is.
+
+The list is the header's field lines, as the transport received them, and a shape over it compares
+them as lines. Where a header is a list in HTTP's sense, its field lines are one value joined with
+commas, and how the elements are framed means nothing (RFC 9110 §5.3). Only the transport knows that,
+so a shape that means it says so with the HTTP component's `http:list` as the header's member, in place
+of the list of lines. No header is read as a list because of its name ([ADR 0082](../../decisions/0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md)).
 
 ### 3.7 Unknown operators are a named failure
 

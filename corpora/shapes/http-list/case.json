@@ -1,0 +1,70 @@
+{
+  "description": "`http:list` admits a header's elements however its field lines frame them (ADR 0082 decision 2): one line, one line with no spaces and an empty element, and one field line per element; the built-in HTTP component runs it, as the native engine registers it",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get orders as a list",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "request": {
+          "headers": {
+            "shape": "object",
+            "members": {
+              "accept": {
+                "shape": "http:list",
+                "elements": [
+                  "application/json",
+                  "text/plain"
+                ],
+                "example": [
+                  "application/json, text/plain"
+                ]
+              },
+              "x-ids": {
+                "shape": "http:list",
+                "elements": [
+                  "1",
+                  "2"
+                ],
+                "example": [
+                  "1, 2"
+                ]
+              },
+              "vary": {
+                "shape": "http:list",
+                "elements": [
+                  "Accept",
+                  "Origin"
+                ],
+                "example": [
+                  "Accept, Origin"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.headers": {
+      "accept": [
+        "application/json, text/plain"
+      ],
+      "x-ids": [
+        "1,,2,"
+      ],
+      "vary": [
+        "Accept",
+        "Origin"
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

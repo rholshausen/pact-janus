@@ -1,0 +1,27 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/header-list-in-a-body",
+  "category": "translation",
+  "title": "'header-list' nested in a body is refused at the call.",
+  "covers": [
+    "shape.header-list.headers-only"
+  ],
+  "why": "behavioural spec 'header-list' (ADR 0019, ADR 0082): a body has no field lines, and the literal rules refuse the helper anywhere but a header's value, wrapped by another helper included.",
+  "interaction": {
+    "description": "a header list inside a body",
+    "response": {
+      "body": {
+        "accepted": {
+          "$": "header-list",
+          "args": [
+            "a",
+            "b"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "refused": true
+  }
+}

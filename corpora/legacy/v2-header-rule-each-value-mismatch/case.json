@@ -1,0 +1,61 @@
+{
+  "description": "a header's rule applies to each of its values (ADR 0082 decision 6): the second X-TEST, 10000, fails \\d{1,4} and is the mismatch, at its own index",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get the test header",
+          "request": {
+            "method": "GET",
+            "path": "/one"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "X-TEST": "1"
+            },
+            "matchingRules": {
+              "$.headers.X-TEST": {
+                "match": "regex",
+                "regex": "\\d{1,4}"
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "2.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/one",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.x-test": [
+      "1",
+      "10000"
+    ]
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.headers.x-test[1]",
+        "message": "Expected '10000' to match '^(?:\\d{1,4})$'",
+        "action": "match:regex"
+      }
+    ]
+  }
+}
