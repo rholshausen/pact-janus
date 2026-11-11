@@ -249,6 +249,22 @@ even names an alternative for, which is not narrower than anything the consumer 
 more discriminator values than `P` uses is not a finding: `P` simply exercises a subset of the union, and
 subsetting a union is what narrower means.
 
+**A provider node that is not a `one-of`, against a consumer `one-of`, is split by its discriminator**
+([ADR 0081](../../decisions/0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md)). Rule 3 picks the consumer's alternative by the literal the
+provider binds `discriminator` to, and a provider shape often binds several: a recorded one writes the
+`any-of` of every value it observed. So when `P`'s shape at the discriminator member admits a finite
+set of literals — an `equality`, or an `any-of` — the walk compares once per alternative of `C` those
+literals reach: `P`, with its discriminator narrowed to the literals that alternative binds, against
+the alternative, the results combined by Kleene conjunction exactly as for two `one-of`s. Literals no
+alternative of `C` binds are `no`, `wider-values`, reported at the node.
+When `P`'s discriminator admits an open set (a `string`, an absent member), which alternative it is in
+is not decidable from the shape, and the node is `unknown`, `unreviewable`.
+
+A per-field provider shape answers per field (§5). Narrowed to `SHIPPED`, a provider whose
+`shippedAt` is `optional` is `no` against a consumer alternative that requires it, though the provider
+may never send one without the other. A provider whose correlation matters writes its own shape as a
+`one-of`.
+
 ## 4. Findings
 
 ### 4.1 What gets reported

@@ -232,8 +232,7 @@ impl SamplingPolicy {
   }
 
   /// Resolve the layered policy document (spec §3.8): defaults, then each of `layers` in order
-  /// (session config, the per-call override, ...) — the interaction specification's own policy
-  /// (layer 3) has no document model yet (designs 2.5/3.2's business) and is skipped. `None`
+  /// (session config, the interaction specification's own policy, the per-call override). `None`
   /// entries (a layer that supplied nothing) are ignored.
   pub fn resolve(layers: &[Option<&Value>]) -> Result<SamplingPolicy, Problem> {
     let mut policy = SamplingPolicy::default();
@@ -245,6 +244,64 @@ impl SamplingPolicy {
       policy.apply(patch);
     }
     Ok(policy)
+  }
+}
+
+/// An interaction's own policy (spec §3.8's third layer, ADR 0080), validated and with every pin's and
+/// exclusion's dimension reference resolved against the interaction's variant space (§6.3): the
+/// document as given, each `dimension` rewritten to the full id, so the contract records what a
+/// verifier never has to resolve. Problems point into the interaction specification, under
+/// `pointer` (`/policy`), and are the interaction's `interaction-invalid`.
+pub fn resolve_interaction_policy(
+  space: &VariantSpace,
+  policy: &Value,
+  pointer: &str,
+) -> Result<Value, Vec<Problem>> {
+  let patch: PolicyPatch = serde_path_to_error::deserialize(policy).map_err(|err| {
+    vec![Problem {
+      pointer: format!("{pointer}{}", crate::error::json_pointer(err.path())),
+      message: err.inner().to_string(),
+    }]
+  })?;
+  let mut problems = Vec::new();
+  let mut resolved = policy.clone();
+  let mut resolve_list = |list: &str, entry: usize, refs: &[PointRef], member: &str| {
+    for (index, point_ref) in refs.iter().enumerate() {
+      let at = format!("{pointer}/{list}/{entry}/{member}/{index}");
+      match resolve_point_ref(space, point_ref) {
+        Ok((id, _)) => resolved[list][entry][member][index]["dimension"] = Value::String(id),
+        Err(problem) => problems.push(Problem {
+          pointer: at,
+          message: problem.message,
+        }),
+      }
+    }
+  };
+  for (entry, pin) in patch.pin.iter().enumerate() {
+    resolve_list("pin", entry, &pin.assignment, "assignment");
+  }
+  for (entry, exclusion) in patch.exclude.iter().enumerate() {
+    resolve_list("exclude", entry, &exclusion.when, "when");
+  }
+  for (entry, exclusion) in patch.exclude.iter().enumerate() {
+    if exclusion.when.is_empty() {
+      problems.push(Problem {
+        pointer: format!("{pointer}/exclude/{entry}/when"),
+        message: "an exclusion names at least one point".to_string(),
+      });
+    }
+    if exclusion.reason.trim().is_empty() {
+      problems.push(Problem {
+        pointer: format!("{pointer}/exclude/{entry}/reason"),
+        message: "an exclusion needs a reason: the contract records why this region is never exercised"
+          .to_string(),
+      });
+    }
+  }
+  if problems.is_empty() {
+    Ok(resolved)
+  } else {
+    Err(problems)
   }
 }
 
@@ -369,11 +426,24 @@ pub enum VariantError {
 // §2.1 — assignments, activation, `complete`.
 // ---------------------------------------------------------------------------------------------
 
+/// A dimension's gates grouped by the dimension they name, in the order first named, each with the
+/// points it allows (spec §2.1, shape spec §6.3): gates on one dimension are alternatives, which only
+/// a `min: 0` cardinality writes (ADR 0079). Every other group holds one point.
+pub(crate) fn gate_groups(dim: &Dimension) -> Vec<(&str, Vec<&str>)> {
+  let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+  for gate in &dim.gated_by {
+    match groups.iter_mut().find(|(d, _)| *d == gate.dimension) {
+      Some((_, points)) => points.push(&gate.point),
+      None => groups.push((&gate.dimension, vec![&gate.point])),
+    }
+  }
+  groups
+}
+
 fn is_active(assignment: &Assignment, dim: &Dimension) -> bool {
-  dim
-    .gated_by
+  gate_groups(dim)
     .iter()
-    .all(|g| assignment.get(&g.dimension).is_some_and(|p| p == &g.point))
+    .all(|(g, points)| assignment.get(*g).is_some_and(|p| points.contains(&p.as_str())))
 }
 
 /// `complete(α)` (spec §2.1): walk the dimensions in variant-space order; skip the inactive
@@ -495,17 +565,24 @@ fn resolve_point_ref(space: &VariantSpace, point_ref: &PointRef) -> Result<(Stri
 // §2.3 — counting the space.
 // ---------------------------------------------------------------------------------------------
 
-fn last_gate(dim: &Dimension) -> Option<(&str, &str)> {
+/// The innermost gating dimension's points, each a `(dimension, point)` the dimension is a child of:
+/// one for every gate but a `min: 0` cardinality's, which gates by each of its non-empty points.
+fn parent_gates(dim: &Dimension) -> Vec<(&str, &str)> {
+  let Some(last) = dim.gated_by.last() else {
+    return Vec::new();
+  };
   dim
     .gated_by
-    .last()
+    .iter()
+    .filter(|g| g.dimension == last.dimension)
     .map(|g| (g.dimension.as_str(), g.point.as_str()))
+    .collect()
 }
 
 fn children_by_gate(space: &VariantSpace) -> HashMap<(&str, &str), Vec<&Dimension>> {
   let mut map: HashMap<(&str, &str), Vec<&Dimension>> = HashMap::new();
   for dim in &space.dimensions {
-    if let Some(gate) = last_gate(dim) {
+    for gate in parent_gates(dim) {
       map.entry(gate).or_default().push(dim);
     }
   }
@@ -655,33 +732,44 @@ fn boundary_partial(space: &VariantSpace, minimal: bool) -> Assignment {
 type Target = BTreeMap<String, String>;
 
 /// The requirement set a target implies once its dimensions' gates are pulled in transitively
-/// (spec §3.3): the target's own pairs plus every gate of every dimension it names. `None` means
-/// inconsistent — some dimension required at two different points — so the target is not
-/// reachable.
+/// (spec §3.3): the target's own pairs plus every gate of every dimension it names. A gate group on
+/// one dimension allows any of its points (ADR 0079), so each dimension is required at the points
+/// every requirement on it allows, and takes the first of them in its own point order. `None` means
+/// inconsistent — some dimension allowed no point at all — so the target is not reachable. With one
+/// point per group, as every space without a `min: 0` list has, this is exactly a consistency check.
 fn target_requirements(space: &VariantSpace, target: &Target) -> Option<BTreeMap<String, String>> {
   let by_id: HashMap<&str, &Dimension> = space.dimensions.iter().map(|d| (d.id.as_str(), d)).collect();
-  let mut reqs: BTreeMap<String, String> = BTreeMap::new();
-  fn insert(reqs: &mut BTreeMap<String, String>, dim: &str, point: &str) -> bool {
-    match reqs.get(dim) {
-      Some(existing) if existing != point => false,
-      _ => {
-        reqs.insert(dim.to_string(), point.to_string());
-        true
-      }
-    }
+  let mut allowed: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+  fn require<'a>(allowed: &mut BTreeMap<&'a str, Vec<&'a str>>, dim: &'a str, points: &[&'a str]) -> bool {
+    let entry = allowed.entry(dim).or_insert_with(|| points.to_vec());
+    entry.retain(|p| points.contains(p));
+    !entry.is_empty()
   }
   for (dim_id, point) in target {
-    if !insert(&mut reqs, dim_id, point) {
+    if !require(&mut allowed, dim_id, &[point.as_str()]) {
       return None;
     }
     let dim = by_id.get(dim_id.as_str())?;
-    for gate in &dim.gated_by {
-      if !insert(&mut reqs, &gate.dimension, &gate.point) {
+    for (gate, points) in gate_groups(dim) {
+      if !require(&mut allowed, gate, &points) {
         return None;
       }
     }
   }
-  Some(reqs)
+  allowed
+    .into_iter()
+    .map(|(dim_id, points)| {
+      let first = match by_id.get(dim_id) {
+        Some(dim) => dim
+          .points
+          .iter()
+          .map(|p| p.name.as_str())
+          .find(|p| points.contains(p))?,
+        None => points.first().copied()?,
+      };
+      Some((dim_id.to_string(), first.to_string()))
+    })
+    .collect()
 }
 
 /// Every reachable target at strength `t` (spec §3.3), split into those excluded (counted
@@ -1099,7 +1187,7 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
     "exhaustive" => {
       let seeds: Vec<Assignment> = variants.iter().map(|v| v.assignment.clone()).collect();
       let mut all = Vec::new();
-      enumerate_all(space, &mut Assignment::new(), 0, &exclusions, &mut all);
+      enumerate_all(space, &mut Assignment::new(), 0, &mut exclusions, &mut all);
       for assignment in all {
         if !seeds.iter().any(|s| s == &assignment) {
           push(assignment, Origin::Covering, &mut variants, &mut seen);
@@ -1146,7 +1234,13 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
   } else {
     0
   };
-  let removed: usize = exclusions.iter().map(|e| e.removed).sum();
+  // Coverage counts targets, which only `t-wise` has; an exclusion's own `removed` below says what
+  // it removed under either strategy.
+  let removed: usize = if strategy == "t-wise" {
+    exclusions.iter().map(|e| e.removed).sum()
+  } else {
+    0
+  };
 
   let applied_exclusions: Vec<AppliedExclusion> = exclusions
     .iter()
@@ -1197,16 +1291,23 @@ pub fn select(space: &VariantSpace, policy: &SamplingPolicy) -> Result<Selected,
   Ok(Selected { variants, report })
 }
 
+/// Every variant of the space, in variant-space order, less those an exclusion matches: each is
+/// counted against the first exclusion it matches, as a target is under `t-wise`, so the report
+/// records an exclusion that removed something whichever strategy ran (spec §3.5).
 fn enumerate_all(
   space: &VariantSpace,
   current: &mut Assignment,
   pos: usize,
-  exclusions: &[ResolvedExclusion],
+  exclusions: &mut [ResolvedExclusion],
   out: &mut Vec<Assignment>,
 ) {
   if pos == space.dimensions.len() {
-    if matching_exclusion(current, exclusions).is_none() {
-      out.push(current.clone());
+    match exclusions
+      .iter_mut()
+      .find(|e| assignment_matches(current, &e.when))
+    {
+      Some(excl) => excl.removed += 1,
+      None => out.push(current.clone()),
     }
     return;
   }

@@ -287,7 +287,7 @@ conversion does with them.
 | `date`, `time`, `datetime`, `timestamp`, `localDate`, and `dateExpression`, `timeExpression`, `datetimeExpression` | `date`, `time`, `datetime`, with the format. Generators, an expression's too, are filled as pact-jvm fills them | kept |
 | `includesStr`, `nullValue` | `include`, and an `equality` with `null`: pact-jvm writes no rule for a null | kept |
 | `valueFromProviderState` | `type`, with a `ProviderState` generator a verifier fills from the state's values | kept |
-| `eachLike`, `minArrayLike`, `maxArrayLike`, `minMaxArrayLike`, `eachArrayLike` and its bounded forms | `each-like`, with `min` and `max` where given | kept |
+| `eachLike`, `minArrayLike`, `maxArrayLike`, `minMaxArrayLike`, `eachArrayLike` and its bounded forms | `each-like`, with `min` and `max` where given. `eachLike` and `eachArrayLike` name no length, and admit an empty list as pact-jvm's do: `min: 0` ([ADR 0079](decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)) | kept |
 | `array()` with no rule | An exact `array`, as pact-jvm compared it | kept |
 | `arrayContaining(…)` | `contains`, which needs a distinct element for each variant, where pact-jvm let one element satisfy two | adapted |
 | `eachKeyLike`, `eachValueLike`, `eachKeyMappedToAnArrayLike` | `each-entry` | kept |

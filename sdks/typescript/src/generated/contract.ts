@@ -61,6 +61,12 @@ export interface Interaction {
    * The members whose values the writer replaced by a placeholder because they carry credentials (spec.md §5.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.
    */
   redacted?: string[];
+  /**
+   * The interaction's own sampling policy, as its specification gave it, with every dimension reference resolved to a full id (spec.md §4.1, ADR 0080). Design 2.3's policy document, validated against sampling-policy.schema.json. Absent when the specification had none.
+   */
+  policy?: {
+    [k: string]: unknown;
+  };
   selection: RecordedSelection;
   [k: string]: unknown;
 }
@@ -89,6 +95,12 @@ export interface InteractionSpec {
    * Components this interaction cannot be matched without (spec.md §7).
    */
   requires?: Requirement[];
+  /**
+   * The interaction's own sampling policy (variant semantics spec §3.8's third layer, ADR 0080): its exclusions, its pins and any other member it sets. Design 2.3's policy document, validated against sampling-policy.schema.json. Its dimension references are resolved when the interaction is added.
+   */
+  policy?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 

@@ -69,7 +69,8 @@ What this specification owns, and what it hands off:
 | the frames a contract travels in | design [2.1](../engine-protocol/spec.md) |
 
 The **interaction specification** an author writes is this document's interaction record minus the
-evidence: the same `description`, `transport`, `states`, `parts` and `requires`, with no `selection`.
+evidence: the same `description`, `transport`, `states`, `parts`, `requires` and `policy`, with no
+`selection`.
 Plan task 3.2 builds its parser; the schema names it `$defs/InteractionSpec` (added by plan task 6.1,
 whose SDK bindings need the type an SDK actually builds). Keeping one document with one optional half
 is what stops an author's input and the engine's output drifting into two schemas that describe the
@@ -278,11 +279,20 @@ defensively and fall through (§9).
   "parts": { "request": { }, "response": { } },
   "content-types": { "response": { "body": "application/x-protobuf" } },
   "requires": [ { "component": "content/protobuf", "min-version": 2 } ],
+  "policy": { "exclude": [ { "when": [ { "dimension": "response.body.status#value", "point": "SHIPPED" },
+                                       { "dimension": "response.body.shippedAt#presence", "point": "absent" } ],
+                             "reason": "the order service sets shippedAt when it ships" } ] },
   "selection": { "variants": [ ], "report": { } } }
 ```
 
 `description`, `parts` and `selection` are required; a record without evidence is not an interaction
 this format can carry (§2.2). `content-types` declares the media type of a content slot, and is §5.5's.
+
+`policy` is the interaction's own sampling policy, design 2.3's third layer (variant semantics §3.8,
+[ADR 0080](../../decisions/0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md)): its exclusions and pins, and any other member the author set. It is
+recorded as the author's specification gave it, with every `dimension` reference resolved to the
+dimension's full id, and it is absent when the specification had none. What it did to the selection
+is the selection report's (§5.2).
 
 An interaction has **no `pending` member**, though a v4 pact's may ([ADR
 0051](../../decisions/0051-leave-pending-out-of-the-contract-and-let-upgrade-exclude-pending-interactions.md)).
@@ -580,7 +590,7 @@ slot, this position, this constraint", which is where a shape node goes.
 | `semver` | `semver` | |
 | `notEmpty` | `not-empty` | |
 | `contentType` | `content-type` | |
-| `min`, `max`, `minmax` on an array | `each-like` with `min`/`max` | the bound is the declaring array's own: a rule that only *cascades* to a nested array gives it `each-like` with `min: 0` and no `max`, because v1–v4 never re-apply a bound below the array that declared it. A bare `type` on an array names no bound and becomes `each-like`'s default `min: 1` — stricter than v1–v4, which admit `[]` — reported as `rule-narrowed` (`judgement`) |
+| `min`, `max`, `minmax` on an array | `each-like` with `min`/`max` | the bound is the declaring array's own: a rule that only *cascades* to a nested array gives it `each-like` with `min: 0` and no `max`, because v1–v4 never re-apply a bound below the array that declared it. A bare `type` on an array names no bound, so v1–v4 admit any length, `[]` included: it becomes `each-like` with `min: 0`, with no finding ([ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)) |
 | `values` | `each-entry` over values | |
 | `eachKey`, `eachValue` | `each-entry` over keys / values | each by the rule's own matchers. `eachKey` leaves the values open, since v1–v4 compare a member the pact names only when the reply has it (`rule-unmapped`). `eachValue` on a list is `each-like` with `min: 0` (ADR 0048) |
 | `arrayContains` | `contains` | |

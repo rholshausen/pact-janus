@@ -31,6 +31,7 @@ pub fn parse(value: &Value) -> Result<InteractionSpec, InteractionSpecError> {
   let requires = parse_field::<Vec<Requirement>>(obj, "requires", &mut problems);
   let parts = parse_parts(obj, &mut problems);
   let content_types = parse_field::<ContentTypes>(obj, "content-types", &mut problems);
+  let policy = parse_field::<Map<String, Value>>(obj, "policy", &mut problems).map(Value::Object);
   if let (Some(content_types), Some(parts)) = (&content_types, &parts) {
     check_content_types(content_types, parts, &mut problems);
   }
@@ -43,6 +44,7 @@ pub fn parse(value: &Value) -> Result<InteractionSpec, InteractionSpecError> {
       parts,
       content_types,
       requires,
+      policy,
     }),
     _ => Err(InteractionSpecError { problems }),
   }

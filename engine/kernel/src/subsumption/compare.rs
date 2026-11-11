@@ -814,8 +814,12 @@ impl<'a> Walk<'a> {
   }
 
   /// Spec §3.2's Rule 3 for a `one-of` on the consumer's side: a union on the *right* does not
-  /// decompose, so the walk resolves it by reading the provider's own discriminator binding and
-  /// testing containment in the alternative it picks out.
+  /// decompose, so the walk reads the provider's own discriminator binding and tests containment in
+  /// the alternative it picks out. A provider shape often binds several literals (a recorded one
+  /// writes the `any-of` of every value it saw), so the provider node is split (spec §3.3, ADR
+  /// 0081): once per consumer alternative, with its discriminator narrowed to the literals that
+  /// alternative binds, and the results combined as two `one-of`s' are. Literals no alternative binds
+  /// are `wider-values`; an open discriminator is not decidable here.
   fn inside_alternative(&mut self, p: &ShapeNode, c: &ShapeNode, cc: &CoreShape, at: &str) -> Out {
     let CoreShape::OneOf {
       discriminator,
@@ -826,29 +830,86 @@ impl<'a> Walk<'a> {
       unreachable!("inside_alternative is only called with a one-of consumer node");
     };
     let literals = discriminator_literals(p, discriminator);
-    let by_literal = by_discriminator(alternatives, discriminator);
-    let matched: BTreeSet<&str> = literals
-      .iter()
-      .filter_map(|literal| by_literal.get(&literal_key(literal)).map(|(name, _)| *name))
-      .collect();
-    if literals.is_empty() || matched.len() != 1 {
+    if literals.is_empty() {
       return Out::unknown(Finding::unreviewable(
         at,
         Side::new(phrases::describe(p)),
         Side::new(phrases::describe(c)),
         format!(
-          "the provider's shape does not bind '{discriminator}' to one alternative's literal, so \
-           which alternative it must be inside is not decidable here"
+          "the provider's shape does not bind '{discriminator}' to literals, so which alternative \
+           it must be inside is not decidable here"
         ),
       ));
     }
-    let name = matched.iter().next().copied().expect("one match");
-    let (_, alternative) = by_literal
-      .values()
-      .find(|(candidate, _)| *candidate == name)
-      .expect("the matched alternative");
-    self.node(p, alternative, &path::alternative(at, name))
+    let by_literal = by_discriminator(alternatives, discriminator);
+    // Alternative name -> the provider's literals it binds, in the provider's order; and the literals
+    // nothing binds.
+    let mut split: Vec<(&str, &ShapeNode, Vec<Value>)> = Vec::new();
+    let mut unbound: Vec<Value> = Vec::new();
+    for literal in literals {
+      match by_literal.get(&literal_key(&literal)) {
+        Some((name, alternative)) => match split.iter_mut().find(|(n, _, _)| n == name) {
+          Some((_, _, bound)) => bound.push(literal),
+          None => split.push((name, alternative, vec![literal])),
+        },
+        None => unbound.push(literal),
+      }
+    }
+    let mut out = Out::yes();
+    for (name, alternative, bound) in split {
+      let narrowed = narrow_discriminator(p, discriminator, &bound);
+      out = out.and(self.node(&narrowed, alternative, &path::alternative(at, name)));
+    }
+    if !unbound.is_empty() {
+      out = out.and(Out::no(Finding::wider_values(
+        at,
+        Side::new(phrases::describe(p)),
+        Side::new(phrases::describe(c)),
+        format!(
+          "the provider may produce the '{discriminator}' value(s) {} , which the consumer's \
+           contract names no alternative for",
+          phrases::literals(&unbound)
+        ),
+      )));
+    }
+    out
   }
+}
+
+/// `node` with its object's `discriminator` member narrowed to `literals`: an `equality` for one, an
+/// `any-of` for several. `optional` and `nullable` around the object are kept, so what they admit
+/// besides the object is compared as before.
+fn narrow_discriminator(node: &ShapeNode, discriminator: &str, literals: &[Value]) -> ShapeNode {
+  let mut narrowed = node.clone();
+  match &mut narrowed.kind {
+    ShapeKind::Core(CoreShape::Optional { of } | CoreShape::Nullable { of }) => {
+      **of = narrow_discriminator(of, discriminator, literals);
+    }
+    ShapeKind::Core(CoreShape::Object { members }) => {
+      if let Some(tag) = members.get_mut(discriminator) {
+        let example = Some(Example {
+          value: literals[0].clone(),
+          encoded: None,
+        });
+        *tag = match literals {
+          [_] => ShapeNode {
+            example,
+            generator: None,
+            kind: ShapeKind::Core(CoreShape::Equality),
+          },
+          _ => ShapeNode {
+            example,
+            generator: None,
+            kind: ShapeKind::Core(CoreShape::AnyOf {
+              options: literals.to_vec(),
+            }),
+          },
+        };
+      }
+    }
+    _ => {}
+  }
+  narrowed
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -1253,6 +1314,7 @@ fn matched_by(node: &ShapeNode, value: &Value) -> bool {
     )]),
     content_types: None,
     requires: None,
+    policy: None,
   };
   let plan = plan::compile(&spec, &plan::Assignment::new(), None);
   let resolver =

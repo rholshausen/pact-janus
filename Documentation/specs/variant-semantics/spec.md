@@ -80,7 +80,10 @@ deterministic order, parents before the dimensions they gate, each with ordered 
 point, and zero or more gates.
 
 An **assignment** is a partial map from dimension id to point name. A dimension `d` is **active**
-under an assignment `α` when every gate `(g, p)` of `d` has `α(g) = p`. A **variant** is an assignment
+under an assignment `α` when, for every dimension `g` that `d`'s gates name, `α(g)` is one of the
+points `d`'s gates name for `g`. Gates on one dimension are alternatives, which only a `min: 0`
+cardinality writes (shape spec §6.3, [ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)).
+Gates on different dimensions must all hold. A **variant** is an assignment
 that is *exactly total over its active dimensions*: every active dimension has a point, and no
 inactive dimension has one. That double condition is the whole well-formedness rule, and both halves
 matter — a missing point leaves a value undetermined, and a point on an inactive dimension names a
@@ -89,7 +92,7 @@ choice that no produced value can show.
 Two derived facts this specification relies on:
 
 - **Gates form a forest.** A dimension's gates are the gating operators on its path from the root of
-  the part, so they are a chain ordered by nesting, and the gating relation over all dimensions is a
+  the part, so the dimensions they name are a chain ordered by nesting, and the gating relation over all dimensions is a
   forest. An engine MUST reject a variant-space document whose gates are not a forest
   (`interaction-invalid`); no shape can produce one, but a component operator declaring its own
   dimensions could.
@@ -291,8 +294,11 @@ distinct dimensions. A target is **reachable** when some variant contains all of
 only if it is reachable.
 
 Reachability is decided structurally, not by search. The target's own pairs, together with the gates of
-each dimension it names (transitively), form a set of requirements; the target is reachable iff that
-set is **consistent** — no dimension required at two different points. Two dimensions in different
+each dimension it names (transitively), form a set of requirements, each allowing a dimension one or
+more points; the target is reachable iff that set is **consistent** — every dimension it names is
+allowed some point by all of them. Where a requirement allows several points (a `min: 0` cardinality's
+gate, shape spec §6.3), the dimension takes the first that every requirement allows, in its own point
+order. Two dimensions in different
 alternatives of the same `one-of` are therefore never paired, and a dimension inside an `optional` is
 paired only with that `optional`'s `present` point. Exclusions (§3.5) remove targets in addition.
 
@@ -300,13 +306,12 @@ An engine MUST report the count of reachable targets and the count actually cove
 report a coverage figure it did not compute; "pairwise" is a claim about a specific set of pairs, and a
 sampler that cannot say which pairs it covered has not made the claim.
 
-**Vacuous coverage.** A collection's cardinality dimension does not gate the dimensions inside it
-(shape spec §6.5) — the interior dimensions are shared across elements and take a point whatever the
-cardinality is. When the selected cardinality point is size 0 there are no elements, so the interior
-points are chosen but never shown. A variant whose cardinality point for a collection is 0 therefore
-MUST NOT be counted as covering any target that names a dimension inside that collection. This is the
-one seam where shape spec §6.5's no-gating rule shows, and closing it here is cheaper than gating a
-dimension on a numeric point.
+**An empty collection covers nothing inside it.** A collection whose `min` is 0 gates its interior by
+every cardinality point with an element (shape spec §6.3), so under its size-0 point the dimensions
+inside it are inactive: no point is chosen for them, and no target naming one is covered there. A
+target pairing a dimension inside the collection with the size-0 point is unreachable. This replaces
+the vacuous-coverage rule this section had, which counted the empty variant's interior points as chosen
+but not shown, and which no engine implemented ([ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)).
 
 ### 3.4 The selection algorithm
 
@@ -347,7 +352,7 @@ covering array to the front, and everything after it grows horizontally into tha
   dimension's point order. Extend `τ`, and remove the targets it now covers.
 - *Vertical.* For each still-uncovered target involving `d`, in `T`'s order: extend an existing `τ`
   that is compatible with it (the first such, in order) if one exists; otherwise append a new partial assignment holding
-  the target's pairs and their gates. Remove what is now covered.
+  the target's pairs and their gates, each gated dimension at the point §3.3's requirements give it. Remove what is now covered.
 
 **Step 5 — completion.** Complete each partial assignment with `complete` (§2.1) and append it to `S`,
 skipping duplicates. Where a default would make the completed variant match an exclusion, replace it
@@ -377,6 +382,11 @@ absent`, though the provider will never produce it.
 An **exclusion** removes a region of the space: a conjunction of `(dimension, point)` pairs, plus a
 **required `reason`**. A variant matching every pair of an exclusion is not in the space, is not a
 coverage target, and is never selected.
+
+An exclusion is for a combination the consumer handles but the provider cannot produce, or a
+correlation no member discriminates. A correlation the consumer relies on is part of what it accepts,
+so it is written as a `one-of` keyed by the member that decides it ([ADR 0081](../../decisions/0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md)): an
+exclusion would leave the contract admitting the combination the consumer breaks on.
 
 Three rules keep exclusions from becoming a way to make a contract quietly weaker:
 
@@ -467,8 +477,10 @@ A policy resolves in layers, each overriding the one before it member by member:
 
 1. the defaults of this specification;
 2. the session configuration (`consumer-session/create`'s open `config`);
-3. the interaction specification's own policy (designs 2.5, 3.2), where an author says "this
-   interaction is exhaustive";
+3. the interaction specification's own `policy` member (designs 2.5, 3.2; [ADR 0080](../../decisions/0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md)), where an
+   author says "this interaction is exhaustive", or excludes a combination. The engine validates it
+   and resolves its references (§6.3) at `add-interaction`, failing with `interaction-invalid`, and
+   the contract records it with every reference resolved;
 4. the `policy` member of the `consumer-session/variants` request, for a host that is offering a
    `--exhaustive` switch.
 

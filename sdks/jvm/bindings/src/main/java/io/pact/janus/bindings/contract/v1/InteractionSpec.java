@@ -31,7 +31,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "states",
     "parts",
     "content-types",
-    "requires"
+    "requires",
+    "policy"
 })
 public class InteractionSpec {
 
@@ -83,8 +84,15 @@ public class InteractionSpec {
     @JsonProperty("requires")
     @JsonPropertyDescription("Components this interaction cannot be matched without (spec.md \u00a77).")
     private List<Requirement> requires;
+    /**
+     * The interaction's own sampling policy (variant semantics spec §3.8's third layer, ADR 0080): its exclusions, its pins and any other member it sets. Design 2.3's policy document, validated against sampling-policy.schema.json. Its dimension references are resolved when the interaction is added.
+     * 
+     */
+    @JsonProperty("policy")
+    @JsonPropertyDescription("The interaction's own sampling policy (variant semantics spec \u00a73.8's third layer, ADR 0080): its exclusions, its pins and any other member it sets. Design 2.3's policy document, validated against sampling-policy.schema.json. Its dimension references are resolved when the interaction is added.")
+    private Map<String, Object> policy;
     @JsonIgnore
-    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
      * What the interaction is, in the author's words (spec.md §4.2).
@@ -206,13 +214,31 @@ public class InteractionSpec {
         this.requires = requires;
     }
 
+    /**
+     * The interaction's own sampling policy (variant semantics spec §3.8's third layer, ADR 0080): its exclusions, its pins and any other member it sets. Design 2.3's policy document, validated against sampling-policy.schema.json. Its dimension references are resolved when the interaction is added.
+     * 
+     */
+    @JsonProperty("policy")
+    public Map<String, Object> getPolicy() {
+        return policy;
+    }
+
+    /**
+     * The interaction's own sampling policy (variant semantics spec §3.8's third layer, ADR 0080): its exclusions, its pins and any other member it sets. Design 2.3's policy document, validated against sampling-policy.schema.json. Its dimension references are resolved when the interaction is added.
+     * 
+     */
+    @JsonProperty("policy")
+    public void setPolicy(Map<String, Object> policy) {
+        this.policy = policy;
+    }
+
     @JsonAnyGetter
-    public Map<java.lang.String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
@@ -244,6 +270,10 @@ public class InteractionSpec {
         sb.append('=');
         sb.append(((this.requires == null)?"<null>":this.requires));
         sb.append(',');
+        sb.append("policy");
+        sb.append('=');
+        sb.append(((this.policy == null)?"<null>":this.policy));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -266,11 +296,12 @@ public class InteractionSpec {
         result = ((result* 31)+((this.contentTypes == null)? 0 :this.contentTypes.hashCode()));
         result = ((result* 31)+((this.states == null)? 0 :this.states.hashCode()));
         result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
+        result = ((result* 31)+((this.policy == null)? 0 :this.policy.hashCode()));
         return result;
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -278,7 +309,7 @@ public class InteractionSpec {
             return false;
         }
         InteractionSpec rhs = ((InteractionSpec) other);
-        return ((((((((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
+        return (((((((((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
     }
 
 }

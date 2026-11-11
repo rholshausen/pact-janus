@@ -1,0 +1,58 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders/66'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :body (
+        %legacy:body-type (
+          $.response.headers.content-type,
+          'application/json'
+        ),
+        :"$.items" (
+          %match:type (
+            $.response.body.items,
+            [{'sku': 'sku-0'}]
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              :"$.items[*].sku" (
+                %match:type (
+                  ~>.sku,
+                  'sku-0'
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

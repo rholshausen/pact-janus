@@ -39,7 +39,9 @@ readability:
   shapes, and admit a generated value where the example was (ADR 0048). `upgrade-number-kinds/` and its `-mismatch` twin are a v4 `decimal` and `integer` rule, which
   read how a number is written in the pact and in its contract alike (ADR 0072). `upgrade-message/` and its
   `-mismatch` twin are a v3 message and the emissive interaction it converts into, its metadata
-  member by member and its contents a body (ADR 0067).
+  member by member and its contents a body (ADR 0067). `upgrade-array-any-length/` is a bare `type` rule on an
+  array, which names no length: v1–v4 admit `[]`, and so does the `each-like` with `min: 0` it
+  upgrades into (ADR 0079).
   `v1-text-body/`, `v1-binary-body/`, their `-mismatch` twins and `v3-text-body-regex/` are bodies
   that are not JSON, each compiled as one value at `$` (ADR 0036); a binary case tags its body's
   value as base64 in `encoded` (plan-grammar spec §6.1). `v1-form-body/` and `v3-form-body-mismatch/`

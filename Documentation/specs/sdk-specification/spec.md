@@ -209,6 +209,22 @@ Every arrow is engine-protocol spec §8.2's own operation table; this design add
 attaches DSL call sites to it so an implementer has one place that shows the whole path from keystroke to
 wire call.
 
+Three of the DSL's meanings are fixed ahead of its surface (staged plan S3.1, gate D), and every
+SDK's guidance repeats them:
+
+- **A list has an element unless the author says otherwise.** `eachLike(items)` is at least one
+  element, and `eachLike(items, { min: 0 })` may be empty. There is one array operator, and a list
+  that may be empty is still exercised with an element first
+  ([ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)).
+- **A combination the provider cannot produce is excluded on the interaction**, with a reason:
+  `.exclude([['status', 'SHIPPED'], ['shippedAt', 'absent']], reason)`, written into the interaction
+  specification's `policy` and recorded in the contract
+  ([ADR 0080](../../decisions/0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md)).
+- **A correlation the consumer relies on is a `oneOf`**, keyed by the member that decides it, with each
+  alternative naming the members that come with it. An exclusion leaves the contract admitting the
+  combination, so it is only for a combination the consumer handles and the provider cannot produce
+  ([ADR 0081](../../decisions/0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md)).
+
 The provider side is the same idea one run long ([ADR 0055](../../decisions/0055-verify-a-provider-in-a-test-through-the-run-with-handlers-as-loopback-hooks.md),
 staged plan S1.14):
 

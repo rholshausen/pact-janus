@@ -284,3 +284,59 @@ fn the_same_space_selects_the_same_variants_in_the_same_order_every_time() {
     pretty_assertions::assert_eq!(first, again, "selection {run} differs from the first");
   }
 }
+
+/// ADR 0079: a list that may be empty is exercised with an element first, its empty variant assigns
+/// nothing inside it, and every pair inside it is covered by a variant that produces an element. Before,
+/// four of seven variants served `[]` and two pairs were counted for them alone.
+#[test]
+fn a_list_that_may_be_empty_covers_its_interior_with_elements() {
+  let interaction = interaction_with(json!({ "shape": "object",
+    "members": { "items": { "shape": "each-like", "min": 0,
+      "items": { "shape": "object", "members": {
+        "sku": { "shape": "string", "example": "S" },
+        "gift": { "shape": "optional", "of": { "shape": "boolean", "example": true } },
+        "kind": { "shape": "any-of", "options": ["A", "B", "C"], "example": "A" } } } } } }));
+  let space = variant_space(&interaction);
+  let selected = select(&space, &SamplingPolicy::default()).unwrap();
+  let cardinality = "response.body.items#cardinality";
+  let gift = "response.body.items[*].gift#presence";
+  let kind = "response.body.items[*].kind#value";
+
+  let base = &selected.variants[0];
+  assert_eq!(
+    base.assignment[cardinality], "min+1",
+    "the base variant has an element"
+  );
+  assert_eq!(
+    selected.report.space.size, 7,
+    "1 empty list + 2 x 3 non-empty ones"
+  );
+
+  let empty: Vec<_> = selected
+    .variants
+    .iter()
+    .filter(|v| v.assignment[cardinality] == "min")
+    .collect();
+  assert_eq!(empty.len(), 1, "one empty variant, the minimal boundary");
+  assert_eq!(empty[0].origin, Origin::Boundary);
+  assert_eq!(
+    empty[0].assignment.len(),
+    1,
+    "nothing inside an empty list: {:?}",
+    empty[0].assignment
+  );
+
+  for g in ["present", "absent"] {
+    for k in ["A", "B", "C"] {
+      assert!(
+        selected
+          .variants
+          .iter()
+          .any(|v| v.assignment.get(gift).map(String::as_str) == Some(g)
+            && v.assignment.get(kind).map(String::as_str) == Some(k)),
+        "gift={g} with kind={k} is shown with an element"
+      );
+    }
+  }
+  assert_eq!(selected.report.coverage.covered, selected.report.coverage.targets);
+}

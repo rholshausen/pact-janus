@@ -341,6 +341,15 @@ impl ConsumerSession {
         Err(problems) => return Err(InteractionSpecError { problems }.into()),
       }
     }
+    // So are its own policy's pins and exclusions (ADR 0080), and for the same reasons: the contract
+    // records the resolved ids, and an author learns of a reference that names nothing at `execute`.
+    if let Some(policy) = &spec.policy {
+      let space = plan::variant_space(&spec);
+      match crate::variant::resolve_interaction_policy(&space, policy, "/policy") {
+        Ok(resolved) => spec.policy = Some(resolved),
+        Err(problems) => return Err(InteractionSpecError { problems }.into()),
+      }
+    }
     let contributions = self.scope.contributions();
     let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
@@ -544,7 +553,7 @@ impl ConsumerSession {
       }
       selected
     } else {
-      let layers = [self.policy.as_ref(), call_policy];
+      let layers = [self.policy.as_ref(), entry.spec.policy.as_ref(), call_policy];
       let policy = crate::variant::SamplingPolicy::resolve(&layers)
         .map_err(|problem| VariantsError::Variant(VariantError::InvalidPolicy(vec![problem])))?;
       select(&space, &policy).map_err(VariantsError::Variant)?
@@ -870,6 +879,7 @@ impl ConsumerSession {
         content_types: entry.spec.content_types.clone(),
         requires: entry.spec.requires.clone(),
         redacted: None,
+        policy: entry.spec.policy.clone(),
         selection: contract::RecordedSelection {
           variants,
           report: report_to_map(&selected.report),

@@ -343,6 +343,7 @@ impl Conversion {
       content_types: (!content_types.is_empty()).then_some(content_types),
       requires: (!requires.is_empty()).then_some(requires),
       redacted: None,
+      policy: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),
@@ -435,6 +436,7 @@ impl Conversion {
       content_types: (!content_types.is_empty()).then_some(content_types),
       requires: (!requires.is_empty()).then_some(requires),
       redacted: None,
+      policy: None,
       selection: RecordedSelection {
         variants: vec![RecordedVariant {
           id: "base".to_string(),
@@ -1353,21 +1355,9 @@ impl Conversion {
     // size the array that declared them, and v1–v4 never re-apply them below it (`pact_matching`
     // checks the bound only when `!cascaded`) — nor does design 3.5's plan, which reduces a
     // cascaded one to `match:type`, admitting any length. `min: 0` is what agrees with both.
+    // A bare `type` names no bound either, so v1–v4 admit any length, `[]` included, and the
+    // contract does too (ADR 0079 decision 3).
     let (min, max) = if cascaded { (0, None) } else { cardinality(&list) };
-    // A bare `type` names no bound, and v1–v4 then admit `[]` where `each-like`'s default `min: 1`
-    // does not (phase-9 finding 2). Stricter, so false failures rather than false passes — but the
-    // two paths now disagree about the empty list, and plan-grammar spec §4.4 wants that said.
-    if !cascaded && list.rules.iter().all(|rule| matches!(rule, MatchingRule::Type)) {
-      self.finding(Finding::at(
-        "rule-narrowed",
-        "judgement",
-        &ctx.at,
-        "a type rule on an array names no length, and v1–v4 admit an empty one; the contract's \
-         each-like keeps its default min: 1 — write min: 0 if an empty list is a case the consumer \
-         handles"
-          .to_string(),
-      ));
-    }
     let template = items.first().cloned().unwrap_or(Value::Null);
     let items_shape = self.body_shape(rules, &template, &ctx.template_item());
     let mut shape = json!({ "shape": "each-like", "items": items_shape, "min": min });
@@ -2822,8 +2812,8 @@ fn is_map_entry_rule(rule: &MatchingRule) -> bool {
 }
 
 /// `min`/`max`/`minmax` on a collection become `each-like`'s own cardinality (spec §8.2). A bare
-/// `type` on an array says "every element is like the template" with no bound, which is
-/// `each-like`'s default of one — the same default `eachLike` has always had.
+/// `type` on an array says "every element is like the template" with no bound, which v1–v4 read as
+/// any length, so it is `min: 0` (ADR 0079 decision 3).
 fn cardinality(list: &RuleList) -> (u64, Option<u64>) {
   for rule in &list.rules {
     match rule {
@@ -2833,7 +2823,7 @@ fn cardinality(list: &RuleList) -> (u64, Option<u64>) {
       _ => {}
     }
   }
-  (1, None)
+  (0, None)
 }
 
 /// The first rule `pact_models` read as a plugin's (ADR 0073), by its name and configuration.

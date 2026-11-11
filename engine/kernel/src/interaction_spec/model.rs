@@ -9,6 +9,7 @@
 
 use crate::common::{ContentTypes, Requirement, State, Transport};
 use crate::shape::ShapeNode;
+use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// One part's slots: slot name -> the shape it holds (shape-language spec §3.6). Which slots a
@@ -28,4 +29,7 @@ pub struct InteractionSpec {
   /// names a slot `parts` gives a shape; [`super::parse`] checks that.
   pub content_types: Option<ContentTypes>,
   pub requires: Option<Vec<Requirement>>,
+  /// The interaction's own sampling policy, variant-semantics spec §3.8's third layer (ADR 0080):
+  /// the document as written, its dimension references resolved when the interaction is added.
+  pub policy: Option<Value>,
 }

@@ -155,11 +155,11 @@ fn a_cascaded_bound_does_not_size_a_nested_array() {
   assert!(tags.get("max").is_none(), "no bound was declared here: {tags}");
 }
 
-/// Phase-9 finding 2: a bare `type` on an array admits `[]` in v1–v4 and not in the contract
-/// (`each-like`'s default `min: 1`). Stricter, so safe — but the two paths disagree, and the
-/// upgrade says so where it used to be silent. A stated `min` is the author's own bound: no finding.
+/// Phase-9 finding 2, ADR 0079 decision 3: a bare `type` on an array names no length, so v1–v4
+/// admit `[]`, and the contract does too — `min: 0`, with nothing to report. A stated `min` is the
+/// author's own bound and is kept.
 #[test]
-fn a_bare_type_on_an_array_says_the_empty_list_is_no_longer_admitted() {
+fn a_bare_type_on_an_array_admits_the_empty_list_as_v1_to_v4_do() {
   let response = json!({
     "status": 200,
     "body": { "items": [{ "sku": "a" }] },
@@ -167,10 +167,13 @@ fn a_bare_type_on_an_array_says_the_empty_list_is_no_longer_admitted() {
   });
   let upgraded = upgrade(&pact_with(get_slash(), response));
   let items = &shape(&upgraded, 0, "response", "body")["members"]["items"];
-  assert_eq!(items["min"], json!(1));
-  let finding = find(&upgraded.findings, "rule-narrowed");
-  assert_eq!(finding.kind, "judgement");
-  assert!(finding.message.contains("empty"), "{}", finding.message);
+  assert_eq!(items["min"], json!(0));
+  assert!(items.get("max").is_none(), "no bound was declared: {items}");
+  assert!(
+    !codes(&upgraded.findings).contains(&"rule-narrowed"),
+    "{:?}",
+    codes(&upgraded.findings)
+  );
 
   let bounded = json!({
     "status": 200,
@@ -178,6 +181,8 @@ fn a_bare_type_on_an_array_says_the_empty_list_is_no_longer_admitted() {
     "matchingRules": { "body": { "$.items": { "matchers": [{ "match": "type", "min": 1 }] } } }
   });
   let upgraded = upgrade(&pact_with(get_slash(), bounded));
+  let items = &shape(&upgraded, 0, "response", "body")["members"]["items"];
+  assert_eq!(items["min"], json!(1));
   assert!(
     !codes(&upgraded.findings).contains(&"rule-narrowed"),
     "{:?}",

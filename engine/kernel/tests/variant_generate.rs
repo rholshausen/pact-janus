@@ -137,3 +137,39 @@ fn a_base64_example_that_does_not_decode_is_its_text() {
     generate::Generated::Document(json!("not base64!"))
   );
 }
+
+/// ADR 0079 decision 4: a list that may be empty serves the author's element in the base variant,
+/// and `[]` in its minimal boundary.
+#[test]
+fn a_list_that_may_be_empty_serves_an_element_first_and_then_none() {
+  let spec = json!({
+    "description": "get an order",
+    "parts": { "response": { "body": { "shape": "object", "members": {
+      "items": { "shape": "each-like", "min": 0,
+        "items": { "shape": "object", "members": {
+          "gift": { "shape": "optional", "of": { "shape": "boolean", "example": true } } } } } } } } }
+  });
+  let interaction = parse(&spec).unwrap_or_else(|err| panic!("{:?}", err.problems));
+  let space = variant_space(&interaction);
+  let selected = select(&space, &SamplingPolicy::default()).unwrap();
+  let lengths: Vec<usize> = selected
+    .variants
+    .iter()
+    .map(|v| {
+      let parts = generate::interaction(&interaction, &v.assignment);
+      let body = parts["response"]["body"]
+        .as_document()
+        .expect("a document")
+        .clone();
+      body["items"].as_array().expect("a list").len()
+    })
+    .collect();
+  assert_eq!(
+    lengths[0], 1,
+    "the base variant serves the author's element: {lengths:?}"
+  );
+  assert!(
+    lengths.contains(&0),
+    "and one variant serves an empty list: {lengths:?}"
+  );
+}

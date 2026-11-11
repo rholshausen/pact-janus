@@ -83,11 +83,11 @@ public class Dimension {
     @JsonPropertyDescription("Name of the point the shape's own examples exercise \u2014 the base variant's assignment for this dimension.")
     private String _default;
     /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * Points that gate this dimension. It is active when, for every dimension named here, one of the points named for it is selected: gates on one dimension are alternatives, and gates on different dimensions must all hold. Absent or empty means always active (spec.md §6.3).
      * 
      */
     @JsonProperty("gated-by")
-    @JsonPropertyDescription("Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md \u00a76.3).")
+    @JsonPropertyDescription("Points that gate this dimension. It is active when, for every dimension named here, one of the points named for it is selected: gates on one dimension are alternatives, and gates on different dimensions must all hold. Absent or empty means always active (spec.md \u00a76.3).")
     private List<Gate> gatedBy;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
@@ -209,7 +209,7 @@ public class Dimension {
     }
 
     /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * Points that gate this dimension. It is active when, for every dimension named here, one of the points named for it is selected: gates on one dimension are alternatives, and gates on different dimensions must all hold. Absent or empty means always active (spec.md §6.3).
      * 
      */
     @JsonProperty("gated-by")
@@ -218,7 +218,7 @@ public class Dimension {
     }
 
     /**
-     * Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).
+     * Points that gate this dimension. It is active when, for every dimension named here, one of the points named for it is selected: gates on one dimension are alternatives, and gates on different dimensions must all hold. Absent or empty means always active (spec.md §6.3).
      * 
      */
     @JsonProperty("gated-by")

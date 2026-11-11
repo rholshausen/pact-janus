@@ -48,7 +48,7 @@
         },
         "gated-by": {
           "type": "array",
-          "description": "Points that must all be selected for this dimension to be active. Absent or empty means always active (spec.md §6.3).",
+          "description": "Points that gate this dimension. It is active when, for every dimension named here, one of the points named for it is selected: gates on one dimension are alternatives, and gates on different dimensions must all hold. Absent or empty means always active (spec.md §6.3).",
           "items": { "$ref": "#/$defs/Gate" }
         }
       }

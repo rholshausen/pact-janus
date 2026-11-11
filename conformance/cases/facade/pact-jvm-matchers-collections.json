@@ -147,7 +147,7 @@
                     "members": {
                       "any": {
                         "items": { "members": { "id": { "example": 1, "shape": "integer" } }, "shape": "object" },
-                        "min": 1,
+                        "min": 0,
                         "shape": "each-like"
                       },
                       "between": {
@@ -208,7 +208,7 @@
                     "entries": [
                       {
                         "items": { "items": { "example": "A-1", "shape": "type" }, "min": 2, "shape": "each-like" },
-                        "min": 1,
+                        "min": 0,
                         "shape": "each-like"
                       }
                     ],

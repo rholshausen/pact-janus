@@ -47,11 +47,11 @@ public class AppliedExclusion {
     @JsonProperty("reason")
     private String reason;
     /**
-     * Coverage targets this exclusion made unreachable.
+     * Coverage targets this exclusion made unreachable, or, under the exhaustive strategy, which has no targets, the variants it removed.
      * 
      */
     @JsonProperty("removed")
-    @JsonPropertyDescription("Coverage targets this exclusion made unreachable.")
+    @JsonPropertyDescription("Coverage targets this exclusion made unreachable, or, under the exhaustive strategy, which has no targets, the variants it removed.")
     private Long removed;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
@@ -97,7 +97,7 @@ public class AppliedExclusion {
     }
 
     /**
-     * Coverage targets this exclusion made unreachable.
+     * Coverage targets this exclusion made unreachable, or, under the exhaustive strategy, which has no targets, the variants it removed.
      * 
      */
     @JsonProperty("removed")
@@ -106,7 +106,7 @@ public class AppliedExclusion {
     }
 
     /**
-     * Coverage targets this exclusion made unreachable.
+     * Coverage targets this exclusion made unreachable, or, under the exhaustive strategy, which has no targets, the variants it removed.
      * 
      */
     @JsonProperty("removed")

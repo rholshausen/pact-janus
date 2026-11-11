@@ -767,3 +767,139 @@ fn a_generated_response_value_is_fresh_each_exchange_and_the_example_is_recorded
     "{recorded}"
   );
 }
+
+/// An order whose `status` and `shippedAt` vary independently, and an exclusion on the interaction
+/// that a shipped order has a shipping date, written as the DSL writes it: short references.
+fn order_interaction_excluding_shipped_without_a_date() -> Value {
+  let mut interaction = order_interaction();
+  interaction["parts"]["response"]["body"] = json!({
+    "shape": "object",
+    "members": {
+      "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" },
+      "shippedAt": { "shape": "optional", "of": { "shape": "string", "example": "2026-07-30" } } }
+  });
+  interaction["policy"] = json!({ "exclude": [ {
+    "when": [ { "dimension": "status", "point": "SHIPPED" }, { "dimension": "shippedAt", "point": "absent" } ],
+    "reason": "the order service sets shippedAt when it ships" } ] });
+  interaction
+}
+
+fn session(engine: &mut Engine) -> String {
+  hello(engine);
+  let create = send(
+    engine,
+    "r-2",
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-api" } } }),
+  );
+  create["ok"]["session"].as_str().unwrap().to_string()
+}
+
+/// ADR 0080: an interaction's own policy is §3.8's third layer. Its exclusion is applied when the
+/// variants are selected, and the contract records it with its references resolved to full ids.
+#[test]
+fn an_exclusion_on_the_interaction_is_applied_and_recorded_resolved() {
+  let mut engine = engine_with_real_components();
+  let session = session(&mut engine);
+  let added = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": order_interaction_excluding_shipped_without_a_date() }),
+  );
+  let handle = added["ok"]["handle"].as_str().unwrap().to_string();
+  let variants = send(
+    &mut engine,
+    "r-4",
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let selected: Vec<&Value> = variants["ok"]["variants"].as_array().unwrap().iter().collect();
+  let shipped_without_a_date = |v: &&Value| {
+    let assignment = v["assignment"].as_array().unwrap();
+    assignment.contains(&json!({ "dimension": "response.body.status#value", "point": "SHIPPED" }))
+      && assignment.contains(&json!({ "dimension": "response.body.shippedAt#presence", "point": "absent" }))
+  };
+  assert!(!selected.iter().any(shipped_without_a_date), "{selected:?}");
+  assert_eq!(
+    selected.len(),
+    3,
+    "the space of 4, less the one excluded: {selected:?}"
+  );
+  let applied = &variants["ok"]["report"]["exclusions"][0];
+  assert_eq!(
+    applied["reason"],
+    json!("the order service sets shippedAt when it ships")
+  );
+
+  let started = send(
+    &mut engine,
+    "r-5",
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!(
+    "{}:{}",
+    endpoint["host"].as_str().unwrap(),
+    endpoint["port"].as_u64().unwrap()
+  );
+  for (i, variant) in selected.iter().enumerate() {
+    send(
+      &mut engine,
+      &format!("r-{}", 10 + i),
+      "consumer-session/serve-variant",
+      json!({ "session": session, "handle": handle, "variant": variant["id"] }),
+    );
+    assert_eq!(http_get(&addr, "/orders/66").0, 200);
+  }
+  let finalised = send(
+    &mut engine,
+    "r-99",
+    "consumer-session/finalise",
+    json!({ "session": session }),
+  );
+  let recorded = &finalised["ok"]["contract"]["interactions"][0];
+  assert_eq!(
+    recorded["policy"],
+    json!({ "exclude": [ {
+      "when": [ { "dimension": "response.body.status#value", "point": "SHIPPED" },
+                { "dimension": "response.body.shippedAt#presence", "point": "absent" } ],
+      "reason": "the order service sets shippedAt when it ships" } ] })
+  );
+}
+
+/// ADR 0080 decisions 3 and 5: a reference that names no dimension, a point the dimension does not
+/// have and an empty reason are each the interaction's `interaction-invalid`, when it is added.
+#[test]
+fn an_interaction_policy_that_does_not_resolve_is_refused_when_the_interaction_is_added() {
+  let mut engine = engine_with_real_components();
+  let session = session(&mut engine);
+  let mut interaction = order_interaction_excluding_shipped_without_a_date();
+  interaction["policy"] = json!({ "exclude": [
+    { "when": [ { "dimension": "deliveredAt", "point": "absent" } ], "reason": "never delivered" },
+    { "when": [ { "dimension": "status", "point": "CANCELLED" } ], "reason": "never cancelled" },
+    { "when": [ { "dimension": "status", "point": "SHIPPED" } ], "reason": " " } ] });
+  let refused = send(
+    &mut engine,
+    "r-3",
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  assert_eq!(refused["error"]["code"], "interaction-invalid", "{refused}");
+  let pointers: Vec<&str> = refused["error"]["details"]["problems"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|p| p["pointer"].as_str().unwrap())
+    .collect();
+  assert_eq!(
+    pointers,
+    vec![
+      "/policy/exclude/0/when/0",
+      "/policy/exclude/1/when/0",
+      "/policy/exclude/2/reason"
+    ],
+    "{refused}"
+  );
+}

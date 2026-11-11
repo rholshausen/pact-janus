@@ -542,6 +542,12 @@ be 0 — an `each-like` with `min: 0` admits the empty array, and its cardinalit
 empty case as a point, which is the honest way to declare "this list is sometimes empty" (and, like
 every dimension, it is then a promise to exercise it).
 
+The default is 1 because a list the author wrote with an element is one they have shown has an
+element ([ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)).
+The same holds for `each-entry`. A list that may be empty is still exercised with an element first:
+its default point is the first that produces one (§6.4), and the empty list is its minimal boundary,
+whose interior is inactive (§6.3).
+
 ### 5.6 Depth and size
 
 An engine MAY impose limits on shape depth and node count and MUST report exceeding them as
@@ -599,14 +605,23 @@ order.
 ### 6.3 Gating
 
 Dimensions nested under a point that is not selected are **inactive** for that variant, and an
-inactive dimension takes no point at all. Two operators gate:
+inactive dimension takes no point at all. These operators gate:
 
 - `optional` — dimensions inside `of` are gated by the `present` point. If the member is absent there
   is nothing inside it to vary.
 - `one-of` — dimensions inside an alternative are gated by that alternative's point.
+- `each-like` and `each-entry` with `min: 0` — dimensions inside `items`, `keys` and `values` are gated
+  by every cardinality point whose size is above 0. An empty list has no elements to vary. With `min`
+  above 0, every point produces an element, and the interior is not gated.
 
 `nullable` gates the same way in principle (`null` has no interior), but its `of` subtree's dimensions
 are gated by `non-null`.
+
+A dimension is active when, for each dimension its gates name, the variant gives that dimension one
+of the points they name. Gates on one dimension are therefore alternatives, and gates on different
+dimensions must all hold. Only a `min: 0` cardinality gates by more than one point of itself
+([ADR 0079](../../decisions/0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md)
+decision 6).
 
 Gating is the difference between a variant space that is a product and one that is a sum of products,
 and 2.3's sampler needs it as input rather than as a discovered surprise: the number of variants is
@@ -621,7 +636,7 @@ dimension is not a variant at all.
 | `nullable` | `nullability` | `non-null`, `null` | `non-null` | yes, on `non-null` |
 | `any-of` | `value` | one per option, named by its canonical rendering | the `example`, else the first option | no |
 | `one-of` | `alternative` | one per alternative, named by the alternative | `default`, else lexicographically first | yes, per alternative |
-| `each-like`, `each-entry` | `cardinality` | `min`; `min+1` when `max > min`; `max` when `max` is finite and distinct from both | `min` | no (§6.5) |
+| `each-like`, `each-entry` | `cardinality` | `min`; `min+1` when `max > min`; `max` when `max` is finite and distinct from both | `min`, or `min+1` when `min` is 0 | only when `min` is 0, on every point but `min` (§6.3, §6.5) |
 | everything else | — | — | — | — |
 
 Point names for `any-of` are the canonical rendering of the option: a string option is its own text, a

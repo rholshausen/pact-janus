@@ -72,6 +72,10 @@ pub struct Interaction {
   /// `request.headers.authorization`. Absent when there were none.
   #[serde(skip_serializing_if = "Option::is_none", default)]
   pub redacted: Option<Vec<String>>,
+  /// The interaction's own sampling policy (contract-file spec §4.1, ADR 0080), its dimension
+  /// references resolved to full ids. Absent when the specification had none.
+  #[serde(skip_serializing_if = "Option::is_none", default)]
+  pub policy: Option<Value>,
   pub selection: RecordedSelection,
 }
 
@@ -96,6 +100,9 @@ impl Interaction {
     }
     if let Some(requires) = &self.requires {
       map.insert("requires".to_string(), serde_json::json!(requires));
+    }
+    if let Some(policy) = &self.policy {
+      map.insert("policy".to_string(), policy.clone());
     }
     document
   }

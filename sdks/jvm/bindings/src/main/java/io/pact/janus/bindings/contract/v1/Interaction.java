@@ -33,6 +33,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "content-types",
     "requires",
     "redacted",
+    "policy",
     "selection"
 })
 public class Interaction {
@@ -93,6 +94,13 @@ public class Interaction {
     @JsonPropertyDescription("The members whose values the writer replaced by a placeholder because they carry credentials (spec.md \u00a75.6, ADR 0074), as paths: a part, a slot, then member names ('request.headers.authorization'). Sorted. Absent when there were none.")
     private List<java.lang.String> redacted;
     /**
+     * The interaction's own sampling policy, as its specification gave it, with every dimension reference resolved to a full id (spec.md §4.1, ADR 0080). Design 2.3's policy document, validated against sampling-policy.schema.json. Absent when the specification had none.
+     * 
+     */
+    @JsonProperty("policy")
+    @JsonPropertyDescription("The interaction's own sampling policy, as its specification gave it, with every dimension reference resolved to a full id (spec.md \u00a74.1, ADR 0080). Design 2.3's policy document, validated against sampling-policy.schema.json. Absent when the specification had none.")
+    private Map<String, Object> policy;
+    /**
      * RecordedSelection
      * <p>
      * Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).
@@ -103,7 +111,7 @@ public class Interaction {
     @JsonPropertyDescription("Design 2.3's variant-selection document \u2014 the exercised variants and the report of how they were chosen \u2014 with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md \u00a75.1).")
     private RecordedSelection selection;
     @JsonIgnore
-    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
      * What the interaction is, in the author's words. Unique within a contract for a given state list (spec.md §4.2).
@@ -244,6 +252,24 @@ public class Interaction {
     }
 
     /**
+     * The interaction's own sampling policy, as its specification gave it, with every dimension reference resolved to a full id (spec.md §4.1, ADR 0080). Design 2.3's policy document, validated against sampling-policy.schema.json. Absent when the specification had none.
+     * 
+     */
+    @JsonProperty("policy")
+    public Map<String, Object> getPolicy() {
+        return policy;
+    }
+
+    /**
+     * The interaction's own sampling policy, as its specification gave it, with every dimension reference resolved to a full id (spec.md §4.1, ADR 0080). Design 2.3's policy document, validated against sampling-policy.schema.json. Absent when the specification had none.
+     * 
+     */
+    @JsonProperty("policy")
+    public void setPolicy(Map<String, Object> policy) {
+        this.policy = policy;
+    }
+
+    /**
      * RecordedSelection
      * <p>
      * Design 2.3's variant-selection document — the exercised variants and the report of how they were chosen — with the evidence this design adds. Members not named here belong to variant-selection.schema.json and are validated against it (spec.md §5.1).
@@ -268,12 +294,12 @@ public class Interaction {
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
@@ -309,6 +335,10 @@ public class Interaction {
         sb.append('=');
         sb.append(((this.redacted == null)?"<null>":this.redacted));
         sb.append(',');
+        sb.append("policy");
+        sb.append('=');
+        sb.append(((this.policy == null)?"<null>":this.policy));
+        sb.append(',');
         sb.append("selection");
         sb.append('=');
         sb.append(((this.selection == null)?"<null>":this.selection));
@@ -337,11 +367,12 @@ public class Interaction {
         result = ((result* 31)+((this.contentTypes == null)? 0 :this.contentTypes.hashCode()));
         result = ((result* 31)+((this.states == null)? 0 :this.states.hashCode()));
         result = ((result* 31)+((this.requires == null)? 0 :this.requires.hashCode()));
+        result = ((result* 31)+((this.policy == null)? 0 :this.policy.hashCode()));
         return result;
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -349,7 +380,7 @@ public class Interaction {
             return false;
         }
         Interaction rhs = ((Interaction) other);
-        return ((((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.redacted == rhs.redacted)||((this.redacted!= null)&&this.redacted.equals(rhs.redacted))))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))));
+        return (((((((((((this.selection == rhs.selection)||((this.selection!= null)&&this.selection.equals(rhs.selection)))&&((this.redacted == rhs.redacted)||((this.redacted!= null)&&this.redacted.equals(rhs.redacted))))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contentTypes == rhs.contentTypes)||((this.contentTypes!= null)&&this.contentTypes.equals(rhs.contentTypes))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))))&&((this.requires == rhs.requires)||((this.requires!= null)&&this.requires.equals(rhs.requires))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
     }
 
 }

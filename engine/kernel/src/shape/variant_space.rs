@@ -143,6 +143,55 @@ pub fn compute_many<'a>(shapes: impl IntoIterator<Item = (String, &'a ShapeNode)
   VariantSpace { dimensions }
 }
 
+/// Push an `each-like`/`each-entry` cardinality dimension, when it has two points, and return the
+/// gates its interior is walked under (spec §6.3, §6.4, ADR 0079). With `min` above 0 every point
+/// produces an element, so the interior is gated as its parent is. With `min: 0` an empty list has no
+/// interior: it is gated by every point whose size is above 0, gates on one dimension being
+/// alternatives, and the default is `min+1`, the first point that produces an element.
+fn cardinality_dimension(
+  at: &str,
+  operator: &'static str,
+  min: u64,
+  max: Option<u64>,
+  gates: &[Gate],
+  out: &mut Vec<Dimension>,
+) -> Vec<Gate> {
+  let points = cardinality_points(min, max);
+  if points.len() < 2 {
+    return gates.to_vec();
+  }
+  let id = path::dimension_id(at, "cardinality");
+  let default = points
+    .iter()
+    .find(|p| p.size > 0)
+    .map_or("min", |p| p.name.as_str())
+    .to_string();
+  out.push(Dimension {
+    id: id.clone(),
+    path: at.to_string(),
+    facet: "cardinality",
+    operator,
+    points: points
+      .iter()
+      .map(|p| Point {
+        name: p.name.clone(),
+        value: None,
+        size: Some(p.size),
+      })
+      .collect(),
+    default,
+    gated_by: gates.to_vec(),
+  });
+  let mut inner = gates.to_vec();
+  if min == 0 {
+    inner.extend(points.iter().filter(|p| p.size > 0).map(|p| Gate {
+      dimension: id.clone(),
+      point: p.name.clone(),
+    }));
+  }
+  inner
+}
+
 fn walk(shape: &ShapeNode, at: &str, gates: &[Gate], out: &mut Vec<Dimension>) {
   let ShapeKind::Core(core) = &shape.kind else {
     // A component operator's `admits` — and therefore its dimension, if any — is opaque to the
@@ -253,28 +302,8 @@ fn walk(shape: &ShapeNode, at: &str, gates: &[Gate], out: &mut Vec<Dimension>) {
       }
     }
     CoreShape::EachLike { items, min, max } => {
-      let points = cardinality_points(*min, *max);
-      if points.len() >= 2 {
-        out.push(Dimension {
-          id: path::dimension_id(at, "cardinality"),
-          path: at.to_string(),
-          facet: "cardinality",
-          operator: "each-like",
-          points: points
-            .iter()
-            .map(|p| Point {
-              name: p.name.clone(),
-              value: None,
-              size: Some(p.size),
-            })
-            .collect(),
-          default: "min".to_string(),
-          gated_by: gates.to_vec(),
-        });
-      }
-      // Cardinality does not gate its subtree (spec §6.4): interior dimensions vary regardless
-      // of which cardinality point is selected.
-      walk(items, &path::each_like_item(at), gates, out);
+      let inner = cardinality_dimension(at, "each-like", *min, *max, gates, out);
+      walk(items, &path::each_like_item(at), &inner, out);
     }
     CoreShape::EachEntry {
       keys,
@@ -282,29 +311,11 @@ fn walk(shape: &ShapeNode, at: &str, gates: &[Gate], out: &mut Vec<Dimension>) {
       min,
       max,
     } => {
-      let points = cardinality_points(*min, *max);
-      if points.len() >= 2 {
-        out.push(Dimension {
-          id: path::dimension_id(at, "cardinality"),
-          path: at.to_string(),
-          facet: "cardinality",
-          operator: "each-entry",
-          points: points
-            .iter()
-            .map(|p| Point {
-              name: p.name.clone(),
-              value: None,
-              size: Some(p.size),
-            })
-            .collect(),
-          default: "min".to_string(),
-          gated_by: gates.to_vec(),
-        });
-      }
+      let inner = cardinality_dimension(at, "each-entry", *min, *max, gates, out);
       if let Some(keys) = keys {
-        walk(keys, &path::each_entry_key(at), gates, out);
+        walk(keys, &path::each_entry_key(at), &inner, out);
       }
-      walk(values, &path::each_entry_value(at), gates, out);
+      walk(values, &path::each_entry_value(at), &inner, out);
     }
     CoreShape::Object { members } => {
       // By name, the lexicographic order spec §6.2 requires, not the declared order (ADR 0037).

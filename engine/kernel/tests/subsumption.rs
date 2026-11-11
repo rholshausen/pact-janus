@@ -905,3 +905,66 @@ fn provenance_falls_back_document_then_specification_default() {
   let published = read_provider_shape(bare.to_string().as_bytes()).expect("well-formed");
   assert_eq!(published.provenance_of(&published.interactions[0]), "authored");
 }
+
+// --- ADR 0081: a provider object against a consumer `one-of`, split by its discriminator ----------
+
+/// The consumer relies on the correlation: a shipped or delivered order has a shipping date, and a
+/// pending one need not.
+fn consumer_status_union() -> Value {
+  json!({ "shape": "one-of", "discriminator": "status", "alternatives": {
+    "pending": { "shape": "object", "members": {
+      "status": { "shape": "equality", "example": "PENDING" } } },
+    "shipped": { "shape": "object", "members": {
+      "status": { "shape": "any-of", "options": ["SHIPPED", "DELIVERED"], "example": "SHIPPED" },
+      "shippedAt": { "shape": "string", "example": "2026-07-30" } } } } })
+}
+
+/// A provider whose `status` is the `any-of` a recorder writes is compared once per consumer
+/// alternative. Here every alternative holds, where the walk used to answer `unknown`.
+#[test]
+fn a_provider_object_binding_several_tags_is_split_by_the_consumers_alternatives() {
+  let provider = json!({ "shape": "object", "members": {
+    "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED", "DELIVERED"], "example": "PENDING" },
+    "shippedAt": { "shape": "string", "example": "2026-07-30" } } });
+  let (verdict, findings) = walk(&provider, &consumer_status_union());
+  assert_eq!((verdict, findings.len()), (Verdict::Yes, 0), "{findings:?}");
+}
+
+/// A tag the consumer names no alternative for is `wider-values`, and a correlated member the
+/// provider may omit is `no` inside the alternative that needs it, once, though two tags reach it.
+#[test]
+fn a_split_names_the_unhandled_tag_and_the_correlated_member_the_provider_may_omit() {
+  let provider = json!({ "shape": "object", "members": {
+    "status": { "shape": "any-of", "options": ["CANCELLED", "PENDING", "SHIPPED", "DELIVERED"],
+                "example": "PENDING" },
+    "shippedAt": { "shape": "optional", "of": { "shape": "string", "example": "2026-07-30" } } } });
+  let (verdict, findings) = walk(&provider, &consumer_status_union());
+  assert_eq!(verdict, Verdict::No);
+  let unhandled = finding_at(&findings, "response.body");
+  assert_eq!(unhandled.kind, "wider-values");
+  let reason = serde_json::to_value(unhandled).unwrap()["reason"]
+    .as_str()
+    .unwrap()
+    .to_string();
+  assert!(
+    reason.contains("CANCELLED") && !reason.contains("PENDING"),
+    "{reason}"
+  );
+  let shipped: Vec<&Finding> = findings
+    .iter()
+    .filter(|f| f.path == "response.body@shipped.shippedAt")
+    .collect();
+  assert_eq!(shipped.len(), 1, "{findings:?}");
+  assert_eq!(shipped[0].verdict, Verdict::No);
+}
+
+/// A provider whose tag is an open `string` may be in any alternative or none, and the shape cannot
+/// say which: still `unknown`.
+#[test]
+fn a_provider_with_an_open_tag_is_still_undecidable_against_a_union() {
+  let provider = json!({ "shape": "object", "members": {
+    "status": { "shape": "string", "example": "PENDING" } } });
+  let (verdict, findings) = walk(&provider, &consumer_status_union());
+  assert_eq!(verdict, Verdict::Unknown);
+  assert_eq!(finding_at(&findings, "response.body").kind, "unreviewable");
+}

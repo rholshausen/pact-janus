@@ -252,7 +252,7 @@ export interface AppliedExclusion {
   when: [Point, ...Point[]];
   reason: string;
   /**
-   * Coverage targets this exclusion made unreachable.
+   * Coverage targets this exclusion made unreachable, or, under the exhaustive strategy, which has no targets, the variants it removed.
    */
   removed?: number;
   [k: string]: unknown;

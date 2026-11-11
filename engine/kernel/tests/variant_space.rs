@@ -199,6 +199,45 @@ fn an_each_like_with_a_finite_max_contributes_three_points() {
   );
 }
 
+/// ADR 0079 decisions 4 and 5: a list that may be empty defaults to its first point with an element,
+/// and its interior is gated by every such point, so the empty variant has nothing inside it to vary.
+#[test]
+fn an_each_like_that_may_be_empty_gates_its_interior_on_its_non_empty_points() {
+  let interaction = interaction_with(json!({ "shape": "object",
+    "members": { "items": { "shape": "each-like", "min": 0, "max": 3,
+                             "items": { "shape": "object", "members": {
+                               "gift": { "shape": "optional", "of": { "shape": "boolean", "example": true } } } } } } }));
+  let space = variant_space(&interaction);
+  let cardinality = &space.dimensions[0];
+  assert_eq!(cardinality.id, "response.body.items#cardinality");
+  assert_eq!(cardinality.default, "min+1");
+  let gift = &space.dimensions[1];
+  assert_eq!(gift.id, "response.body.items[*].gift#presence");
+  assert_eq!(
+    gift
+      .gated_by
+      .iter()
+      .map(|g| (g.dimension.as_str(), g.point.as_str()))
+      .collect::<Vec<_>>(),
+    vec![
+      ("response.body.items#cardinality", "min+1"),
+      ("response.body.items#cardinality", "max")
+    ]
+  );
+}
+
+/// With `min` above 0 every point has an element: the default is `min`, and nothing is gated.
+#[test]
+fn an_each_like_with_a_minimum_does_not_gate_its_interior() {
+  let interaction = interaction_with(json!({ "shape": "object",
+    "members": { "items": { "shape": "each-like", "min": 1,
+                             "items": { "shape": "object", "members": {
+                               "gift": { "shape": "optional", "of": { "shape": "boolean", "example": true } } } } } } }));
+  let space = variant_space(&interaction);
+  assert_eq!(space.dimensions[0].default, "min");
+  assert!(space.dimensions[1].gated_by.is_empty());
+}
+
 #[test]
 fn a_component_operator_contributes_no_dimension() {
   let interaction = interaction_with(json!({ "shape": "object",
