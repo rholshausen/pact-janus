@@ -27,6 +27,8 @@ export type MultiValue = unknown;
 export interface InteractionScript {
   description: string;
   given?: { name: string; params?: Record<string, unknown> }[];
+  /** 'exclude' calls, in order: each its [dimension, point] pairs and its reason. */
+  exclude?: { when: [string, string][]; reason: string }[];
   request?: {
     method?: unknown;
     path?: unknown;

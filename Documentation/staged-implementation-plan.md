@@ -2278,6 +2278,19 @@ The RFC's answer to optional fields, delivered to users.
 - **S3.2 The native DSL** — **L**: `optional`, `anyOf`, `oneOf`, `eachLike`, `forbidden`,
   `whenVariant`, `variantCases` and `exclude` (ADR 0080), designed with the community, specified first, then implemented in
   both SDKs under the conformance suite.
+  *Built 2026-11-11; the community review is open*:
+  - The prototype's DSL already had every primitive but `exclude`, each specified and held to
+    conformance cases. `exclude(when, reason)` is on both SDKs' interaction and message builders, in
+    the behavioural specification, and covered by four cases. It writes the interaction's
+    `policy.exclude` and checks nothing, the engine resolving its references when the interaction is
+    added.
+  - `exclude` is the only member of the sampling policy the DSL spells, on an interaction or for a
+    suite. Pins, strategy, budget and boundaries can be added later as a minor change, and none could
+    be removed once frozen. A host still passes a policy on each `variants` call.
+  - [`native-dsl-review.md`](native-dsl-review.md) is the surface put to the community: every
+    primitive in both spellings, what is decided, and six open questions, each with its current
+    answer. The surface freezes, as stage 3's exit requires, when the review's answers are in the
+    specification.
 - **S3.3 `http:media-type` and list-valued headers** (finding 1) — **M**, as namespaced operators the
   HTTP component contributes, so a consumer's `application/json` accepts `; charset=utf-8` again. The
   media-type half moved to S2.16, brought forward by S2.5b; list-valued headers are this item.

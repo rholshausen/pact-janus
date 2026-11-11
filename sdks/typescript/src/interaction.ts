@@ -79,9 +79,28 @@ export function variantCases(
   );
 }
 
+/**
+ * A combination of variant points to leave out (behavioural spec 'exclude'): (dimension, point) pairs
+ * that hold together. Each dimension is a reference, as `whenVariant` takes one.
+ */
+export type ExcludedPoints = readonly (readonly [dimension: string, point: string])[];
+
+/** One `exclude` call, as the `policy.exclude` entry it appends. The engine checks it, not the SDK (ADR 0080). */
+export type Exclusion = { when: { dimension: string; point: string }[]; reason: string };
+
+export function exclusion(when: ExcludedPoints, reason: string): Exclusion {
+  return { when: when.map(([dimension, point]) => ({ dimension, point })), reason };
+}
+
+/** The `policy` member for the exclusions written: absent when there are none. */
+export function policyMember(exclusions: readonly Exclusion[]): { policy?: { exclude: Exclusion[] } } {
+  return exclusions.length > 0 ? { policy: { exclude: structuredClone([...exclusions]) } } : {};
+}
+
 export class InteractionBuilder {
   readonly #description: string;
   readonly #states: contract.State[] = [];
+  readonly #exclusions: Exclusion[] = [];
   #request: Record<string, shape.Shape> | undefined;
   #response: Record<string, shape.Shape> | undefined;
   /** Part -> slot -> media type, for every body written with `content` (contract spec §5.5). */
@@ -101,6 +120,16 @@ export class InteractionBuilder {
    */
   given(name: string, params?: { readonly [k: string]: unknown }): this {
     this.#states.push(providerState(name, params));
+    return this;
+  }
+
+  /**
+   * Leaves a combination the provider cannot produce out of the variants exercised, saying why
+   * (ADR 0080): `.exclude([["status", "SHIPPED"], ["shippedAt", "absent"]], "the service dates a
+   * shipped order")`. Each call is one exclusion; calls accumulate. The contract still admits it.
+   */
+  exclude(when: ExcludedPoints, reason: string): this {
+    this.#exclusions.push(exclusion(when, reason));
     return this;
   }
 
@@ -150,6 +179,7 @@ export class InteractionBuilder {
       ...(this.#contentTypes.size > 0
         ? { "content-types": Object.fromEntries([...this.#contentTypes].map(([part, slots]) => [part, { ...slots }])) }
         : {}),
+      ...policyMember(this.#exclusions),
     };
   }
 }

@@ -1,0 +1,65 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/exclude-policy",
+  "category": "translation",
+  "title": "Each 'exclude' appends one exclusion to the interaction's 'policy.exclude', its pairs and reason exactly as written.",
+  "covers": ["session.exclude.policy-written", "session.exclude.accumulates"],
+  "why": "behavioural spec 'exclude': appends { when: [ { dimension, point } ], reason } to 'policy.exclude' in call order, each pair in the order given and each reference as written, a short one and a full id alike, because resolving it is the engine's (ADR 0080 decision 3). 'policy' holds only 'exclude'. A chain that does not call 'exclude' writes no 'policy', which every other translation case's 'spec' pins.",
+  "interaction": {
+    "description": "an order that may have shipped",
+    "exclude": [
+      { "when": [["status", "SHIPPED"], ["shippedAt", "absent"]], "reason": "the order service dates a shipped order" },
+      { "when": [["response.body.status#value", "DELIVERED"]], "reason": "an order is delivered after the test's clock" }
+    ],
+    "request": { "method": "GET", "path": "/orders/42" },
+    "response": {
+      "status": 200,
+      "body": {
+        "$": "json",
+        "args": [
+          {
+            "status": { "$": "any-of", "args": ["PENDING", "SHIPPED", "DELIVERED"] },
+            "shippedAt": { "$": "optional", "args": ["2026-07-30T10:00:00Z"] }
+          }
+        ]
+      }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "an order that may have shipped",
+      "transport": { "kind": "http", "mode": "passive" },
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "equality", "example": "/orders/42" }
+        },
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": {
+            "shape": "object",
+            "members": {
+              "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED", "DELIVERED"], "example": "PENDING" },
+              "shippedAt": { "shape": "optional", "of": { "shape": "equality", "example": "2026-07-30T10:00:00Z" } }
+            }
+          }
+        }
+      },
+      "policy": {
+        "exclude": [
+          {
+            "when": [
+              { "dimension": "status", "point": "SHIPPED" },
+              { "dimension": "shippedAt", "point": "absent" }
+            ],
+            "reason": "the order service dates a shipped order"
+          },
+          {
+            "when": [{ "dimension": "response.body.status#value", "point": "DELIVERED" }],
+            "reason": "an order is delivered after the test's clock"
+          }
+        ]
+      }
+    }
+  }
+}

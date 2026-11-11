@@ -3,7 +3,7 @@
 // protocol call; reading a delivered message decodes nothing but its octets.
 
 import type { contract, protocol, shape } from "./generated/index.js";
-import { providerState } from "./interaction.js";
+import { type ExcludedPoints, type Exclusion, exclusion, policyMember, providerState } from "./interaction.js";
 import { compile, Content, type Template } from "./shapes.js";
 
 /** A message's slots: its metadata, name by name, and its body. */
@@ -15,6 +15,7 @@ export interface MessageSlots {
 export class MessageBuilder {
   readonly #description: string;
   readonly #states: contract.State[] = [];
+  readonly #exclusions: Exclusion[] = [];
   readonly #parts = new Map<string, Record<string, shape.Shape>>();
   /** Part -> the body's media type: `content`'s, else JSON (ADR 0068 decision 2). */
   readonly #bodyTypes = new Map<string, string>();
@@ -30,6 +31,12 @@ export class MessageBuilder {
   /** As an interaction's `given`. */
   given(name: string, params?: { readonly [k: string]: unknown }): this {
     this.#states.push(providerState(name, params));
+    return this;
+  }
+
+  /** As an interaction's `exclude`. */
+  exclude(when: ExcludedPoints, reason: string): this {
+    this.#exclusions.push(exclusion(when, reason));
     return this;
   }
 
@@ -76,6 +83,7 @@ export class MessageBuilder {
       ...(this.#bodyTypes.size > 0
         ? { "content-types": Object.fromEntries([...this.#bodyTypes].map(([part, type]) => [part, { body: type }])) }
         : {}),
+      ...policyMember(this.#exclusions),
     };
   }
 }

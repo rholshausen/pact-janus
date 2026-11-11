@@ -27,6 +27,7 @@ SDK (plan task 6.3); what that turned up is in
   | `interaction` | `janus.interaction(description)` → `Interaction` |
   | `given`, `request`, `response` | `Interaction.given(...)`, `.request(r -> ...)`, `.response(r -> ...)` |
   | `when-variant`, `variant-cases` | static methods on `io.pact.janus.sdk.VariantBinding`, written as a `given` parameter's value: `given("an order exists", map("shipped", whenVariant("shippedAt", "present")))`. Not on `Shapes`, because a binding is not a shape and is refused wherever a shape is expected |
+  | `exclude` | `Interaction.exclude(when, reason)` and `MessageInteraction.exclude(when, reason)`, `when` a `List` of `Map.Entry<String, String>`, dimension to point: `exclude(List.of(entry("status", "SHIPPED"), entry("shippedAt", "absent")), "the service dates a shipped order")`. `Map.entry` keeps the JDK's own pair type, and a `List` the order written; a `Map` would not keep it under `Map.of` |
   | `message` | `janus.message(description)` → `MessageInteraction` (ADR 0068) |
   | `message-contents`, `message-request` | `MessageInteraction.contents(m -> m.metadata(..).body(..))`, `.request(m -> ...)`, lambda-configured `MessageSlots`; `given` as an interaction's |
   | `execute` | `janus.execute(interaction, (mock, variant) -> ...)`; for a message, `janus.execute(message, (received, variant) -> ...)` |

@@ -45,7 +45,7 @@
     ]
   },
   "budgets": {
-    "idiomatic": 980,
+    "idiomatic": 1000,
     "embedding": 390,
     "loopback": 80,
     "facade": 1550,

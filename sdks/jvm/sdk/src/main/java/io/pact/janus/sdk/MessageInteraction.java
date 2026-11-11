@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 public final class MessageInteraction {
   private final String description;
   private final List<State> states = new ArrayList<>();
+  private final List<Map<String, Object>> exclusions = new ArrayList<>();
   /** Part -> its slots, {@code request} before {@code message}. */
   private final Map<String, Map<String, Shape>> parts = new LinkedHashMap<>();
   private final Map<String, String> bodyTypes = new LinkedHashMap<>();
@@ -42,6 +43,12 @@ public final class MessageInteraction {
   /** {@code given}, as {@link Interaction#given(String, Map)}. */
   public MessageInteraction given(String name, Map<String, ?> params) {
     states.add(Interaction.state(name, params));
+    return this;
+  }
+
+  /** {@code exclude}, as {@link Interaction#exclude(List, String)}. */
+  public MessageInteraction exclude(List<? extends Map.Entry<String, String>> when, String reason) {
+    exclusions.add(Interaction.exclusion(when, reason));
     return this;
   }
 
@@ -94,6 +101,7 @@ public final class MessageInteraction {
       bodyTypes.forEach((part, type) -> declared.setAdditionalProperty(part, Map.of("body", type)));
       spec.setContentTypes(declared);
     }
+    spec.setPolicy(Interaction.policy(exclusions));
     return spec;
   }
 

@@ -147,7 +147,7 @@
     },
     "InteractionScript": {
       "type": "object",
-      "description": "A DSL chain, as data: the driver replays it through its own surface, one call per member, in this order — interaction, given*, request, response. A chain with 'message' or 'message-request' is a message chain instead (ADR 0068): message, given*, message-request, message-contents.",
+      "description": "A DSL chain, as data: the driver replays it through its own surface, one call per member, in this order — interaction, given*, exclude*, request, response. A chain with 'message' or 'message-request' is a message chain instead (ADR 0068): message, given*, exclude*, message-request, message-contents.",
       "required": ["description"],
       "properties": {
         "description": { "type": "string" },
@@ -159,6 +159,22 @@
             "properties": {
               "name": { "type": "string" },
               "params": { "type": "object" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "description": "'exclude' calls, in order, replayed after 'given' (ADR 0080): each the pairs as [dimension, point], and the reason.",
+          "items": {
+            "type": "object",
+            "required": ["when", "reason"],
+            "properties": {
+              "when": {
+                "type": "array",
+                "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+              },
+              "reason": { "type": "string" }
             },
             "additionalProperties": false
           }
@@ -698,7 +714,7 @@
     },
     "ContractContent": {
       "type": "object",
-      "description": "A contract compared by interaction content only (ADR 0017, contract spec §5–§6): 'interactions' by description, each by its 'states', 'parts' and 'selection'. 'metadata' and the parties are never compared — they are facts about the SDK, deliberately outside content identity.",
+      "description": "A contract compared by interaction content only (ADR 0017, contract spec §5–§6): 'interactions' by description, each by its 'states', 'parts', 'policy' and 'selection'. 'metadata' and the parties are never compared — they are facts about the SDK, deliberately outside content identity.",
       "properties": {
         "interactions": { "type": "array", "items": { "type": "object" } }
       },

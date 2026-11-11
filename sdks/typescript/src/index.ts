@@ -23,6 +23,7 @@ export {
   type ResponseParts,
   type MultiValue,
   type Spellable,
+  type ExcludedPoints,
 } from "./interaction.js";
 export {
   Shape,

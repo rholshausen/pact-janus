@@ -134,7 +134,8 @@
             "nested-shape",
             "options-bag",
             "label",
-            "closure"
+            "closure",
+            "point-list"
           ]
         },
         "description": { "type": "string" }

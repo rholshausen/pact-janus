@@ -87,11 +87,14 @@ export function buildInteraction(janus: Janus, script: InteractionScript): Inter
   return buildHttp(janus, script);
 }
 
-/** A message chain (ADR 0068): message, given*, message-request, message-contents. */
+/** A message chain (ADR 0068): message, given*, exclude*, message-request, message-contents. */
 function buildMessage(janus: Janus, script: InteractionScript): MessageBuilder {
   let message = janus.message(script.description);
   for (const state of script.given ?? []) {
     message = state.params === undefined ? message.given(state.name) : message.given(state.name, stateParams(state.params));
+  }
+  for (const { when, reason } of script.exclude ?? []) {
+    message = message.exclude(when, reason);
   }
   const slots = ({ metadata, body }: MessageSlotsScript) => ({
     ...(metadata === undefined ? {} : { metadata: mapValues(metadata, template) }),
@@ -111,6 +114,9 @@ function buildHttp(janus: Janus, script: InteractionScript): InteractionBuilder 
   for (const state of script.given ?? []) {
     interaction =
       state.params === undefined ? interaction.given(state.name) : interaction.given(state.name, stateParams(state.params));
+  }
+  for (const { when, reason } of script.exclude ?? []) {
+    interaction = interaction.exclude(when, reason);
   }
   if (script.request) {
     const { method, path, query, headers, body } = script.request;

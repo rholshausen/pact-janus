@@ -347,10 +347,11 @@ async function record(testCase: Case, document: Record<string, unknown> | undefi
 /** A contract's interaction content, in the form a case's `contract.content` expects it (ADR 0017). */
 export function contentOf(document: Record<string, unknown>): { interactions: Record<string, unknown>[] } {
   const interactions = ((document.interactions ?? []) as Record<string, unknown>[]).map(
-    ({ description, states, parts, selection }) => ({
+    ({ description, states, parts, policy, selection }) => ({
       description,
       ...(states === undefined ? {} : { states }),
       ...(parts === undefined ? {} : { parts }),
+      ...(policy === undefined ? {} : { policy }),
       ...(selection === undefined ? {} : { selection }),
     }),
   );

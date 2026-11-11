@@ -1,0 +1,27 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/exclude-engine-validates",
+  "category": "live",
+  "title": "An exclusion whose reference matches no dimension is rejected by the engine when the interaction is added, not by the SDK.",
+  "covers": ["session.exclude.engine-validates"],
+  "why": "behavioural spec 'exclude': the SDK checks nothing about an exclusion. The engine resolves its references when the interaction is added (ADR 0080 decision 3), so a reference that matches no dimension fails 'execute' with 'interaction-invalid' before any variant runs.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an exclusion on a field the shape does not have",
+          "exclude": [{ "when": [["deliveredAt", "absent"]], "reason": "an order is never delivered in a test" }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [{ "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] } }]
+            }
+          }
+        }
+      },
+      "expect": { "outcome": { "error": "engine-error", "code": "interaction-invalid" }, "closure-calls": [] }
+    }
+  ]
+}

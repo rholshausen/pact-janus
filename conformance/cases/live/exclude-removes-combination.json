@@ -1,0 +1,61 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/exclude-removes-combination",
+  "category": "live",
+  "title": "An excluded combination is never served, and the contract records the exclusion with its references resolved.",
+  "covers": ["session.exclude.removes-combination"],
+  "why": "behavioural spec 'exclude': no selected variant is inside an exclusion, and the contract records the policy with every reference resolved to its full id (variant semantics spec §3.5, §3.8; ADR 0080 decision 4). 'status' has two points and 'shippedAt' two, so the space is 4 and the selection exhaustive; excluding SHIPPED with no shipping date leaves 3. The SDK wrote 'status' and 'shippedAt', and what the contract records is what only the engine could resolve.",
+  "steps": [
+    {
+      "execute": {
+        "interaction": {
+          "description": "an order that may have shipped",
+          "exclude": [{ "when": [["status", "SHIPPED"], ["shippedAt", "absent"]], "reason": "the order service dates a shipped order" }],
+          "request": { "method": "GET", "path": "/orders/42" },
+          "response": {
+            "status": 200,
+            "body": {
+              "$": "json",
+              "args": [
+                {
+                  "status": { "$": "any-of", "args": ["PENDING", "SHIPPED"] },
+                  "shippedAt": { "$": "optional", "args": [{ "$": "datetime", "args": ["2026-07-30T10:00:00Z"] }] }
+                }
+              ]
+            }
+          }
+        },
+        "closure": { "exchange": { "method": "GET", "path": "/orders/42", "expect-status": 200 } }
+      },
+      "expect": { "outcome": "ok" }
+    },
+    {
+      "finalise": {},
+      "expect": {
+        "outcome": "ok",
+        "contract": {
+          "written": true,
+          "content": {
+            "interactions": [
+              {
+                "description": "an order that may have shipped",
+                "policy": {
+                  "exclude": [
+                    {
+                      "when": [
+                        { "dimension": "response.body.status#value", "point": "SHIPPED" },
+                        { "dimension": "response.body.shippedAt#presence", "point": "absent" }
+                      ],
+                      "reason": "the order service dates a shipped order"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": { "variant-count": 3 }
+}

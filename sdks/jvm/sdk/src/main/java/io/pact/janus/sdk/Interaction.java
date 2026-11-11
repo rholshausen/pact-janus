@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 public final class Interaction {
   private final String description;
   private final List<State> states = new ArrayList<>();
+  private final List<Map<String, Object>> exclusions = new ArrayList<>();
   private Map<String, Shape> request;
   private Map<String, Shape> response;
   /** Part -> slot -> media type, for every body written with {@code content} (contract spec §5.5). */
@@ -76,6 +77,50 @@ public final class Interaction {
       state.setVariantParams(bindings);
     }
     return state;
+  }
+
+  /**
+   * {@code exclude}: leaves a combination the provider cannot produce out of the variants exercised,
+   * saying why (ADR 0080), for example {@code exclude(List.of(Map.entry("status", "SHIPPED"),
+   * Map.entry("shippedAt", "absent")), "the service dates a shipped order")}. Each pair names a
+   * dimension, as {@link VariantBinding#whenVariant} does, and one of its points; the pairs hold
+   * together. Each call is one exclusion, and calls accumulate. The engine checks the references and
+   * the reason when the interaction is added, not this method. The contract still admits the
+   * combination.
+   */
+  public Interaction exclude(List<? extends Map.Entry<String, String>> when, String reason) {
+    exclusions.add(exclusion(when, reason));
+    return this;
+  }
+
+  /** One {@code exclude}, as the {@code policy.exclude} entry it appends, for an interaction or a message. */
+  static Map<String, Object> exclusion(List<? extends Map.Entry<String, String>> when, String reason) {
+    List<Map<String, Object>> points = new ArrayList<>();
+    for (Map.Entry<String, String> pair : Objects.requireNonNull(when, "excluded points")) {
+      Map<String, Object> point = new LinkedHashMap<>();
+      point.put("dimension", pair.getKey());
+      point.put("point", pair.getValue());
+      points.add(point);
+    }
+    Map<String, Object> exclusion = new LinkedHashMap<>();
+    exclusion.put("when", points);
+    exclusion.put("reason", Objects.requireNonNull(reason, "exclusion reason"));
+    return exclusion;
+  }
+
+  /** The {@code policy} member for the exclusions written, or null when there are none. */
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> policy(List<Map<String, Object>> exclusions) {
+    if (exclusions.isEmpty()) {
+      return null;
+    }
+    List<Object> copy = new ArrayList<>();
+    for (Map<String, Object> e : exclusions) {
+      copy.add(Json.MAPPER.convertValue(e, LinkedHashMap.class));
+    }
+    Map<String, Object> policy = new LinkedHashMap<>();
+    policy.put("exclude", copy);
+    return policy;
   }
 
   /** A copy of each state, so a built document shares nothing with the builder. */
@@ -149,6 +194,7 @@ public final class Interaction {
       contentTypes.forEach((part, slots) -> declared.setAdditionalProperty(part, new LinkedHashMap<>(slots)));
       spec.setContentTypes(declared);
     }
+    spec.setPolicy(policy(exclusions));
     return spec;
   }
 

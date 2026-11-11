@@ -63,6 +63,19 @@
       "conformance": [ "state.variant-cases.cases-as-written", "state.variant-cases.empty-refused" ]
     },
     {
+      "id": "exclude",
+      "category": "interaction",
+      "summary": "Leaves a combination of variant points the provider cannot produce out of what is exercised, saying why (ADR 0080).",
+      "produces": [ { "kind": "spec-member", "path": "policy.exclude" } ],
+      "signature": [
+        { "name": "when", "role": "point-list", "description": "The combination: one or more (dimension, point) pairs that hold together. Each dimension is a reference as for 'when-variant', and each point one of its point names." },
+        { "name": "reason", "role": "label", "description": "Why the provider cannot produce the combination. The contract records it." } ],
+      "semantics": "Valid on an interaction ('interaction' and its chain) and on a message ('message' and its chain). Appends { when: [ { dimension, point }, ... ], reason } to the interaction-spec document's 'policy.exclude', in call order: each call is one exclusion, a conjunction of its pairs, and calls accumulate (variant semantics spec §3.5). The pairs are written in the order given, each 'dimension' and 'point' exactly as given, and 'reason' as given. 'policy' is written only when 'exclude' was called, and then holds only 'exclude': the DSL spells no other member of the sampling policy (ADR 0080 decision 2; staged plan S3.2), so a chain that does not call it builds the document it built before. The SDK checks nothing about an exclusion: not that a reference resolves, that the point exists, that the pairs are not empty, or that the reason is not blank. The engine validates the policy and resolves its references when the interaction is added (ADR 0080 decisions 3 and 5), because only the engine computes the variant space, and a second check here could only disagree with it. An exclusion governs what is exercised, never what is admitted: no selected variant is inside it, it is never a coverage target, the selection report records it with its reason, and the contract records the policy with every reference resolved to its full id (variant semantics spec §3.5, §3.8; contract spec §4.1). A provider that sends the excluded combination still passes. Contributes nothing to the variant space.",
+      "errors": [
+        { "code": "interaction-invalid", "surfaced-as": "thrown from 'execute' (this primitive makes no call), with the engine's 'problems' carried verbatim — a reference that resolves to no dimension or to several, or a point the dimension lacks, pointed at '/policy/exclude/<i>/when/<j>'; no pairs at '/policy/exclude/<i>/when'; a blank reason at '/policy/exclude/<i>/reason'" } ],
+      "conformance": [ "session.exclude.policy-written", "session.exclude.accumulates", "session.exclude.on-a-message", "session.exclude.removes-combination", "session.exclude.engine-validates" ]
+    },
+    {
       "id": "request",
       "category": "interaction",
       "summary": "Declares the request part of an HTTP interaction.",

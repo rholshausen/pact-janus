@@ -261,7 +261,8 @@ failed build, a compile-time type error backed by a runtime check — is the sty
 language whose failures are not exceptions maps it to whatever failing a test means there.
 
 `contract.content` compares **interaction content only** (ADR 0017): each interaction by
-description, on the members the case names — `states`, `parts`, `selection` (contract spec §5–§6).
+description, on the members the case names — `states`, `parts`, `policy`, `selection` (contract spec
+§4.1, §5–§6).
 `metadata` and the parties are never compared. Bytes are compared across languages instead: the
 engine writes a contract and an SDK writes its text unchanged (ADR 0063), so a live case's contract
 is the same file whichever SDK wrote it, and `check` fails when two reports' digests differ (§5).

@@ -14,6 +14,12 @@ specification disagree, the behavioural specification wins and this file has a b
   value written where a shape is expected. `when-variant` and `variant-cases` are `whenVariant` and
   `variantCases`, written as a `given` param's value; `variantCases`' default is a trailing optional
   argument, so "no default" and "a default of `undefined`" cannot be confused.
+- `exclude` is a method of both builders, `.exclude(when, reason)`, its `when` a list of
+  `[dimension, point]` tuples (`ExcludedPoints`): `.exclude([["status", "SHIPPED"], ["shippedAt",
+  "absent"]], "the service dates a shipped order")`. A tuple keeps the pairs in the order written, which
+  an object keyed by dimension would too, but it would also let one exclusion name a dimension once
+  only, a limit the specification does not set. The reason is a required argument; whether it is blank
+  is the engine's to say.
 - `message` is `Janus.message`, returning a `MessageBuilder` (ADR 0068): `given` as an interaction's,
   and `message-contents` and `message-request` spelled `contents` and `request` on it, each an options
   bag of `metadata` and `body`. The builder has no `response`, and an `InteractionBuilder` no

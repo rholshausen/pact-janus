@@ -214,7 +214,7 @@ final class Suite {
     ArrayNode interactions = content.putArray("interactions");
     for (JsonNode interaction : document.path("interactions")) {
       ObjectNode kept = interactions.addObject();
-      for (String member : List.of("description", "states", "parts", "selection")) {
+      for (String member : List.of("description", "states", "parts", "policy", "selection")) {
         if (interaction.has(member)) {
           kept.set(member, interaction.get(member));
         }

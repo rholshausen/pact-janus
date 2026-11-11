@@ -1,0 +1,34 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/exclude-on-a-message",
+  "category": "translation",
+  "title": "A message's 'exclude' writes its 'policy.exclude' as an interaction's does.",
+  "covers": ["session.exclude.on-a-message"],
+  "why": "behavioural spec 'exclude': valid on a message ('message' and its chain) as on an interaction, appending to the document's 'policy.exclude' in call order. A message has a variant space as an interaction does (ADR 0067), so a combination its provider cannot produce is excluded the same way.",
+  "interaction": {
+    "description": "an order was placed",
+    "exclude": [{ "when": [["note", "absent"]], "reason": "the shop always writes a note" }],
+    "message": {
+      "body": { "id": { "$": "integer", "args": [42] }, "note": { "$": "optional", "args": ["fragile"] } }
+    }
+  },
+  "expect": {
+    "spec": {
+      "description": "an order was placed",
+      "transport": { "kind": "message", "mode": "emissive" },
+      "parts": {
+        "message": {
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": { "shape": "integer", "example": 42 },
+              "note": { "shape": "optional", "of": { "shape": "equality", "example": "fragile" } }
+            }
+          }
+        }
+      },
+      "content-types": { "message": { "body": "application/json" } },
+      "policy": { "exclude": [{ "when": [{ "dimension": "note", "point": "absent" }], "reason": "the shop always writes a note" }] }
+    }
+  }
+}

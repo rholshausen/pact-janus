@@ -225,7 +225,10 @@ Three sources are the source of truth and take precedence over this file when th
 > gates on one dimension being alternatives. ADR 0080: an interaction specification's `policy` is
 > §3.8's third layer, resolved at `add-interaction` and recorded in the contract, which S3.2's
 > `exclude` writes. ADR 0081: a correlation the consumer relies on is a `oneOf`, and the subsumption
-> walk splits a provider object by the consumer's alternatives.
+> walk splits a provider object by the consumer's alternatives. S3.2 is built: both SDKs' builders have
+> `exclude(when, reason)`, the one sampling-policy member the DSL spells, and
+> `Documentation/native-dsl-review.md` puts the whole native surface to the community before it
+> freezes.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

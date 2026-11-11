@@ -106,13 +106,16 @@ final class Dsl {
     return isMessage(script) ? message(janus, script).toDocument() : interaction(janus, script).toDocument();
   }
 
-  /** A message chain: message, given*, message-request, message-contents. */
+  /** A message chain: message, given*, exclude*, message-request, message-contents. */
   static MessageInteraction message(Janus janus, JsonNode script) {
     MessageInteraction message = janus.message(script.path("description").asText());
     for (JsonNode state : script.path("given")) {
       message = state.has("params")
           ? message.given(state.path("name").asText(), literalMap(state.path("params")))
           : message.given(state.path("name").asText());
+    }
+    for (JsonNode exclusion : script.path("exclude")) {
+      message = message.exclude(pairs(exclusion.path("when")), exclusion.path("reason").asText());
     }
     if (script.has("message-request")) {
       message = message.request(slots -> slots(slots, script.get("message-request")));
@@ -121,6 +124,15 @@ final class Dsl {
       message = message.contents(slots -> slots(slots, script.get("message")));
     }
     return message;
+  }
+
+  /** An exclusion's [dimension, point] pairs, as {@code exclude} takes them. */
+  private static List<Map.Entry<String, String>> pairs(JsonNode when) {
+    List<Map.Entry<String, String>> pairs = new ArrayList<>();
+    for (JsonNode pair : when) {
+      pairs.add(Map.entry(pair.path(0).asText(), pair.path(1).asText()));
+    }
+    return pairs;
   }
 
   private static void slots(MessageSlots slots, JsonNode script) {
@@ -137,6 +149,9 @@ final class Dsl {
       interaction = state.has("params")
           ? interaction.given(state.path("name").asText(), literalMap(state.path("params")))
           : interaction.given(state.path("name").asText());
+    }
+    for (JsonNode exclusion : script.path("exclude")) {
+      interaction = interaction.exclude(pairs(exclusion.path("when")), exclusion.path("reason").asText());
     }
     JsonNode request = script.path("request");
     if (request.isObject()) {

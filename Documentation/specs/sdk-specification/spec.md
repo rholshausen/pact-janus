@@ -142,7 +142,7 @@ primitive's semantics.
   calls, not one document. Naming it structurally, rather than only in prose, is what lets a regenerating
   agent (§8) find every primitive touching a given protocol member when that member's own design changes.
 - **`signature`** names parameters by **role**, not by per-language type: `example-value`,
-  `nested-shape`, `options-bag`, `label`. A role is deliberately coarser than a type, because the concrete
+  `nested-shape`, `options-bag`, `label`, and `point-list` for (dimension, point) pairs. A role is deliberately coarser than a type, because the concrete
   type (a `string` in TypeScript, a `String` in Java, a builder object in either) is the idiomatic layer's
   and the style guide's business (§5), not this document's — fixing types here would make the format
   prescribe an API shape rather than a behaviour. An **empty** `signature` is normative and means the
