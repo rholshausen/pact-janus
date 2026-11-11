@@ -95,6 +95,9 @@ superseding ADR instead.
 | [0076](0076-write-a-facades-conformance-cases-as-tests-in-its-own-language.md) | Write a facade's conformance cases as tests in its own language, and read its verdicts from its migration note | accepted; extended by 0078 |
 | [0077](0077-match-a-multipart-parts-content-type-against-its-own-label.md) | Match a multipart part's content type against its own label | accepted |
 | [0078](0078-run-a-test-framework-integrations-conformance-cases-in-a-project-of-their-own.md) | Run a test-framework integration's conformance cases in a project of their own, through the framework's own runner | accepted |
+| [0079](0079-keep-each-likes-minimum-at-one-and-exercise-a-list-that-may-be-empty-with-an-element-first.md) | Keep `each-like`'s minimum at one, and exercise a list that may be empty with an element first | accepted |
+| [0080](0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md) | Write an exclusion on the interaction, as its own sampling policy | accepted |
+| [0081](0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md) | Write a correlation the consumer relies on as a `one-of`, and split a provider object by its discriminator | accepted |
 
 ## Decision backlog
 
