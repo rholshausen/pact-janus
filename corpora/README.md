@@ -78,7 +78,10 @@ readability:
   and `legacy/upgrade-list-header/` the headers v1–v4 compare as lists, which `janus upgrade` writes as
   one (ADR 0082). `v2-header-rule-each-value/`, its `-mismatch` twin and `v2-header-rule-absent-mismatch/`
   are a header's rule applied to each of its values, as today's verifier applies it, the header itself
-  required.
+  required. `v3-header-accept-media-type/`, `v3-header-accept-list-parameters/` and
+  `v3-header-parameters-as-text-mismatch/` are v1–v4's default header comparison (ADR 0083): `Accept`
+  and `Content-Type` compared as media types, element by element (`legacy:header-value`), and every
+  other header as text, a parameter included (`legacy:header-text`).
 
 `contracts/` pins how a contract is written, not how one matches (contract-file spec §2.4, ADR 0063):
 each case is a `pact.json` and the `contract.janus.json` that `upgrade/pact` writes for it, compared

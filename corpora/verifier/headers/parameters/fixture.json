@@ -1,0 +1,57 @@
+{
+  "description": "An Accept header compared as v1-v4 compare one, as media types element by element, the reply's extra parameters allowed: today's verifier passes each",
+  "source": "staged plan S3.4; pact_matching's match_parameter_header and PARAMETERISED_HEADERS",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/accept-one"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Accept": [
+              "application/json;q=0.9"
+            ]
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/accept-charset"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Accept": [
+              "application/json; charset=UTF-8"
+            ]
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "path": "/accept-list"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Accept": [
+              "application/json;q=1, text/plain"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass",
+  "mutations": true
+}

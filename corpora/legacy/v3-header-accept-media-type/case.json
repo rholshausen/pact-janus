@@ -1,0 +1,53 @@
+{
+  "description": "v1-v4 read Accept and Content-Type as media types (ADR 0083): an Accept the request sends with a quality matches the pact's, and a parameter in another header is text, matched exactly",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get one, as JSON",
+          "request": {
+            "method": "GET",
+            "path": "/one",
+            "headers": {
+              "Accept": "application/json"
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "X-Format": "csv; header=present"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/one",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.request.headers.accept": [
+      "application/json;q=0.9"
+    ],
+    "$.response.headers.x-format": [
+      "csv; header=present"
+    ]
+  },
+  "result": {
+    "status": "matched"
+  }
+}

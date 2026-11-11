@@ -72,7 +72,10 @@ Three more problems come from the same gap:
    `pact_models` read several values, or a value with a comma. Its `elements` are the pact's values joined
    and split as decision 2 splits them. The `rule-narrowed` judgement stays only where a header that
    is not `Content-Type` has a value with parameters (`;`). v1–v4 compare such a value's parameters
-   as a set, extra ones allowed, and an element of `http:list` compares exactly.
+   as a set, extra ones allowed, and an element of `http:list` compares exactly. *Amended 2026-11-11*
+   ([ADR 0083](0083-compare-accept-and-content-type-as-media-types-and-every-other-headers-parameters-as-text.md)):
+   today's verifier reads parameters only in `Accept` and `Content-Type`. An `Accept` of one media
+   type is `http:media-type`, and the judgement is left only on an `Accept` of several elements.
 6. **A header's rule applies to each of its values, as today's verifier applies it.** The legacy
    compiler compiles a header with a rule as a `flow:for-each` over the reply's values, each split as
    today's verifier splits it (`pact_models::headers::parse_header`). Its default comparison,

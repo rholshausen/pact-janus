@@ -99,6 +99,7 @@ superseding ADR instead.
 | [0080](0080-write-an-exclusion-on-the-interaction-as-its-own-sampling-policy.md) | Write an exclusion on the interaction, as its own sampling policy | accepted |
 | [0081](0081-write-a-correlation-the-consumer-relies-on-as-a-one-of-and-split-a-provider-object-by-its-discriminator.md) | Write a correlation the consumer relies on as a `one-of`, and split a provider object by its discriminator | accepted |
 | [0082](0082-compare-a-list-valued-header-as-its-elements-when-the-contract-says-it-is-a-list.md) | Compare a list-valued header as its elements, when the contract says it is a list | accepted |
+| [0083](0083-compare-accept-and-content-type-as-media-types-and-every-other-headers-parameters-as-text.md) | Compare `Accept` and `Content-Type` as media types, and every other header's parameters as text | accepted |
 
 ## Decision backlog
 

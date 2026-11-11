@@ -738,12 +738,16 @@ fn compile_headers(headers: &BTreeMap<String, String>, rules: &MatchingRules, pa
             ),
           ]
         }
-        // The v1-v4 default header comparison (module docs): not plain string equality — a
-        // multi-valued (comma-separated) header tolerates whitespace around the commas, and a
-        // MIME-shaped one (`type/subtype; param=value`) compares type and parameters as a set,
-        // extra actual parameters allowed. Legacy-only: no shape operator needs this.
+        // The v1-v4 default header comparison (module docs): not plain string equality. Whitespace
+        // around a comma is ignored, and the two headers v1–v4 read as media types compare each
+        // element's type and parameters as a set, extra actual parameters allowed; every other
+        // header compares a parameter as text (ADR 0083). Legacy-only: no shape operator needs this.
         None => vec![Node::action(
-          "legacy:header-value",
+          if pact_models::headers::PARAMETERISED_HEADERS.contains(&lower_name.as_str()) {
+            "legacy:header-value"
+          } else {
+            "legacy:header-text"
+          },
           vec![resolve, Node::value(Literal::from_json(&example))],
         )],
       };

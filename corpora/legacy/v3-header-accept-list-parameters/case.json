@@ -1,0 +1,47 @@
+{
+  "description": "v1-v4 compare an Accept of several elements element by element, each as a media type (ADR 0083): the request's quality on the first is allowed",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get one, as JSON or text",
+          "request": {
+            "method": "GET",
+            "path": "/one",
+            "headers": {
+              "Accept": "application/json, text/plain"
+            }
+          },
+          "response": {
+            "status": 200
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/one",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.request.headers.accept": [
+      "application/json;q=1, text/plain"
+    ]
+  },
+  "result": {
+    "status": "matched"
+  }
+}

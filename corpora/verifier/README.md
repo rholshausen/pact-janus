@@ -127,7 +127,11 @@ interaction of a pact it did not fetch is `absent` there too.
   differences (S1.26, ADR 0043).
 - `headers/`: headers v1–v4 compare as lists, framed by the reply another way than the pact writes
   them (S3.3, ADR 0082): `list-values`, a `Vary` with no space after its comma and a `Cache-Control`
-  sent as two field lines, which the upgraded contract compares as `http:list`.
+  sent as two field lines, which the upgraded contract compares as `http:list`. `parameters` is an
+  `Accept` the reply sends with a quality or its charset in another case, one media type and a list
+  of them, which today's verifier compares as media types (S3.4, ADR 0083); the upgraded contract
+  compares the list exactly, as its judgement says. `parameters-exact` is another header with a
+  parameter the reply adds, which today's verifier compares as text and fails.
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
   match and that do not, and mutations. `each-value-nested` puts rules below an `eachValue` matcher's

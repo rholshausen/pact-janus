@@ -232,7 +232,10 @@ Three sources are the source of truth and take precedence over this file when th
 > component's `http:list` (`headerList(...)` in both SDKs), which matches its elements however the
 > field lines frame them; the transport never splits a header, and joins HTTP/2 `Cookie` crumbs. A
 > v1–v4 header's rule applies to each of its values, and `janus upgrade` writes a list header as
-> `http:list`. A contract writes a component operator's members by name.
+> `http:list`. A contract writes a component operator's members by name. S3.4 (ADR 0083): v1–v4 read
+> parameters only in `Accept` and `Content-Type`, as media types element by element; the legacy compiler
+> now does (`legacy:header-value`, and `legacy:header-text` for every other header), and `janus upgrade`
+> writes an `Accept` of one media type as `http:media-type`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

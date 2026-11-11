@@ -28,7 +28,7 @@
           )
         ),
         :"$.X-Ids" (
-          %legacy:header-value (
+          %legacy:header-text (
             $.request.headers.x-ids,
             '1, 2'
           )
@@ -44,7 +44,7 @@
       ),
       :headers (
         :"$.Vary" (
-          %legacy:header-value (
+          %legacy:header-text (
             $.response.headers.vary,
             'Accept, Origin'
           )

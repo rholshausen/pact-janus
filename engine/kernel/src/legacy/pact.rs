@@ -1261,9 +1261,10 @@ pub fn response_parts(response: &HttpResponse) -> Parts {
 ///
 /// The wire form is `{name: [line, …]}` (component-interfaces spec §4's own worked example), and a line
 /// may hold several of a list header's values. A header's rule applies to each value, as today's
-/// (ADR 0082 decision 6), and `legacy:header-value` compares their join. Layered over the generic
-/// [`parts_resolver`](crate::protocol) captures rather than replacing them: `CapturedValues` resolves
-/// against the longest captured prefix, so these win for header paths and change nothing else.
+/// (ADR 0082 decision 6), and `legacy:header-value` or `legacy:header-text` compares their join.
+/// Layered over the generic [`parts_resolver`](crate::protocol) captures rather than replacing them:
+/// `CapturedValues` resolves against the longest captured prefix, so these win for header paths and
+/// change nothing else.
 ///
 /// Permanently HTTP-shaped, like the rest of this module — v1–v4 pacts are HTTP documents by
 /// specification, and the compiler that reads them says so in its own module docs.

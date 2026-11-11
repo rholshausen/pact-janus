@@ -23,6 +23,20 @@
       "reason": "ADR 0048: the contract's generated XML body is written back by the XML component, which declares and quotes the document otherwise than sxd-document, and this provider recognises the body byte for byte; the document is the same"
     },
     {
+      "case": "headers/parameters",
+      "key": "run",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0083: an Accept with several elements upgrades to http:list, which compares each element exactly, where v1-v4 compare each as a media type and allow the reply's extra parameters (here a quality). The upgrade reports it as a rule-narrowed judgement"
+    },
+    {
+      "case": "headers/parameters",
+      "key": "0/2",
+      "pact": "pass",
+      "contract": "fail",
+      "reason": "ADR 0083: an Accept with several elements upgrades to http:list, which compares each element exactly, where v1-v4 compare each as a media type and allow the reply's extra parameters (here a quality). The upgrade reports it as a rule-narrowed judgement"
+    },
+    {
       "case": "matching-rules/array-contains",
       "key": "0/2",
       "pact": "pass",

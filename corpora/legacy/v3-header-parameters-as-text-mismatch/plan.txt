@@ -1,0 +1,41 @@
+(
+  :"get one, with parameters" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/one'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.X-Params" (
+          %legacy:header-text (
+            $.response.headers.x-params,
+            'a;b=1'
+          )
+        )
+      )
+    )
+  )
+)

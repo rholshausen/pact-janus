@@ -27,6 +27,9 @@ const KNOWN: &[(&str, &str)] = &[
   // An OR of rules a shape cannot name as a union: the upgrade keeps the first, which fails where a
   // later alternative passes, saying so.
   ("v3-or-first-alternative-fails", "rule-combination-or"),
+  // An `Accept` of several elements: v1–v4 compare each as a media type, and `http:list` exactly
+  // (ADR 0083).
+  ("v3-header-accept-list-parameters", "rule-narrowed"),
 ];
 
 fn corpus() -> PathBuf {

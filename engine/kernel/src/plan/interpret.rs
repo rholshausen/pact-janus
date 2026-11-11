@@ -1153,17 +1153,20 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       Some(as_u64(&value_of(&children[3])).unwrap_or(0)),
     ),
 
-    "legacy:header-value" => {
+    "legacy:header-value" | "legacy:header-text" => {
       let value = value_of(&children[0]);
       let expected = plain_text(&value_of(&children[1]));
+      let matches = if name == "legacy:header-value" {
+        media_type_values_match
+      } else {
+        header_text_matches
+      };
       match as_header_text(&value) {
         None => failed(
           vec![Marked::plain("Expected a string but got "), shown(&value)],
           locus(children),
         ),
-        Some(actual) if header_values_match(&expected, &actual) => {
-          NodeResult::Value(RuntimeValue::Bool(true))
-        }
+        Some(actual) if matches(&expected, &actual) => NodeResult::Value(RuntimeValue::Bool(true)),
         Some(actual) => failed(
           vec![
             Marked::plain("Expected "),
@@ -1537,38 +1540,54 @@ fn match_temporal(children: &[Executed], default_format: &str, kind_name: &str) 
   }
 }
 
-/// `legacy:header-value` (legacy only, plan task 3.5): v1-v4's default header comparison is not
-/// plain string equality. A MIME-shaped value (`type/subtype; param=value; ...`) compares the base
-/// type case-insensitively and requires every parameter named in `expected` to be present in
-/// `actual` with a case-insensitively equal value — extra parameters on the actual side, or a
-/// different parameter order, don't fail it (spec test cases `matches content type with charset`,
-/// `... with parameters in different order`, `content type parameters do not match`). Otherwise, a
-/// comma-separated value tolerates whitespace around the commas (`whitespace after comma
-/// different`); anything else is exact, case-sensitive equality (`header value is different case`).
+/// `legacy:header-value` (legacy only, plan task 3.5): v1–v4's default comparison of the two headers
+/// they read as media types, `Accept` and `Content-Type` (`pact_models::headers::PARAMETERISED_HEADERS`),
+/// is not plain string equality. Each comma-separated element is compared with the element at its
+/// index, and there must be as many: a MIME-shaped element (`type/subtype; param=value; ...`) compares
+/// the base type case-insensitively and requires every parameter named in `expected` to be present in
+/// `actual` with a case-insensitively equal value — extra parameters on the actual side, or a different
+/// parameter order, don't fail it (spec test cases `matches content type with charset`, `... with
+/// parameters in different order`, `content type parameters do not match`). Anything else is exact,
+/// case-sensitive equality (`header value is different case`), ignoring whitespace around the commas
+/// (`whitespace after comma different`). Every other header is `legacy:header-text` (ADR 0083).
 ///
 /// Deliberately an unnamespaced core action, not a component's: plan-grammar spec §4.4 lists it
 /// as *legacy only*, alongside `legacy:array-contains` and `legacy:min-type`/`max-type` — it encodes
 /// v1–v4's own specified default, the same way `legacy:only-entries` encodes v1–v4's closed-body
 /// default, not a guess the kernel invented (kernel-boundary-review.md finding 2, resolved as
 /// "no change" in that doc's task-4.2 resolution section).
-fn header_values_match(expected: &str, actual: &str) -> bool {
-  if expected.contains(';') || actual.contains(';') {
-    let (expected_type, expected_params) = mime_parts(expected);
-    let (actual_type, actual_params) = mime_parts(actual);
-    return expected_type.eq_ignore_ascii_case(&actual_type)
-      && expected_params.iter().all(|(key, value)| {
-        actual_params
-          .iter()
-          .any(|(k, v)| k.eq_ignore_ascii_case(key) && v.eq_ignore_ascii_case(value))
-      });
+fn media_type_values_match(expected: &str, actual: &str) -> bool {
+  let expected: Vec<&str> = expected.split(',').map(str::trim).collect();
+  let actual: Vec<&str> = actual.split(',').map(str::trim).collect();
+  expected.len() == actual.len()
+    && expected
+      .iter()
+      .zip(&actual)
+      .all(|(expected, actual)| media_type_matches(expected, actual))
+}
+
+fn media_type_matches(expected: &str, actual: &str) -> bool {
+  if !expected.contains(';') && !actual.contains(';') {
+    return expected == actual;
   }
-  if expected.contains(',') || actual.contains(',') {
-    fn split(s: &str) -> Vec<&str> {
-      s.split(',').map(str::trim).collect()
-    }
-    return split(expected) == split(actual);
-  }
-  expected == actual
+  let (expected_type, expected_params) = mime_parts(expected);
+  let (actual_type, actual_params) = mime_parts(actual);
+  expected_type.eq_ignore_ascii_case(&actual_type)
+    && expected_params.iter().all(|(key, value)| {
+      actual_params
+        .iter()
+        .any(|(k, v)| k.eq_ignore_ascii_case(key) && v.eq_ignore_ascii_case(value))
+    })
+}
+
+/// `legacy:header-text` (legacy only, ADR 0083): v1–v4's default comparison of a header they do not
+/// read as a media type. Its text is compared exactly, a parameter as any other character, but for
+/// whitespace around a comma, which RFC 9110 makes optional (`whitespace after comma different`).
+fn header_text_matches(expected: &str, actual: &str) -> bool {
+  expected
+    .split(',')
+    .map(str::trim)
+    .eq(actual.split(',').map(str::trim))
 }
 
 fn mime_parts(value: &str) -> (String, Vec<(String, String)>) {

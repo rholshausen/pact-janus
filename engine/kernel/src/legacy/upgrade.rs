@@ -821,7 +821,7 @@ impl Conversion {
       members.insert(key.clone(), shape);
     }
     if media_type {
-      self.media_type_written(at, decl);
+      self.media_type_written(at, decl, "Content-Type");
     }
     Some(json!({ "shape": "object", "members": members }))
   }
@@ -869,16 +869,17 @@ impl Conversion {
 
   /// A `Content-Type` became `http:media-type` (ADR 0071): the interaction requires the HTTP
   /// component, which a verifier reports by name if it is not loaded, and the finding says so.
-  fn media_type_written(&mut self, at: &Where, decl: &mut Declarations) {
+  fn media_type_written(&mut self, at: &Where, decl: &mut Declarations, header: &str) {
     decl.require("http");
     self.finding(Finding::at(
       "rule-narrowed",
       "note",
       at,
-      "the Content-Type with no matching rule became the component operator 'http:media-type', \
-       which compares it as a media type, as v1–v4 do; the interaction now requires the 'http' \
-       component, which a verifier reports by name if it is not loaded"
-        .to_string(),
+      format!(
+        "the {header} with no matching rule became the component operator 'http:media-type', \
+         which compares it as a media type, as v1–v4 do; the interaction now requires the 'http' \
+         component, which a verifier reports by name if it is not loaded"
+      ),
     ));
   }
 
@@ -930,14 +931,15 @@ impl Conversion {
   /// - with a rule on the header, the rule applies to each value, so the member is an `each-like` of
   ///   the rule's shape, at least one value;
   /// - with rules on its values one by one, each value is its own entry, as for a query parameter;
-  /// - a `Content-Type` with no rule is a media type (ADR 0071);
+  /// - a `Content-Type` with no rule is a media type (ADR 0071), and so is an `Accept` of one media
+  ///   type (ADR 0083): v1–v4 read those two headers' parameters as a set;
   /// - another header with no rule that v1–v4 compare as a list, because `pact_models` read several
   ///   values or a value has a comma, is `http:list` of its elements;
-  /// - any other is its value, exactly.
+  /// - any other is its value, exactly, as v1–v4 compare it, a parameter as any other text.
   ///
-  /// A value with parameters is where the conversion is least exact, and it says so: v1–v4 compare
-  /// the parameters of a value with no rule as a set, extra ones allowed, and only a `Content-Type`
-  /// has an operator for that.
+  /// An `Accept` with several elements is where the conversion is least exact, and it says so: v1–v4
+  /// compare each element as a media type, extra parameters allowed, and `http:list` compares each
+  /// exactly.
   fn headers_slot(
     &mut self,
     rules: &MatchingRules,
@@ -952,8 +954,9 @@ impl Conversion {
     let category = rules_for(rules, "header");
     let mut members = Map::new();
     let mut media_type = false;
+    let mut accept_media_type = false;
     let mut list = false;
-    let mut parameters = false;
+    let mut accept_list = false;
     for (name, values) in &headers {
       let escaped = escape_pointer(name);
       let member = at.push(&format!("/{escaped}"), &format!("/members/{escaped}"));
@@ -975,13 +978,18 @@ impl Conversion {
         let one = BTreeMap::from([(name.clone(), values.clone())]);
         let slot = self.multi_map_slot(category.as_ref(), &one, true, at, Some(&mut media_type));
         slot["members"][name.as_str()].clone()
+      } else if name == "accept"
+        && let [value] = values.as_slice()
+        && is_media_type(value)
+      {
+        accept_media_type = true;
+        json!({ "shape": "array", "entries": [media_type_shape(value)] })
       } else if values.len() > 1 || values.iter().any(|value| value.contains(',')) {
         list = true;
-        parameters |= values.iter().any(|value| value.contains(';'));
+        accept_list |= name == "accept";
         let joined = values.join(", ");
         json!({ "shape": LIST, "elements": list_elements(values), "example": [joined] })
       } else {
-        parameters |= values.iter().any(|value| value.contains(';'));
         let one = BTreeMap::from([(name.clone(), values.clone())]);
         let slot = self.multi_map_slot(category.as_ref(), &one, true, at, None);
         slot["members"][name.as_str()].clone()
@@ -989,7 +997,10 @@ impl Conversion {
       members.insert(name.clone(), shape);
     }
     if media_type {
-      self.media_type_written(at, decl);
+      self.media_type_written(at, decl, "Content-Type");
+    }
+    if accept_media_type {
+      self.media_type_written(at, decl, "Accept header");
     }
     if list {
       decl.require("http");
@@ -1004,14 +1015,14 @@ impl Conversion {
           .to_string(),
       ));
     }
-    if parameters {
+    if accept_list {
       self.finding(Finding::at(
         "rule-narrowed",
         "judgement",
         at,
-        "header values with parameters and no matching rule are compared exactly; v1–v4 compared \
-         their parameters as a set, extra ones allowed, and only a Content-Type has an operator \
-         for that"
+        "an Accept header with several elements and no matching rule became 'http:list', which \
+         compares each element exactly; v1–v4 compared each as a media type, its parameters as a \
+         set, extra ones allowed"
           .to_string(),
       ));
     }
@@ -2772,6 +2783,15 @@ fn text_pattern(rule: &MatchingRule) -> Option<&'static str> {
 /// A `Content-Type` value as `http:media-type` (ADR 0071): its `type` and its example are the pact's.
 fn media_type_shape(value: &str) -> Value {
   json!({ "shape": MEDIA_TYPE, "type": value, "example": value })
+}
+
+/// Whether `http:media-type` reads `value` as a media type: a type and a subtype, neither empty.
+/// An `Accept` that is not one (`alligators`) stays its text, as v1–v4 compare it.
+fn is_media_type(value: &str) -> bool {
+  let essence = value.split(';').next().unwrap_or_default();
+  essence
+    .split_once('/')
+    .is_some_and(|(main, sub)| !main.trim().is_empty() && !sub.trim().is_empty())
 }
 
 /// A pattern for a `Content-Type` that `legacy:body-type` finds agrees with `expected`: the same type

@@ -550,25 +550,61 @@ fn an_opened_request_query_is_reported_with_or_without_a_query_in_the_pact() {
   );
 }
 
-/// A header value with parameters and no rule is where this conversion is least exact: v1–v4
-/// compared its parameters as a set, and `equality` is strictly narrower.
+/// ADR 0083: v1–v4 read parameters only in `Accept` and `Content-Type`. An `Accept` of one media type
+/// becomes `http:media-type`, as a `Content-Type` does; an `Accept` of several is where the
+/// conversion is least exact, and says so; any other header's parameters are text, compared
+/// exactly on both sides, so nothing is narrowed.
 #[test]
-fn narrowing_a_header_comparison_to_equality_is_a_judgement_not_a_silent_tightening() {
-  let upgraded = upgrade(&pact_with(
+fn an_accept_header_is_compared_as_media_types_and_only_a_list_of_them_is_a_judgement() {
+  let one = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/", "headers": { "Accept": "application/json;charset=utf-8" } }),
+    json!({ "status": 200 }),
+  ));
+  assert_eq!(
+    shape(&one, 0, "request", "headers")["members"]["accept"],
+    json!({ "shape": "array", "entries": [{ "shape": "http:media-type",
+            "type": "application/json;charset=utf-8", "example": "application/json;charset=utf-8" }] })
+  );
+  let finding = find(&one.findings, "rule-narrowed");
+  assert_eq!(finding.kind, "note");
+  assert!(finding.message.contains("Accept"), "{}", finding.message);
+  assert!(
+    one.contract.interactions[0]
+      .requires
+      .as_ref()
+      .is_some_and(|requires| requires.iter().any(|r| r.component == "http"))
+  );
+
+  let several = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/", "headers": { "Accept": "application/json, text/plain" } }),
+    json!({ "status": 200 }),
+  ));
+  assert!(
+    several
+      .findings
+      .iter()
+      .any(|f| f.code == "rule-narrowed" && f.kind == "judgement" && f.message.contains("Accept")),
+    "{:?}",
+    several.findings
+  );
+
+  let not_a_media_type = upgrade(&pact_with(
+    json!({ "method": "GET", "path": "/", "headers": { "Accept": "alligators" } }),
+    json!({ "status": 200 }),
+  ));
+  assert_eq!(
+    shape(&not_a_media_type, 0, "request", "headers")["members"]["accept"]["entries"][0]["shape"],
+    "equality"
+  );
+
+  let other = upgrade(&pact_with(
     get_slash(),
     json!({ "status": 200, "headers": { "X-Format": "csv; header=present", "X-Trace": "abc" } }),
   ));
-  let finding = find(&upgraded.findings, "rule-narrowed");
-  assert_eq!(finding.kind, "judgement");
-  assert!(finding.message.contains("parameters"), "{}", finding.message);
-
-  let plain = upgrade(&pact_with(
-    get_slash(),
-    json!({ "status": 200, "headers": { "X-Trace": "abc" } }),
-  ));
   assert!(
-    !plain.findings.iter().any(|f| f.code == "rule-narrowed"),
-    "a value with no parameters and no comma is compared exactly, as v1–v4 compare it"
+    !other.findings.iter().any(|f| f.code == "rule-narrowed"),
+    "v1–v4 compare another header's parameters as text, exactly, as equality does: {:?}",
+    other.findings
   );
 }
 

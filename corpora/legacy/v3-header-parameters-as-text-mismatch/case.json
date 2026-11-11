@@ -1,0 +1,54 @@
+{
+  "description": "v1-v4 read parameters only in Accept and Content-Type (ADR 0083): another header's are text, so a parameter the reply adds is a mismatch",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "consumer"
+      },
+      "provider": {
+        "name": "provider"
+      },
+      "interactions": [
+        {
+          "description": "get one, with parameters",
+          "request": {
+            "method": "GET",
+            "path": "/one"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "X-Params": "a;b=1"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "3.0.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/one",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.x-params": [
+      "a;b=1;c=2"
+    ]
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.headers.x-params",
+        "message": "Expected 'a;b=1;c=2' to equal 'a;b=1'",
+        "action": "legacy:header-text"
+      }
+    ]
+  }
+}

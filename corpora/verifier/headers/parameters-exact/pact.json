@@ -1,0 +1,28 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "orders"
+  },
+  "interactions": [
+    {
+      "description": "get a custom header with parameters",
+      "request": {
+        "method": "GET",
+        "path": "/custom"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Params": "a;b=1"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

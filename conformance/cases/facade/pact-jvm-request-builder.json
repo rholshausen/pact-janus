@@ -46,7 +46,7 @@
                   "headers": {
                     "members": {
                       "accept": {
-                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "entries": [{ "example": "application/json", "shape": "http:media-type", "type": "application/json" }],
                         "shape": "array"
                       },
                       "x-tenant": {
@@ -138,7 +138,7 @@
                   "headers": {
                     "members": {
                       "accept": {
-                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "entries": [{ "example": "application/json", "shape": "http:media-type", "type": "application/json" }],
                         "shape": "array"
                       },
                       "x-order": {
@@ -204,7 +204,7 @@
                   "headers": {
                     "members": {
                       "accept": {
-                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "entries": [{ "example": "application/json", "shape": "http:media-type", "type": "application/json" }],
                         "shape": "array"
                       },
                       "x-request-id": { "entries": [{ "example": "r-1", "shape": "equality" }], "shape": "array" }
@@ -250,7 +250,7 @@
                   "headers": {
                     "members": {
                       "accept": {
-                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "entries": [{ "example": "application/json", "shape": "http:media-type", "type": "application/json" }],
                         "shape": "array"
                       }
                     },

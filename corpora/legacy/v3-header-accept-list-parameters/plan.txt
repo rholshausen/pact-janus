@@ -1,0 +1,41 @@
+(
+  :"get one, as JSON or text" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/one'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Accept" (
+          %legacy:header-value (
+            $.request.headers.accept,
+            'application/json, text/plain'
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,49 @@
+(
+  :"get one, as JSON" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/one'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      ),
+      :headers (
+        :"$.Accept" (
+          %legacy:header-value (
+            $.request.headers.accept,
+            'application/json'
+          )
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.X-Format" (
+          %legacy:header-text (
+            $.response.headers.x-format,
+            'csv; header=present'
+          )
+        )
+      )
+    )
+  )
+)

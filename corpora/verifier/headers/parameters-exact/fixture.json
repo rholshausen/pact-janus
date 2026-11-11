@@ -1,0 +1,28 @@
+{
+  "description": "A header v1-v4 do not read as a media type, with a parameter the reply adds: today's verifier compares its text exactly and fails it",
+  "source": "staged plan S3.4; pact_matching's match_header_value, which reads parameters only for PARAMETERISED_HEADERS",
+  "pacts": [
+    "pact.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/custom"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "X-Params": [
+              "a;b=1;c=2"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

@@ -1,0 +1,54 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "orders"
+  },
+  "interactions": [
+    {
+      "description": "get what the provider accepts, with a quality",
+      "request": {
+        "method": "GET",
+        "path": "/accept-one"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Accept": "application/json"
+        }
+      }
+    },
+    {
+      "description": "get what the provider accepts, its charset in another case",
+      "request": {
+        "method": "GET",
+        "path": "/accept-charset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Accept": "application/json;charset=utf-8"
+        }
+      }
+    },
+    {
+      "description": "get what the provider accepts, a list with a quality",
+      "request": {
+        "method": "GET",
+        "path": "/accept-list"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Accept": "application/json, text/plain"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

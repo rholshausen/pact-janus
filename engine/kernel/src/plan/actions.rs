@@ -68,6 +68,7 @@ const CORE: &[(&str, Option<&str>, usize)] = &[
   ("legacy:max-type", Some("match:max-type"), 3),
   ("legacy:min-max-type", Some("match:min-max-type"), 4),
   ("legacy:header-value", Some("match:header-value"), 2),
+  ("legacy:header-text", None, 2),
   ("legacy:body-type", None, 2),
   ("legacy:message-type", None, 2),
   ("legacy:xml-children", None, 1),

@@ -37,7 +37,7 @@
                   "headers": {
                     "members": {
                       "accept": {
-                        "entries": [{ "example": "application/json", "shape": "equality" }],
+                        "entries": [{ "example": "application/json", "shape": "http:media-type", "type": "application/json" }],
                         "shape": "array"
                       }
                     },

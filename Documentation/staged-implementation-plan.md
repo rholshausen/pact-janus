@@ -2327,6 +2327,20 @@ The RFC's answer to optional fields, delivered to users.
     `each-like`'s cardinality dimension in its recorded space, though it still runs base-only.
 - **S3.4 `upgrade` without the media-type narrowing** — **S**. It already reports the narrowing; with
   S3.3 it stops making it. Moved to S2.16, with S3.3's media-type half.
+  *Done 2026-11-11*, for what S2.16 left ([ADR 0083](decisions/0083-compare-accept-and-content-type-as-media-types-and-every-other-headers-parameters-as-text.md)):
+  - S2.16 made `Content-Type` a media type, and v1–v4 read `Accept` as one too: `janus upgrade` still
+    wrote it as `equality`, failing a quality or a charset in another case its pact passes. It writes an
+    `Accept` of one media type as `http:media-type` now.
+  - Not foreseen: today's verifier reads parameters in those two headers only, and compares `Accept`
+    element by element. The legacy compiler read them in every header, and compared an `Accept` list
+    as one value, so `janus verify` of a pact disagreed with it both ways. `Accept` and `Content-Type`
+    compile to `legacy:header-value`, now element by element, and every other header to a new
+    `legacy:header-text`, a parameter compared as text.
+  - So ADR 0082's parameters judgement was given where nothing was narrowed. It is left only on an
+    `Accept` of several elements, `http:list`, which compares each exactly.
+  - S1.1's fixtures `headers/parameters` and `headers/parameters-exact` pin it against today's
+    verifier; the upgrade ledger has the one judgement's entries. Three legacy corpus cases pin the
+    plans, and `upgrade_agreement.rs` lists the judgement's case.
 - **S3.5 Variant failure reporting in each test framework** — **M**: one test per variant where the
   framework registers tests dynamically, a per-variant result list where it does not, and the exchange
   loop's match decision as an event a host can surface while the run is going (variant ergonomics

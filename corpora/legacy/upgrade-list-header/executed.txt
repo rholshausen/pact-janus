@@ -28,7 +28,7 @@
           ) => BOOL(true)
         ) => BOOL(true),
         :"$.X-Ids" (
-          %legacy:header-value (
+          %legacy:header-text (
             $.request.headers.x-ids => ['1', '2'],
             '1, 2'
           ) => BOOL(true)
@@ -44,7 +44,7 @@
       ) => BOOL(true),
       :headers (
         :"$.Vary" (
-          %legacy:header-value (
+          %legacy:header-text (
             $.response.headers.vary => ['Accept,  Origin'],
             'Accept, Origin'
           ) => BOOL(true)

@@ -28,6 +28,17 @@ fn engine() -> (Engine, String) {
   transports.insert("http".to_string(), Arc::new(HttpTransport::new()));
   let mut engine = Engine::with_components(transports, Some(Arc::new(JsonContent::new())));
   engine.register_background(Arc::new(pact_janus_kernel::protocol::Threads));
+  // The HTTP component's matcher, as the native embeddings register it: an upgraded `Accept` is its
+  // `http:media-type` (ADR 0083).
+  {
+    use pact_janus_component_http::status;
+    engine.register_matcher(
+      status::NAME,
+      "1.0.0",
+      status::ACTIONS,
+      Arc::new(status::HttpMatcher::new()),
+    );
+  }
   send(
     &mut engine,
     "engine/hello",
