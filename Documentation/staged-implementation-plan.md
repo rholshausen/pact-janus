@@ -2525,6 +2525,28 @@ once there are shapes to publish.
     there whatever it declares, and forwarding `matcher/compare` over the component pipe would have no
     caller. That is S5.7. And `live/recorded-shape`'s 404 body was not the sample provider's: its
     `error` is `not-found`, which the case now records.
+- **S4.8 Deriving shapes for message interactions from AsyncAPI** — **M**. Added 2026-11-13. S4.2 derives
+  an HTTP provider's shape from the document it already publishes; a message producer's is an AsyncAPI
+  document, and nothing derives one. The payload is the easy half: AsyncAPI's Schema Object is a JSON
+  Schema superset, so S4.2's mapping, and its reporting of each lossy one, is reused as another front end
+  on the same tool. Each operation's message headers become the `message` part's `metadata`, and its
+  payload the `body`. Only what the documented application sends is a provider shape: `action: send` in
+  AsyncAPI 3, and `subscribe` in 2.x, whose verbs are inverted. A request/reply operation (AsyncAPI 3's
+  `reply`) is a synchronous message (ADR 0067), with its request as the selector.
+  The hard half is identity, and an ADR decides it first. ADR 0025's selector matches over the slots
+  that identify an operation, and an asynchronous message has no request: what identifies its operation
+  is the channel's address and which of the channel's messages it is. A Janus contract records neither,
+  unless the consumer wrote them into `metadata` (ADR 0068 left a message's transport out until S6.2),
+  and a v1–v4 message pact names its message by description alone. Without a decision every derived
+  entry is `not-published`, which is what ADR 0025 was written to end, and its tripwire names this case:
+  a provider that cannot identify an operation from its request slots argues for a transport-owned
+  operation. A message whose kind is a header and a body member together is ADR 0086's tripwire too.
+  The same ADR decides how S4.1's recorder names a message's operation, which S4.6 relies on and
+  ADR 0086 does not say. A payload in another schema format (`schemaFormat`) waits for a component for
+  its content type: protobuf for S5.2, which proves the importer is not JSON-shaped, and Avro for S6.9.
+  *Exit:* an AsyncAPI 3 document and a 2.x one for the same producer import into one shape, which
+  `janus check` matches to a message contract by selector and decides as S4.6 does; each lossy mapping
+  is reported; and a request/reply operation is checked against a synchronous message.
 
 **Done when** the demo's loop runs against a broker built from S4.3's series, with a provider shape
 recorded from a provider's own test suite (S4.1).
@@ -2642,6 +2664,15 @@ content component exists written by someone outside the core team.
   tests first.
   *Exit:* `janus verify` with the option writes a shape with provenance `observed` that `janus check`
   matches by description to every contract the run verified.
+- **S6.9 Avro bodies, and AsyncAPI payloads in Avro** — **M**. Added 2026-11-13, out of S4.8 to keep
+  its scope down: protobuf (S5.2) proves the importer and the walk handle a format that is not JSON, and
+  Avro follows the same path. A content component for Avro decodes a body into a document by its
+  schema, whose source it has to be told: the AsyncAPI document's, or a schema registry's (a Kafka
+  message carries the registry's id ahead of the octets). S4.8's importer then maps an Avro
+  `schemaFormat` payload as it maps a protobuf one. A v1–v4 pact written with today's Avro plugin may
+  reach the engine through S5.2's bridge first.
+  *Exit:* an AsyncAPI document whose payload is Avro imports into a shape that `janus check` decides
+  against a message contract with an Avro body.
 
 **Done when** it never is. Each SDK has its own exit: conformance passing, and the old SDK's example
 suites, consumer and provider, running on its compatibility facade.
@@ -2773,6 +2804,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.1 | Recording names an interaction by the consumer's words and takes decoded values, so no provider's own suite can use it | spike 7.3 §2; found reviewing stage 4 |
 | S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view; `check` on a message contract | broker notes §12 |
 | S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
+| S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
@@ -2782,6 +2814,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |
 | S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |
 | S6.8 | No shape is recorded from verification traffic (`observed`) | ADR 0086 decision 9 |
+| S6.9 | No content component reads Avro, so an AsyncAPI payload in Avro derives no shape | split from S4.8 |
 | SA.3 | The security review an agent with provider access needs | AI-layer notes §4 |
 
 ## 6. Risks
