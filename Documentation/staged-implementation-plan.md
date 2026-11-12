@@ -2390,6 +2390,32 @@ The RFC's answer to optional fields, delivered to users.
     discriminator the value binds.
   - The behavioural specification's `produces` gains a `shape-member` kind, for a primitive that writes
     a member on a node it is given.
+- **S3.7 A test per interaction in provider tests, where the framework can** — **M**. Added 2026-11-12,
+  asked for by a community member. S3.5 made each variant a consumer test in every framework that
+  registers tests dynamically. On the provider side only JUnit 5 has the same: `JanusProviderExtension`'s
+  `@TestFactory` returns one dynamic test per interaction result of one run (S1.15). The native
+  `Verifier` under Vitest, Jest and Spock is one test for the whole run, whose failure lists the failed
+  interactions and whose report (ADR 0059) names the rest, so a CI dashboard shows one failing test
+  where a pact has twenty interactions.
+  - Each framework spells it the way S3.5 does: Spock as a `where:` block over the run's results,
+    Vitest and Jest as ES modules as a call at a file's top level that registers a test per result.
+    Jest from CommonJS cannot register a test after an `await`, so it keeps one test, as it keeps
+    `execute`. Each test is named as the JVM's are: the consumer, the interaction's description, and
+    the variant when it is not the base one. A last test fails a run that failed outright, and is
+    skipped for a filtered one.
+  - First, an ADR decides when the run happens. A file's top level runs before `beforeAll`, and the
+    provider is usually started there. The options are to run at the top level and leave starting the
+    provider to the test file, or to register the tests first from the interactions the pacts record,
+    run once in `beforeAll` and have each test await its own result. The second needs the engine to
+    list a run's interactions and variants before it verifies them, which no operation does yet, and a
+    broker source decides them only when it fetches. Spock evaluates `where:` after `setupSpec`, so it
+    does not have the problem.
+  - pact-js's `Verifier` in `pact-janus/verifier` is a facade and stays one promise, as pact-js's is.
+  - In the behavioural specification first, under `verification`. `framework/provider-test-per-interaction`
+    replaces `provider-extension-test-per-interaction` and runs in JUnit 5, Spock, Vitest and Jest as ES
+    modules.
+  *Exit:* a provider suite with a failing interaction reports that interaction, and only that one, as
+  a failed test in each of those four frameworks.
 
 **Done when** the RFC's consumer example runs natively in both SDKs, the demo runs on them, and the DSL
 is frozen as the major version's surface.
@@ -2616,6 +2642,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S3.3 | `http:media-type`, and list-valued headers | finding 1 |
 | S3.1 | The empty-array default; exclusions in the DSL; correlated fields | findings 2, 35 |
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |
+| S3.7 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12 |
 | S4.4 | A `provenance` selector on exemptions | finding 9B |
 | S4.1, S4.2 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
 | S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view | broker notes §12 |
