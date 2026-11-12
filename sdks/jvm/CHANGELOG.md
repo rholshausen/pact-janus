@@ -1,3 +1,79 @@
+## 0.2.3 (2026-11-12)
+
+### Features
+
+#### `exclude` leaves out a combination the provider cannot produce
+
+`Interaction` and `MessageInteraction` have `exclude(when, reason)` (staged plan S3.2, ADR 0080), the
+pairs a `List` of `Map.Entry<String, String>`, dimension to point:
+
+```java
+janus.interaction("get an order")
+    .exclude(List.of(entry("status", "SHIPPED"), entry("shippedAt", "absent")),
+        "the order service dates a shipped order")
+```
+
+Each call is one exclusion, and calls accumulate. No variant the engine selects is inside an exclusion,
+and the contract records each one with its reason and its references resolved to full ids. The
+contract still admits the combination, so a provider that sends it passes. A reference that names no
+dimension, a point the dimension does not have, and a blank reason fail `execute` with the engine's
+`interaction-invalid`. An interaction that does not call `exclude` builds the document it built before.
+
+#### `Shapes.generated` names a generator on a value
+
+`Shapes.generated(of, generator)` and `Shapes.generated(of, generator, config)` are a value the engine
+produces fresh wherever it is produced, a mock's reply each time it serves one and a verifier's
+request, while the contract records `of`'s example (staged plan S3.6, ADR 0085):
+
+```java
+janus.interaction("get an order")
+    .given("an order exists", map("id", 42))
+    .request(r -> r.method("GET").path(generated("/orders/42", "pact:ProviderState", map("expression", "/orders/${id}"))))
+    .response(r -> r.status(200).body(json(map("id", integer(42), "token", generated(string("a1b2"), "pact:Uuid")))));
+```
+
+The generator is named by its component, `pact:` for the generators pact's DSLs have. `of` is a plain
+value or a value helper's result; a map, a list, a structural helper or one whose value a variant
+chooses throws an `IllegalArgumentException` (write `optional(generated(...))`). A generator nothing
+provides is the engine's `interaction-invalid`, from `execute`.
+
+#### `Shapes.headerList` declares a header that is a list
+
+`Shapes.headerList(Object... elements)` is a header's value whose elements match however the client or
+provider frames them, one field line or several, with any spacing around the commas (staged plan
+S3.3, ADR 0082):
+
+```java
+janus.interaction("list orders")
+    .request(r -> r.method("GET").path("/orders").header("Accept", headerList("application/json", "text/plain")))
+    .response(r -> r.status(200).header("Vary", headerList("Accept", "Origin")));
+```
+
+A mock serves it as one field line, `Accept, Origin`. It is accepted only as a request or response
+header's value; a query value or the literal rules refuse it with an `IllegalArgumentException`. A
+`String` or `List` is still compared as the header's field lines, exactly.
+
+#### Each variant a row of its own under Spock, and what the mock did logged as the test runs
+
+Staged plan S3.5, ADR 0084.
+
+- **Spock**: `janus.variants(interaction)` in a feature's `where:` block answers one `VariantRun` per
+  selected variant, and `janus.run(variant) { mock, v -> }` runs it, failing with the closure's own
+  exception or the engine's verdict. A feature named `"#variant"` unrolls into one iteration per variant,
+  named `label [id]`. A message's rows are `MessageVariantRun`s, run with a `MessageTest`.
+- **What the mock made of each request is logged while the test runs**, to the SLF4J logger
+  `io.pact.janus.engine`: a request it rejected at `warn` (`'get an order' [base]: the request did not
+  match`, then each mismatch), one it matched at `debug`. The SDK asks for the session's events only
+  when an SLF4J provider is bound; with none, the engine's own warning on its stderr says it, as before.
+
+### Fixes
+
+#### The generated bindings carry an interaction's sampling policy
+
+The contract bindings' `InteractionSpec` and `Interaction` have an optional `policy`: the
+interaction's own sampling policy (ADR 0080), which the engine resolves when the interaction is added
+and records in the contract. The SDK writes none yet; S3.2's `exclude` will.
+
 ## 0.2.2 (2026-11-09)
 
 The SDK runs janus-engine 0.5.0, where it ran 0.4.5: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.5.0) says what changed.
