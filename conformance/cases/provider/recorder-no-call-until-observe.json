@@ -1,0 +1,20 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-no-call-until-observe",
+  "category": "provider",
+  "title": "A shape recorder nothing observed with starts no engine, and finishing it sends nothing and writes nothing.",
+  "covers": [
+    "verification.shape-recorder.no-call-until-observe",
+    "verification.finish-recording.nothing-observed"
+  ],
+  "why": "behavioural spec 'shape-recorder': 'makes no protocol call and starts no engine when constructed: the first observe does'; 'finish-recording': 'when nothing was observed, sends nothing, starts no engine and writes nothing'.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": []
+  },
+  "expect": {
+    "ops": [],
+    "written": false
+  }
+}

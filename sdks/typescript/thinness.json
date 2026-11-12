@@ -24,7 +24,8 @@
       "src/message.ts",
       "src/shapes.ts",
       "src/errors.ts",
-      "src/verifier.ts"
+      "src/verifier.ts",
+      "src/recorder.ts"
     ],
     "embedding": [
       "src/engine"
@@ -45,7 +46,7 @@
     ]
   },
   "budgets": {
-    "idiomatic": 1200,
+    "idiomatic": 1350,
     "embedding": 400,
     "loopback": 80,
     "facade": 1550,

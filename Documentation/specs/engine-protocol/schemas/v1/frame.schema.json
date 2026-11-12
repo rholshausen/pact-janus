@@ -55,7 +55,10 @@
             "verification/explain",
             "upgrade/pact",
             "config/load",
-            "events/poll"
+            "events/poll",
+            "provider-shape-session/create",
+            "provider-shape-session/observe",
+            "provider-shape-session/finalise"
           ]
         },
         "body": {

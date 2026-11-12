@@ -1,0 +1,62 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-engine-error",
+  "category": "provider",
+  "title": "An engine error fails observe with that error, and the recorder still finishes.",
+  "covers": [
+    "verification.observe.engine-error-surfaces"
+  ],
+  "why": "behavioural spec 'observe': 'an engine error fails observe with that error, and the recorder can still observe and finish'.",
+  "engine": {
+    "errors": {
+      "provider-shape-session/observe": {
+        "code": "interaction-invalid",
+        "problems": [
+          {
+            "pointer": "/operation",
+            "message": "the operation does not admit the request the provider answered"
+          }
+        ]
+      }
+    }
+  },
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200
+        },
+        "request": {
+          "method": "GET",
+          "path": "/customers/1"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "provider-shape-session/create",
+      "provider-shape-session/observe",
+      "provider-shape-session/finalise"
+    ],
+    "observed": [
+      {
+        "error": "engine-error",
+        "code": "interaction-invalid"
+      }
+    ],
+    "written": true,
+    "engine-closed": true
+  }
+}

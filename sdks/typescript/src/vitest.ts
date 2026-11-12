@@ -2,10 +2,11 @@
 // `finalise` registered as an `afterAll` hook — so it runs after the last test, whether or not the
 // tests passed, and a withheld contract fails the suite (behavioural spec 'finalise').
 
-import { afterAll, test } from "vitest";
+import { afterAll, expect, test } from "vitest";
 import type { InteractionBuilder } from "./interaction.js";
 import { Janus, type Closure, type JanusConfig, type MessageClosure } from "./janus.js";
 import type { MessageBuilder } from "./message.js";
+import { ShapeRecorder, testSource, type ShapeRecorderConfig } from "./recorder.js";
 
 /** The suite's one `Janus`, which can also make each variant a test of its own. */
 export class VitestJanus extends Janus {
@@ -32,4 +33,14 @@ export function useJanus(config: JanusConfig): VitestJanus {
     await janus.finalise();
   });
   return janus;
+}
+
+/** A shape recorder for this test file, at its top level: the file is its source, and it finishes after its tests. */
+export function useShapeRecorder(config: ShapeRecorderConfig): ShapeRecorder {
+  const source = testSource(expect.getState().testPath);
+  const recorder = new ShapeRecorder({ ...(source === undefined ? {} : { source }), ...config });
+  afterAll(async () => {
+    await recorder.finish();
+  });
+  return recorder;
 }

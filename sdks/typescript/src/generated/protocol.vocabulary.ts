@@ -329,6 +329,9 @@ export const RequestFrameOp = {
   UpgradePact: "upgrade/pact",
   ConfigLoad: "config/load",
   EventsPoll: "events/poll",
+  ProviderShapeSessionCreate: "provider-shape-session/create",
+  ProviderShapeSessionObserve: "provider-shape-session/observe",
+  ProviderShapeSessionFinalise: "provider-shape-session/finalise",
 } as const;
 
 /**

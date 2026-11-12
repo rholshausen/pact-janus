@@ -109,6 +109,15 @@ export const content = (mediaType: string, document: Template): Content => new C
  */
 export const headerList = (...elements: (string | number | boolean)[]): HeaderList => new HeaderList(elements);
 
+/**
+ * A path matching `template`, as OpenAPI and every router write one: each `{name}` stands for one or
+ * more characters that are not `/` (behavioural spec 'path-template', ADR 0086). Without an
+ * `example`, the example is the template itself — enough to name an operation a `ShapeRecorder`
+ * observes, but a consumer's request needs one, since a verifier sends it.
+ */
+export const pathTemplate = (template: string, example?: string): Shape =>
+  withExample("http:path", example ?? template, { template } as Partial<shape.Shape>);
+
 export const integer = (example: number): Shape => withExample("integer", example);
 export const number = (example: number): Shape => withExample("number", example);
 export const decimal = (example: number): Shape => withExample("decimal", example);

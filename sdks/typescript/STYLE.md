@@ -35,8 +35,8 @@ specification disagree, the behavioural specification wins and this file has a b
   - `src/generated/` — layer 1, the generated bindings (task 6.1). Never edited, never linted.
   - `src/engine/` — the embedding: `pipe.ts` (the frozen frame pipe), `subprocess.ts` (the
     `janus-engine` embedding), `engine.ts` (typed operations over the pipe).
-  - `src/shapes.ts`, `src/interaction.ts`, `src/message.ts`, `src/janus.ts`, `src/errors.ts` — the
-    idiomatic layer.
+  - `src/shapes.ts`, `src/interaction.ts`, `src/message.ts`, `src/janus.ts`, `src/verifier.ts`,
+    `src/recorder.ts`, `src/errors.ts` — the idiomatic layer.
   - `src/jest.ts` and `src/vitest.ts` — the test-framework integrations, separate entry points
     (`pact-janus/jest`, `pact-janus/vitest`) so the core never imports a test framework.
 - Generated types are used inside the idiomatic layer and appear in its public types where the
@@ -196,6 +196,26 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   its type from the metadata, else its octets.
 - `verify` resolves with the result for `verified` and `filtered` runs: a test that must not pass a
   filtered run checks `result.status`. It rejects with `VerificationFailedError` for `failed`.
+
+## Recording a provider shape
+
+- `new ShapeRecorder({ provider, shapeDir?, evidenceDir?, source?, policy?, engine?, logLevel? })`,
+  then `await recorder.observe(operation, response, { description?, states?, request? })` per answer,
+  then `await recorder.finish()`, which resolves with the path the engine wrote (behavioural spec
+  'shape-recorder', 'observe', 'finish-recording'; ADR 0086). Under Jest or Vitest,
+  `useShapeRecorder(config)` from `pact-janus/jest` or `pact-janus/vitest`, called at a test file's
+  top level, names the file as the source and finishes after its tests, as `useJanus` finalises.
+- `operation` is written as a request's slots are: `{ method: "GET", path: pathTemplate("/orders/{id}") }`.
+  `path-template` is `pathTemplate(template, example?)`, a shape helper like any other.
+- `response` is a `fetch` `Response`, read from a clone, so it is handed over before its body is read,
+  or `{ status, headers?, body? }`: each header a string or its field lines, the body a `Uint8Array` or
+  a string, written as UTF-8. A `Response` carries no method, so `request` is the option's alone.
+- Defaults: `shapeDir` is `shapes` and `evidenceDir` `.janus/evidence`, both under the working
+  directory; `.janus` is a directory a project ignores, as it ignores `node_modules`. `source` is the
+  test file relative to the working directory, written with `/`: `useShapeRecorder`'s, or the one
+  Jest's global `expect` names. With none, `finish` throws a `TypeError` naming `source`.
+- `observe` resolves with the engine's answer, `{ observations, interactions, warnings? }`. A refused
+  call throws a `TypeError`; an engine error a `JanusError`.
 
 ## pact-js's provider API (`pact-janus/verifier`)
 

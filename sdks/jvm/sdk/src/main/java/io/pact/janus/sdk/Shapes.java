@@ -52,6 +52,24 @@ public final class Shapes {
     return new HeaderList(Arrays.asList(elements));
   }
 
+  /**
+   * {@code path-template}: a path matching {@code template}, as OpenAPI and every router write one:
+   * each {@code {name}} stands for one or more characters that are not {@code /} (ADR 0086). Its
+   * example is the template itself — enough to name an operation a {@link ShapeRecorder} observes,
+   * but a consumer's request needs {@link #pathTemplate(String, String)}, since a verifier sends it.
+   */
+  public static ShapeNode pathTemplate(String template) {
+    return pathTemplate(template, template);
+  }
+
+  /** {@code path-template} with the path a verifier sends as its example. */
+  public static ShapeNode pathTemplate(String template, String example) {
+    Shape shape = Literals.node("http:path");
+    shape.setAdditionalProperty("template", Objects.requireNonNull(template, "pathTemplate(template)"));
+    Literals.example(shape, Objects.requireNonNull(example, "pathTemplate(template, example)"), "pathTemplate(...)");
+    return new ShapeNode(shape);
+  }
+
   // ---------------------------------------------------------------------------------------------
   // kind predicates
 

@@ -2440,6 +2440,26 @@ once there are shapes to publish.
   *Exit:* in each SDK, a provider test suite whose tests never name a consumer's interaction records a
   shape, and `janus check` matches it to the demo's contract by selector and finds the `CANCELLED`
   status M5 found.
+  *Done 2026-11-12* (ADR 0086):
+  - `provider-shape-session/observe` takes `operation`, the entry's selector, and the transport's own
+    parts, a body's octets decoded by the engine; the HTTP component runs `http:path`, and selectors
+    run with the engine's matchers. `finalise`'s `write` has the engine's host write the shape from
+    every source's counts. Both SDKs have a `ShapeRecorder` and `pathTemplate`, and seven conformance
+    cases cover them. `live/recorded-shape` pins the shape both write from the sample provider's
+    answers, and `engine/kernel/tests/provider_shape_by_operation.rs` checks it against the demo's
+    contract and the sample provider's pact: matched by operation, it finds `CANCELLED`.
+  - Not foreseen: nothing kept one operation's outcomes apart, so a 404 recorded beside the 200s made
+    every member of the order optional. A transport now declares `outcome-slots` (component-interfaces
+    spec §5.10), HTTP's the status, which the recorder writes into the selector; and an entry naming
+    the interaction's states is used over one naming none (design 2.8 §2.2).
+  - `finalise` answers the shape beside `written`, since the schema check refuses dropping a required
+    member. The frame schema did not name the recording operations. Vitest puts no `expect` on the
+    global object, so the TypeScript SDK's default source comes from `useShapeRecorder` in its Jest and
+    Vitest integrations; the JVM SDK's is the class that made the recorder.
+  - A recorded `Content-Type` against an upgraded pact's `http:media-type` is a review, as the review of
+    stage 4 predicted: S4.7.
+  - Budgets: the TypeScript idiomatic layer moved from 1,200 to 1,350 lines and the JVM's from 2,700 to
+    2,900, each for its recorder.
 - **S4.2 Deriving shapes from OpenAPI and protobuf** — **M**, emitting selectors so they match
   consumer interactions by operation (ADR 0025). Spike 7.3's findings are the specification. Its
   importer and corpus were deleted with the rest of the spike code (S0.12) and are at `b8d5010`. The

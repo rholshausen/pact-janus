@@ -34,6 +34,7 @@ export {
   json,
   content,
   headerList,
+  pathTemplate,
   integer,
   number,
   decimal,
@@ -51,6 +52,13 @@ export {
   eachLike,
   generated,
 } from "./shapes.js";
+export {
+  ShapeRecorder,
+  type ShapeRecorderConfig,
+  type Operation,
+  type RecordedResponse,
+  type ObserveOptions,
+} from "./recorder.js";
 export {
   Verifier,
   type VerifierConfig,

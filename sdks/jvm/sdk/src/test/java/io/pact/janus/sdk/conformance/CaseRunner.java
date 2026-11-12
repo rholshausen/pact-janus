@@ -52,6 +52,8 @@ final class CaseRunner {
         runner.translation();
       } else if (testCase.has("verifier")) {
         ProviderRunner.run(testCase, runner.failures);
+      } else if (testCase.has("recorder")) {
+        RecorderRunner.run(testCase, runner.failures);
       } else {
         runner.session();
       }

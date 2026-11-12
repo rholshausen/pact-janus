@@ -89,6 +89,7 @@
       "description": "'provider' cases: whether the test calls 'verify' once the verifier is configured. false: it configures the verifier and its handlers and stops."
     },
     "provider": { "$ref": "#/$defs/LiveProvider" },
+    "recorder": { "$ref": "#/$defs/Recorder" },
     "steps": {
       "type": "array",
       "minItems": 1,
@@ -113,11 +114,11 @@
     },
     {
       "if": { "properties": { "category": { "const": "live" } }, "required": ["category"] },
-      "then": { "anyOf": [{ "required": ["steps"] }, { "required": ["verifier", "provider", "expect"] }, { "required": ["subjects", "expect"] }] }
+      "then": { "anyOf": [{ "required": ["steps"] }, { "required": ["verifier", "provider", "expect"] }, { "required": ["recorder", "expect"] }, { "required": ["subjects", "expect"] }] }
     },
     {
       "if": { "properties": { "category": { "const": "provider" } }, "required": ["category"] },
-      "then": { "required": ["verifier", "expect"] }
+      "then": { "anyOf": [{ "required": ["verifier", "expect"] }, { "required": ["recorder", "expect"] }] }
     },
     {
       "if": { "properties": { "category": { "const": "framework" } }, "required": ["category"] },
@@ -126,6 +127,59 @@
     }
   ],
   "$defs": {
+    "Recorder": {
+      "type": "object",
+      "description": "The 'shape-recorder' a provider or live case drives (behavioural spec 'shape-recorder', 'observe', 'finish-recording'; ADR 0086), as data. Its provider is always 'orders-api', and the driver gives it a shape directory and an evidence directory of the run's own.",
+      "properties": {
+        "source": { "type": "string", "description": "The 'source' option. Absent: the SDK's default." },
+        "policy": { "type": "object", "description": "The 'policy' option, as given." },
+        "observations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Observation" },
+          "description": "Each 'observe', in order. One that fails is recorded in 'expect.observed', and the driver goes on."
+        },
+        "finish": { "type": "boolean", "default": true, "description": "Whether the driver calls 'finish-recording' after the observations." }
+      },
+      "additionalProperties": false
+    },
+    "Observation": {
+      "type": "object",
+      "required": ["operation", "response"],
+      "properties": {
+        "operation": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/Template" },
+          "description": "The operation: slot name -> template, as a request's slots are written."
+        },
+        "response": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "integer" },
+            "headers": {
+              "type": "object",
+              "additionalProperties": { "type": ["string", "array"], "items": { "type": "string" } },
+              "description": "Each header's value, or its field lines, by its name as written."
+            },
+            "body": {
+              "type": "object",
+              "description": "One of 'text', a string the driver writes as UTF-8, or 'bytes', base64.",
+              "properties": { "text": { "type": "string" }, "bytes": { "type": "string" } },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": { "type": "string" },
+        "states": { "type": "array", "items": { "type": "string" } },
+        "request": {
+          "type": "object",
+          "properties": { "method": { "type": "string" }, "path": { "type": "string" } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "Template": {
       "description": "A value where the DSL expects a shape. Plain JSON is written as itself and compiles by the behavioural spec's 'literal' rule. An object carrying a '$' member is a shape-helper call instead: '$' is the helper's primitive id in behavioural-spec.json, 'args' its arguments in signature order, 'options' its options bag. '{ \"$\": \"literal\", \"args\": [ … ] }' escapes a plain object that would otherwise be read as a call.",
       "$comment": "Deliberately unconstrained: a template is any JSON document, and the '$' convention is a reading of it, not a restriction on it.",
@@ -538,6 +592,19 @@
     "CaseExpectation": {
       "type": "object",
       "properties": {
+        "observed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Outcome" },
+          "description": "A recorder case: how each 'observe' ended, in order."
+        },
+        "written": {
+          "type": "boolean",
+          "description": "A recorder case: whether 'finish-recording' answered a path. When true, it is '<shape directory>/orders-api.provider-shape.json' and a file is there, and the 'finalise' frame's 'write.evidence' is '<evidence directory>/orders-api.json'."
+        },
+        "shape": {
+          "type": "object",
+          "description": "A live recorder case: the provider shape the engine wrote, compared by value."
+        },
         "tests": {
           "type": "array",
           "description": "Cases with subjects: every test the subject has, and how each ended (ADR 0076 decision 1). A TypeScript driver calls them in this order; a JUnit class's run in the order JUnit gives them, and are compared by name. A test with 'fails' must fail, with an error whose message holds each of its strings; one without must pass. A test the subject has and the list does not name fails the case.",

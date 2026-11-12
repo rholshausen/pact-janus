@@ -1,0 +1,68 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-description",
+  "category": "provider",
+  "title": "observe describes an entry by the operation's plain method and path, and sends the request it was told answered.",
+  "covers": [
+    "verification.observe.description-from-operation",
+    "verification.observe.frame"
+  ],
+  "why": "behavioural spec 'observe': 'description', the option when given, else the operation's method and path joined by one space; 'request' { method: { content }, path: { content } } when the request is known, from the 'request' option. A response with no header and no body sends neither slot.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "method": "GET",
+          "path": "/orders"
+        },
+        "response": {
+          "status": 204
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "frames": {
+      "provider-shape-session/observe": {
+        "description": "GET /orders",
+        "operation": {
+          "request": {
+            "method": {
+              "shape": "equality",
+              "example": "GET"
+            },
+            "path": {
+              "shape": "equality",
+              "example": "/orders"
+            }
+          }
+        },
+        "parts": {
+          "response": {
+            "status": {
+              "content": 204
+            }
+          },
+          "request": {
+            "method": {
+              "content": "GET"
+            },
+            "path": {
+              "content": "/orders"
+            }
+          }
+        }
+      }
+    },
+    "observed": [
+      "ok"
+    ],
+    "written": true
+  }
+}

@@ -203,6 +203,7 @@ export interface Case {
   engine?: ScriptedEngine;
   verifier?: VerifierScript;
   verify?: boolean;
+  recorder?: RecorderScript;
   provider?: LiveProvider;
   steps?: Step[];
   expect?: {
@@ -227,7 +228,24 @@ export interface Case {
     invocations?: { status: number; result?: unknown }[];
     "handler-calls"?: HandlerCall[];
     "endpoint-closed"?: boolean;
+    observed?: ("ok" | Outcome)[];
+    written?: boolean;
+    shape?: Record<string, unknown>;
   };
+}
+
+/** A shape recorder as data (README §3): its options and each answer it observes. */
+export interface RecorderScript {
+  source?: string;
+  policy?: Record<string, number>;
+  observations?: {
+    operation: Record<string, unknown>;
+    response: { status: number; headers?: Record<string, string | string[]>; body?: { text?: string; bytes?: string } };
+    description?: string;
+    states?: string[];
+    request?: { method: string; path: string };
+  }[];
+  finish?: boolean;
 }
 
 /** This SDK's language, as its report names it and `conformance/facades.json` names a facade's. */

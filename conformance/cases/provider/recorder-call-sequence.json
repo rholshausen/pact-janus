@@ -1,0 +1,114 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-call-sequence",
+  "category": "provider",
+  "title": "observe starts the engine, creates the session and sends the operation and the answer as the HTTP transport presents one; finish-recording names the shape and evidence files and ends the engine.",
+  "covers": [
+    "verification.observe.call-sequence",
+    "verification.observe.frame",
+    "verification.finish-recording.writes-shape"
+  ],
+  "why": "behavioural spec 'observe': hello, then create with { provider: { name } } and 'policy' as given, then one observe whose 'operation' is { request: each slot compiled by the 'literal' rules }, whose 'description' joins the method and the template, and whose 'parts.response' is the status as a number, the headers by lower-cased name as lists of field lines, and the body's octets as base64 labelled with the first 'content-type' line (component-interfaces spec §5.9). 'finish-recording': finalise with write { path: '<shape directory>/<provider>.provider-shape.json', evidence: '<evidence directory>/<provider>.json', source }, then end the engine (ADR 0086 decision 7).",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "policy": {
+      "min-evidence": 1
+    },
+    "observations": [
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Request-Id": [
+              "a",
+              "b"
+            ]
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"PENDING\"}"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "provider-shape-session/create",
+      "provider-shape-session/observe",
+      "provider-shape-session/finalise"
+    ],
+    "frames": {
+      "provider-shape-session/create": {
+        "provider": {
+          "name": "orders-api"
+        },
+        "policy": {
+          "min-evidence": 1
+        }
+      },
+      "provider-shape-session/observe": {
+        "session": "r-1",
+        "description": "GET /orders/{id}",
+        "operation": {
+          "request": {
+            "method": {
+              "shape": "equality",
+              "example": "GET"
+            },
+            "path": {
+              "shape": "http:path",
+              "template": "/orders/{id}",
+              "example": "/orders/{id}"
+            }
+          }
+        },
+        "parts": {
+          "response": {
+            "status": {
+              "content": 200
+            },
+            "headers": {
+              "content": {
+                "content-type": [
+                  "application/json"
+                ],
+                "x-request-id": [
+                  "a",
+                  "b"
+                ]
+              }
+            },
+            "body": {
+              "content": "eyJpZCI6IjY2Iiwic3RhdHVzIjoiUEVORElORyJ9",
+              "encoded": "base64",
+              "content-type": "application/json"
+            }
+          }
+        }
+      },
+      "provider-shape-session/finalise": {
+        "session": "r-1",
+        "write": {
+          "source": "orders.test"
+        }
+      }
+    },
+    "observed": [
+      "ok"
+    ],
+    "written": true,
+    "engine-closed": true
+  }
+}

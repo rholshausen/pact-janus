@@ -21,6 +21,7 @@ import {
   number,
   oneOf,
   optional,
+  pathTemplate,
   regex,
   string,
   time,
@@ -62,6 +63,7 @@ const helpers: Record<string, (args: unknown[], options: Record<string, unknown>
     options === undefined ? generated(template(args[0]), args[1] as string) : generated(template(args[0]), args[1] as string, options),
   // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
   "header-list": (args) => headerList(...(args as (string | number | boolean)[])) as unknown as Template,
+  "path-template": (args) => pathTemplate(args[0] as string, args[1] as string | undefined),
 };
 
 /** A case's template: plain JSON as written, an object carrying `$` as the helper call it names. */

@@ -20,6 +20,7 @@ import { equal, pointer, show, subset } from "./compare.js";
 import { buildInteraction } from "./dsl.js";
 import { runFramework } from "./framework.js";
 import { runProvider } from "./provider.js";
+import { runRecorder } from "./recorder.js";
 import { runSubject } from "./subject.js";
 import { CONSUMER, PROVIDER, ScriptedPipe } from "./scripted-engine.js";
 
@@ -44,6 +45,8 @@ export async function runCase(testCase: Case): Promise<CaseResult> {
       await runTranslation(testCase, failures);
     } else if (testCase.verifier) {
       await runProvider(testCase, failures);
+    } else if (testCase.recorder) {
+      await runRecorder(testCase, failures);
     } else {
       digest = await runSession(testCase, failures);
     }

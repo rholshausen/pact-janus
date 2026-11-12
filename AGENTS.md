@@ -243,6 +243,12 @@ Three sources are the source of truth and take precedence over this file when th
 > SDKs names a generator on one value, which a mock fills fresh in each reply while the contract records
 > the example; `add-interaction` refuses a generator nothing provides, and a `one-of`'s alternative is
 > filled too.
+> Stage 4 has started, its items reviewed against what stages 1–3 built (S4.7 added; S3.7 moved to
+> stage 6 as S6.6). S4.1 (ADR 0086): a provider's own tests record its shape by the operation each
+> names (`observe`'s `operation`, the entry's selector, with `pathTemplate`, the HTTP component's
+> `http:path`), the answer read as an arrival and its outcome (HTTP's status, a transport's
+> `outcome-slots`) kept apart; `finalise`'s `write` has the engine's host write the shape from every
+> source's counts. Both SDKs have a `ShapeRecorder`, and `live/recorded-shape` pins what they write.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

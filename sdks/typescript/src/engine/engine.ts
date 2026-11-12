@@ -22,6 +22,9 @@ interface Operations {
   [Op.ConfigLoad]: [protocol.Load, protocol.LoadResult];
   [Op.VerificationVerify]: [protocol.Verify, protocol.VerifyResult];
   [Op.EventsPoll]: [protocol.Poll, protocol.PollResult];
+  [Op.ProviderShapeSessionCreate]: [protocol.StartRecording, protocol.StartRecordingResult];
+  [Op.ProviderShapeSessionObserve]: [protocol.ObserveResponse, protocol.ObserveResponseResult];
+  [Op.ProviderShapeSessionFinalise]: [protocol.FinaliseRecording, protocol.FinaliseRecordingResult];
 }
 
 /** The only protocol version this SDK speaks (engine-protocol spec §5). */

@@ -265,6 +265,29 @@ Interaction getOrder = janus.interaction("get an order")
   result's `status()`; a failed run throws `VerificationFailedException`, naming each failure. The run
   is one feature, not one per interaction.
 
+## Recording a provider shape
+
+- `ShapeRecorder.forProvider(provider)`, then `withShapeDir`, `withEvidenceDir`, `withSource`,
+  `withPolicy` and `withEmbedding`, each returning the recorder, then `observe(operation, response)` or
+  `observe(operation, response, options)` per answer, then `finish()`, which returns the path the engine
+  wrote, or null when nothing was observed (behavioural spec 'shape-recorder', 'observe',
+  'finish-recording'; ADR 0086). A test class makes one in a `static` field or `@BeforeAll` and calls
+  `finish()` in `@AfterAll`; a Spock specification makes it `@Shared` and finishes it in `cleanupSpec`.
+- `operation` is a `Map` written as a request's slots are: `Map.of("method", "GET", "path",
+  Shapes.pathTemplate("/orders/{id}"))`. `path-template` is `Shapes.pathTemplate(template)` and
+  `Shapes.pathTemplate(template, example)`.
+- `response` is a `ShapeRecorder.Response`: `new Response(status, headers, body)`, each header's field
+  lines and the body's octets, or `Response.of(httpResponse)` for a `java.net.http`
+  `HttpResponse<byte[]>`, which carries the request it answered, so its method and path are sent as
+  the `request` part. `ShapeRecorder.Options.none()` and its `withDescription`, `withStates` and
+  `withRequest` copies are the options bag.
+- Defaults: the shape directory is `shapes`; the evidence directory is `target/janus/evidence` in a
+  directory with a `pom.xml` and `build/janus/evidence` otherwise, each under the working directory, so
+  `mvn clean` or `gradle clean` clears stale counts. The source is the name of the class that called
+  `forProvider`, found with `StackWalker`, so no test framework is involved.
+- `observe` returns the engine's answer as a `Map`, `warnings` included. A refused call throws
+  `IllegalArgumentException`; an engine error `JanusEngineException`.
+
 ## Logging
 
 - The engine's logs are the JVM's own (ADR 0061): its events go to the SLF4J logger

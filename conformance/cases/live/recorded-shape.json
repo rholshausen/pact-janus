@@ -1,0 +1,369 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/recorded-shape",
+  "category": "live",
+  "title": "A provider's own tests, naming only the operation, record the sample provider's variance as one shape: an entry per status, selected by the operation.",
+  "covers": [
+    "verification.observe.frame",
+    "verification.finish-recording.writes-shape"
+  ],
+  "why": "behavioural spec 'observe' and 'finish-recording' (ADR 0086), against the real engine: the operation becomes each entry's selector, with the status the engine writes into it, the body's octets are decoded as the JSON they are labelled as, and the engine's host writes the shape. These are the answers the sample provider gives (samples/order-service), and engine/kernel/tests/provider_shape_by_operation.rs checks this shape against that provider's consumer pact: it is matched by the operation and finds the CANCELLED status the consumer never tested (staged plan S4.1's exit).",
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"PENDING\",\"channel\":\"web\",\"items\":[{\"sku\":\"sku-0\",\"quantity\":1}]}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"SHIPPED\",\"channel\":\"web\",\"items\":[{\"sku\":\"sku-0\",\"quantity\":1},{\"sku\":\"sku-1\",\"quantity\":2}],\"shippedAt\":\"2026-07-30T09:00:00Z\"}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"PENDING\",\"channel\":\"web\",\"items\":[{\"sku\":\"sku-0\",\"quantity\":1},{\"sku\":\"sku-1\",\"quantity\":2},{\"sku\":\"sku-2\",\"quantity\":3}]}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"CANCELLED\",\"channel\":\"web\",\"items\":[]}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"SHIPPED\",\"channel\":\"web\",\"items\":[{\"sku\":\"sku-0\",\"quantity\":1}],\"shippedAt\":\"2026-07-30T09:00:00Z\"}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"id\":\"66\",\"status\":\"PENDING\",\"channel\":\"web\",\"items\":[{\"sku\":\"sku-0\",\"quantity\":1},{\"sku\":\"sku-1\",\"quantity\":2}]}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/66"
+        }
+      },
+      {
+        "operation": {
+          "method": "GET",
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 404,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "text": "{\"error\":\"not found\",\"id\":\"999\"}"
+          }
+        },
+        "request": {
+          "method": "GET",
+          "path": "/orders/999"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "observed": [
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ],
+    "written": true,
+    "shape": {
+      "$format": "janus-provider-shape/1",
+      "provider": {
+        "name": "orders-api"
+      },
+      "provenance": "recorded",
+      "interactions": [
+        {
+          "description": "GET /orders/{id}",
+          "selector": {
+            "request": {
+              "method": {
+                "example": "GET",
+                "shape": "equality"
+              },
+              "path": {
+                "example": "/orders/{id}",
+                "shape": "http:path",
+                "template": "/orders/{id}"
+              }
+            },
+            "response": {
+              "status": {
+                "example": 200,
+                "shape": "equality"
+              }
+            }
+          },
+          "source": {
+            "observations": 6
+          },
+          "parts": {
+            "response": {
+              "body": {
+                "members": {
+                  "channel": {
+                    "example": "web",
+                    "shape": "equality"
+                  },
+                  "id": {
+                    "example": "66",
+                    "shape": "equality"
+                  },
+                  "items": {
+                    "items": {
+                      "members": {
+                        "quantity": {
+                          "example": 1,
+                          "options": [
+                            1,
+                            2,
+                            3
+                          ],
+                          "shape": "any-of"
+                        },
+                        "sku": {
+                          "example": "sku-0",
+                          "options": [
+                            "sku-0",
+                            "sku-1",
+                            "sku-2"
+                          ],
+                          "shape": "any-of"
+                        }
+                      },
+                      "shape": "object"
+                    },
+                    "max": 3,
+                    "min": 0,
+                    "shape": "each-like"
+                  },
+                  "shippedAt": {
+                    "of": {
+                      "example": "2026-07-30T09:00:00Z",
+                      "shape": "equality"
+                    },
+                    "shape": "optional"
+                  },
+                  "status": {
+                    "example": "CANCELLED",
+                    "options": [
+                      "CANCELLED",
+                      "PENDING",
+                      "SHIPPED"
+                    ],
+                    "shape": "any-of"
+                  }
+                },
+                "shape": "object"
+              },
+              "headers": {
+                "members": {
+                  "content-type": {
+                    "items": {
+                      "example": "application/json",
+                      "shape": "equality"
+                    },
+                    "max": 1,
+                    "min": 1,
+                    "shape": "each-like"
+                  }
+                },
+                "shape": "object"
+              },
+              "status": {
+                "example": 200,
+                "shape": "equality"
+              }
+            }
+          }
+        },
+        {
+          "description": "GET /orders/{id}",
+          "selector": {
+            "request": {
+              "method": {
+                "example": "GET",
+                "shape": "equality"
+              },
+              "path": {
+                "example": "/orders/{id}",
+                "shape": "http:path",
+                "template": "/orders/{id}"
+              }
+            },
+            "response": {
+              "status": {
+                "example": 404,
+                "shape": "equality"
+              }
+            }
+          },
+          "source": {
+            "observations": 1
+          },
+          "parts": {
+            "response": {
+              "body": {
+                "members": {
+                  "error": {
+                    "example": "not found",
+                    "shape": "equality"
+                  },
+                  "id": {
+                    "example": "999",
+                    "shape": "equality"
+                  }
+                },
+                "shape": "object"
+              },
+              "headers": {
+                "members": {
+                  "content-type": {
+                    "items": {
+                      "example": "application/json",
+                      "shape": "equality"
+                    },
+                    "max": 1,
+                    "min": 1,
+                    "shape": "each-like"
+                  }
+                },
+                "shape": "object"
+              },
+              "status": {
+                "example": 404,
+                "shape": "equality"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

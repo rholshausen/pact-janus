@@ -183,6 +183,26 @@ final class ScriptedPipe implements Embedding, FramePipe {
           }
         }
       }
+      case "provider-shape-session/create" -> ok.put("session", "r-1");
+      case "provider-shape-session/observe" ->
+          ok.put("observations", ops.stream().filter("provider-shape-session/observe"::equals).count()).put("interactions", 1);
+      case "provider-shape-session/finalise" -> {
+        // As the engine's host would (ADR 0086 decision 7): the shape to the file the request names.
+        ObjectNode shape = ok.putObject("provider-shape").put("$format", "janus-provider-shape/1");
+        shape.putObject("provider").put("name", "orders-api");
+        shape.put("provenance", "recorded").putArray("interactions");
+        JsonNode write = body.path("write");
+        if (write.has("path")) {
+          try {
+            java.nio.file.Path file = java.nio.file.Path.of(write.path("path").asText());
+            java.nio.file.Files.createDirectories(file.getParent());
+            java.nio.file.Files.writeString(file, shape + "\n");
+          } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+          }
+          ok.set("written", write.get("path"));
+        }
+      }
       default -> {
         // Every other operation is answered with an empty result.
       }

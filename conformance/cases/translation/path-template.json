@@ -1,0 +1,48 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "translation/path-template",
+  "category": "translation",
+  "title": "'path-template' is the HTTP component's http:path, its example the one given, else the template itself.",
+  "covers": [
+    "shape.path-template.compiled"
+  ],
+  "why": "behavioural spec 'path-template' (ADR 0086): it compiles to { shape: 'http:path', template, example }; without an example, the example is the template itself, which its template admits.",
+  "interaction": {
+    "description": "get an order",
+    "request": {
+      "method": "GET",
+      "path": {
+        "$": "path-template",
+        "args": [
+          "/orders/{id}",
+          "/orders/66"
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "self": {
+          "$": "path-template",
+          "args": [
+            "/orders/{id}"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "at": {
+      "/parts/request/path": {
+        "shape": "http:path",
+        "template": "/orders/{id}",
+        "example": "/orders/66"
+      },
+      "/parts/response/body/members/self": {
+        "shape": "http:path",
+        "template": "/orders/{id}",
+        "example": "/orders/{id}"
+      }
+    }
+  }
+}

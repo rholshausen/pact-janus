@@ -1,0 +1,45 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-description-refused",
+  "category": "provider",
+  "title": "observe refuses an operation it cannot describe when no description is given, before any frame is sent.",
+  "covers": [
+    "verification.observe.description-from-operation"
+  ],
+  "why": "behavioural spec 'observe': 'an operation with neither is refused at the call, naming description'. A method written with a shape helper has no plain value to join.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "method": {
+            "$": "regex",
+            "args": [
+              "^(GET|HEAD)$",
+              "GET"
+            ]
+          },
+          "path": {
+            "$": "path-template",
+            "args": [
+              "/orders/{id}"
+            ]
+          }
+        },
+        "response": {
+          "status": 200
+        }
+      }
+    ]
+  },
+  "expect": {
+    "ops": [],
+    "observed": [
+      {
+        "error": "refused"
+      }
+    ],
+    "written": false
+  }
+}

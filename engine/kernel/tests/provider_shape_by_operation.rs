@@ -561,3 +561,41 @@ fn an_entry_about_the_interactions_states_is_used_over_one_about_any_state() {
      the PENDING the stateless entry saw is reported"
   );
 }
+
+#[test]
+fn the_shape_every_sdk_records_is_matched_by_operation_and_finds_its_variance() {
+  // S4.1's exit, across the boundary: `conformance/cases/live/recorded-shape.json` pins the shape both
+  // SDKs write from tests that name only the operation. Checked against the demo's contract, and the
+  // sample provider's consumer pact, it is matched by the operation and finds the CANCELLED status the
+  // consumer never tested (M5). The conformance suite runs every SDK as provider `orders-api`, so each
+  // document is read as that provider's.
+  let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+  let read =
+    |path: &str| -> Value { serde_json::from_slice(&std::fs::read(root.join(path)).unwrap()).unwrap() };
+  let shape = read("conformance/cases/live/recorded-shape.json")["expect"]["shape"].clone();
+
+  for path in [
+    "demo/web-app/contracts/web-app-order-service.janus.json",
+    "samples/order-service/pacts/web-app-order-service.json",
+  ] {
+    let mut contract = read(path);
+    contract["provider"]["name"] = json!("orders-api");
+    let mut engine = engine(None);
+    let checked = send(
+      &mut engine,
+      "subsumption/check",
+      json!({ "contract": contract, "provider-shape": shape.clone() }),
+    );
+    let found = &checked["ok"]["report"]["interactions"][0];
+    assert_eq!(
+      found["description"], "a request for an order",
+      "{path}: {checked:#}"
+    );
+    assert_eq!(found["matched-by"], "selector", "{path}");
+    let status = finding(found, "response.body.status").unwrap_or_else(|| panic!("{path}: {checked:#}"));
+    assert_eq!(
+      status["provider"]["summary"], "one of 'CANCELLED' | 'PENDING' | 'SHIPPED'",
+      "{path}"
+    );
+  }
+}

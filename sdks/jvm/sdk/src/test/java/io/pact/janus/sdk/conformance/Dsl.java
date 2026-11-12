@@ -93,6 +93,9 @@ final class Dsl {
       case "each-like" -> Shapes.eachLike(template(args.path(0)), cardinality(options));
       // Not a shape either: a header's list, accepted only as a header's value (ADR 0082).
       case "header-list" -> Shapes.headerList(literals(args).toArray());
+      case "path-template" -> args.size() > 1
+          ? Shapes.pathTemplate(args.path(0).asText(), args.path(1).asText())
+          : Shapes.pathTemplate(args.path(0).asText());
       // The generator's configuration is the case's options bag, given or not, as written.
       case "generated" -> node.has("options")
           ? Shapes.generated(template(args.path(0)), args.path(1).asText(), literalMap(options))

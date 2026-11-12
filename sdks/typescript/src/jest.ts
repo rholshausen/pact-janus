@@ -3,10 +3,11 @@
 // tests passed, and a withheld contract fails the suite (behavioural spec 'finalise').
 // `@jest/globals` is Jest's own runtime, which gives the hook to an ES module and to `require` alike.
 
-import { afterAll, test } from "@jest/globals";
+import { afterAll, expect, test } from "@jest/globals";
 import type { InteractionBuilder } from "./interaction.js";
 import { Janus, type Closure, type JanusConfig, type MessageClosure } from "./janus.js";
 import type { MessageBuilder } from "./message.js";
+import { ShapeRecorder, testSource, type ShapeRecorderConfig } from "./recorder.js";
 
 /** The suite's one `Janus`, which can also make each variant a test of its own. */
 export class JestJanus extends Janus {
@@ -34,4 +35,14 @@ export function useJanus(config: JanusConfig): JestJanus {
     await janus.finalise();
   });
   return janus;
+}
+
+/** A shape recorder for this test file, at its top level: the file is its source, and it finishes after its tests. */
+export function useShapeRecorder(config: ShapeRecorderConfig): ShapeRecorder {
+  const source = testSource(expect.getState().testPath);
+  const recorder = new ShapeRecorder({ ...(source === undefined ? {} : { source }), ...config });
+  afterAll(async () => {
+    await recorder.finish();
+  });
+  return recorder;
 }

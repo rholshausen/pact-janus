@@ -162,6 +162,20 @@ export class ScriptedPipe implements FramePipe {
           ...(this.#script.refused === undefined ? {} : { refused: this.#script.refused }),
           ...(this.#script["withhold-contract"] ? {} : this.#contract(body.write as protocol.ContractWrite | undefined)),
         };
+      case "provider-shape-session/create":
+        return { session: "r-1" };
+      case "provider-shape-session/observe":
+        return { observations: this.ops.filter((op) => op === "provider-shape-session/observe").length, interactions: 1 };
+      case "provider-shape-session/finalise": {
+        // As the engine's host would (ADR 0086 decision 7): the shape to the file the request names.
+        const shape = { $format: "janus-provider-shape/1", provider: { name: PROVIDER }, provenance: "recorded", interactions: [] };
+        const write = body.write as protocol.ShapeWrite | undefined;
+        if (write !== undefined) {
+          mkdirSync(dirname(write.path), { recursive: true });
+          writeFileSync(write.path, `${JSON.stringify(shape)}\n`, "utf8");
+        }
+        return { "provider-shape": shape, ...(write === undefined ? {} : { written: write.path }) };
+      }
       default:
         return {};
     }
