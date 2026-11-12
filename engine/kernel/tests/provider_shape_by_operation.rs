@@ -418,7 +418,9 @@ fn call(base_url: &str, path: &str) -> Value {
     .call()
     .expect("the provider answers");
   let mut headers: serde_json::Map<String, Value> = serde_json::Map::new();
-  for (name, value) in answer.headers() {
+  // `Date` is the clock: left out, so the recording, and the shape checked in from it, is the same
+  // every run.
+  for (name, value) in answer.headers().iter().filter(|(name, _)| *name != "date") {
     let lines = headers
       .entry(name.as_str().to_ascii_lowercase())
       .or_insert_with(|| json!([]));
@@ -596,5 +598,29 @@ fn the_shape_every_sdk_records_is_matched_by_operation_and_finds_its_variance() 
   assert_eq!(
     checked["ok"]["report"]["interactions"][1]["matched-by"],
     "selector"
+  );
+}
+
+/// The document `samples/order-service/shapes/` holds is *this* recording, not a hand-written
+/// approximation of it: the sample provider's answers, recorded by the operation each names, as a
+/// provider's own tests record them (ADR 0086). Checked in because `janus check` and the demo need a
+/// file to read, and asserted here because a checked-in artifact nobody regenerates has quietly
+/// stopped being true. `SHAPES=overwrite` writes it again, after a deliberate change; read the diff.
+#[test]
+fn the_checked_in_sample_shape_is_what_the_providers_tests_record() {
+  let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .join("../../samples/order-service/shapes/order-service.provider-shape.json");
+  let mut engine = engine(None);
+  let recorded = record_the_sample_provider(&mut engine);
+  if std::env::var("SHAPES").as_deref() == Ok("overwrite") {
+    let text = serde_json::to_string_pretty(&recorded).unwrap() + "\n";
+    std::fs::write(&path, text).unwrap();
+  }
+  let checked_in: Value =
+    serde_json::from_slice(&std::fs::read(&path).unwrap_or_else(|err| panic!("reading {path:?}: {err}")))
+      .unwrap();
+  assert_eq!(
+    checked_in, recorded,
+    "the checked-in provider shape and the recording have diverged; SHAPES=overwrite writes it again"
   );
 }

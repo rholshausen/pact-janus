@@ -6,12 +6,26 @@
   "provenance": "recorded",
   "interactions": [
     {
-      "description": "a request for an order",
-      "states": [
-        {
-          "name": "an order exists"
+      "description": "GET /orders/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders/id",
+            "shape": "http:path",
+            "template": "/orders/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
         }
-      ],
+      },
       "source": {
         "observations": 6
       },
@@ -73,6 +87,120 @@
               }
             },
             "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-length": {
+                "items": {
+                  "example": "114",
+                  "shape": "string"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "equality"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "server": {
+                "items": {
+                  "example": "tiny-http (Rust)",
+                  "shape": "equality"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /orders/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders/id",
+            "shape": "http:path",
+            "template": "/orders/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 404,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "observations": 1
+      },
+      "parts": {
+        "response": {
+          "body": {
+            "members": {
+              "error": {
+                "example": "not-found",
+                "shape": "equality"
+              },
+              "id": {
+                "example": "999",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          },
+          "headers": {
+            "members": {
+              "content-length": {
+                "items": {
+                  "example": "32",
+                  "shape": "equality"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "equality"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "server": {
+                "items": {
+                  "example": "tiny-http (Rust)",
+                  "shape": "equality"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "status": {
+            "example": 404,
+            "shape": "equality"
           }
         }
       }

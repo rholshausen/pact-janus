@@ -1942,8 +1942,9 @@ fn publishing_to_a_broker_nobody_answers_for_fails_and_names_it() {
 // check (plan task 7.4)
 // ---------------------------------------------------------------------------------------------
 
-/// The provider shape the sample provider's own tests recorded (plan task 7.2), checked in beside
-/// its pacts and asserted against the recorder in `engine/kernel/tests/provider_shape_record.rs`.
+/// The provider shape the sample provider's own tests recorded by operation (ADR 0086), checked in
+/// beside its pacts and asserted against the recording in
+/// `engine/kernel/tests/provider_shape_by_operation.rs`.
 fn order_shapes() -> String {
   repo("samples/order-service/shapes")
 }
@@ -1951,7 +1952,8 @@ fn order_shapes() -> String {
 /// The consumer side of M5 as the RFC writes it: a contract that declares two statuses, so the
 /// provider's third shows up as the RFC's own two-line finding. The pact beside the provider
 /// froze one example as `equality` instead, which is a true finding about a narrower claim but
-/// not the sketch.
+/// not the sketch. The sample's shape is recorded by operation (ADR 0086), so the contract records
+/// the request and status a consumer test would, which is what selects the shape's entry.
 ///
 /// Written once per test process: the tests that read it run in parallel, and a rewrite truncates
 /// the file under a `janus check` another test has just started on it.
@@ -1968,7 +1970,10 @@ fn write_order_consumer_contract() -> String {
     "interactions": [
       { "description": "a request for an order",
         "states": [ { "name": "an order exists" } ],
-        "parts": { "response": { "body": {
+        "parts": {
+         "request": { "method": { "shape": "equality", "example": "GET" },
+                      "path": { "shape": "equality", "example": "/orders/66" } },
+         "response": { "status": { "shape": "equality", "example": 200 }, "body": {
           "shape": "object",
           "members": {
             "id": { "shape": "string", "example": "66" },
@@ -1977,7 +1982,11 @@ fn write_order_consumer_contract() -> String {
                        "items": { "shape": "object", "members": {
                          "sku": { "shape": "string", "example": "sku-0" },
                          "quantity": { "shape": "integer", "example": 1 } } } } } } } },
-        "selection": { "variants": [], "report": {} } } ] });
+        "selection": { "variants": [ { "id": "base", "origin": "base", "assignment": [],
+          "parts": { "request": { "method": { "content": "GET" }, "path": { "content": "/orders/66" } },
+                     "response": { "status": { "content": 200 },
+                                   "body": { "content": { "id": "66", "status": "PENDING", "items": [] } } } } } ],
+          "report": {} } } ] });
   std::fs::write(&path, document.to_string()).expect("writing the contract");
   path
 }

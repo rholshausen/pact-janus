@@ -168,12 +168,10 @@ observation names the operation it answered, `GET /orders/{id}` as a method and 
 template, because a provider's own tests do not know a consumer's words, and the shape matches a
 consumer's interaction by that operation and the status it was answered with
 ([ADR 0086](../../Documentation/decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)).
-`engine/kernel/tests/provider_shape_by_operation.rs` records this provider that way, a 404 beside the
-200s, and checks the result against [`pacts/`](pacts/).
-
-`engine/kernel/tests/provider_shape_record.rs` records it by the consumer's description, six responses across
-the states it supports, and the document that comes out says the three things this provider was
-built to say:
+`engine/kernel/tests/provider_shape_by_operation.rs` records this provider that way: six orders
+across the states it supports, and one that does not exist, each fetched as `GET /orders/{id}`. The
+document that comes out has an entry per status, each selected by the operation and the status, and
+the 200's says the three things this provider was built to say:
 
 | Recorded | Why it is there |
 |---|---|
@@ -181,11 +179,13 @@ built to say:
 | `shippedAt: optional(...)` | absent on an order that has not shipped — variance, not an error |
 | `channel` | present on every order and declared by nobody, recorded like any other member because the recorder does not know who asked for what |
 
-Feed that document and the consumer's contract to the subsumption checker (task 7.1) and the result
-is M5, reached from the recording side: **one decided finding**, `response.body.status`, provider
-`'CANCELLED' | 'PENDING' | 'SHIPPED'` against consumer `'PENDING' | 'SHIPPED'`. Nothing about
-`channel` — an extra provider member is must-ignore, and reporting it would teach a team to ignore
-the report.
+The 404's entry holds the error document alone, so it never makes an order's members optional. Feed
+the document and a consumer's contract to the subsumption checker (task 7.1) and the result is M5,
+reached from the recording side: `response.body.status`, provider `'CANCELLED' | 'PENDING' |
+'SHIPPED'` against consumer `'PENDING' | 'SHIPPED'`. Nothing about `channel` — an extra provider
+member is must-ignore, and reporting it would teach a team to ignore the report. The `Date` header
+is left out of the recording, so the document is the same every time it is recorded
+(`SHAPES=overwrite` writes it again).
 
 What a recorded shape claims is worth keeping straight, because it is easy to over-read: *these are
 the shapes my tests produced*. Had this provider's own tests never set up a cancelled order, the
@@ -210,17 +210,13 @@ janus check pacts/web-app-order-service.json --provider-shape shapes/
     consumer has only tested at least one item
   interaction 'a request for an order', response body $.shippedAt:
     provider may produce exactly '2026-07-30T09:00:00Z', or absent
-    consumer has only tested strings matching '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', always present
-  ? interaction 'a request for an order', response body $.shippedAt:
-    provider exactly '2026-07-30T09:00:00Z' cannot be compared against consumer strings matching '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' — review manually
+    consumer has only tested strings matching '^(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)$', always present
   interaction 'a request for an order', response body $.status:
     provider may produce: 'CANCELLED' | 'PENDING' | 'SHIPPED'
     consumer has only tested exactly 'SHIPPED'
   verification: no result supplied
   ! no verification result was supplied for this pair; a contract nobody replayed is not a passing one
-  - 1 of 2 interactions has no published provider shape and was not checked
   ! 3 decided findings: the provider may produce responses this consumer has not tested
-  ! 1 comparison the checker cannot decide either way; a person has to look
   => WARN: web-app -> order-service
 
 WARN: 0 pairs blocked, 1 warned, 0 passed — policy on-finding warn, on-review warn, exemptions as of 2026-09-22
@@ -243,23 +239,23 @@ Now the page carries both halves — `verification: verified (2 of 2 variants)` 
 — and the exit code is 1: the verification passed and the deploy is still a no, which is the entire
 point of a second source of truth. `cli/tests/cli.rs` runs exactly that sequence.
 
-Four things in that output are the sample teaching what the loop costs:
+Four things in that output are the sample teaching what the loop costs, and what it does not:
 
 - **The pact works, and it is noisier than a contract.** `janus check` reads the v3 pact directly
   (converted with design 2.5's rules), so a provider can publish a shape and get an answer about
   consumers who have not migrated. But a conversion freezes each example as `equality`, so `$.status`
   reads "consumer has only tested exactly 'SHIPPED'" where a Janus contract declaring
-  `anyOf('PENDING', 'SHIPPED')` would print the RFC's own second line. Three of the four results are
-  true; the fourth — the `review` at `$.shippedAt`, the recorder's single observed timestamp against
-  the pact's regex — is a comparison the shape language declines to decide and could.
+  `anyOf('PENDING', 'SHIPPED')` would print the RFC's own second line. The three findings are true.
   [Phase-9 finding 9](../../Documentation/prototype/phase-9-findings.md#9-a-converted-pacts-frozen-examples-are-the-consumer-side-of-73s-noise-question)
-  measures both.
+  measures the cost, and the review it once printed at `$.shippedAt`, which task 9.2 decided.
 - **`$.items` says "up to 3 items"** because that is what six recorded responses saw. A recorded
   shape claims what the provider's tests produced, never what it can do — the honesty §2.3 of design
   2.8 ranks the provenances for.
-- **The second interaction is not checked, and says so.** The provider recorded nothing for "a
-  request for an order that does not exist", and a report full of silent passes is what design 2.8
-  §6.3 exists to prevent.
+- **The second interaction is checked, and passes.** "a request for an order that does not exist"
+  selects the entry the provider's 404 was recorded in, by the operation and the status, though no
+  test of the provider's ever used the consumer's words. Its headers pass too: the provider's
+  `Content-Type` against the pact's is decided by the HTTP component (ADR 0087), not left for a
+  person to review.
 - **The `channel` member never appears.** The provider records it, no consumer asked for it, and an
   extra provider member is must-ignore (shape spec §4.3). A checker that reported it would teach a
   team to ignore the report.
