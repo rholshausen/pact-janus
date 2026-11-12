@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794446754524,
+  "lastUpdate": 1794446756829,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -50940,6 +50940,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 47524,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "91aa8be325876daac474f0eb44d9fe0dddfb9ff7",
+          "message": "chore: the demo on the stage 3 DSL, with the SDK installed as a release is\n\nThe demo's consumer now declares shippedAt and excludes the one combination the\nsample provider cannot produce, a SHIPPED order with no shipping date (exclude,\nADR 0080). Before, it left shippedAt out because the DSL had no exclusion. The\nprovider state binds `shipped` to shippedAt's presence. Step 1 selects 6\nvariants. After widening, 4 of 6 fail, and janus check repeats the exclusion's\nreason beside the fields it leaves untested together.\n\nrun.sh packs the TypeScript SDK from the tree with npm pack, the file a release\npublishes, and installs it in the scratch copy as a project installs a\nrelease, in place of a Vitest alias to the SDK's source. JANUS_SDK is no\nlonger read. CI and the rename rehearsal no longer install demo/web-app's\ndependencies themselves.\n\ndemo.gif is recorded again. The tape's terminal is taller (1200px) and its\nwait longer (420s), because step 6's page no longer fit.\n\nThe staged plan says where stage 3's exit stands. The demo stays TypeScript,\nand the JVM SDK's run of the RFC example is OrderConsumerTest. What remains\nis the DSL freeze.\n\nNo-Changeset: the demo, CI and documentation ship in no package.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T12:20:58+11:00",
+          "tree_id": "15ac3e927618ca0b4d62099dd43e9a59bf5cffb0",
+          "url": "https://github.com/rholshausen/pact-janus/commit/91aa8be325876daac474f0eb44d9fe0dddfb9ff7"
+        },
+        "date": 1794446756196,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27800,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 25960,
             "unit": "requests per second",
             "extra": "engines 4"
           }
