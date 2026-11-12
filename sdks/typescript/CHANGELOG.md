@@ -1,3 +1,80 @@
+## 0.2.3 (2026-11-12)
+
+### Features
+
+#### `exclude` leaves out a combination the provider cannot produce
+
+`InteractionBuilder` and `MessageBuilder` have `exclude(when, reason)` (staged plan S3.2, ADR 0080):
+
+```ts
+janus.interaction("get an order")
+  .exclude([["status", "SHIPPED"], ["shippedAt", "absent"]], "the order service dates a shipped order")
+```
+
+Each call is one exclusion, and calls accumulate. No variant the engine selects is inside an exclusion,
+and the contract records each one with its reason and its references resolved to full ids. The
+contract still admits the combination, so a provider that sends it passes. A reference that names no
+dimension, a point the dimension does not have, and a blank reason fail `execute` with the engine's
+`interaction-invalid`. An interaction that does not call `exclude` builds the document it built before.
+
+#### `generated` names a generator on a value
+
+`generated(of, generator, config?)` is a value the engine produces fresh wherever it is produced, a
+mock's reply each time it serves one and a verifier's request, while the contract records `of`'s
+example (staged plan S3.6, ADR 0085):
+
+```ts
+janus.interaction("get an order")
+  .given("an order exists", { id: 42 })
+  .request({ method: "GET", path: generated("/orders/42", "pact:ProviderState", { expression: "/orders/${id}" }) })
+  .response({ status: 200, body: { id: integer(42), token: generated(string("a1b2"), "pact:Uuid") } })
+```
+
+The generator is named by its component, `pact:` for the generators pact's DSLs have. `of` is a plain
+value or a value helper's result; a map, a list, a structural helper or one whose value a variant
+chooses throws a `TypeError` (write `optional(generated(...))`). A generator nothing provides is the
+engine's `interaction-invalid`, from `execute`.
+
+#### `headerList` declares a header that is a list
+
+`headerList(...elements)` is a header's value whose elements match however the client or provider
+frames them, one field line or several, with any spacing around the commas (staged plan S3.3,
+ADR 0082):
+
+```ts
+janus.interaction("list orders")
+  .request({ method: "GET", path: "/orders", headers: { Accept: headerList("application/json", "text/plain") } })
+  .response({ status: 200, headers: { Vary: headerList("Accept", "Origin") } })
+```
+
+A mock serves it as one field line, `Accept, Origin`. It is accepted only as a request or response
+header's value; a query value, a body or another helper refuses it. A plain string or list is still
+compared as the header's field lines, exactly. `HeaderList` and the `HeaderValue` type are exported.
+
+#### Each variant a test of its own under Vitest and Jest, and what the mock did logged as the test runs
+
+Staged plan S3.5, ADR 0084.
+
+- **`await janus.variants(interaction, closure)`**, on the `Janus` that `pact-janus/vitest`'s or
+  `pact-janus/jest`'s `useJanus` returns, registers one test per variant the engine selects, named
+  `label [id]` (`base` for the base variant). Await it at a test file's top level (Vitest also in an
+  async `describe`); Jest needs the file to be an ES module. A failing variant fails only its own test,
+  with its closure's error or the engine's verdict. `variantTests` on any `Janus` answers the same tests
+  as `{ name, run }`, for another framework.
+- **What the mock made of each request is logged while the closure runs**: a request it rejected
+  through `console.warn` (`pact-janus: 'get an order' [base]: the request did not match`, then each
+  mismatch), one it matched through `console.debug`, as `logLevel` (else `LOG_LEVEL`, else `warn`)
+  allows. The SDK asks for the session's events and polls them during each closure, which needs an
+  engine that answers `create` with a `stream`; with an older one it polls nothing.
+
+### Fixes
+
+#### The generated bindings carry an interaction's sampling policy
+
+The contract bindings' `InteractionSpec` and `Interaction` have an optional `policy`: the
+interaction's own sampling policy (ADR 0080), which the engine resolves when the interaction is added
+and records in the contract. The SDK writes none yet; S3.2's `exclude` will.
+
 ## 0.2.2 (2026-11-09)
 
 The SDK runs janus-engine 0.5.0, where it ran 0.4.5: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.5.0) says what changed.

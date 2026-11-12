@@ -1,3 +1,139 @@
+## 0.6.0 (2026-11-12)
+
+### Breaking Changes
+
+#### v1–v4 read parameters in `Accept` and `Content-Type` only, and `janus upgrade` writes an `Accept` as a media type
+
+Staged plan S3.4, ADR 0083.
+
+- **A v1–v4 header with no rule is compared as today's verifier compares it.** `Accept` and
+  `Content-Type` compile to `legacy:header-value`, which compares each comma-separated element with the
+  one at its index, as media types where either has parameters. So `Accept: application/json,
+  text/plain` now passes a reply's `application/json;q=1, text/plain`, as it does today. Every other
+  header compiles to a new legacy action, `legacy:header-text`: its text, ignoring whitespace around a
+  comma, a parameter compared as any other text. So `X-Params: a;b=1` now fails a reply's
+  `a;b=1;c=2`, as it does today, where `janus verify` passed it.
+- **`janus upgrade`** writes an `Accept` of one media type as the HTTP component's `http:media-type`,
+  as it writes a `Content-Type`, so the contract passes a quality or a charset in another case that its
+  pact passes. The interaction requires `http`, with a `rule-narrowed` note. The `rule-narrowed`
+  judgement on headers is left only on an `Accept` of several elements, which is `http:list`; another
+  header with parameters is converted with no judgement, since nothing is narrowed.
+- **Plan grammar.** `legacy:header-text` is a legacy-only action taking two children, the value and the
+  expected text. A plan compiled from a pact with a header other than `Accept` or `Content-Type` names
+  it where it named `legacy:header-value`.
+
+#### The conformance suite holds an SDK to `exclude`
+
+The behavioural specification has an `exclude` primitive (staged plan S3.2, ADR 0080). On an interaction
+or a message, it appends `{ when, reason }` to the document's `policy.exclude`. It writes each pair and
+the reason as given, and checks nothing: the engine resolves the references when the interaction is
+added. Four cases cover it: `translation/exclude-policy`, `translation/exclude-on-a-message`,
+`live/exclude-removes-combination` and `live/exclude-engine-validates`. `janus-sdk-gates conformance
+check` expects them in every report, so an SDK must implement `exclude` to move to this release.
+
+A case's chain takes `exclude`, replayed after `given`, and a contract's content is compared on
+`policy` as well as `states`, `parts` and `selection`. Signature roles gain `point-list`, the role of
+`exclude`'s pairs.
+
+#### A generator nothing provides is refused when the interaction is added, and the conformance suite holds an SDK to `generated`
+
+Staged plan S3.6, ADR 0085.
+
+- **`consumer-session/add-interaction` asks each generator its shapes name once**, on the consumer's
+  side, with its node's example. A `generator` member that is not `{ name, config }`, a name no
+  component provides (`no generator 'pact:Uiud'`) or a configuration its component refuses (`'Regex'
+  is missing a member it needs (regex)`) is `interaction-invalid`, its problem at the node's
+  `generator`, such as `/parts/response/body/members/token/generator`. Before, the mock served the
+  recorded value on every exchange and said so only in its log. `janus upgrade` writes only
+  generators the `pact` component provides, so no upgraded pact, and no interaction a facade
+  converts, is refused by this.
+- **A mock and a verifier fill a generator inside a `one-of`**, in the alternative whose discriminator
+  literal the value binds. Before, nothing below a `one-of` was filled.
+- **The behavioural specification has a `generated` primitive**, and six cases cover it:
+  `translation/generated`, `translation/generated-optional-refused`, `translation/generated-any-of-refused`,
+  `translation/generated-twice-refused`, `live/generated-engine-validates` and `live/generated-served-fresh`.
+  `janus-sdk-gates conformance check` expects them in every report, so an SDK must implement `generated`
+  to move to this release. A live case's exchange may say what the mock served, `expect-body`, and a
+  primitive's `produces` may be a `shape-member`, a member written on the node it is given.
+
+#### A header is a list where the contract says so, and a v1–v4 header's rule applies to each value
+
+Staged plan S3.3, ADR 0082.
+
+- **`http:list`.** The built-in HTTP component runs a new operator, `http:list`, whose member
+  `elements` is a list's elements in order. It admits a header whose field lines, joined with commas
+  and split at each comma outside a quoted string, are those elements: `a, b`, `a,b` and two field
+  lines `a` and `b` all match `elements: ["a", "b"]`. An embedding that registers the HTTP component's
+  matcher actions (`ACTIONS`) gets it with no change.
+- **Headers are field lines.** The HTTP transport never splits a header. A served HTTP/2 or HTTP/3
+  request's `Cookie` crumbs are joined into one line with `"; "`, as HTTP/1.1 sends it.
+- **`janus upgrade`** writes a header v1–v4 compare as a list, with no rule, as `http:list`: a header
+  `pact_models` splits (`Accept`, `Vary`, `Cache-Control`, …) or a value with a comma. A reply that
+  frames the list another way now passes the contract, as it passes the pact. A header with a rule is
+  an `each-like` of the rule's shape with `min: 1`, so its recorded variant space has a cardinality
+  dimension, though a converted interaction still runs base-only. The `rule-narrowed` judgement on
+  headers is left only for a value with parameters.
+- **A v1–v4 header's rule applies to each of its values,** as today's verifier applies it, where it
+  was applied to their join. `janus verify` captures a reply's header as its values, split as
+  `pact_models` splits a list header, and `legacy:header-value` and `legacy:body-type` read several
+  values as their join with `", "`. A plan compiled from a pact with a header rule is a
+  `flow:for-each` over the header's values, behind an `expect:not-empty`.
+- **A contract writes a component operator's members by name,** and each value as it arrived. An
+  existing contract with an `http:media-type` or `http:status-class` node is written with that node's
+  members in another order the next time it is written.
+- **Conformance.** The behavioural specification has a `header-list` primitive, and three ids:
+  `shape.header-list.compiled-on-the-header`, `shape.header-list.headers-only` and
+  `shape.header-list.any-framing`, covered by `translation/header-list`,
+  `translation/header-list-in-a-query`, `translation/header-list-in-a-body` and
+  `live/header-list-any-framing`. `janus-sdk-gates conformance check` expects them in every report,
+  so an SDK must implement `header-list` to move to this release. Four pinned facade contracts record
+  a header rule as an `each-like`.
+
+### Features
+
+#### An empty list is opt-in and covers nothing inside it, an interaction carries its own sampling policy, and a provider object is split by a consumer's union
+
+These are staged plan S3.1's decisions (gate D, ADRs 0079–0081).
+
+- **`janus upgrade` writes a bare `type` rule on an array as `each-like` with `min: 0`.** A v1–v4 pact
+  that names no length admits an empty list, and the contract now does too. The `rule-narrowed`
+  finding for it is gone. pact-jvm's `eachLike` and `eachArrayLike` keep their meaning through the
+  facade, so the `facade/pact-jvm-matchers-collections` conformance case now pins `min: 0` for both.
+  A pact that states a `min` or a `max` converts as before.
+- **A list whose `min` is 0 is exercised with an element first.** Its cardinality dimension's default
+  is `min+1`, and the dimensions inside it are gated by every point with an element. The variant-space
+  document writes one gate per point. Gates that name one dimension are alternatives, which no earlier
+  engine wrote. The empty list is the minimal boundary variant, and it assigns nothing inside the list.
+  The selection for such a list changes. A contract already recorded verifies as before, because a
+  verifier replays what the contract recorded. Selections of spaces with no `min: 0` list do not change.
+- **An interaction specification may carry `policy`**, a sampling-policy document, applied between the
+  session's policy and the `variants` call's. Its pins' and exclusions' references are resolved at
+  `add-interaction`. A reference that names nothing, a point the dimension does not have, or an
+  exclusion with an empty reason is `interaction-invalid` there. The contract records `policy` on the
+  interaction with full dimension ids.
+- **An exclusion is reported under `exhaustive`**, with the variants it removed. Before, it was reported
+  only under `t-wise`.
+- **The subsumption walk splits a provider object against a consumer `one-of`.** When the provider's
+  discriminator is an `equality` or an `any-of`, the object is compared once per consumer alternative
+  its literals reach. A literal no alternative binds is `wider-values`. Before, any provider that bound
+  more than one literal was `unknown`.
+
+#### A consumer session can tell what its mock made of each request, as it happens
+
+Staged plan S3.5, ADR 0084.
+
+- **`consumer-session/create` takes `events: true`** and answers with `stream`, which `events/poll`
+  drains. Each request a started transport receives is a `consumer-session/exchange` event: the
+  transport instance, `status` (`matched`, `mismatched`, `undelivered`, or `unmatched` when nothing was
+  armed), and the `handle` and `variant` it went to, with `mismatches`, redacted as `report-variant`'s
+  are. `finalise` ends the stream with `consumer-session/finished`, without waiting for the host to
+  drain it.
+- **The engine's own log line drops to `debug`** for a session whose host asked for events, since the
+  host says it: `request did not match the armed variant` and `inbound request arrived with nothing
+  armed` are `warn` only in a session with no stream.
+- A session created without `events` behaves as before. A host that asks must drain the stream: a
+  thousand undrained requests stall the mock until it does.
+
 ## 0.5.0 (2026-11-09)
 
 ### Breaking Changes
