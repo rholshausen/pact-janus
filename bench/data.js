@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794464403616,
+  "lastUpdate": 1794464405559,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -51648,6 +51648,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19552,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "a4b0009c88df0259dd86c7b157d727eaabce153c",
+          "message": "feat: S4.1 both SDKs record a provider shape from the provider's own tests\n\nADR 0086, the SDK half, which meets S4.1's exit. The behavioural\nspecification has path-template (the HTTP component's http:path) and\nshape-recorder, observe and finish-recording: the first observe starts\nthe engine and creates the session, each observe sends the operation\nthe test names and the answer as the HTTP transport presents one, the\nbody's octets for the engine to decode, and finish-recording has the\nengine's host write the shape, from every source's counts, and ends the\nengine.\n\nTypeScript: ShapeRecorder and pathTemplate, and useShapeRecorder in the\nJest and Vitest integrations, which names the test file as the source,\nsince Vitest puts no expect on the global object, and finishes after\nthe file's tests. A fetch Response is read from a clone. JVM:\nShapeRecorder.forProvider, whose source is the calling class, found\nwith StackWalker, and Shapes.pathTemplate. Response.of reads a\njava.net.http response with the request it answered.\n\nSeven conformance cases cover the primitives, and both drivers run them;\na case may have a recorder, and expect observed, written and shape.\nlive/recorded-shape pins the shape both SDKs write from the sample\nprovider's answers, and the kernel test checks that shape against the\ndemo's contract and the sample provider's pact: matched by operation,\nit finds CANCELLED. The frame schema now names the recording operations.\n\nBudgets: the TypeScript idiomatic layer moves from 1,200 to 1,350 code\nlines and the JVM's from 2,700 to 2,900, each for its recorder, which\nis the provider side's second primitive family after the verifier.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T16:55:47+11:00",
+          "tree_id": "1ef34d8830ee58f58070cd87220b1860f52caf78",
+          "url": "https://github.com/rholshausen/pact-janus/commit/a4b0009c88df0259dd86c7b157d727eaabce153c"
+        },
+        "date": 1794464405097,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 19704,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19697,
             "unit": "requests per second",
             "extra": "engines 4"
           }
