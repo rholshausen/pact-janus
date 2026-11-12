@@ -2446,8 +2446,10 @@ once there are shapes to publish.
     run with the engine's matchers. `finalise`'s `write` has the engine's host write the shape from
     every source's counts. Both SDKs have a `ShapeRecorder` and `pathTemplate`, and seven conformance
     cases cover them. `live/recorded-shape` pins the shape both write from the sample provider's
-    answers, and `engine/kernel/tests/provider_shape_by_operation.rs` checks it against the demo's
-    contract and the sample provider's pact: matched by operation, it finds `CANCELLED`.
+    answers, and `engine/kernel/tests/provider_shape_by_operation.rs` checks it against the sample
+    provider's pact, the pair the demo uses: matched by operation, it finds `CANCELLED`. The demo's own
+    contract is written when the demo runs and is not in the repository, so CI does not check against it;
+    the demo still checks the description-matched shape task 7.2 recorded.
   - Not foreseen: nothing kept one operation's outcomes apart, so a 404 recorded beside the 200s made
     every member of the order optional. A transport now declares `outcome-slots` (component-interfaces
     spec §5.10), HTTP's the status, which the recorder writes into the selector; and an entry naming
