@@ -415,10 +415,6 @@ jobs:
       # longer shows what the report says it shows fails here. It is a bash walkthrough built on
       # symbolic links and job control, so it runs where those exist; on Windows the CLI, the engine
       # and the SDK it strings together are each covered by their own suites above.
-      - name: Install the demo's dependencies
-        if: runner.os != 'Windows'
-        run: npm ci
-        working-directory: demo/web-app
       - name: The demo runs
         if: runner.os != 'Windows'
         run: demo/run.sh --ci

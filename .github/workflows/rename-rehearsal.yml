@@ -128,6 +128,4 @@ jobs:
         working-directory: cli/tests/${{ env.PLACEHOLDER }}-engine-node
         run: npm ci && npm test
       - name: The demo runs
-        run: |
-          (cd demo/web-app && npm ci)
-          demo/run.sh --ci
+        run: demo/run.sh --ci

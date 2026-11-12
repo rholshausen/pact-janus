@@ -12,8 +12,9 @@
 #   --pace N      wait N seconds between steps instead (what demo.tape records)
 #   --ci          no pauses; check every step's outcome and exit non-zero if one differs
 #
-# Needs cargo, and Node >= 22.6 with npm. Nothing in the repo is modified: the web app is copied to a
-# scratch directory and the steps are patched into the copy.
+# Needs cargo, and Node >= 22.6 with npm. Nothing in the repo is modified but build output: the web app
+# is copied to a scratch directory, the TypeScript SDK is packed from this tree and installed there as a
+# user installs a release's tarball, and the steps are patched into the copy.
 
 set -euo pipefail
 
@@ -66,15 +67,22 @@ trap cleanup EXIT
 
 say "building janus, janus-engine and the sample provider…"
 (cd "$repo" && cargo build -q -p pact_janus_cli -p pact_janus_sample_order_service)
-[[ -d "$demo/web-app/node_modules" ]] || (cd "$demo/web-app" && npm ci --silent --no-audit --no-fund)
+say "packing the TypeScript SDK…"
+sdk="$repo/sdks/typescript"
+[[ -d "$sdk/node_modules" ]] || (cd "$sdk" && npm ci --silent --no-audit --no-fund)
+# The file a release publishes (`npm pack`'s tarball, ADR 0060), built from this tree, so the demo
+# always runs the DSL as it stands.
+(cd "$sdk" && npm pack --silent --pack-destination "$work" >/dev/null)
+tarball="$(echo "$work"/pact-janus-*.tgz)"
 
 export PATH="$repo/target/debug:$PATH"
 export JANUS_ENGINE="$repo/target/debug/janus-engine"
-export JANUS_SDK="$repo/sdks/typescript/src"
 
 mkdir -p "$work/web-app" "$work/order-service"
-cp -r "$demo/web-app/src" "$demo/web-app/test" "$demo/web-app/package.json" "$demo/web-app/vitest.config.ts" "$work/web-app/"
-ln -s "$demo/web-app/node_modules" "$work/web-app/node_modules"
+cp -r "$demo/web-app/src" "$demo/web-app/test" "$demo/web-app/package.json" "$demo/web-app/package-lock.json" \
+  "$demo/web-app/vitest.config.ts" "$work/web-app/"
+# What a project does with a release: `npm install` its tarball, beside its own dependencies.
+(cd "$work/web-app" && npm install --silent --no-save --no-audit --no-fund --prefer-offline "$tarball")
 cp -r "$repo/samples/order-service/verifier.janus.yaml" "$repo/samples/order-service/hooks" \
   "$repo/samples/order-service/shapes" "$work/order-service/"
 cd "$work"
@@ -102,11 +110,12 @@ consumer_test() {
       const c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
       const vs = c.interactions[0].selection.variants;
       console.log(`  the contract records ${vs.length} variants, each one exercised:`);
+      // the label form the engine uses: each dimension id shortened to its last path segment
+      const label = (v) => v.id.replace(/response\.body\.(\w+)#\w+=/g, "$1=");
+      const width = Math.max(...vs.map((v) => label(v).length));
       for (const v of vs) {
-        // the label form the engine uses: each dimension id shortened to its last path segment
-        const label = v.id.replace(/response\.body\.(\w+)#\w+=/g, "$1=");
         const p = v.states[0].params;
-        console.log(`    ${label.padEnd(28)} provider state: status=${p.status}, items=${p.items}`);
+        console.log(`    ${label(v).padEnd(width)}  provider state: status=${p.status}, shipped=${p.shipped}, items=${p.items}`);
       }' "$contract"
   else
     printf '%s✗ shows an order%s\n' "$red" "$reset"
@@ -120,7 +129,8 @@ consumer_test() {
 
 step "1. The consumer's test"
 say "web-app shows orders from order-service. Its contract says an order's status is PENDING or"
-say "SHIPPED, and it has at least one item. The provider states say how to produce each variant."
+say "SHIPPED, it may have a shipping date, and it has at least one item. The provider states say how"
+say "to produce each variant, and the exclusion names the one combination the provider cannot."
 say "test/orders.test.ts:"
 sed -n '/const getOrder/,/^  });/p' web-app/test/orders.test.ts
 pause

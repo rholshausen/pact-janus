@@ -4,6 +4,7 @@
 export interface Order {
   id: string;
   status: string;
+  shippedAt?: string;
   items: { sku: string; quantity: number }[];
 }
 
@@ -24,13 +25,14 @@ const STATUS = new Map([
   ["SHIPPED", "on its way"],
 ]);
 
-/** "Order 42 (on its way): 1 × sku-0 and 1 more" */
+/** "Order 42 (on its way, shipped 2026-07-30): 1 × sku-0 and 1 more" */
 export function summarise(order: Order): string {
   const status = STATUS.get(order.status);
   if (status === undefined) {
     throw new Error(`unknown order status '${order.status}'`);
   }
+  const shipped = order.shippedAt === undefined ? "" : `, shipped ${order.shippedAt.slice(0, 10)}`;
   const [first, ...rest] = order.items;
   const more = rest.length > 0 ? ` and ${rest.length} more` : "";
-  return `Order ${order.id} (${status}): ${first.quantity} × ${first.sku}${more}`;
+  return `Order ${order.id} (${status}${shipped}): ${first.quantity} × ${first.sku}${more}`;
 }

@@ -2394,6 +2394,17 @@ The RFC's answer to optional fields, delivered to users.
 **Done when** the RFC's consumer example runs natively in both SDKs, the demo runs on them, and the DSL
 is frozen as the major version's surface.
 
+*Where the exit stands, 2026-11-12*: the first two hold, and the freeze waits on the review.
+- The RFC's consumer example runs in both SDKs against the real engine:
+  `sdks/typescript/test/rfc-example.test.ts`, the JVM SDK's `OrderConsumerTest` and `EndToEndTest`, and
+  `conformance/cases/translation/rfc-order-body.json` for both.
+- The demo stays TypeScript, since its consumer is a web app. The JVM SDK's run of the same loop is
+  `OrderConsumerTest`. `demo/run.sh` now installs the SDK as a project does, from the tarball `npm pack`
+  builds from the tree (the file a release publishes), not through an alias to its source. Its consumer
+  declares `shippedAt` and excludes the one combination the sample provider cannot produce, which it left
+  out before because the DSL had no `exclude`. `demo.gif` is recorded again.
+- The DSL is frozen when [`native-dsl-review.md`](native-dsl-review.md)'s answers are in.
+
 ### Stage 4: Provider shapes and the subsumption check — **L**
 
 The part of the RFC no Pact user has today: catching what the provider may send that no consumer tested.
