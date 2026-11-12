@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794466629004,
+  "lastUpdate": 1794466630972,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -52356,6 +52356,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 45863,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d6684e4760c3e2727283fbf239d030782ddc77ef",
+          "message": "test: the sample provider's shape is recorded by operation, so the demo checks S4.1's exit\n\nThe demo's contract is written when it runs, so the only way CI checks\nS4.1's exit against it is for the shape the demo reads to be recorded by\noperation. samples/order-service/shapes/ now holds the sample provider's\nanswers recorded as its own tests would record them (ADR 0086): GET\n/orders/{id} for six orders and one that does not exist, an entry per\nstatus, selected by the operation. provider_shape_by_operation.rs\nasserts the file is that recording, and SHAPES=overwrite writes it again;\nthe Date header is left out, so the recording is the same every run.\n\ndemo/run.sh --ci passes against it: the first check finds CANCELLED and\nthe empty list, matched by operation, and the second is compatible. The\nCLI's check tests give their hand-written contract the request and\nstatus a consumer test records, which is what selects the entry. The\nsample's README shows the output janus check prints now: three findings,\nthe 404 interaction checked and passing, and no review, which task 9.2\nand ADR 0087 decided.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T17:49:36+11:00",
+          "tree_id": "cbc7632ce93af0a997287804eda7ba4226064b81",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d6684e4760c3e2727283fbf239d030782ddc77ef"
+        },
+        "date": 1794466630432,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 59328,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 48438,
             "unit": "requests per second",
             "extra": "engines 4"
           }
