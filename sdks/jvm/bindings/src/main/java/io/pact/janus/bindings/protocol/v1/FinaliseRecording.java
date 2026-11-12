@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
@@ -24,7 +25,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "session"
+    "session",
+    "write"
 })
 public class FinaliseRecording {
 
@@ -35,6 +37,15 @@ public class FinaliseRecording {
      */
     @JsonProperty("session")
     private String session;
+    /**
+     * ShapeWrite
+     * <p>
+     * Have the engine's host write the shape, merged with what every other source recorded (ADR 0086 decision 7). Behind the 'contract-writing' capability; an engine without a writer answers component-unavailable naming 'contract-writer'.
+     * 
+     */
+    @JsonProperty("write")
+    @JsonPropertyDescription("Have the engine's host write the shape, merged with what every other source recorded (ADR 0086 decision 7). Behind the 'contract-writing' capability; an engine without a writer answers component-unavailable naming 'contract-writer'.")
+    private ShapeWrite write;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -58,6 +69,28 @@ public class FinaliseRecording {
         this.session = session;
     }
 
+    /**
+     * ShapeWrite
+     * <p>
+     * Have the engine's host write the shape, merged with what every other source recorded (ADR 0086 decision 7). Behind the 'contract-writing' capability; an engine without a writer answers component-unavailable naming 'contract-writer'.
+     * 
+     */
+    @JsonProperty("write")
+    public ShapeWrite getWrite() {
+        return write;
+    }
+
+    /**
+     * ShapeWrite
+     * <p>
+     * Have the engine's host write the shape, merged with what every other source recorded (ADR 0086 decision 7). Behind the 'contract-writing' capability; an engine without a writer answers component-unavailable naming 'contract-writer'.
+     * 
+     */
+    @JsonProperty("write")
+    public void setWrite(ShapeWrite write) {
+        this.write = write;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -76,6 +109,10 @@ public class FinaliseRecording {
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
         sb.append(',');
+        sb.append("write");
+        sb.append('=');
+        sb.append(((this.write == null)?"<null>":this.write));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -91,8 +128,9 @@ public class FinaliseRecording {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
+        result = ((result* 31)+((this.write == null)? 0 :this.write.hashCode()));
+        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
         return result;
     }
 
@@ -105,7 +143,7 @@ public class FinaliseRecording {
             return false;
         }
         FinaliseRecording rhs = ((FinaliseRecording) other);
-        return (((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.write == rhs.write)||((this.write!= null)&&this.write.equals(rhs.write))))&&((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session))));
     }
 
 }

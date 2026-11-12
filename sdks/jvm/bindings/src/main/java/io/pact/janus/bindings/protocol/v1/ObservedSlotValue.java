@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * ObservedSlotValue
  * <p>
- * One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.
+ * One slot's value, wrapped the way contract spec §5.3 wraps one. A content slot carries its octets, tagged 'base64', and the type they are labelled with.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -32,32 +32,32 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 public class ObservedSlotValue {
 
     /**
-     * The decoded value, any JSON value including null.
+     * The value: a plain value as the transport presents it, or a content slot's octets.
      * (Required)
      * 
      */
     @JsonProperty("content")
-    @JsonPropertyDescription("The decoded value, any JSON value including null.")
+    @JsonPropertyDescription("The value: a plain value as the transport presents it, or a content slot's octets.")
     private Object content;
     /**
-     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence.
      * 
      */
     @JsonProperty("encoded")
-    @JsonPropertyDescription("Representation tag for 'content' (spec.md \u00a72.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.")
+    @JsonPropertyDescription("Representation tag for 'content' (spec.md \u00a72.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence.")
     private String encoded;
     /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
+     * The type the slot's octets are labelled with: a content component that handles it decodes them, as a verification decodes a reply. Octets it cannot decode are recorded as octets, with a warning; octets no component claims are recorded as octets.
      * 
      */
     @JsonProperty("content-type")
-    @JsonPropertyDescription("Advisory: what the host believes the slot carried. Not interpreted.")
+    @JsonPropertyDescription("The type the slot's octets are labelled with: a content component that handles it decodes them, as a verification decodes a reply. Octets it cannot decode are recorded as octets, with a warning; octets no component claims are recorded as octets.")
     private String contentType;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
     /**
-     * The decoded value, any JSON value including null.
+     * The value: a plain value as the transport presents it, or a content slot's octets.
      * (Required)
      * 
      */
@@ -67,7 +67,7 @@ public class ObservedSlotValue {
     }
 
     /**
-     * The decoded value, any JSON value including null.
+     * The value: a plain value as the transport presents it, or a content slot's octets.
      * (Required)
      * 
      */
@@ -77,7 +77,7 @@ public class ObservedSlotValue {
     }
 
     /**
-     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence.
      * 
      */
     @JsonProperty("encoded")
@@ -86,7 +86,7 @@ public class ObservedSlotValue {
     }
 
     /**
-     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+     * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence.
      * 
      */
     @JsonProperty("encoded")
@@ -95,7 +95,7 @@ public class ObservedSlotValue {
     }
 
     /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
+     * The type the slot's octets are labelled with: a content component that handles it decodes them, as a verification decodes a reply. Octets it cannot decode are recorded as octets, with a warning; octets no component claims are recorded as octets.
      * 
      */
     @JsonProperty("content-type")
@@ -104,7 +104,7 @@ public class ObservedSlotValue {
     }
 
     /**
-     * Advisory: what the host believes the slot carried. Not interpreted.
+     * The type the slot's octets are labelled with: a content component that handles it decodes them, as a verification decodes a reply. Octets it cannot decode are recorded as octets, with a warning; octets no component claims are recorded as octets.
      * 
      */
     @JsonProperty("content-type")

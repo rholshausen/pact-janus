@@ -8,12 +8,14 @@ use super::broker::{self as broker_ops, PublishContracts};
 use super::consumer_session::{
   AddInteraction, AddPactInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
 };
+use super::contributions::in_tree_actions;
 use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::provider_shape_session::{
-  Create as CreateRecording, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
+  Create as CreateRecording, DEFAULT_KIND as RECORDING_KIND, Declarations as RecordingDeclarations,
+  Evidence as RecordingEvidence, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
 };
 use super::scope::Scope;
 use super::session::{
@@ -1080,12 +1082,18 @@ impl Engine {
   /// diagnostic channel: contract-file spec §8.1 requires the conversion to be honest rather than
   /// lossless, and a caller that ignored them would be reading only half of what it was told.
   /// `provider-shape-session/create` (spec §8.5): a recording session, which holds no transport,
-  /// runs nothing, and is released by `finalise`.
+  /// runs nothing, and is released by `finalise`. It reads what the transport for its kind declares
+  /// (ADR 0086 decision 3), so a kind no transport serves is `component-unavailable`.
   fn handle_create_recording(&mut self, id: String, body: Value) -> ResponseFrame {
     let create: CreateRecording = match parse_body(body) {
       Ok(create) => create,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    let kind = create.kind.as_deref().unwrap_or(RECORDING_KIND);
+    let Some(transport) = self.transports.get(kind) else {
+      return ResponseFrame::err(id, EngineError::component_unavailable(kind));
+    };
+    let declarations = RecordingDeclarations::of(transport.as_ref());
     let policy = create
       .policy
       .as_ref()
@@ -1093,31 +1101,39 @@ impl Engine {
       .unwrap_or_default();
     self.next_recording += 1;
     let session = format!("r-{}", self.next_recording);
-    self
-      .recordings
-      .insert(session.clone(), RecordingSession::new(create.provider, policy));
+    self.recordings.insert(
+      session.clone(),
+      RecordingSession::new(create.provider, policy, declarations),
+    );
     ResponseFrame::ok(id, json!({ "session": session }))
   }
 
-  /// `provider-shape-session/observe` (spec §8.5): one response the provider produced.
+  /// `provider-shape-session/observe` (spec §8.5): one answer the provider produced, read as an
+  /// arrival (ADR 0086 decision 3).
   fn handle_observe(&mut self, id: String, body: Value) -> ResponseFrame {
     let req: Observe = match parse_body(body) {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    let actions = in_tree_actions(&self.matchers);
     let Some(session) = self.recordings.get_mut(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
-    session.observe(&req);
+    let warnings = match session.observe(&req, Some(&self.content), &actions) {
+      Ok(warnings) => warnings,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
     let (observations, interactions) = session.progress();
-    ResponseFrame::ok(
-      id,
-      json!({ "observations": observations, "interactions": interactions }),
-    )
+    let mut answer = json!({ "observations": observations, "interactions": interactions });
+    if !warnings.is_empty() {
+      answer["warnings"] = json!(warnings);
+    }
+    ResponseFrame::ok(id, answer)
   }
 
   /// `provider-shape-session/finalise` (spec §8.5): the shape the evidence adds up to, and the
-  /// end of the session.
+  /// end of the session. With `write`, the engine's host writes it, merged with what every other
+  /// source recorded (ADR 0086 decision 7).
   ///
   /// Unlike a consumer session's `finalise` there is no honesty rule to apply (contract spec
   /// §2.2): a contract is withheld when a variant failed because it is a claim about a passing
@@ -1131,6 +1147,48 @@ impl Engine {
     let Some(session) = self.recordings.remove(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
+    if let Some(write) = &req.write {
+      let Some(writer) = self.contract_writer.clone() else {
+        return ResponseFrame::err(id, EngineError::component_unavailable(files::WRITER));
+      };
+      let provider = session.provider().to_string();
+      let policy = session.policy();
+      let entries = session.evidence();
+      // The evidence file's lock is held from reading every source's counts until the shape they
+      // add up to is written, so two sessions finishing at once write one after the other.
+      let mut written_shape = None;
+      let written = writer.update(&write.evidence, &mut |existing| {
+        let mut evidence = RecordingEvidence::read(&write.evidence, existing, &provider)?;
+        let shape = evidence.replace(&write.source, entries.clone(), policy);
+        let mut bytes = serde_json::to_vec(&shape).map_err(|err| EngineError::internal(err.to_string()))?;
+        written_shape = Some(shape);
+        bytes.push(b'\n');
+        writer.update(&write.path, &mut |_| Ok(bytes.clone()))?;
+        let mut held = serde_json::to_vec(&evidence).map_err(|err| EngineError::internal(err.to_string()))?;
+        held.push(b'\n');
+        Ok(held)
+      });
+      #[derive(serde::Serialize)]
+      struct Written<'a> {
+        #[serde(rename = "provider-shape")]
+        provider_shape: &'a crate::subsumption::ProviderShape,
+        written: &'a str,
+      }
+      return match (written, written_shape) {
+        (Ok(()), Some(shape)) => ResponseFrame::ok_serialized(
+          id,
+          &Written {
+            provider_shape: &shape,
+            written: &write.path,
+          },
+        ),
+        (Ok(()), None) => ResponseFrame::err(
+          id,
+          EngineError::internal("the evidence was written and the shape was not"),
+        ),
+        (Err(err), _) => ResponseFrame::err(id, err),
+      };
+    }
     // Serialised from the model rather than via `Value`, for the reason `consumer-session/finalise`
     // gives: a `Value` map sorts members, and the document's order is the schema's.
     #[derive(serde::Serialize)]
@@ -1154,7 +1212,7 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    match subsumption_ops::check(&req) {
+    match subsumption_ops::check(&req, &in_tree_actions(&self.matchers)) {
       Ok((report, format)) => {
         let report = serde_json::to_value(&report).expect("a report always serializes");
         ResponseFrame::ok(id, json!({ "report": report, "format": format }))

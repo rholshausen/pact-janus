@@ -1,0 +1,34 @@
+{
+  "description": "`http:path` admits a path that matches its template, a parameter standing for one non-empty segment, as OpenAPI and every router read one (staged plan S4.1, ADR 0086): the built-in HTTP component runs it, as the native engine registers it",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "request": {
+          "method": {
+            "shape": "equality",
+            "example": "GET"
+          },
+          "path": {
+            "shape": "http:path",
+            "template": "/orders/{id}",
+            "example": "/orders/1"
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders/66"
+  },
+  "result": {
+    "status": "matched"
+  }
+}

@@ -20,12 +20,13 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * FinaliseRecordingResult
  * <p>
- * The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed.
+ * The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed. With 'write', it is the shape written, from every source's evidence, and 'written' says where.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "provider-shape"
+    "provider-shape",
+    "written"
 })
 public class FinaliseRecordingResult {
 
@@ -37,6 +38,13 @@ public class FinaliseRecordingResult {
     @JsonProperty("provider-shape")
     @JsonPropertyDescription("Design 2.8's ProviderShape document, with provenance 'recorded'. Opaque here.")
     private Map<String, Object> providerShape;
+    /**
+     * The path the shape was written to, when 'write' was given.
+     * 
+     */
+    @JsonProperty("written")
+    @JsonPropertyDescription("The path the shape was written to, when 'write' was given.")
+    private java.lang.String written;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -60,6 +68,24 @@ public class FinaliseRecordingResult {
         this.providerShape = providerShape;
     }
 
+    /**
+     * The path the shape was written to, when 'write' was given.
+     * 
+     */
+    @JsonProperty("written")
+    public java.lang.String getWritten() {
+        return written;
+    }
+
+    /**
+     * The path the shape was written to, when 'write' was given.
+     * 
+     */
+    @JsonProperty("written")
+    public void setWritten(java.lang.String written) {
+        this.written = written;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -78,6 +104,10 @@ public class FinaliseRecordingResult {
         sb.append('=');
         sb.append(((this.providerShape == null)?"<null>":this.providerShape));
         sb.append(',');
+        sb.append("written");
+        sb.append('=');
+        sb.append(((this.written == null)?"<null>":this.written));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -94,6 +124,7 @@ public class FinaliseRecordingResult {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.providerShape == null)? 0 :this.providerShape.hashCode()));
+        result = ((result* 31)+((this.written == null)? 0 :this.written.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
     }
@@ -107,7 +138,7 @@ public class FinaliseRecordingResult {
             return false;
         }
         FinaliseRecordingResult rhs = ((FinaliseRecordingResult) other);
-        return (((this.providerShape == rhs.providerShape)||((this.providerShape!= null)&&this.providerShape.equals(rhs.providerShape)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return ((((this.providerShape == rhs.providerShape)||((this.providerShape!= null)&&this.providerShape.equals(rhs.providerShape)))&&((this.written == rhs.written)||((this.written!= null)&&this.written.equals(rhs.written))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

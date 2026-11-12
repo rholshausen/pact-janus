@@ -44,8 +44,8 @@ what consumers asked for, though, and the RFC's promise is the provider's own te
    the initiating part's slots, in the part → slot → shape form of a contract's `parts`, which become the
    recorded entry's `selector` (ADR 0025). The test writes it with the DSL it already uses, so in both
    SDKs an observation is `observe({ method: "GET", path: pathTemplate("/orders/{id}") }, response)`.
-   `description` becomes optional, and an entry recorded without one is named by its selector as
-   `explain` prints a shape, which is what a report shows for it.
+   `description` stays, as what a report calls the entry: the SDKs write the operation,
+   `GET /orders/{id}`, unless the test gives the consumer's words.
 2. **The HTTP component contributes `http:path`.** Its member `template` is a path template as OpenAPI
    and every router write one: `{name}` matches one non-empty segment, and every other character matches
    itself. It admits a path that matches the whole template. Both SDKs spell it `pathTemplate(t)`, which
@@ -55,7 +55,7 @@ what consumers asked for, though, and the RFC's promise is the provider's own te
    wrapped as contract spec §5.3 wraps one, a content slot carrying its octets. The session reads them
    as a verification reads what a provider answered: through the transport component for `kind`, a new
    member of `create` (`http` unless given), with each content slot decoded through the session's
-   content registry by its labelled or detected type. A value that does not decode is recorded as its
+   content registry by the type it is labelled with. A value that does not decode is recorded as its
    octets, and the `observe` result says so, as a warning.
 4. **A transport declares the slots that tell an exchange's outcomes apart**, as `outcome-slots` in its
    `TransportContribution` (component-interfaces §5): part name → slot names. HTTP's are
@@ -73,8 +73,8 @@ what consumers asked for, though, and the RFC's promise is the provider's own te
    never carries a `Set-Cookie` a test was given.
 7. **The engine's host writes the shape, and merges it.** `finalise` takes
    `write: { path, evidence, source }`, behind the `contract-writing` capability ADR 0065 added, and
-   answers `written`. `evidence` is a file of the recorder's counts for each entry, keyed by `source`. A
-   session replaces its own source's counts, and the shape is written from all of them, under the
+   answers `written` beside the shape it wrote. `evidence` is a file of the recorder's counts for each
+   entry, keyed by `source`. A session replaces its own source's counts, and the shape is written from all of them, under the
    evidence file's lock, held as ADR 0065 decision 6 holds a contract's. So a test file run twice counts
    once, and test files that ran one after another or in separate workers write the shape one session
    recording them all would have. A single session's shape needs no merging, but is written the same

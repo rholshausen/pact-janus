@@ -32,9 +32,22 @@
 //! saying plainly: widening too eagerly produces `broader-type` findings a team can see and argue
 //! with, while keeping a literal set too long produces a narrow provider shape that makes the
 //! checker answer `yes`. The defaults therefore lean towards widening.
+//!
+//! **Entries, and what keeps them apart (ADR 0086).** An observation names the operation it answered
+//! as a `selector`, since a provider's own tests do not know a consumer's words, and the selector
+//! carries the observation's outcome too (decision 4: for HTTP, the status), so a 200 with an order
+//! and a 404 with an error document are two entries and neither widens the other. An entry is one
+//! description, one set of state names and one selector.
+//!
+//! **Evidence outlives a session.** Several test files, run one after another or in separate
+//! workers, each record part of one shape. Finished shapes cannot be merged without losing the
+//! counts the two judgements need, so [`Recorder::evidence`] hands the counts out and
+//! [`Recorder::absorb`] folds them back in, and the shape is written from all of them (decision 7).
 
 use super::provider_shape::{FORMAT, ProviderInteraction, ProviderShape, ShapePart, StateRef};
 use crate::contract::Party;
+use crate::redaction::CredentialMembers;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
@@ -56,8 +69,12 @@ impl Default for RecordingPolicy {
   }
 }
 
-/// One interaction's identity, as design 2.8 §2.2 matches it: description plus state *names*.
-type Key = (String, Vec<String>);
+/// A selector: part name -> slot name -> shape (ADR 0025).
+pub type Selector = BTreeMap<String, ShapePart>;
+
+/// One entry's identity: description, state *names*, and the selector's canonical text, so that two
+/// selectors written in different orders are one entry.
+type Key = (String, Vec<String>, String);
 
 /// Accumulates observations and emits one [`ProviderShape`].
 #[derive(Debug)]
@@ -65,12 +82,28 @@ pub struct Recorder {
   provider: String,
   provenance: String,
   policy: RecordingPolicy,
+  /// Members recorded as present or absent, never with their values (ADR 0086 decision 6).
+  credentials: CredentialMembers,
   interactions: BTreeMap<Key, Observed>,
+}
+
+/// One entry's evidence, as [`Recorder::evidence`] hands it out and [`Recorder::absorb`] takes it
+/// back: what an evidence file keeps per source (ADR 0086 decision 7).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EntryEvidence {
+  pub description: String,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub states: Vec<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub selector: Option<Selector>,
+  pub observations: u64,
+  /// Part name -> slot name -> the evidence accumulated at that slot's root.
+  parts: BTreeMap<String, BTreeMap<String, Profile>>,
 }
 
 #[derive(Debug, Default)]
 struct Observed {
-  /// Part name -> slot name -> the evidence accumulated at that slot's root.
+  selector: Option<Selector>,
   parts: BTreeMap<String, BTreeMap<String, Profile>>,
   observations: u64,
 }
@@ -85,17 +118,30 @@ impl Recorder {
       provider: provider.into(),
       provenance: "recorded".to_string(),
       policy,
+      credentials: CredentialMembers::new(),
       interactions: BTreeMap::new(),
     }
+  }
+
+  /// Members of slots whose values are never recorded (ADR 0086 decision 6): part name -> slot name
+  /// -> member names, compared ignoring ASCII case, as a transport declares its credentials.
+  pub fn with_credentials(mut self, credentials: CredentialMembers) -> Recorder {
+    self.credentials = credentials;
+    self
+  }
+
+  pub fn provider(&self) -> &str {
+    &self.provider
   }
 
   /// How many observations one interaction has contributed, for a host that wants to report it.
   pub fn observations(&self, description: &str, states: &[String]) -> u64 {
     self
       .interactions
-      .get(&(description.to_string(), states.to_vec()))
-      .map(|observed| observed.observations)
-      .unwrap_or(0)
+      .iter()
+      .filter(|((d, s, _), _)| d == description && s == states)
+      .map(|(_, observed)| observed.observations)
+      .sum()
   }
 
   pub fn interaction_count(&self) -> usize {
@@ -114,15 +160,77 @@ impl Recorder {
     states: &[String],
     parts: &BTreeMap<String, BTreeMap<String, Value>>,
   ) {
-    let observed = self
-      .interactions
-      .entry((description.to_string(), states.to_vec()))
-      .or_default();
+    self.observe_operation(description, states, None, parts);
+  }
+
+  /// [`Recorder::observe`], for an observation that names its operation as a `selector`
+  /// (ADR 0086 decision 1), its outcome already written into it (decision 4).
+  pub fn observe_operation(
+    &mut self,
+    description: &str,
+    states: &[String],
+    selector: Option<&Selector>,
+    parts: &BTreeMap<String, BTreeMap<String, Value>>,
+  ) {
+    let key = (
+      description.to_string(),
+      states.to_vec(),
+      selector.map(canonical_selector).unwrap_or_default(),
+    );
+    let observed = self.interactions.entry(key).or_insert_with(|| Observed {
+      selector: selector.cloned(),
+      ..Observed::default()
+    });
     observed.observations += 1;
     for (part, slots) in parts {
       let recorded_part = observed.parts.entry(part.clone()).or_default();
       for (slot, value) in slots {
-        recorded_part.entry(slot.clone()).or_default().observe(value);
+        let profile = recorded_part.entry(slot.clone()).or_default();
+        match self.credentials.get(part).and_then(|slots| slots.get(slot)) {
+          Some(members) => profile.observe_withholding(value, members),
+          None => profile.observe(value),
+        }
+      }
+    }
+  }
+
+  /// The evidence so far, entry by entry, in the order [`Recorder::finish`] writes them.
+  pub fn evidence(&self) -> Vec<EntryEvidence> {
+    self
+      .interactions
+      .iter()
+      .map(|((description, states, _), observed)| EntryEvidence {
+        description: description.clone(),
+        states: states.clone(),
+        selector: observed.selector.clone(),
+        observations: observed.observations,
+        parts: observed.parts.clone(),
+      })
+      .collect()
+  }
+
+  /// Fold evidence another session recorded into this recorder's, as if it had been observed here.
+  pub fn absorb(&mut self, evidence: &[EntryEvidence]) {
+    for entry in evidence {
+      let key = (
+        entry.description.clone(),
+        entry.states.clone(),
+        entry
+          .selector
+          .as_ref()
+          .map(canonical_selector)
+          .unwrap_or_default(),
+      );
+      let observed = self.interactions.entry(key).or_insert_with(|| Observed {
+        selector: entry.selector.clone(),
+        ..Observed::default()
+      });
+      observed.observations += entry.observations;
+      for (part, slots) in &entry.parts {
+        let recorded_part = observed.parts.entry(part.clone()).or_default();
+        for (slot, profile) in slots {
+          recorded_part.entry(slot.clone()).or_default().merge(profile);
+        }
       }
     }
   }
@@ -133,7 +241,7 @@ impl Recorder {
     let interactions = self
       .interactions
       .into_iter()
-      .map(|((description, states), observed)| ProviderInteraction {
+      .map(|((description, states, _), observed)| ProviderInteraction {
         description,
         states: (!states.is_empty()).then(|| {
           states
@@ -141,7 +249,7 @@ impl Recorder {
             .map(|name| StateRef { name })
             .collect::<Vec<_>>()
         }),
-        selector: None,
+        selector: observed.selector,
         provenance: None,
         source: Some(BTreeMap::from([(
           "observations".to_string(),
@@ -173,6 +281,29 @@ impl Recorder {
   }
 }
 
+/// A selector's text with every object's members sorted, so that it names one entry however its
+/// writer ordered it.
+fn canonical_selector(selector: &Selector) -> String {
+  fn sorted(value: &Value) -> Value {
+    match value {
+      Value::Object(members) => {
+        let mut names: Vec<&String> = members.keys().collect();
+        names.sort();
+        Value::Object(
+          names
+            .into_iter()
+            .map(|name| (name.clone(), sorted(&members[name])))
+            .collect(),
+        )
+      }
+      Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+      other => other.clone(),
+    }
+  }
+  let value = serde_json::to_value(selector).unwrap_or_default();
+  sorted(&value).to_string()
+}
+
 // -----------------------------------------------------------------------------------------------
 // The evidence
 // -----------------------------------------------------------------------------------------------
@@ -182,7 +313,8 @@ impl Recorder {
 /// Every counter here exists to answer one question the emitted shape needs: how often the
 /// position was looked at (presence), how often it held `null` (nullability), which JSON kinds it
 /// took (the value operator), and which distinct literals (a set, or an open domain).
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "kebab-case")]
 struct Profile {
   /// How many observations reached this position with a value of any kind, `null` included.
   seen: u64,
@@ -198,18 +330,24 @@ struct Profile {
   booleans: bool,
   integers: bool,
   decimals: bool,
+  /// Seen, and its values never recorded (ADR 0086 decision 6): a credential, recorded as `any`.
+  withheld: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
   object: Option<Box<ObjectProfile>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   array: Option<Box<ArrayProfile>>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 struct ObjectProfile {
   /// How many objects were seen here — the denominator that makes a member's absence decidable.
   count: u64,
   members: BTreeMap<String, Profile>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 struct ArrayProfile {
   count: u64,
   min: u64,
@@ -220,6 +358,59 @@ struct ArrayProfile {
 }
 
 impl Profile {
+  /// An object whose `withheld` members are recorded as present or absent and nothing more.
+  fn observe_withholding(&mut self, value: &Value, withheld: &[String]) {
+    let Value::Object(members) = value else {
+      return self.observe(value);
+    };
+    self.seen += 1;
+    let object = self.object.get_or_insert_with(Box::default);
+    object.count += 1;
+    for (name, member) in members {
+      let profile = object.members.entry(name.clone()).or_default();
+      if withheld.iter().any(|w| w.eq_ignore_ascii_case(name)) {
+        profile.seen += 1;
+        profile.withheld = true;
+      } else {
+        profile.observe(member);
+      }
+    }
+  }
+
+  /// Fold another profile of the same position into this one. Every count adds and every set
+  /// joins, so evidence folds to the same profile in any order.
+  fn merge(&mut self, other: &Profile) {
+    self.seen += other.seen;
+    self.nulls += other.nulls;
+    self.scalars += other.scalars;
+    for (key, value) in &other.literals {
+      self.literals.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+    self.strings |= other.strings;
+    self.booleans |= other.booleans;
+    self.integers |= other.integers;
+    self.decimals |= other.decimals;
+    self.withheld |= other.withheld;
+    if let Some(theirs) = &other.object {
+      let ours = self.object.get_or_insert_with(Box::default);
+      ours.count += theirs.count;
+      for (name, member) in &theirs.members {
+        ours.members.entry(name.clone()).or_default().merge(member);
+      }
+    }
+    if let Some(theirs) = &other.array {
+      match &mut self.array {
+        Some(ours) => {
+          ours.count += theirs.count;
+          ours.min = ours.min.min(theirs.min);
+          ours.max = ours.max.max(theirs.max);
+          ours.items.merge(&theirs.items);
+        }
+        None => self.array = Some(theirs.clone()),
+      }
+    }
+  }
+
   fn observe(&mut self, value: &Value) {
     self.seen += 1;
     match value {
@@ -275,6 +466,10 @@ impl Profile {
   fn to_shape(&self, policy: &RecordingPolicy) -> Option<Value> {
     if self.seen == 0 {
       return None;
+    }
+    if self.withheld {
+      // What a credential held is not the shape's to say (ADR 0086 decision 6).
+      return Some(shape("any"));
     }
     let non_null = self.seen - self.nulls;
     if non_null == 0 {

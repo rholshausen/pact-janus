@@ -536,6 +536,37 @@ all `elements: ["a", "b"]`. An element compares exactly, and an absent header fa
 one, because it has a comma outside quotes, whitespace around it or no text, is the
 operator's invalid configuration. Its example is the elements joined with `", "`, as one field line.
 
+### 5.10 Which slots tell an exchange's outcomes apart
+
+One operation can answer in kinds that share nothing: an order, or an error document saying there is
+none. A recorder that unioned them would make every member of the order optional, so it keeps them
+apart, by the value of a slot only the transport knows means "which kind of answer"
+([ADR 0086](../../decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)
+decision 4). A transport **declares** it, as `outcome-slots` in its `TransportContribution`: part
+name → slot names. The built-in HTTP transport's is the response's status:
+
+```json sketch
+{ "response": ["status"] }
+```
+
+A provider-shape session (engine-protocol spec §8.5) records one entry per operation, state names and
+outcome value, and writes each outcome slot's value into the entry's selector as `equality`, so a
+consumer interaction that recorded that value selects it. A transport that declares none records one
+entry per operation and state names. An in-tree transport declares them in code (§9.1).
+
+### 5.11 How the built-in HTTP component compares a path
+
+`http:path`, which the HTTP component runs as a matcher, as it runs `http:list` (§5.9), compares a path
+against a path template, as OpenAPI and every router write one
+([ADR 0086](../../decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)
+decision 2). Its member `template` is the template. Each `{name}` in it matches one or more characters
+that are not `/`, and every other character matches itself, so `/orders/{id}` admits `/orders/66` and
+neither `/orders/` nor `/orders/66/items`, and `/files/{name}.{ext}` admits `/files/report.pdf`. It
+admits a path that matches the whole template, compared exactly. A template with a `{` no `}` closes, a
+`}` no `{` opens, a parameter with no name, or two parameters with nothing between them is the
+operator's invalid configuration. A provider-shape entry's selector writes an operation with it
+(subsumption-check spec §2.2), and a consumer's request may use it like any other operator.
+
 ## 6. The content interface
 
 Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).

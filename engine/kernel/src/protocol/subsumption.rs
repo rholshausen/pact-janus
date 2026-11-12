@@ -17,7 +17,9 @@
 
 use crate::compatibility::{self, CompatibilityReport};
 use crate::contract::{self, Contract, ContractError, IdentifyMode, Party};
-use crate::subsumption::{CheckError, ProviderShape, SubsumptionPolicy, SubsumptionReport, check as walk};
+use crate::subsumption::{
+  CheckError, ProviderShape, SubsumptionPolicy, SubsumptionReport, check_with as walk,
+};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -74,8 +76,12 @@ pub enum SubsumptionError {
   Invalid { problems: Vec<crate::error::Problem> },
 }
 
-/// `subsumption/check`: one consumer contract against one provider shape (design 2.8 §3.1).
-pub fn check(request: &Check) -> Result<(SubsumptionReport, String), SubsumptionError> {
+/// `subsumption/check`: one consumer contract against one provider shape (design 2.8 §3.1). `actions`
+/// runs the component operators a selector uses (ADR 0086 decision 2).
+pub fn check(
+  request: &Check,
+  actions: &dyn crate::plan::ActionApplier,
+) -> Result<(SubsumptionReport, String), SubsumptionError> {
   let (contract, format) = consumer_contract(&request.contract)?;
   let shape: ProviderShape = read_provider_shape(&request.provider_shape)?;
   if contract.provider.name != shape.provider.name {
@@ -84,7 +90,7 @@ pub fn check(request: &Check) -> Result<(SubsumptionReport, String), Subsumption
       shape: shape.provider.name.clone(),
     });
   }
-  let report = walk(&contract, &shape).map_err(SubsumptionError::Check)?;
+  let report = walk(&contract, &shape, Some(actions)).map_err(SubsumptionError::Check)?;
   Ok((report, format))
 }
 

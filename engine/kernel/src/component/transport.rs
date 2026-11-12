@@ -87,6 +87,10 @@ pub struct DisposeResult {}
 /// Part name -> the slot names in it that carry content (component-interfaces spec §5.5).
 pub type ContentSlots = std::collections::BTreeMap<String, Vec<String>>;
 
+/// Part name -> the slot names in it whose values tell an exchange's outcomes apart
+/// (component-interfaces spec §5.10, ADR 0086 decision 4).
+pub type OutcomeSlots = std::collections::BTreeMap<String, Vec<String>>;
+
 /// Which of a transport's parts starts an exchange and which answers it (component-interfaces spec
 /// §5.7, staged plan S1.7). The engine reads part names from here and never spells one: HTTP's are
 /// `request` and `response`, and a transport whose kind has no answer, such as a published message,
@@ -130,6 +134,13 @@ pub trait TransportComponent: ::std::marker::Send + ::std::marker::Sync {
   /// unless a transport says so.
   fn credential_members(&self) -> crate::redaction::CredentialMembers {
     crate::redaction::CredentialMembers::new()
+  }
+  /// Which slots of which parts tell one exchange's outcome from another's (component-interfaces
+  /// spec §5.10, ADR 0086 decision 4), as part name -> slot names: what a recorder keeps a provider
+  /// shape's entries apart by, so that one operation's answers of different kinds do not widen each
+  /// other. The in-tree form of `TransportContribution.outcome-slots`; none unless a transport says so.
+  fn outcome_slots(&self) -> OutcomeSlots {
+    OutcomeSlots::new()
   }
   fn start(&self, req: Start) -> Result<StartResult, ComponentError>;
   fn stop(&self, req: Stop) -> Result<StopResult, ComponentError>;

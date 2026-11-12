@@ -1,0 +1,18 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          $.request.method,
+          'GET'
+        )
+      ),
+      :path (
+        %http:path (
+          $.request.path,
+          {'template': '/orders/{id}'}
+        )
+      )
+    )
+  )
+)

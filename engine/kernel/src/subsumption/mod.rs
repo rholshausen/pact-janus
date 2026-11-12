@@ -35,12 +35,12 @@ pub use policy::{Action, Exemption, InteractionRef, SubsumptionPolicy};
 pub use provider_shape::{
   FORMAT as PROVIDER_SHAPE_FORMAT, ProviderInteraction, ProviderShape, StateRef, read_provider_shape,
 };
-pub use record::{Recorder, RecordingPolicy};
+pub use record::{EntryEvidence, Recorder, RecordingPolicy, Selector};
 pub use render::{render, render_marked};
 // The page task 7.4 prints is this block under a decision, so [`crate::compatibility`] composes
 // the same lines rather than re-wording them (render's own module docs).
 pub(crate) use render::{finding_lines, header};
 pub use report::{
   CheckError, FORMAT as REPORT_FORMAT, Finding, InteractionResult, NOT_PUBLISHED, Severity, Side,
-  SubsumptionReport, Summary, check,
+  SubsumptionReport, Summary, check, check_with,
 };

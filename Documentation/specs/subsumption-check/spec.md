@@ -117,12 +117,17 @@ The checker matches in two steps:
 2. **By selector** — otherwise, every entry with a `selector` whose shapes admit the recorded values of
    **every** variant the contract records for the interaction. An entry that names `states` also needs
    the state names to be equal; one that names none (every derived shape) is about the operation in
-   any state. Exactly one such entry is used. More than one is **not** chosen between — the checker
-   does not guess, any more than §8's walk does — and the interaction is `not-published` with a
-   `reason` naming the entries that tied.
+   any state. When both kinds select the interaction, the entries that name its states are used and
+   the others set aside, since they are about it more exactly
+   ([ADR 0086](../../decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)
+   decision 5). Exactly one entry is then used. More than one is **not** chosen between — the
+   checker does not guess, any more than §8's walk does — and the interaction is `not-published` with
+   a `reason` naming the entries that tied.
 
-A selector is matched against recorded *examples*, by the same plans every exchange runs, so the kernel
-never parses a path template and never learns HTTP: "is this request an instance of that operation" is
+A selector is matched against recorded *examples*, by the same plans every exchange runs, with the
+components a run has, so a selector may use a component's operator, such as the HTTP component's
+`http:path` template (component-interfaces spec §5.11). So the kernel never parses a path template and
+never learns HTTP: "is this request an instance of that operation" is
 a question about a request the consumer actually sent. A selector is never compared for subsumption,
 and so carries no claim about what the provider *accepts* — §2.1's "no request-direction slots" is
 about that claim, and still holds. The report records which step matched (`matched-by`, §6.1), because
@@ -137,7 +142,8 @@ decide about."
 
 Every provider shape carries a **provenance**, an open string vocabulary naming how it came to exist, in
 the RFC's own decreasing order of fidelity: `recorded` (the union of response shapes the provider's own
-tests produced — task 7.2), `derived` (imported from types via a content component — task 7.3),
+tests produced — task 7.2; each entry selected by the operation the test named, and its outcome, as
+engine-protocol spec §8.5 records it), `derived` (imported from types via a content component — task 7.3),
 `authored` (written by hand), `observed` (accumulated from verification traffic). Provenance is recorded
 for the reader, not for the walk: **the structural comparison in §3 does not vary by provenance, and a
 checker MUST NOT decide a different verdict for the same two shapes because one arrived with a different

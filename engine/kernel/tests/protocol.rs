@@ -6,8 +6,11 @@
 //! is not dispatched yet — no transport is bound to a consumer session (that gap is 4.2's
 //! component crate waiting on its own wiring, tracked for whoever picks it up next).
 
+use pact_janus_kernel::component::TransportComponent;
 use pact_janus_kernel::protocol::Engine;
 use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Send one request frame, return the decoded response frame.
 fn send(engine: &mut Engine, id: &str, op: &str, body: Value) -> Value {
@@ -509,6 +512,17 @@ fn record(engine: &mut Engine, session: &str, description: &str, states: Value, 
   )
 }
 
+/// An engine that can record: a recording reads what the transport for its kind declares
+/// (ADR 0086 decision 3).
+fn recording_engine() -> Engine {
+  let mut transports: HashMap<String, Arc<dyn TransportComponent>> = HashMap::new();
+  transports.insert(
+    "http".to_string(),
+    Arc::new(pact_janus_component_http::HttpTransport::new()),
+  );
+  Engine::with_components(transports, None)
+}
+
 fn recording_session(engine: &mut Engine) -> String {
   let created = send(
     engine,
@@ -537,7 +551,7 @@ fn recording_is_declared_as_a_capability_rather_than_assumed() {
 
 #[test]
 fn a_recording_session_turns_observed_responses_into_a_provider_shape() {
-  let mut engine = Engine::new();
+  let mut engine = recording_engine();
   hello(&mut engine);
   let session = recording_session(&mut engine);
 
@@ -576,7 +590,7 @@ fn a_recording_session_turns_observed_responses_into_a_provider_shape() {
 
 #[test]
 fn a_host_may_set_the_recorders_judgements_per_session() {
-  let mut engine = Engine::new();
+  let mut engine = recording_engine();
   hello(&mut engine);
   // `min-evidence: 1` makes one non-repeating observation enough to call a position open, which
   // is a host saying "my suite hits each endpoint once, do not read enums into that".
@@ -614,7 +628,7 @@ fn a_host_may_set_the_recorders_judgements_per_session() {
 #[test]
 fn a_recording_session_ends_at_finalise_and_says_so_afterwards() {
   // Spec §7.1: a session ends in exactly one way per kind, and a stale id gets a named error.
-  let mut engine = Engine::new();
+  let mut engine = recording_engine();
   hello(&mut engine);
   let session = recording_session(&mut engine);
   record(
@@ -653,7 +667,7 @@ fn recording_a_response_never_needs_the_engine_to_know_what_a_response_is() {
   // The value arrives decoded and wrapped as a contract wraps one (contract spec §5.3). A slot
   // that carried nothing is left out rather than given a special value, and a part the provider
   // did not produce simply is not there.
-  let mut engine = Engine::new();
+  let mut engine = recording_engine();
   hello(&mut engine);
   let session = recording_session(&mut engine);
   let observed = send(
@@ -679,7 +693,7 @@ fn recording_a_response_never_needs_the_engine_to_know_what_a_response_is() {
 
 #[test]
 fn a_malformed_observation_is_a_value_not_a_panic() {
-  let mut engine = Engine::new();
+  let mut engine = recording_engine();
   hello(&mut engine);
   let session = recording_session(&mut engine);
   let response = send(

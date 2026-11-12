@@ -733,6 +733,10 @@ export interface HelloResult {
 
 export interface StartRecording {
   provider: RecordedProvider;
+  /**
+   * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+   */
+  kind?: string;
   policy?: RecordingPolicy;
   [k: string]: unknown;
 }
@@ -761,12 +765,12 @@ export interface RecordingPolicy {
 }
 
 /**
- * One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.
+ * One answer the provider produced, as an arrival (ADR 0086 decision 3): the transport's own parts, read as a verification reads what a provider answered. The engine makes no call here and holds no opinion about how the provider was called.
  */
 export interface ObserveResponse {
   session: string;
   /**
-   * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+   * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
    */
   description: string;
   /**
@@ -774,7 +778,17 @@ export interface ObserveResponse {
    */
   states?: string[];
   /**
-   * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+   * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+   */
+  operation?: {
+    [k: string]: {
+      [k: string]: {
+        [k: string]: unknown;
+      };
+    };
+  };
+  /**
+   * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
    */
   parts: {
     [k: string]: {
@@ -785,19 +799,19 @@ export interface ObserveResponse {
 }
 
 /**
- * One slot's value, wrapped the way contract spec §5.3 wraps one, so a host that already builds those has nothing new to learn.
+ * One slot's value, wrapped the way contract spec §5.3 wraps one. A content slot carries its octets, tagged 'base64', and the type they are labelled with.
  */
 export interface ObservedSlotValue {
   /**
-   * The decoded value, any JSON value including null.
+   * The value: a plain value as the transport presents it, or a content slot's octets.
    */
   content: unknown;
   /**
-   * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence, which is recorded as that string.
+   * Representation tag for 'content' (spec.md §2.4-2.5). Absent means the natural JSON value; 'base64' means content is a string carrying the base64 of an octet sequence.
    */
   encoded?: string;
   /**
-   * Advisory: what the host believes the slot carried. Not interpreted.
+   * The type the slot's octets are labelled with: a content component that handles it decodes them, as a verification decodes a reply. Octets it cannot decode are recorded as octets, with a warning; octets no component claims are recorded as octets.
    */
   "content-type"?: string;
   [k: string]: unknown;
@@ -809,19 +823,43 @@ export interface ObserveResponseResult {
    */
   observations: number;
   /**
-   * How many distinct interactions those responses covered.
+   * How many distinct entries those responses covered: one per description, state names and selector, the outcome included.
    */
   interactions: number;
+  /**
+   * What this observation recorded other than as given, such as a body labelled with a type it did not decode as. Absent when there is nothing to say.
+   */
+  warnings?: string[];
   [k: string]: unknown;
 }
 
 export interface FinaliseRecording {
   session: string;
+  write?: ShapeWrite;
   [k: string]: unknown;
 }
 
 /**
- * The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed.
+ * Have the engine's host write the shape, merged with what every other source recorded (ADR 0086 decision 7). Behind the 'contract-writing' capability; an engine without a writer answers component-unavailable naming 'contract-writer'.
+ */
+export interface ShapeWrite {
+  /**
+   * Where the shape is written, absolute. Its directory is created.
+   */
+  path: string;
+  /**
+   * Where the recorder's counts are kept, absolute: a file of each source's evidence, read and rewritten under its own lock, which is held until the shape is written. Not a document to publish.
+   */
+  evidence: string;
+  /**
+   * Whose evidence this session's is, such as the test file: it replaces what the same source recorded before, so a test file run twice counts once.
+   */
+  source: string;
+  [k: string]: unknown;
+}
+
+/**
+ * The recorded document, and the end of the session. Always produced: unlike a consumer session's finalise, there is no honesty rule to apply, because a provider shape claims only that these responses were produced, never that a test passed. With 'write', it is the shape written, from every source's evidence, and 'written' says where.
  */
 export interface FinaliseRecordingResult {
   /**
@@ -830,6 +868,10 @@ export interface FinaliseRecordingResult {
   "provider-shape": {
     [k: string]: unknown;
   };
+  /**
+   * The path the shape was written to, when 'write' was given.
+   */
+  written?: string;
   [k: string]: unknown;
 }
 

@@ -266,6 +266,15 @@ impl std::error::Error for CheckError {}
 /// plainly, rather than a report full of silent `yes`es a reader could mistake for coverage"
 /// (spec §6.3).
 pub fn check(contract: &Contract, provider_shape: &ProviderShape) -> Result<SubsumptionReport, CheckError> {
+  check_with(contract, provider_shape, None)
+}
+
+/// [`check`], with what runs a component operator a selector uses (ADR 0086 decision 2).
+pub fn check_with(
+  contract: &Contract,
+  provider_shape: &ProviderShape,
+  actions: Option<&dyn crate::plan::ActionApplier>,
+) -> Result<SubsumptionReport, CheckError> {
   let mut problems = Vec::new();
   let mut interactions = Vec::new();
 
@@ -283,7 +292,7 @@ pub fn check(contract: &Contract, provider_shape: &ProviderShape) -> Result<Subs
         .collect()
     });
 
-    let (published, matched_by) = match select(provider_shape, interaction, &states, &mut problems) {
+    let (published, matched_by) = match select(provider_shape, interaction, &states, actions, &mut problems) {
       Selection::Description(entry) => (entry, BY_DESCRIPTION),
       Selection::Selector(entry) => (entry, BY_SELECTOR),
       unmatched => {

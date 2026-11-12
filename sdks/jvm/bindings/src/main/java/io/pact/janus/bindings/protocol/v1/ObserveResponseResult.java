@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -26,7 +27,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "observations",
-    "interactions"
+    "interactions",
+    "warnings"
 })
 public class ObserveResponseResult {
 
@@ -39,13 +41,20 @@ public class ObserveResponseResult {
     @JsonPropertyDescription("How many responses this session has recorded in total, so a host can report progress without holding its own counters.")
     private Long observations;
     /**
-     * How many distinct interactions those responses covered.
+     * How many distinct entries those responses covered: one per description, state names and selector, the outcome included.
      * (Required)
      * 
      */
     @JsonProperty("interactions")
-    @JsonPropertyDescription("How many distinct interactions those responses covered.")
+    @JsonPropertyDescription("How many distinct entries those responses covered: one per description, state names and selector, the outcome included.")
     private Long interactions;
+    /**
+     * What this observation recorded other than as given, such as a body labelled with a type it did not decode as. Absent when there is nothing to say.
+     * 
+     */
+    @JsonProperty("warnings")
+    @JsonPropertyDescription("What this observation recorded other than as given, such as a body labelled with a type it did not decode as. Absent when there is nothing to say.")
+    private List<String> warnings;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -70,7 +79,7 @@ public class ObserveResponseResult {
     }
 
     /**
-     * How many distinct interactions those responses covered.
+     * How many distinct entries those responses covered: one per description, state names and selector, the outcome included.
      * (Required)
      * 
      */
@@ -80,13 +89,31 @@ public class ObserveResponseResult {
     }
 
     /**
-     * How many distinct interactions those responses covered.
+     * How many distinct entries those responses covered: one per description, state names and selector, the outcome included.
      * (Required)
      * 
      */
     @JsonProperty("interactions")
     public void setInteractions(Long interactions) {
         this.interactions = interactions;
+    }
+
+    /**
+     * What this observation recorded other than as given, such as a body labelled with a type it did not decode as. Absent when there is nothing to say.
+     * 
+     */
+    @JsonProperty("warnings")
+    public List<String> getWarnings() {
+        return warnings;
+    }
+
+    /**
+     * What this observation recorded other than as given, such as a body labelled with a type it did not decode as. Absent when there is nothing to say.
+     * 
+     */
+    @JsonProperty("warnings")
+    public void setWarnings(List<String> warnings) {
+        this.warnings = warnings;
     }
 
     @JsonAnyGetter
@@ -111,6 +138,10 @@ public class ObserveResponseResult {
         sb.append('=');
         sb.append(((this.interactions == null)?"<null>":this.interactions));
         sb.append(',');
+        sb.append("warnings");
+        sb.append('=');
+        sb.append(((this.warnings == null)?"<null>":this.warnings));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -129,6 +160,7 @@ public class ObserveResponseResult {
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.observations == null)? 0 :this.observations.hashCode()));
         result = ((result* 31)+((this.interactions == null)? 0 :this.interactions.hashCode()));
+        result = ((result* 31)+((this.warnings == null)? 0 :this.warnings.hashCode()));
         return result;
     }
 
@@ -141,7 +173,7 @@ public class ObserveResponseResult {
             return false;
         }
         ObserveResponseResult rhs = ((ObserveResponseResult) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.observations == rhs.observations)||((this.observations!= null)&&this.observations.equals(rhs.observations))))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))));
+        return (((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.observations == rhs.observations)||((this.observations!= null)&&this.observations.equals(rhs.observations))))&&((this.interactions == rhs.interactions)||((this.interactions!= null)&&this.interactions.equals(rhs.interactions))))&&((this.warnings == rhs.warnings)||((this.warnings!= null)&&this.warnings.equals(rhs.warnings))));
     }
 
 }

@@ -1,0 +1,18 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          $.request.method => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %http:path (
+          $.request.path => '/orders/66/items',
+          {'template': '/orders/{id}'}
+        ) => ERROR(Expected a path matching the template '/orders/{id}' but was '/orders/66/items')
+      ) => BOOL(false)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

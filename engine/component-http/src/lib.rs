@@ -18,16 +18,18 @@
 mod drive;
 pub mod list;
 mod media_type;
+pub mod path;
 mod serve;
 pub mod status;
 pub use list::LIST;
 pub use media_type::MEDIA_TYPE;
+pub use path::PATH;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use drive::DriveInstance;
 use pact_janus_kernel::component::{
-  ComponentError, ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, PollInbound,
+  ComponentError, ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, OutcomeSlots, PollInbound,
   PollInboundResult, Reply, ReplyResult, Send, SendResult, SlotValue, Start, StartResult, Stop, StopResult,
   TransportComponent,
 };
@@ -212,6 +214,12 @@ impl TransportComponent for HttpTransport {
       ),
       ("response".to_string(), headers(&["set-cookie"])),
     ])
+  }
+
+  /// A response's status tells one answer from another (ADR 0086 decision 4): a 200 with an order
+  /// and a 404 with an error document are two outcomes of one operation, not one widened answer.
+  fn outcome_slots(&self) -> OutcomeSlots {
+    OutcomeSlots::from([("response".to_string(), vec!["status".to_string()])])
   }
 
   fn start(&self, req: Start) -> Result<StartResult, ComponentError> {

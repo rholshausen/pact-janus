@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "provider",
+    "kind",
     "policy"
 })
 public class StartRecording {
@@ -39,6 +40,13 @@ public class StartRecording {
      */
     @JsonProperty("provider")
     private RecordedProvider provider;
+    /**
+     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    @JsonPropertyDescription("The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec \u00a75) \u2014 which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.")
+    private String kind;
     /**
      * RecordingPolicy
      * <p>
@@ -73,6 +81,24 @@ public class StartRecording {
     @JsonProperty("provider")
     public void setProvider(RecordedProvider provider) {
         this.provider = provider;
+    }
+
+    /**
+     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    public String getKind() {
+        return kind;
+    }
+
+    /**
+     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    public void setKind(String kind) {
+        this.kind = kind;
     }
 
     /**
@@ -115,6 +141,10 @@ public class StartRecording {
         sb.append('=');
         sb.append(((this.provider == null)?"<null>":this.provider));
         sb.append(',');
+        sb.append("kind");
+        sb.append('=');
+        sb.append(((this.kind == null)?"<null>":this.kind));
+        sb.append(',');
         sb.append("policy");
         sb.append('=');
         sb.append(((this.policy == null)?"<null>":this.policy));
@@ -136,6 +166,7 @@ public class StartRecording {
         int result = 1;
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.provider == null)? 0 :this.provider.hashCode()));
+        result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
         result = ((result* 31)+((this.policy == null)? 0 :this.policy.hashCode()));
         return result;
     }
@@ -149,7 +180,7 @@ public class StartRecording {
             return false;
         }
         StartRecording rhs = ((StartRecording) other);
-        return ((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
+        return (((((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties)))&&((this.provider == rhs.provider)||((this.provider!= null)&&this.provider.equals(rhs.provider))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.policy == rhs.policy)||((this.policy!= null)&&this.policy.equals(rhs.policy))));
     }
 
 }

@@ -21,7 +21,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * ObserveResponse
  * <p>
- * One response the provider produced, as decoded values. The engine does no HTTP here and holds no opinion about how the provider was called.
+ * One answer the provider produced, as an arrival (ADR 0086 decision 3): the transport's own parts, read as a verification reads what a provider answered. The engine makes no call here and holds no opinion about how the provider was called.
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "session",
     "description",
     "states",
+    "operation",
     "parts"
 })
 public class ObserveResponse {
@@ -41,12 +42,12 @@ public class ObserveResponse {
     @JsonProperty("session")
     private java.lang.String session;
     /**
-     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+     * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
      * (Required)
      * 
      */
     @JsonProperty("description")
-    @JsonPropertyDescription("The interaction this response belongs to. With 'states', it is the identity design 2.8 \u00a72.2 matches a consumer contract's interaction by.")
+    @JsonPropertyDescription("What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.")
     private java.lang.String description;
     /**
      * Provider state names only — a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 §2.2).
@@ -56,15 +57,22 @@ public class ObserveResponse {
     @JsonPropertyDescription("Provider state names only \u2014 a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 \u00a72.2).")
     private List<java.lang.String> states;
     /**
-     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * 
+     */
+    @JsonProperty("operation")
+    @JsonPropertyDescription("The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 \u00a72.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec \u00a75.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.")
+    private Map<String, Map<String, Map<String, Object>>> operation;
+    /**
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
     @JsonProperty("parts")
-    @JsonPropertyDescription("Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.")
+    @JsonPropertyDescription("The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.")
     private Map<String, Map<String, ObservedSlotValue>> parts;
     @JsonIgnore
-    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
      * 
@@ -87,7 +95,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+     * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
      * (Required)
      * 
      */
@@ -97,7 +105,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The interaction this response belongs to. With 'states', it is the identity design 2.8 §2.2 matches a consumer contract's interaction by.
+     * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
      * (Required)
      * 
      */
@@ -125,7 +133,25 @@ public class ObserveResponse {
     }
 
     /**
-     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * 
+     */
+    @JsonProperty("operation")
+    public Map<String, Map<String, Map<String, Object>>> getOperation() {
+        return operation;
+    }
+
+    /**
+     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * 
+     */
+    @JsonProperty("operation")
+    public void setOperation(Map<String, Map<String, Map<String, Object>>> operation) {
+        this.operation = operation;
+    }
+
+    /**
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
@@ -135,7 +161,7 @@ public class ObserveResponse {
     }
 
     /**
-     * Part name -> slot name -> the value that slot carried. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
@@ -145,12 +171,12 @@ public class ObserveResponse {
     }
 
     @JsonAnyGetter
-    public Map<java.lang.String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(java.lang.String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
@@ -169,6 +195,10 @@ public class ObserveResponse {
         sb.append("states");
         sb.append('=');
         sb.append(((this.states == null)?"<null>":this.states));
+        sb.append(',');
+        sb.append("operation");
+        sb.append('=');
+        sb.append(((this.operation == null)?"<null>":this.operation));
         sb.append(',');
         sb.append("parts");
         sb.append('=');
@@ -189,16 +219,17 @@ public class ObserveResponse {
     @Override
     public int hashCode() {
         int result = 1;
+        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
         result = ((result* 31)+((this.parts == null)? 0 :this.parts.hashCode()));
         result = ((result* 31)+((this.description == null)? 0 :this.description.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
-        result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
+        result = ((result* 31)+((this.operation == null)? 0 :this.operation.hashCode()));
         result = ((result* 31)+((this.states == null)? 0 :this.states.hashCode()));
         return result;
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -206,7 +237,7 @@ public class ObserveResponse {
             return false;
         }
         ObserveResponse rhs = ((ObserveResponse) other);
-        return ((((((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts)))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
+        return (((((((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session)))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.operation == rhs.operation)||((this.operation!= null)&&this.operation.equals(rhs.operation))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
     }
 
 }

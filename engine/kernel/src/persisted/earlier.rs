@@ -5,6 +5,7 @@
 
 pub const CONTRACT_FORMAT: &[&str] = &[];
 pub const PROVIDER_SHAPE_FORMAT: &[&str] = &[];
+pub const PROVIDER_SHAPE_EVIDENCE_FORMAT: &[&str] = &[];
 pub const COMPONENT_ARTIFACT_TYPE: &[&str] = &[];
 pub const COMPONENT_CONFIG_MEDIA_TYPE: &[&str] = &[];
 pub const COMPONENT_INTERFACE: &[&str] = &[];

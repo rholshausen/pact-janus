@@ -1,0 +1,41 @@
+{
+  "description": "`http:path` refuses a path its template does not match, here one segment too many, saying what it expected (staged plan S4.1, ADR 0086)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "requires": [
+        {
+          "component": "http"
+        }
+      ],
+      "parts": {
+        "request": {
+          "method": {
+            "shape": "equality",
+            "example": "GET"
+          },
+          "path": {
+            "shape": "http:path",
+            "template": "/orders/{id}",
+            "example": "/orders/1"
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders/66/items"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.request.path",
+        "message": "Expected a path matching the template '/orders/{id}' but was '/orders/66/items'",
+        "action": "http:path"
+      }
+    ]
+  }
+}

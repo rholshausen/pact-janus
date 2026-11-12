@@ -155,16 +155,23 @@ one through a third session kind (engine-protocol spec §8.5, behind the
 `provider-shape-recording` capability):
 
 ```text
-provider-shape-session/create   { provider: { name: "order-service" } }        -> { session }
-provider-shape-session/observe  { session, description, states, parts }        -> { observations }
-provider-shape-session/finalise { session }                                    -> { provider-shape }
+provider-shape-session/create   { provider: { name: "order-service" } }                  -> { session }
+provider-shape-session/observe  { session, description, operation, parts }              -> { observations }
+provider-shape-session/finalise { session, write? }                                      -> { provider-shape }
 ```
 
-`observe` carries the **decoded response**, wrapped exactly as a contract wraps a recorded value.
-The engine makes no HTTP call of its own and needs no opinion about how the provider was reached:
-the provider's own test suite calls it however it already does, and hands over what came back.
+`observe` carries **what the provider answered**, as the HTTP transport presents a response: its
+status, its headers and its body's octets, which the engine decodes as a verification would. The
+engine makes no HTTP call of its own and needs no opinion about how the provider was reached: the
+provider's own test suite calls it however it already does, and hands over what came back. Each
+observation names the operation it answered, `GET /orders/{id}` as a method and an `http:path`
+template, because a provider's own tests do not know a consumer's words, and the shape matches a
+consumer's interaction by that operation and the status it was answered with
+([ADR 0086](../../Documentation/decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)).
+`engine/kernel/tests/provider_shape_by_operation.rs` records this provider that way, a 404 beside the
+200s, and checks the result against [`pacts/`](pacts/).
 
-`engine/kernel/tests/provider_shape_record.rs` does that against this provider, six responses across
+`engine/kernel/tests/provider_shape_record.rs` records it by the consumer's description, six responses across
 the states it supports, and the document that comes out says the three things this provider was
 built to say:
 

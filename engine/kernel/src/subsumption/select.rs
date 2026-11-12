@@ -12,7 +12,7 @@ use super::provider_shape::{ProviderInteraction, ProviderShape};
 use crate::contract::Interaction;
 use crate::error::Problem;
 use crate::interaction_spec;
-use crate::plan::{Assignment, CapturedValues, Status, compile, execute, outcome};
+use crate::plan::{ActionApplier, Assignment, CapturedValues, Status, compile, execute_with, outcome};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -35,11 +35,13 @@ pub const BY_SELECTOR: &str = "selector";
 
 /// Find the entry `interaction` is checked against. A selector that is not a valid shape
 /// document is a problem at `/interactions/<n>/selector`, reported as `interaction-invalid` with
-/// everything else the walk finds (spec §8).
+/// everything else the walk finds (spec §8). `actions` runs a component operator a selector uses,
+/// such as `http:path` (ADR 0086 decision 2).
 pub fn select<'a>(
   provider_shape: &'a ProviderShape,
   interaction: &Interaction,
   states: &[String],
+  actions: Option<&dyn ActionApplier>,
   problems: &mut Vec<Problem>,
 ) -> Selection<'a> {
   if let Some(entry) = provider_shape.find(&interaction.description, states) {
@@ -56,9 +58,14 @@ pub fn select<'a>(
     if entry.states.is_some() && entry.state_names() != states {
       continue;
     }
-    if admits_every_example(selector, interaction, index, problems) {
+    if admits_every_example(selector, interaction, index, actions, problems) {
       selected.push(entry);
     }
+  }
+  // An entry about the interaction's own states is more specific than one about the operation in
+  // any state, and is used over it (ADR 0086 decision 5). Two alike in that still tie.
+  if selected.iter().any(|entry| entry.states.is_some()) {
+    selected.retain(|entry| entry.states.is_some());
   }
   match selected.len() {
     0 => Selection::None,
@@ -71,6 +78,7 @@ fn admits_every_example(
   selector: &BTreeMap<String, BTreeMap<String, Value>>,
   interaction: &Interaction,
   index: usize,
+  actions: Option<&dyn ActionApplier>,
   problems: &mut Vec<Problem>,
 ) -> bool {
   let document = json!({ "description": "selector", "parts": selector });
@@ -100,6 +108,6 @@ fn admits_every_example(
         }
       }
       let resolver = CapturedValues::from_json(&values);
-      outcome(&execute(&plan, &resolver)).0 == Status::Matched
+      outcome(&execute_with(&plan, &resolver, None, actions)).0 == Status::Matched
     })
 }

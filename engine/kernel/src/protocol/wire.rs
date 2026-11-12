@@ -90,6 +90,32 @@ pub(crate) fn decode_slot(
 
 /// The content type a slot is decoded as and the component that claims it, if one does: the type
 /// declared for the slot, else the one it is labelled with.
+/// A recorded slot's document value (ADR 0086 decision 3), decoded as a reply's is by [`decode_slot`],
+/// except that octets a component claims and cannot decode are kept as octets rather than read as
+/// absent: a recorder records what the provider sent. The second value says why, when it did.
+pub(crate) fn recorded_slot(
+  slot: &SlotValue,
+  content: Option<&dyn ContentComponent>,
+) -> (RuntimeValue, Option<String>) {
+  let Some((content_type, component)) = claimant(slot, None, content) else {
+    return (decode_slot(slot, None, None), None);
+  };
+  match component.decode(Decode {
+    content_type: content_type.to_string(),
+    value: slot.clone(),
+    options: None,
+  }) {
+    Ok(result) => (result.document, None),
+    Err(error) => (
+      decode_slot(slot, None, None),
+      Some(format!(
+        "the value labelled '{content_type}' could not be decoded, so its octets were recorded: {}",
+        error.message
+      )),
+    ),
+  }
+}
+
 fn claimant<'a, 'c>(
   slot: &'a SlotValue,
   declared: Option<&'a str>,

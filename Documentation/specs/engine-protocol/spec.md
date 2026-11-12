@@ -900,23 +900,56 @@ answers these operations with `operation-unsupported`.
 
 | Operation | Body → Result |
 |---|---|
-| `provider-shape-session/create` | `{ provider, policy? }` → `{ session }` |
-| `provider-shape-session/observe` | `{ session, description, states?, parts }` → `{ observations, interactions }` |
-| `provider-shape-session/finalise` | `{ session }` → `{ provider-shape }` |
+| `provider-shape-session/create` | `{ provider, kind?, policy? }` → `{ session }` |
+| `provider-shape-session/observe` | `{ session, description, states?, operation?, parts }` → `{ observations, interactions, warnings? }` |
+| `provider-shape-session/finalise` | `{ session, write? }` → `{ provider-shape, written? }` |
 
 This is the engine driven a third way: not producing a contract and not replaying one, but
 accumulating what a provider's own tests produced into the artifact
 [design 2.8](../subsumption-check/spec.md) §2 defines, with provenance `recorded`. What the
 document *means* — and the judgements a recorder makes to produce one — belong to that design
-and to task 7.2, not here; the protocol's contribution is that `observe` carries **decoded
-values**, wrapped exactly as a contract wraps them (contract spec §5.3), so the engine needs
-no opinion about how the provider was called and the architecture rule that keeps HTTP out of
-the kernel is not bent to record an HTTP response.
+and to task 7.2, not here.
+
+What the protocol settles is how an answer reaches the recorder, and
+[ADR 0086](../../decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)
+settles it so a provider's own test suite can use it:
+
+- **An observation names its operation.** A provider's own tests do not know a consumer's
+  description, so `operation` names what the answer was to, as shapes over the initiating part's
+  slots — for HTTP a `method` and an `http:path` template (component-interfaces spec §5.11). It
+  becomes the entry's `selector` (design 2.8 §2.2). `description` is what a report calls the entry,
+  the provider's own name for the operation unless the test knows the consumer's words. When `parts`
+  carries the initiating part, an `operation` that does not admit it is `interaction-invalid` at
+  `/operation`, so a template written wrong is found where it was written.
+- **An observation is an arrival.** `parts` are the transport's own, as it presents them
+  (component-interfaces spec §5.9 for HTTP), a content slot carrying its octets tagged `base64` and
+  labelled with its type. They are read as a verification reads what a provider answered: through
+  what the transport for the session's `kind` declares (`http` unless given; a kind no transport
+  serves is `component-unavailable`), and the engine's content components, so no host decodes a
+  body. Only the answering part is recorded. Octets a component claims and cannot decode are
+  recorded as octets, and the result's `warnings` says so.
+- **Outcomes are kept apart.** The transport's outcome slots (component-interfaces spec §5.10; for
+  HTTP the status) are written into the selector as `equality`, so an entry is one description, one
+  set of state names and one selector, outcome included, and a 404 never widens a 200. An
+  observation with no `operation` is about the consumer interaction its description names, and is
+  kept as one entry, as before.
+- **Credentials are withheld.** A member the transport declares a credential
+  (component-interfaces spec §5.8) is recorded as present or absent, as the shape `any`.
 
 `finalise` always produces the document. The honesty rule that makes a consumer session
 withhold a contract (contract spec §2.2) has no counterpart here, and importing it would be a
 category error: a contract claims a test passed, while a provider shape claims only that these
 responses were produced.
+
+With `write: { path, evidence, source }` (behind `contract-writing`, as a consumer session's
+`write` is), the engine's host writes the shape to `path`, and answers `written` beside it. Several
+sessions record one shape: a suite's test files, one after another or in separate workers. So the
+recorder's counts are kept in `evidence`, a file of each `source`'s evidence (a
+`janus-provider-shape-evidence/1` document, not one to publish). Under that file's lock, held until
+the shape is written, a session replaces its own source's evidence and the shape is written from all
+of them, so a test file recorded twice counts once and the shape is the one a single session
+recording them all would have written. Evidence about another provider is `contract-conflict`, and
+both files are left as they were.
 
 ### 8.6 Subsumption and the compatibility decision — `subsumption/*`
 

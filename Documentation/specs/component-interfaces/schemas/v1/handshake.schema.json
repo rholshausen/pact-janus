@@ -138,6 +138,11 @@
             "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
         },
+        "outcome-slots": {
+          "type": "object",
+          "description": "Which slots of which parts tell one exchange's outcome from another's (spec.md §5.10, ADR 0086), as part name -> slot names: a provider-shape recording keeps one entry per value of them, so an operation's answers of different kinds do not widen each other. HTTP's is the response's 'status'. Absent means none.",
+          "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        },
         "roles": {
           "type": "array",
           "description": "Which roles it supports: 'serve' accepts inbound traffic, 'drive' initiates outbound (spec.md §5.1). A transport may support both.",

@@ -55,6 +55,12 @@ pub const CONTRACT_FORMAT: Persisted = Persisted::new("janus-contract/1", earlie
 /// A provider shape's `$format` (subsumption-check spec §4).
 pub const PROVIDER_SHAPE_FORMAT: Persisted =
   Persisted::new("janus-provider-shape/1", earlier::PROVIDER_SHAPE_FORMAT);
+/// A provider shape's evidence file's `$format` (ADR 0086 decision 7): the recorder's counts, kept
+/// in a build directory so several sessions can write one shape.
+pub const PROVIDER_SHAPE_EVIDENCE_FORMAT: Persisted = Persisted::new(
+  "janus-provider-shape-evidence/1",
+  earlier::PROVIDER_SHAPE_EVIDENCE_FORMAT,
+);
 /// An OCI component artifact's `artifactType` (ADR 0021).
 pub const COMPONENT_ARTIFACT_TYPE: Persisted = Persisted::new(
   "application/vnd.pact.janus.component.v1",
@@ -79,9 +85,10 @@ pub const HOOK_SCRIPT_GLOBAL: Persisted = Persisted::new("janus", earlier::HOOK_
 pub const HOOK_BODY_FORMAT: Persisted = Persisted::new("janus", earlier::HOOK_BODY_FORMAT);
 
 /// Every persisted identifier, by name, for whatever must visit them all.
-pub const ALL: [(&str, Persisted); 7] = [
+pub const ALL: [(&str, Persisted); 8] = [
   ("CONTRACT_FORMAT", CONTRACT_FORMAT),
   ("PROVIDER_SHAPE_FORMAT", PROVIDER_SHAPE_FORMAT),
+  ("PROVIDER_SHAPE_EVIDENCE_FORMAT", PROVIDER_SHAPE_EVIDENCE_FORMAT),
   ("COMPONENT_ARTIFACT_TYPE", COMPONENT_ARTIFACT_TYPE),
   ("COMPONENT_CONFIG_MEDIA_TYPE", COMPONENT_CONFIG_MEDIA_TYPE),
   ("COMPONENT_INTERFACE", COMPONENT_INTERFACE),

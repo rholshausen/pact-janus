@@ -253,7 +253,8 @@ because the kernel knows nothing about HTTP. It arrives as `http:status-class`, 
 transport component that knows what a status class is. A `Content-Type` compared as a media type is the
 second: `http:media-type`, whose member `type` is the media type expected (ADR 0071). A header compared
 as the elements of a list is the third: `http:list`, whose member `elements` is the elements expected
-(ADR 0082).
+(ADR 0082). A path compared against a path template is the fourth: `http:path`, whose member `template`
+is the template, as OpenAPI writes one (ADR 0086).
 
 ### 3.6 Where shapes attach
 
