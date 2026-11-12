@@ -2431,6 +2431,12 @@ once there are shapes to publish.
     provider answered during `janus verify` (`observed`, design 2.8 §2.3) needs no selector, but sees
     only what consumers asked for. The ADR decides whether it comes first, beside recording from the
     provider's own tests, or not at all.
+  [ADR 0086](decisions/0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md)
+  decided them on 2026-11-12. Each observation names its operation with the DSL (`http:path`'s
+  `pathTemplate`), is read as an arrival through the transport and content components, and is kept apart
+  by the transport's `outcome-slots` (HTTP's `status`). The engine's host writes and merges the shape,
+  with the recorder's counts kept per test file in the build directory. Recording during verification is
+  S6.8, and reading a framework's own responses and routes is S6.7.
   *Exit:* in each SDK, a provider test suite whose tests never name a consumer's interaction records a
   shape, and `janus check` matches it to the demo's contract by selector and finds the `CANCELLED`
   status M5 found.
@@ -2576,6 +2582,22 @@ content component exists written by someone outside the core team.
   *Exit:* a provider suite with a failing interaction reports that interaction, and only that one, as
   a failed test in each of those four frameworks.
 
+- **S6.7 Recording adapters for provider test frameworks** — **S** per framework. Added 2026-11-12 by
+  ADR 0086, which has a recorder take a response as status, headers and body octets, or as the standard
+  client returns one, and the test name its operation. An adapter reads a framework's own test response
+  (Spring's `MvcResult`, supertest's, Ktor's) and, where the framework knows it, the route that answered
+  (Spring's best-matching pattern, Express's `req.route.path`), so the test need not write the template.
+  An adapter fills in what the test would have written, and changes nothing the engine records.
+  *Exit:* per framework, a test that records through the adapter writes the shape the same test
+  writing its operation and response by hand writes, byte for byte.
+- **S6.8 Recording a provider shape during verification** (`observed`, design 2.8 §2.3) — **M**. Added
+  2026-11-12 by ADR 0086 decision 9, for when someone asks for it. A `verification/verify` option hands
+  each answer the run scored to a recorder, keyed by the contract's identity, so the entry needs no
+  selector. It sees only what consumers asked for, which is why S4.1 records from the provider's own
+  tests first.
+  *Exit:* `janus verify` with the option writes a shape with provenance `observed` that `janus check`
+  matches by description to every contract the run verified.
+
 **Done when** it never is. Each SDK has its own exit: conformance passing, and the old SDK's example
 suites, consumer and provider, running on its compatibility facade.
 
@@ -2712,6 +2734,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |
+| S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |
+| S6.8 | No shape is recorded from verification traffic (`observed`) | ADR 0086 decision 9 |
 | SA.3 | The security review an agent with provider access needs | AI-layer notes §4 |
 
 ## 6. Risks
