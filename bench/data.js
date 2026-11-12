@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794441849584,
+  "lastUpdate": 1794441851310,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -49878,6 +49878,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19814,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "9e9ff6a19d96c5b637d9e005a61cc88add902317",
+          "message": "feat: S3.6 generators in the DSL, as generated(of, generator, config?)\n\nADR 0085: both SDKs name a generator on one value with `generated`, which\nwrites `generator: { name, config }` on the node its argument compiles to.\nA mock fills it fresh in each reply and a verifier in its request, while\nthe contract records the example (ADR 0048). It wraps a plain scalar or a\nvalue helper only: a node whose value the running variant chooses, a\nstructural one, or one already generated is refused at the call, and\n`optional(generated(...))` is the spelling for a value that may be absent.\n\n`live/generated-served-fresh` is S1.19's deferred exit case, passing in\nboth SDKs byte for byte; five more cases cover the node, the refusals and\nthe engine's check. A live case's exchange can now say what the mock\nserved (`expect-body`), and `produces` gains a `shape-member` kind.\n\nNot foreseen: the engine asked a generator only when it produced a value,\nso a misspelt one served the example with a log line. `add-interaction`\nnow asks each generator once and refuses one nothing provides, or whose\nconfiguration its component refuses, as `interaction-invalid` at the\nnode's `generator`. And the fill walk now goes into a `one-of`, by the\nalternative whose discriminator the value binds (amending ADR 0048\ndecision 6).\n\nThinness budgets: TypeScript idiomatic 1150 -> 1200, JVM idiomatic\n2650 -> 2700. `generated` adds one helper and its refusals in each SDK,\nnone of it matching logic or orchestration.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T10:08:26+11:00",
+          "tree_id": "2a2b3cefb06469b3d1693dfd50d98bb2e9ab8ffa",
+          "url": "https://github.com/rholshausen/pact-janus/commit/9e9ff6a19d96c5b637d9e005a61cc88add902317"
+        },
+        "date": 1794441850901,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 35557,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 26432,
             "unit": "requests per second",
             "extra": "engines 4"
           }
