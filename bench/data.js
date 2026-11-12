@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794466190868,
+  "lastUpdate": 1794466193130,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -52002,6 +52002,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19697,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "452a168551cd2b83f3a7a06091f00ba978de1e88",
+          "message": "fix: S4.1's exit test reads only files the repository holds\n\nthe_shape_every_sdk_records_is_matched_by_operation_and_finds_its_variance\nread demo/web-app/contracts/web-app-order-service.janus.json, which the\ndemo writes when it runs and .gitignore leaves out, so it passed locally\nand failed in CI. It checks the pinned shape against the sample\nprovider's pact alone, the pair the demo uses, and a file it cannot read\nnow names its path. S4.1's Done line says what CI checks, and that the\ndemo still checks task 7.2's description-matched shape.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T17:33:10+11:00",
+          "tree_id": "6f4a395f969f74be5e40cb4f8df5baa8dd80a08b",
+          "url": "https://github.com/rholshausen/pact-janus/commit/452a168551cd2b83f3a7a06091f00ba978de1e88"
+        },
+        "date": 1794466192383,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 47822,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 45863,
             "unit": "requests per second",
             "extra": "engines 4"
           }
