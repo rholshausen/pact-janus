@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794456674107,
+  "lastUpdate": 1794456676653,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -51294,6 +51294,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 25960,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "c2e97630580869a19c921403396bdd787c23f77c",
+          "message": "docs: S3.7 a test per interaction in provider tests, where the framework can\n\nAsked for by a community member. S3.5 made each variant a consumer test in\nevery framework that registers tests dynamically; on the provider side only\nJUnit 5's JanusProviderExtension has a test per interaction result. The\nnative Verifier under Vitest, Jest and Spock is one test for the whole run.\n\nThe item spells it per framework as S3.5 does, leaves pact-js's Verifier\nfacade as one promise, and names the ADR it needs first: when the run\nhappens, since a file's top level runs before beforeAll, where a provider\nis usually started. A known-debt row points at it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T15:05:42+11:00",
+          "tree_id": "7bef7e41c5320af830be84b9a4274da801c83c69",
+          "url": "https://github.com/rholshausen/pact-janus/commit/c2e97630580869a19c921403396bdd787c23f77c"
+        },
+        "date": 1794456675821,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26350,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19552,
             "unit": "requests per second",
             "extra": "engines 4"
           }
