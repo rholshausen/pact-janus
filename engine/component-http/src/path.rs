@@ -73,6 +73,11 @@ impl Template {
     Ok(Template { pieces })
   }
 
+  /// Whether the template has a parameter, and so admits more than one path.
+  pub fn has_parameters(&self) -> bool {
+    self.pieces.contains(&Piece::Parameter)
+  }
+
   /// Whether `path` matches the whole template.
   pub fn admits(&self, path: &str) -> bool {
     matches(&self.pieces, path)

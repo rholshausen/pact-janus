@@ -103,6 +103,7 @@ superseding ADR instead.
 | [0084](0084-tell-what-the-mock-made-of-each-request-while-the-test-runs-and-make-each-variant-a-test-where-the-framework-can.md) | Tell what the mock made of each request while the test runs, and make each variant a test where the framework can | accepted |
 | [0085](0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md) | Name a generator in the DSL on the value it produces, and refuse one nothing provides when the interaction is added | accepted |
 | [0086](0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md) | Record a provider shape from the provider's own tests, by the operation each test names | accepted |
+| [0087](0087-compare-the-built-in-components-operators-by-their-own-matchers-and-a-compare-each-declares.md) | Compare the built-in components' operators by their own matchers, and a `compare` each declares | accepted |
 
 ## Decision backlog
 

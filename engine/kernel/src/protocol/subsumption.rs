@@ -76,11 +76,12 @@ pub enum SubsumptionError {
   Invalid { problems: Vec<crate::error::Problem> },
 }
 
-/// `subsumption/check`: one consumer contract against one provider shape (design 2.8 §3.1). `actions`
-/// runs the component operators a selector uses (ADR 0086 decision 2).
+/// `subsumption/check`: one consumer contract against one provider shape (design 2.8 §3.1).
+/// `components` answers for component operators: a selector's (ADR 0086 decision 2), and the walk's
+/// (ADR 0087).
 pub fn check(
   request: &Check,
-  actions: &dyn crate::plan::ActionApplier,
+  components: &dyn crate::subsumption::OperatorComparer,
 ) -> Result<(SubsumptionReport, String), SubsumptionError> {
   let (contract, format) = consumer_contract(&request.contract)?;
   let shape: ProviderShape = read_provider_shape(&request.provider_shape)?;
@@ -90,7 +91,7 @@ pub fn check(
       shape: shape.provider.name.clone(),
     });
   }
-  let report = walk(&contract, &shape, Some(actions)).map_err(SubsumptionError::Check)?;
+  let report = walk(&contract, &shape, Some(components)).map_err(SubsumptionError::Check)?;
   Ok((report, format))
 }
 

@@ -848,6 +848,22 @@ floor. So an operator declares a **comparability class** in the handshake:
 guess — shape spec §8's rule that a wrong `yes` is how a checker loses its users applies to components
 verbatim, and a component is the party most tempted to be optimistic about its own operator.
 
+A provider that admits a finite set of values (`equality`, `any-of`) against an `exact` or `conservative`
+operator is not handed to `compare`: the checker runs the operator's own action on each value, as shape
+spec §8 decides one against a conservative core operator. Anything wider goes to `compare`, for the
+consumer's operator first, then the provider's
+([ADR 0087](../../decisions/0087-compare-the-built-in-components-operators-by-their-own-matchers-and-a-compare-each-declares.md)).
+The native binding answers the class and `compare` in code (§9.1). The built-in HTTP component declares:
+
+| Operator | Class | What its `compare` decides |
+|---|---|---|
+| `http:status-class` | `exact` | against another class or a set of statuses, by the statuses each admits |
+| `http:media-type` | `exact` | against another, whether the consumer's admits the provider's own type; against an `equality` or `any-of`, `no` |
+| `http:list` | `exact` | against another, whether the elements are equal; against an `equality` or `any-of`, `no` |
+| `http:path` | `conservative` | a template with no parameter as its one path; one with a parameter against an `equality` or `any-of`, `no`; two templates that differ, `unknown` |
+
+Each is `yes` against `any`, and the three string-valued ones against `string`.
+
 ## 8. The hook interface
 
 Schema: [`schemas/v1/hook.schema.json`](schemas/v1/hook.schema.json).

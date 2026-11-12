@@ -502,10 +502,9 @@ fn a_shape_recorded_by_operation_is_matched_to_the_consumers_pact_and_finds_its_
     status["provider"]["summary"],
     "one of 'CANCELLED' | 'PENDING' | 'SHIPPED'"
   );
-  // What the provider sent as its `Content-Type`, against the pact's `http:media-type`, is a review:
-  // the walk cannot compare a component operator yet. S4.7 decides it, and changes this.
-  let content_type = finding(found, "response.headers.content-type[0]").expect("a review");
-  assert_eq!(content_type["severity"], "review");
+  // What the provider sent as its `Content-Type`, against the pact's `http:media-type`, is decided:
+  // the HTTP component's matcher admits it (S4.7, ADR 0087), so there is nothing to report.
+  assert_eq!(finding(found, "response.headers.content-type[0]"), None);
 
   let missing = &interactions[1];
   assert_eq!(
@@ -517,9 +516,9 @@ fn a_shape_recorded_by_operation_is_matched_to_the_consumers_pact_and_finds_its_
     "the 404 the consumer expects selects the entry the provider's 404 was recorded in"
   );
   assert_eq!(
-    missing["findings"].as_array().unwrap().len(),
-    1,
-    "S4.7's review alone"
+    missing["findings"],
+    json!([]),
+    "nothing the 404 consumer has not tested"
   );
 }
 

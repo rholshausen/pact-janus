@@ -249,6 +249,10 @@ Three sources are the source of truth and take precedence over this file when th
 > `http:path`), the answer read as an arrival and its outcome (HTTP's status, a transport's
 > `outcome-slots`) kept apart; `finalise`'s `write` has the engine's host write the shape from every
 > source's counts. Both SDKs have a `ShapeRecorder`, and `live/recorded-shape` pins what they write.
+> S4.7 (ADR 0087): the walk decides the built-in HTTP component's operators, a finite provider by the
+> operator's own action and anything wider by the component's `matcher/compare`, for an operator it
+> declared `exact` or `conservative` (`MatcherComponent::comparability`); a declared component's stay
+> opaque in `janus check` until S5.7.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

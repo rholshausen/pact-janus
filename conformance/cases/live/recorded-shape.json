@@ -171,7 +171,7 @@
             "Content-Type": "application/json"
           },
           "body": {
-            "text": "{\"error\":\"not found\",\"id\":\"999\"}"
+            "text": "{\"error\":\"not-found\",\"id\":\"999\"}"
           }
         },
         "request": {
@@ -332,7 +332,7 @@
               "body": {
                 "members": {
                   "error": {
-                    "example": "not found",
+                    "example": "not-found",
                     "shape": "equality"
                   },
                   "id": {

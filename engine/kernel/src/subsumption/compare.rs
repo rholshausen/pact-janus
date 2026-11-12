@@ -30,6 +30,15 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// What the walk asks about a component's operators (component-interfaces spec §7.5, ADR 0087): the
+/// class each declares, and `matcher/compare` for a pair one of them is in. It runs their actions
+/// too, which is how a finite provider is decided against one.
+pub trait OperatorComparer: plan::ActionApplier {
+  fn comparability(&self, operator: &str) -> crate::component::Comparability;
+  /// `None` when no component answers for `operator`, or it could not run.
+  fn compare(&self, operator: &str, provider: &Value, consumer: &Value) -> Option<(Verdict, Option<String>)>;
+}
+
 /// The walk's three-valued answer (shape spec §8). `not-published` is a report-level state, not
 /// one of these (spec §6.3), and lives on [`super::InteractionResult`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,7 +154,19 @@ fn dimension_path(id: &str) -> &str {
 /// Compare one published shape against one declared shape, rooted at `at` (a dimension path,
 /// shape spec §6.2 — typically [`path::root`]'s `"<part>.<slot>"`).
 pub fn compare(provider: &ShapeNode, consumer: &ShapeNode, at: &str) -> (Verdict, Vec<Finding>) {
-  let mut walk = Walk::new(&[]);
+  let mut walk = Walk::new(&[], None);
+  let out = walk.node(provider, consumer, at);
+  (out.verdict, out.findings)
+}
+
+/// [`compare`], with what answers for component operators (ADR 0087).
+pub fn compare_with(
+  provider: &ShapeNode,
+  consumer: &ShapeNode,
+  at: &str,
+  components: &dyn OperatorComparer,
+) -> (Verdict, Vec<Finding>) {
+  let mut walk = Walk::new(&[], Some(components));
   let out = walk.node(provider, consumer, at);
   (out.verdict, out.findings)
 }
@@ -153,11 +174,92 @@ pub fn compare(provider: &ShapeNode, consumer: &ShapeNode, at: &str) -> (Verdict
 /// The walk, plus the §5 cross-reference it carries along.
 pub(super) struct Walk<'a> {
   exclusions: &'a [RecordedExclusion],
+  /// What answers for component operators; without it, every one is opaque.
+  components: Option<&'a dyn OperatorComparer>,
 }
 
 impl<'a> Walk<'a> {
-  pub(super) fn new(exclusions: &'a [RecordedExclusion]) -> Walk<'a> {
-    Walk { exclusions }
+  pub(super) fn new(
+    exclusions: &'a [RecordedExclusion],
+    components: Option<&'a dyn OperatorComparer>,
+  ) -> Walk<'a> {
+    Walk {
+      exclusions,
+      components,
+    }
+  }
+
+  /// A pair a component's operator is in (ADR 0087), when its component declared it comparable. A
+  /// finite provider against the consumer's operator is decided by that operator's own matcher, as
+  /// shape spec §8's conservative row decides one; anything else is the component's `compare`,
+  /// asked for the consumer's operator first. `None` leaves the pair to the opaque rule.
+  fn component_operators(&mut self, p: &ShapeNode, c: &ShapeNode, at: &str) -> Option<Out> {
+    use crate::component::Comparability;
+    let components = self.components?;
+    fn declared<'n>(node: &'n ShapeNode, components: &dyn OperatorComparer) -> Option<&'n str> {
+      match &node.kind {
+        ShapeKind::Component { operator, .. } => Some(operator.as_str())
+          .filter(|operator| components.comparability(operator) != Comparability::Opaque),
+        ShapeKind::Core(_) => None,
+      }
+    }
+    let (provider, consumer) = (declared(p, components), declared(c, components));
+    if provider.is_none() && consumer.is_none() {
+      return None;
+    }
+    if let Some(operator) = consumer
+      && let Some(values) = enumerate(p)
+    {
+      let outside: Vec<&Value> = values
+        .iter()
+        .filter(|value| !matched_with(c, value, components))
+        .collect();
+      if outside.is_empty() {
+        return Some(Out::yes());
+      }
+      return Some(Out::no(Finding::wider_values(
+        at,
+        Side::new(phrases::describe(p)),
+        Side::new(phrases::describe(c)),
+        format!(
+          "the consumer's {operator} does not admit {}",
+          outside
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+        ),
+      )));
+    }
+    let (p_document, c_document) = (document(p), document(c));
+    let mut reasons = Vec::new();
+    for operator in [consumer, provider].into_iter().flatten() {
+      match components.compare(operator, &p_document, &c_document) {
+        Some((Verdict::Yes, _)) => return Some(Out::yes()),
+        Some((Verdict::No, reason)) => {
+          return Some(Out::no(Finding::wider_values(
+            at,
+            Side::new(phrases::describe(p)),
+            Side::new(phrases::describe(c)),
+            reason.unwrap_or_else(|| format!("'{operator}' decides the provider's shape admits more")),
+          )));
+        }
+        Some((Verdict::Unknown, reason)) => reasons.extend(reason),
+        None => {}
+      }
+    }
+    Some(Out::unknown(Finding::unreviewable(
+      at,
+      Side::new(phrases::describe(p)),
+      Side::new(phrases::describe(c)),
+      reasons.pop().unwrap_or_else(|| {
+        format!(
+          "'{}' against '{}': the component cannot decide this pair",
+          p.operator(),
+          c.operator()
+        )
+      }),
+    )))
   }
 
   /// One node pair, with §5's coverage caveat applied at this path. Structural children go
@@ -289,6 +391,10 @@ impl<'a> Walk<'a> {
   fn operators(&mut self, p: &ShapeNode, c: &ShapeNode, at: &str) -> Out {
     if same_admits(p, c) && self.floor_stands(p, at) {
       return Out::yes();
+    }
+
+    if let Some(out) = self.component_operators(p, c, at) {
+      return out;
     }
 
     // The opaque class (shape spec §8): `contains`, and every component operator that has not
@@ -1304,6 +1410,15 @@ fn admits_value(node: &ShapeNode, value: &Value) -> Option<bool> {
 /// of a one-slot interaction and run against the value. Shape spec §7.4 makes the compiled plan
 /// the definition of `admits`, so this cannot disagree with what a verification would decide.
 fn matched_by(node: &ShapeNode, value: &Value) -> bool {
+  matched(node, value, None)
+}
+
+/// [`matched_by`], with what runs a component operator's action.
+fn matched_with(node: &ShapeNode, value: &Value, components: &dyn OperatorComparer) -> bool {
+  matched(node, value, Some(components as &dyn plan::ActionApplier))
+}
+
+fn matched(node: &ShapeNode, value: &Value, actions: Option<&dyn plan::ActionApplier>) -> bool {
   let spec = InteractionSpec {
     description: "membership".to_string(),
     transport: None,
@@ -1319,7 +1434,29 @@ fn matched_by(node: &ShapeNode, value: &Value) -> bool {
   let plan = plan::compile(&spec, &plan::Assignment::new(), None);
   let resolver =
     plan::CapturedValues::new().capture("$.subsumption.value", plan::RuntimeValue::from_json(value));
-  plan::outcome(&plan::execute(&plan, &resolver)).0 == plan::Status::Matched
+  plan::outcome(&plan::execute_with(&plan, &resolver, None, actions)).0 == plan::Status::Matched
+}
+
+/// A node as the shape document `matcher/compare` is handed: a component operator's own members,
+/// and the core operators a component may be compared against — a value, a set of them, a kind.
+fn document(node: &ShapeNode) -> Value {
+  let mut document = serde_json::Map::new();
+  document.insert("shape".to_string(), Value::from(node.operator()));
+  match &node.kind {
+    ShapeKind::Component { raw, .. } => {
+      for (name, value) in raw {
+        document.insert(name.clone(), value.clone());
+      }
+    }
+    ShapeKind::Core(CoreShape::AnyOf { options }) => {
+      document.insert("options".to_string(), Value::Array(options.clone()));
+    }
+    ShapeKind::Core(_) => {}
+  }
+  if let Some(example) = &node.example {
+    document.insert("example".to_string(), example.value.clone());
+  }
+  Value::Object(document)
 }
 
 fn admits_example(node: &ShapeNode, example: &Example) -> Option<bool> {

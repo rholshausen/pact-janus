@@ -10,7 +10,9 @@
 //! allowed. Each class is the range today's verifier checks (`pact_matching`'s `match_status_code`).
 //! A plan passes them as the action's second argument, which arrives as `config.arguments[0]`.
 
-use pact_janus_kernel::component::{Apply, ApplyResult, ComponentError, MatcherComponent};
+use pact_janus_kernel::component::{
+  Apply, ApplyResult, Comparability, Compare, CompareResult, ComponentError, MatcherComponent,
+};
 use serde_json::{Value, json};
 
 /// The component's name, which namespaces what it contributes (spec §2.4).
@@ -118,39 +120,51 @@ fn as_status(value: &Value) -> Option<u16> {
 
 impl MatcherComponent for HttpMatcher {
   fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
-    if req.action == crate::media_type::MEDIA_TYPE {
-      return crate::media_type::apply(req.config.as_ref(), &req.values);
+    match req.action.as_str() {
+      crate::media_type::MEDIA_TYPE => crate::media_type::apply(req.config.as_ref(), &req.values),
+      crate::list::LIST => crate::list::apply(req.config.as_ref(), &req.values),
+      crate::path::PATH => crate::path::apply(req.config.as_ref(), &req.values),
+      STATUS_CLASS => apply(req.config.as_ref(), &req.values),
+      other => Err(ComponentError::operation_unsupported(other)),
     }
-    if req.action == crate::list::LIST {
-      return crate::list::apply(req.config.as_ref(), &req.values);
-    }
-    if req.action == crate::path::PATH {
-      return crate::path::apply(req.config.as_ref(), &req.values);
-    }
-    if req.action != STATUS_CLASS {
-      return Err(ComponentError::operation_unsupported(&req.action));
-    }
-    let allowed = Allowed::read(req.config.as_ref())?;
-    let results = req
-      .values
-      .iter()
-      .map(|value| {
-        let actual = value.get("content").unwrap_or(&Value::Null);
-        match as_status(actual) {
-          Some(status) if allowed.admits(status) => json!({ "status": "ok" }),
-          Some(status) => json!({
-            "status": "error",
-            "message": format!("Expected {} but was {status}", allowed.phrase()),
-          }),
-          None => json!({
-            "status": "error",
-            "message": format!("Expected {} but was {actual}, which is not a status", allowed.phrase()),
-          }),
-        }
-      })
-      .collect();
-    Ok(ApplyResult { results })
   }
+
+  fn comparability(&self, operator: &str) -> Comparability {
+    crate::compare::comparability(operator)
+  }
+
+  fn compare(&self, req: Compare) -> Result<CompareResult, ComponentError> {
+    Ok(crate::compare::compare(&req))
+  }
+}
+
+/// Runs `http:status-class` over each value.
+pub(crate) fn apply(config: Option<&Value>, values: &[Value]) -> Result<ApplyResult, ComponentError> {
+  let allowed = Allowed::read(config)?;
+  let results = values
+    .iter()
+    .map(|value| {
+      let actual = value.get("content").unwrap_or(&Value::Null);
+      match as_status(actual) {
+        Some(status) if allowed.admits(status) => json!({ "status": "ok" }),
+        Some(status) => json!({
+          "status": "error",
+          "message": format!("Expected {} but was {status}", allowed.phrase()),
+        }),
+        None => json!({
+          "status": "error",
+          "message": format!("Expected {} but was {actual}, which is not a status", allowed.phrase()),
+        }),
+      }
+    })
+    .collect();
+  Ok(ApplyResult { results })
+}
+
+/// What a status class's members admit, as a predicate over statuses, for comparing two of them.
+pub(crate) fn admitted(members: &Value) -> Option<impl Fn(u16) -> bool> {
+  let allowed = Allowed::read(Some(&json!({ "arguments": [members] }))).ok()?;
+  Some(move |status| allowed.admits(status))
 }
 
 #[cfg(test)]

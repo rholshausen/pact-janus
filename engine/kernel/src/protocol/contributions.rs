@@ -186,8 +186,58 @@ fn refused(component: &str, part: &str, slot: &str, error: FragmentError) -> Una
 
 /// What runs `matchers`' actions when a plan reaches one, as a run's scope does (ADR 0057): for a
 /// caller that executes plans outside a session, such as the golden corpus.
-pub fn in_tree_actions(matchers: &[InTreeMatcher]) -> impl ActionApplier + use<> {
+pub fn in_tree_actions(matchers: &[InTreeMatcher]) -> impl crate::subsumption::OperatorComparer + use<> {
   Contributions::from_resolved(&[], matchers)
+}
+
+/// What the subsumption walk asks about a component's operators (component-interfaces spec §7.5,
+/// ADR 0087): the matcher of the component whose namespace the operator is in.
+impl crate::subsumption::OperatorComparer for Contributions {
+  fn comparability(&self, operator: &str) -> crate::component::Comparability {
+    self
+      .matcher_for(operator)
+      .map(|matcher| matcher.comparability(operator))
+      .unwrap_or(crate::component::Comparability::Opaque)
+  }
+
+  fn compare(
+    &self,
+    operator: &str,
+    provider: &serde_json::Value,
+    consumer: &serde_json::Value,
+  ) -> Option<(crate::subsumption::Verdict, Option<String>)> {
+    use crate::subsumption::Verdict;
+    let result = self
+      .matcher_for(operator)?
+      .compare(crate::component::Compare {
+        operator: operator.to_string(),
+        provider: provider.clone(),
+        consumer: consumer.clone(),
+      })
+      .ok()?;
+    let verdict = match result.verdict.as_str() {
+      "yes" => Verdict::Yes,
+      "no" => Verdict::No,
+      // An answer this engine does not know is no answer: the walk must not guess.
+      _ => Verdict::Unknown,
+    };
+    Some((verdict, result.reason))
+  }
+}
+
+impl Contributions {
+  /// The matcher of the component that contributes `operator`, by its namespace.
+  fn matcher_for(&self, operator: &str) -> Option<&Arc<dyn MatcherComponent>> {
+    let (namespace, _) = operator.split_once(':')?;
+    self
+      .contributors
+      .iter()
+      .find(|contributor| {
+        contributor.name == namespace && contributor.actions.iter().any(|action| action == operator)
+      })?
+      .matcher
+      .as_ref()
+  }
 }
 
 /// `matcher/apply` for a fragment's component actions (spec §7.1).

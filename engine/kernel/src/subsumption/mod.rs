@@ -30,7 +30,7 @@ mod report;
 mod select;
 
 pub use crate::contract::Party;
-pub use compare::{Verdict, compare};
+pub use compare::{OperatorComparer, Verdict, compare, compare_with};
 pub use policy::{Action, Exemption, InteractionRef, SubsumptionPolicy};
 pub use provider_shape::{
   FORMAT as PROVIDER_SHAPE_FORMAT, ProviderInteraction, ProviderShape, StateRef, read_provider_shape,

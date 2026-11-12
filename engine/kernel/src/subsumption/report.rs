@@ -269,12 +269,14 @@ pub fn check(contract: &Contract, provider_shape: &ProviderShape) -> Result<Subs
   check_with(contract, provider_shape, None)
 }
 
-/// [`check`], with what runs a component operator a selector uses (ADR 0086 decision 2).
+/// [`check`], with what answers for component operators: the actions a selector uses (ADR 0086
+/// decision 2), and their comparability (ADR 0087).
 pub fn check_with(
   contract: &Contract,
   provider_shape: &ProviderShape,
-  actions: Option<&dyn crate::plan::ActionApplier>,
+  components: Option<&dyn super::OperatorComparer>,
 ) -> Result<SubsumptionReport, CheckError> {
+  let actions = components.map(|components| components as &dyn crate::plan::ActionApplier);
   let mut problems = Vec::new();
   let mut interactions = Vec::new();
 
@@ -333,7 +335,7 @@ pub fn check_with(
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect(),
     ));
-    let mut walk = Walk::new(&exclusions);
+    let mut walk = Walk::new(&exclusions, components);
 
     let mut verdict = Verdict::Yes;
     let mut findings = Vec::new();

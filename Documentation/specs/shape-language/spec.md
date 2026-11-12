@@ -809,7 +809,9 @@ Two notes for 2.8:
   `content-type` is left out of it because it inspects octets and an enumerated example is JSON.
 - Component operators SHOULD declare a comparability class and, where they can, a containment
   procedure (design 2.6's interface). A component that declares nothing is opaque, and the check
-  degrades locally and visibly rather than globally and silently.
+  degrades locally and visibly rather than globally and silently. The enumerable-provider row applies
+  to a component operator declared `exact` or `conservative` too, by running its own action on each
+  value (ADR 0087).
 
 ## 9. Evolution and compatibility
 

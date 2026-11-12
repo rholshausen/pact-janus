@@ -2510,6 +2510,17 @@ once there are shapes to publish.
   *Exit:* the kernel's subsumption tests decide each built-in operator against a literal, itself and
   its neighbours, and `janus check` passes an upgraded pact's `Content-Type` against a recorded
   `application/json`.
+  *Done 2026-11-12* (ADR 0087):
+  - The native matcher binding answers `comparability` and `matcher/compare`, and the walk asks the
+    engine's contributions. A finite provider against a declared component operator is decided by that
+    operator's own action, as task 9.2 decided `regex`; anything wider is the component's `compare`.
+    The HTTP component declares `http:status-class`, `http:media-type` and `http:list` `exact` and
+    `http:path` `conservative`. `engine/kernel/tests/subsumption_components.rs` decides 35 pairs, and
+    the sample provider's recorded shape against its pact reports M5's three findings and no review.
+  - Not foreseen: `janus check` loads no declared component, so a third party's operator stays opaque
+    there whatever it declares, and forwarding `matcher/compare` over the component pipe would have no
+    caller. That is S5.7. And `live/recorded-shape`'s 404 body was not the sample provider's: its
+    `error` is `not-found`, which the case now records.
 
 **Done when** the demo's loop runs against a broker built from S4.3's series, with a provider shape
 recorded from a provider's own test suite (S4.1).
@@ -2546,6 +2557,16 @@ The component model, opened to the ecosystem.
   §9). The multipart document does not change.
   *Exit:* the worked CSV component (`third-party/janus-csv`) decodes a `text/csv` part of a multipart
   body into rows a contract shapes, in each binding; and an ADR supersedes ADR 0040 decision 3.
+
+- **S5.7 The subsumption check with a project's declared components** — **S**. Added 2026-11-12 by
+  ADR 0087. `janus check` and `subsumption/check` load no declared component, so an operator a third
+  party contributes, `csv:column` say, is opaque to the walk whatever comparability its handshake
+  declares. `janus check --config` loads the components a project declares, as `janus explain --config`
+  does (ADR 0050); the WASM loader reads each operator's `comparability` from the handshake and forwards
+  `matcher/compare` over the component pipe; and `subsumption/check` takes `components`.
+  *Exit:* `third-party/janus-csv` declares `csv:column` `exact` and implements `compare`, and
+  `janus check --config` decides two contracts' `csv:column` nodes `yes` and `no` where, without
+  `--config`, both are reviews.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -2753,6 +2774,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
+| S5.7 | A declared component's operators are opaque to `janus check`, which loads none | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |
 | S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |
 | S6.8 | No shape is recorded from verification traffic (`observed`) | ADR 0086 decision 9 |

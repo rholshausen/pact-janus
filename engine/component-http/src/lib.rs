@@ -15,6 +15,7 @@
 //! thread (ADR 0035). The serve half ([`serve`], S2.1) is hyper on a thread and runtime of its own
 //! per served instance (ADR 0062 decision 5), serving HTTP/1.1 and HTTP/2.
 
+mod compare;
 mod drive;
 pub mod list;
 mod media_type;
