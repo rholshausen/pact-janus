@@ -2408,26 +2408,85 @@ is frozen as the major version's surface.
 
 The part of the RFC no Pact user has today: catching what the provider may send that no consumer tested.
 
+Reviewed 2026-11-12, before it started, against what stages 1–3 built. The engine already has the walk,
+the provider-shape document, recording (`provider-shape-session/*`, engine-protocol spec §8.5), policy
+and `janus check` (tasks 7.1–7.4). What it lacks is a way for a real provider to produce a shape, and a
+walk that can decide the operators stages 1–3 added. The review gave every item an exit, added S4.7, and
+found that recording cannot be used as specified (S4.1). S4.1's ADR and S4.7 come first. S4.3 starts
+once there are shapes to publish.
+
 - **S4.1 Recording provider shapes from provider test suites** — **M**, in each provider language's
-  test framework, through the S1.15 integrations. Janus records only through its own verifier (task
-  7.2).
+  test framework, through the S1.15 integrations. The engine records a shape, and nothing but
+  `engine/kernel/tests/provider_shape_record.rs` calls it. Three things stop a real suite using it, and
+  an ADR decides them first:
+  - *Identity.* `observe` names the interaction by the consumer's description and state names, which a
+    provider's own tests do not know. Spike 7.3 §2 found this blocks `recorded` as it blocks `derived`.
+    An observation should carry the request it answered, so the recorder can write a `selector`
+    (ADR 0025) instead. A request's literal path selects only itself, so the operation's template has
+    to come from somewhere: the test names it, or the integration reads it from the framework's routing.
+  - *Octets.* `observe` takes decoded values, so an SDK would have to decode a JSON, XML or form body
+    itself, which principle 4 forbids. It should take each slot's octets and type, as a transport's
+    parts are, and decode them through the session's content registry.
+  - *Which route first.* A verification run knows each contract's descriptions, so recording what the
+    provider answered during `janus verify` (`observed`, design 2.8 §2.3) needs no selector, but sees
+    only what consumers asked for. The ADR decides whether it comes first, beside recording from the
+    provider's own tests, or not at all.
+  *Exit:* in each SDK, a provider test suite whose tests never name a consumer's interaction records a
+  shape, and `janus check` matches it to the demo's contract by selector and finds the `CANCELLED`
+  status M5 found.
 - **S4.2 Deriving shapes from OpenAPI and protobuf** — **M**, emitting selectors so they match
-  consumer interactions by operation (ADR 0025). Spike 7.3's importer is the starting point, and its
-  lessons are the specification.
+  consumer interactions by operation (ADR 0025). Spike 7.3's findings are the specification. Its
+  importer and corpus were deleted with the rest of the spike code (S0.12) and are at `b8d5010`. The
+  spike recommended two things this item adopts unless an ADR says otherwise: the importer is a tool that
+  writes the document, outside the engine and the component model (§5, option c), and an array with no
+  `minItems` makes no cardinality claim (§4.2). An undiscriminated `oneOf` or `anyOf` becomes `any`, and
+  the importer reports each mapping that loses something, since a silent widening is how a derived shape
+  misleads. A protobuf shape is useful only to a contract with a protobuf body, which S5.2 makes
+  possible, so the protobuf half may land after it.
+  *Exit:* spike 7.3's hand-authored OpenAPI document imports into a shape that `janus check` matches by
+  selector and that reproduces the recorded shape's findings, and the generator-emitted one's lossy
+  mappings are each reported.
 - **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **L**: a resource for provider shapes,
   decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and rendering from
-  the report's own words; `janus publish` learns provider shapes (S1.3). PactFlow's side is PactFlow's
-  to decide.
-- **S4.4 Policy** — **S**: a `provenance` selector for exemptions (finding 9B); whether `block` ever
-  becomes a default, judged on pilot data, not decided now (gate P).
+  the report's own words. On this side, `janus publish` learns provider shapes (S1.3) and `janus check`
+  publishes its report (row 6). The rows are pull requests to the Pact Broker, whose maintainers decide
+  them (§7.5). PactFlow's side is PactFlow's to decide.
+  *Exit:* the demo's loop runs against a broker built from the series, and `can-i-deploy` gives a
+  subsumption reason. Whether the series merges is the community's, and the stage's exit waits on it as
+  stage 1a's waits on pilots.
+- **S4.4 Policy** — **S**: a `provenance` selector on policies and their exemptions (finding 9B). Spike
+  7.3 §6 found it is the only axis on which a derived shape's noise separates from its signal, so a team
+  can block on `recorded` findings and warn on `derived` ones. Whether `block` ever becomes a default is
+  gate P, judged on pilot data, not decided now.
+  *Exit:* design 2.8 §7 has the selector, and a `janus check` test gives a `recorded` finding and a
+  `derived` one each the severity its policy names.
 - **S4.5 The WASM offline artifact in the broker** (broker notes row 9) — **M**: recompute on cache
-  miss, the first real host of ADR 0023's offline embedding. Whether N×M recomputation scales is
-  measured here (broker notes §12).
-- **S4.6 Message interactions in the broker view** — **S**. The walk is direction-agnostic, but a
-  message-only provider's shape and decision page are untested (broker notes §12).
+  miss, the first real host of ADR 0023's offline embedding.
+  *Exit:* `benchmarks/janus` measures the walk over N consumers and M provider versions in the WASM
+  embedding, and an ADR confirms or replaces the broker notes' §3c recommendation on that number
+  (§12's open question).
+- **S4.6 Message interactions in the check and the broker view** — **S**. The walk is
+  direction-agnostic, but `janus check` has never run on a contract with messages (S2.12), and a
+  message-only provider's shape and decision page are untested (broker notes §12). Recording a
+  message's shape is S4.1's: what a `produce-message` hook answers (S1.7) is the provider's own output.
+  *Exit:* `janus check` decides a message contract against a provider shape of its `message` part, in a
+  `check` test, and S4.3's demonstration includes a message-only provider.
+- **S4.7 Comparing the built-in components' operators** — **S**. Added 2026-11-12. Stages 1–3 added
+  operators the built-in components own: `http:status-class`, `http:media-type` and `http:list`
+  (ADRs 0057, 0071, 0082), and the `pact` component's (ADR 0073). The walk treats every component
+  operator as opaque (shape spec §8), so a recorded `Content-Type` against an upgraded pact's
+  `http:media-type` is a `review`, whatever the values. It has not shown yet only because the one
+  recorded shape has a body and no headers or status. Component-interfaces spec §7.5 says how an
+  operator declares a comparability class and how the walk asks it through `matcher/compare`; none of
+  it is built. Build it, and give each built-in operator a class. A provider's finite set of values
+  against any component operator can also be decided as task 9.2 decided `regex`: by running the
+  operator's own matcher on each value. A `pact` operator nobody implements stays opaque.
+  *Exit:* the kernel's subsumption tests decide each built-in operator against a literal, itself and
+  its neighbours, and `janus check` passes an upgraded pact's `Content-Type` against a recorded
+  `application/json`.
 
-**Done when** the demo's loop runs against a real broker, with a provider shape published from a real
-provider's test suite.
+**Done when** the demo's loop runs against a broker built from S4.3's series, with a provider shape
+recorded from a provider's own test suite (S4.1).
 
 ### Stage 5: Plugins as the core design — **L**
 
@@ -2644,7 +2703,9 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S3.5 | The exchange loop's match decision is a log line, not an event | variant ergonomics report, recommendation 3 |
 | S4.4 | A `provenance` selector on exemptions | finding 9B |
 | S4.1, S4.2 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
-| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view | broker notes §12 |
+| S4.1 | Recording names an interaction by the consumer's words and takes decoded values, so no provider's own suite can use it | spike 7.3 §2; found reviewing stage 4 |
+| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view; `check` on a message contract | broker notes §12 |
+| S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
