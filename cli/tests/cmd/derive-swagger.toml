@@ -1,0 +1,5 @@
+# Swagger 2.0 is refused by name: the command cannot run, exit 2.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/openapi/swagger.json"]
+fs.cwd = "../../.."
+status.code = 2

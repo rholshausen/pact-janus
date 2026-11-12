@@ -1,0 +1,5 @@
+# The sample provider's OpenAPI document (staged plan S4.2, ADR 0088): the shape on stdout, every
+# mapping that lost something on stderr. Both are the CLI's own, so both are pinned whole.
+bin.name = "janus"
+args = ["derive", "samples/order-service/openapi.yaml"]
+fs.cwd = "../../.."

@@ -1,0 +1,1 @@
+janus derive: cli/tests/cmd/fixtures/openapi/swagger.json: Swagger 2.0 is not read; convert it to OpenAPI 3 first

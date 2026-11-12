@@ -1,0 +1,144 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "order-service"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "GET /orders/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders/id",
+            "shape": "http:path",
+            "template": "/orders/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /orders/{id}",
+        "operation-id": "getOrder",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "id": {
+                "example": "string",
+                "shape": "string"
+              },
+              "status": {
+                "example": "PENDING",
+                "options": [
+                  "PENDING",
+                  "SHIPPED",
+                  "CANCELLED"
+                ],
+                "shape": "any-of"
+              },
+              "shippedAt": {
+                "of": {
+                  "example": "2026-07-30T10:00:00Z",
+                  "shape": "datetime"
+                },
+                "shape": "optional"
+              },
+              "items": {
+                "items": {
+                  "members": {
+                    "sku": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "quantity": {
+                      "example": 1,
+                      "shape": "integer"
+                    }
+                  },
+                  "shape": "object"
+                },
+                "min": 0,
+                "shape": "each-like"
+              },
+              "channel": {
+                "example": "web",
+                "options": [
+                  "web",
+                  "mobile"
+                ],
+                "shape": "any-of"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /orders/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/orders/id",
+            "shape": "http:path",
+            "template": "/orders/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 404,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /orders/{id}",
+        "operation-id": "getOrder",
+        "response": "404"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 404,
+            "shape": "equality"
+          }
+        }
+      }
+    }
+  ]
+}

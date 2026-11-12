@@ -193,6 +193,26 @@ recorded shape would not mention `CANCELLED`, and the check against that consume
 That gap is the provider's test coverage, not the recorder's bug — and it is the reason design 2.8
 §2.3 ranks the four provenances at all.
 
+## Deriving its shape
+
+A provider that publishes an OpenAPI document has a shape without recording one. This provider's is
+[`openapi.yaml`](openapi.yaml), written as someone who knows the API writes one (spike 7.3's
+hand-authored document), and `janus derive` turns it into a shape with provenance `derived`
+([ADR 0088](../../Documentation/decisions/0088-derive-a-provider-shape-from-openapi-with-janus-derive-and-report-every-mapping-that-loses-something.md)):
+
+```sh
+janus derive samples/order-service/openapi.yaml --write derived.provider-shape.json
+janus check samples/order-service/pacts/web-app-order-service.json --provider-shape derived.provider-shape.json
+```
+
+It has an entry for the 200 and one for the 404, selected by `GET /orders/{id}` and the status as the
+recorded one's are, and it finds what the recorded shape finds: `CANCELLED`, the empty `items` list, and
+`shippedAt` absent. The document says `items` may be empty only by not saying `minItems`, which
+`janus derive` reports. It finds more besides, because a document says what a test run did not see:
+any `id`, where the recorder saw order 66, and `shippedAt` as a `date-time`, which the walk cannot
+compare with the pact's regex and leaves to a person. `cli/tests/derive.rs` holds the two shapes to
+that.
+
 ## Checking it — M5 in one command
 
 The recording above is checked in at

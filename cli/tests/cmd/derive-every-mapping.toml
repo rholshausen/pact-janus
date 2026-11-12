@@ -1,0 +1,6 @@
+# One operation per construct the mapping knows (ADR 0088 decision 5): what each becomes, and each
+# loss, with the base path the servers agree on, a range less its explicit statuses, and no
+# `default`.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/openapi/mapping.openapi.yaml", "--provider", "mapping-service"]
+fs.cwd = "../../.."

@@ -1,0 +1,5 @@
+error: cli/tests/cmd/fixtures/openapi/untitled.openapi.json has no info.title to name the provider; name it with '--provider <NAME>'
+
+Usage: janus derive [OPTIONS] <DOCUMENT>
+
+For more information, try '--help'.

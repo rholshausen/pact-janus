@@ -1,0 +1,5 @@
+# --output json: the shape and its losses in one document, here from spike 7.3's generator-emitted
+# document, whose two lossy mappings are each reported.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/openapi/order-service.orm-generated.openapi.json", "--output", "json"]
+fs.cwd = "../../.."

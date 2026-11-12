@@ -48,6 +48,9 @@ url = "2"
 # JSON — the same choice the hook loader makes for `verifier.janus.yaml`, and the same crate,
 # already in the tree behind `pact_janus_hooks_host`.
 serde_yaml_ng = "0.10"
+# `janus derive` (ADR 0088) checks that an OpenAPI `pattern` is one the shape language's `regex`
+# reads, which is this crate's dialect (shape spec §4.1). Already in the tree behind the kernel.
+regex = "1"
 # The CLI is where the kernel's `tracing` facade actually goes somewhere (AGENTS.md: "a subscriber
 # is an application concern, installed by whatever embeds the kernel"). `janus-engine` installs it
 # so `RUST_LOG=trace` shows the frames `Engine::dispatch` traces on every call.

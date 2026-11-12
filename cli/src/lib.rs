@@ -7,8 +7,9 @@
 //! the protocol and it shows up here first. `janus-engine`, the sibling binary, carries the
 //! identical frames over stdio for embeddings that want a subprocess (ADR 0023: every SDK's).
 //!
-//! `component` is the one command that does not speak the protocol, and says why in its own module:
-//! publishing a component is not an engine operation.
+//! `component` and `derive` are the two commands that do not speak the protocol, and each says why
+//! in its own module: publishing a component is not an engine operation, and nor is deriving a
+//! provider shape from a type document.
 //!
 //! `check` is the one command whose subject is not a provider but a *decision*: it reads documents
 //! that already exist — contracts, provider shapes, the summaries `verify` wrote — and answers the
@@ -28,6 +29,7 @@ mod check;
 mod component;
 pub mod contract_files;
 mod date;
+mod derive;
 mod engine;
 mod error;
 mod explain;
@@ -135,6 +137,7 @@ fn dispatch(command: Command) -> Result<Outcome, Error> {
     Command::Check(args) => check::run(&args),
     Command::Explain(args) => explain::run(&args),
     Command::Upgrade(args) => upgrade::run(&args),
+    Command::Derive(args) => derive::run(&args),
     Command::Publish(args) => publish::run(&args),
     Command::Component(command) => component::run(&command),
     Command::Completions(args) => {

@@ -1,0 +1,920 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "mapping-service"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "GET /v1/discriminated",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/discriminated",
+            "shape": "http:path",
+            "template": "/v1/discriminated"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /discriminated",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "alternatives": {
+              "Invoice": {
+                "members": {
+                  "type": {
+                    "example": "Invoice",
+                    "shape": "equality"
+                  },
+                  "dueDate": {
+                    "example": "2026-07-30",
+                    "shape": "date"
+                  }
+                },
+                "shape": "object"
+              },
+              "card": {
+                "members": {
+                  "type": {
+                    "example": "card",
+                    "shape": "equality"
+                  },
+                  "last4": {
+                    "pattern": "[0-9]{4}",
+                    "shape": "regex"
+                  }
+                },
+                "shape": "object"
+              }
+            },
+            "discriminator": "type",
+            "shape": "one-of"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/undiscriminated",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/undiscriminated",
+            "shape": "http:path",
+            "template": "/v1/undiscriminated"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /undiscriminated",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "shape": "any"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/composed",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/composed",
+            "shape": "http:path",
+            "template": "/v1/composed"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /composed",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "type": {
+                "example": "string",
+                "shape": "string"
+              },
+              "last4": {
+                "pattern": "[0-9]{4}",
+                "shape": "regex"
+              },
+              "region": {
+                "example": "AU",
+                "options": [
+                  "AU",
+                  "NZ"
+                ],
+                "shape": "any-of"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/scalars",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/scalars",
+            "shape": "http:path",
+            "template": "/v1/scalars"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /scalars",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "kind": {
+                "example": "scalar",
+                "shape": "equality"
+              },
+              "maybe": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "nullable"
+              },
+              "either": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "nullable"
+              },
+              "level": {
+                "of": {
+                  "example": "low",
+                  "options": [
+                    "low",
+                    "high"
+                  ],
+                  "shape": "any-of"
+                },
+                "shape": "nullable"
+              },
+              "id": {
+                "example": "string",
+                "shape": "string"
+              },
+              "code": {
+                "example": "AUD",
+                "pattern": "^[A-Z]{3}$",
+                "shape": "regex"
+              },
+              "reference": {
+                "example": "string",
+                "shape": "string"
+              },
+              "count": {
+                "example": 1,
+                "shape": "integer"
+              },
+              "ratio": {
+                "example": 1.5,
+                "shape": "number"
+              },
+              "flag": {
+                "example": true,
+                "shape": "boolean"
+              },
+              "when": {
+                "example": "2026-07-30",
+                "shape": "date"
+              },
+              "tags": {
+                "items": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "max": 5,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/objects",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/objects",
+            "shape": "http:path",
+            "template": "/v1/objects"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /objects",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "closed": {
+                "members": {
+                  "id": {
+                    "example": "string",
+                    "shape": "string"
+                  }
+                },
+                "shape": "object"
+              },
+              "labels": {
+                "min": 0,
+                "shape": "each-entry",
+                "values": {
+                  "example": "string",
+                  "shape": "string"
+                }
+              },
+              "extended": {
+                "members": {
+                  "name": {
+                    "of": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "shape": "optional"
+                  }
+                },
+                "shape": "object"
+              },
+              "untyped": {
+                "members": {},
+                "shape": "object"
+              },
+              "anything": {
+                "shape": "any"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/references",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/references",
+            "shape": "http:path",
+            "template": "/v1/references"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /references",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "tree": {
+                "members": {
+                  "name": {
+                    "example": "string",
+                    "shape": "string"
+                  },
+                  "children": {
+                    "of": {
+                      "items": {
+                        "shape": "any"
+                      },
+                      "min": 0,
+                      "shape": "each-like"
+                    },
+                    "shape": "optional"
+                  }
+                },
+                "shape": "object"
+              },
+              "elsewhere": {
+                "of": {
+                  "shape": "any"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/outcomes/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/outcomes/id",
+            "shape": "http:path",
+            "template": "/v1/outcomes/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /outcomes/{id}",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/problem+json; charset=utf-8",
+                  "shape": "http:media-type",
+                  "type": "application/problem+json; charset=utf-8"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "x-rate-limit": {
+                "items": {
+                  "example": "1",
+                  "pattern": "^-?[0-9]+$",
+                  "shape": "regex"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              },
+              "etag": {
+                "of": {
+                  "items": {
+                    "example": "string",
+                    "shape": "string"
+                  },
+                  "max": 1,
+                  "min": 1,
+                  "shape": "each-like"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {},
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/outcomes/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/outcomes/id",
+            "shape": "http:path",
+            "template": "/v1/outcomes/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 404,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /outcomes/{id}",
+        "response": "404"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 404,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "application/json",
+                  "shape": "http:media-type",
+                  "type": "application/json"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "error": {
+                "example": "not-found",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /v1/outcomes/{id}",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/v1/outcomes/id",
+            "shape": "http:path",
+            "template": "/v1/outcomes/{id}"
+          }
+        },
+        "response": {
+          "status": {
+            "codes": [
+              400,
+              401,
+              402,
+              403,
+              405,
+              406,
+              407,
+              408,
+              409,
+              410,
+              411,
+              412,
+              413,
+              414,
+              415,
+              416,
+              417,
+              418,
+              419,
+              420,
+              421,
+              422,
+              423,
+              424,
+              425,
+              426,
+              427,
+              428,
+              429,
+              430,
+              431,
+              432,
+              433,
+              434,
+              435,
+              436,
+              437,
+              438,
+              439,
+              440,
+              441,
+              442,
+              443,
+              444,
+              445,
+              446,
+              447,
+              448,
+              449,
+              450,
+              451,
+              452,
+              453,
+              454,
+              455,
+              456,
+              457,
+              458,
+              459,
+              460,
+              461,
+              462,
+              463,
+              464,
+              465,
+              466,
+              467,
+              468,
+              469,
+              470,
+              471,
+              472,
+              473,
+              474,
+              475,
+              476,
+              477,
+              478,
+              479,
+              480,
+              481,
+              482,
+              483,
+              484,
+              485,
+              486,
+              487,
+              488,
+              489,
+              490,
+              491,
+              492,
+              493,
+              494,
+              495,
+              496,
+              497,
+              498,
+              499
+            ],
+            "example": 400,
+            "shape": "http:status-class"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /outcomes/{id}",
+        "response": "4XX"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "codes": [
+              400,
+              401,
+              402,
+              403,
+              405,
+              406,
+              407,
+              408,
+              409,
+              410,
+              411,
+              412,
+              413,
+              414,
+              415,
+              416,
+              417,
+              418,
+              419,
+              420,
+              421,
+              422,
+              423,
+              424,
+              425,
+              426,
+              427,
+              428,
+              429,
+              430,
+              431,
+              432,
+              433,
+              434,
+              435,
+              436,
+              437,
+              438,
+              439,
+              440,
+              441,
+              442,
+              443,
+              444,
+              445,
+              446,
+              447,
+              448,
+              449,
+              450,
+              451,
+              452,
+              453,
+              454,
+              455,
+              456,
+              457,
+              458,
+              459,
+              460,
+              461,
+              462,
+              463,
+              464,
+              465,
+              466,
+              467,
+              468,
+              469,
+              470,
+              471,
+              472,
+              473,
+              474,
+              475,
+              476,
+              477,
+              478,
+              479,
+              480,
+              481,
+              482,
+              483,
+              484,
+              485,
+              486,
+              487,
+              488,
+              489,
+              490,
+              491,
+              492,
+              493,
+              494,
+              495,
+              496,
+              497,
+              498,
+              499
+            ],
+            "example": 400,
+            "shape": "http:status-class"
+          }
+        }
+      }
+    },
+    {
+      "description": "GET /no-json",
+      "selector": {
+        "request": {
+          "method": {
+            "example": "GET",
+            "shape": "equality"
+          },
+          "path": {
+            "example": "/no-json",
+            "shape": "http:path",
+            "template": "/no-json"
+          }
+        },
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          }
+        }
+      },
+      "source": {
+        "openapi": "get /no-json",
+        "response": "200"
+      },
+      "parts": {
+        "response": {
+          "status": {
+            "example": 200,
+            "shape": "equality"
+          },
+          "headers": {
+            "members": {
+              "content-type": {
+                "items": {
+                  "example": "text/csv",
+                  "shape": "http:media-type",
+                  "type": "text/csv"
+                },
+                "max": 1,
+                "min": 1,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

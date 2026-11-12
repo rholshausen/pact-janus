@@ -1,0 +1,42 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "order-service", "version": "1.0.0" },
+  "x-note": "The same API as the hand-authored document, emitted the way a schema generator that walks an ORM model emits one. Every pattern here is one real generators produce: no required list (the ORM cannot tell a NOT NULL column from an application invariant), nullable on every column-backed field, enums flattened to their storage type, integers reported as number, a JSON column as an unconstrained object, and a polymorphic association as an undiscriminated oneOf.",
+  "paths": {
+    "/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Order" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "nullable": true },
+          "status": { "type": "string", "nullable": true },
+          "shippedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "items": { "type": "array", "nullable": true, "items": { "$ref": "#/components/schemas/OrderItem" } },
+          "channel": { "type": "string", "nullable": true },
+          "metadata": { "type": "object", "nullable": true }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "sku": { "type": "string", "nullable": true },
+          "quantity": { "type": "number", "nullable": true }
+        }
+      }
+    }
+  }
+}

@@ -62,6 +62,8 @@ pub enum Command {
   Explain(ExplainArgs),
   /// Convert a v1-v4 pact into a Janus contract, and say what the conversion could not carry
   Upgrade(UpgradeArgs),
+  /// Derive a provider shape from an OpenAPI document, and say what the derivation could not carry
+  Derive(DeriveArgs),
   /// Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
   Publish(PublishArgs),
   /// Publish a WASM component to an OCI registry, or fetch one and say what it is
@@ -81,6 +83,7 @@ impl Command {
       Command::Check(_) => "check",
       Command::Explain(_) => "explain",
       Command::Upgrade(_) => "upgrade",
+      Command::Derive(_) => "derive",
       Command::Publish(_) => "publish",
       Command::Component(ComponentCommand::Push(_)) => "component push",
       Command::Component(ComponentCommand::Pull(_)) => "component pull",
@@ -821,6 +824,54 @@ pub struct UpgradeArgs {
 
   /// text prints the contract, and the findings on standard error; json prints one document
   /// holding both
+  #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
+  pub output: Output,
+}
+
+#[derive(Debug, Args)]
+#[command(
+  after_help = "One entry per operation and documented response status, each selected by the \
+                        operation's method, its path template and the status, so janus check \
+                        matches it to every consumer by operation. A 'default' response is not \
+                        imported. Only a JSON body is derived.\n\nThe losses, each with a code: \
+                        additional-properties-dropped, all-of-union, base-path-ambiguous, \
+                        body-not-json, bounds-dropped, cardinality-assumed, cardinality-unstated, \
+                        closed-object, default-response, discriminator-unbound, external-reference, \
+                        format-dropped, header-serialised, pattern-unreadable, recursive-schema, reference-unresolved, \
+                        response-unreadable, schema-too-deep, unconstrained-object, \
+                        undiscriminated-union, untyped-schema.\n\nExit status: 0 the shape was \
+                        written, whatever it lost; 2 the document could not be read or is not one \
+                        janus derive reads.",
+  arg_required_else_help = true
+)]
+pub struct DeriveArgs {
+  /// The OpenAPI 3.0 or 3.1 document, as JSON or YAML
+  #[arg(value_name = "DOCUMENT")]
+  pub document: PathBuf,
+
+  /// The provider the shape is about. Without it, the document's info.title
+  #[arg(long, value_name = "NAME")]
+  pub provider: Option<String>,
+
+  /// The path consumers' requests put before each of the document's paths. Without it, the path
+  /// of the servers that apply, when they agree
+  #[arg(long, value_name = "PATH")]
+  pub base_path: Option<String>,
+
+  /// Write an array that states no minItems as never empty, instead of as possibly empty
+  #[arg(long)]
+  pub assume_non_empty: bool,
+
+  /// Write the shape to this file instead of standard output
+  #[arg(long, value_name = "FILE")]
+  pub write: Option<PathBuf>,
+
+  /// Do not print the losses
+  #[arg(long)]
+  pub quiet: bool,
+
+  /// text prints the shape, and the losses on standard error; json prints one document holding
+  /// both
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
 }

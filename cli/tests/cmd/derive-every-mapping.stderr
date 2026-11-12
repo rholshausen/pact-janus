@@ -1,0 +1,47 @@
+
+LOSSY — the shape admits more than the document says, or claims what it did not
+  cardinality-unstated at /components/schemas/Node/properties/children
+      the array states no minItems, so the empty array is admitted, as JSON Schema says; a consumer that declared at least one element is told so
+      -> in GET /v1/references 200
+  recursive-schema at /components/schemas/Node/properties/children/items
+      '#/components/schemas/Node' refers to itself through this schema; here any value is admitted
+      -> in GET /v1/references 200
+  base-path-ambiguous at /paths/~1no-json/get
+      the servers that apply put different paths before it (/v1, /v2), so none is used; name the one consumers call with --base-path
+      -> in GET /no-json
+  body-not-json at /paths/~1no-json/get/responses/200/content
+      the body is text/csv, and only a JSON body is derived; no body is claimed
+      -> in GET /no-json 200
+  untyped-schema at /paths/~1objects/get/responses/200/content/application~1json/schema/properties/anything
+      the schema names no type, so any value is admitted
+      -> in GET /v1/objects 200
+  closed-object at /paths/~1objects/get/responses/200/content/application~1json/schema/properties/closed
+      additionalProperties: false cannot be expressed (ADR 0007), so other members stay admitted
+      -> in GET /v1/objects 200
+  additional-properties-dropped at /paths/~1objects/get/responses/200/content/application~1json/schema/properties/extended/additionalProperties
+      the schema for members the object does not name is dropped beside its properties, so any value is admitted for them
+      -> in GET /v1/objects 200
+  unconstrained-object at /paths/~1objects/get/responses/200/content/application~1json/schema/properties/untyped
+      the object names no properties, so every object is admitted
+      -> in GET /v1/objects 200
+  unconstrained-object at /paths/~1outcomes~1{id}/get/responses/200/content/application~1problem+json; charset=utf-8/schema
+      the object names no properties, so every object is admitted
+      -> in GET /v1/outcomes/{id} 200
+  default-response at /paths/~1outcomes~1{id}/get/responses/default
+      a 'default' response is not imported: it stands for every status the operation does not name, so a consumer interaction expecting one of those is not checked
+      -> in GET /v1/outcomes/{id} default
+  external-reference at /paths/~1references/get/responses/200/content/application~1json/schema/properties/elsewhere
+      'common.yaml#/Money' is not a schema in this document; any value is admitted
+      -> in GET /v1/references 200
+  bounds-dropped at /paths/~1scalars/get/responses/200/content/application~1json/schema/properties/count
+      minimum cannot be expressed in a shape, so a value outside it is admitted
+      -> in GET /v1/scalars 200
+  format-dropped at /paths/~1scalars/get/responses/200/content/application~1json/schema/properties/id
+      format 'uuid' has no shape, so any string is admitted
+      -> in GET /v1/scalars 200
+  pattern-unreadable at /paths/~1scalars/get/responses/200/content/application~1json/schema/properties/reference
+      '^(?=REF)' is not a pattern the shape language's regex dialect reads, so any string is admitted
+      -> in GET /v1/scalars 200
+  undiscriminated-union at /paths/~1undiscriminated/get/responses/200/content/application~1json/schema/oneOf
+      2 alternatives with no discriminator, and the shape language has no undiscriminated union, so everything below is admitted
+      -> in GET /v1/undiscriminated 200

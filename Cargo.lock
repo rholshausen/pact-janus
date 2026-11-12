@@ -2304,6 +2304,7 @@ dependencies = [
  "pact_janus_sample_order_service",
  "pact_janus_test_servers",
  "pretty_assertions",
+ "regex",
  "rstest",
  "serde_json",
  "serde_yaml_ng",

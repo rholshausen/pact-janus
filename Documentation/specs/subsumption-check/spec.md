@@ -143,7 +143,9 @@ decide about."
 Every provider shape carries a **provenance**, an open string vocabulary naming how it came to exist, in
 the RFC's own decreasing order of fidelity: `recorded` (the union of response shapes the provider's own
 tests produced — task 7.2; each entry selected by the operation the test named, and its outcome, as
-engine-protocol spec §8.5 records it), `derived` (imported from types via a content component — task 7.3),
+engine-protocol spec §8.5 records it), `derived` (imported from a type document by a program outside
+the engine, such as `janus derive`,
+[ADR 0088](../../decisions/0088-derive-a-provider-shape-from-openapi-with-janus-derive-and-report-every-mapping-that-loses-something.md)),
 `authored` (written by hand), `observed` (accumulated from verification traffic). Provenance is recorded
 for the reader, not for the walk: **the structural comparison in §3 does not vary by provenance, and a
 checker MUST NOT decide a different verdict for the same two shapes because one arrived with a different

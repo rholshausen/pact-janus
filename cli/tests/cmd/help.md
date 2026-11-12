@@ -17,6 +17,8 @@ Commands:
   explain      Print the plan the engine will execute for one interaction
   upgrade      Convert a v1-v4 pact into a Janus contract, and say what the conversion could not
                carry
+  derive       Derive a provider shape from an OpenAPI document, and say what the derivation could
+               not carry
   publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
                consumer
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
@@ -284,6 +286,48 @@ Global options:
 A converted pact has one variant per interaction, because one example is one variant; growing it is
 the consumer test suite's job. Verifying a pact needs no conversion: janus verify reads v1-v4 pacts
 directly.
+
+```
+
+```console
+$ janus derive --help
+Derive a provider shape from an OpenAPI document, and say what the derivation could not carry
+
+Usage: janus derive [OPTIONS] <DOCUMENT>
+
+Arguments:
+  <DOCUMENT>  The OpenAPI 3.0 or 3.1 document, as JSON or YAML
+
+Options:
+      --provider <NAME>   The provider the shape is about. Without it, the document's info.title
+      --base-path <PATH>  The path consumers' requests put before each of the document's paths.
+                          Without it, the path of the servers that apply, when they agree
+      --assume-non-empty  Write an array that states no minItems as never empty, instead of as
+                          possibly empty
+      --write <FILE>      Write the shape to this file instead of standard output
+      --quiet             Do not print the losses
+      --output <FORMAT>   text prints the shape, and the losses on standard error; json prints one
+                          document holding both [default: text] [possible values: text, json]
+  -h, --help              Print help
+
+Global options:
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
+
+One entry per operation and documented response status, each selected by the operation's method, its
+path template and the status, so janus check matches it to every consumer by operation. A 'default'
+response is not imported. Only a JSON body is derived.
+
+The losses, each with a code: additional-properties-dropped, all-of-union, base-path-ambiguous,
+body-not-json, bounds-dropped, cardinality-assumed, cardinality-unstated, closed-object,
+default-response, discriminator-unbound, external-reference, format-dropped, header-serialised,
+pattern-unreadable, recursive-schema, reference-unresolved, response-unreadable, schema-too-deep,
+unconstrained-object, undiscriminated-union, untyped-schema.
+
+Exit status: 0 the shape was written, whatever it lost; 2 the document could not be read or is not
+one janus derive reads.
 
 ```
 

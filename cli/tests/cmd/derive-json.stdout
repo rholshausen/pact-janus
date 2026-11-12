@@ -1,0 +1,165 @@
+{
+  "provider-shape": {
+    "$format": "janus-provider-shape/1",
+    "provider": {
+      "name": "order-service"
+    },
+    "provenance": "derived",
+    "interactions": [
+      {
+        "description": "GET /orders/{id}",
+        "selector": {
+          "request": {
+            "method": {
+              "example": "GET",
+              "shape": "equality"
+            },
+            "path": {
+              "example": "/orders/id",
+              "shape": "http:path",
+              "template": "/orders/{id}"
+            }
+          },
+          "response": {
+            "status": {
+              "example": 200,
+              "shape": "equality"
+            }
+          }
+        },
+        "source": {
+          "openapi": "get /orders/{id}",
+          "operation-id": "getOrder",
+          "response": "200"
+        },
+        "parts": {
+          "response": {
+            "status": {
+              "example": 200,
+              "shape": "equality"
+            },
+            "headers": {
+              "members": {
+                "content-type": {
+                  "items": {
+                    "example": "application/json",
+                    "shape": "http:media-type",
+                    "type": "application/json"
+                  },
+                  "max": 1,
+                  "min": 1,
+                  "shape": "each-like"
+                }
+              },
+              "shape": "object"
+            },
+            "body": {
+              "members": {
+                "id": {
+                  "of": {
+                    "of": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                },
+                "status": {
+                  "of": {
+                    "of": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                },
+                "shippedAt": {
+                  "of": {
+                    "of": {
+                      "example": "2026-07-30T10:00:00Z",
+                      "shape": "datetime"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                },
+                "items": {
+                  "of": {
+                    "of": {
+                      "items": {
+                        "members": {
+                          "sku": {
+                            "of": {
+                              "of": {
+                                "example": "string",
+                                "shape": "string"
+                              },
+                              "shape": "nullable"
+                            },
+                            "shape": "optional"
+                          },
+                          "quantity": {
+                            "of": {
+                              "of": {
+                                "example": 1.5,
+                                "shape": "number"
+                              },
+                              "shape": "nullable"
+                            },
+                            "shape": "optional"
+                          }
+                        },
+                        "shape": "object"
+                      },
+                      "min": 0,
+                      "shape": "each-like"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                },
+                "channel": {
+                  "of": {
+                    "of": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                },
+                "metadata": {
+                  "of": {
+                    "of": {
+                      "members": {},
+                      "shape": "object"
+                    },
+                    "shape": "nullable"
+                  },
+                  "shape": "optional"
+                }
+              },
+              "shape": "object"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "losses": [
+    {
+      "code": "cardinality-unstated",
+      "pointer": "/components/schemas/Order/properties/items",
+      "message": "the array states no minItems, so the empty array is admitted, as JSON Schema says; a consumer that declared at least one element is told so",
+      "entry": "GET /orders/{id} 200"
+    },
+    {
+      "code": "unconstrained-object",
+      "pointer": "/components/schemas/Order/properties/metadata",
+      "message": "the object names no properties, so every object is admitted",
+      "entry": "GET /orders/{id} 200"
+    }
+  ]
+}

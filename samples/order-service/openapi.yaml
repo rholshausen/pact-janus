@@ -1,0 +1,58 @@
+# The sample provider's API as someone who knows it writes it: enums declared, required lists
+# accurate, nullability where it is real and nowhere else. Spike 7.3's hand-authored document, in
+# YAML. `janus derive` turns it into a provider shape (staged plan S4.2, ADR 0088), which
+# `cli/tests/derive.rs` checks against the pact in pacts/ beside the shape the provider's own tests
+# recorded in shapes/.
+openapi: 3.0.3
+info:
+  title: order-service
+  version: 1.0.0
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: the order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: no such order
+components:
+  schemas:
+    Order:
+      type: object
+      required: [id, status, items, channel]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SHIPPED, CANCELLED]
+        shippedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        channel:
+          type: string
+          enum: [web, mobile]
+    OrderItem:
+      type: object
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          format: int32

@@ -2476,6 +2476,28 @@ once there are shapes to publish.
   *Exit:* spike 7.3's hand-authored OpenAPI document imports into a shape that `janus check` matches by
   selector and that reproduces the recorded shape's findings, and the generator-emitted one's lossy
   mappings are each reported.
+  *Done 2026-11-13* (ADR 0088):
+  - `janus derive <document>` reads OpenAPI 3.0 and 3.1, as JSON or YAML, and writes a `derived`
+    shape: one entry per operation and documented status, selected by method, `http:path` template
+    (the `servers` path in front, or `--base-path`) and status, a range less the statuses documented
+    explicitly so no two entries tie, and no `default`. Each entry has the response's documented headers
+    (as field lines, a header's schema read as text), its `Content-Type` as `http:media-type`, and its
+    JSON body. Every mapping that loses something is reported by code and JSON pointer. The command
+    speaks no protocol, as `component` does not.
+  - The sample provider has its OpenAPI document, `samples/order-service/openapi.yaml`, spike 7.3's
+    hand-authored one. `cli/tests/derive.rs` derives it, and against the sample provider's pact the
+    derived shape matches both interactions by selector and finds every finding the recorded shape
+    finds, and two more: any `id`, where the recorder saw one, and a review of `date-time` against the
+    pact's regex. The generator-emitted document's two lossy mappings are each reported, and every
+    derived shape parses with the kernel's own reader. The trycmd cases `derive*.toml` pin the output,
+    `derive-every-mapping` with one operation per construct.
+  - Not as the plan said: an array with no `minItems` is `min: 0`, reported as `cardinality-unstated`,
+    not "no claim". The shape language can write no claim only as `min: 1`, which hides the empty list
+    the sample provider really answers; `--assume-non-empty` writes that instead.
+  - Not foreseen: a header's schema describes the text of a field line, so an `integer` header is a
+    `regex` of digits and a `boolean` one `'true' | 'false'`, or no recorded or consumer value would be
+    admitted.
+  - The protobuf half is S5.2's (ADR 0088 decision 8).
 - **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **L**: a resource for provider shapes,
   decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and rendering from
   the report's own words. On this side, `janus publish` learns provider shapes (S1.3) and `janus check`
@@ -2562,7 +2584,8 @@ The component model, opened to the ecosystem.
   published with `wkg`).
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
   user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
-  spec §9). This closes S1.8's refusal.
+  spec §9). This closes S1.8's refusal. With it, S4.2's protobuf half: `janus derive` reads a `.proto`
+  into a shape whose bodies the protobuf component decodes (ADR 0088 decision 8).
 - **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
   decode errors and degradations reaching the user as their own finding kind, not as "expected a
   value" (findings 13, 14). Member order moved to S1.20.

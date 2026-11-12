@@ -104,6 +104,7 @@ superseding ADR instead.
 | [0085](0085-name-a-generator-in-the-dsl-on-the-value-it-produces-and-refuse-one-nothing-provides-when-the-interaction-is-added.md) | Name a generator in the DSL on the value it produces, and refuse one nothing provides when the interaction is added | accepted |
 | [0086](0086-record-a-provider-shape-from-the-providers-own-tests-by-the-operation-each-test-names.md) | Record a provider shape from the provider's own tests, by the operation each test names | accepted |
 | [0087](0087-compare-the-built-in-components-operators-by-their-own-matchers-and-a-compare-each-declares.md) | Compare the built-in components' operators by their own matchers, and a `compare` each declares | accepted |
+| [0088](0088-derive-a-provider-shape-from-openapi-with-janus-derive-and-report-every-mapping-that-loses-something.md) | Derive a provider shape from OpenAPI with `janus derive`, and report every mapping that loses something | accepted |
 
 ## Decision backlog
 

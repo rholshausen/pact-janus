@@ -1,0 +1,5 @@
+# A document with no title names no provider, and the command line must.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/openapi/untitled.openapi.json"]
+fs.cwd = "../../.."
+status.code = 2

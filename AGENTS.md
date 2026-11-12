@@ -252,7 +252,10 @@ Three sources are the source of truth and take precedence over this file when th
 > S4.7 (ADR 0087): the walk decides the built-in HTTP component's operators, a finite provider by the
 > operator's own action and anything wider by the component's `matcher/compare`, for an operator it
 > declared `exact` or `conservative` (`MatcherComponent::comparability`); a declared component's stay
-> opaque in `janus check` until S5.7.
+> opaque in `janus check` until S5.7. S4.2 (ADR 0088): `janus derive` writes a `derived` provider
+> shape from an OpenAPI 3.0 or 3.1 document, an entry per operation and documented status selected as a
+> recorded one is, and reports each mapping that loses something, an unstated `minItems` (written as
+> `min: 0`) among them; the sample provider's `openapi.yaml` finds what its recorded shape finds.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -278,7 +281,7 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  JSON, XML, text and form components it holds itself;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
-cli/             `janus` CLI (verify, explain, upgrade, check)
+cli/             `janus` CLI (verify, explain, upgrade, check, derive)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
                  its protocol bindings (task 6.1), src/engine/pin.ts its copy of the engine pin;
                  release-check/ installs a release outside the repository and uses it (S1.36)
@@ -532,6 +535,8 @@ janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <
 janus explain <document.json> [--index N | --description <text>] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
               [--config verifier.janus.yaml]   # the components a run would load (S1.12, ADR 0050)
 janus upgrade <pact.json> [--write <file>] [--quiet] [--exclude-pending] [--output text|json]
+janus derive <openapi.yaml|json> [--provider <name>] [--base-path <p>] [--assume-non-empty]
+             [--write <file>] [--quiet] [--output text|json]   # a derived provider shape (S4.2, ADR 0088)
 janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>
               [--branch <b>] [--tag <t>]... [--build-url <url>]
               [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings
@@ -611,8 +616,9 @@ pinned broker, each provider state set up through the broker's API. `.cargo/conf
 tests run against the pinned broker when `JANUS_PACT_BROKER` names it (CI's `verifier-diff` job), and
 skip otherwise.
 
-`janus component push|pull` (plan task 8.2) is the one command that does not speak the protocol —
-publishing is not an engine operation. `push` writes the artifact's config from the component's own
+`janus component push|pull` (plan task 8.2) and `janus derive` (S4.2, ADR 0088) are the commands
+that do not speak the protocol — publishing a component is not an engine operation, and nor is
+deriving a shape from a type document. `push` writes the artifact's config from the component's own
 handshake; `pull` fetches into the cache, checks every byte, and prints the pinned declaration. A pin
 is fetched by digest alone and a second run fetches nothing. Loopback registries are plain HTTP.
 A run's registry credential is its declaration's `source.auth`, `${VAR}`-interpolated by the loader

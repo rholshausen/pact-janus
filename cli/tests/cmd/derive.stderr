@@ -1,0 +1,5 @@
+
+LOSSY — the shape admits more than the document says, or claims what it did not
+  cardinality-unstated at /components/schemas/Order/properties/items
+      the array states no minItems, so the empty array is admitted, as JSON Schema says; a consumer that declared at least one element is told so
+      -> in GET /orders/{id} 200
