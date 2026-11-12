@@ -6,12 +6,12 @@ import type { EnginePin } from "./release.js";
 
 export const PIN: EnginePin = {
   "repository": "rholshausen/pact-janus",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "sha256": {
-    "janus-engine-aarch64-apple-darwin": "0072e1ea6df262b13f9e93dcbbab8c58f34e93925dee8125199718818112e886",
-    "janus-engine-aarch64-unknown-linux-musl": "9c064caa2b4161541ef4db95eec9b0fd6d574d9a7088fbba23d5911132db4c20",
-    "janus-engine-x86_64-apple-darwin": "603478506c07125e6ac119e69a979158f877894ff24f5f94c61bad5edf16a7e1",
-    "janus-engine-x86_64-pc-windows-msvc.exe": "4a5678a37cd970b13906ef9f4f2e072dc21114aa626177f44bc41e1021c79aee",
-    "janus-engine-x86_64-unknown-linux-musl": "9e6903afb0f1abb167230a759d52a1755db1850ebe12503fdf8f26ec05f14bb9"
+    "janus-engine-aarch64-apple-darwin": "5e98701c4a77439fd83797880f88e679115ceca699a8346ea6a1eeea443a61f2",
+    "janus-engine-aarch64-unknown-linux-musl": "3b5039fbadb3231028c1b821901ead8039199dcce66e3d60e3f831ee016de600",
+    "janus-engine-x86_64-apple-darwin": "53fa55c9184f151de05c3f2bb4888c834cc44c61c4396abc3753c6fdb5cfcbcb",
+    "janus-engine-x86_64-pc-windows-msvc.exe": "06a4ac4bf97777f8fabf26c8f677c49620d401b8d8aa8065fe953f3e99840b2f",
+    "janus-engine-x86_64-unknown-linux-musl": "c0286ea30931e0d8ddf30ba2fd5450f881c380a1ab769d4c7e0b0457faf33ac5"
   }
 };

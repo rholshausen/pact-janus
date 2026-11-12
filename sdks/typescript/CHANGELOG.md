@@ -1,5 +1,7 @@
 ## 0.2.3 (2026-11-12)
 
+The SDK runs janus-engine 0.6.0, where it ran 0.5.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.6.0) says what changed.
+
 ### Features
 
 #### `exclude` leaves out a combination the provider cannot produce
