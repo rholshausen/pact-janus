@@ -95,10 +95,7 @@ impl Exemption {
         }
       }
     }
-    if self.path.as_deref().is_some_and(|selected| selected != path) {
-      return false;
-    }
-    true
+    !self.path.as_deref().is_some_and(|selected| selected != path)
   }
 
   /// Whether this exemption has passed its own expiry date, as of `as_of` (both `YYYY-MM-DD`).
