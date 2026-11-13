@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "interaction",
+    "provenance",
     "disposition",
     "exemption",
     "finding"
@@ -42,6 +43,13 @@ public class FindingEntry {
     @JsonProperty("interaction")
     @JsonPropertyDescription("An interaction by contract spec \u00a74.2's identity: description plus state names.")
     private InteractionId interaction;
+    /**
+     * The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one.
+     * 
+     */
+    @JsonProperty("provenance")
+    @JsonPropertyDescription("The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one.")
+    private java.lang.String provenance;
     /**
      * Whether policy left this finding live or an exemption silenced it.
      * (Required)
@@ -92,6 +100,24 @@ public class FindingEntry {
     @JsonProperty("interaction")
     public void setInteraction(InteractionId interaction) {
         this.interaction = interaction;
+    }
+
+    /**
+     * The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one.
+     * 
+     */
+    @JsonProperty("provenance")
+    public java.lang.String getProvenance() {
+        return provenance;
+    }
+
+    /**
+     * The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one.
+     * 
+     */
+    @JsonProperty("provenance")
+    public void setProvenance(java.lang.String provenance) {
+        this.provenance = provenance;
     }
 
     /**
@@ -174,6 +200,10 @@ public class FindingEntry {
         sb.append('=');
         sb.append(((this.interaction == null)?"<null>":this.interaction));
         sb.append(',');
+        sb.append("provenance");
+        sb.append('=');
+        sb.append(((this.provenance == null)?"<null>":this.provenance));
+        sb.append(',');
         sb.append("disposition");
         sb.append('=');
         sb.append(((this.disposition == null)?"<null>":this.disposition));
@@ -201,8 +231,9 @@ public class FindingEntry {
     @Override
     public int hashCode() {
         int result = 1;
-        result = ((result* 31)+((this.interaction == null)? 0 :this.interaction.hashCode()));
         result = ((result* 31)+((this.disposition == null)? 0 :this.disposition.hashCode()));
+        result = ((result* 31)+((this.provenance == null)? 0 :this.provenance.hashCode()));
+        result = ((result* 31)+((this.interaction == null)? 0 :this.interaction.hashCode()));
         result = ((result* 31)+((this.exemption == null)? 0 :this.exemption.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.finding == null)? 0 :this.finding.hashCode()));
@@ -218,7 +249,7 @@ public class FindingEntry {
             return false;
         }
         FindingEntry rhs = ((FindingEntry) other);
-        return ((((((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction)))&&((this.disposition == rhs.disposition)||((this.disposition!= null)&&this.disposition.equals(rhs.disposition))))&&((this.exemption == rhs.exemption)||((this.exemption!= null)&&this.exemption.equals(rhs.exemption))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.finding == rhs.finding)||((this.finding!= null)&&this.finding.equals(rhs.finding))));
+        return (((((((this.disposition == rhs.disposition)||((this.disposition!= null)&&this.disposition.equals(rhs.disposition)))&&((this.provenance == rhs.provenance)||((this.provenance!= null)&&this.provenance.equals(rhs.provenance))))&&((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction))))&&((this.exemption == rhs.exemption)||((this.exemption!= null)&&this.exemption.equals(rhs.exemption))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.finding == rhs.finding)||((this.finding!= null)&&this.finding.equals(rhs.finding))));
     }
 
 }

@@ -198,10 +198,30 @@
         "on-review": {
           "$ref": "#/$defs/PolicyAction"
         },
+        "provenance": {
+          "type": "object",
+          "description": "The actions named for findings from shapes of each provenance, when any were (subsumption-check spec §7.1, ADR 0089). Absent when none were.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ProvenanceActions"
+          }
+        },
         "exemptions": {
           "type": "integer",
           "minimum": 0,
           "description": "How many exemptions were in force across every layer."
+        }
+      }
+    },
+    "ProvenanceActions": {
+      "title": "ProvenanceActions",
+      "type": "object",
+      "description": "The actions for findings from shapes of one provenance; an unset severity takes the policy's own.",
+      "properties": {
+        "on-finding": {
+          "$ref": "#/$defs/PolicyAction"
+        },
+        "on-review": {
+          "$ref": "#/$defs/PolicyAction"
         }
       }
     },
@@ -421,6 +441,11 @@
         "interaction": {
           "$ref": "#/$defs/InteractionId"
         },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one."
+        },
         "disposition": {
           "type": "string",
           "description": "Whether policy left this finding live or an exemption silenced it.",
@@ -508,6 +533,10 @@
           "$ref": "#/$defs/InteractionId"
         },
         "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
           "type": "string",
           "minLength": 1
         },

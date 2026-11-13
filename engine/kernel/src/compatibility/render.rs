@@ -180,6 +180,19 @@ fn verdict_line(report: &CompatibilityReport) -> Marked {
     report.policy.on_finding.as_str(),
     report.policy.on_review.as_str()
   );
+  // Each provenance's own actions after the plain ones (ADR 0089 decision 5).
+  for (provenance, actions) in &report.policy.provenance {
+    let named: Vec<String> = [
+      ("on-finding", actions.on_finding),
+      ("on-review", actions.on_review),
+    ]
+    .into_iter()
+    .filter_map(|(name, action)| action.map(|action| format!("{name} {}", action.as_str())))
+    .collect();
+    if !named.is_empty() {
+      policy.push_str(&format!("; {provenance} {}", named.join(", ")));
+    }
+  }
   if let Some(as_of) = &report.as_of {
     policy.push_str(&format!(", exemptions as of {as_of}"));
   }

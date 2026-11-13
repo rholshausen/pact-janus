@@ -27,6 +27,7 @@
 use crate::error::Problem;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 /// What a severity does to a run (§7.1). Deliberately two values: `pass` is not an action a
 /// policy can choose, because a policy that could turn a decided incompatibility into silence
@@ -65,6 +66,11 @@ pub struct Exemption {
   pub interaction: Option<InteractionRef>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub path: Option<String>,
+  /// The provenance of the shape the finding came from (§7.2, ADR 0089 decision 4), compared
+  /// exactly: how a team silences what a `derived` shape says and keeps what a `recorded` one does,
+  /// at the same path.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub provenance: Option<String>,
   /// Required by §7.2: an exemption a team could accept silently would make "why is this
   /// exempted" archaeology instead of a one-line answer.
   pub reason: String,
@@ -77,7 +83,23 @@ impl Exemption {
   /// are compared as sets: an interaction's identity is its description plus which states it
   /// declares, and a policy author who wrote two state names in the other order meant the same
   /// interaction.
-  pub fn matches(&self, consumer: &str, description: &str, states: &[String], path: &str) -> bool {
+  /// `provenance` is the finding's interaction's, which a report written before it was recorded
+  /// does not have: such a finding matches no exemption that names one.
+  pub fn matches(
+    &self,
+    consumer: &str,
+    description: &str,
+    states: &[String],
+    path: &str,
+    provenance: Option<&str>,
+  ) -> bool {
+    if self
+      .provenance
+      .as_deref()
+      .is_some_and(|selected| Some(selected) != provenance)
+    {
+      return false;
+    }
     if self.consumer.as_deref().is_some_and(|name| name != consumer) {
       return false;
     }
@@ -112,13 +134,26 @@ impl Exemption {
   }
 }
 
+/// The actions a policy names for findings from shapes of one provenance (§7.1, ADR 0089 decision
+/// 2). Either may be unset, and the policy's own action governs that severity.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct ProvenanceActions {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub on_finding: Option<Action>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub on_review: Option<Action>,
+}
+
 /// One layer of policy (§7.1): `on-finding`/`on-review` override, `exemptions` accumulate — so a
-/// layer parses as an all-optional patch rather than a full policy.
+/// layer parses as an all-optional patch rather than a full policy. `provenance` merges by
+/// provenance and by severity.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", default)]
 struct PolicyPatch {
   on_finding: Option<Action>,
   on_review: Option<Action>,
+  provenance: BTreeMap<String, ProvenanceActions>,
   exemptions: Vec<Exemption>,
 }
 
@@ -129,6 +164,10 @@ struct PolicyPatch {
 pub struct SubsumptionPolicy {
   pub on_finding: Action,
   pub on_review: Action,
+  /// The actions for findings from shapes of each provenance, which beat `on-finding` and
+  /// `on-review` whatever layer set those (ADR 0089 decision 3).
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub provenance: BTreeMap<String, ProvenanceActions>,
   #[serde(default)]
   pub exemptions: Vec<Exemption>,
 }
@@ -140,6 +179,7 @@ impl Default for SubsumptionPolicy {
     SubsumptionPolicy {
       on_finding: Action::Warn,
       on_review: Action::Warn,
+      provenance: BTreeMap::new(),
       exemptions: Vec::new(),
     }
   }
@@ -163,6 +203,19 @@ impl SubsumptionPolicy {
       if let Some(action) = patch.on_review {
         policy.on_review = action;
       }
+      // By provenance and by severity: a later layer that names `derived`'s `on-review` leaves an
+      // earlier layer's `derived` `on-finding` standing. And a later layer's plain `on-finding`
+      // leaves both standing, since a provenance's own action is the more specific (ADR 0089
+      // decision 3).
+      for (provenance, actions) in patch.provenance {
+        let merged = policy.provenance.entry(provenance).or_default();
+        if actions.on_finding.is_some() {
+          merged.on_finding = actions.on_finding;
+        }
+        if actions.on_review.is_some() {
+          merged.on_review = actions.on_review;
+        }
+      }
       policy.exemptions.extend(patch.exemptions);
     }
     Ok(policy)
@@ -170,10 +223,18 @@ impl SubsumptionPolicy {
 
   /// The action a severity dispatches to, or `None` for one no policy governs — `advisory`, which
   /// §4.3 makes policy-inert by construction.
-  pub fn action_for(&self, severity: super::Severity) -> Option<Action> {
+  ///
+  /// A finding from a shape of a provenance this policy names an action for takes that action;
+  /// every other finding the policy's own (ADR 0089 decision 2).
+  pub fn action_for(&self, severity: super::Severity, provenance: Option<&str>) -> Option<Action> {
+    let named = provenance.and_then(|provenance| self.provenance.get(provenance));
     match severity {
-      super::Severity::Finding => Some(self.on_finding),
-      super::Severity::Review => Some(self.on_review),
+      super::Severity::Finding => Some(
+        named
+          .and_then(|named| named.on_finding)
+          .unwrap_or(self.on_finding),
+      ),
+      super::Severity::Review => Some(named.and_then(|named| named.on_review).unwrap_or(self.on_review)),
       super::Severity::Advisory => None,
     }
   }

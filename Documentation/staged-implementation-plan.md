@@ -2512,6 +2512,22 @@ once there are shapes to publish.
   gate P, judged on pilot data, not decided now.
   *Exit:* design 2.8 §7 has the selector, and a `janus check` test gives a `recorded` finding and a
   `derived` one each the severity its policy names.
+  *Done 2026-11-13* (ADR 0089):
+  - A subsumption report records each matched interaction's `provenance`. A policy's `provenance` names
+    actions per provenance, which beat `on-finding` and `on-review` whatever layer set those, so
+    `janus check --on-finding block` over a policy that warns on derived findings blocks all but them.
+    An exemption may select by `provenance`. The compatibility report echoes the map, gives each finding
+    entry its provenance, and splits a pair's `subsumption-findings` and `subsumption-reviews` reasons
+    by action, naming the provenances when the policy names any. Design 2.8 §6.1 and §7, and
+    engine-protocol spec §8.6's reason table, say so; the three schemas carry it, and the SDKs'
+    bindings were regenerated.
+  - `cli/tests/derive.rs` is the exit: one `janus check` run over the sample provider's pact against its
+    recorded shape, and the same pact under a second name against its derived one, with a policy that
+    warns on derived findings and `--on-finding block`, blocks the first pair and warns on the second.
+    `engine/kernel/tests/compatibility.rs` covers the layering, a pair whose shape mixes provenances,
+    and the exemption selector.
+  - `janus check`'s flags keep their one form; a provenance form waits until someone asks (ADR 0089
+    decision 6). No default changed: gate P.
 - **S4.5 The WASM offline artifact in the broker** (broker notes row 9) — **M**: recompute on cache
   miss, the first real host of ADR 0023's offline embedding.
   *Exit:* `benchmarks/janus` measures the walk over N consumers and M provider versions in the WASM

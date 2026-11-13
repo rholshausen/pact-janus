@@ -30,6 +30,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "consumer",
     "interaction",
     "path",
+    "provenance",
     "reason",
     "expires"
 })
@@ -63,6 +64,8 @@ public class ExemptionResult {
     private InteractionId interaction;
     @JsonProperty("path")
     private String path;
+    @JsonProperty("provenance")
+    private String provenance;
     /**
      * 
      * (Required)
@@ -157,6 +160,16 @@ public class ExemptionResult {
         this.path = path;
     }
 
+    @JsonProperty("provenance")
+    public String getProvenance() {
+        return provenance;
+    }
+
+    @JsonProperty("provenance")
+    public void setProvenance(String provenance) {
+        this.provenance = provenance;
+    }
+
     /**
      * 
      * (Required)
@@ -221,6 +234,10 @@ public class ExemptionResult {
         sb.append('=');
         sb.append(((this.path == null)?"<null>":this.path));
         sb.append(',');
+        sb.append("provenance");
+        sb.append('=');
+        sb.append(((this.provenance == null)?"<null>":this.provenance));
+        sb.append(',');
         sb.append("reason");
         sb.append('=');
         sb.append(((this.reason == null)?"<null>":this.reason));
@@ -247,6 +264,7 @@ public class ExemptionResult {
         result = ((result* 31)+((this.path == null)? 0 :this.path.hashCode()));
         result = ((result* 31)+((this.reason == null)? 0 :this.reason.hashCode()));
         result = ((result* 31)+((this.expires == null)? 0 :this.expires.hashCode()));
+        result = ((result* 31)+((this.provenance == null)? 0 :this.provenance.hashCode()));
         result = ((result* 31)+((this.interaction == null)? 0 :this.interaction.hashCode()));
         result = ((result* 31)+((this.matched == null)? 0 :this.matched.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
@@ -264,7 +282,7 @@ public class ExemptionResult {
             return false;
         }
         ExemptionResult rhs = ((ExemptionResult) other);
-        return (((((((((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path)))&&((this.reason == rhs.reason)||((this.reason!= null)&&this.reason.equals(rhs.reason))))&&((this.expires == rhs.expires)||((this.expires!= null)&&this.expires.equals(rhs.expires))))&&((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction))))&&((this.matched == rhs.matched)||((this.matched!= null)&&this.matched.equals(rhs.matched))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
+        return ((((((((((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path)))&&((this.reason == rhs.reason)||((this.reason!= null)&&this.reason.equals(rhs.reason))))&&((this.expires == rhs.expires)||((this.expires!= null)&&this.expires.equals(rhs.expires))))&&((this.provenance == rhs.provenance)||((this.provenance!= null)&&this.provenance.equals(rhs.provenance))))&&((this.interaction == rhs.interaction)||((this.interaction!= null)&&this.interaction.equals(rhs.interaction))))&&((this.matched == rhs.matched)||((this.matched!= null)&&this.matched.equals(rhs.matched))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.consumer == rhs.consumer)||((this.consumer!= null)&&this.consumer.equals(rhs.consumer))))&&((this.status == rhs.status)||((this.status!= null)&&this.status.equals(rhs.status))));
     }
 
 }

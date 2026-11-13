@@ -911,3 +911,197 @@ fn the_report_validates_against_the_shipped_schema() {
   );
   assert_eq!(report["$format"], json!("janus-compatibility-report/1"));
 }
+
+// --- provenance (staged plan S4.4, ADR 0089) -----------------------------------------------------
+
+/// A shape whose document is `derived` and whose one interaction is `recorded`, for a contract that
+/// has both: one finding from each.
+fn mixed_provenance_pair(engine: &mut Engine) -> Value {
+  let interaction = |description: &str| {
+    json!({ "description": description,
+      "parts": { "response": { "body": { "shape": "object", "members": {
+        "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" } } } } },
+      "selection": { "variants": [], "report": {} } })
+  };
+  let published = |description: &str, provenance: Option<&str>| {
+    let mut entry = json!({ "description": description,
+      "parts": { "response": { "body": { "shape": "object", "members": {
+        "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED", "CANCELLED"],
+                    "example": "PENDING" } } } } } });
+    if let Some(provenance) = provenance {
+      entry["provenance"] = json!(provenance);
+    }
+    entry
+  };
+  let contract = json!({ "$format": "janus-contract/1",
+    "consumer": { "name": "order-consumer" }, "provider": { "name": "order-service" },
+    "interactions": [ interaction("get an order"), interaction("list orders") ] });
+  let shape = json!({ "$format": "janus-provider-shape/1",
+    "provider": { "name": "order-service" }, "provenance": "derived",
+    "interactions": [ published("get an order", None), published("list orders", Some("recorded")) ] });
+  let result = ok(
+    engine,
+    "subsumption/check",
+    json!({ "contract": contract, "provider-shape": shape }),
+  );
+  json!({ "consumer": { "name": "order-consumer" }, "provider": { "name": "order-service" },
+          "format": result["format"], "subsumption": result["report"] })
+}
+
+#[test]
+fn a_provenances_own_action_beats_the_plain_one_whatever_layer_set_it() {
+  // The project routes derived findings to `warn`; the run says `--on-finding block`. The run's
+  // plain action does not reach the provenance the project named (ADR 0089 decision 3), and a
+  // later layer that names `derived`'s other severity leaves its `on-finding` standing.
+  let project = json!({ "provenance": { "derived": { "on-finding": "warn" } } });
+  let more = json!({ "provenance": { "derived": { "on-review": "block" } } });
+  let run = json!({ "on-finding": "block" });
+  let policy = SubsumptionPolicy::resolve(&[Some(&project), Some(&more), Some(&run)]).expect("three layers");
+  use pact_janus_kernel::subsumption::Severity;
+  assert_eq!(
+    policy.action_for(Severity::Finding, Some("derived")),
+    Some(Action::Warn)
+  );
+  assert_eq!(
+    policy.action_for(Severity::Review, Some("derived")),
+    Some(Action::Block)
+  );
+  assert_eq!(
+    policy.action_for(Severity::Finding, Some("recorded")),
+    Some(Action::Block)
+  );
+  assert_eq!(
+    policy.action_for(Severity::Finding, None),
+    Some(Action::Block),
+    "a report that recorded no provenance takes the plain action"
+  );
+
+  // Between two settings alike in specificity, the later layer wins, as on-finding's always has.
+  let later = json!({ "provenance": { "derived": { "on-finding": "block" } } });
+  let policy = SubsumptionPolicy::resolve(&[Some(&project), Some(&later)]).expect("two layers");
+  assert_eq!(
+    policy.action_for(Severity::Finding, Some("derived")),
+    Some(Action::Block)
+  );
+}
+
+#[test]
+fn the_report_records_each_interactions_provenance_the_entrys_own_before_its_documents() {
+  let mut engine = engine();
+  let pair = mixed_provenance_pair(&mut engine);
+  let interactions = pair["subsumption"]["interactions"].as_array().unwrap();
+  assert_eq!(interactions[0]["provenance"], json!("derived"));
+  assert_eq!(interactions[1]["provenance"], json!("recorded"));
+}
+
+#[test]
+fn a_pairs_findings_take_the_action_their_provenance_names_and_the_reasons_say_which() {
+  let mut engine = engine();
+  let pair = mixed_provenance_pair(&mut engine);
+  let (report, text) = decide(
+    &mut engine,
+    json!({ "pairs": [pair], "verification": [verified_summary()],
+            "policy": [ { "on-finding": "block",
+                          "provenance": { "derived": { "on-finding": "warn" } } } ] }),
+  );
+  assert_eq!(report["decision"], json!("block"), "the recorded finding blocks");
+  let findings: Vec<(Value, Value)> = report["pairs"][0]["reasons"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .filter(|reason| reason["code"] == json!("subsumption-findings"))
+    .map(|reason| (reason["action"].clone(), reason["message"].clone()))
+    .collect();
+  assert_eq!(
+    findings,
+    vec![
+      (
+        json!("block"),
+        json!(
+          "1 decided finding from recorded shapes: the provider may produce responses this consumer has not tested"
+        )
+      ),
+      (
+        json!("warn"),
+        json!(
+          "1 decided finding from derived shapes: the provider may produce responses this consumer has not tested"
+        )
+      ),
+    ]
+  );
+  let provenances: Vec<&Value> = report["pairs"][0]["findings"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|entry| &entry["provenance"])
+    .collect();
+  assert_eq!(provenances, vec![&json!("derived"), &json!("recorded")]);
+  assert_eq!(
+    report["policy"]["provenance"],
+    json!({ "derived": { "on-finding": "warn" } })
+  );
+  assert!(
+    text.contains("policy on-finding block, on-review warn; derived on-finding warn"),
+    "{text}"
+  );
+
+  // With no provenance named, the same pair reads as it always did: one reason, no provenance.
+  let pair = mixed_provenance_pair(&mut engine);
+  let (report, _) = decide(
+    &mut engine,
+    json!({ "pairs": [pair], "verification": [verified_summary()],
+            "policy": [ { "on-finding": "block" } ] }),
+  );
+  let reasons: Vec<&Value> = report["pairs"][0]["reasons"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .filter(|reason| reason["code"] == json!("subsumption-findings"))
+    .collect();
+  assert_eq!(reasons.len(), 1);
+  assert_eq!(
+    reasons[0]["message"],
+    json!("2 decided findings: the provider may produce responses this consumer has not tested")
+  );
+  assert!(report["policy"].get("provenance").is_none());
+}
+
+#[test]
+fn an_exemption_that_names_a_provenance_silences_only_findings_from_shapes_of_it() {
+  let mut engine = engine();
+  let pair = mixed_provenance_pair(&mut engine);
+  let (report, _) = decide(
+    &mut engine,
+    json!({ "pairs": [pair.clone()],
+            "policy": [ { "exemptions": [ { "provenance": "derived", "path": "response.body.status",
+                                            "reason": "the ORM's enums are wider than the API's" } ] } ] }),
+  );
+  let entries = report["pairs"][0]["findings"].as_array().unwrap();
+  let dispositions: Vec<(&Value, &Value)> = entries
+    .iter()
+    .map(|entry| (&entry["provenance"], &entry["disposition"]))
+    .collect();
+  assert_eq!(
+    dispositions,
+    vec![
+      (&json!("derived"), &json!("exempt")),
+      (&json!("recorded"), &json!("live"))
+    ]
+  );
+  assert_eq!(
+    report["pairs"][0]["exemptions"][0]["provenance"],
+    json!("derived")
+  );
+
+  // A report written before provenance was recorded has none, and matches no exemption that names one.
+  let mut older = pair;
+  for interaction in older["subsumption"]["interactions"].as_array_mut().unwrap() {
+    interaction.as_object_mut().unwrap().remove("provenance");
+  }
+  let (report, _) = decide(
+    &mut engine,
+    json!({ "pairs": [older],
+            "policy": [ { "exemptions": [ { "provenance": "derived", "reason": "derived noise" } ] } ] }),
+  );
+  assert_eq!(report["pairs"][0]["subsumption"]["exempt"], json!(0));
+}

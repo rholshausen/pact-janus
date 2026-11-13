@@ -27,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "on-finding",
     "on-review",
+    "provenance",
     "exemptions"
 })
 public class PolicyView {
@@ -40,7 +41,7 @@ public class PolicyView {
      */
     @JsonProperty("on-finding")
     @JsonPropertyDescription("What a subsumption severity does to the run (design 2.8 \u00a77.1). Both default to 'warn' (ADR 0016).")
-    private String onFinding;
+    private java.lang.String onFinding;
     /**
      * PolicyAction
      * <p>
@@ -50,7 +51,14 @@ public class PolicyView {
      */
     @JsonProperty("on-review")
     @JsonPropertyDescription("What a subsumption severity does to the run (design 2.8 \u00a77.1). Both default to 'warn' (ADR 0016).")
-    private String onReview;
+    private java.lang.String onReview;
+    /**
+     * The actions named for findings from shapes of each provenance, when any were (subsumption-check spec §7.1, ADR 0089). Absent when none were.
+     * 
+     */
+    @JsonProperty("provenance")
+    @JsonPropertyDescription("The actions named for findings from shapes of each provenance, when any were (subsumption-check spec \u00a77.1, ADR 0089). Absent when none were.")
+    private Map<String, ProvenanceActions> provenance;
     /**
      * How many exemptions were in force across every layer.
      * (Required)
@@ -60,7 +68,7 @@ public class PolicyView {
     @JsonPropertyDescription("How many exemptions were in force across every layer.")
     private Long exemptions;
     @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
 
     /**
      * PolicyAction
@@ -70,7 +78,7 @@ public class PolicyView {
      * 
      */
     @JsonProperty("on-finding")
-    public String getOnFinding() {
+    public java.lang.String getOnFinding() {
         return onFinding;
     }
 
@@ -82,7 +90,7 @@ public class PolicyView {
      * 
      */
     @JsonProperty("on-finding")
-    public void setOnFinding(String onFinding) {
+    public void setOnFinding(java.lang.String onFinding) {
         this.onFinding = onFinding;
     }
 
@@ -94,7 +102,7 @@ public class PolicyView {
      * 
      */
     @JsonProperty("on-review")
-    public String getOnReview() {
+    public java.lang.String getOnReview() {
         return onReview;
     }
 
@@ -106,8 +114,26 @@ public class PolicyView {
      * 
      */
     @JsonProperty("on-review")
-    public void setOnReview(String onReview) {
+    public void setOnReview(java.lang.String onReview) {
         this.onReview = onReview;
+    }
+
+    /**
+     * The actions named for findings from shapes of each provenance, when any were (subsumption-check spec §7.1, ADR 0089). Absent when none were.
+     * 
+     */
+    @JsonProperty("provenance")
+    public Map<String, ProvenanceActions> getProvenance() {
+        return provenance;
+    }
+
+    /**
+     * The actions named for findings from shapes of each provenance, when any were (subsumption-check spec §7.1, ADR 0089). Absent when none were.
+     * 
+     */
+    @JsonProperty("provenance")
+    public void setProvenance(Map<String, ProvenanceActions> provenance) {
+        this.provenance = provenance;
     }
 
     /**
@@ -131,17 +157,17 @@ public class PolicyView {
     }
 
     @JsonAnyGetter
-    public Map<String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public String toString() {
+    public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(PolicyView.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("onFinding");
@@ -151,6 +177,10 @@ public class PolicyView {
         sb.append("onReview");
         sb.append('=');
         sb.append(((this.onReview == null)?"<null>":this.onReview));
+        sb.append(',');
+        sb.append("provenance");
+        sb.append('=');
+        sb.append(((this.provenance == null)?"<null>":this.provenance));
         sb.append(',');
         sb.append("exemptions");
         sb.append('=');
@@ -172,6 +202,7 @@ public class PolicyView {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.onFinding == null)? 0 :this.onFinding.hashCode()));
+        result = ((result* 31)+((this.provenance == null)? 0 :this.provenance.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.onReview == null)? 0 :this.onReview.hashCode()));
         result = ((result* 31)+((this.exemptions == null)? 0 :this.exemptions.hashCode()));
@@ -187,7 +218,7 @@ public class PolicyView {
             return false;
         }
         PolicyView rhs = ((PolicyView) other);
-        return (((((this.onFinding == rhs.onFinding)||((this.onFinding!= null)&&this.onFinding.equals(rhs.onFinding)))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.onReview == rhs.onReview)||((this.onReview!= null)&&this.onReview.equals(rhs.onReview))))&&((this.exemptions == rhs.exemptions)||((this.exemptions!= null)&&this.exemptions.equals(rhs.exemptions))));
+        return ((((((this.onFinding == rhs.onFinding)||((this.onFinding!= null)&&this.onFinding.equals(rhs.onFinding)))&&((this.provenance == rhs.provenance)||((this.provenance!= null)&&this.provenance.equals(rhs.provenance))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.onReview == rhs.onReview)||((this.onReview!= null)&&this.onReview.equals(rhs.onReview))))&&((this.exemptions == rhs.exemptions)||((this.exemptions!= null)&&this.exemptions.equals(rhs.exemptions))));
     }
 
 }

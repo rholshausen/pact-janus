@@ -5,9 +5,12 @@
 //! the type rather than a hand-rolled serializer.
 
 use crate::contract::Party;
-use crate::subsumption::{Action, Exemption, NOT_PUBLISHED, Severity, SubsumptionPolicy, SubsumptionReport};
+use crate::subsumption::{
+  Action, Exemption, NOT_PUBLISHED, ProvenanceActions, Severity, SubsumptionPolicy, SubsumptionReport,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The format token this module writes.
 pub const FORMAT: &str = "janus-compatibility-report/1";
@@ -121,6 +124,9 @@ pub struct CompatibilityReport {
 pub struct PolicyView {
   pub on_finding: Action,
   pub on_review: Action,
+  /// The actions named for findings from shapes of each provenance (ADR 0089), when any were.
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub provenance: BTreeMap<String, ProvenanceActions>,
   /// How many exemptions were in force, across every layer.
   pub exemptions: usize,
 }
@@ -193,6 +199,9 @@ pub enum Disposition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FindingEntry {
   pub interaction: InteractionId,
+  /// The provenance of the shape the finding came from, which policy may act on (ADR 0089).
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub provenance: Option<String>,
   pub disposition: Disposition,
   /// The exemption that silenced it, when one did — the reason a reader is looking for.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -301,6 +310,7 @@ pub fn decide(
     policy: PolicyView {
       on_finding: policy.on_finding,
       on_review: policy.on_review,
+      provenance: policy.provenance.clone(),
       exemptions: policy.exemptions.len(),
     },
     as_of: as_of.map(str::to_string),
@@ -408,23 +418,27 @@ fn decide_pair(
         },
       ));
     }
-    if subsumption.findings > 0 {
+    // One reason per action the live findings resolved to (ADR 0089 decision 5), so a policy that
+    // blocks recorded findings and warns on derived ones says which were which.
+    for group in by_action(&findings, Severity::Finding, policy) {
       reasons.push(Reason::new(
         "subsumption-findings",
-        ReasonAction::of(policy.on_finding),
+        ReasonAction::of(group.action),
         format!(
-          "{}: the provider may produce responses this consumer has not tested",
-          super::count(subsumption.findings as u64, "decided finding", "decided findings")
+          "{}{}: the provider may produce responses this consumer has not tested",
+          super::count(group.count as u64, "decided finding", "decided findings"),
+          group.from(policy)
         ),
       ));
     }
-    if subsumption.reviews > 0 {
+    for group in by_action(&findings, Severity::Review, policy) {
       reasons.push(Reason::new(
         "subsumption-reviews",
-        ReasonAction::of(policy.on_review),
+        ReasonAction::of(group.action),
         format!(
-          "{} the checker cannot decide either way; a person has to look",
-          super::count(subsumption.reviews as u64, "comparison", "comparisons")
+          "{}{} the checker cannot decide either way; a person has to look",
+          super::count(group.count as u64, "comparison", "comparisons"),
+          group.from(policy)
         ),
       ));
     }
@@ -528,14 +542,21 @@ fn dispose(
       // An `advisory` is policy-inert by construction (design 2.8 §4.3), so no exemption is
       // consulted for one: silencing a caveat nobody dispatches on would only inflate the
       // exempt count and hide the caveat.
-      let exempting = policy.action_for(finding.severity).and_then(|_| {
+      let provenance = interaction.provenance.as_deref();
+      let exempting = policy.action_for(finding.severity, provenance).and_then(|_| {
         policy
           .exemptions
           .iter()
           .enumerate()
           .filter(|(_, exemption)| !exemption.lapsed(as_of))
           .find(|(_, exemption)| {
-            exemption.matches(consumer, &interaction.description, &states, &finding.path)
+            exemption.matches(
+              consumer,
+              &interaction.description,
+              &states,
+              &finding.path,
+              provenance,
+            )
           })
       });
       match exempting {
@@ -544,6 +565,7 @@ fn dispose(
           view.exempt += 1;
           entries.push(FindingEntry {
             interaction: id.clone(),
+            provenance: interaction.provenance.clone(),
             disposition: Disposition::Exempt,
             exemption: Some(ExemptionRef {
               reason: exemption.reason.clone(),
@@ -560,6 +582,7 @@ fn dispose(
           }
           entries.push(FindingEntry {
             interaction: id.clone(),
+            provenance: interaction.provenance.clone(),
             disposition: Disposition::Live,
             exemption: None,
             finding: finding.clone(),
@@ -659,6 +682,61 @@ fn dispose(
   }
 
   (view, entries, exemptions, reasons)
+}
+
+/// The live findings of one severity that resolved to one action, and the provenances they came
+/// from.
+struct ActionGroup {
+  action: Action,
+  count: usize,
+  provenances: BTreeSet<String>,
+}
+
+impl ActionGroup {
+  /// ` from derived shapes`, when the policy names actions by provenance and so a reader needs to
+  /// know which findings a reason counted; nothing otherwise, so a report decided by a policy that
+  /// names none reads as it did.
+  fn from(&self, policy: &SubsumptionPolicy) -> String {
+    if policy.provenance.is_empty() || self.provenances.is_empty() {
+      return String::new();
+    }
+    let names: Vec<&str> = self.provenances.iter().map(String::as_str).collect();
+    let names = match names.as_slice() {
+      [only] => only.to_string(),
+      [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+      [] => String::new(),
+    };
+    format!(" from {names} shapes")
+  }
+}
+
+/// `findings`' live entries of `severity`, grouped by the action the policy resolves each to:
+/// `block` first, so the reason that decides a pair leads.
+fn by_action(findings: &[FindingEntry], severity: Severity, policy: &SubsumptionPolicy) -> Vec<ActionGroup> {
+  let mut groups: Vec<ActionGroup> = Vec::new();
+  for entry in findings
+    .iter()
+    .filter(|entry| entry.disposition == Disposition::Live && entry.finding.severity == severity)
+  {
+    let Some(action) = policy.action_for(severity, entry.provenance.as_deref()) else {
+      continue;
+    };
+    let group = match groups.iter_mut().position(|group| group.action == action) {
+      Some(at) => &mut groups[at],
+      None => {
+        groups.push(ActionGroup {
+          action,
+          count: 0,
+          provenances: BTreeSet::new(),
+        });
+        groups.last_mut().expect("just pushed")
+      }
+    };
+    group.count += 1;
+    group.provenances.extend(entry.provenance.clone());
+  }
+  groups.sort_by_key(|group| group.action != Action::Block);
+  groups
 }
 
 /// Kleene conjunction over the report's own verdict strings (design 2.8 §6.2, one level up

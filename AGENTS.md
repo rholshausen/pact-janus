@@ -256,6 +256,9 @@ Three sources are the source of truth and take precedence over this file when th
 > shape from an OpenAPI 3.0 or 3.1 document, an entry per operation and documented status selected as a
 > recorded one is, and reports each mapping that loses something, an unstated `minItems` (written as
 > `min: 0`) among them; the sample provider's `openapi.yaml` finds what its recorded shape finds.
+> S4.4 (ADR 0089): a policy's `provenance` names actions per provenance (`derived: { on-finding: warn }`),
+> which beat the plain ones whatever layer set those, and an exemption may select by `provenance`; a
+> subsumption report records each matched interaction's provenance.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

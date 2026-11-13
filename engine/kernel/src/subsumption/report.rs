@@ -184,6 +184,12 @@ pub struct InteractionResult {
   /// fact a reader wants, because the two sides then never agreed on a name.
   #[serde(rename = "matched-by", skip_serializing_if = "Option::is_none")]
   pub matched_by: Option<String>,
+  /// How the entry it matched came to exist (spec §2.3): the entry's own provenance, else its
+  /// document's. Recorded here because policy may act on it (spec §7, ADR 0089), and a report is
+  /// decided without the shape it was walked against. None when unmatched, and in a report written
+  /// before it was recorded.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub provenance: Option<String>,
   /// Why an unmatched interaction is unmatched, when that is more than "nothing was published":
   /// today only an ambiguous selection, naming the entries that tied.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -316,6 +322,7 @@ pub fn check_with(
           states: recorded_states,
           matched: false,
           matched_by: None,
+          provenance: None,
           reason,
           verdict: NOT_PUBLISHED.to_string(),
           findings: Vec::new(),
@@ -375,6 +382,7 @@ pub fn check_with(
       states: recorded_states,
       matched: true,
       matched_by: Some(matched_by.to_string()),
+      provenance: Some(provider_shape.provenance_of(published).to_string()),
       reason: None,
       verdict: verdict.as_str().to_string(),
       findings,

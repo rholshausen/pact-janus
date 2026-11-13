@@ -999,9 +999,24 @@ export interface PolicyView {
   "on-finding": PolicyAction;
   "on-review": PolicyAction;
   /**
+   * The actions named for findings from shapes of each provenance, when any were (subsumption-check spec §7.1, ADR 0089). Absent when none were.
+   */
+  provenance?: {
+    [k: string]: ProvenanceActions;
+  };
+  /**
    * How many exemptions were in force across every layer.
    */
   exemptions: number;
+  [k: string]: unknown;
+}
+
+/**
+ * The actions for findings from shapes of one provenance; an unset severity takes the policy's own.
+ */
+export interface ProvenanceActions {
+  "on-finding"?: PolicyAction;
+  "on-review"?: PolicyAction;
   [k: string]: unknown;
 }
 
@@ -1112,6 +1127,10 @@ export interface SubsumptionView {
 export interface FindingEntry {
   interaction: InteractionId;
   /**
+   * The provenance of the provider-shape entry the finding came from (ADR 0089). Absent when the subsumption report did not record one.
+   */
+  provenance?: string;
+  /**
    * Whether policy left this finding live or an exemption silenced it.
    */
   disposition: string;
@@ -1155,6 +1174,7 @@ export interface ExemptionResult {
   consumer?: string;
   interaction?: InteractionId;
   path?: string;
+  provenance?: string;
   reason: string;
   expires?: string;
   [k: string]: unknown;

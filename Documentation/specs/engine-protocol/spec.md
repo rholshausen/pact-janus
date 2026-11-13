@@ -1011,8 +1011,8 @@ run's decision is the most severe of its pairs'.
 | `verification-filtered` | `warn` | a covering run was filtered for this pair (its `pairs` entry says `filtered`; for a summary without `pairs`, the run says `filtered`): unreplayed variants are not passing ones |
 | `provider-shape-missing` | `note` | no report was attached — replay-only semantics, the RFC's per-provider adoption path |
 | `interactions-not-published` | `note` | the provider published a shape, but not for every interaction (design 2.8 §6.3) |
-| `subsumption-findings` | `on-finding` | at least one `finding`-severity result no exemption silenced |
-| `subsumption-reviews` | `on-review` | at least one `review`-severity result no exemption silenced |
+| `subsumption-findings` | `on-finding`, or a provenance's own | at least one `finding`-severity result no exemption silenced; once for each action those results resolved to (design 2.8 §7.1, ADR 0089) |
+| `subsumption-reviews` | `on-review`, or a provenance's own | at least one `review`-severity result no exemption silenced; once for each action, as above |
 | `subsumption-exempt` | `note` | an exemption silenced at least one finding |
 | `subsumption-advisories` | `note` | a passing field carries an exercised-coverage caveat (design 2.8 §5) |
 | `exemption-lapsed` | `warn` | an exemption is past its `expires` date, so what it covered is decided again |

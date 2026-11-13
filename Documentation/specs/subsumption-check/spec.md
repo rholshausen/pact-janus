@@ -374,6 +374,7 @@ aggregate verdict per interaction and overall.
     { "description": "get an order",
       "states": [ { "name": "an order exists" } ],
       "matched": true,
+      "provenance": "recorded",
       "verdict": "no",
       "findings": [
         { "path": "response.body.status", "verdict": "no", "severity": "finding", "kind": "wider-values",
@@ -382,6 +383,10 @@ aggregate verdict per interaction and overall.
           "reason": "4 options vs 3" } ] } ],
   "summary": { "interactions": 1, "matched": 1, "findings": 1, "reviews": 0 } }
 ```
+
+A matched interaction records the `provenance` of the entry it matched, the entry's own or else its
+document's (§2.3), because policy may act on it (§7) and a report is decided without the shape it was
+walked against ([ADR 0089](../../decisions/0089-scope-a-subsumption-policy-and-its-exemptions-by-the-provenance-of-the-shape-a-finding-came-from.md)).
 
 Schema: [`schemas/v1/subsumption-report.schema.json`](schemas/v1/subsumption-report.schema.json).
 
@@ -496,7 +501,8 @@ result, and what happens on a `review`-severity one — plus the exemptions a te
 to re-litigate every run.
 
 ```json policy
-{ "on-finding": "warn", "on-review": "warn",
+{ "on-finding": "block", "on-review": "warn",
+  "provenance": { "derived": { "on-finding": "warn" } },
   "exemptions": [
     { "interaction": { "description": "get an order" },
       "path": "response.body.status",
@@ -511,6 +517,15 @@ layers the same way sampling policy does (variant semantics spec §3.8) — spec
 project config, then a per-run override — with `exemptions` accumulating across layers rather than the
 last layer replacing the list, the same treatment ADR 0008 gives `exclude`.
 
+`provenance` names actions for findings from shapes of each provenance (§2.3, §7.3): a map from a
+provenance to `{ on-finding?, on-review? }`. A finding whose interaction matched an entry of a
+provenance the map names, for a severity that entry sets, takes that action; every other finding takes
+`on-finding` or `on-review`. **The more specific setting wins whatever layer set it**: a later layer's
+`on-finding` does not override an earlier layer's `provenance.derived.on-finding`, so a per-run
+`--on-finding block` over a project policy that routes derived findings to `warn` blocks every finding
+but a derived one. Between settings alike in specificity, the later layer wins, and the map merges by
+provenance and by severity ([ADR 0089](../../decisions/0089-scope-a-subsumption-policy-and-its-exemptions-by-the-provenance-of-the-shape-a-finding-came-from.md)). Every action defaults to `warn`, for every provenance.
+
 ### 7.2 Exemption scoping
 
 An exemption's selector members are all optional; an unset selector matches every value on that axis, and
@@ -521,6 +536,7 @@ an exemption applies to a finding only when **every selector it sets** matches:
 | `consumer` | every finding for the named consumer |
 | `interaction` (`description` + optional `states`) | every finding within that interaction, for any consumer if `consumer` is unset |
 | `path` | one field, within whatever `interaction`/`consumer` also narrow — matched exactly, not as a subtree prefix (v1) |
+| `provenance` | findings from interactions whose matched entry has that provenance (§6.1), compared exactly; a report that records none matches no exemption that sets it |
 
 This is the granularity the plan names directly — per field, per interaction, per consumer — as three
 selectors that compose rather than three separate mechanisms, following the same shape ADR 0008's
@@ -553,14 +569,21 @@ them, not the schema shape.
 
 §2.3 fixed that provenance never changes a verdict. It is exactly the input policy is *for*: a team
 importing `derived` provider shapes and drowning in `wider-values`/`weaker-presence` findings from an
-everything-nullable ORM schema (the RFC's own drawback, and task 7.3's evidence-gathering target) does
-not fix that by asking the checker to compute a different `admits` for `derived` shapes — it fixes it by
-scoping policy, or exemptions, to provenance. This specification does not add `provenance` as a policy
-selector in v1, deliberately: task 7.3 has not yet produced the evidence for how noisy `derived` findings
-actually get on a realistic spec, and adding a selector ahead of that evidence risks shaping the surface
-around a guess. The `path`/`interaction`/`consumer` selectors already available are sufficient to hand-
-scope the same outcome while that evidence is gathered; a `provenance` selector is the natural next
-addition once 7.3 reports back, and would be additive (§9).
+everything-nullable ORM schema (the RFC's own drawback) does not fix that by asking the checker to compute
+a different `admits` for `derived` shapes — it fixes it by scoping policy, or exemptions, to provenance.
+
+Spike 7.3 measured why that is the only axis that works: a generator-emitted document gave 4.5 times the
+findings of a hand-authored one, and the true `wider-values` and the generated `weaker-presence` sat at
+the same path in the same interaction, so a `path` exemption silenced both (its findings §4.3). So a
+policy may name actions per provenance (§7.1) and an exemption may select by it (§7.2); the
+configuration the evidence supports is `block` on `recorded` and `warn` on `derived`
+([ADR 0089](../../decisions/0089-scope-a-subsumption-policy-and-its-exemptions-by-the-provenance-of-the-shape-a-finding-came-from.md)). Whether `block` becomes a default for any provenance is gate P, decided on pilot
+data, not here.
+
+The compatibility report (engine-protocol spec §8.6) says what this did: its echoed `policy` carries the
+`provenance` map, each finding entry its `provenance`, and a pair's `subsumption-findings` and
+`subsumption-reviews` reasons are given once for each action their live findings resolved to, naming the
+provenances counted when the policy names any.
 
 ## 8. Errors
 

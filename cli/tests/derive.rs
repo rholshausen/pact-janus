@@ -250,3 +250,90 @@ fn every_entry_of_the_mapping_document_is_selected_by_a_request_to_its_operation
       .any(|entry| entry["source"]["response"] == "default")
   );
 }
+
+/// S4.4's exit (ADR 0089): one `janus check` run in which a recorded finding and a derived one each
+/// take the action their policy names. The sample provider's pact is checked against the shape its
+/// tests recorded, and the same pact, under a second provider's name, against the shape its OpenAPI
+/// document derives. The policy blocks on findings and warns on derived ones, and the project's
+/// `derived` routing survives the run's `--on-finding block`.
+#[test]
+fn a_policy_blocks_on_recorded_findings_and_warns_on_derived_ones() {
+  let pact: Value = serde_json::from_slice(
+    &std::fs::read(root().join("samples/order-service/pacts/web-app-order-service.json")).unwrap(),
+  )
+  .unwrap();
+  let mut renamed = pact.clone();
+  renamed["provider"]["name"] = Value::from("order-service-derived");
+  let renamed_pact = scratch("web-app-order-service-derived.json");
+  std::fs::write(&renamed_pact, serde_json::to_vec_pretty(&renamed).unwrap()).unwrap();
+
+  let derived_shape = scratch("order-service-derived.provider-shape.json");
+  let (derived, _) = derive(
+    "samples/order-service/openapi.yaml",
+    &["--provider", "order-service-derived"],
+  );
+  std::fs::write(&derived_shape, serde_json::to_vec_pretty(&derived).unwrap()).unwrap();
+
+  let policy = scratch("policy.yaml");
+  std::fs::write(&policy, "provenance:\n  derived:\n    on-finding: warn\n").unwrap();
+
+  let (code, report) = janus(&[
+    "check",
+    "samples/order-service/pacts/web-app-order-service.json",
+    renamed_pact.to_str().unwrap(),
+    "--provider-shape",
+    "samples/order-service/shapes/order-service.provider-shape.json",
+    "--provider-shape",
+    derived_shape.to_str().unwrap(),
+    "--policy",
+    policy.to_str().unwrap(),
+    "--on-finding",
+    "block",
+    "--output",
+    "json",
+  ]);
+  assert_eq!(code, 1, "a block is the subject failing: {report:#}");
+  let decisions: Vec<(&str, &str)> = report["pairs"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|pair| {
+      (
+        pair["provider"]["name"].as_str().unwrap(),
+        pair["decision"].as_str().unwrap(),
+      )
+    })
+    .collect();
+  assert_eq!(
+    decisions,
+    vec![("order-service", "block"), ("order-service-derived", "warn")]
+  );
+  for pair in report["pairs"].as_array().unwrap() {
+    let provenance = if pair["provider"]["name"] == "order-service" {
+      "recorded"
+    } else {
+      "derived"
+    };
+    let reason = pair["reasons"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .find(|reason| reason["code"] == "subsumption-findings")
+      .unwrap_or_else(|| panic!("{pair:#}"));
+    assert!(
+      reason["message"]
+        .as_str()
+        .unwrap()
+        .contains(&format!("from {provenance} shapes")),
+      "{reason:#}"
+    );
+    assert!(
+      pair["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|entry| entry["provenance"] == provenance),
+      "{pair:#}"
+    );
+  }
+}

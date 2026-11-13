@@ -68,6 +68,12 @@
           "description": "How the provider-shape entry was found (spec.md §2.2, ADR 0025): 'description', or 'selector' when the descriptions differ and an entry's operation selector admitted every recorded example. Absent when 'matched' is false.",
           "x-known-values": ["description", "selector"]
         },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provenance of the provider-shape entry this interaction matched: the entry's own, else its document's (spec.md §2.3). Policy may act on it (spec.md §7, ADR 0089). Absent when 'matched' is false.",
+          "x-known-values": ["recorded", "derived", "authored", "observed"]
+        },
         "reason": {
           "type": "string",
           "description": "Why an unmatched interaction is unmatched, when that is more than nothing having been published — e.g. several entries' selectors tie, and the checker does not choose between them."

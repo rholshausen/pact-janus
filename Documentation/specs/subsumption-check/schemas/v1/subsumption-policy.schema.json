@@ -17,6 +17,11 @@
       "x-known-values": ["warn", "block"],
       "default": "warn"
     },
+    "provenance": {
+      "type": "object",
+      "description": "Actions for findings from shapes of each provenance (spec.md §7.1, ADR 0089), keyed by provenance. A provenance's own action beats 'on-finding'/'on-review' whatever layer set either; layers merge this map by provenance and by severity.",
+      "additionalProperties": { "$ref": "#/$defs/ProvenanceActions" }
+    },
     "exemptions": {
       "type": "array",
       "description": "Accepted gaps between what the provider may do and what the consumer has tested (spec.md §7.2).",
@@ -41,6 +46,11 @@
           "minLength": 1,
           "description": "Limits the exemption to one field, in shape spec §6.2's path grammar."
         },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Limits the exemption to findings from provider-shape entries of this provenance (spec.md §2.3), compared exactly (ADR 0089)."
+        },
         "reason": {
           "type": "string",
           "minLength": 1,
@@ -50,6 +60,21 @@
           "type": "string",
           "format": "date",
           "description": "When the exemption should be revisited. Optional, since some gaps are permanent by design, but its absence SHOULD be surfaced by a report or dashboard (task 7.4/7.5)."
+        }
+      }
+    },
+    "ProvenanceActions": {
+      "title": "ProvenanceActions",
+      "description": "The actions for findings from shapes of one provenance; a severity left unset takes the policy's own.",
+      "type": "object",
+      "properties": {
+        "on-finding": {
+          "type": "string",
+          "x-known-values": ["warn", "block"]
+        },
+        "on-review": {
+          "type": "string",
+          "x-known-values": ["warn", "block"]
         }
       }
     },
