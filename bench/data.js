@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794528597199,
+  "lastUpdate": 1794528599878,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -52710,6 +52710,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 48438,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "52c5a1648c525f66a149a1cacddfed3bd6360b5a",
+          "message": "feat: S4.2 janus derive writes a provider shape from an OpenAPI document\n\nADR 0088. `janus derive` reads OpenAPI 3.0 and 3.1, as JSON or YAML, and\nwrites a `derived` provider shape: one entry per operation and documented\nresponse status, selected by method, `http:path` template (behind the\n`servers` path, or --base-path) and status, so `janus check` matches it to\nevery consumer by operation. A range is the statuses the operation does\nnot document explicitly, so no two entries tie; `default` is not\nimported. Each entry carries the response's documented headers, read as\ntext, its Content-Type as `http:media-type`, and its JSON body.\n\nEvery mapping that loses something is reported by code and JSON pointer.\nAn array with no minItems is `min: 0`, as JSON Schema says, reported as\n`cardinality-unstated`, superseding spike 7.3 §4.2's \"no claim\", which\nthe shape language can only write as `min: 1`; --assume-non-empty\nwrites that instead. The command speaks no protocol, as `component` does\nnot.\n\nThe sample provider has its OpenAPI document, spike 7.3's hand-authored\none; its derived shape matches the sample pact's interactions by\nselector and finds everything the recorded shape finds. The mapping is\nspike 7.3's importer (b8d5010), rewritten for selectors, outcomes and\nheaders. The protobuf half moves to S5.2.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-13T10:53:49+11:00",
+          "tree_id": "9c27b80b016507f0d9aa5df79bf5059e2800932a",
+          "url": "https://github.com/rholshausen/pact-janus/commit/52c5a1648c525f66a149a1cacddfed3bd6360b5a"
+        },
+        "date": 1794528599352,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27030,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 28722,
             "unit": "requests per second",
             "extra": "engines 4"
           }
