@@ -1,3 +1,71 @@
+## 0.2.4 (2026-11-13)
+
+### Features
+
+#### `ShapeRecorder` records a provider shape from the provider's own tests
+
+A provider's tests record the shape of what the provider answers, by the operation each test names,
+and the engine writes it for `janus check` (staged plan S4.1, ADR 0086):
+
+```java
+static final ShapeRecorder recorder = ShapeRecorder.forProvider("order-service");
+
+@Test
+void anOrder() throws Exception {
+  HttpResponse<byte[]> response = client.send(request("/orders/66"), BodyHandlers.ofByteArray());
+  recorder.observe(Map.of("method", "GET", "path", Shapes.pathTemplate("/orders/{id}")),
+      ShapeRecorder.Response.of(response));
+  // ...the test's own assertions
+}
+
+@AfterAll
+static void finish() {
+  recorder.finish();
+}
+```
+
+The recording's source is the class that called `forProvider`. `finish()` has the engine write
+`shapes/order-service.provider-shape.json`, merged with every other class's, and keep the counts in
+`target/janus/evidence` beside a `pom.xml`, else `build/janus/evidence`. `Response.of` sends the
+request the response answered, which the engine checks the operation admits; `new Response(status,
+headers, body)` is the other form. `Shapes.pathTemplate(template)` and `pathTemplate(template,
+example)` are the HTTP component's path template, which a consumer's request may use too, with an
+example.
+
+#### `ShapeRecorder.observeMessage` records the messages a provider produces
+
+A provider's tests record the messages it publishes into the same shape as its HTTP answers, by what
+identifies each message's operation (staged plan S4.6, ADR 0090):
+
+```java
+recorder.observeMessage(Map.of("metadata", Map.of("queue", "orders.placed")), orderPlaced(),
+    ShapeRecorder.MessageOptions.described("publish orders.placed"));
+```
+
+The message is the `Message` a `@ProvidesMessage` method returns. `operation` names its `metadata` and
+`body`, or with `MessageOptions.withRequest(message)`, a synchronous message's request. `janus check`
+then matches a consumer's message contract to the entry by what its message carries, here the queue.
+
+### Fixes
+
+#### The generated bindings carry a compatibility report's provenance
+
+The protocol bindings' `PolicyView` has an optional `provenance`, a map to the new
+`ProvenanceActions`, and `FindingEntry` and `ExemptionResult` an optional `provenance` (ADR 0089).
+Nothing in the SDK reads them.
+
+#### The generated bindings carry a provider-shape recording's operation and write
+
+The protocol bindings' `StartRecording` has an optional `kind`, `ObserveResponse` an optional
+`operation`, `ObserveResponseResult` optional `warnings`, `FinaliseRecording` an optional `write`
+(`ShapeWrite`) and `FinaliseRecordingResult` an optional `written` (ADR 0086). The SDK records no
+shape yet.
+
+#### The generated bindings carry an observation's kind
+
+The protocol bindings' `ObserveResponse` has an optional `kind` (ADR 0090), which `observeMessage`
+sends.
+
 ## 0.2.3 (2026-11-12)
 
 The SDK runs janus-engine 0.6.0, where it ran 0.5.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.6.0) says what changed.

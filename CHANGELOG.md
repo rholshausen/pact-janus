@@ -1,3 +1,174 @@
+## 0.7.0 (2026-11-13)
+
+### Breaking Changes
+
+#### The subsumption check decides the HTTP component's operators
+
+Staged plan S4.7, ADR 0087. `janus check` and `subsumption/check` compared every component operator as
+opaque: `yes` when the two nodes were identical, a review otherwise. Now a component may declare an
+operator's comparability, and the walk asks it:
+
+- **A finite provider** (`equality`, `any-of`) against an operator declared `exact` or `conservative`
+  is decided by that operator's own matcher: a recorded `Content-Type` of `application/json` against an
+  upgraded pact's `http:media-type` is `yes`, where it was a review on every interaction.
+- **Anything wider** is the component's `matcher/compare`. The HTTP component declares
+  `http:status-class`, `http:media-type` and `http:list` `exact` and `http:path` `conservative`, and
+  decides two status classes by their statuses, two media types by whether the consumer's admits the
+  provider's type, and two lists by their elements.
+
+A comparison that was a review can now be a decided finding, a `wider-values`, which `on-finding`
+governs rather than `on-review`: a check that warned under `on-finding: block` may now block. The
+native binding's `MatcherComponent` has `comparability` and `compare`, defaulting to opaque, so an
+embedding's own matcher compiles unchanged. A declared component's operators are still opaque to
+`janus check` (S5.7).
+
+The conformance case `live/recorded-shape` records the sample provider's 404 as the provider sends it,
+`{"error":"not-found"}`, and pins the shape that writes.
+
+#### The conformance suite holds an SDK to recording a provider shape
+
+The behavioural specification has four new primitives (staged plan S4.1, ADR 0086): `path-template`,
+the HTTP component's `http:path`, and `shape-recorder`, `observe` and `finish-recording`, which record
+a provider shape from the provider's own tests by the operation each test names. Seven cases cover
+them: `translation/path-template`, `provider/recorder-no-call-until-observe`,
+`provider/recorder-call-sequence`, `provider/recorder-description`,
+`provider/recorder-description-refused`, `provider/recorder-engine-error` and `live/recorded-shape`,
+which pins the shape the engine writes from the sample provider's answers. `janus-sdk-gates
+conformance check` expects them in every report, so an SDK must implement recording to move to this
+release.
+
+A case may have a `recorder`, a shape recorder as data, in a `provider` or `live` case, and expect
+`observed`, `written` and `shape`. The frame schema's operations name the three
+`provider-shape-session/*` operations.
+
+#### A provider shape is recorded by the operation each test names, and written by the engine's host
+
+Staged plan S4.1, ADR 0086.
+
+- **`observe` names an operation.** `provider-shape-session/observe` takes `operation`, shapes over the
+  initiating part's slots, which become the recorded entry's `selector`, so a provider's own tests
+  record a shape without knowing a consumer's words. With the initiating part in `parts`, an
+  operation that does not admit it is `interaction-invalid` at `/operation`.
+- **`observe` takes an arrival.** `parts` are the transport's own, a content slot's octets tagged
+  `base64` and labelled with their type, and the engine decodes them through its content components.
+  Only the answering part is recorded. Octets a component cannot decode are recorded as octets, with
+  a `warnings` entry in the result. A plain JSON value, as before, is still read as itself.
+- **`create` takes `kind`**, `http` unless given, and reads what that transport declares. An engine
+  with no transport of that kind answers `component-unavailable`: an embedding that records shapes
+  must register its transports, as one that serves or drives does.
+- **Outcomes are kept apart.** A transport declares `outcome-slots` (component-interfaces spec §5.10),
+  HTTP's the response's `status`, which an observation that names an operation writes into its
+  selector. A 200 and a 404 of one operation are two entries.
+- **Credentials are withheld.** A member the transport declares a credential, such as `set-cookie`,
+  is recorded as `any`, never with its value.
+- **`finalise` writes.** `write: { path, evidence, source }`, behind `contract-writing`, has the
+  engine's host write the shape and keep each source's counts in `evidence`, so several test files,
+  in sequence or in parallel workers, write the shape one session recording them all would have. The
+  result has `written` beside `provider-shape`.
+- **`http:path`.** The built-in HTTP component runs a new operator, `http:path`, whose member
+  `template` is a path template: each `{name}` matches one or more characters that are not `/`. An
+  embedding that registers the HTTP component's matcher actions (`ACTIONS`) gets it with no change.
+- **Selecting.** `subsumption/check` runs a selector with the engine's matchers, so it may use
+  `http:path`. When an entry naming an interaction's states and one naming none both select it, the
+  one naming them is used, where the two were a tie.
+
+#### The conformance suite holds an SDK to recording the messages a provider produces
+
+The behavioural specification has a new primitive, `observe-message` (staged plan S4.6, ADR 0090): a
+shape recorder records a message as a message producer returns one, with an operation over the
+message's own `metadata` and `body`, or with a `request` over the request's, of the kind `message`.
+Four cases cover it: `provider/recorder-message-frame`, `provider/recorder-message-synchronous`,
+`provider/recorder-message-description-refused` and `live/recorded-message-shape`, which pins the shape
+the engine writes. `janus-sdk-gates conformance check` expects them in every report, so an SDK must
+implement `observe-message` to move to this release.
+
+A case's recorder observation may be a `message`, with an optional `message-request`, in place of a
+`response`.
+
+### Features
+
+#### `janus derive` writes a message producer's shape from an AsyncAPI document
+
+Staged plan S4.8, ADR 0091. `janus derive` reads AsyncAPI 2.x and 3.0 documents, as JSON or YAML,
+beside OpenAPI ones, and writes a `derived` provider shape that `janus check` decides message
+contracts against:
+
+- **Only what the application produces.** One entry per message it sends (3.0 `action: send`, 2.x
+  `subscribe`), and per reply it answers a request with (3.0 `action: receive` with a `reply`). Each
+  entry's `message` part has the message's headers as `metadata`, its content type as a `contentType`
+  member there, and its JSON payload as `body`. Message traits are merged as each version says.
+- **Selected by the values a message fixes.** A header or payload member whose schema allows one value
+  (`const`, or an `enum` of one) is a selector member, and a reply is selected by its request's. A
+  channel's address selects only where a header fixes it, so a consumer is matched by what its message
+  carries, as ADR 0090 decided.
+- **New loss codes**, reported as OpenAPI's are: `selector-empty` (a message fixes nothing, so only its
+  description can match it), `selector-ambiguous` (two entries one message could select, which
+  `janus check` chooses neither of), `content-type-unstated`, `schema-format-unread` (an Avro or
+  protobuf payload, until a component reads it) and `reply-unresolved`.
+
+An AsyncAPI document refuses `--base-path`, and AsyncAPI 1.x is refused by name.
+
+#### `janus derive` writes a provider shape from an OpenAPI document
+
+Staged plan S4.2, ADR 0088. `janus derive <openapi.yaml|json>` reads an OpenAPI 3.0 or 3.1 document and
+writes a provider shape with provenance `derived`, which `janus check` reads like a recorded one:
+
+- **One entry per operation and documented response status**, selected by the method, the path as an
+  `http:path` template (with the `servers` path in front, or `--base-path`) and the status, so it
+  matches every consumer's interaction by operation, error responses included. A range such as `4XX`
+  is the statuses the operation does not document explicitly; `default` is not imported.
+- **Each response's documented headers, its `Content-Type`, and its JSON body**, mapped as spike 7.3
+  measured. An array that states no `minItems` admits the empty array, as JSON Schema says;
+  `--assume-non-empty` writes it as never empty.
+- **Every mapping that loses something is reported**, by code and JSON pointer, on stderr or with the
+  shape under `--output json`: an undiscriminated union, a closed object, a dropped bound or format, a
+  body that is not JSON, an unstated `minItems`, and the rest `janus derive --help` lists.
+
+The command does not speak the engine protocol: deriving is not an engine operation. Swagger 2.0 is
+refused. The sample provider has an OpenAPI document, `samples/order-service/openapi.yaml`, whose
+derived shape finds everything its recorded shape finds against its consumer's pact.
+
+#### A subsumption policy can act on where a provider shape came from
+
+Staged plan S4.4, ADR 0089. A provider shape says how it came to exist, its `provenance` (`recorded`,
+`derived`, ...), and a policy can now act on it:
+
+- **A policy's `provenance`** names actions per provenance:
+  `{ "on-finding": "block", "provenance": { "derived": { "on-finding": "warn" } } }` blocks on what the
+  provider's own tests recorded and warns on what its OpenAPI document says. A provenance's own action
+  beats the plain one whatever layer set either, so `janus check --on-finding block` leaves a project
+  policy's derived `warn` standing.
+- **An exemption's `provenance`** selects findings from shapes of that provenance only, beside
+  `consumer`, `interaction` and `path`.
+- **A subsumption report** records each matched interaction's `provenance`; a compatibility report
+  echoes the policy's `provenance` map, gives each finding entry its `provenance`, and splits a pair's
+  `subsumption-findings` and `subsumption-reviews` reasons by the action their findings resolved to,
+  naming the provenances when the policy names any.
+
+Every action still defaults to `warn`. A report written before this records no provenance, and its
+findings take the plain actions and match no exemption that names one.
+
+#### A provider shape records the messages a provider produces, and `janus check` decides message contracts by it
+
+Staged plan S4.6, ADR 0090. A message has no request, so its operation is named by the message itself:
+
+- **`provider-shape-session/observe` takes `kind`**, the session's when absent, so one session records
+  a provider's HTTP answers and its messages into one shape. The kind `message`, which no transport
+  serves, is read as `produce-message` hooks produce it: the `message` part is recorded, answering a
+  synchronous message's `request`, and a body with no `content-type` is read by its metadata's
+  `contentType`, else by its octets, as a verification reads a produced message. Any other kind no
+  transport serves is still `component-unavailable`.
+- **An observation's `operation` may name any part it carries**: an asynchronous message's own
+  `metadata` or `body`, such as the queue it was published to, or a synchronous message's `request`.
+  Every part it names is checked against it, and one it does not admit is `interaction-invalid` at
+  `/operation`.
+- **`subsumption/check` decodes a content slot a selector names** by its declared type, so a selector
+  over a member of a message's body selects by the member.
+
+`janus check` on pact-js's message example, against the shape its provider records, is matched by the
+queue the consumer names and finds the empty list it never tested. The `subsumption-findings` reason
+now says the provider "may produce what this consumer has not tested", where it said "responses".
+
 ## 0.6.0 (2026-11-12)
 
 ### Breaking Changes
