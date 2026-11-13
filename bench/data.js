@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794551446898,
+  "lastUpdate": 1794551449257,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -54126,6 +54126,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19628,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ee21aa72a14bf2623716a104199ebcf51fb95cb5",
+          "message": "feat: S4.8 janus derive writes a message producer's shape from an AsyncAPI document\n\nADR 0091. `janus derive` reads AsyncAPI 2.x and 3.0, as JSON or YAML,\nbeside OpenAPI, and writes a `derived` provider shape of what the\ndocumented application produces: one entry per message it sends (3.0\n`send`, 2.x `subscribe`) and per reply it answers a request with (3.0\n`receive` with a `reply`). Each entry's `message` part is the headers as\n`metadata`, with the message's content type as `contentType`\n(`http:media-type`, as `janus upgrade` writes a v3 message's), and the\nJSON payload as `body`. Traits are merged as each version says.\n\nA selector is the values a message fixes (ADR 0090 decision 7): a header\nor payload member whose schema allows one value, `const` or an `enum` of\none; a reply is selected by its request's. The channel address selects\nonly where a header fixes it. New losses: selector-empty,\nselector-ambiguous, content-type-unstated, schema-format-unread (Avro and\nprotobuf wait for S6.9 and S5.2) and reply-unresolved.\n\nThe schema mapping S4.2 built moves into its own module, shared by both\nfront ends, and now reads AsyncAPI's string discriminator; OpenAPI output\nis unchanged. The exit is cli/tests/derive.rs: AsyncAPI 3.0 and 2.6\ndocuments for pact-js's message example's provider derive one shape,\nwhich janus check matches by its queue and which finds what S4.6's\nrecorded shape finds, and a request/reply operation is checked against a\nsynchronous message.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-13T17:25:14+11:00",
+          "tree_id": "74c320b78a56ca96b6eb80263c3853b6e8523020",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ee21aa72a14bf2623716a104199ebcf51fb95cb5"
+        },
+        "date": 1794551448655,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27641,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 28659,
             "unit": "requests per second",
             "extra": "engines 4"
           }
