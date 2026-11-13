@@ -1,5 +1,7 @@
 ## 0.2.4 (2026-11-13)
 
+The SDK runs janus-engine 0.7.0, where it ran 0.6.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.7.0) says what changed.
+
 ### Features
 
 #### `ShapeRecorder` records a provider shape from the provider's own tests
