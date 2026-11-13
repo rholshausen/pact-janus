@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794553099444,
+  "lastUpdate": 1794553101633,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -54480,6 +54480,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 28659,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41898282+github-actions[bot]@users.noreply.github.com",
+            "name": "github-actions[bot]",
+            "username": "github-actions[bot]"
+          },
+          "committer": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "88e85d76f6f6600540deed8ef7cd86e0ebdd194f",
+          "message": "chore: release engine 0.7.0, typescript-sdk 0.2.4, jvm-sdk 0.2.4",
+          "timestamp": "2026-11-13T17:53:18+11:00",
+          "tree_id": "f88bebe49ce4acf9c79f080c6f55947f55254c19",
+          "url": "https://github.com/rholshausen/pact-janus/commit/88e85d76f6f6600540deed8ef7cd86e0ebdd194f"
+        },
+        "date": 1794553101049,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 49794,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 51404,
             "unit": "requests per second",
             "extra": "engines 4"
           }
