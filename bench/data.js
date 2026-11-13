@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794532265488,
+  "lastUpdate": 1794532267510,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -53418,6 +53418,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19533,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d80124906ee7034228c16d35b5f6bc4869fb3ed8",
+          "message": "feat: S4.4 a subsumption policy acts on the provenance of the shape a finding came from\n\nADR 0089. A subsumption report records each matched interaction's\nprovenance, the entry's own or else its document's. A policy's\n`provenance` names actions per provenance, which beat `on-finding` and\n`on-review` whatever layer set those, so `janus check --on-finding\nblock` over a project policy that warns on derived findings blocks all\nbut them; layers merge the map by provenance and by severity. An\nexemption may select by `provenance`, beside consumer, interaction and\npath.\n\nThe compatibility report echoes the map, gives each finding entry its\nprovenance, and splits a pair's subsumption-findings and\nsubsumption-reviews reasons by the action their findings resolved to,\nnaming the provenances when the policy names any; a policy that names\nnone reads as before. No default changes (gate P). Design 2.8 §6.1 and\n§7 replace §7.3's deferral with spike 7.3's evidence; the schemas carry\nthe new members and both SDKs' bindings are regenerated.\n\nS4.4's exit is cli/tests/derive.rs: one janus check run blocks the\nsample pact against its recorded shape and warns on it against its\nderived one.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-13T12:05:40+11:00",
+          "tree_id": "c985e7b5d905fd8a1bb4749d218df69e0e7202e9",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d80124906ee7034228c16d35b5f6bc4869fb3ed8"
+        },
+        "date": 1794532267082,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 26282,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19805,
             "unit": "requests per second",
             "extra": "engines 4"
           }
