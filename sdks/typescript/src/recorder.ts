@@ -1,7 +1,8 @@
-// The recording primitives (behavioural spec 'shape-recorder', 'observe', 'finish-recording';
-// ADR 0086). A recorder is one provider-shape session: each answer the test hands it goes to the
-// engine as the HTTP transport presents one, and the engine's host writes the shape. Nothing here
-// decodes a body or decides what the shape is.
+// The recording primitives (behavioural spec 'shape-recorder', 'observe', 'observe-message',
+// 'finish-recording'; ADR 0086, ADR 0090). A recorder is one provider-shape session: each answer the
+// test hands it goes to the engine as the HTTP transport presents one, each message as a message
+// producer answers one, and the engine's host writes the shape. Nothing here decodes a body or
+// decides what the shape is.
 
 import { relative, resolve, sep } from "node:path";
 import { protocolVocabulary, type protocol } from "./generated/index.js";
@@ -9,6 +10,7 @@ import { Engine } from "./engine/engine.js";
 import type { FramePipe } from "./engine/pipe.js";
 import { SubprocessPipe, type SubprocessOptions } from "./engine/subprocess.js";
 import { compile, Shape, type Template } from "./shapes.js";
+import { messageSlots, type Message } from "./verifier.js";
 
 const Op = protocolVocabulary.RequestFrameOp;
 
@@ -49,6 +51,21 @@ export interface ObserveOptions {
   request?: { method: string; path: string };
 }
 
+/** What identifies a message's operation: its metadata's members, its body, or both. */
+export interface MessageOperation {
+  metadata?: Record<string, Template>;
+  body?: Template;
+}
+
+export interface ObserveMessageOptions {
+  /** What a report calls the entry. */
+  description: string;
+  /** The provider states the message was produced in, by name. */
+  states?: readonly string[];
+  /** The message the provider was asked, for a synchronous message: the operation is then the request's. */
+  request?: Message;
+}
+
 type Slots = Record<string, protocol.ObservedSlotValue>;
 
 export class ShapeRecorder {
@@ -81,6 +98,35 @@ export class ShapeRecorder {
       description,
       ...(options.states ? { states: [...options.states] } : {}),
       operation: { request: Object.fromEntries(Object.entries(operation).map(([slot, value]) => [slot, compile(value)])) },
+      parts,
+    });
+  }
+
+  /**
+   * Records one message the provider produced, as a message producer returns one. The operation is
+   * the message's own slots, or with `request` the request's. Resolves with the engine's answer.
+   */
+  async observeMessage(
+    operation: MessageOperation,
+    message: Message,
+    options: ObserveMessageOptions,
+  ): Promise<protocol.ObserveResponseResult> {
+    if (typeof options?.description !== "string") {
+      throw new TypeError("observeMessage: name the entry with 'description'");
+    }
+    const named = Object.entries(operation).filter(([, value]) => value !== undefined);
+    const slots = Object.fromEntries(named.map(([slot, value]) => [slot, compile(value as Template)]));
+    const parts: Record<string, Slots> = { message: messageSlots(message) };
+    if (options.request) {
+      parts.request = messageSlots(options.request);
+    }
+    const { engine, session } = await this.#start();
+    return engine.call(Op.ProviderShapeSessionObserve, {
+      session,
+      kind: "message",
+      description: options.description,
+      ...(options.states ? { states: [...options.states] } : {}),
+      operation: { [options.request ? "request" : "message"]: slots },
       parts,
     });
   }

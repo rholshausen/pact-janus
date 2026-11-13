@@ -1,0 +1,234 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "live/recorded-message-shape",
+  "category": "live",
+  "title": "A provider's own tests, naming only the queue each message is published to, record the shape of the messages it produces.",
+  "covers": [
+    "verification.observe-message.frame",
+    "verification.finish-recording.writes-shape"
+  ],
+  "why": "behavioural spec 'observe-message' (ADR 0090), against the real engine: the operation over the message's metadata becomes the entry's selector, the unlabelled bodies are decoded by the type their metadata names, and the engine's host writes the shape. engine/kernel/tests/provider_shape_messages.rs checks this shape against pact-js's message example's pact (corpora/verifier/messages/pact-js-order-placed): matched by the queue, it finds the empty list the consumer never tested (staged plan S4.6's exit).",
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-0",
+            "customerId": "customer-001",
+            "totalAmount": 149.95,
+            "currency": "GBP",
+            "items": [
+              {
+                "productId": "prod-0",
+                "quantity": 1
+              },
+              {
+                "productId": "prod-1",
+                "quantity": 2
+              }
+            ]
+          },
+          "metadata": {
+            "queue": "orders.placed",
+            "contentType": "application/json"
+          }
+        },
+        "description": "publish orders.placed"
+      },
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-1",
+            "customerId": "customer-001",
+            "totalAmount": 149.95,
+            "currency": "EUR",
+            "items": []
+          },
+          "metadata": {
+            "queue": "orders.placed",
+            "contentType": "application/json"
+          }
+        },
+        "description": "publish orders.placed"
+      },
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-2",
+            "customerId": "customer-001",
+            "totalAmount": 149.95,
+            "currency": "GBP",
+            "items": [
+              {
+                "productId": "prod-0",
+                "quantity": 1
+              }
+            ]
+          },
+          "metadata": {
+            "queue": "orders.placed",
+            "contentType": "application/json"
+          }
+        },
+        "description": "publish orders.placed"
+      },
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-3",
+            "customerId": "customer-001",
+            "totalAmount": 149.95,
+            "currency": "EUR",
+            "items": [
+              {
+                "productId": "prod-0",
+                "quantity": 1
+              },
+              {
+                "productId": "prod-1",
+                "quantity": 2
+              },
+              {
+                "productId": "prod-2",
+                "quantity": 3
+              }
+            ]
+          },
+          "metadata": {
+            "queue": "orders.placed",
+            "contentType": "application/json"
+          }
+        },
+        "description": "publish orders.placed"
+      }
+    ]
+  },
+  "expect": {
+    "observed": [
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ],
+    "written": true,
+    "shape": {
+      "$format": "janus-provider-shape/1",
+      "provider": {
+        "name": "orders-api"
+      },
+      "provenance": "recorded",
+      "interactions": [
+        {
+          "description": "publish orders.placed",
+          "selector": {
+            "message": {
+              "metadata": {
+                "shape": "object",
+                "members": {
+                  "queue": {
+                    "shape": "equality",
+                    "example": "orders.placed"
+                  }
+                }
+              }
+            }
+          },
+          "source": {
+            "observations": 4
+          },
+          "parts": {
+            "message": {
+              "body": {
+                "shape": "object",
+                "members": {
+                  "currency": {
+                    "shape": "any-of",
+                    "options": [
+                      "EUR",
+                      "GBP"
+                    ],
+                    "example": "EUR"
+                  },
+                  "customerId": {
+                    "shape": "equality",
+                    "example": "customer-001"
+                  },
+                  "items": {
+                    "shape": "each-like",
+                    "min": 0,
+                    "max": 3,
+                    "items": {
+                      "shape": "object",
+                      "members": {
+                        "productId": {
+                          "shape": "any-of",
+                          "options": [
+                            "prod-0",
+                            "prod-1",
+                            "prod-2"
+                          ],
+                          "example": "prod-0"
+                        },
+                        "quantity": {
+                          "shape": "any-of",
+                          "options": [
+                            1,
+                            2,
+                            3
+                          ],
+                          "example": 1
+                        }
+                      }
+                    }
+                  },
+                  "orderId": {
+                    "shape": "string",
+                    "example": "order-0"
+                  },
+                  "totalAmount": {
+                    "shape": "equality",
+                    "example": 149.95
+                  }
+                }
+              },
+              "metadata": {
+                "shape": "object",
+                "members": {
+                  "contentType": {
+                    "shape": "equality",
+                    "example": "application/json"
+                  },
+                  "queue": {
+                    "shape": "equality",
+                    "example": "orders.placed"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

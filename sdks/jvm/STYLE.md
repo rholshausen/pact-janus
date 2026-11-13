@@ -285,8 +285,15 @@ Interaction getOrder = janus.interaction("get an order")
   directory with a `pom.xml` and `build/janus/evidence` otherwise, each under the working directory, so
   `mvn clean` or `gradle clean` clears stale counts. The source is the name of the class that called
   `forProvider`, found with `StackWalker`, so no test framework is involved.
-- `observe` returns the engine's answer as a `Map`, `warnings` included. A refused call throws
-  `IllegalArgumentException`; an engine error `JanusEngineException`.
+- `observeMessage(operation, message, options)` records a message the provider produced, on the same
+  recorder (behavioural spec 'observe-message'; ADR 0090). `operation` is a `Map` of `metadata`, itself
+  a `Map` of name to template, and `body`: `Map.of("metadata", Map.of("queue", "orders.placed"))`.
+  `message` is the `Message` a `@ProvidesMessage` method returns, so a test can record what its producer
+  returns. The options bag is `ShapeRecorder.MessageOptions.described(description)`, the description
+  being required, and its `withStates` and `withRequest(message)` copies; null options are refused, as
+  a missing description is.
+- `observe` and `observeMessage` return the engine's answer as a `Map`, `warnings` included. A refused
+  call throws `IllegalArgumentException`; an engine error `JanusEngineException`.
 
 ## Logging
 

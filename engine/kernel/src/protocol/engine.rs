@@ -8,7 +8,7 @@ use super::broker::{self as broker_ops, PublishContracts};
 use super::consumer_session::{
   AddInteraction, AddPactInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
 };
-use super::contributions::in_tree_actions;
+use super::contributions::{check_components, in_tree_actions};
 use super::events::{Event, Poll, Stream};
 use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
@@ -1089,11 +1089,10 @@ impl Engine {
       Ok(create) => create,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    let kind = create.kind.as_deref().unwrap_or(RECORDING_KIND);
-    let Some(transport) = self.transports.get(kind) else {
-      return ResponseFrame::err(id, EngineError::component_unavailable(kind));
-    };
-    let declarations = RecordingDeclarations::of(transport.as_ref());
+    let kind = create.kind.as_deref().unwrap_or(RECORDING_KIND).to_string();
+    if self.recording_declarations(&kind).is_none() {
+      return ResponseFrame::err(id, EngineError::component_unavailable(&kind));
+    }
     let policy = create
       .policy
       .as_ref()
@@ -1103,9 +1102,20 @@ impl Engine {
     let session = format!("r-{}", self.next_recording);
     self.recordings.insert(
       session.clone(),
-      RecordingSession::new(create.provider, policy, declarations),
+      RecordingSession::new(create.provider, policy, kind),
     );
     ResponseFrame::ok(id, json!({ "session": session }))
+  }
+
+  /// What a recording of `kind` reads (ADR 0086 decision 3): what the transport for it declares,
+  /// else, for the kind `message`, what `produce-message` hooks produce (ADR 0090 decision 3).
+  /// `None` for a kind nothing serves.
+  fn recording_declarations(&self, kind: &str) -> Option<RecordingDeclarations> {
+    match self.transports.get(kind) {
+      Some(transport) => Some(RecordingDeclarations::of(transport.as_ref())),
+      None if kind == crate::hooks::points::PRODUCED_KIND => Some(RecordingDeclarations::produced_message()),
+      None => None,
+    }
   }
 
   /// `provider-shape-session/observe` (spec §8.5): one answer the provider produced, read as an
@@ -1116,10 +1126,20 @@ impl Engine {
       Err(err) => return ResponseFrame::err(id, err),
     };
     let actions = in_tree_actions(&self.matchers);
+    let Some(kind) = self
+      .recordings
+      .get(&req.session)
+      .map(|session| session.kind_of(&req).to_string())
+    else {
+      return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
+    };
+    let Some(declarations) = self.recording_declarations(&kind) else {
+      return ResponseFrame::err(id, EngineError::component_unavailable(&kind));
+    };
     let Some(session) = self.recordings.get_mut(&req.session) else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
-    let warnings = match session.observe(&req, Some(&self.content), &actions) {
+    let warnings = match session.observe(&req, &declarations, Some(&self.content), &actions) {
       Ok(warnings) => warnings,
       Err(err) => return ResponseFrame::err(id, err),
     };
@@ -1212,7 +1232,7 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    match subsumption_ops::check(&req, &in_tree_actions(&self.matchers)) {
+    match subsumption_ops::check(&req, &check_components(&self.matchers, &self.content)) {
       Ok((report, format)) => {
         let report = serde_json::to_value(&report).expect("a report always serializes");
         ResponseFrame::ok(id, json!({ "report": report, "format": format }))

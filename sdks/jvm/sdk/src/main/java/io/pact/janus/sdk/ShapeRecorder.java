@@ -16,9 +16,10 @@ import java.util.Objects;
 
 /**
  * The recording primitives (behavioural spec {@code shape-recorder}, {@code observe},
- * {@code finish-recording}; ADR 0086). A recorder is one provider-shape session: each answer the
- * test hands it goes to the engine as the HTTP transport presents one, and the engine's host writes
- * the shape. Nothing here decodes a body or decides what the shape is.
+ * {@code observe-message}, {@code finish-recording}; ADR 0086, ADR 0090). A recorder is one
+ * provider-shape session: each answer the test hands it goes to the engine as the HTTP transport
+ * presents one, each message as a message producer answers one, and the engine's host writes the
+ * shape. Nothing here decodes a body or decides what the shape is.
  *
  * <p>Nothing is sent until the first {@link #observe}. Its source is, unless given, the class that
  * created it: a test class creates one in a {@code static} field or {@code @BeforeAll}, observes in
@@ -62,6 +63,33 @@ public final class ShapeRecorder {
 
     public Options withRequest(String method, String path) {
       return new Options(description, states, new Request(method, path));
+    }
+  }
+
+  /**
+   * What an observed message says besides the message: what a report calls its entry, which is
+   * required, the provider states it was produced in, and for a synchronous message the request it
+   * answered. Each {@code with...} returns a copy.
+   */
+  public record MessageOptions(String description, List<String> states, Message request) {
+    public MessageOptions {
+      if (description == null) {
+        throw new IllegalArgumentException("observeMessage: name the entry with a description");
+      }
+    }
+
+    /** An entry a report calls {@code description}. */
+    public static MessageOptions described(String description) {
+      return new MessageOptions(description, null, null);
+    }
+
+    public MessageOptions withStates(List<String> states) {
+      return new MessageOptions(description, List.copyOf(states), request);
+    }
+
+    /** The message the provider was asked: the operation is then the request's. */
+    public MessageOptions withRequest(Message request) {
+      return new MessageOptions(description, states, Objects.requireNonNull(request, "request"));
     }
   }
 
@@ -139,6 +167,40 @@ public final class ShapeRecorder {
       body.put("states", options.states());
     }
     body.put("operation", Map.of("request", slots));
+    body.put("parts", parts);
+    return engine.send(RequestFrameOp.PROVIDER_SHAPE_SESSION_OBSERVE, body).ok();
+  }
+
+  /**
+   * Records one message the provider produced, as a message producer returns one. {@code operation}
+   * names what identifies it: {@code metadata}, a map of name to template, and {@code body}, a
+   * template, either or both: the message's own, or with {@link MessageOptions#withRequest} the
+   * request's. Returns the engine's answer.
+   */
+  public Map<String, Object> observeMessage(Map<String, ?> operation, Message message, MessageOptions options) {
+    if (options == null) {
+      throw new IllegalArgumentException("observeMessage: name the entry with a description");
+    }
+    Map<String, Object> slots = new LinkedHashMap<>();
+    if (operation.containsKey("metadata")) {
+      slots.put("metadata", Literals.compile(operation.get("metadata"), "operation.metadata"));
+    }
+    if (operation.containsKey("body")) {
+      slots.put("body", Literals.compile(operation.get("body"), "operation.body"));
+    }
+    Map<String, Object> parts = new LinkedHashMap<>();
+    parts.put("message", message.slots());
+    if (options.request() != null) {
+      parts.put("request", options.request().slots());
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("session", start());
+    body.put("kind", "message");
+    body.put("description", options.description());
+    if (options.states() != null) {
+      body.put("states", options.states());
+    }
+    body.put("operation", Map.of(options.request() != null ? "request" : "message", slots));
     body.put("parts", parts);
     return engine.send(RequestFrameOp.PROVIDER_SHAPE_SESSION_OBSERVE, body).ok();
   }

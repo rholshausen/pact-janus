@@ -124,9 +124,32 @@ The checker matches in two steps:
    checker does not guess, any more than §8's walk does — and the interaction is `not-published` with
    a `reason` naming the entries that tied.
 
+A message has no request (contract-file spec §4.3's `emissive` mode), so what identifies its operation
+is in the message itself: a metadata member that names where it was published, such as pact-js's
+`queue`, or a member of its body that names its kind. An asynchronous message's selector is over its
+`message` part, and a synchronous message's over its `request`
+([ADR 0090](../../decisions/0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md)
+decision 1):
+
+```json provider-shape
+{ "$format": "janus-provider-shape/1",
+  "provider": { "name": "OrderProvider" },
+  "provenance": "recorded",
+  "interactions": [
+    { "description": "publish orders.placed",
+      "selector": { "message": { "metadata": { "shape": "object", "members": {
+        "queue": { "shape": "equality", "example": "orders.placed" } } } } },
+      "parts": { "message": { "body": { "shape": "object", "members": { } } } } } ] }
+```
+
+A consumer that wrote nothing that names the operation into its message selects no entry by it, and
+is matched by description or not at all.
+
 A selector is matched against recorded *examples*, by the same plans every exchange runs, with the
 components a run has, so a selector may use a component's operator, such as the HTTP component's
-`http:path` template (component-interfaces spec §5.11). So the kernel never parses a path template and
+`http:path` template (component-interfaces spec §5.11). A content slot is matched as the document its
+declared type decodes to, as a verification reads it, so a selector over a body member sees the
+member, not the body's text (ADR 0090 decision 2). So the kernel never parses a path template and
 never learns HTTP: "is this request an instance of that operation" is
 a question about a request the consumer actually sent. A selector is never compared for subsumption,
 and so carries no claim about what the provider *accepts* — §2.1's "no request-direction slots" is

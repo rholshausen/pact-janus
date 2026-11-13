@@ -1018,13 +1018,13 @@ fn a_pairs_findings_take_the_action_their_provenance_names_and_the_reasons_say_w
       (
         json!("block"),
         json!(
-          "1 decided finding from recorded shapes: the provider may produce responses this consumer has not tested"
+          "1 decided finding from recorded shapes: the provider may produce what this consumer has not tested"
         )
       ),
       (
         json!("warn"),
         json!(
-          "1 decided finding from derived shapes: the provider may produce responses this consumer has not tested"
+          "1 decided finding from derived shapes: the provider may produce what this consumer has not tested"
         )
       ),
     ]
@@ -1061,7 +1061,7 @@ fn a_pairs_findings_take_the_action_their_provenance_names_and_the_reasons_say_w
   assert_eq!(reasons.len(), 1);
   assert_eq!(
     reasons[0]["message"],
-    json!("2 decided findings: the provider may produce responses this consumer has not tested")
+    json!("2 decided findings: the provider may produce what this consumer has not tested")
   );
   assert!(report["policy"].get("provenance").is_none());
 }

@@ -144,13 +144,17 @@
     },
     "Observation": {
       "type": "object",
-      "required": ["operation", "response"],
+      "description": "One 'observe', of an HTTP 'response', or one 'observe-message', of a 'message' (ADR 0090).",
+      "required": ["operation"],
+      "oneOf": [{ "required": ["response"] }, { "required": ["message"] }],
       "properties": {
         "operation": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/Template" },
-          "description": "The operation: slot name -> template, as a request's slots are written."
+          "description": "The operation: slot name -> template, as a request's slots are written, or for a message 'metadata' and 'body', as a message's are."
         },
+        "message": { "$ref": "#/$defs/Message", "description": "The message 'observe-message' records." },
+        "message-request": { "$ref": "#/$defs/Message", "description": "observe-message's 'request' option: the message the provider was asked." },
         "response": {
           "type": "object",
           "required": ["status"],

@@ -27,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "session",
+    "kind",
     "description",
     "states",
     "operation",
@@ -41,6 +42,13 @@ public class ObserveResponse {
      */
     @JsonProperty("session")
     private java.lang.String session;
+    /**
+     * The kind whose parts these are, read as 'create''s 'kind' is, when it is not the session's (ADR 0090 decision 4): so one session records a provider's HTTP answers and its messages into one shape. A kind nothing serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    @JsonPropertyDescription("The kind whose parts these are, read as 'create''s 'kind' is, when it is not the session's (ADR 0090 decision 4): so one session records a provider's HTTP answers and its messages into one shape. A kind nothing serves is component-unavailable.")
+    private java.lang.String kind;
     /**
      * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
      * (Required)
@@ -57,19 +65,19 @@ public class ObserveResponse {
     @JsonPropertyDescription("Provider state names only \u2014 a provider knows its own state vocabulary, never a given consumer's parameter values (design 2.8 \u00a72.2).")
     private List<java.lang.String> states;
     /**
-     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * The operation this answers, as shapes over the slots that identify it, part name -> slot name -> shape (ADR 0086 decision 1): the initiating part's, or for an asynchronous message, which has none, the message's own, its metadata or a member of its body (ADR 0090 decision 1). It is the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. An operation that does not admit a part it names and 'parts' carries is interaction-invalid at '/operation'.
      * 
      */
     @JsonProperty("operation")
-    @JsonPropertyDescription("The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 \u00a72.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec \u00a75.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.")
+    @JsonPropertyDescription("The operation this answers, as shapes over the slots that identify it, part name -> slot name -> shape (ADR 0086 decision 1): the initiating part's, or for an asynchronous message, which has none, the message's own, its metadata or a member of its body (ADR 0090 decision 1). It is the recorded entry's selector (design 2.8 \u00a72.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec \u00a75.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. An operation that does not admit a part it names and 'parts' carries is interaction-invalid at '/operation'.")
     private Map<String, Map<String, Map<String, Object>>> operation;
     /**
-     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A produced message's body with no 'content-type' is read by the type a verification reads it as: its metadata's 'contentType', else what its octets are detected as (ADR 0090 decision 3). A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
     @JsonProperty("parts")
-    @JsonPropertyDescription("The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.")
+    @JsonPropertyDescription("The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A produced message's body with no 'content-type' is read by the type a verification reads it as: its metadata's 'contentType', else what its octets are detected as (ADR 0090 decision 3). A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.")
     private Map<String, Map<String, ObservedSlotValue>> parts;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
@@ -92,6 +100,24 @@ public class ObserveResponse {
     @JsonProperty("session")
     public void setSession(java.lang.String session) {
         this.session = session;
+    }
+
+    /**
+     * The kind whose parts these are, read as 'create''s 'kind' is, when it is not the session's (ADR 0090 decision 4): so one session records a provider's HTTP answers and its messages into one shape. A kind nothing serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    public java.lang.String getKind() {
+        return kind;
+    }
+
+    /**
+     * The kind whose parts these are, read as 'create''s 'kind' is, when it is not the session's (ADR 0090 decision 4): so one session records a provider's HTTP answers and its messages into one shape. A kind nothing serves is component-unavailable.
+     * 
+     */
+    @JsonProperty("kind")
+    public void setKind(java.lang.String kind) {
+        this.kind = kind;
     }
 
     /**
@@ -133,7 +159,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * The operation this answers, as shapes over the slots that identify it, part name -> slot name -> shape (ADR 0086 decision 1): the initiating part's, or for an asynchronous message, which has none, the message's own, its metadata or a member of its body (ADR 0090 decision 1). It is the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. An operation that does not admit a part it names and 'parts' carries is interaction-invalid at '/operation'.
      * 
      */
     @JsonProperty("operation")
@@ -142,7 +168,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+     * The operation this answers, as shapes over the slots that identify it, part name -> slot name -> shape (ADR 0086 decision 1): the initiating part's, or for an asynchronous message, which has none, the message's own, its metadata or a member of its body (ADR 0090 decision 1). It is the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. An operation that does not admit a part it names and 'parts' carries is interaction-invalid at '/operation'.
      * 
      */
     @JsonProperty("operation")
@@ -151,7 +177,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A produced message's body with no 'content-type' is read by the type a verification reads it as: its metadata's 'contentType', else what its octets are detected as (ADR 0090 decision 3). A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
@@ -161,7 +187,7 @@ public class ObserveResponse {
     }
 
     /**
-     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+     * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A produced message's body with no 'content-type' is read by the type a verification reads it as: its metadata's 'contentType', else what its octets are detected as (ADR 0090 decision 3). A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
      * (Required)
      * 
      */
@@ -187,6 +213,10 @@ public class ObserveResponse {
         sb.append("session");
         sb.append('=');
         sb.append(((this.session == null)?"<null>":this.session));
+        sb.append(',');
+        sb.append("kind");
+        sb.append('=');
+        sb.append(((this.kind == null)?"<null>":this.kind));
         sb.append(',');
         sb.append("description");
         sb.append('=');
@@ -220,6 +250,7 @@ public class ObserveResponse {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.session == null)? 0 :this.session.hashCode()));
+        result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
         result = ((result* 31)+((this.parts == null)? 0 :this.parts.hashCode()));
         result = ((result* 31)+((this.description == null)? 0 :this.description.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
@@ -237,7 +268,7 @@ public class ObserveResponse {
             return false;
         }
         ObserveResponse rhs = ((ObserveResponse) other);
-        return (((((((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session)))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.operation == rhs.operation)||((this.operation!= null)&&this.operation.equals(rhs.operation))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
+        return ((((((((this.session == rhs.session)||((this.session!= null)&&this.session.equals(rhs.session)))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.parts == rhs.parts)||((this.parts!= null)&&this.parts.equals(rhs.parts))))&&((this.description == rhs.description)||((this.description!= null)&&this.description.equals(rhs.description))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.operation == rhs.operation)||((this.operation!= null)&&this.operation.equals(rhs.operation))))&&((this.states == rhs.states)||((this.states!= null)&&this.states.equals(rhs.states))));
     }
 
 }

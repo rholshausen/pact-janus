@@ -901,7 +901,7 @@ answers these operations with `operation-unsupported`.
 | Operation | Body → Result |
 |---|---|
 | `provider-shape-session/create` | `{ provider, kind?, policy? }` → `{ session }` |
-| `provider-shape-session/observe` | `{ session, description, states?, operation?, parts }` → `{ observations, interactions, warnings? }` |
+| `provider-shape-session/observe` | `{ session, kind?, description, states?, operation?, parts }` → `{ observations, interactions, warnings? }` |
 | `provider-shape-session/finalise` | `{ session, write? }` → `{ provider-shape, written? }` |
 
 This is the engine driven a third way: not producing a contract and not replaying one, but
@@ -920,13 +920,22 @@ settles it so a provider's own test suite can use it:
   becomes the entry's `selector` (design 2.8 §2.2). `description` is what a report calls the entry,
   the provider's own name for the operation unless the test knows the consumer's words. When `parts`
   carries the initiating part, an `operation` that does not admit it is `interaction-invalid` at
-  `/operation`, so a template written wrong is found where it was written.
+  `/operation`, so a template written wrong is found where it was written. An asynchronous message
+  answers no request, so its operation is shapes over the message's own slots, a metadata member
+  that names its queue or topic or a member of its body that names its kind, and a synchronous
+  message's is over its request ([ADR 0090](../../decisions/0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md)
+  decision 1). Every part `operation` names and `parts` carries is checked against it.
 - **An observation is an arrival.** `parts` are the transport's own, as it presents them
   (component-interfaces spec §5.9 for HTTP), a content slot carrying its octets tagged `base64` and
   labelled with its type. They are read as a verification reads what a provider answered: through
   what the transport for the session's `kind` declares (`http` unless given; a kind no transport
   serves is `component-unavailable`), and the engine's content components, so no host decodes a
-  body. Only the answering part is recorded. Octets a component claims and cannot decode are
+  body. Only the answering part is recorded. The kind `message`, which no transport serves yet, is
+  what `produce-message` hooks produce (lifecycle-hooks spec §3.4): a `message` part answering a
+  synchronous message's `request`, with no outcome slots and no credential members, and a body
+  with no label read by its metadata's `contentType`, else what its octets are detected as, as a
+  verification reads it (ADR 0090 decision 3). An observation may name its own `kind`, so one
+  session records a provider's HTTP answers and its messages into one shape (decision 4). Octets a component claims and cannot decode are
   recorded as octets, and the result's `warnings` says so.
 - **Outcomes are kept apart.** The transport's outcome slots (component-interfaces spec §5.10; for
   HTTP the status) are written into the selector as `equality`, so an entry is one description, one

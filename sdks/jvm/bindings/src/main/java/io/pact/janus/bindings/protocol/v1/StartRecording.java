@@ -41,11 +41,11 @@ public class StartRecording {
     @JsonProperty("provider")
     private RecordedProvider provider;
     /**
-     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable.
      * 
      */
     @JsonProperty("kind")
-    @JsonPropertyDescription("The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec \u00a75) \u2014 which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.")
+    @JsonPropertyDescription("The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec \u00a75) \u2014 which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable.")
     private String kind;
     /**
      * RecordingPolicy
@@ -84,7 +84,7 @@ public class StartRecording {
     }
 
     /**
-     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable.
      * 
      */
     @JsonProperty("kind")
@@ -93,7 +93,7 @@ public class StartRecording {
     }
 
     /**
-     * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+     * The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable.
      * 
      */
     @JsonProperty("kind")

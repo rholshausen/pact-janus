@@ -17,6 +17,14 @@
 /// decision 3), and the part an emissive interaction records its message as (ADR 0067 decision 1).
 pub const PRODUCED_PART: &str = "message";
 
+/// The part a synchronous message's request is recorded as (ADR 0067 decision 2): what a provider
+/// that produces the `message` part was asked.
+pub const PRODUCED_REQUEST_PART: &str = "request";
+
+/// The kind a message is recorded under when no transport serves one (ADR 0067 decision 1, ADR
+/// 0090 decision 3): what `produce-message` hooks produce, read as a verification reads it.
+pub const PRODUCED_KIND: &str = "message";
+
 /// How often a point runs, and therefore what its context can hold (spec §2.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {

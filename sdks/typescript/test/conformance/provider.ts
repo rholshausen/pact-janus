@@ -171,7 +171,7 @@ function act(behaviour: Behaviour, calls: HandlerCall[], call: HandlerCall): unk
 }
 
 /** The case's message as this SDK's: bytes as a Uint8Array, a string as itself, JSON as a value. */
-function message(script: MessageScript): Message {
+export function message(script: MessageScript): Message {
   const body = script.bytes !== undefined ? new Uint8Array(Buffer.from(script.bytes, "base64")) : (script.text ?? script.json);
   return {
     body,

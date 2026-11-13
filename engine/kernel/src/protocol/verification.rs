@@ -1875,27 +1875,7 @@ fn produced_resolver(
   let Some(message) = parts.get(PRODUCED_PART) else {
     return resolver;
   };
-  let body = message.get("body");
-  let labelled = body.and_then(|body| body.content_type.clone());
-  let own = || {
-    message
-      .get("metadata")
-      .and_then(|metadata| metadata.content.get("contentType"))
-      .and_then(Value::as_str)
-      .filter(|content_type| !content_type.is_empty())
-      .map(str::to_string)
-  };
-  let detected = || {
-    let (body, content) = (body?, content?);
-    content
-      .detect(crate::component::Detect {
-        value: body.clone(),
-        hint: None,
-      })
-      .ok()?
-      .media_type
-  };
-  match labelled.or_else(own).or_else(detected) {
+  match super::wire::produced_message_type(message, content) {
     Some(content_type) => resolver.capture(
       format!("$.{PRODUCED_PART}.metadata.contentType"),
       plan::RuntimeValue::String(content_type),

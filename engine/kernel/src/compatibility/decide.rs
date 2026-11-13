@@ -425,7 +425,7 @@ fn decide_pair(
         "subsumption-findings",
         ReasonAction::of(group.action),
         format!(
-          "{}{}: the provider may produce responses this consumer has not tested",
+          "{}{}: the provider may produce what this consumer has not tested",
           super::count(group.count as u64, "decided finding", "decided findings"),
           group.from(policy)
         ),

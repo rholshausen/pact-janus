@@ -2539,6 +2539,26 @@ once there are shapes to publish.
   message's shape is S4.1's: what a `produce-message` hook answers (S1.7) is the provider's own output.
   *Exit:* `janus check` decides a message contract against a provider shape of its `message` part, in a
   `check` test, and S4.3's demonstration includes a message-only provider.
+  *Built 2026-11-13* (ADR 0090), its demonstration S4.3's:
+  - `janus check` already decided a message's `metadata` and `body`; what was missing was a shape to
+    check against, and a way to name a message's operation. ADR 0090 decided both, as the half of
+    S4.8's identity question S4.6 relied on. A message's selector is over the part that starts its
+    exchange: a synchronous message's `request`, and an asynchronous message itself, a metadata member
+    naming its queue or a body member naming its kind. A selector reads a content slot as the
+    document its declared type decodes to.
+  - The kind `message`, which no transport serves, is recorded as `produce-message` hooks produce it,
+    an unlabelled body read by its metadata's `contentType` as a verification reads it. `observe`
+    takes `kind`, so one session records a provider's HTTP answers and its messages into one shape.
+    Both SDKs' recorders have `observeMessage`, taking the `Message` their message producers return;
+    four conformance cases cover it, and `live/recorded-message-shape` pins the shape both write.
+  - The exit's test is `cli/tests/cli.rs`'s `check_decides_a_message_contract_against_the_shape_of_its_message`:
+    pact-js's message pact, and the contract it upgrades to, are each matched by their queue and blocked
+    on the empty list the consumer never tested. `engine/kernel/tests/provider_shape_messages.rs` checks
+    the pinned shape against the same pact, a synchronous message selected by its request, and a
+    selector over a body member.
+  - Not foreseen: `janus check`'s reason for decided findings said the provider "may produce
+    responses", which a message-only pair has none of; it says "what this consumer has not tested".
+  - Budget: the TypeScript idiomatic layer moved from 1,350 to 1,400 lines, for `observeMessage`.
 - **S4.7 Comparing the built-in components' operators** — **S**. Added 2026-11-12. Stages 1–3 added
   operators the built-in components own: `http:status-class`, `http:media-type` and `http:list`
   (ADRs 0057, 0071, 0082), and the `pact` component's (ADR 0073). The walk treats every component
@@ -2571,7 +2591,11 @@ once there are shapes to publish.
   payload the `body`. Only what the documented application sends is a provider shape: `action: send` in
   AsyncAPI 3, and `subscribe` in 2.x, whose verbs are inverted. A request/reply operation (AsyncAPI 3's
   `reply`) is a synchronous message (ADR 0067), with its request as the selector.
-  The hard half is identity, and an ADR decides it first. ADR 0025's selector matches over the slots
+  The hard half is identity, and an ADR decides it first. [ADR 0090](decisions/0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md)
+  decided it on 2026-11-13, for S4.6: a message's selector is over the part that starts its exchange, an
+  asynchronous message's own metadata and body, and an importer writes one only from what a message
+  carries (decision 7), leaving which AsyncAPI constructs fix a value to this item. As it stood before:
+  ADR 0025's selector matches over the slots
   that identify an operation, and an asynchronous message has no request: what identifies its operation
   is the channel's address and which of the channel's messages it is. A Janus contract records neither,
   unless the consumer wrote them into `metadata` (ADR 0068 left a message's transport out until S6.2),
@@ -2580,7 +2604,8 @@ once there are shapes to publish.
   a provider that cannot identify an operation from its request slots argues for a transport-owned
   operation. A message whose kind is a header and a body member together is ADR 0086's tripwire too.
   The same ADR decides how S4.1's recorder names a message's operation, which S4.6 relies on and
-  ADR 0086 does not say. A payload in another schema format (`schemaFormat`) waits for a component for
+  ADR 0086 does not say (ADR 0090 decisions 1 and 3, which found its tripwire does not fire).
+  A payload in another schema format (`schemaFormat`) waits for a component for
   its content type: protobuf for S5.2, which proves the importer is not JSON-shaped, and Avro for S6.9.
   *Exit:* an AsyncAPI 3 document and a 2.x one for the same producer import into one shape, which
   `janus check` matches to a message contract by selector and decides as S4.6 does; each lossy mapping
@@ -2841,7 +2866,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.4 | A `provenance` selector on exemptions | finding 9B |
 | S4.1, S4.2 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
 | S4.1 | Recording names an interaction by the consumer's words and takes decoded values, so no provider's own suite can use it | spike 7.3 §2; found reviewing stage 4 |
-| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view; `check` on a message contract | broker notes §12 |
+| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view (`check` on a message contract is built, ADR 0090) | broker notes §12 |
 | S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
 | S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |

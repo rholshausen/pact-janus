@@ -45,7 +45,7 @@ mod scope;
 mod session;
 mod subsumption;
 mod verification;
-mod wire;
+pub(crate) mod wire;
 
 pub use background::{Background, Panicked, SpawnError, Task, Threads};
 pub use contributions::in_tree_actions;

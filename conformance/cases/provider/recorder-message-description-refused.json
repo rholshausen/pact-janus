@@ -1,0 +1,37 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-message-description-refused",
+  "category": "provider",
+  "title": "observe-message without a description is refused before any frame is sent.",
+  "covers": [
+    "verification.observe-message.description-required"
+  ],
+  "why": "behavioural spec 'observe-message': a message's operation has no method and path to name it by, so 'description' is required, and a call without it is refused at the call, naming 'description'.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-1"
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "ops": [],
+    "observed": [
+      {
+        "error": "refused"
+      }
+    ],
+    "written": false
+  }
+}

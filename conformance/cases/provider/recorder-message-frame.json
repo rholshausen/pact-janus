@@ -1,0 +1,91 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-message-frame",
+  "category": "provider",
+  "title": "observe-message sends the message as a message producer answers it, of the kind 'message', with an operation over the message's own slots.",
+  "covers": [
+    "verification.observe-message.frame"
+  ],
+  "why": "behavioural spec 'observe-message' (ADR 0090): the first call starts the engine and creates the session as 'observe' does; the observe frame names 'kind': 'message', the description as given, 'operation' { message: { metadata compiled as an object by the 'literal' rules } }, since an asynchronous message is identified by its own slots, and 'parts.message' as a message producer's answer is written: the metadata with no contentType when the message names no type, and the body's JSON text as base64, unlabelled.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "message": {
+          "json": {
+            "orderId": "order-1",
+            "currency": "GBP",
+            "items": []
+          },
+          "metadata": {
+            "queue": "orders.placed"
+          }
+        },
+        "description": "publish orders.placed",
+        "states": [
+          "an order has been placed"
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "provider-shape-session/create",
+      "provider-shape-session/observe",
+      "provider-shape-session/finalise"
+    ],
+    "frames": {
+      "provider-shape-session/create": {
+        "provider": {
+          "name": "orders-api"
+        }
+      },
+      "provider-shape-session/observe": {
+        "session": "r-1",
+        "kind": "message",
+        "description": "publish orders.placed",
+        "states": [
+          "an order has been placed"
+        ],
+        "operation": {
+          "message": {
+            "metadata": {
+              "shape": "object",
+              "members": {
+                "queue": {
+                  "shape": "equality",
+                  "example": "orders.placed"
+                }
+              }
+            }
+          }
+        },
+        "parts": {
+          "message": {
+            "metadata": {
+              "content": {
+                "queue": "orders.placed"
+              }
+            },
+            "body": {
+              "content": "eyJvcmRlcklkIjoib3JkZXItMSIsImN1cnJlbmN5IjoiR0JQIiwiaXRlbXMiOltdfQ==",
+              "encoded": "base64"
+            }
+          }
+        }
+      }
+    },
+    "observed": [
+      "ok"
+    ],
+    "written": true,
+    "engine-closed": true
+  }
+}

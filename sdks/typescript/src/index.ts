@@ -58,6 +58,8 @@ export {
   type Operation,
   type RecordedResponse,
   type ObserveOptions,
+  type MessageOperation,
+  type ObserveMessageOptions,
 } from "./recorder.js";
 export {
   Verifier,

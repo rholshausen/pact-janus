@@ -441,17 +441,7 @@ public final class Verifier {
     Map<String, Object> pactMessage = map(map(context.get("interaction")).get("pact-message"));
     try {
       Message message = producer.produce(map(pactMessage.get("request")));
-      Map<String, Object> body = new LinkedHashMap<>();
-      body.put("content", java.util.Base64.getEncoder().encodeToString(message.octets()));
-      body.put("encoded", "base64");
-      Map<String, Object> metadata = new LinkedHashMap<>();
-      if (message.contentType() != null) {
-        body.put("content-type", message.contentType());
-        metadata.put("contentType", message.contentType());
-      }
-      metadata.putAll(message.metadata());
-      return Map.of("outcome", "ok", "changes", Map.of("parts", Map.of("message",
-          Map.of("metadata", Map.of("content", Json.value(metadata, "metadata")), "body", body))));
+      return Map.of("outcome", "ok", "changes", Map.of("parts", Map.of("message", message.slots())));
     } catch (Exception e) {
       return failed(e);
     }

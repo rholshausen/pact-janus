@@ -47,6 +47,10 @@ final class RecorderRunner {
 
     ArrayNode observed = Suite.MAPPER.createArrayNode();
     for (JsonNode observation : script.path("observations")) {
+      if (observation.has("message")) {
+        observed.add(observeMessage(recorder, observation, pipe));
+        continue;
+      }
       Map<String, Object> operation = new LinkedHashMap<>();
       observation.path("operation").properties().forEach(slot -> operation.put(slot.getKey(), Dsl.template(slot.getValue())));
       JsonNode response = observation.path("response");
@@ -127,6 +131,44 @@ final class RecorderRunner {
       if (!Suite.equal(expect.get("shape"), shape)) {
         failures.add("the shape written differs\n  expected: " + Suite.show(expect.get("shape")) + "\n  actual:   " + Suite.show(shape));
       }
+    }
+  }
+
+  /** One message observation, as {@code observeMessage} spells it: the operation's metadata and body as templates. */
+  private static JsonNode observeMessage(ShapeRecorder recorder, JsonNode observation, ScriptedPipe pipe) {
+    Map<String, Object> operation = new LinkedHashMap<>();
+    JsonNode written = observation.path("operation");
+    if (written.has("metadata")) {
+      Map<String, Object> metadata = new LinkedHashMap<>();
+      written.get("metadata").properties().forEach(member -> metadata.put(member.getKey(), Dsl.template(member.getValue())));
+      operation.put("metadata", metadata);
+    }
+    if (written.has("body")) {
+      operation.put("body", Dsl.template(written.get("body")));
+    }
+    int sent = pipe == null ? 0 : pipe.ops().size();
+    try {
+      ShapeRecorder.MessageOptions options = null;
+      if (observation.has("description")) {
+        options = ShapeRecorder.MessageOptions.described(observation.get("description").asText());
+        if (observation.has("states")) {
+          List<String> states = new ArrayList<>();
+          observation.get("states").forEach(state -> states.add(state.asText()));
+          options = options.withStates(states);
+        }
+        if (observation.has("message-request")) {
+          options = options.withRequest(ProviderRunner.message(observation.get("message-request")));
+        }
+      }
+      recorder.observeMessage(operation, ProviderRunner.message(observation.get("message")), options);
+      return Suite.MAPPER.getNodeFactory().textNode("ok");
+    } catch (JanusEngineException e) {
+      return Suite.MAPPER.createObjectNode().put("error", "engine-error").put("code", e.code());
+    } catch (IllegalArgumentException e) {
+      if (pipe != null && pipe.ops().size() != sent) {
+        throw e;
+      }
+      return Suite.MAPPER.createObjectNode().put("error", "refused");
     }
   }
 }

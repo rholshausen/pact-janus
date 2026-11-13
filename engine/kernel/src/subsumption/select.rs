@@ -41,7 +41,7 @@ pub fn select<'a>(
   provider_shape: &'a ProviderShape,
   interaction: &Interaction,
   states: &[String],
-  actions: Option<&dyn ActionApplier>,
+  components: Option<&dyn super::OperatorComparer>,
   problems: &mut Vec<Problem>,
 ) -> Selection<'a> {
   if let Some(entry) = provider_shape.find(&interaction.description, states) {
@@ -58,7 +58,7 @@ pub fn select<'a>(
     if entry.states.is_some() && entry.state_names() != states {
       continue;
     }
-    if admits_every_example(selector, interaction, index, actions, problems) {
+    if admits_every_example(selector, interaction, index, components, problems) {
       selected.push(entry);
     }
   }
@@ -78,9 +78,11 @@ fn admits_every_example(
   selector: &BTreeMap<String, BTreeMap<String, Value>>,
   interaction: &Interaction,
   index: usize,
-  actions: Option<&dyn ActionApplier>,
+  components: Option<&dyn super::OperatorComparer>,
   problems: &mut Vec<Problem>,
 ) -> bool {
+  let actions = components.map(|components| components as &dyn ActionApplier);
+  let content = components.and_then(|components| components.content());
   let document = json!({ "description": "selector", "parts": selector });
   let spec = match interaction_spec::parse(&document) {
     Ok(spec) => spec,
@@ -96,18 +98,23 @@ fn admits_every_example(
   let plan = compile(&spec, &Assignment::new(), None);
 
   // A contract always records at least its base variant; one that recorded none has no example
-  // to select by, and is selected by nothing.
+  // to select by, and is selected by nothing. A content slot is matched as the document its
+  // declared type decodes it to, as a verification reads it, so a selector may name a member of a
+  // message's body (ADR 0090 decision 2).
   !interaction.selection.variants.is_empty()
     && interaction.selection.variants.iter().all(|variant| {
-      let mut values = BTreeMap::new();
+      let mut resolver = CapturedValues::new();
       for (part, slots) in selector {
         for slot in slots.keys() {
           if let Some(value) = variant.parts.get(part).and_then(|recorded| recorded.get(slot)) {
-            values.insert(format!("$.{part}.{slot}"), value.content.clone());
+            let declared = crate::common::declared_type(interaction.content_types.as_ref(), part, slot);
+            resolver = resolver.capture(
+              format!("$.{part}.{slot}"),
+              crate::protocol::wire::decode_slot(value, declared, content),
+            );
           }
         }
       }
-      let resolver = CapturedValues::from_json(&values);
       outcome(&execute_with(&plan, &resolver, None, actions)).0 == Status::Matched
     })
 }

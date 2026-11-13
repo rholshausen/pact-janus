@@ -2130,6 +2130,69 @@ fn check_json_prints_the_compatibility_report_a_script_can_read() {
   assert_eq!(report["pairs"][0]["format"], json!("janus-contract/1"));
 }
 
+/// S4.6 (ADR 0090): a message contract decided against the shape of the messages its provider
+/// produces, matched by the queue pact-js's consumer names in its metadata. The shape is what the
+/// recorder writes for a provider whose own tests published orders in two currencies, one with no
+/// items, to `orders.placed` (`engine/kernel/tests/provider_shape_messages.rs` records it).
+#[test]
+fn check_decides_a_message_contract_against_the_shape_of_its_message() {
+  let shape = temp("order-provider.provider-shape.json");
+  let produced = json!({
+    "$format": "janus-provider-shape/1",
+    "provider": { "name": "OrderProvider" },
+    "provenance": "recorded",
+    "interactions": [ {
+      "description": "publish orders.placed",
+      "selector": { "message": { "metadata": { "shape": "object", "members": {
+        "queue": { "shape": "equality", "example": "orders.placed" } } } } },
+      "parts": { "message": {
+        "metadata": { "shape": "object", "members": {
+          "contentType": { "shape": "equality", "example": "application/json" },
+          "queue": { "shape": "equality", "example": "orders.placed" } } },
+        "body": { "shape": "object", "members": {
+          "currency": { "shape": "any-of", "options": ["EUR", "GBP"], "example": "GBP" },
+          "customerId": { "shape": "type", "example": "customer-001" },
+          "items": { "shape": "each-like", "min": 0, "items": { "shape": "object", "members": {
+            "productId": { "shape": "type", "example": "prod-0" },
+            "quantity": { "shape": "integer", "example": 1 } } } },
+          "orderId": { "shape": "type", "example": "order-0" },
+          "totalAmount": { "shape": "decimal", "example": 149.95 } } } } }
+    } ]
+  });
+  std::fs::write(&shape, produced.to_string()).expect("writing the shape");
+
+  // The pact pact-js's consumer wrote, and the contract it upgrades to, are decided alike.
+  let pact = repo("corpora/verifier/messages/pact-js-order-placed/pact.json");
+  let contract = temp("order-placed.contract.json");
+  let upgraded = janus(&["upgrade", &pact, "--write", &contract, "--quiet"]);
+  assert_eq!(code(&upgraded), 0, "{}", stderr(&upgraded));
+  for subject in [&pact, &contract] {
+    let output = janus(&[
+      "check",
+      subject,
+      "--provider-shape",
+      &shape,
+      "--on-finding",
+      "block",
+    ]);
+    let text = stdout(&output);
+    for line in [
+      "✗ OrderConsumer is not compatible with OrderProvider",
+      "  interaction 'an OrderPlaced event', message body $.items:",
+      "    provider may produce an empty list",
+      "    consumer has only tested at least one item",
+      "1 decided finding: the provider may produce what this consumer has not tested",
+    ] {
+      assert!(text.contains(line), "missing {line:?} in:\n{text}");
+    }
+    assert_eq!(
+      code(&output),
+      1,
+      "a blocked finding is the subject failing: {text}"
+    );
+  }
+}
+
 /// A provider that published nothing gets today's semantics — and the command says so on stderr,
 /// because "no shape was supplied for this provider" is the CLI's own half of the answer: the
 /// engine was never handed a file to miss.

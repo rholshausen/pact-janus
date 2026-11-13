@@ -15,10 +15,15 @@
 //! (component-interfaces spec §5) and the session's content registry, so the kernel still does not
 //! know what a response is. An observation names the operation it answered (decision 1), and the
 //! transport's outcome slots keep one operation's outcomes apart (decision 4).
+//!
+//! A message has no transport yet (ADR 0067), so the kind `message` is read as `produce-message`
+//! hooks produce one, and an observation names the kind it is of, so one session records a
+//! provider's HTTP answers and its messages into one shape (ADR 0090).
 
 use crate::component::{ContentComponent, ExchangeParts, OutcomeSlots, Parts, TransportComponent};
 use crate::contract::Party;
 use crate::error::Problem;
+use crate::hooks::points::{PRODUCED_PART, PRODUCED_REQUEST_PART};
 use crate::interaction_spec;
 use crate::plan::{ActionApplier, Assignment, CapturedValues, Status, compile, execute_with, outcome};
 use crate::protocol::EngineError;
@@ -33,7 +38,8 @@ pub const DEFAULT_KIND: &str = "http";
 #[derive(Debug, Deserialize)]
 pub struct Create {
   pub provider: Party,
-  /// The transport kind whose parts are observed (ADR 0086 decision 3): `http` unless given.
+  /// The transport kind whose parts are observed (ADR 0086 decision 3): `http` unless given, and
+  /// what an observation that names none is of (ADR 0090 decision 4).
   #[serde(default)]
   pub kind: Option<String>,
   /// Overrides the recorder's own judgements (design 2.8 §2.3's provenance is fixed at
@@ -67,6 +73,9 @@ impl Policy {
 #[derive(Debug, Deserialize)]
 pub struct Observe {
   pub session: String,
+  /// The kind whose parts these are, when not the session's (ADR 0090 decision 4).
+  #[serde(default)]
+  pub kind: Option<String>,
   /// What a report calls the entry: the consumer's words when the test knows them, else the
   /// provider's own name for the operation (ADR 0086 decision 1).
   pub description: String,
@@ -74,12 +83,12 @@ pub struct Observe {
   /// given consumer's parameter values.
   #[serde(default)]
   pub states: Vec<String>,
-  /// The operation answered, as shapes over the initiating part's slots (ADR 0086 decision 1): the
-  /// recorded entry's selector.
+  /// The operation answered, as shapes over the slots that identify it (ADR 0086 decision 1, ADR
+  /// 0090 decision 1): the recorded entry's selector.
   #[serde(default)]
   pub operation: Option<Selector>,
-  /// The transport's own parts (ADR 0086 decision 3). The answering part is recorded; an initiating
-  /// part, when given, is checked against `operation`.
+  /// The transport's own parts (ADR 0086 decision 3). The answering part is recorded; every part
+  /// `operation` names, when given, is checked against it.
   pub parts: Parts,
 }
 
@@ -114,46 +123,73 @@ impl Declarations {
       credential_members: transport.credential_members(),
     }
   }
+
+  /// What `produce-message` hooks produce, for the kind `message` when no transport serves it (ADR
+  /// 0090 decision 3): the `message` part answers a synchronous message's `request` (ADR 0067
+  /// decision 2), and nothing tells a message's outcomes apart or is a credential.
+  pub fn produced_message() -> Declarations {
+    Declarations {
+      exchange_parts: ExchangeParts {
+        initiating: PRODUCED_REQUEST_PART.to_string(),
+        answering: Some(PRODUCED_PART.to_string()),
+      },
+      outcome_slots: OutcomeSlots::new(),
+      credential_members: crate::redaction::CredentialMembers::new(),
+    }
+  }
 }
 
-/// One recording session: a [`Recorder`], what the transport declared, and the counter a host
-/// sees back from `observe`.
+/// One recording session: a [`Recorder`], the kind an observation is of unless it says, and the
+/// counter a host sees back from `observe`.
 #[derive(Debug)]
 pub struct Session {
   recorder: Recorder,
-  declarations: Declarations,
+  kind: String,
   policy: RecordingPolicy,
   observations: u64,
 }
 
 impl Session {
-  pub fn new(provider: Party, policy: RecordingPolicy, declarations: Declarations) -> Session {
+  pub fn new(provider: Party, policy: RecordingPolicy, kind: String) -> Session {
     Session {
-      recorder: Recorder::with_policy(provider.name, policy)
-        .with_credentials(declarations.credential_members.clone()),
-      declarations,
+      recorder: Recorder::with_policy(provider.name, policy),
+      kind,
       policy,
       observations: 0,
     }
   }
 
-  /// Record one observation, answering the warnings it raised.
+  /// The kind `request` is of: its own, else the session's.
+  pub fn kind_of<'a>(&'a self, request: &'a Observe) -> &'a str {
+    request.kind.as_deref().unwrap_or(&self.kind)
+  }
+
+  /// Record one observation, read through what its kind declares, answering the warnings it raised.
   pub fn observe(
     &mut self,
     request: &Observe,
+    declarations: &Declarations,
     content: Option<&dyn ContentComponent>,
     actions: &dyn ActionApplier,
   ) -> Result<Vec<String>, EngineError> {
-    let initiating = &self.declarations.exchange_parts.initiating;
-    let answering = self.declarations.exchange_parts.answering.as_deref();
+    let initiating = &declarations.exchange_parts.initiating;
+    let answering = declarations.exchange_parts.answering.as_deref();
+    // A kind whose answer is the produced message is read as a verification reads one; HTTP's
+    // `request` is not a message's.
+    let observed = if answering == Some(PRODUCED_PART) {
+      labelled(&request.parts, content)
+    } else {
+      request.parts.clone()
+    };
 
     if let Some(operation) = &request.operation {
-      admits_initiating(operation, &request.parts, initiating, content, actions)?;
+      admits_observed(operation, &observed, initiating, content, actions)?;
     }
+    self.recorder.add_credentials(&declarations.credential_members);
 
     let mut warnings = Vec::new();
     let mut parts = BTreeMap::new();
-    for (part, slots) in &request.parts {
+    for (part, slots) in &observed {
       // A provider shape carries what the provider produces (design 2.8 §2.1): the answering part,
       // or for a kind with none, everything but what started the exchange.
       let produced = match answering {
@@ -177,7 +213,7 @@ impl Session {
     // operation: one named by the consumer's words is about one interaction already.
     let selector = request.operation.as_ref().map(|operation| {
       let mut selector = operation.clone();
-      for (part, slots) in &self.declarations.outcome_slots {
+      for (part, slots) in &declarations.outcome_slots {
         for slot in slots {
           if let Some(value) = parts.get(part).and_then(|values| values.get(slot)) {
             selector
@@ -220,9 +256,34 @@ impl Session {
   }
 }
 
-/// Refuse an observation whose request its own operation does not admit: a test that named the
-/// wrong template would otherwise record an entry no consumer interaction ever selects.
-fn admits_initiating(
+/// The observed parts, a produced message's unlabelled body labelled with the type a verification
+/// reads it as (ADR 0090 decision 3): its metadata's `contentType`, else what its octets are
+/// detected as. So a recording decodes the body a verification would, and a selector over one of
+/// its members is matched against the document.
+fn labelled(parts: &Parts, content: Option<&dyn ContentComponent>) -> Parts {
+  let mut parts = parts.clone();
+  for (name, part) in parts.iter_mut() {
+    if name != PRODUCED_PART && name != PRODUCED_REQUEST_PART {
+      continue;
+    }
+    let unlabelled = part.get("body").is_some_and(|body| body.content_type.is_none());
+    if !unlabelled {
+      continue;
+    }
+    if let Some(content_type) = super::wire::produced_message_type(part, content)
+      && let Some(body) = part.get_mut("body")
+    {
+      body.content_type = Some(content_type);
+    }
+  }
+  parts
+}
+
+/// Refuse an observation that its own operation does not admit: a test that named the wrong
+/// template would otherwise record an entry no consumer interaction ever selects. Every part the
+/// operation names and the observation carries is checked: an HTTP request, a synchronous
+/// message's request, or an asynchronous message itself (ADR 0090 decision 1).
+fn admits_observed(
   operation: &Selector,
   parts: &Parts,
   initiating: &str,
@@ -241,13 +302,24 @@ fn admits_initiating(
       .collect();
     EngineError::interaction_invalid(&problems)
   })?;
-  let Some(sent) = parts.get(initiating) else {
-    return Ok(());
-  };
   let mut resolver = CapturedValues::new();
-  for (slot, value) in sent {
-    let document = super::wire::decode_slot(value, None, content);
-    resolver = resolver.capture(format!("$.{initiating}.{slot}"), document);
+  let mut named = Vec::new();
+  for part in operation.keys() {
+    let Some(observed) = parts.get(part) else {
+      continue;
+    };
+    named.push(if part == initiating {
+      format!("the {part} the provider answered")
+    } else {
+      format!("the {part} the provider produced")
+    });
+    for (slot, value) in observed {
+      let document = super::wire::decode_slot(value, None, content);
+      resolver = resolver.capture(format!("$.{part}.{slot}"), document);
+    }
+  }
+  if named.is_empty() {
+    return Ok(());
   }
   let plan = compile(&spec, &Assignment::new(), None);
   let executed = execute_with(&plan, &resolver, None, Some(actions));
@@ -260,7 +332,8 @@ fn admits_initiating(
     .map(|mismatch| Problem {
       pointer: "/operation".to_string(),
       message: format!(
-        "the operation does not admit the {initiating} the provider answered: {}",
+        "the operation does not admit {}: {}",
+        named.join(" and "),
         mismatch.message
       ),
     })

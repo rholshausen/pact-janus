@@ -236,7 +236,7 @@ janus check pacts/web-app-order-service.json --provider-shape shapes/
     consumer has only tested exactly 'SHIPPED'
   verification: no result supplied
   ! no verification result was supplied for this pair; a contract nobody replayed is not a passing one
-  ! 3 decided findings: the provider may produce responses this consumer has not tested
+  ! 3 decided findings: the provider may produce what this consumer has not tested
   => WARN: web-app -> order-service
 
 WARN: 0 pairs blocked, 1 warned, 0 passed — policy on-finding warn, on-review warn, exemptions as of 2026-09-22

@@ -130,6 +130,22 @@ impl Recorder {
     self
   }
 
+  /// What another kind declares a credential, beside those already declared (ADR 0090 decision 4):
+  /// a session recording several kinds withholds each one's, and their parts are their own.
+  pub fn add_credentials(&mut self, credentials: &CredentialMembers) {
+    for (part, slots) in credentials {
+      let known = self.credentials.entry(part.clone()).or_default();
+      for (slot, members) in slots {
+        let known = known.entry(slot.clone()).or_default();
+        for member in members {
+          if !known.iter().any(|existing| existing.eq_ignore_ascii_case(member)) {
+            known.push(member.clone());
+          }
+        }
+      }
+    }
+  }
+
   pub fn provider(&self) -> &str {
     &self.provider
   }

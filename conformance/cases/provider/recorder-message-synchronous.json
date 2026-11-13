@@ -1,0 +1,98 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/recorder-message-synchronous",
+  "category": "provider",
+  "title": "observe-message with a request records a synchronous message's answer, its operation over the request.",
+  "covers": [
+    "verification.observe-message.synchronous"
+  ],
+  "why": "behavioural spec 'observe-message' (ADR 0090 decision 1): with the 'request' option the operation is over 'request', as an HTTP operation is over its request, and 'parts' carries the request beside the message, each written as a message producer's answer is: a content type labels the body and is the metadata's contentType, under the metadata given; a string body is its UTF-8.",
+  "engine": {},
+  "recorder": {
+    "source": "orders.test",
+    "observations": [
+      {
+        "operation": {
+          "body": {
+            "kind": "order-lookup"
+          }
+        },
+        "message": {
+          "text": "{\"id\":\"66\"}",
+          "content-type": "application/json"
+        },
+        "message-request": {
+          "json": {
+            "kind": "order-lookup",
+            "id": "66"
+          },
+          "content-type": "application/json",
+          "metadata": {
+            "replyTo": "orders.replies"
+          }
+        },
+        "description": "look up an order"
+      }
+    ]
+  },
+  "expect": {
+    "ops": [
+      "engine/hello",
+      "provider-shape-session/create",
+      "provider-shape-session/observe",
+      "provider-shape-session/finalise"
+    ],
+    "frames": {
+      "provider-shape-session/observe": {
+        "session": "r-1",
+        "kind": "message",
+        "description": "look up an order",
+        "operation": {
+          "request": {
+            "body": {
+              "shape": "object",
+              "members": {
+                "kind": {
+                  "shape": "equality",
+                  "example": "order-lookup"
+                }
+              }
+            }
+          }
+        },
+        "parts": {
+          "message": {
+            "metadata": {
+              "content": {
+                "contentType": "application/json"
+              }
+            },
+            "body": {
+              "content": "eyJpZCI6IjY2In0=",
+              "encoded": "base64",
+              "content-type": "application/json"
+            }
+          },
+          "request": {
+            "metadata": {
+              "content": {
+                "contentType": "application/json",
+                "replyTo": "orders.replies"
+              }
+            },
+            "body": {
+              "content": "eyJraW5kIjoib3JkZXItbG9va3VwIiwiaWQiOiI2NiJ9",
+              "encoded": "base64",
+              "content-type": "application/json"
+            }
+          }
+        }
+      }
+    },
+    "observed": [
+      "ok"
+    ],
+    "written": true,
+    "engine-closed": true
+  }
+}

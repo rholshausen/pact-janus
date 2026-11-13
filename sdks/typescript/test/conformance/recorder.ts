@@ -7,11 +7,11 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { JanusError, ShapeRecorder } from "../../src/index.js";
-import type { Case, Outcome } from "./cases.js";
+import { JanusError, ShapeRecorder, type ObserveMessageOptions } from "../../src/index.js";
+import type { Case, MessageScript, Outcome, RecorderScript } from "./cases.js";
 import { equal, show } from "./compare.js";
 import { template } from "./dsl.js";
-import { checkEngine } from "./provider.js";
+import { checkEngine, message } from "./provider.js";
 import { PROVIDER, ScriptedPipe } from "./scripted-engine.js";
 
 export async function runRecorder(testCase: Case, failures: string[]): Promise<void> {
@@ -33,7 +33,12 @@ export async function runRecorder(testCase: Case, failures: string[]): Promise<v
 
   const observed: ("ok" | Outcome)[] = [];
   for (const observation of script.observations ?? []) {
-    const { status, headers, body } = observation.response;
+    const { message: produced, response } = observation;
+    if (produced !== undefined || response === undefined) {
+      observed.push(await outcome(() => observeMessage(recorder, observation, produced ?? { json: null }), pipe));
+      continue;
+    }
+    const { status, headers, body } = response;
     const operation = Object.fromEntries(Object.entries(observation.operation).map(([slot, value]) => [slot, template(value)]));
     const octets = body?.bytes !== undefined ? new Uint8Array(Buffer.from(body.bytes, "base64")) : body?.text;
     observed.push(
@@ -76,6 +81,25 @@ export async function runRecorder(testCase: Case, failures: string[]): Promise<v
       failures.push(`the shape written differs\n  expected: ${show(expected.shape)}\n  actual:   ${show(shape)}`);
     }
   }
+}
+
+/** One message observation, as `observeMessage` spells it: the operation's metadata and body as templates. */
+function observeMessage(
+  recorder: ShapeRecorder,
+  observation: NonNullable<RecorderScript["observations"]>[number],
+  produced: MessageScript,
+) {
+  const { metadata, body } = observation.operation as { metadata?: Record<string, unknown>; body?: unknown };
+  const operation = {
+    ...(metadata !== undefined ? { metadata: Object.fromEntries(Object.entries(metadata).map(([name, value]) => [name, template(value)])) } : {}),
+    ...(body !== undefined ? { body: template(body) } : {}),
+  };
+  const options = {
+    ...(observation.description !== undefined ? { description: observation.description } : {}),
+    ...(observation.states !== undefined ? { states: observation.states } : {}),
+    ...(observation["message-request"] !== undefined ? { request: message(observation["message-request"]) } : {}),
+  } as ObserveMessageOptions;
+  return recorder.observeMessage(operation, message(produced), options);
 }
 
 /** This SDK's ways of ending `observe`, as the case's outcomes (README §4). */

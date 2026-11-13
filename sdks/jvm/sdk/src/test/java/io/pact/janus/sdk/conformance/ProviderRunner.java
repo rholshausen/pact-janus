@@ -352,7 +352,7 @@ final class ProviderRunner {
   }
 
   /** The case's message as this SDK's: bytes as a byte[], a string as itself, JSON as a Java value. */
-  private static Message message(JsonNode script) {
+  static Message message(JsonNode script) {
     Object body = script.has("bytes") ? java.util.Base64.getDecoder().decode(script.get("bytes").asText())
         : script.has("text") ? script.get("text").asText()
         : Suite.MAPPER.convertValue(script.path("json"), Object.class);

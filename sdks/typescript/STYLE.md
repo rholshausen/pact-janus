@@ -214,8 +214,14 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
   directory; `.janus` is a directory a project ignores, as it ignores `node_modules`. `source` is the
   test file relative to the working directory, written with `/`: `useShapeRecorder`'s, or the one
   Jest's global `expect` names. With none, `finish` throws a `TypeError` naming `source`.
-- `observe` resolves with the engine's answer, `{ observations, interactions, warnings? }`. A refused
-  call throws a `TypeError`; an engine error a `JanusError`.
+- `await recorder.observeMessage(operation, message, { description, states?, request? })` records a
+  message the provider produced, on the same recorder (behavioural spec 'observe-message'; ADR 0090).
+  `operation` is `{ metadata?, body? }`, written as `message-contents`' slots are:
+  `{ metadata: { queue: "orders.placed" } }`. `message`, and `request` for a synchronous message, are
+  `pact-janus/verifier`'s `Message`, `{ body, contentType?, metadata? }`, as a message producer returns
+  one, so a test can record what its producer returns. `description` is required.
+- `observe` and `observeMessage` resolve with the engine's answer, `{ observations, interactions,
+  warnings? }`. A refused call throws a `TypeError`; an engine error a `JanusError`.
 
 ## pact-js's provider API (`pact-janus/verifier`)
 

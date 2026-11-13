@@ -266,18 +266,31 @@ async function answerFilter(filter: RequestFilter, changes: readonly string[], c
 async function answerMessage(produce: MessageProducer, context: Context): Promise<Answer> {
   const interaction = (context.interaction ?? {}) as { "pact-message"?: { request?: Record<string, unknown> } };
   try {
-    const { body, contentType, metadata } = await produce(interaction["pact-message"]?.request ?? {});
-    const octets =
-      body instanceof Uint8Array ? body : new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body));
-    const slot: Answer = { content: Buffer.from(octets).toString("base64"), encoded: "base64" };
-    if (contentType !== undefined) {
-      slot["content-type"] = contentType;
-    }
-    const meta = { ...(contentType === undefined ? {} : { contentType }), ...metadata };
-    return { outcome: "ok", changes: { parts: { message: { metadata: { content: meta }, body: slot } } } };
+    const message = await produce(interaction["pact-message"]?.request ?? {});
+    return { outcome: "ok", changes: { parts: { message: messageSlots(message) } } };
   } catch (error) {
     return failed(error);
   }
+}
+
+/**
+ * A message as `produce-message` hooks produce one: its metadata, with the content type as its
+ * `contentType` under the metadata given, and its body's octets, labelled only with a content type.
+ */
+export function messageSlots({ body, contentType, metadata }: Message): {
+  metadata: { content: Record<string, unknown> };
+  body: { content: string; encoded: "base64"; "content-type"?: string };
+} {
+  const octets =
+    body instanceof Uint8Array ? body : new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body));
+  const slot: { content: string; encoded: "base64"; "content-type"?: string } = {
+    content: Buffer.from(octets).toString("base64"),
+    encoded: "base64",
+  };
+  if (contentType !== undefined) {
+    slot["content-type"] = contentType;
+  }
+  return { metadata: { content: { ...(contentType === undefined ? {} : { contentType }), ...metadata } }, body: slot };
 }
 
 function failed(error: unknown): Answer {

@@ -282,7 +282,6 @@ pub fn check_with(
   provider_shape: &ProviderShape,
   components: Option<&dyn super::OperatorComparer>,
 ) -> Result<SubsumptionReport, CheckError> {
-  let actions = components.map(|components| components as &dyn crate::plan::ActionApplier);
   let mut problems = Vec::new();
   let mut interactions = Vec::new();
 
@@ -300,36 +299,37 @@ pub fn check_with(
         .collect()
     });
 
-    let (published, matched_by) = match select(provider_shape, interaction, &states, actions, &mut problems) {
-      Selection::Description(entry) => (entry, BY_DESCRIPTION),
-      Selection::Selector(entry) => (entry, BY_SELECTOR),
-      unmatched => {
-        let reason = match unmatched {
-          Selection::Ambiguous(entries) => Some(format!(
-            "{} published shapes select this interaction by operation ({}); the checker does not \
+    let (published, matched_by) =
+      match select(provider_shape, interaction, &states, components, &mut problems) {
+        Selection::Description(entry) => (entry, BY_DESCRIPTION),
+        Selection::Selector(entry) => (entry, BY_SELECTOR),
+        unmatched => {
+          let reason = match unmatched {
+            Selection::Ambiguous(entries) => Some(format!(
+              "{} published shapes select this interaction by operation ({}); the checker does not \
              choose between them",
-            entries.len(),
-            entries
-              .iter()
-              .map(|entry| format!("'{}'", entry.description))
-              .collect::<Vec<_>>()
-              .join(", ")
-          )),
-          _ => None,
-        };
-        interactions.push(InteractionResult {
-          description: interaction.description.clone(),
-          states: recorded_states,
-          matched: false,
-          matched_by: None,
-          provenance: None,
-          reason,
-          verdict: NOT_PUBLISHED.to_string(),
-          findings: Vec::new(),
-        });
-        continue;
-      }
-    };
+              entries.len(),
+              entries
+                .iter()
+                .map(|entry| format!("'{}'", entry.description))
+                .collect::<Vec<_>>()
+                .join(", ")
+            )),
+            _ => None,
+          };
+          interactions.push(InteractionResult {
+            description: interaction.description.clone(),
+            states: recorded_states,
+            matched: false,
+            matched_by: None,
+            provenance: None,
+            reason,
+            verdict: NOT_PUBLISHED.to_string(),
+            findings: Vec::new(),
+          });
+          continue;
+        }
+      };
 
     // §5's cross-reference reads the consumer's own recorded exclusions; a contract whose
     // selection report carries none contributes an empty set, and the walk then skips the

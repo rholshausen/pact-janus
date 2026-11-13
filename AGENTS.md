@@ -258,7 +258,11 @@ Three sources are the source of truth and take precedence over this file when th
 > `min: 0`) among them; the sample provider's `openapi.yaml` finds what its recorded shape finds.
 > S4.4 (ADR 0089): a policy's `provenance` names actions per provenance (`derived: { on-finding: warn }`),
 > which beat the plain ones whatever layer set those, and an exemption may select by `provenance`; a
-> subsumption report records each matched interaction's provenance.
+> subsumption report records each matched interaction's provenance. S4.6 (ADR 0090): a message's
+> operation is a selector over the part that starts its exchange, an asynchronous message's own
+> metadata or body; the kind `message` is recorded as `produce-message` hooks produce it, `observe`
+> takes `kind`, and both SDKs' recorders have `observeMessage`; `janus check` decides a message
+> contract, its demonstration waiting on S4.3.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

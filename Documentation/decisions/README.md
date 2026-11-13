@@ -106,6 +106,7 @@ superseding ADR instead.
 | [0087](0087-compare-the-built-in-components-operators-by-their-own-matchers-and-a-compare-each-declares.md) | Compare the built-in components' operators by their own matchers, and a `compare` each declares | accepted |
 | [0088](0088-derive-a-provider-shape-from-openapi-with-janus-derive-and-report-every-mapping-that-loses-something.md) | Derive a provider shape from OpenAPI with `janus derive`, and report every mapping that loses something | accepted |
 | [0089](0089-scope-a-subsumption-policy-and-its-exemptions-by-the-provenance-of-the-shape-a-finding-came-from.md) | Scope a subsumption policy and its exemptions by the provenance of the shape a finding came from | accepted |
+| [0090](0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md) | Name a message's operation by the message itself, and record it as `produce-message` hooks produce it | accepted |
 
 ## Decision backlog
 

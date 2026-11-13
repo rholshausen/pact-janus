@@ -37,6 +37,11 @@ pub trait OperatorComparer: plan::ActionApplier {
   fn comparability(&self, operator: &str) -> crate::component::Comparability;
   /// `None` when no component answers for `operator`, or it could not run.
   fn compare(&self, operator: &str, provider: &Value, consumer: &Value) -> Option<(Verdict, Option<String>)>;
+  /// What decodes a content slot a selector names, such as a message's `body` (ADR 0090 decision
+  /// 2). `None` matches a content slot as the value it was recorded as.
+  fn content(&self) -> Option<&dyn crate::component::ContentComponent> {
+    None
+  }
 }
 
 /// The walk's three-valued answer (shape spec §8). `not-published` is a report-level state, not

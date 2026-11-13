@@ -116,6 +116,37 @@ pub(crate) fn recorded_slot(
   }
 }
 
+/// The type a produced message has (ADR 0067 decision 3), as today's verifier takes it: its body's
+/// label, else its metadata's own `contentType`, else what the content registry detects its octets
+/// as. A verification checks the contract's `contentType` against it, and a recording reads an
+/// unlabelled body by it (ADR 0090 decision 3), so both read one message the same way.
+pub(crate) fn produced_message_type(
+  message: &crate::component::Part,
+  content: Option<&dyn ContentComponent>,
+) -> Option<String> {
+  let body = message.get("body");
+  let labelled = body.and_then(|body| body.content_type.clone());
+  let own = || {
+    message
+      .get("metadata")
+      .and_then(|metadata| metadata.content.get("contentType"))
+      .and_then(Value::as_str)
+      .filter(|content_type| !content_type.is_empty())
+      .map(str::to_string)
+  };
+  let detected = || {
+    let (body, content) = (body?, content?);
+    content
+      .detect(crate::component::Detect {
+        value: body.clone(),
+        hint: None,
+      })
+      .ok()?
+      .media_type
+  };
+  labelled.or_else(own).or_else(detected)
+}
+
 fn claimant<'a, 'c>(
   slot: &'a SlotValue,
   declared: Option<&'a str>,

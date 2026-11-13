@@ -734,7 +734,7 @@ export interface HelloResult {
 export interface StartRecording {
   provider: RecordedProvider;
   /**
-   * The transport kind whose parts are observed (ADR 0086 decision 3): the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. A kind no transport serves is component-unavailable.
+   * The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable.
    */
   kind?: string;
   policy?: RecordingPolicy;
@@ -770,6 +770,10 @@ export interface RecordingPolicy {
 export interface ObserveResponse {
   session: string;
   /**
+   * The kind whose parts these are, read as 'create''s 'kind' is, when it is not the session's (ADR 0090 decision 4): so one session records a provider's HTTP answers and its messages into one shape. A kind nothing serves is component-unavailable.
+   */
+  kind?: string;
+  /**
    * What a report calls the entry: the consumer's words when the test knows them, else the provider's own name for the operation, such as 'GET /orders/{id}' (ADR 0086 decision 1). With 'states' and 'operation', the entry's identity.
    */
   description: string;
@@ -778,7 +782,7 @@ export interface ObserveResponse {
    */
   states?: string[];
   /**
-   * The operation this answers, as shapes over the initiating part's slots, part name -> slot name -> shape (ADR 0086 decision 1): the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. When 'parts' carries the initiating part, an operation that does not admit it is interaction-invalid at '/operation'.
+   * The operation this answers, as shapes over the slots that identify it, part name -> slot name -> shape (ADR 0086 decision 1): the initiating part's, or for an asynchronous message, which has none, the message's own, its metadata or a member of its body (ADR 0090 decision 1). It is the recorded entry's selector (design 2.8 §2.2), with the answer's outcome slots written into it as 'equality' (component-interfaces spec §5.10). Shapes are design 2.2's document, opaque here; one that is not a shape is interaction-invalid at '/operation/...'. An operation that does not admit a part it names and 'parts' carries is interaction-invalid at '/operation'.
    */
   operation?: {
     [k: string]: {
@@ -788,7 +792,7 @@ export interface ObserveResponse {
     };
   };
   /**
-   * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
+   * The transport's own parts, part name -> slot name -> the value that slot carried (ADR 0086 decision 3). The answering part is recorded, and for a kind with none every part but the initiating one; an initiating part is only checked against 'operation'. A produced message's body with no 'content-type' is read by the type a verification reads it as: its metadata's 'contentType', else what its octets are detected as (ADR 0090 decision 3). A slot the provider did not produce is left out; it is not observed, which is a different fact from a member being absent inside a value.
    */
   parts: {
     [k: string]: {

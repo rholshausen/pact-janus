@@ -190,6 +190,48 @@ pub fn in_tree_actions(matchers: &[InTreeMatcher]) -> impl crate::subsumption::O
   Contributions::from_resolved(&[], matchers)
 }
 
+/// [`in_tree_actions`], with `content` decoding what a selector names (ADR 0090 decision 2): what
+/// `subsumption/check` runs a selector with.
+pub fn check_components<'a>(
+  matchers: &[InTreeMatcher],
+  content: &'a dyn ContentComponent,
+) -> impl crate::subsumption::OperatorComparer + use<'a> {
+  CheckComponents {
+    operators: Contributions::from_resolved(&[], matchers),
+    content,
+  }
+}
+
+struct CheckComponents<'a> {
+  operators: Contributions,
+  content: &'a dyn ContentComponent,
+}
+
+impl ActionApplier for CheckComponents<'_> {
+  fn apply(&self, action: &str, arguments: &[RuntimeValue], path: Option<&str>) -> Option<plan::NodeResult> {
+    self.operators.apply(action, arguments, path)
+  }
+}
+
+impl crate::subsumption::OperatorComparer for CheckComponents<'_> {
+  fn comparability(&self, operator: &str) -> crate::component::Comparability {
+    self.operators.comparability(operator)
+  }
+
+  fn compare(
+    &self,
+    operator: &str,
+    provider: &serde_json::Value,
+    consumer: &serde_json::Value,
+  ) -> Option<(crate::subsumption::Verdict, Option<String>)> {
+    self.operators.compare(operator, provider, consumer)
+  }
+
+  fn content(&self) -> Option<&dyn ContentComponent> {
+    Some(self.content)
+  }
+}
+
 /// What the subsumption walk asks about a component's operators (component-interfaces spec §7.5,
 /// ADR 0087): the matcher of the component whose namespace the operator is in.
 impl crate::subsumption::OperatorComparer for Contributions {

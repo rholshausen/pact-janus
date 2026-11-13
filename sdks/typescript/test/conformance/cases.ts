@@ -240,7 +240,9 @@ export interface RecorderScript {
   policy?: Record<string, number>;
   observations?: {
     operation: Record<string, unknown>;
-    response: { status: number; headers?: Record<string, string | string[]>; body?: { text?: string; bytes?: string } };
+    response?: { status: number; headers?: Record<string, string | string[]>; body?: { text?: string; bytes?: string } };
+    message?: MessageScript;
+    "message-request"?: MessageScript;
     description?: string;
     states?: string[];
     request?: { method: string; path: string };
