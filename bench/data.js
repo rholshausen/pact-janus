@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794548826284,
+  "lastUpdate": 1794548828259,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -53772,6 +53772,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 19805,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3b79bab4e4cda577d825e56ad1a6797d59c64edf",
+          "message": "feat: S4.6 a provider shape records the messages a provider produces, and janus check decides message contracts\n\nADR 0090 names a message's operation by the part that starts its exchange: a\nsynchronous message's request, as an HTTP request, and an asynchronous message\nitself, a metadata member naming its queue or a body member naming its kind. It\nis the identity half of S4.8, which S4.6 relied on.\n\n- The kind `message`, which no transport serves, is recorded as produce-message\n  hooks produce it: the `message` part, answering a synchronous message's\n  `request`, an unlabelled body read by its metadata's contentType as a\n  verification reads it. `provider-shape-session/observe` takes `kind`, so one\n  session records a provider's HTTP answers and its messages into one shape.\n- An observation's operation is checked against every part it names.\n- `subsumption/check` decodes a content slot a selector names by its declared\n  type, so a selector over a body member selects by the member.\n- Both SDKs' recorders have `observeMessage`, taking the `Message` their message\n  producers return; the behavioural spec has `observe-message`, and four\n  conformance cases cover it, `live/recorded-message-shape` pinning the shape.\n- `janus check`'s decided-findings reason says the provider \"may produce what\n  this consumer has not tested\", not \"responses\", which a message-only pair has\n  none of.\n\nThe exit's check test is cli/tests/cli.rs's\ncheck_decides_a_message_contract_against_the_shape_of_its_message; S4.3's\ndemonstration with a message-only provider is still S4.3's.\n\nBudget: the TypeScript SDK's idiomatic layer moves from 1,350 to 1,400 lines, for\nobserveMessage.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-13T16:41:30+11:00",
+          "tree_id": "c19b84dc2a9b1757742acd75c9962592142dd716",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3b79bab4e4cda577d825e56ad1a6797d59c64edf"
+        },
+        "date": 1794548827756,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 23954,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19628,
             "unit": "requests per second",
             "extra": "engines 4"
           }
