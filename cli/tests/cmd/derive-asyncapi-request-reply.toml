@@ -1,0 +1,5 @@
+# A request/reply operation (staged plan S4.8, ADR 0091): the reply the provider answers with is its
+# shape, selected by the value its request fixes.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/name-lookup.asyncapi.yaml"]
+fs.cwd = "../../.."

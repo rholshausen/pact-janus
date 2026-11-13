@@ -1,9 +1,13 @@
-//! `janus derive` (staged plan S4.2, ADR 0088), checked with the commands that read what it writes.
+//! `janus derive` (staged plan S4.2 and S4.8, ADR 0088 and ADR 0091), checked with the commands that
+//! read what it writes.
 //!
-//! The exit: the sample provider's OpenAPI document, spike 7.3's hand-authored one, derives a shape
+//! S4.2's exit: the sample provider's OpenAPI document, spike 7.3's hand-authored one, derives a shape
 //! that `janus check` matches to the sample provider's pact by selector and that finds everything
 //! the shape its own tests recorded finds; and the generator-emitted document's lossy mappings are
-//! each reported. What the command prints is pinned by the trycmd cases `tests/cmd/derive*.toml`.
+//! each reported. S4.8's: an AsyncAPI 3.0 document and a 2.x one for pact-js's message example's
+//! provider derive one shape, which `janus check` matches to the example's pact by selector and
+//! decides as S4.6 does; and a request/reply operation is checked against a synchronous message.
+//! What the command prints is pinned by the trycmd cases `tests/cmd/derive*.toml`.
 
 use pretty_assertions::assert_eq;
 use serde_json::Value;
@@ -58,11 +62,20 @@ fn scratch(name: &str) -> PathBuf {
 
 /// `janus check --output json` of the sample provider's pact against a provider shape.
 fn check_the_pact(shape: &Value, name: &str) -> Value {
+  check(
+    "samples/order-service/pacts/web-app-order-service.json",
+    shape,
+    name,
+  )
+}
+
+/// `janus check --output json` of one contract or pact against a provider shape: its one pair.
+fn check(contract: &str, shape: &Value, name: &str) -> Value {
   let path = scratch(name);
   std::fs::write(&path, serde_json::to_vec_pretty(shape).unwrap()).unwrap();
   let (_, report) = janus(&[
     "check",
-    "samples/order-service/pacts/web-app-order-service.json",
+    contract,
     "--provider-shape",
     path.to_str().unwrap(),
     "--output",
@@ -188,6 +201,11 @@ fn every_derived_shape_is_one_the_engine_reads() {
     "samples/order-service/openapi.yaml",
     "cli/tests/cmd/fixtures/openapi/order-service.orm-generated.openapi.json",
     "cli/tests/cmd/fixtures/openapi/mapping.openapi.yaml",
+    "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-3.yaml",
+    "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-2.yaml",
+    "cli/tests/cmd/fixtures/asyncapi/name-lookup.asyncapi.yaml",
+    "cli/tests/cmd/fixtures/asyncapi/mapping.asyncapi-3.yaml",
+    "cli/tests/cmd/fixtures/asyncapi/mapping.asyncapi-2.yaml",
   ] {
     let (shape, _) = derive(document, &[]);
     let bytes = serde_json::to_vec(&shape).unwrap();
@@ -195,7 +213,11 @@ fn every_derived_shape_is_one_the_engine_reads() {
       .unwrap_or_else(|err| panic!("{document}: {err:?}"));
     for (index, entry) in shape["interactions"].as_array().unwrap().iter().enumerate() {
       for member in ["selector", "parts"] {
-        for (part, slots) in entry[member].as_object().unwrap() {
+        // An AsyncAPI entry whose message fixes nothing has no selector (ADR 0091 decision 4).
+        let Some(parts) = entry[member].as_object() else {
+          continue;
+        };
+        for (part, slots) in parts {
           for (slot, node) in slots.as_object().unwrap() {
             let at = format!("{document}: interactions[{index}].{member}.{part}.{slot}");
             pact_janus_kernel::shape::parse(node, &at)
@@ -336,4 +358,162 @@ fn a_policy_blocks_on_recorded_findings_and_warns_on_derived_ones() {
       "{pair:#}"
     );
   }
+}
+
+// --- AsyncAPI (S4.8, ADR 0091) ---------------------------------------------------------------------
+
+const ORDER_PLACED: &str = "corpora/verifier/messages/pact-js-order-placed/pact.json";
+
+/// pact-js's message example's pact, under a provider name of the test's choosing.
+fn order_placed_pact_for(provider: &str, name: &str) -> PathBuf {
+  let mut pact: Value = serde_json::from_slice(&std::fs::read(root().join(ORDER_PLACED)).unwrap()).unwrap();
+  pact["provider"]["name"] = Value::from(provider);
+  let path = scratch(name);
+  std::fs::write(&path, serde_json::to_vec_pretty(&pact).unwrap()).unwrap();
+  path
+}
+
+#[test]
+fn an_asyncapi_3_document_and_a_2_one_for_one_producer_derive_one_shape() {
+  let (three, three_losses) = derive(
+    "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-3.yaml",
+    &[],
+  );
+  let (two, two_losses) = derive(
+    "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-2.yaml",
+    &[],
+  );
+  assert_eq!(three, two);
+  assert_eq!(three_losses, two_losses);
+  assert_eq!(
+    codes(&three_losses),
+    BTreeSet::from(["cardinality-unstated".to_string()])
+  );
+  // Only what the provider sends: what it receives on `payments.taken` is its consumers' shape.
+  let entries = three["interactions"].as_array().unwrap();
+  assert_eq!(entries.len(), 1, "{three:#}");
+  assert_eq!(
+    entries[0]["selector"]["message"]["metadata"]["members"]["queue"]["example"],
+    "orders.placed"
+  );
+}
+
+#[test]
+fn a_derived_message_shape_is_matched_by_selector_and_finds_what_the_recorded_one_finds() {
+  let (derived, _) = derive(
+    "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-3.yaml",
+    &[],
+  );
+  let by_derived = check(ORDER_PLACED, &derived, "order-provider.derived.json");
+  // The consumer recorded the queue in its message's metadata, which the document's header fixes.
+  assert_eq!(by_derived["subsumption"]["matched"], 1, "{by_derived:#}");
+  assert_eq!(by_derived["subsumption"]["not-published"], 0, "{by_derived:#}");
+
+  // The shape every SDK records from tests that publish to the queue (S4.6's live case), checked
+  // against the same pact under the conformance suite's provider name.
+  let case: Value = serde_json::from_slice(
+    &std::fs::read(root().join("conformance/cases/live/recorded-message-shape.json")).unwrap(),
+  )
+  .unwrap();
+  let recorded_pact = order_placed_pact_for("orders-api", "order-placed.orders-api.json");
+  let by_recorded = check(
+    recorded_pact.to_str().unwrap(),
+    &case["expect"]["shape"],
+    "order-provider.recorded.json",
+  );
+
+  let recorded_findings = findings(&by_recorded);
+  let derived_findings = findings(&by_derived);
+  assert_eq!(
+    recorded_findings,
+    BTreeSet::from([(
+      "an OrderPlaced event".to_string(),
+      "message.body.items".to_string(),
+      "wider-cardinality".to_string()
+    )])
+  );
+  let missed: Vec<_> = recorded_findings.difference(&derived_findings).collect();
+  assert!(
+    missed.is_empty(),
+    "the derived shape misses what the recorded one finds: {missed:?}"
+  );
+  // Beyond it, what the document says and the recorder's four orders did not show: a `number` total
+  // may be written as an integer, which the consumer's `decimal` does not admit.
+  let beyond: BTreeSet<_> = derived_findings
+    .difference(&recorded_findings)
+    .map(|(_, path, kind)| (path.as_str(), kind.as_str()))
+    .collect();
+  assert_eq!(
+    beyond,
+    BTreeSet::from([("message.body.totalAmount", "broader-type")])
+  );
+}
+
+#[test]
+fn a_reply_is_checked_against_a_synchronous_message_selected_by_its_request() {
+  let (derived, losses) = derive("cli/tests/cmd/fixtures/asyncapi/name-lookup.asyncapi.yaml", &[]);
+  assert!(losses.is_empty(), "{losses:#?}");
+  let entry = &derived["interactions"][0];
+  // The provider produces the reply, so it is the entry's message; the request only selects it.
+  let parts: Vec<&String> = entry["parts"].as_object().unwrap().keys().collect();
+  assert_eq!(parts, vec!["message"]);
+  assert_eq!(
+    entry["selector"]["request"]["body"]["members"]["type"]["example"],
+    "NameLookup"
+  );
+
+  let pair = check(
+    "cli/tests/cmd/fixtures/asyncapi/name-lookup.pact.json",
+    &derived,
+    "name-lookup.derived.json",
+  );
+  assert_eq!(pair["subsumption"]["matched"], 1, "{pair:#}");
+  assert_eq!(
+    findings(&pair),
+    BTreeSet::from([(
+      "a name lookup".to_string(),
+      "message.body.name".to_string(),
+      "weaker-presence".to_string()
+    )])
+  );
+}
+
+#[test]
+fn messages_that_fix_different_values_are_told_apart_and_two_that_tie_are_not_published() {
+  let (derived, losses) = derive("cli/tests/cmd/fixtures/asyncapi/mapping.asyncapi-3.yaml", &[]);
+  let ambiguous: BTreeSet<&str> = losses
+    .iter()
+    .filter(|loss| loss["code"] == "selector-ambiguous")
+    .filter_map(|loss| loss["entry"].as_str())
+    .collect();
+  assert_eq!(
+    ambiguous,
+    BTreeSet::from(["send events Shipped", "send events.copy Shipped"])
+  );
+
+  // A consumer of each: the cancelled event is selected by the `kind` its header fixes, and the
+  // shipped one by two entries alike, which the check does not choose between.
+  let message = |description: &str, kind: &str, body: Value| {
+    serde_json::json!({
+      "type": "Asynchronous/Messages",
+      "description": description,
+      "contents": { "content": body, "contentType": "application/json", "encoded": false },
+      "metadata": { "contentType": "application/json", "kind": kind },
+      "pending": false
+    })
+  };
+  let pact = serde_json::json!({
+    "consumer": { "name": "events-consumer" },
+    "provider": { "name": "mapping" },
+    "interactions": [
+      message("a cancellation", "cancelled", serde_json::json!({ "reason": "changed my mind" })),
+      message("a shipment", "shipped", serde_json::json!({ "parcel": { "type": "Letter" } }))
+    ],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  });
+  let path = scratch("events-consumer.pact.json");
+  std::fs::write(&path, serde_json::to_vec_pretty(&pact).unwrap()).unwrap();
+  let pair = check(path.to_str().unwrap(), &derived, "mapping.derived.json");
+  assert_eq!(pair["subsumption"]["matched"], 1, "{pair:#}");
+  assert_eq!(pair["subsumption"]["not-published"], 1, "{pair:#}");
 }

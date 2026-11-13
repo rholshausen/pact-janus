@@ -1,0 +1,45 @@
+# The AsyncAPI 2.x constructs janus derive maps that 3.0 spells differently (staged plan S4.8, ADR
+# 0091): what the application sends is a channel's `subscribe`, a `oneOf` of messages, a payload's
+# format named on its message, and traits that win over the message's own members.
+asyncapi: 2.6.0
+info:
+  title: mapping
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  user/signedup:
+    subscribe:
+      operationId: publishUserEvents
+      message:
+        oneOf:
+          - $ref: '#/components/messages/SignedUp'
+          - name: Avro
+            schemaFormat: application/vnd.apache.avro;version=1.9.0
+            payload:
+              type: record
+              name: User
+              fields: []
+  # What the application receives: not derived.
+  user/deleted:
+    publish:
+      message:
+        payload:
+          type: object
+components:
+  messages:
+    SignedUp:
+      messageId: signedUp
+      headers:
+        type: object
+        properties:
+          event:
+            type: string
+            const: signed-up
+      payload:
+        type: object
+        properties:
+          name:
+            type: string
+      traits:
+        # A 2.x trait is merged over the message, so its contentType wins.
+        - contentType: application/vnd.example.user+json

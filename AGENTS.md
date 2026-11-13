@@ -262,7 +262,10 @@ Three sources are the source of truth and take precedence over this file when th
 > operation is a selector over the part that starts its exchange, an asynchronous message's own
 > metadata or body; the kind `message` is recorded as `produce-message` hooks produce it, `observe`
 > takes `kind`, and both SDKs' recorders have `observeMessage`; `janus check` decides a message
-> contract, its demonstration waiting on S4.3.
+> contract, its demonstration waiting on S4.3. S4.8 (ADR 0091): `janus derive` reads AsyncAPI 2.x and 3.0 too,
+> an entry per message the application sends and per reply it answers a request with, selected by
+> the values a message (or its request) fixes on a header or payload member; the address selects only
+> where a header fixes it, and a message that fixes nothing, or two that tie, is reported.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -542,8 +545,8 @@ janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <
 janus explain <document.json> [--index N | --description <text>] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
               [--config verifier.janus.yaml]   # the components a run would load (S1.12, ADR 0050)
 janus upgrade <pact.json> [--write <file>] [--quiet] [--exclude-pending] [--output text|json]
-janus derive <openapi.yaml|json> [--provider <name>] [--base-path <p>] [--assume-non-empty]
-             [--write <file>] [--quiet] [--output text|json]   # a derived provider shape (S4.2, ADR 0088)
+janus derive <openapi|asyncapi document> [--provider <name>] [--base-path <p>] [--assume-non-empty]
+             [--write <file>] [--quiet] [--output text|json]   # a derived provider shape (S4.2, ADR 0088; S4.8, ADR 0091)
 janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>
               [--branch <b>] [--tag <t>]... [--build-url <url>]
               [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings

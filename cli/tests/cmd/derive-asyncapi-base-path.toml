@@ -1,0 +1,5 @@
+# --base-path is an OpenAPI document's: an AsyncAPI one has no paths to put it before.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/name-lookup.asyncapi.yaml", "--base-path", "/v1"]
+status.code = 2
+fs.cwd = "../../.."

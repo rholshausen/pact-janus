@@ -1,0 +1,6 @@
+# What AsyncAPI 2.x spells differently (ADR 0091): `subscribe` is what the application sends, a
+# message may be a `oneOf`, a payload's format is named on its message, and a trait wins over the
+# message's own members.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/mapping.asyncapi-2.yaml"]
+fs.cwd = "../../.."

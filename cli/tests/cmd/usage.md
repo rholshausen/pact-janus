@@ -19,8 +19,8 @@ Commands:
   explain      Print the plan the engine will execute for one interaction
   upgrade      Convert a v1-v4 pact into a Janus contract, and say what the conversion could not
                carry
-  derive       Derive a provider shape from an OpenAPI document, and say what the derivation could
-               not carry
+  derive       Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the
+               derivation could not carry
   publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
                consumer
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
@@ -88,7 +88,7 @@ Convert a v1-v4 pact into a Janus contract, and say what the conversion could no
 ```console
 $ janus derive
 ? 2
-Derive a provider shape from an OpenAPI document, and say what the derivation could not carry
+Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the derivation could not
 ...
 ```
 

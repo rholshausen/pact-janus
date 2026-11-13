@@ -1,0 +1,5 @@
+error: '--base-path <PATH>' is an OpenAPI document's; cli/tests/cmd/fixtures/asyncapi/name-lookup.asyncapi.yaml is an AsyncAPI one
+
+Usage: janus derive [OPTIONS] <DOCUMENT>
+
+For more information, try '--help'.

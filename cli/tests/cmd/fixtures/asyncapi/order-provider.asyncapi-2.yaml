@@ -1,0 +1,63 @@
+# order-provider.asyncapi-3.yaml's producer in AsyncAPI 2.6, where what the application publishes is
+# its channel's `subscribe` operation: the verbs are the reader's. Both derive one shape (staged
+# plan S4.8, ADR 0091).
+asyncapi: 2.6.0
+info:
+  title: OrderProvider
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  orders.placed:
+    subscribe:
+      operationId: publishOrderPlaced
+      message:
+        $ref: '#/components/messages/OrderPlaced'
+  # What the provider consumes is its consumers' shape, not its own: not derived.
+  payments.taken:
+    publish:
+      operationId: receivePayments
+      message:
+        payload:
+          type: object
+components:
+  messages:
+    OrderPlaced:
+      name: OrderPlaced
+      title: An order was placed
+      contentType: application/json
+      headers:
+        type: object
+        required: [queue]
+        properties:
+          queue:
+            description: The queue the message is published to, which the message carries.
+            type: string
+            const: orders.placed
+      payload:
+        $ref: '#/components/schemas/Order'
+  schemas:
+    Order:
+      type: object
+      required: [orderId, customerId, totalAmount, currency, items]
+      properties:
+        orderId:
+          type: string
+        customerId:
+          type: string
+        totalAmount:
+          type: number
+        currency:
+          type: string
+          enum: [EUR, GBP, USD]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+    LineItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer

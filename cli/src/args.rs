@@ -62,7 +62,8 @@ pub enum Command {
   Explain(ExplainArgs),
   /// Convert a v1-v4 pact into a Janus contract, and say what the conversion could not carry
   Upgrade(UpgradeArgs),
-  /// Derive a provider shape from an OpenAPI document, and say what the derivation could not carry
+  /// Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the derivation
+  /// could not carry
   Derive(DeriveArgs),
   /// Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
   Publish(PublishArgs),
@@ -830,22 +831,28 @@ pub struct UpgradeArgs {
 
 #[derive(Debug, Args)]
 #[command(
-  after_help = "One entry per operation and documented response status, each selected by the \
-                        operation's method, its path template and the status, so janus check \
-                        matches it to every consumer by operation. A 'default' response is not \
-                        imported. Only a JSON body is derived.\n\nThe losses, each with a code: \
+  after_help = "From an OpenAPI 3.0 or 3.1 document: one entry per operation and documented \
+                        response status, each selected by the operation's method, its path \
+                        template and the status, so janus check matches it to every consumer by \
+                        operation. A 'default' response is not imported.\n\nFrom an AsyncAPI 2.x \
+                        or 3.0 document: one entry per message the application sends, and per \
+                        reply it answers a request with, each selected by the values the message, \
+                        or the request, fixes on a header or a payload member. Only a JSON body is \
+                        derived.\n\nThe losses, each with a code: \
                         additional-properties-dropped, all-of-union, base-path-ambiguous, \
                         body-not-json, bounds-dropped, cardinality-assumed, cardinality-unstated, \
-                        closed-object, default-response, discriminator-unbound, external-reference, \
-                        format-dropped, header-serialised, pattern-unreadable, recursive-schema, reference-unresolved, \
-                        response-unreadable, schema-too-deep, unconstrained-object, \
-                        undiscriminated-union, untyped-schema.\n\nExit status: 0 the shape was \
-                        written, whatever it lost; 2 the document could not be read or is not one \
-                        janus derive reads.",
+                        closed-object, content-type-unstated, default-response, \
+                        discriminator-unbound, external-reference, format-dropped, \
+                        header-serialised, pattern-unreadable, recursive-schema, \
+                        reference-unresolved, reply-unresolved, response-unreadable, \
+                        schema-format-unread, schema-too-deep, selector-ambiguous, selector-empty, \
+                        unconstrained-object, undiscriminated-union, untyped-schema.\n\nExit \
+                        status: 0 the shape was written, whatever it lost; 2 the document could \
+                        not be read or is not one janus derive reads.",
   arg_required_else_help = true
 )]
 pub struct DeriveArgs {
-  /// The OpenAPI 3.0 or 3.1 document, as JSON or YAML
+  /// The OpenAPI 3.0 or 3.1 document, or the AsyncAPI 2.x or 3.0 one, as JSON or YAML
   #[arg(value_name = "DOCUMENT")]
   pub document: PathBuf,
 
@@ -853,8 +860,8 @@ pub struct DeriveArgs {
   #[arg(long, value_name = "NAME")]
   pub provider: Option<String>,
 
-  /// The path consumers' requests put before each of the document's paths. Without it, the path
-  /// of the servers that apply, when they agree
+  /// The path consumers' requests put before each of an OpenAPI document's paths. Without it,
+  /// the path of the servers that apply, when they agree
   #[arg(long, value_name = "PATH")]
   pub base_path: Option<String>,
 

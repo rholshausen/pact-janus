@@ -1,0 +1,85 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "mapping"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "send user/signedup signedUp",
+      "selector": {
+        "message": {
+          "metadata": {
+            "members": {
+              "event": {
+                "example": "signed-up",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "send user/signedup",
+        "operation-id": "publishUserEvents",
+        "message": "signedUp"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "event": {
+                "of": {
+                  "example": "signed-up",
+                  "shape": "equality"
+                },
+                "shape": "optional"
+              },
+              "contentType": {
+                "example": "application/vnd.example.user+json",
+                "shape": "http:media-type",
+                "type": "application/vnd.example.user+json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "name": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send user/signedup Avro",
+      "source": {
+        "asyncapi": "send user/signedup",
+        "operation-id": "publishUserEvents",
+        "message": "Avro"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

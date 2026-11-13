@@ -1,0 +1,8 @@
+
+LOSSY — the shape admits more than the document says, or claims what it did not
+  selector-empty at /channels/user~1signedup/subscribe/message/oneOf/1
+      the message fixes no header or payload member, so the entry selects no consumer interaction, and is matched only by its description, 'send user/signedup Avro'
+      -> in send user/signedup Avro
+  schema-format-unread at /channels/user~1signedup/subscribe/message/oneOf/1/payload
+      the payload's schema is written in application/vnd.apache.avro;version=1.9.0, which is not read until a content component for it can decode the body; no body is claimed
+      -> in send user/signedup Avro

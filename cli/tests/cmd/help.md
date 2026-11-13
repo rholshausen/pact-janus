@@ -17,8 +17,8 @@ Commands:
   explain      Print the plan the engine will execute for one interaction
   upgrade      Convert a v1-v4 pact into a Janus contract, and say what the conversion could not
                carry
-  derive       Derive a provider shape from an OpenAPI document, and say what the derivation could
-               not carry
+  derive       Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the
+               derivation could not carry
   publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
                consumer
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
@@ -291,17 +291,18 @@ directly.
 
 ```console
 $ janus derive --help
-Derive a provider shape from an OpenAPI document, and say what the derivation could not carry
+Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the derivation could not
+carry
 
 Usage: janus derive [OPTIONS] <DOCUMENT>
 
 Arguments:
-  <DOCUMENT>  The OpenAPI 3.0 or 3.1 document, as JSON or YAML
+  <DOCUMENT>  The OpenAPI 3.0 or 3.1 document, or the AsyncAPI 2.x or 3.0 one, as JSON or YAML
 
 Options:
       --provider <NAME>   The provider the shape is about. Without it, the document's info.title
-      --base-path <PATH>  The path consumers' requests put before each of the document's paths.
-                          Without it, the path of the servers that apply, when they agree
+      --base-path <PATH>  The path consumers' requests put before each of an OpenAPI document's
+                          paths. Without it, the path of the servers that apply, when they agree
       --assume-non-empty  Write an array that states no minItems as never empty, instead of as
                           possibly empty
       --write <FILE>      Write the shape to this file instead of standard output
@@ -316,14 +317,19 @@ Global options:
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
       --error-chain        Print every cause of an error, not only what failed and its root cause
 
-One entry per operation and documented response status, each selected by the operation's method, its
-path template and the status, so janus check matches it to every consumer by operation. A 'default'
-response is not imported. Only a JSON body is derived.
+From an OpenAPI 3.0 or 3.1 document: one entry per operation and documented response status, each
+selected by the operation's method, its path template and the status, so janus check matches it to
+every consumer by operation. A 'default' response is not imported.
+
+From an AsyncAPI 2.x or 3.0 document: one entry per message the application sends, and per reply it
+answers a request with, each selected by the values the message, or the request, fixes on a header
+or a payload member. Only a JSON body is derived.
 
 The losses, each with a code: additional-properties-dropped, all-of-union, base-path-ambiguous,
 body-not-json, bounds-dropped, cardinality-assumed, cardinality-unstated, closed-object,
-default-response, discriminator-unbound, external-reference, format-dropped, header-serialised,
-pattern-unreadable, recursive-schema, reference-unresolved, response-unreadable, schema-too-deep,
+content-type-unstated, default-response, discriminator-unbound, external-reference, format-dropped,
+header-serialised, pattern-unreadable, recursive-schema, reference-unresolved, reply-unresolved,
+response-unreadable, schema-format-unread, schema-too-deep, selector-ambiguous, selector-empty,
 unconstrained-object, undiscriminated-union, untyped-schema.
 
 Exit status: 0 the shape was written, whatever it lost; 2 the document could not be read or is not

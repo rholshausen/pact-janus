@@ -1,0 +1,314 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "mapping"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "send events Shipped",
+      "selector": {
+        "message": {
+          "metadata": {
+            "members": {
+              "kind": {
+                "example": "shipped",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "send events",
+        "operation-id": "sendEvents",
+        "message": "Shipped"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "source": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "optional"
+              },
+              "kind": {
+                "of": {
+                  "example": "shipped",
+                  "shape": "equality"
+                },
+                "shape": "optional"
+              },
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "parcel": {
+                "alternatives": {
+                  "Box": {
+                    "members": {
+                      "type": {
+                        "example": "Box",
+                        "shape": "equality"
+                      },
+                      "weight": {
+                        "example": 1.5,
+                        "shape": "number"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "Letter": {
+                    "members": {
+                      "type": {
+                        "example": "Letter",
+                        "shape": "equality"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "discriminator": "type",
+                "shape": "one-of"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send events Cancelled",
+      "selector": {
+        "message": {
+          "metadata": {
+            "members": {
+              "kind": {
+                "example": "cancelled",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "send events",
+        "operation-id": "sendEvents",
+        "message": "Cancelled"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "kind": {
+                "of": {
+                  "example": "cancelled",
+                  "shape": "equality"
+                },
+                "shape": "optional"
+              },
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "reason": {
+                "example": "string",
+                "shape": "string"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send events Untyped",
+      "source": {
+        "asyncapi": "send events",
+        "operation-id": "sendEvents",
+        "message": "Untyped"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send events AvroEvent",
+      "source": {
+        "asyncapi": "send events",
+        "operation-id": "sendEvents",
+        "message": "AvroEvent"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "application/avro",
+                "shape": "http:media-type",
+                "type": "application/avro"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send events TextEvent",
+      "source": {
+        "asyncapi": "send events",
+        "operation-id": "sendEvents",
+        "message": "TextEvent"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "text/plain",
+                "shape": "http:media-type",
+                "type": "text/plain"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send audit.{region} Audited",
+      "source": {
+        "asyncapi": "send audit.{region}",
+        "operation-id": "sendAudit",
+        "message": "Audited"
+      },
+      "parts": {
+        "message": {
+          "body": {
+            "members": {
+              "at": {
+                "of": {
+                  "example": "2026-07-30T10:00:00Z",
+                  "shape": "datetime"
+                },
+                "shape": "optional"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    },
+    {
+      "description": "send events.copy Shipped",
+      "selector": {
+        "message": {
+          "metadata": {
+            "members": {
+              "kind": {
+                "example": "shipped",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "send events.copy",
+        "operation-id": "sendCopies",
+        "message": "Shipped"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "source": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "optional"
+              },
+              "kind": {
+                "of": {
+                  "example": "shipped",
+                  "shape": "equality"
+                },
+                "shape": "optional"
+              },
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "parcel": {
+                "alternatives": {
+                  "Box": {
+                    "members": {
+                      "type": {
+                        "example": "Box",
+                        "shape": "equality"
+                      },
+                      "weight": {
+                        "example": 1.5,
+                        "shape": "number"
+                      }
+                    },
+                    "shape": "object"
+                  },
+                  "Letter": {
+                    "members": {
+                      "type": {
+                        "example": "Letter",
+                        "shape": "equality"
+                      }
+                    },
+                    "shape": "object"
+                  }
+                },
+                "discriminator": "type",
+                "shape": "one-of"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

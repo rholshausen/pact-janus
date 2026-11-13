@@ -1,5 +1,6 @@
-//! `janus derive` (staged plan S4.2, ADR 0088): a type document in, a provider shape out, and every
-//! place the mapping lost something.
+//! `janus derive` (staged plan S4.2 and S4.8, ADR 0088 and ADR 0091): a type document in, a provider
+//! shape out, and every place the mapping lost something. An OpenAPI document gives an HTTP
+//! provider's shape, and an AsyncAPI one a message producer's.
 //!
 //! **Like `component`, this command does not speak the protocol**, because deriving is not an engine
 //! operation: it reads one document and writes another, and no engine state takes part (spike 7.3 §5).
@@ -9,7 +10,9 @@
 //! says is how a derived shape misleads, so each widening, each dropped constraint and each claim the
 //! document did not make is printed by default, and "no losses" is said when there are none.
 
+mod asyncapi;
 mod openapi;
+mod schema;
 
 use crate::Outcome;
 use crate::args::{DeriveArgs, Output};
@@ -83,13 +86,26 @@ pub fn run(args: &DeriveArgs) -> Result<Outcome, Error> {
     assume_non_empty: args.assume_non_empty,
   };
 
+  if let (Kind::AsyncApi(_), Some(_)) = (&kind, &options.base_path) {
+    return Err(error::usage(
+      &["derive"],
+      ErrorKind::ArgumentConflict,
+      format!("'--base-path <PATH>' is an OpenAPI document's; {named} is an AsyncAPI one"),
+    ));
+  }
+
   let mut losses = Vec::new();
   let interactions = match kind {
     Kind::OpenApi => openapi::interactions(&document, &options, &mut losses),
+    Kind::AsyncApi(version) => asyncapi::interactions(&document, version, &options, &mut losses),
   };
   if interactions.is_empty() {
+    let missing = match kind {
+      Kind::OpenApi => "no operation with a response",
+      Kind::AsyncApi(_) => "no message the application sends, and no reply it answers with",
+    };
     return Err(Error::Failed(format!(
-      "{named} documents no operation with a response, so there is no shape to write"
+      "{named} documents {missing}, so there is no shape to write"
     )));
   }
   losses.sort();
@@ -145,6 +161,7 @@ fn canonical(entry: &Value) -> Value {
 
 enum Kind {
   OpenApi,
+  AsyncApi(asyncapi::Version),
 }
 
 /// Which type document this is, by its own version member, refusing what is not read.
@@ -167,10 +184,26 @@ fn kind_of(document: &Value) -> Result<Kind, String> {
         .unwrap_or_else(|| version.to_string())
     ));
   }
-  if document.get("asyncapi").is_some() {
-    return Err("an AsyncAPI document is not read yet; janus derive reads OpenAPI 3.0 and 3.1".to_string());
+  if let Some(version) = document.get("asyncapi") {
+    let version = version
+      .as_str()
+      .map(str::to_string)
+      .unwrap_or_else(|| version.to_string());
+    return if version.starts_with("2.") {
+      Ok(Kind::AsyncApi(asyncapi::Version::Two))
+    } else if version.starts_with("3.0.") {
+      Ok(Kind::AsyncApi(asyncapi::Version::Three))
+    } else {
+      Err(format!(
+        "AsyncAPI {version} is not read; janus derive reads AsyncAPI 2.x and 3.0"
+      ))
+    };
   }
-  Err("not an OpenAPI document: it has no 'openapi' member naming its version".to_string())
+  Err(
+    "not a type document janus derive reads: it has no 'openapi' or 'asyncapi' member naming its \
+     version"
+      .to_string(),
+  )
 }
 
 /// The losses, by entry, on standard error.
@@ -198,4 +231,15 @@ fn report(losses: &[Loss]) {
       errln!("      {}", paint(style::DIM, format!("-> in {entry}")));
     }
   }
+}
+
+/// `application/json`, or a media type with the `+json` suffix, parameters aside.
+fn is_json(media_type: &str) -> bool {
+  let essence = media_type
+    .split(';')
+    .next()
+    .unwrap_or_default()
+    .trim()
+    .to_ascii_lowercase();
+  essence == "application/json" || (essence.starts_with("application/") && essence.ends_with("+json"))
 }

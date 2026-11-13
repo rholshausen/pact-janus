@@ -1,0 +1,91 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "OrderProvider"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "send orders.placed OrderPlaced",
+      "selector": {
+        "message": {
+          "metadata": {
+            "members": {
+              "queue": {
+                "example": "orders.placed",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "send orders.placed",
+        "operation-id": "publishOrderPlaced",
+        "message": "OrderPlaced"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "queue": {
+                "example": "orders.placed",
+                "shape": "equality"
+              },
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "orderId": {
+                "example": "string",
+                "shape": "string"
+              },
+              "customerId": {
+                "example": "string",
+                "shape": "string"
+              },
+              "totalAmount": {
+                "example": 1.5,
+                "shape": "number"
+              },
+              "currency": {
+                "example": "EUR",
+                "options": [
+                  "EUR",
+                  "GBP",
+                  "USD"
+                ],
+                "shape": "any-of"
+              },
+              "items": {
+                "items": {
+                  "members": {
+                    "productId": {
+                      "example": "string",
+                      "shape": "string"
+                    },
+                    "quantity": {
+                      "example": 1,
+                      "shape": "integer"
+                    }
+                  },
+                  "shape": "object"
+                },
+                "min": 0,
+                "shape": "each-like"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+
+LOSSY — the shape admits more than the document says, or claims what it did not
+  content-type-unstated at /channels/audit/messages/audited
+      the message names no contentType and the document no defaultContentType, so its payload is read as JSON
+      -> in send audit.{region} Audited
+  selector-empty at /channels/audit/messages/audited
+      the message fixes no header or payload member, so the entry selects no consumer interaction, and is matched only by its description, 'send audit.{region} Audited'
+      -> in send audit.{region} Audited
+  selector-empty at /channels/events/messages/avro
+      the message fixes no header or payload member, so the entry selects no consumer interaction, and is matched only by its description, 'send events AvroEvent'
+      -> in send events AvroEvent
+  schema-format-unread at /channels/events/messages/avro/payload
+      the payload's schema is written in application/vnd.apache.avro+json;version=1.9.0, which is not read until a content component for it can decode the body; no body is claimed
+      -> in send events AvroEvent
+  body-not-json at /channels/events/messages/text
+      the body is text/plain, and only a JSON body is derived; no body is claimed
+      -> in send events TextEvent
+  selector-empty at /channels/events/messages/text
+      the message fixes no header or payload member, so the entry selects no consumer interaction, and is matched only by its description, 'send events TextEvent'
+      -> in send events TextEvent
+  selector-empty at /channels/events/messages/untyped
+      the message fixes no header or payload member, so the entry selects no consumer interaction, and is matched only by its description, 'send events Untyped'
+      -> in send events Untyped
+  untyped-schema at /channels/events/messages/untyped
+      the message has no payload schema, so no body is claimed
+      -> in send events Untyped
+  selector-ambiguous at /components/messages/Shipped
+      a message that carries what this entry's selector fixes may also be selected by 'send events.copy Shipped', and janus check chooses neither, so its consumers' interactions are not-published
+      -> in send events Shipped
+  selector-ambiguous at /components/messages/Shipped
+      a message that carries what this entry's selector fixes may also be selected by 'send events Shipped', and janus check chooses neither, so its consumers' interactions are not-published
+      -> in send events.copy Shipped
+  reply-unresolved at /operations/answerLookupNowhere/reply
+      the reply names no message, and no channel whose messages it is, so the operation's answers are not derived
+  reference-unresolved at /operations/sendMissing/messages/0
+      '#/components/messages/Missing' is not in this document, so what it names is not derived

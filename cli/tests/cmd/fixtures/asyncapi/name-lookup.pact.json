@@ -1,0 +1,71 @@
+{
+  "consumer": {
+    "name": "NameLookupConsumer"
+  },
+  "interactions": [
+    {
+      "description": "a name lookup",
+      "pending": false,
+      "request": {
+        "contents": {
+          "content": {
+            "id": "abcd123",
+            "type": "NameLookup"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "contentType": "application/json"
+        }
+      },
+      "response": [
+        {
+          "contents": {
+            "content": {
+              "name": "Ada"
+            },
+            "contentType": "application/json",
+            "encoded": false
+          },
+          "matchingRules": {
+            "body": {
+              "$.name": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "type"
+                  }
+                ]
+              }
+            }
+          },
+          "metadata": {
+            "contentType": "application/json"
+          }
+        }
+      ],
+      "type": "Synchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "NameLookupProvider"
+  }
+}

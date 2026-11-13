@@ -1,0 +1,1 @@
+janus derive: cli/tests/cmd/fixtures/asyncapi/asyncapi-1.yaml: AsyncAPI 1.2.0 is not read; janus derive reads AsyncAPI 2.x and 3.0

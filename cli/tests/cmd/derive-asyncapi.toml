@@ -1,0 +1,6 @@
+# pact-js's message example's provider, as AsyncAPI 3.0 documents it (staged plan S4.8, ADR 0091):
+# one entry for the message it sends, selected by the queue its header fixes. The shape on stdout,
+# every mapping that lost something on stderr; both are the CLI's own, so both are pinned whole.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-3.yaml"]
+fs.cwd = "../../.."

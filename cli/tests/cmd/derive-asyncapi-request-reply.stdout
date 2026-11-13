@@ -1,0 +1,57 @@
+{
+  "$format": "janus-provider-shape/1",
+  "provider": {
+    "name": "NameLookupProvider"
+  },
+  "provenance": "derived",
+  "interactions": [
+    {
+      "description": "reply to NameLookup on names.lookup with NameFound",
+      "selector": {
+        "request": {
+          "body": {
+            "members": {
+              "type": {
+                "example": "NameLookup",
+                "shape": "equality"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      },
+      "source": {
+        "asyncapi": "receive names.lookup",
+        "operation-id": "answerNameLookup",
+        "message": "NameLookup",
+        "reply": "NameFound"
+      },
+      "parts": {
+        "message": {
+          "metadata": {
+            "members": {
+              "contentType": {
+                "example": "application/json",
+                "shape": "http:media-type",
+                "type": "application/json"
+              }
+            },
+            "shape": "object"
+          },
+          "body": {
+            "members": {
+              "name": {
+                "of": {
+                  "example": "string",
+                  "shape": "string"
+                },
+                "shape": "nullable"
+              }
+            },
+            "shape": "object"
+          }
+        }
+      }
+    }
+  ]
+}

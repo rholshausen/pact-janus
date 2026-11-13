@@ -107,6 +107,7 @@ superseding ADR instead.
 | [0088](0088-derive-a-provider-shape-from-openapi-with-janus-derive-and-report-every-mapping-that-loses-something.md) | Derive a provider shape from OpenAPI with `janus derive`, and report every mapping that loses something | accepted |
 | [0089](0089-scope-a-subsumption-policy-and-its-exemptions-by-the-provenance-of-the-shape-a-finding-came-from.md) | Scope a subsumption policy and its exemptions by the provenance of the shape a finding came from | accepted |
 | [0090](0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md) | Name a message's operation by the message itself, and record it as `produce-message` hooks produce it | accepted |
+| [0091](0091-derive-a-message-producers-shape-from-asyncapi-selected-by-the-values-its-messages-fix.md) | Derive a message producer's shape from AsyncAPI, selected by the values its messages fix | accepted |
 
 ## Decision backlog
 

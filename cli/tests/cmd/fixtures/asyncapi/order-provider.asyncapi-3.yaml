@@ -1,0 +1,74 @@
+# What pact-js's message example's provider publishes (corpora/verifier/messages/pact-js-order-placed),
+# as AsyncAPI 3.0 documents it. order-provider.asyncapi-2.yaml is the same producer in AsyncAPI 2.6,
+# and both derive one shape (staged plan S4.8, ADR 0091).
+asyncapi: 3.0.0
+info:
+  title: OrderProvider
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  ordersPlaced:
+    address: orders.placed
+    messages:
+      orderPlaced:
+        $ref: '#/components/messages/OrderPlaced'
+  paymentsTaken:
+    address: payments.taken
+    messages:
+      paymentTaken:
+        payload:
+          type: object
+operations:
+  publishOrderPlaced:
+    action: send
+    channel:
+      $ref: '#/channels/ordersPlaced'
+    messages:
+      - $ref: '#/channels/ordersPlaced/messages/orderPlaced'
+  # What the provider consumes is its consumers' shape, not its own: not derived.
+  receivePayments:
+    action: receive
+    channel:
+      $ref: '#/channels/paymentsTaken'
+components:
+  messages:
+    OrderPlaced:
+      name: OrderPlaced
+      title: An order was placed
+      contentType: application/json
+      headers:
+        type: object
+        required: [queue]
+        properties:
+          queue:
+            description: The queue the message is published to, which the message carries.
+            type: string
+            const: orders.placed
+      payload:
+        $ref: '#/components/schemas/Order'
+  schemas:
+    Order:
+      type: object
+      required: [orderId, customerId, totalAmount, currency, items]
+      properties:
+        orderId:
+          type: string
+        customerId:
+          type: string
+        totalAmount:
+          type: number
+        currency:
+          type: string
+          enum: [EUR, GBP, USD]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+    LineItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer

@@ -1,0 +1,52 @@
+# A provider that answers name lookups on a request/reply channel, as AsyncAPI 3.0 documents it: it
+# receives the request and sends the reply, so the reply is its shape and the request selects it
+# (staged plan S4.8, ADR 0091). name-lookup.pact.json is its consumer's synchronous message.
+asyncapi: 3.0.0
+info:
+  title: NameLookupProvider
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  lookups:
+    address: names.lookup
+    messages:
+      nameLookup:
+        $ref: '#/components/messages/NameLookup'
+  replies:
+    # Where the reply goes is the request's replyTo header, known only at run time.
+    address: null
+    messages:
+      nameFound:
+        $ref: '#/components/messages/NameFound'
+operations:
+  answerNameLookup:
+    action: receive
+    channel:
+      $ref: '#/channels/lookups'
+    reply:
+      address:
+        location: '$message.header#/replyTo'
+      channel:
+        $ref: '#/channels/replies'
+components:
+  messages:
+    NameLookup:
+      name: NameLookup
+      payload:
+        type: object
+        required: [type, id]
+        properties:
+          type:
+            type: string
+            const: NameLookup
+          id:
+            type: string
+    NameFound:
+      name: NameFound
+      payload:
+        type: object
+        required: [name]
+        properties:
+          name:
+            description: The name, or null when the id names nobody.
+            type: [string, 'null']

@@ -2610,6 +2610,28 @@ once there are shapes to publish.
   *Exit:* an AsyncAPI 3 document and a 2.x one for the same producer import into one shape, which
   `janus check` matches to a message contract by selector and decides as S4.6 does; each lossy mapping
   is reported; and a request/reply operation is checked against a synchronous message.
+  *Done 2026-11-13* ([ADR 0091](decisions/0091-derive-a-message-producers-shape-from-asyncapi-selected-by-the-values-its-messages-fix.md)):
+  - `janus derive` reads AsyncAPI 2.x and 3.0 through the schema mapping S4.2 built, now its own
+    module beside each document's front end. Only what the application produces is derived: a message
+    it sends (3.0 `send`, 2.x `subscribe`) and a reply it answers a request with (3.0 `receive` with a
+    `reply`). Each is an entry whose `message` part is the headers as `metadata`, with the message's
+    content type as `contentType` (`http:media-type`, as `janus upgrade` writes a v3 message's), and
+    the JSON payload as `body`. Traits are merged as each version says.
+  - A selector is the values a message fixes: a header or payload member whose schema allows one value
+    (`const`, or an `enum` of one). A reply's selector is its request's. The address selects only where
+    a header fixes it, as pact-js's example's provider documents its `queue`. A message that fixes
+    nothing is `selector-empty`, two entries one message could select are each `selector-ambiguous`,
+    and a payload in Avro or protobuf is `schema-format-unread` until S5.2 and S6.9.
+  - `cli/tests/derive.rs` is the exit: an AsyncAPI 3.0 document and a 2.6 one for pact-js's message
+    example's provider (`cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-*.yaml`) derive
+    byte-identical shapes, which `janus check` matches to the example's pact by its queue and which find
+    what S4.6's recorded shape finds, and one more: a `number` total may be an integer, which the
+    consumer's `decimal` does not admit. A request/reply operation's reply is checked against a
+    synchronous message selected by the request's `type`, and found to admit a null `name`. The
+    mapping documents' two tying entries are shown to leave a consumer's message `not-published`. The
+    trycmd cases `derive-asyncapi*.toml` pin the output.
+  - Not foreseen: AsyncAPI's `discriminator` is the property's name, not an object, which the shared
+    mapping now reads too.
 
 **Done when** the demo's loop runs against a broker built from S4.3's series, with a provider shape
 recorded from a provider's own test suite (S4.1).
@@ -2868,7 +2890,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.1 | Recording names an interaction by the consumer's words and takes decoded values, so no provider's own suite can use it | spike 7.3 §2; found reviewing stage 4 |
 | S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view (`check` on a message contract is built, ADR 0090) | broker notes §12 |
 | S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
-| S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
+| S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector (both built: ADR 0090, ADR 0091) | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |

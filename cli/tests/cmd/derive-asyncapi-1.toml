@@ -1,0 +1,5 @@
+# AsyncAPI 1.x is refused by name, as Swagger 2.0 is (ADR 0091).
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/asyncapi-1.yaml"]
+status.code = 2
+fs.cwd = "../../.."

@@ -1,0 +1,6 @@
+# One operation per AsyncAPI 3.0 construct janus derive maps (ADR 0091), and every loss particular to
+# AsyncAPI: a message that fixes nothing, two that tie, an unstated content type, a payload in a format
+# or of a type not read, a reply with no message, and a reference that resolves to nothing.
+bin.name = "janus"
+args = ["derive", "cli/tests/cmd/fixtures/asyncapi/mapping.asyncapi-3.yaml"]
+fs.cwd = "../../.."
