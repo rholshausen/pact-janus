@@ -1,3 +1,68 @@
+## 0.2.4 (2026-11-13)
+
+### Features
+
+#### `ShapeRecorder` records a provider shape from the provider's own tests
+
+A provider's tests record the shape of what the provider answers, by the operation each test names,
+and the engine writes it for `janus check` (staged plan S4.1, ADR 0086):
+
+```ts
+import { pathTemplate } from "pact-janus";
+import { useShapeRecorder } from "pact-janus/vitest"; // or pact-janus/jest
+
+const recorder = useShapeRecorder({ provider: "order-service" });
+
+test("an order", async () => {
+  const response = await fetch(`${url}/orders/66`);
+  await recorder.observe({ method: "GET", path: pathTemplate("/orders/{id}") }, response);
+  // ...the test's own assertions
+});
+```
+
+`useShapeRecorder` names the test file as the recording's source and finishes it after the file's
+tests: the engine writes `shapes/order-service.provider-shape.json`, merged with every other test
+file's, and keeps the counts in `.janus/evidence`. `new ShapeRecorder(config)` and `finish()` are the
+same without a test framework. A `fetch` `Response` is read from a clone, so hand it over before
+reading its body; `{ status, headers, body }` is the other form. `pathTemplate(template, example?)` is
+the HTTP component's path template, which a consumer's request may use too, with an example.
+
+#### `ShapeRecorder.observeMessage` records the messages a provider produces
+
+A provider's tests record the messages it publishes into the same shape as its HTTP answers, by what
+identifies each message's operation (staged plan S4.6, ADR 0090):
+
+```ts
+const message = createOrderPlacedEvent("order-1"); // a `Message`, as a message producer returns one
+await recorder.observeMessage({ metadata: { queue: "orders.placed" } }, message, {
+  description: "publish orders.placed",
+});
+```
+
+`operation` names the message's own `metadata` and `body`, or with `request`, the message a synchronous
+message answers, the request's. `description` is required. `janus check` then matches a consumer's
+message contract to the entry by what its message carries, here the queue.
+
+### Fixes
+
+#### The generated bindings carry a compatibility report's provenance
+
+The protocol bindings' `PolicyView` has an optional `provenance`, a map to the new
+`ProvenanceActions`, and `FindingEntry` and `ExemptionResult` an optional `provenance` (ADR 0089).
+Nothing in the SDK reads them.
+
+#### The generated bindings carry a provider-shape recording's operation and write
+
+The protocol bindings' `StartRecording` has an optional `kind`, `ObserveResponse` an optional
+`operation`, `ObserveResponseResult` optional `warnings`, `FinaliseRecording` an optional `write`
+(`ShapeWrite`) and `FinaliseRecordingResult` an optional `written` (ADR 0086). The SDK records no
+shape yet.
+
+#### The generated bindings carry an observation's kind
+
+The protocol bindings' `ObserveResponse` has an optional `kind` (ADR 0090), which `observeMessage`
+sends.
+
 ## 0.2.3 (2026-11-12)
 
 The SDK runs janus-engine 0.6.0, where it ran 0.5.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.6.0) says what changed.
