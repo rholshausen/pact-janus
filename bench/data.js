@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794529707969,
+  "lastUpdate": 1794529711415,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -53064,6 +53064,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 28722,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0ca0215a10ca55f7efc7f18b62a9d2fa6f6181d4",
+          "message": "chore: satisfy Rust 1.100's clippy in the exemption matcher\n\nClippy 1.100 (needless_bool_assign's sibling for if-guards returning a\nliteral) flags `Exemption::matches`' last guard. The same predicate,\nnegated; no behaviour change.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-13T11:22:50+11:00",
+          "tree_id": "4966bd398e469ca1365513a40a88f2edaa624ae7",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0ca0215a10ca55f7efc7f18b62a9d2fa6f6181d4"
+        },
+        "date": 1794529710427,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28163,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 19533,
             "unit": "requests per second",
             "extra": "engines 4"
           }
