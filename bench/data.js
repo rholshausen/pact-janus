@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794707996972,
+  "lastUpdate": 1794707998694,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -56250,6 +56250,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 49901,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "064f4b669cc39ab48ddb93e06f2f48ca16bac66b",
+          "message": "docs: S4.3a is done, and row 1's port pull request is pact_broker-rs#23\n\nThe series outline was posted to the Pact maintainers' Slack channel on 2026-11-15, which meets\nS4.3a's exit. S4.3c has started: row 1 is merged in Ruby (pact_broker#1093) and open on the port.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-15T12:55:22+11:00",
+          "tree_id": "4a342b6b9f5599abc082f9140d848228eae5c1d9",
+          "url": "https://github.com/rholshausen/pact-janus/commit/064f4b669cc39ab48ddb93e06f2f48ca16bac66b"
+        },
+        "date": 1794707998312,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 50721,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 42279,
             "unit": "requests per second",
             "extra": "engines 4"
           }
