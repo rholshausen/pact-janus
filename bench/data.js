@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794704062614,
+  "lastUpdate": 1794704065012,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -55188,6 +55188,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 26372,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f8e7c6f68e8892487f58d85954c9b4aad5f98b28",
+          "message": "docs: S4.3 is six items across the Ruby Pact Broker and its Rust port\n\nReviewed before it started and extended to pact_broker-rs. Each row of the\nbroker notes' series is a pair of changes, one per broker, behind a `janus`\nfeature in the brokers' existing PACT_BROKER_FEATURES switch. The engine\nembedding is proven in S4.3a, because rows 7 and 8 decide through\n`subsumption/decide`; S4.5 keeps recomputing the walk and measuring it.\nRow 1 is reopened from origin's fix/can-i-deploy-badge-unknown-status.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>",
+          "timestamp": "2026-11-15T11:38:41+11:00",
+          "tree_id": "39ea2d4b29a4017d6138c213e5621117d7fd2bb5",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f8e7c6f68e8892487f58d85954c9b4aad5f98b28"
+        },
+        "date": 1794704064269,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 39067,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 30862,
             "unit": "requests per second",
             "extra": "engines 4"
           }
