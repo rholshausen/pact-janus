@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794706436458,
+  "lastUpdate": 1794706438181,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -55896,6 +55896,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 49788,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "ce2b6c77cc44e58622c66d9dc6a4ee19d5dd78d2",
+          "message": "docs: S4.3a's baseline differences are pact_broker-rs#20, #21 and #22\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-15T12:29:03+11:00",
+          "tree_id": "0c931e030d942dc752d736ec741646a23e268809",
+          "url": "https://github.com/rholshausen/pact-janus/commit/ce2b6c77cc44e58622c66d9dc6a4ee19d5dd78d2"
+        },
+        "date": 1794706437790,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 49875,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 49901,
             "unit": "requests per second",
             "extra": "engines 4"
           }
