@@ -2560,8 +2560,8 @@ once there are shapes to publish.
     *Exit:* the site map; the baseline's differences each an issue on the port or an entry in the
     ledger; `decide` answered from both brokers' languages; and the maintainers of both have seen the
     series' outline (§7.5).
-    *Built 2026-11-15* (ADR 0092). Its exit waits on one thing that is not code: the maintainers
-    seeing the outline.
+    *Done 2026-11-15* (ADR 0092). The outline (`broker-pr-series.md` §6) was posted to the Pact
+    maintainers' Slack channel the same day.
     - The site map is [`broker-pr-series.md`](broker-pr-series.md), checked against Ruby's `9b6a3a62`
       and the port's `cd5fa88`, with each row's sites in both, what moved since the notes, the
       `janus` feature, the baseline, and the outline for the maintainers (its §6).
@@ -2605,7 +2605,7 @@ once there are shapes to publish.
     *Exit:* the operations are in the engine-protocol spec with schemas and examples, and the client's
     tests pass against a broker built from S4.3d.
   - **S4.3c Rows 1–3** — **S**. Row 1's Ruby half is merged (pact_broker#1093, `6298abd2`), and
-    its pair in the port is still to send. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
+    its pair in the port is pact_broker-rs#23. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
     SHA that reads its interactions.
     *Exit:* with the feature on, a contract published as `specification: "janus"` is stored, deduped
     and diffed by both brokers, and fires `contract_content_changed` when and only when its

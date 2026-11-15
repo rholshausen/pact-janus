@@ -23,7 +23,7 @@ unless they say otherwise.
 
 | Row | Change | Ruby | pact_broker-rs | Plan item |
 |---|---|---|---|---|
-| 1 | an unknown `can-i-deploy` badge is grey, as `can-i-merge`'s is | `badges/service.rb:36-41` (`deployable ? "brightgreen" : "red"` at `:39`); `can_i_merge_badge_url` at `:43-59` is the three-way precedent | `can_i_deploy_path/mod.rs:89`, the same two-way `if` on a `bool` | S4.3c. Ruby's half is merged: pact_broker#1093, `6298abd2` |
+| 1 | an unknown `can-i-deploy` badge is grey, as `can-i-merge`'s is | `badges/service.rb:36-41` (`deployable ? "brightgreen" : "red"` at `:39`); `can_i_merge_badge_url` at `:43-59` is the three-way precedent | `can_i_deploy_path/mod.rs:89`, the same two-way `if` on a `bool` | S4.3c. Ruby's half is merged: pact_broker#1093, `6298abd2`; the port's is pact_broker-rs#23 |
 | 2 | `specification: "janus"` is stored | `api/contracts/publish_contracts_contract_contract.rb`; `contracts/contract_to_publish.rb:10` (`specification == "pact"`); `contracts/service.rb:133` (`select(&:pact?)`) and `:146-153` (`create_pact_params`) | `pacts/contracts.rs:279-286` (`must be one of: pact`) | S4.3c |
 | 3 | Janus-aware content extraction and SHA | `pacts/content.rb`, `pacts/generate_sha.rb`, `pacts/sort_content.rb` | `src/services/pact_content.rs` (`generate_sha_with` at `:27`, `content_that_affects_verification_results` at `:139`); `metrics.rs:66` (`content_counts`) | S4.3c |
 | 4 | the provider-shape resource and its table | the version routes in `api.rb:106-122`, a migration under `db/migrations/` | `pacticipants/versions.rs`, an entity under `src/entity_pact_broker/`, a migration under `migrations/postgres/` and `migrations/sqlite/` | S4.3d |
@@ -36,7 +36,7 @@ unless they say otherwise.
 
 Row 1's Ruby half merged on 2026-11-15, after the check above, as pact_broker#1093 (`6298abd2`). It
 reopened pact_broker#1045, which was approved and closed only because a pull request from a fork
-cannot pass that repository's required checks. The port's half is still to send.
+cannot pass that repository's required checks. The port's half is pact_broker-rs#23.
 
 Every row but row 1 is behind the `janus` feature (§4). Each row's migration exists in both brokers,
 any new column is nullable or defaulted, and the migrations run whether the feature is on or off.
@@ -174,8 +174,8 @@ the series merges is theirs to decide.
 > today.
 >
 > 1. An unknown `can-i-deploy` badge renders grey, as `can-i-merge`'s does. This is a fix, worth
->    having anyway, and is already merged in the Ruby broker (pact_broker#1093); the port's pull
->    request is next.
+>    having anyway, and is already merged in the Ruby broker (pact_broker#1093); the port's is
+>    pact_broker-rs#23.
 > 2. `specification: "janus"` is accepted and stored.
 > 3. A Janus contract's content SHA and diff read its interactions.
 > 4. A provider shape resource, `PUT`/`GET /pacticipants/{provider}/versions/{version}/provider-shape`

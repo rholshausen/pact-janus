@@ -272,6 +272,8 @@ Three sources are the source of truth and take precedence over this file when th
 > (`engine/wasm/hosts/ruby/pipe.rb`) and the `wasmtime` crate frame for frame as the native engine does
 > (`engine/component-host/tests/engine_wasm.rs`, the Ruby half when `JANUS_RUBY` is set). The artifact
 > now registers the HTTP component's matchers, whose transport is behind a default `transport` feature.
+> S4.3c has started: row 1, the grey `can-i-deploy` badge, is merged in Ruby (pact_broker#1093) and
+> open on the port (pact_broker-rs#23).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
