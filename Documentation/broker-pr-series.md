@@ -127,9 +127,9 @@ The four differences, none of which changes what the client does:
 
 | # | Difference | Ruby 2.121.2 | The port | Where it goes |
 |---|---|---|---|---|
-| B1 | the broker's version | every response carries `X-Pact-Broker-Version` | no such header | an issue on the port |
-| B2 | a pact fetched by its `metadata` link | has a `pb:consumer-versions` link, naming the consumer version | no such link | an issue on the port |
-| B3 | a pacticipant created by `POST /contracts/publish` | `displayName` generated from its name (`recorded-order-api` is "Recorded Order Api") | `displayName` is the name. The port has `generate_display_name` (`src/services/display_name.rs`), but not on this path | an issue on the port |
+| B1 | the broker's version | every response carries `X-Pact-Broker-Version` | no such header | [pact_broker-rs#20](https://github.com/YOU54F/pact_broker-rs/issues/20) |
+| B2 | a pact fetched by its `metadata` link | has a `pb:consumer-versions` link, naming the consumer version | no such link | [pact_broker-rs#21](https://github.com/YOU54F/pact_broker-rs/issues/21) |
+| B3 | a pacticipant created by `POST /contracts/publish` | `displayName` generated from its name (`recorded-order-api` is "Recorded Order Api") | `displayName` is the name. The port has `generate_display_name` (`src/services/display_name.rs`), but not on this path | [pact_broker-rs#22](https://github.com/YOU54F/pact_broker-rs/issues/22) |
 | B4 | the notice when a version's content changes | a unified diff of the pretty-printed contracts | a diff of the compact JSON, one line | the port's own backlog: "Ruby `999ed399` (unified diff rendering) against the `similar`-based diff", under *To verify* in `docs/PARITY_BACKLOG.md`, so not reported again |
 
 Members also come back in a different order in most HAL documents. JSON does not order them and no

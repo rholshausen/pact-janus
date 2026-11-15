@@ -2560,8 +2560,8 @@ once there are shapes to publish.
     *Exit:* the site map; the baseline's differences each an issue on the port or an entry in the
     ledger; `decide` answered from both brokers' languages; and the maintainers of both have seen the
     series' outline (§7.5).
-    *Built 2026-11-15* (ADR 0092). Its exit waits on two things that are not code: issues on the port
-    for three of the baseline's differences, and the maintainers seeing the outline.
+    *Built 2026-11-15* (ADR 0092). Its exit waits on one thing that is not code: the maintainers
+    seeing the outline.
     - The site map is [`broker-pr-series.md`](broker-pr-series.md), checked against Ruby's `9b6a3a62`
       and the port's `cd5fa88`, with each row's sites in both, what moved since the notes, the
       `janus` feature, the baseline, and the outline for the maintainers (its §6).
@@ -2583,7 +2583,7 @@ once there are shapes to publish.
       `X-Pact-Broker-Version` is missing, a pact fetched by its `metadata` link has no
       `pb:consumer-versions`, a pacticipant created by publishing has no generated `displayName`, and
       a changed-content notice diffs the compact JSON. The last is on the port's own backlog. The
-      other three are drafted as issues (`broker-pr-series.md` §5), to be filed on the port. The
+      other three are pact_broker-rs#20, #21 and #22. The
       harness's `--any-version` now accepts a broker that does not state its version.
     - Not as the plan said: more of the cited sites moved than `generate_sha.rb` and `api.rb`.
       `pacts/repository.rb` gained interaction flags, and the HTML renderer (row 10) was rewritten.
