@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794706170248,
+  "lastUpdate": 1794706172495,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -55542,6 +55542,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 30862,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "e26356205ef4616efe7b8dbac4fc69b5b1858534",
+          "message": "feat: S4.3a a broker decides through janus-engine.wasm, and the broker PR series has its site map\n\nThe groundwork for the broker PR series (ADR 0092):\n\n- The site map, Documentation/broker-pr-series.md: each row's sites in the Ruby Pact Broker\n  (master 9b6a3a62) and its Rust port (cd5fa88), what moved since the broker notes, the `janus`\n  feature, the baseline against the port, and the outline for the maintainers. Row 1's Ruby half\n  is merged as pact_broker#1093. Row 10, which had no item, is S6.10.\n- The embedding: janus-engine.wasm answers subsumption/check and subsumption/decide under Ruby's\n  wasmtime gem (engine/wasm/hosts/ruby/pipe.rb) and the wasmtime crate exactly as the native\n  engine does, frame for frame (engine/component-host/tests/engine_wasm.rs). CI's Linux job and\n  the release workflow run the Ruby half. ADR 0092 decides how a broker hosts it, and that it\n  refuses to start with the feature on and no usable artifact.\n- Fixed on the way: the WASM engine registered nothing of the HTTP component, so a shape selected\n  by operation matched nothing and it answered not-checked where janus check found findings. The\n  HTTP component's transport is behind a default `transport` feature, and the WASM engine\n  registers its matchers.\n- The baseline: S1.3's broker checks against the port. The harness and the client's pact agree in\n  full; four responses of the recorded scenario differ (broker-pr-series.md §5). The harness's\n  --any-version accepts a broker that states no version.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-15T12:24:35+11:00",
+          "tree_id": "c233ff502801b3fb70b2d1b717a9541793df34f3",
+          "url": "https://github.com/rholshausen/pact-janus/commit/e26356205ef4616efe7b8dbac4fc69b5b1858534"
+        },
+        "date": 1794706171935,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 47606,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 49788,
             "unit": "requests per second",
             "extra": "engines 4"
           }
