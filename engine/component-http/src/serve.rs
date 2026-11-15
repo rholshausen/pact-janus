@@ -8,7 +8,7 @@
 //! `dispose` complete. `stop` ends the runtime, which closes the channel and so wakes a waiting
 //! `poll-inbound`.
 
-use crate::{Names, multi_map_slot, text_slot};
+use crate::transport::{Names, multi_map_slot, text_slot};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::Bytes;
@@ -291,7 +291,7 @@ pub(crate) fn response(response_part: &Part) -> Result<Answer, ComponentError> {
     .ok_or_else(|| ComponentError::transport_failed(format!("{status} is not an HTTP status")))?;
   let body_slot = response_part.get("body");
   let body = match body_slot {
-    Some(slot) => crate::slot_bytes(slot)?,
+    Some(slot) => crate::transport::slot_bytes(slot)?,
     None => Vec::new(),
   };
 

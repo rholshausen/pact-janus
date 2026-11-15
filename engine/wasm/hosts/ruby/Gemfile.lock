@@ -1,0 +1,38 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    wasmtime (50.0.0-aarch64-linux)
+    wasmtime (50.0.0-aarch64-linux-musl)
+    wasmtime (50.0.0-arm64-darwin)
+    wasmtime (50.0.0-x64-mingw-ucrt)
+    wasmtime (50.0.0-x86_64-darwin)
+    wasmtime (50.0.0-x86_64-linux)
+    wasmtime (50.0.0-x86_64-linux-musl)
+
+PLATFORMS
+  aarch64-linux
+  aarch64-linux-musl
+  arm64-darwin
+  x64-mingw-ucrt
+  x86_64-darwin
+  x86_64-linux
+  x86_64-linux-musl
+
+DEPENDENCIES
+  wasmtime (= 50.0.0)
+
+CHECKSUMS
+  bundler (4.0.24) sha256=16ca64e20816a0cf151a948fb141d788602996d2b4d73577b74388fe84fa98bc
+  wasmtime (50.0.0-aarch64-linux) sha256=ff00818d75304587387e8ccc176cd19414828fa22d677dc93c6114a833252118
+  wasmtime (50.0.0-aarch64-linux-musl) sha256=c6c2cf0366436e3c247cae6feb84661e7f6c1c4713a9f1a707f8fa50717a50d0
+  wasmtime (50.0.0-arm64-darwin) sha256=23953189b10360b391afaa74f3560a78b4651cdf9b2962f2b96d066dd1537347
+  wasmtime (50.0.0-x64-mingw-ucrt) sha256=24f4b2dec708da382e00a36afc3c10ee6695d1448dc01ad6f65507f127ac1e55
+  wasmtime (50.0.0-x86_64-darwin) sha256=6d499730c9fa7dcb9b8b7a21ac6c952d2f4e6868ede49697f0314d571393f712
+  wasmtime (50.0.0-x86_64-linux) sha256=dca5ad649c15f4ef35b1a731569b574ea2db89e44f431523ba6a6a6a9aebf1b4
+  wasmtime (50.0.0-x86_64-linux-musl) sha256=110ca34154b40ee83e2d19dddcc0dd166b8c69af3ac24e8502e098357705d86d
+
+RUBY VERSION
+  ruby 3.4.10
+
+BUNDLED WITH
+  4.0.24

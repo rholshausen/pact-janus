@@ -2479,6 +2479,7 @@ name = "pact_janus_engine_wasm"
 version = "0.7.0"
 dependencies = [
  "pact_janus_component_form",
+ "pact_janus_component_http",
  "pact_janus_component_json",
  "pact_janus_component_multipart",
  "pact_janus_component_text",

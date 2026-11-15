@@ -6,7 +6,7 @@
 //! of the same name the interaction carries (today's `--header`); and `client`, the HTTP client
 //! options, which are TLS, proxies, timeouts and the HTTP version.
 
-use crate::{BASE64, Names, multi_map_slot, query_string, slot_bytes};
+use crate::transport::{BASE64, Names, multi_map_slot, query_string, slot_bytes};
 use base64::Engine as _;
 use pact_janus_http_client::{Defaults, HttpClient};
 use pact_janus_kernel::chain;

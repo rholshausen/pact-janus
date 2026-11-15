@@ -2525,10 +2525,9 @@ once there are shapes to publish.
     So the embedding is proven first (S4.3a) and rows 7 and 8 decide through it. S4.5 keeps what is
     left of row 9: recomputing the *walk* on a cache miss.
   - *Row 1 is written.* pact_broker#1045 was approved and closed unmerged, only because a pull request
-    from a fork cannot pass that repository's required checks. Its branch,
-    `fix/can-i-deploy-badge-unknown-status`, is on `origin`; the pull request is opened again from
-    there. The port has the same fault (`src/api/resources/can_i_deploy_path/mod.rs`, whose badge takes
-    a `bool`).
+    from a fork cannot pass that repository's required checks. It was opened again from `origin`'s
+    branch as pact_broker#1093 and merged on 2026-11-15 (`6298abd2`). The port has the same fault
+    (`src/api/resources/can_i_deploy_path/mod.rs`, whose badge takes a `bool`).
   - *The notes' citations are of `fd6e5b63`.* Ruby's `master` is 124 commits on; of the cited sites
     only `pacts/generate_sha.rb` and `api.rb` changed. The port was last reconciled to v2.124.0, and
     S1.3's harness pins 2.121.2. Nothing here has run against the port: the one contact is
@@ -2561,6 +2560,40 @@ once there are shapes to publish.
     *Exit:* the site map; the baseline's differences each an issue on the port or an entry in the
     ledger; `decide` answered from both brokers' languages; and the maintainers of both have seen the
     series' outline (§7.5).
+    *Built 2026-11-15* (ADR 0092). Its exit waits on two things that are not code: issues on the port
+    for three of the baseline's differences, and the maintainers seeing the outline.
+    - The site map is [`broker-pr-series.md`](broker-pr-series.md), checked against Ruby's `9b6a3a62`
+      and the port's `cd5fa88`, with each row's sites in both, what moved since the notes, the
+      `janus` feature, the baseline, and the outline for the maintainers (its §6).
+    - The embedding: `janus-engine.wasm` answers `subsumption/check` and `subsumption/decide` under
+      Ruby's `wasmtime` gem 50.0.0 (`engine/wasm/hosts/ruby/pipe.rb`) and under the `wasmtime` crate,
+      granted nothing. `engine/component-host/tests/engine_wasm.rs` runs one conversation (the sample
+      provider's pact against its recorded shape, decided under no policy, then under an exemption
+      the day before and the day after it lapses) through the native engine and the artifact under
+      both runtimes, frame for frame. CI's Linux job and the release workflow run the Ruby half.
+      ADR 0092 decides that a broker hosts the artifact pinned by digest, one instance per decision,
+      and refuses to start with the feature on and no usable artifact.
+    - Not foreseen: the artifact could not decide a shape selected by operation. It registered no HTTP
+      component, so `http:path` matched nothing, and it answered `not-checked` where `janus check`
+      found three findings. `pact_janus_component_http`'s transport is now behind a default
+      `transport` feature, and the WASM engine registers its matchers.
+    - The baseline: against the port, the differential harness's broker cases find no difference
+      (1,383 verdicts, the ledger's 13 and nothing else), and the client's own pact verifies. The
+      recorded scenario concludes the same at every step, and four responses differ:
+      `X-Pact-Broker-Version` is missing, a pact fetched by its `metadata` link has no
+      `pb:consumer-versions`, a pacticipant created by publishing has no generated `displayName`, and
+      a changed-content notice diffs the compact JSON. The last is on the port's own backlog. The
+      other three are drafted as issues (`broker-pr-series.md` §5), to be filed on the port. The
+      harness's `--any-version` now accepts a broker that does not state its version.
+    - Not as the plan said: more of the cited sites moved than `generate_sha.rb` and `api.rb`.
+      `pacts/repository.rb` gained interaction flags, and the HTML renderer (row 10) was rewritten.
+      `IgnoredReason`, the notes' precedent for an exempted finding, has been dead code since 2021,
+      and the port has no counterpart, so row 7 builds it again. Ruby's `feature_enabled?` turns every
+      feature on outside production, so the series checks `janus` with `ignore_env`, as the port's
+      switch already behaves. The Ruby broker supports Ruby 3.2, and the gem's precompiled builds need
+      3.3.
+    - The `janus` feature lands with row 2, as planned. Row 10, which the plan left unnumbered, is
+      S6.10.
   - **S4.3b The Janus side** — **M**, an ADR extending ADR 0032 first. `janus publish` takes a provider
     shape. `janus check --broker-url` fetches the provider's shape by version or by branch, so a
     consumer's pipeline wires no pair by hand, and publishes its report. Each is a protocol operation
@@ -2571,8 +2604,8 @@ once there are shapes to publish.
     it verifies its others.
     *Exit:* the operations are in the engine-protocol spec with schemas and examples, and the client's
     tests pass against a broker built from S4.3d.
-  - **S4.3c Rows 1–3** — **S**. Row 1 is opened again from `origin`'s branch, with its pair in the
-    port. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
+  - **S4.3c Rows 1–3** — **S**. Row 1's Ruby half is merged (pact_broker#1093, `6298abd2`), and
+    its pair in the port is still to send. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
     SHA that reads its interactions.
     *Exit:* with the feature on, a contract published as `specification: "janus"` is stored, deduped
     and diffed by both brokers, and fires `contract_content_changed` when and only when its
@@ -2855,6 +2888,15 @@ content component exists written by someone outside the core team.
   reach the engine through S5.2's bridge first.
   *Exit:* an AsyncAPI document whose payload is Avro imports into a shape that `janus check` decides
   against a message contract with an Avro body.
+- **S6.10 A Janus contract's page in the broker** (broker notes §7.3, §10 row 10) — **S**, a pair in
+  both brokers like S4.3's rows, behind the `janus` feature. Added 2026-11-15 by S4.3a, which found
+  row 10 in no item. Today a contract renders as raw JSON under "this content could not be rendered as
+  a pact" (Ruby's `api/renderers/html_pact_renderer.rb`, the port's `pacts/html.rs`). That is an
+  honest degradation, and the least urgent of the notes' views. The page would render each
+  interaction's shapes and exercised variants with the engine's own display text, through the
+  embedding ADR 0092 decides on, so a broker writes no prose of its own (notes §7).
+  *Exit:* with the feature on, both brokers render a Janus contract's interactions from the engine's
+  text, and with it off they render it as they do today.
 
 **Done when** it never is. Each SDK has its own exit: conformance passing, and the old SDK's example
 suites, consumer and provider, running on its compatibility facade.
@@ -2997,6 +3039,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |
 | S6.8 | No shape is recorded from verification traffic (`observed`) | ADR 0086 decision 9 |
 | S6.9 | No content component reads Avro, so an AsyncAPI payload in Avro derives no shape | split from S4.8 |
+| S6.10 | A Janus contract's broker page is raw JSON under a "could not be rendered as a pact" note | broker notes §7.3, §10 row 10; found by S4.3a |
 | SA.3 | The security review an agent with provider access needs | AI-layer notes §4 |
 
 ## 6. Risks

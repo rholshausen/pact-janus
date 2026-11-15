@@ -255,7 +255,12 @@ fn run(
   let broker = match (broker, cases.iter().any(|case| case.broker.is_some())) {
     (Some(url), true) => {
       let broker = broker::Broker::new(&url);
-      let version = broker.version()?;
+      // `--any-version` checks no version, so it also takes a broker that does not say one: the
+      // Rust port of the broker sends no `X-Pact-Broker-Version` (staged plan S4.3a).
+      let version = match broker.version() {
+        Err(_) if any_version => "unstated".to_string(),
+        version => version?,
+      };
       let pinned = broker::pinned_version(repo)?;
       if version != pinned && !any_version {
         return Err(format!(

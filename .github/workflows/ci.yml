@@ -117,6 +117,20 @@ jobs:
           done
           curl -fsS http://localhost:5000/v2/ >/dev/null
           echo "JANUS_OCI_REGISTRY=localhost:5000" >> "$GITHUB_ENV"
+      # ADR 0092: a Pact Broker hosts the engine's WASM component, the Ruby broker with the wasmtime
+      # gem. engine/component-host/tests/engine_wasm.rs holds that host (engine/wasm/hosts/ruby) to
+      # the native engine when JANUS_RUBY names a Ruby with its gems. Linux only, as the broker's
+      # image is; the Ruby is the image's.
+      - name: Ruby host of the WASM engine (Linux)
+        if: runner.os == 'Linux'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4.10"
+          bundler-cache: true
+          working-directory: engine/wasm/hosts/ruby
+      - name: Name the Ruby host (Linux)
+        if: runner.os == 'Linux'
+        run: echo "JANUS_RUBY=$(command -v ruby)" >> "$GITHUB_ENV"
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Build

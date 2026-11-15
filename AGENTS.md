@@ -266,6 +266,12 @@ Three sources are the source of truth and take precedence over this file when th
 > an entry per message the application sends and per reply it answers a request with, selected by
 > the values a message (or its request) fixes on a header or payload member; the address selects only
 > where a header fixes it, and a message that fixes nothing, or two that tie, is reported.
+> S4.3a (ADR 0092): the broker PR series' site map is `Documentation/broker-pr-series.md`, checked against
+> the Ruby Pact Broker's `master` and its Rust port, with S1.3's broker checks run against the port.
+> A broker decides through `janus-engine.wasm`, which answers `subsumption/*` under Ruby's `wasmtime` gem
+> (`engine/wasm/hosts/ruby/pipe.rb`) and the `wasmtime` crate frame for frame as the native engine does
+> (`engine/component-host/tests/engine_wasm.rs`, the Ruby half when `JANUS_RUBY` is set). The artifact
+> now registers the HTTP component's matchers, whose transport is behind a default `transport` feature.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -290,7 +296,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  registered after component-form, which decodes each part through the built-in
                  JSON, XML, text and form components it holds itself;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
-                 ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32
+                 ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32;
+                 its hosts/ruby is the Ruby host a Pact Broker would write (ADR 0092, S4.3a)
 cli/             `janus` CLI (verify, explain, upgrade, check, derive)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds
                  its protocol bindings (task 6.1), src/engine/pin.ts its copy of the engine pin;

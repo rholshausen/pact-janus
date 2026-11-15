@@ -1,0 +1,3 @@
+# What `bundle install` writes beside the Gemfile (CI installs into vendor/bundle).
+/.bundle/
+/vendor/

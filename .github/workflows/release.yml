@@ -246,8 +246,17 @@ jobs:
           mkdir dist
           cp target/wasm32-wasip2/release/pact_janus_engine_wasm.wasm dist/janus-engine.wasm
           ls -l dist
+      # Under the wasmtime crate and under Ruby's wasmtime gem, as the two Pact Brokers host it
+      # (ADR 0092).
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4.10"
+          bundler-cache: true
+          working-directory: engine/wasm/hosts/ruby
       - name: The component that ships answers as this engine
-        run: JANUS_ENGINE_WASM="$PWD/dist/janus-engine.wasm" cargo test --locked --package pact_janus_component_host --test engine_wasm
+        run: |
+          JANUS_RUBY="$(command -v ruby)" JANUS_ENGINE_WASM="$PWD/dist/janus-engine.wasm" \
+            cargo test --locked --package pact_janus_component_host --test engine_wasm
       - uses: actions/upload-artifact@v4
         with:
           name: wasm

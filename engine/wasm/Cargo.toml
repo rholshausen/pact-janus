@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_engine_wasm"
-description = "The Pact Janus engine as a WASM component: the embedding for offline operations (ADR 0023 decision 2) — the kernel and the in-tree JSON content component behind the frozen byte-pipe, with no transports."
+description = "The Pact Janus engine as a WASM component: the embedding for offline operations (ADR 0023 decision 2) — the kernel, the in-tree content components and the HTTP component's matchers behind the frozen byte-pipe, with no transports."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -26,6 +26,9 @@ pact_janus_component_text = { path = "../component-text" }
 pact_janus_component_form = { path = "../component-form" }
 pact_janus_component_xml = { path = "../component-xml" }
 pact_janus_component_multipart = { path = "../component-multipart" }
+# The HTTP component's matcher half, without its transport (ADR 0092): a selector's `http:path` and
+# a contract's `http:media-type`, `http:list` and `http:status-class` run here as they do natively.
+pact_janus_component_http = { path = "../component-http", default-features = false }
 serde_json = "1"
 wit-bindgen = "0.63"
 

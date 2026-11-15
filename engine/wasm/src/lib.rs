@@ -1,8 +1,8 @@
 //! The Janus engine as a WASM component: the embedding for offline operations (ADR 0023
 //! decision 2), for a host that wants Janus's answers without a native binary.
 //!
-//! It is `Engine::dispatch` behind the frozen pipe, with the in-tree JSON content component, and it
-//! has no transports and registers no background work: a `wasm32-wasip2` guest has sockets, but no
+//! It is `Engine::dispatch` behind the frozen pipe, with the in-tree content components and the HTTP
+//! component's matchers (ADR 0092), and it has no transports and registers no background work: a `wasm32-wasip2` guest has sockets, but no
 //! threads for the exchange loop or a run, and the HTTP transport was not built for the target
 //! (Phase 9 finding 3, ADR 0062). So it does what the kernel does without I/O (handshake, compile,
 //! variant enumeration, upgrade, subsumption), and `start-transport` and `verification/verify` fail
@@ -17,6 +17,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use pact_janus_component_form::FormContent;
+use pact_janus_component_http::status;
 use pact_janus_component_json::JsonContent;
 use pact_janus_component_multipart::MultipartContent;
 use pact_janus_component_text::TextContent;
@@ -38,6 +39,16 @@ thread_local! {
 fn engine() -> Engine {
   let mut engine = Engine::with_components(HashMap::new(), Some(Arc::new(JsonContent::new())));
   engine.declare_in_tree("content", "json", "1.0.0");
+  // The HTTP component's matchers, as `janus-engine` registers them, without the transport it has
+  // no thread to run (ADR 0092): a provider shape is selected by `http:path`, so without them no
+  // shape recorded or derived by operation matches anything, and `subsumption/check` answers
+  // `not-checked` where `janus check` answers with findings.
+  engine.register_matcher(
+    status::NAME,
+    "1.0.0",
+    status::ACTIONS,
+    Arc::new(status::HttpMatcher::new()),
+  );
   // XML before text, which claims all of `text/*`, so `text/xml` reaches it (ADR 0039).
   engine.register_content(Arc::new(XmlContent::new()));
   engine.declare_in_tree("content", "xml", "1.0.0");

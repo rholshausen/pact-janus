@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+# The Ruby host of the engine's WASM component (pipe.rb, ADR 0092). The gem's version is
+# wasmtime's, and moves with the `wasmtime` crate engine/component-host builds against. Its
+# precompiled gems need Ruby 3.3 or later; on 3.2 it builds from source, which needs Rust.
+source "https://rubygems.org"
+
+ruby ">= 3.3"
+
+gem "wasmtime", "50.0.0"
