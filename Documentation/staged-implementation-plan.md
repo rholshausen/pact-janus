@@ -2498,12 +2498,105 @@ once there are shapes to publish.
     `regex` of digits and a `boolean` one `'true' | 'false'`, or no recorded or consumer value would be
     admitted.
   - The protobuf half is S5.2's (ADR 0088 decision 8).
-- **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **L**: a resource for provider shapes,
-  decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and rendering from
-  the report's own words. On this side, `janus publish` learns provider shapes (S1.3) and `janus check`
-  publishes its report (row 6). The rows are pull requests to the Pact Broker, whose maintainers decide
-  them (§7.5). PactFlow's side is PactFlow's to decide.
-  *Exit:* the demo's loop runs against a broker built from the series, and `can-i-deploy` gives a
+- **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **XL**, as S4.3a–f: a resource for
+  provider shapes, decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and
+  rendering from the report's own words. On this side, `janus publish` learns provider shapes (S1.3)
+  and `janus check` publishes its report (row 6). The rows are pull requests to the Pact Broker, whose
+  maintainers decide them (§7.5). PactFlow's side is PactFlow's to decide.
+  Reviewed 2026-11-15, before it started, and extended to two brokers: the Ruby Pact Broker
+  (`pact-foundation/pact_broker`) and its Rust port (`YOU54F/pact_broker-rs`). The series targets
+  today's broker and its data model; the broker redesign is a separate thought experiment, and nothing
+  here waits on it. The review found five things the broker notes do not say:
+  - *Each row is a pair.* The Rust port holds itself to the Ruby broker's answers: Ruby is its source
+    of truth, its tests run both brokers alternately on one database, and one OpenAPI document and
+    drift suite is run against both. So a row is one change made twice, with one migration (Ruby's
+    `db/migrations` and the port's `migrations/postgres` and `migrations/sqlite`, any new column
+    nullable or defaulted) and one set of OpenAPI operations, never a Ruby series ported afterwards.
+  - *The series lands behind a feature switch.* Both brokers already have one mechanism:
+    `PACT_BROKER_FEATURES`, read by `PactBroker.feature_enabled?` in Ruby and by the port's `features`
+    setting. Every row but row 1 is behind a `janus` feature there, set by environment variable or
+    configuration value, so a pair can merge before the series is whole and neither broker answers
+    differently from the other with it off. The port may also put the engine embedding behind a Cargo
+    feature, so a build without it carries no WASM runtime. With the feature off, no new route is
+    served, no new link is advertised and no new event name is accepted; the migrations run either way.
+  - *Rows 7 and 8 need the engine.* The notes say nothing before row 9 does. But a decision applies
+    exemptions, their expiry and their provenance (ADR 0016, ADR 0089), which is `subsumption/decide`,
+    and a broker that applied them itself would be the second implementation notes §3a and §6 reject.
+    So the embedding is proven first (S4.3a) and rows 7 and 8 decide through it. S4.5 keeps what is
+    left of row 9: recomputing the *walk* on a cache miss.
+  - *Row 1 is written.* pact_broker#1045 was approved and closed unmerged, only because a pull request
+    from a fork cannot pass that repository's required checks. Its branch,
+    `fix/can-i-deploy-badge-unknown-status`, is on `origin`; the pull request is opened again from
+    there. The port has the same fault (`src/api/resources/can_i_deploy_path/mod.rs`, whose badge takes
+    a `bool`).
+  - *The notes' citations are of `fd6e5b63`.* Ruby's `master` is 124 commits on; of the cited sites
+    only `pacts/generate_sha.rb` and `api.rb` changed. The port was last reconciled to v2.124.0, and
+    S1.3's harness pins 2.121.2. Nothing here has run against the port: the one contact is
+    pact_broker-rs#11.
+
+  The rows and their sites, the port's under `src/api/resources/` unless they say otherwise:
+
+  | Row | Change | Ruby (`lib/pact_broker/`) | pact_broker-rs |
+  |---|---|---|---|
+  | 1 | an unknown `can-i-deploy` badge is grey | `badges/service.rb` | `can_i_deploy_path/mod.rs` |
+  | 2 | `specification: "janus"` is stored | `api/contracts/publish_contracts_contract_contract.rb`, `contracts/contract_to_publish.rb`, `contracts/service.rb` | `pacts/contracts.rs` |
+  | 3 | Janus-aware content extraction and SHA | `pacts/content.rb`, `pacts/generate_sha.rb`, `pacts/sort_content.rb` | `src/services/pact_content.rs`, `metrics.rs` |
+  | 4 | the provider-shape resource and its table | the version routes in `api.rb`, a migration | `pacticipants/versions.rs`, an entity, a migration |
+  | 5 | `provider_shape_changed` | `webhooks/webhook_event.rb` | `webhooks/mod.rs`, `webhook_templates.rs` |
+  | 6 | stored subsumption reports | a table keyed (contract SHA, shape SHA, engine version) | the same migration |
+  | 7 | subsumption reasons in the decision | `matrix/reason.rb`, `matrix/deployment_status_summary.rb`, `api/resources/can_i_deploy.rb` | `matrix_reasons.rs`, `can_i_deploy.rs` |
+  | 8 | stored policy, and the exemptions page | `integrations/` | `integrations.rs`, the UI templates |
+
+  - **S4.3a Groundwork** — **S**. Four things the rest stands on:
+    - The broker notes are a record, so their §10 is checked again against Ruby's `master` and each
+      site mapped to the port's, in a new document beside this plan that the pull requests cite.
+    - A baseline: S1.3's broker checks (the recorded scenario, the client's own pact, the differential
+      harness's broker cases) run against the port as they do against the pinned Ruby broker, and what
+      differs is reported to the port, not worked around here.
+    - The embedding: `janus-engine.wasm` answers `subsumption/decide` under Ruby's `wasmtime` gem,
+      the one claim the notes took on report, and under the `wasmtime` crate in the port. An ADR
+      records the result, and what a broker does when the artifact is absent.
+    - The `janus` feature, in both brokers, with a test in each that the feature off changes nothing a
+      client sees. It lands with the first pair that needs it.
+    *Exit:* the site map; the baseline's differences each an issue on the port or an entry in the
+    ledger; `decide` answered from both brokers' languages; and the maintainers of both have seen the
+    series' outline (§7.5).
+  - **S4.3b The Janus side** — **M**, an ADR extending ADR 0032 first. `janus publish` takes a provider
+    shape. `janus check --broker-url` fetches the provider's shape by version or by branch, so a
+    consumer's pipeline wires no pair by hand, and publishes its report. Each is a protocol operation
+    behind the `broker` capability, never the CLI speaking the broker's API. The client finds each
+    capability by the HAL link the broker advertises, as it finds publishing today, and sends
+    `specification: "janus"` only where the broker says it stores one: gate B's default does not move.
+    The client's own pact with the broker gains these interactions, and the port verifies that pact as
+    it verifies its others.
+    *Exit:* the operations are in the engine-protocol spec with schemas and examples, and the client's
+    tests pass against a broker built from S4.3d.
+  - **S4.3c Rows 1–3** — **S**. Row 1 is opened again from `origin`'s branch, with its pair in the
+    port. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
+    SHA that reads its interactions.
+    *Exit:* with the feature on, a contract published as `specification: "janus"` is stored, deduped
+    and diffed by both brokers, and fires `contract_content_changed` when and only when its
+    interactions change; with it off, both refuse it as they do today.
+  - **S4.3d Rows 4–6** — **L**. The shape is stored verbatim against a provider version, with its
+    content SHA and its provenance, never merged across versions (notes §2). `provider_shape_changed`
+    fires when the SHA differs from the previous version's. A report is stored as published, a cache
+    and never a decision (notes §4).
+    *Exit:* in both brokers, a provider publishes a shape and reads it back by version and by branch,
+    the event fires once for a change and not for a republish, and a report `janus check` published is
+    read back by its pair.
+  - **S4.3e Rows 7–8** — **L**. `can-i-deploy` gives subsumption reasons, computed on read from the
+    stored report, the policy's layers and today's date through the embedded `decide`; the reasons take
+    the severities notes §5 gives them, an exempted finding kept and marked as `IgnoredReason` keeps
+    one. Policy is a resource on the integration, one more layer and passed unmerged, with the
+    exemptions page, and the pair view renders the report's own text (notes §7).
+    *Exit:* both brokers give the same decision and reasons `janus check` gives for the same documents,
+    policy and date, including an exemption that lapsed with no document changing.
+  - **S4.3f The demonstration** — **M**. `demo/run.sh` takes a broker, and CI runs it against a Ruby
+    broker and the port, each built from the series with the feature on. It includes a message-only
+    provider (S4.6).
+    *Exit:* S4.3's, below.
+
+  *Exit:* the demo's loop runs against each broker built from the series, and `can-i-deploy` gives a
   subsumption reason. Whether the series merges is the community's, and the stage's exit waits on it as
   stage 1a's waits on pilots.
 - **S4.4 Policy** — **S**: a `provenance` selector on policies and their exemptions (finding 9B). Spike
@@ -2529,10 +2622,13 @@ once there are shapes to publish.
   - `janus check`'s flags keep their one form; a provenance form waits until someone asks (ADR 0089
     decision 6). No default changed: gate P.
 - **S4.5 The WASM offline artifact in the broker** (broker notes row 9) — **M**: recompute on cache
-  miss, the first real host of ADR 0023's offline embedding.
+  miss, in both brokers. The embedding itself is S4.3a's, since rows 7 and 8 decide through it; what
+  is left here is running the walk in the broker and whether that scales. The Rust port could link
+  the kernel instead of hosting the WASM artifact, at the cost of building QuickJS, so the measurement
+  covers both.
   *Exit:* `benchmarks/janus` measures the walk over N consumers and M provider versions in the WASM
-  embedding, and an ADR confirms or replaces the broker notes' §3c recommendation on that number
-  (§12's open question).
+  embedding and linked natively, and an ADR confirms or replaces the broker notes' §3c recommendation
+  on those numbers (§12's open question).
 - **S4.6 Message interactions in the check and the broker view** — **S**. The walk is
   direction-agnostic, but `janus check` has never run on a contract with messages (S2.12), and a
   message-only provider's shape and decision page are untested (broker notes §12). Recording a
@@ -2633,8 +2729,8 @@ once there are shapes to publish.
   - Not foreseen: AsyncAPI's `discriminator` is the property's name, not an object, which the shared
     mapping now reads too.
 
-**Done when** the demo's loop runs against a broker built from S4.3's series, with a provider shape
-recorded from a provider's own test suite (S4.1).
+**Done when** the demo's loop runs against each broker built from S4.3's series, the Ruby Pact Broker
+and its Rust port, with a provider shape recorded from a provider's own test suite (S4.1).
 
 ### Stage 5: Plugins as the core design — **L**
 
@@ -2946,7 +3042,9 @@ say why each one matters, what the prototype found that bears on it, and which i
    conformance on the new engine. This plan's stage exits make that measurable per language, on both
    sides. The timeline around them is the community's. Waits on it: S6.4.
 5. **How the broker's API evolves.** The broker notes (task 7.5) set out a PR series for provider shapes
-   and decisions. How far the open-source broker and PactFlow each go is theirs to decide. Waits on it:
+   and decisions. How far the open-source broker and PactFlow each go is theirs to decide. S4.3 makes
+   each row in the Ruby broker and in its Rust port, behind a `janus` feature that is off unless a
+   deployment sets it, so a row can merge before the community has decided the whole. Waits on it:
    S4.3, gate B.
 
 ## 8. Closing the prototype
