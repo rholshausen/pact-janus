@@ -111,9 +111,10 @@ fn broken_pact(name: &str) -> String {
 // ---------------------------------------------------------------------------------------------
 
 /// A v3 pact with one interaction and no provider state, for a provider these tests stand up
-/// themselves.
-fn secure_orders_pact() -> String {
-  let path = temp("secure-orders-pact.json");
+/// themselves. Each test names its own file: the tests run in parallel, and one writing the file
+/// another's run is reading would leave that run half a pact.
+fn secure_orders_pact(name: &str) -> String {
+  let path = temp(name);
   std::fs::write(
     &path,
     json!({
@@ -182,7 +183,7 @@ fn verify_reaches_a_tls_provider_that_demands_a_client_certificate_through_a_pro
 
   let output = janus(&[
     "verify",
-    &secure_orders_pact(),
+    &secure_orders_pact("tls-client-certificate-pact.json"),
     "--provider-url",
     &provider.base_url,
     "--base-path",
@@ -233,7 +234,7 @@ fn verify_trusts_a_provider_certificate_only_when_told_to() {
   let header = format!("Authorization=Bearer {token}");
   let args = [
     "verify",
-    &secure_orders_pact(),
+    &secure_orders_pact("trusted-certificate-pact.json"),
     "--provider-url",
     &provider.base_url,
     "--base-path",
@@ -353,7 +354,7 @@ fn verify_reaches_the_provider_through_the_environments_proxy() {
   let output = janus_command()
     .args([
       "verify",
-      &secure_orders_pact(),
+      &secure_orders_pact("environment-proxy-pact.json"),
       "--provider-url",
       &provider.base_url,
       "--base-path",
@@ -639,9 +640,10 @@ fn answering(reply: &'static str) -> (String, std::sync::mpsc::Receiver<(String,
   (port.to_string(), rx)
 }
 
-/// A v4 pact with an HTTP interaction and a message, as pact-js and pact-jvm write one.
-fn mixed_pact() -> String {
-  let path = temp("mixed-pact.json");
+/// A v4 pact with an HTTP interaction and a message, as pact-js and pact-jvm write one, written to
+/// a file of the test's own (see [`secure_orders_pact`]).
+fn mixed_pact(name: &str) -> String {
+  let path = temp(name);
   let pact = json!({
     "consumer": { "name": "web-app" }, "provider": { "name": "order-service" },
     "interactions": [
@@ -664,7 +666,7 @@ fn mixed_pact() -> String {
 fn verify_asks_for_a_message_where_transports_sends_it() {
   let (http_port, http_requests) = answering(r#"{"ok": true}"#);
   let (message_port, message_requests) = answering(r#"{"ok": true}"#);
-  let pact = mixed_pact();
+  let pact = mixed_pact("routed-message-pact.json");
   let output = janus(&[
     "verify",
     &pact,
@@ -696,7 +698,7 @@ fn verify_asks_for_a_message_where_transports_sends_it() {
 #[test]
 fn verify_asks_the_provider_url_for_a_message_when_nothing_routes_it() {
   let (port, requests) = answering(r#"{"ok": true}"#);
-  let pact = mixed_pact();
+  let pact = mixed_pact("unrouted-message-pact.json");
   let output = janus(&[
     "verify",
     &pact,
@@ -723,7 +725,7 @@ fn verify_asks_the_provider_url_for_a_message_when_nothing_routes_it() {
 fn a_configured_producer_replaces_the_default() {
   let (port, requests) = answering(r#"{"ok": true}"#);
   let (producer_port, producer_requests) = answering(r#"{"ok": true}"#);
-  let pact = mixed_pact();
+  let pact = mixed_pact("configured-producer-pact.json");
   let config = temp("message-producer.yaml");
   std::fs::write(
     &config,
