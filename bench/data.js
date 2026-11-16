@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794809167580,
+  "lastUpdate": 1794809169641,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -57312,6 +57312,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20530,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "558f9abb25d0571b179f76cadece1202c1947c1b",
+          "message": "docs: S4.9 and S4.10, a provider-shape plugin for Drift that embeds janus-engine.wasm\n\nAdds the proposal, Documentation/provider-shape-plugin.md: the plugin lives in the\nDrift repository, composed with the released janus-engine.wasm at build time, and\nrecords each answer Drift's events carry into a provider shape, selected by the\nOpenAPI document's path templates. S4.9 is the engine change it needs first: the WASM\nengine registers no transport, so it cannot read an HTTP observation's declarations.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T17:01:45+11:00",
+          "tree_id": "4918c078c1c51be21389a722c3ffe53aa229f4bc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/558f9abb25d0571b179f76cadece1202c1947c1b"
+        },
+        "date": 1794809169102,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 48678,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 47184,
             "unit": "requests per second",
             "extra": "engines 4"
           }
