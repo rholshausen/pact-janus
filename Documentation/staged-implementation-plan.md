@@ -2764,6 +2764,45 @@ once there are shapes to publish.
     trycmd cases `derive-asyncapi*.toml` pin the output.
   - Not foreseen: AsyncAPI's `discriminator` is the property's name, not an object, which the shared
     mapping now reads too.
+- **S4.9 Recording an HTTP provider's shape in the WASM engine** — **S**. Added 2026-11-16, for S4.10.
+  `provider-shape-session/observe` reads an observation through what the transport for its kind
+  declares (ADR 0086 decision 3): which part answers, the outcome slots that keep a 404 from widening
+  a 200, and the credential members recorded only as present (ADR 0074). `janus-engine.wasm` registers
+  no transports (ADR 0062, ADR 0092), so inside it an `http` observation is `component-unavailable`;
+  only the kind `message`, whose declarations are built in (ADR 0090 decision 3), records. The HTTP
+  component's declarations are not I/O, but they are methods of its transport, behind the `transport`
+  feature the WASM build leaves off. Move them out, and have the WASM engine use them, as ADR 0092
+  brought in the component's matchers. An ADR decides first how the kernel holds a kind's declarations
+  with no transport: a registry the recording reads before the transports, or a transport with no
+  serve or drive role whose `start-transport` fails by name, which `engine/hello` would then list.
+  [`provider-shape-plugin.md`](provider-shape-plugin.md) §4 has the detail.
+  *Exit:* the sample provider's answers recorded through `janus-engine.wasm` under the `wasmtime` crate,
+  as `engine/component-host/tests/engine_wasm.rs` runs it, give the shape the native engine records from
+  the same observations, byte for byte, credential members included.
+- **S4.10 A provider-shape plugin for Drift** — **M**, as S4.10a (HTTP) and S4.10b (messages). Added
+  2026-11-16. Drift runs test cases against a provider from its OpenAPI or AsyncAPI document, and its
+  plugins are WASM components. A Drift plugin that records each answer into a provider shape gives a
+  Drift user a `recorded` shape with no SDK provider test, and is the offline artifact's first host
+  that is not a broker (ADR 0023 decision 2). [`provider-shape-plugin.md`](provider-shape-plugin.md) is
+  the proposal: the plugin lives in the Drift repository (`Plugins/provider-shape-plugin`, after
+  `reports-plugin`), takes `janus-engine.wasm` as a release pinned by digest, and is composed with it at
+  build time (`wac plug`), since a WASM guest cannot host WASM (ADR 0013). Drift's events carry what
+  the recorder needs: each operation's method and path template (`file:loaded`), each test's target
+  (`testcase:loaded`), and the answer (`operation:invoked`). So a Drift test names no operation, and the
+  selector comes from the OpenAPI document, as `janus derive`'s does. The code is Drift's; the item is
+  here so the work has an exit. It is like S6.7's adapters, a recorder fed by a framework that knows
+  the operation, but it embeds the engine rather than reaching it through an SDK.
+  - **S4.10a HTTP**, on S4.9. *Exit:* Drift test cases against `samples/order-service/openapi.yaml`,
+    exercising the answers the sample provider's own tests exercise, record a shape through the plugin,
+    and `janus check` on it and the sample provider's pact reports what the checked-in recorded shape
+    reports: the `CANCELLED` status and the empty list.
+  - **S4.10b Messages**, needing no engine change: an async operation's answer is recorded as the kind
+    `message`, selected by the values the message carries (ADR 0090 decision 1), the selectors
+    `janus derive` writes from the same AsyncAPI document (ADR 0091). *Exit:* the same, for pact-js's
+    message example's provider, against the AsyncAPI document `cli/tests/derive.rs` derives from.
+  - Open, in the proposal's §8: Drift has no event that ends a run, so where `finalise` is called; and
+    whether shapes from several runs are merged, which natively is the engine's host's job and the
+    WASM engine has no host for.
 
 **Done when** the demo's loop runs against each broker built from S4.3's series, the Ruby Pact Broker
 and its Rust port, with a provider shape recorded from a provider's own test suite (S4.1).
