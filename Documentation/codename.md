@@ -59,6 +59,13 @@ yet. When the broker client writes it (stage 1), it is added to `persisted.rs`, 
 identifier is: one constant in the form the rename reads, an empty list in `earlier.rs`, an entry in
 `ALL`, and its readers calling `reads()`.
 
+**Read outside this repository.** The Pact Broker series (S4.3c, [broker-pr-series.md §7](broker-pr-series.md#7-rows-2-and-3-a-janus-contract-stored-under-its-own-word))
+makes both brokers readers of two of these names: the `specification` value `janus`, and
+`CONTRACT_FORMAT`, `janus-contract/1`. Each broker spells them once (`PactBroker::Janus` in Ruby,
+`services::janus` in the port). The rename script cannot reach them, so a rename is also a pull
+request to each broker that adds the new spellings beside the old, and the brokers keep reading
+the old ones for as long as contracts carry them.
+
 ### Written, never read back: renamed outright
 
 These identify documents the engine writes for people and pipelines. Nothing reads them back to decide

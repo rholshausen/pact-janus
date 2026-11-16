@@ -18,14 +18,15 @@ unless they say otherwise.
 4. [The `janus` feature](#4-the-janus-feature)
 5. [The baseline: S1.3's checks against the port](#5-the-baseline-s13s-checks-against-the-port)
 6. [The outline for the maintainers](#6-the-outline-for-the-maintainers)
+7. [Rows 2 and 3: a Janus contract stored under its own word](#7-rows-2-and-3-a-janus-contract-stored-under-its-own-word)
 
 ## 1. The rows and their sites
 
 | Row | Change | Ruby | pact_broker-rs | Plan item |
 |---|---|---|---|---|
 | 1 | an unknown `can-i-deploy` badge is grey, as `can-i-merge`'s is | `badges/service.rb:36-41` (`deployable ? "brightgreen" : "red"` at `:39`); `can_i_merge_badge_url` at `:43-59` is the three-way precedent | `can_i_deploy_path/mod.rs:89`, the same two-way `if` on a `bool` | S4.3c. Ruby's half is merged: pact_broker#1093, `6298abd2`; the port's is pact_broker-rs#23 |
-| 2 | `specification: "janus"` is stored | `api/contracts/publish_contracts_contract_contract.rb`; `contracts/contract_to_publish.rb:10` (`specification == "pact"`); `contracts/service.rb:133` (`select(&:pact?)`) and `:146-153` (`create_pact_params`) | `pacts/contracts.rs:279-286` (`must be one of: pact`) | S4.3c |
-| 3 | Janus-aware content extraction and SHA | `pacts/content.rb`, `pacts/generate_sha.rb`, `pacts/sort_content.rb` | `src/services/pact_content.rs` (`generate_sha_with` at `:27`, `content_that_affects_verification_results` at `:139`); `metrics.rs:66` (`content_counts`) | S4.3c |
+| 2 | `specification: "janus"` is stored | `api/contracts/publish_contracts_contract_contract.rb`; `contracts/contract_to_publish.rb:10` (`specification == "pact"`); `contracts/service.rb:133` (`select(&:pact?)`) and `:146-153` (`create_pact_params`) | `pacts/contracts.rs:279-286` (`must be one of: pact`) | S4.3c, with row 3: pact_broker#1094 and pact_broker-rs#24 (§7) |
+| 3 | Janus-aware content extraction and SHA | `pacts/content.rb`, `pacts/generate_sha.rb`, `pacts/sort_content.rb` | `src/services/pact_content.rs` (`generate_sha_with` at `:27`, `content_that_affects_verification_results` at `:139`); `metrics.rs:66` (`content_counts`) | S4.3c, with row 2 (§7) |
 | 4 | the provider-shape resource and its table | the version routes in `api.rb:106-122`, a migration under `db/migrations/` | `pacticipants/versions.rs`, an entity under `src/entity_pact_broker/`, a migration under `migrations/postgres/` and `migrations/sqlite/` | S4.3d |
 | 5 | `provider_shape_changed` | `webhooks/webhook_event.rb:9-17` (the event names) | `webhooks/mod.rs:432-439` (`EVENT_NAMES`), `webhook_templates.rs` | S4.3d |
 | 6 | stored subsumption reports | a table keyed (contract SHA, shape SHA, engine version), in row 4's migration | the same, in row 4's migrations | S4.3d |
@@ -196,3 +197,60 @@ the series merges is theirs to decide.
 > The design notes behind this are
 > [broker-integration-notes.md](prototype/broker-integration-notes.md), and the site-by-site map is
 > this document.
+
+## 7. Rows 2 and 3: a Janus contract stored under its own word
+
+S4.3c's rows 2 and 3 are one pull request in each broker, a commit per row:
+[pact_broker#1094](https://github.com/pact-foundation/pact_broker/pull/1094), on Ruby's `6298abd2`,
+and [pact_broker-rs#24](https://github.com/YOU54F/pact_broker-rs/pull/24), on the port's `cd5fa88`,
+opened on 2026-11-16. They decide the following, the same way in both.
+
+- **A contract is recognised by its content.** Neither broker records the specification a pact
+  version was published under, and adding a column for it would be a migration rows 2 and 3 do not
+  otherwise need. A contract identifies itself by its `$format` ([ADR 0011](decisions/0011-contracts-as-self-identifying-json-documents.md),
+  contract-file spec §2.3), so with the feature on, a document whose `$format` is `janus-contract/1`
+  is read as a Janus contract wherever pact content is read, whichever word published it. A later
+  major is not recognised, since it may change what an interaction holds. With the feature off,
+  nothing is.
+- **`specification: "janus"` must be a Janus contract.** It is accepted only with the feature on,
+  and only for content whose `$format` is `janus-contract/1`, refused otherwise as `content published
+  with specification 'janus' must be a Janus contract, whose $format is 'janus-contract/1'`. A
+  contract published as `pact`, as every client does today (gate B), is still stored. `contentType`
+  stays `application/json`: the media type a contract may be served as is a hint (contract-file
+  spec §2.3), and the publish request's `contentType` says how `content` is encoded.
+- **The SHA is the interactions alone, and is the SHA a pact would get.** Everything that changes
+  what a verifier does is inside an interaction (contract-file spec §3.2), so a contract's content
+  SHA covers `interactions`, sorted as a pact's are, and not `metadata`, `$format`, a stray `messages`
+  member or a `pactSpecification` a contract must not carry. For a contract written as the
+  specification says, that is exactly the SHA the broker gave it before the feature existed. So the
+  same contract is one pact version whether it was published as `janus` or as `pact`, turning the
+  feature on churns no version and fires no webhook, and a client that moves from `pact` to `janus`
+  when gate B moves republishes nothing. `contract_content_changed` fires when, and only when, an
+  interaction changes. Both brokers' tests pin the fixture's SHA, `21d089c0…`, which Ruby, the port
+  and an independent computation agree on.
+- **States, messages and merges read the contract's own members.** A contract's provider states are
+  each interaction's `states`. Its messages are its emissive interactions (contract-file spec §4.3):
+  Ruby's `messages_count`, `interactions_count`, `has_messages` and `has_http_interactions`, and the
+  port's metrics, count them as Ruby counts typed v4 messages. It has no `messages` array and no pact
+  specification version. A `PATCH` or an `onConflict: merge` publish matches an interaction by its
+  description and states (contract-file spec §4.2) and replaces it. Two contracts conflict when one
+  interaction is recorded differently, ignoring the `_id` the broker adds, as ADR 0065 decides for a
+  merged file. A contract and a pact always conflict, and a merge of the two replaces. Before, Ruby's
+  merger read a `request` a Janus interaction does not have, and raised.
+- **The diff needs nothing.** The previous-distinct diff sorts and strips `_id` generically, and a
+  test in each broker shows a changed contract diffed.
+- **How a client learns the broker stores `janus` is S4.3b's.** Neither branch advertises it. The
+  client finds each capability by the link the broker advertises (S4.3b), and S4.3b's ADR decides
+  that link; its broker half amends row 2 or lands with row 4.
+- **The brokers read two persisted names.** `janus` and `janus-contract/1` are spelled once in each
+  broker (`PactBroker::Janus`, `services::janus`). A rename of the codename
+  ([codename.md](codename.md)) adds the new spellings there, beside the old, as `persisted.rs` does
+  here.
+
+What each branch's tests cover, in Ruby's `spec/features/publish_janus_contract_spec.rb` and the
+port's `tests/publish_janus_contract.rs`: with the feature on, a contract is stored, counted, deduped
+across a metadata change and across the two words, a new version with `contract_content_changed`
+when an interaction changes, diffed, and gives its states; a pact published as `janus` is refused.
+With it off, `janus` is refused with today's message and nothing is created, and a contract published
+as `pact` is stored as it always was. Unit tests in each broker cover recognition, the SHA, the
+counts and the merger.

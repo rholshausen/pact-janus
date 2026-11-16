@@ -273,7 +273,9 @@ Three sources are the source of truth and take precedence over this file when th
 > (`engine/component-host/tests/engine_wasm.rs`, the Ruby half when `JANUS_RUBY` is set). The artifact
 > now registers the HTTP component's matchers, whose transport is behind a default `transport` feature.
 > S4.3c has started: row 1, the grey `can-i-deploy` badge, is merged in Ruby (pact_broker#1093) and
-> open on the port (pact_broker-rs#23).
+> open on the port (pact_broker-rs#23). Rows 2 and 3, a contract published as `specification: "janus"`
+> and read by its `$format` behind the brokers' `janus` feature, are pact_broker#1094 and
+> pact_broker-rs#24 (`broker-pr-series.md` §7).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

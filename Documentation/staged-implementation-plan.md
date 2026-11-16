@@ -2606,7 +2606,10 @@ once there are shapes to publish.
     tests pass against a broker built from S4.3d.
   - **S4.3c Rows 1–3** — **S**. Row 1's Ruby half is merged (pact_broker#1093, `6298abd2`), and
     its pair in the port is pact_broker-rs#23. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
-    SHA that reads its interactions.
+    SHA that reads its interactions. They are one pull request in each broker, pact_broker#1094 and
+    pact_broker-rs#24, opened 2026-11-16, whose decisions are [`broker-pr-series.md`](broker-pr-series.md) §7: a
+    contract is recognised by its `$format`, its SHA is the one it gets as a pact today, and the
+    `janus` feature lands with them.
     *Exit:* with the feature on, a contract published as `specification: "janus"` is stored, deduped
     and diffed by both brokers, and fires `contract_content_changed` when and only when its
     interactions change; with it off, both refuse it as they do today.
