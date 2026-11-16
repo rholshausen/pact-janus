@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794798894613,
+  "lastUpdate": 1794798896895,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -56604,6 +56604,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 42279,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "10793945b8aac8e3c8cfbb2be113df8ac714325f",
+          "message": "test: each CLI test that verifies a written pact writes its own file\n\nmixed_pact() and secure_orders_pact() wrote one path per process, so a\ntest running in parallel could truncate the pact another test's\n`janus verify` was reading (\"not JSON: EOF while parsing a value\", seen\nin CI on 064f4b6). Each caller now names its own file.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T14:09:59+11:00",
+          "tree_id": "8c785b3ef2db7c18b4b25bd5f8a60d32e6941b75",
+          "url": "https://github.com/rholshausen/pact-janus/commit/10793945b8aac8e3c8cfbb2be113df8ac714325f"
+        },
+        "date": 1794798896324,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 31688,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27547,
             "unit": "requests per second",
             "extra": "engines 4"
           }
