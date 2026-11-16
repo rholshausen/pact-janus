@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794804448298,
+  "lastUpdate": 1794804450835,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -56958,6 +56958,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 27547,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "6a658cba09e921cdbdc76cf66411ad3b59e8b98e",
+          "message": "docs: S4.3c rows 2 and 3 are pact_broker#1094 and pact_broker-rs#24\n\nRows 2 and 3 of the broker PR series are one pull request in each\nbroker, a commit per row, behind the brokers' janus feature.\nbroker-pr-series.md §7 records what they decide: a contract is\nrecognised by its $format, since neither broker records the word a pact\nversion was published under; its SHA covers its interactions alone,\nwhich is the SHA it gets as a pact today, so the two words give one pact\nversion; its states, messages and merges read its own members. How a\nclient learns the broker stores janus is S4.3b's.\n\ncodename.md notes that both brokers now read janus and janus-contract/1,\nso a rename is also a pull request to each.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:41:49+11:00",
+          "tree_id": "232d7bfbfd8e6e2ee5b3d00df1129fddc4d3cc8d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/6a658cba09e921cdbdc76cf66411ad3b59e8b98e"
+        },
+        "date": 1794804450119,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28172,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20530,
             "unit": "requests per second",
             "extra": "engines 4"
           }
