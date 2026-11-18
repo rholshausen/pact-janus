@@ -768,6 +768,7 @@ Schema: [`schemas/v1/matcher.schema.json`](schemas/v1/matcher.schema.json).
 | `matcher/apply` | `{ action, config?, values }` → `{ results }` |
 | `matcher/variant-space` | `{ operator, node, path }` → `{ dimensions }` |
 | `matcher/compare` | `{ operator, provider, consumer }` → `{ verdict, reason? }` |
+| `matcher/prefix` | `{ operator, node }` → `{ prefix? }` |
 | `generator/generate` | `{ generator, config?, context? }` → `{ value }` |
 
 `generator/generate` carries its own operation area while belonging to this interface: an op name says
@@ -877,6 +878,23 @@ The native binding answers the class and `compare` in code (§9.1). The built-in
 | `http:path` | `conservative` | a template with no parameter as its one path; one with a parameter against an `equality` or `any-of`, `no`; two templates that differ, `unknown` |
 
 Each is `yes` against `any`, and the three string-valued ones against `string`.
+
+### 7.6 Declaring a prefix
+
+A provider shape's entries are told apart by their selectors (subsumption-check spec §2.2), and a
+check of a large contract against a large shape would run every entry's selector for every
+interaction. The checker narrows the entries it tries by what a selector fixes. An `equality` fixes a
+value, and the kernel reads that itself. A component operator fixes what its component says, so a
+matcher component MAY answer `matcher/prefix`: given one of its operators and a shape document that
+uses it (`node`), the text every value the document admits begins with, or no `prefix` when there is
+none. A component that does not implement it answers `operation-unsupported`, which means no prefix.
+The checker passes over an entry only when a recorded value is a string that does not begin with
+the prefix, so a prefix that is too short costs time and a wrong one changes which entry is selected:
+a component MUST answer only a prefix every admitted value really has
+([ADR 0096](../../decisions/0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md)).
+The native binding answers it in code (§9.1). The built-in HTTP component answers it for `http:path`:
+the template's text before its first parameter, so `/orders/{id}` has the prefix `/orders/` and
+`/orders` the whole of itself. A template that begins with a parameter has none.
 
 ## 8. The hook interface
 

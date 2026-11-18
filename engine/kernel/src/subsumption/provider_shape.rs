@@ -117,12 +117,18 @@ impl ProviderInteraction {
 /// Read a provider shape from bytes (spec §8's error table: `contract-invalid` for a document
 /// that is not one, `contract-version-unsupported` for a major this checker does not implement).
 pub fn read_provider_shape(bytes: &[u8]) -> Result<ProviderShape, crate::contract::ContractError> {
+  match serde_json::from_slice::<Value>(bytes) {
+    Ok(document) => provider_shape_of(&document),
+    Err(_) => Err(crate::contract::ContractError::NotAContract),
+  }
+}
+
+/// [`read_provider_shape`], of a document already parsed, as a frame carries one: read once, not
+/// written out as text and parsed again (staged plan S4.11).
+pub fn provider_shape_of(document: &Value) -> Result<ProviderShape, crate::contract::ContractError> {
   use crate::contract::ContractError;
 
-  let format = serde_json::from_slice::<Value>(bytes)
-    .ok()
-    .and_then(|value| value.get("$format").and_then(Value::as_str).map(str::to_string));
-  match format.as_deref() {
+  match document.get("$format").and_then(Value::as_str) {
     None => return Err(ContractError::NotAContract),
     Some(found) if crate::persisted::PROVIDER_SHAPE_FORMAT.reads(found) => {}
     Some(other) => {
@@ -139,8 +145,7 @@ pub fn read_provider_shape(bytes: &[u8]) -> Result<ProviderShape, crate::contrac
     }
   }
 
-  let mut de = serde_json::Deserializer::from_slice(bytes);
-  serde_path_to_error::deserialize(&mut de).map_err(|err| ContractError::Invalid {
+  serde_path_to_error::deserialize(document).map_err(|err| ContractError::Invalid {
     problems: vec![Problem {
       pointer: json_pointer(err.path()),
       message: err.inner().to_string(),

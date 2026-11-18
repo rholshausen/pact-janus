@@ -227,6 +227,10 @@ impl crate::subsumption::OperatorComparer for CheckComponents<'_> {
     self.operators.compare(operator, provider, consumer)
   }
 
+  fn prefix(&self, operator: &str, node: &serde_json::Value) -> Option<String> {
+    self.operators.prefix(operator, node)
+  }
+
   fn content(&self) -> Option<&dyn ContentComponent> {
     Some(self.content)
   }
@@ -264,6 +268,17 @@ impl crate::subsumption::OperatorComparer for Contributions {
       _ => Verdict::Unknown,
     };
     Some((verdict, result.reason))
+  }
+
+  fn prefix(&self, operator: &str, node: &serde_json::Value) -> Option<String> {
+    self
+      .matcher_for(operator)?
+      .prefix(crate::component::Prefix {
+        operator: operator.to_string(),
+        node: node.clone(),
+      })
+      .ok()?
+      .prefix
   }
 }
 

@@ -205,6 +205,23 @@ fn answer(instances: &dyn Instances, pact: &Value, shape: &Value) -> Value {
   decide(&mut client, pact, &checked)
 }
 
+/// What checking `pact` against `shape` costs each interaction, apart from reading the two documents
+/// (S4.11): the median check, less the median check of the same documents with no interactions,
+/// shared among the interactions. Answers the reading's median and the share, in µs.
+fn per_interaction(client: &mut Client, pact: &Value, shape: &Value, iterations: usize) -> (f64, f64) {
+  let median = |samples: Samples| samples.metrics()["median_us"].as_f64().unwrap();
+  let interactions = pact["interactions"].as_array().unwrap().len();
+  let mut empty = pact.clone();
+  empty["interactions"] = json!([]);
+  let read = median(Samples::collect(2, iterations, || {
+    check(client, &empty, shape);
+  }));
+  let whole = median(Samples::collect(2, iterations, || {
+    check(client, pact, shape);
+  }));
+  (read, round((whole - read) / interactions as f64, 1))
+}
+
 fn round(value: f64, places: i32) -> f64 {
   let scale = 10f64.powi(places);
   (value * scale).round() / scale
@@ -250,11 +267,17 @@ pub fn scenarios(results: &mut RunResults, fleet: &Fleet, instances: &dyn Instan
     metrics["decide_median_us"] = decide_samples.metrics()["median_us"].clone();
     metrics["instance_median_us"] = instance_samples.metrics()["median_us"].clone();
     metrics["report_bytes"] = json!(report_bytes);
+    if size == 50 {
+      let (read, share) = per_interaction(&mut client, &pact, shape, iterations);
+      metrics["read_median_us"] = json!(read);
+      metrics["per_interaction_us"] = json!(share);
+    }
     results.record(&format!("subsumption-pair-{size}"), metrics);
   }
 
-  // The same 50 interactions against a provider with five times the operations: what selection,
-  // which reads every entry for every interaction, adds as a shape grows.
+  // The same 50 interactions against a provider with five times the operations. Reading a document
+  // five times the size costs five times as much; what each interaction costs is selection's share,
+  // which grew with the entries until S4.11 (ADR 0096).
   let pact = consumer_pact(0, 50);
   let samples = Samples::collect(2, 40, || {
     answer(instances, &pact, &fleet.wide);
@@ -262,6 +285,9 @@ pub fn scenarios(results: &mut RunResults, fleet: &Fleet, instances: &dyn Instan
   let mut metrics = samples.metrics();
   metrics["interactions"] = json!(50);
   metrics["entries"] = json!(fleet.wide["interactions"].as_array().unwrap().len());
+  let (read, share) = per_interaction(&mut Client::new(instances.instance()), &pact, &fleet.wide, 40);
+  metrics["read_median_us"] = json!(read);
+  metrics["per_interaction_us"] = json!(share);
   results.record("subsumption-pair-50-wide-shape", metrics);
 
   // The cache hit: a stored report, decided again today, which a broker does on every read (notes §4).

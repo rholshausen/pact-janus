@@ -1,7 +1,8 @@
 //! The matcher interface's execution half (component-interfaces spec §7.1, plan task 8.4):
 //! `matcher/apply`, which runs one of a component's own namespaced actions when a plan reaches it, and
 //! `matcher/compare`, which the subsumption walk asks about an operator the component declared
-//! comparable (spec §7.5, ADR 0087). `compile`, `variant-space` and `generator/generate` have no caller
+//! comparable (spec §7.5, ADR 0087), and `matcher/prefix`, which narrows the entries a check tries
+//! (spec §7.6, ADR 0096). `compile`, `variant-space` and `generator/generate` have no caller
 //! yet: a contributed operator compiles to the action of the same name, which `apply` runs.
 
 use super::ComponentError;
@@ -41,6 +42,28 @@ pub trait MatcherComponent: Send + Sync {
     let _ = req;
     Err(ComponentError::operation_unsupported("matcher/compare"))
   }
+
+  /// `matcher/prefix` (spec §7.6, ADR 0096): text every value the operator admits begins with, read
+  /// from one of its shape documents, so a check can rule an entry out without running it. `None`
+  /// when there is none; an operator that admits non-strings has none.
+  fn prefix(&self, req: Prefix) -> Result<PrefixResult, ComponentError> {
+    let _ = req;
+    Err(ComponentError::operation_unsupported("matcher/prefix"))
+  }
+}
+
+/// `matcher/prefix`'s request (`schemas/v1/matcher.schema.json`): the operator and its shape
+/// document.
+#[derive(Debug, Clone)]
+pub struct Prefix {
+  pub operator: String,
+  pub node: Value,
+}
+
+/// `matcher/prefix`'s result: the text every admitted value begins with, if there is any.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrefixResult {
+  pub prefix: Option<String>,
 }
 
 /// An operator's comparability class (shape spec §8, component-interfaces spec §7.5).

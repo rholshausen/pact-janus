@@ -11,7 +11,8 @@
 //! A plan passes them as the action's second argument, which arrives as `config.arguments[0]`.
 
 use pact_janus_kernel::component::{
-  Apply, ApplyResult, Comparability, Compare, CompareResult, ComponentError, MatcherComponent,
+  Apply, ApplyResult, Comparability, Compare, CompareResult, ComponentError, MatcherComponent, Prefix,
+  PrefixResult,
 };
 use serde_json::{Value, json};
 
@@ -135,6 +136,16 @@ impl MatcherComponent for HttpMatcher {
 
   fn compare(&self, req: Compare) -> Result<CompareResult, ComponentError> {
     Ok(crate::compare::compare(&req))
+  }
+
+  /// Only `http:path` has one: its template's text before the first parameter (ADR 0096).
+  fn prefix(&self, req: Prefix) -> Result<PrefixResult, ComponentError> {
+    Ok(PrefixResult {
+      prefix: match req.operator.as_str() {
+        crate::path::PATH => crate::path::prefix(&req.node),
+        _ => None,
+      },
+    })
   }
 }
 

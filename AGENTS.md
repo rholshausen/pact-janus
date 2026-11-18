@@ -291,7 +291,10 @@ Three sources are the source of truth and take precedence over this file when th
 > S4.5 (ADR 0095): `benchmarks/janus` measures a broker's recompute over a generated fleet in the WASM
 > embedding and linked natively (`src/fleet.rs`); a broker keeps the WASM artifact and computes a
 > missing report for the pair a decision needs, within a time budget, never a fleet at once. A check
-> compiles each selector once; selection is still interactions × entries, which is S4.11.
+> compiles each selector once. S4.11 (ADR 0096): a check passes over an entry its selector's
+> constraints rule out (an `equality`'s value, a prefix a component declares through the optional
+> `matcher/prefix`, `http:path`'s text before its first parameter) before running its plan, so
+> selection no longer grows with a shape's entries; the plans still decide which entry is selected.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

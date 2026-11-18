@@ -36,7 +36,8 @@ pub use loader::{
   SourceAuth, Unavailable, check_requirements, resolve,
 };
 pub use matcher::{
-  Apply, ApplyResult, Comparability, Compare, CompareResult, InTreeMatcher, MatcherComponent,
+  Apply, ApplyResult, Comparability, Compare, CompareResult, InTreeMatcher, MatcherComponent, Prefix,
+  PrefixResult,
 };
 pub use parts::{Part, Parts, SlotValue};
 pub use registry::{ContentRegistry, media_type_matches};

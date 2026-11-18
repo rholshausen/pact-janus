@@ -2875,6 +2875,25 @@ once there are shapes to publish.
   change and needs its ADR. Which entries an interaction selects must not change.
   *Exit:* `subsumption-pair-50-wide-shape` costs within 1.5 times `subsumption-pair-50` in both
   embeddings, and every subsumption test and corpus case gives the same report.
+  *Done 2026-11-18* ([ADR 0096](decisions/0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md)):
+  - Each entry's selector fixes constraints, compiled with its plan once per check: an `equality`'s
+    scalar at a slot or under it, and a prefix a component operator declares through a new, optional
+    `matcher/prefix` (component-interfaces spec §7.6). The HTTP component declares `http:path`'s, the
+    template's text before its first parameter. A constraint passes over an entry only where its plan
+    would certainly refuse, so the plans still decide which entry is selected. An interaction's
+    recorded values are decoded once per check, not once per entry.
+  - Each interaction's share of a 50-interaction check is 203 µs against 80 entries and 269 µs against
+    400 natively (1.32 times; it was 427 and 1,358 µs, 3.2 times), and 268 and 337 µs in WASM (1.26
+    times). A 500-interaction pair and a fleet's 500 pairs check in about half the time they took.
+    Every kernel test gives the same report; `provider_shape_by_operation.rs` adds templates that share
+    their text up to a parameter, and `select.rs` what a constraint may refuse.
+  - Not as the plan said: the exit measured the whole check, and reading a document five times the
+    size costs five times as much, which no narrowing removes. `benchmarks/janus` now records a check
+    of the same documents with no interactions (`read_median_us`) and each interaction's share of the
+    rest (`per_interaction_us`), and the exit is held on the share. Reading is now half of a check
+    against 400 entries, and a broker pays it once a pair.
+  - Not foreseen: `subsumption/check` read a provider shape by writing it out as text and parsing it
+    twice. It reads the document the frame holds, which makes reading a fifth cheaper.
 
 **Done when** the demo's loop runs against each broker built from S4.3's series, the Ruby Pact Broker
 and its Rust port, with a provider shape recorded from a provider's own test suite (S4.1).
@@ -3144,7 +3163,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
 | S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector (both built: ADR 0090, ADR 0091) | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
-| S4.11 | A check tries every provider-shape entry for every interaction | ADR 0095; found measuring S4.5 |
+| S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |

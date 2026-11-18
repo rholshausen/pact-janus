@@ -82,6 +82,22 @@ impl Template {
   pub fn admits(&self, path: &str) -> bool {
     matches(&self.pieces, path)
   }
+
+  /// The text every path the template admits begins with: what comes before its first parameter
+  /// (ADR 0096). A path is compared exactly, so it is a prefix of each admitted path.
+  pub fn prefix(&self) -> &str {
+    match self.pieces.first() {
+      Some(Piece::Literal(text)) => text,
+      _ => "",
+    }
+  }
+}
+
+/// `matcher/prefix` for an `http:path` shape document: its template's [`Template::prefix`], or
+/// `None` for a template that names none or does not parse, which its plan reports.
+pub fn prefix(node: &Value) -> Option<String> {
+  let template = Template::parse(node.get("template")?.as_str()?).ok()?;
+  Some(template.prefix().to_string()).filter(|prefix| !prefix.is_empty())
 }
 
 fn matches(pieces: &[Piece], path: &str) -> bool {
@@ -178,6 +194,27 @@ mod tests {
   #[case::missing_the_rest("/orders/{id}/items", "/orders/66")]
   fn refuses_one_that_does_not(#[case] template: &str, #[case] path: &str) {
     assert_eq!(verdict(template, json!(path))["status"], "error");
+  }
+
+  #[rstest]
+  #[case("/orders/{id}", Some("/orders/"))]
+  #[case("/orders", Some("/orders"))]
+  #[case("/files/{name}.{ext}", Some("/files/"))]
+  #[case("{tenant}/orders", None)]
+  #[case("/orders/{id", None)]
+  fn its_prefix_is_the_text_before_the_first_parameter(
+    #[case] template: &str,
+    #[case] expected: Option<&str>,
+  ) {
+    let node = json!({ "shape": PATH, "template": template, "example": "/orders/1" });
+    assert_eq!(prefix(&node).as_deref(), expected);
+    if let (Some(expected), Ok(parsed)) = (expected, Template::parse(template)) {
+      for path in ["/orders/66", "/orders", "/files/report.pdf"] {
+        if parsed.admits(path) {
+          assert!(path.starts_with(expected), "{template} admits {path}");
+        }
+      }
+    }
   }
 
   #[test]

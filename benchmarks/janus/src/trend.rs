@@ -46,6 +46,8 @@ const METRICS: &[(&str, &str, &str, Better)] = &[
   ("rps", "", "requests per second", Better::Bigger),
   // A broker's recompute (staged plan S4.5): one pair's walk, a sweep over a fleet, and its rate.
   ("check_median_us", " · check", "µs", Better::Smaller),
+  // What a check costs each interaction, apart from reading its documents (S4.11).
+  ("per_interaction_us", " · per interaction", "µs", Better::Smaller),
   ("median_ms", "", "ms", Better::Smaller),
   ("pairs_per_second", "", "pairs per second", Better::Bigger),
 ];

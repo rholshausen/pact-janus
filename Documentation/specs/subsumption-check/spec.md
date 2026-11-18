@@ -124,6 +124,13 @@ The checker matches in two steps:
    checker does not guess, any more than §8's walk does — and the interaction is `not-published` with
    a `reason` naming the entries that tied.
 
+Which entries step 2 tries is narrowed first by what each selector fixes: an `equality`'s value at a
+slot or a member under it, and the prefix a component operator declares every value it admits begins
+with (component-interfaces spec §7.6). An entry is passed over only when one of those certainly
+refuses a recorded value, so the entries that select an interaction are the same with or without it;
+what changes is that an interaction is not tried against every entry of a large shape
+([ADR 0096](../../decisions/0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md)).
+
 A message has no request (contract-file spec §4.3's `emissive` mode), so what identifies its operation
 is in the message itself: a metadata member that names where it was published, such as pact-js's
 `queue`, or a member of its body that names its kind. An asynchronous message's selector is over its

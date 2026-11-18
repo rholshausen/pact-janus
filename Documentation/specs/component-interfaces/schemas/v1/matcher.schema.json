@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/component/v1/matcher.schema.json",
   "title": "Matcher",
-  "description": "The matcher interface: contributed shape operators, plan actions, variant dimensions, comparability and generators. Matching and generating are one interface because a generator's output must be admitted by the shape it generates for (shape spec §3.4), and one declared authority is what lets the engine check that pair. See spec.md §7.",
+  "description": "The matcher interface: contributed shape operators, plan actions, variant dimensions, comparability, prefixes and generators. Matching and generating are one interface because a generator's output must be admitted by the shape it generates for (shape spec §3.4), and one declared authority is what lets the engine check that pair. See spec.md §7.",
   "$defs": {
     "Compile": {
       "title": "Compile",
@@ -107,6 +107,26 @@
           "x-known-values": ["yes", "no", "unknown"]
         },
         "reason": { "type": "string" }
+      }
+    },
+    "Prefix": {
+      "title": "Prefix",
+      "description": "What the subsumption checker asks to narrow the provider-shape entries it tries (spec.md §7.6, ADR 0096): one of the component's operators, and a shape document that uses it. Optional: a component that does not implement it answers operation-unsupported, which means no prefix.",
+      "type": "object",
+      "required": ["operator", "node"],
+      "properties": {
+        "operator": { "type": "string" },
+        "node": { "type": "object" }
+      }
+    },
+    "PrefixResult": {
+      "title": "PrefixResult",
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "description": "Text every value the shape document admits begins with. Absent when there is none. A component MUST NOT answer one an admitted value lacks: the checker passes over an entry whose prefix a recorded value does not begin with."
+        }
       }
     },
     "Generate": {

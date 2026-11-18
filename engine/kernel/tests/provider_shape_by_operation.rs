@@ -680,3 +680,84 @@ fn the_checked_in_sample_shape_is_what_the_providers_tests_record() {
     "the checked-in provider shape and the recording have diverged; SHAPES=overwrite writes it again"
   );
 }
+
+// --- selection narrowed by what a selector fixes (staged plan S4.11, ADR 0096) -------------------
+
+/// One entry of a hand-written shape: `method template` answering `status` with `{ "kind": kind }`.
+fn operation_entry(method: &str, template: &str, status: u16, kind: &str) -> Value {
+  json!({
+    "description": format!("{method} {template}"),
+    "selector": {
+      "request": {
+        "method": { "shape": "equality", "example": method },
+        "path": { "shape": "http:path", "template": template, "example": template.replace(['{', '}'], "") } },
+      "response": { "status": { "shape": "equality", "example": status } } },
+    "parts": { "response": {
+      "status": { "shape": "equality", "example": status },
+      "body": { "shape": "object", "members": { "kind": { "shape": "equality", "example": kind } } } } }
+  })
+}
+
+/// Templates that share their text up to a parameter, a method and a status apart: each consumer
+/// interaction is checked against the one entry its plan selects, as before entries were narrowed by
+/// their prefixes and literals, so every pair is `yes` and the one no entry selects is not published.
+#[test]
+fn narrowing_the_entries_tried_never_changes_the_entry_selected() {
+  let mut engine = engine(None);
+  let shape = json!({ "$format": "janus-provider-shape/1", "provider": { "name": "order-service" },
+    "provenance": "recorded",
+    "interactions": [
+      operation_entry("GET", "/orders/{id}/items", 200, "items"),
+      operation_entry("GET", "/orders/{id}", 200, "order"),
+      operation_entry("GET", "/orders/{id}", 404, "missing"),
+      operation_entry("GET", "/order-lines/{id}", 200, "line"),
+      operation_entry("POST", "/orders", 201, "created"),
+      operation_entry("GET", "{tenant}/orders", 200, "tenant"),
+    ] });
+  let interaction = |description: &str, method: &str, path: &str, status: u16, kind: &str| {
+    json!({ "description": description, "request": { "method": method, "path": path },
+            "response": { "status": status, "headers": { "Content-Type": "application/json" },
+                          "body": { "kind": kind } } })
+  };
+  let pact = json!({
+    "consumer": { "name": "web-app" }, "provider": { "name": "order-service" },
+    "interactions": [
+      interaction("an order", "GET", "/orders/66", 200, "order"),
+      interaction("its items", "GET", "/orders/66/items", 200, "items"),
+      interaction("no order", "GET", "/orders/999", 404, "missing"),
+      interaction("a line", "GET", "/order-lines/1", 200, "line"),
+      interaction("a new order", "POST", "/orders", 201, "created"),
+      interaction("a tenant's orders", "GET", "acme/orders", 200, "tenant"),
+      interaction("something else", "GET", "/customers/1", 200, "customer"),
+    ],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } } });
+  let checked = send(
+    &mut engine,
+    "subsumption/check",
+    json!({ "contract": pact, "provider-shape": shape }),
+  );
+  let verdicts: std::collections::BTreeMap<&str, &str> = checked["ok"]["report"]["interactions"]
+    .as_array()
+    .unwrap_or_else(|| panic!("{checked:#}"))
+    .iter()
+    .map(|result| {
+      (
+        result["description"].as_str().unwrap(),
+        result["verdict"].as_str().unwrap(),
+      )
+    })
+    .collect();
+  assert_eq!(
+    verdicts,
+    std::collections::BTreeMap::from([
+      ("an order", "yes"),
+      ("its items", "yes"),
+      ("no order", "yes"),
+      ("a line", "yes"),
+      ("a new order", "yes"),
+      ("a tenant's orders", "yes"),
+      ("something else", "not-published"),
+    ]),
+    "{checked:#}"
+  );
+}

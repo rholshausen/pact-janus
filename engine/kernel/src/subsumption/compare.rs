@@ -37,6 +37,12 @@ pub trait OperatorComparer: plan::ActionApplier {
   fn comparability(&self, operator: &str) -> crate::component::Comparability;
   /// `None` when no component answers for `operator`, or it could not run.
   fn compare(&self, operator: &str, provider: &Value, consumer: &Value) -> Option<(Verdict, Option<String>)>;
+  /// Text every value `operator`'s shape document `node` admits begins with (ADR 0096), which
+  /// narrows the entries a check tries. `None` when no component says.
+  fn prefix(&self, operator: &str, node: &Value) -> Option<String> {
+    let _ = (operator, node);
+    None
+  }
   /// What decodes a content slot a selector names, such as a message's `body` (ADR 0090 decision
   /// 2). `None` matches a content slot as the value it was recorded as.
   fn content(&self) -> Option<&dyn crate::component::ContentComponent> {

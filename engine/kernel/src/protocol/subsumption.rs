@@ -187,10 +187,8 @@ fn consumer_contract(document: &Value) -> Result<(Contract, String), Subsumption
 }
 
 fn read_provider_shape(document: &Value) -> Result<ProviderShape, SubsumptionError> {
-  crate::subsumption::read_provider_shape(document.to_string().as_bytes()).map_err(|error| {
-    SubsumptionError::Document {
-      member: "provider-shape",
-      error,
-    }
+  crate::subsumption::provider_shape_of(document).map_err(|error| SubsumptionError::Document {
+    member: "provider-shape",
+    error,
   })
 }
