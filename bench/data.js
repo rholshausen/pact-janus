@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794980326256,
+  "lastUpdate": 1794980328713,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -58020,6 +58020,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 20416,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "0c0fb4b5bc97f814b65846dd07c9c2a5308204c6",
+          "message": "feat: S4.9, janus-engine.wasm records an HTTP provider's shape (ADR 0094)\n\nWhat a transport kind declares without doing I/O (its exchange parts,\noutcome slots and credential members) is now the kernel's\nKindDeclarations, which an embedding with no transport for a kind\nregisters with Engine::register_kind. A transport registered for the kind\nstill declares it, and the kernel registers `message` itself, so the\nbuilt-in kind is no longer a special case. A registered kind is not a\ntransport: nothing is declared in-tree, engine/hello is unchanged, and\nstart-transport for it is still component-unavailable.\n\npact_janus_component_http::kind is HTTP's declarations, built without the\ntransport feature; HttpTransport answers from it, and the WASM engine\nregisters it for `http`, so provider-shape-session/observe records an\nHTTP answer there as janus-engine does.\n\nNot foreseen: redaction asked only the registered transports, so a v1-v4\npact upgraded in the artifact kept its Authorization and Set-Cookie\nvalues. It now reads registered kinds too.\n\nengine_wasm.rs records the sample provider's answers, fetched through the\nHTTP transport's drive role with a Set-Cookie added to the 404, through\nthe artifact and natively, and requires every frame to be the same; it\nalso upgrades one pact both ways. provider_shape_by_operation.rs checks\nthe registry natively.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T16:33:08+11:00",
+          "tree_id": "863f196829fd06810bc861c79ce154e84f708603",
+          "url": "https://github.com/rholshausen/pact-janus/commit/0c0fb4b5bc97f814b65846dd07c9c2a5308204c6"
+        },
+        "date": 1794980327993,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28410,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18391,
             "unit": "requests per second",
             "extra": "engines 4"
           }
