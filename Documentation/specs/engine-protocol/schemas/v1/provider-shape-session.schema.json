@@ -18,7 +18,7 @@
         "kind": {
           "type": "string",
           "minLength": 1,
-          "description": "The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that transport declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members. 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind no transport serves is component-unavailable."
+          "description": "The transport kind whose parts are observed (ADR 0086 decision 3), unless an observation names its own: the session reads what that kind declares (component-interfaces spec §5) — which part answers an exchange, its outcome slots and its credential members: its transport's, or, in an embedding with no transport for it, what the embedding holds for the kind, as the WASM engine holds 'http''s (ADR 0094). 'http' when absent. 'message', when no transport serves it, is what produce-message hooks produce (ADR 0090 decision 3): a 'message' part answering a synchronous message's 'request', with no outcome slots and no credential members. Any other kind nothing declares is component-unavailable."
         },
         "policy": {
           "$ref": "#/$defs/RecordingPolicy"

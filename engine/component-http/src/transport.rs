@@ -167,38 +167,18 @@ impl TransportComponent for HttpTransport {
     ])
   }
 
-  /// An exchange starts with a request and is answered with a response (component-interfaces spec
-  /// §5.7): the names the engine reads instead of spelling them.
+  /// The kind's own declarations (ADR 0094 decision 4), which an embedding with no transport reads
+  /// too: see [`crate::kind`].
   fn exchange_parts(&self) -> ExchangeParts {
-    ExchangeParts {
-      initiating: "request".to_string(),
-      answering: Some("response".to_string()),
-    }
+    crate::kind::exchange_parts()
   }
 
-  /// The credentials HTTP itself defines (ADR 0074 decision 2): `Authorization` and
-  /// `Proxy-Authorization` (RFC 9110 §11.6.2, §11.7.2) and `Cookie` on a request, `Set-Cookie` on a
-  /// response (RFC 6265 §4). Header names are lower-case, as this transport presents them.
   fn credential_members(&self) -> CredentialMembers {
-    let headers = |names: &[&str]| {
-      std::collections::BTreeMap::from([(
-        "headers".to_string(),
-        names.iter().map(|name| name.to_string()).collect::<Vec<_>>(),
-      )])
-    };
-    CredentialMembers::from([
-      (
-        "request".to_string(),
-        headers(&["authorization", "proxy-authorization", "cookie"]),
-      ),
-      ("response".to_string(), headers(&["set-cookie"])),
-    ])
+    crate::kind::credential_members()
   }
 
-  /// A response's status tells one answer from another (ADR 0086 decision 4): a 200 with an order
-  /// and a 404 with an error document are two outcomes of one operation, not one widened answer.
   fn outcome_slots(&self) -> OutcomeSlots {
-    OutcomeSlots::from([("response".to_string(), vec!["status".to_string()])])
+    crate::kind::outcome_slots()
   }
 
   fn start(&self, req: Start) -> Result<StartResult, ComponentError> {

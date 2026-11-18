@@ -108,6 +108,10 @@ To check first:
 
 ## 4. The gap in the engine (S4.9)
 
+*Closed on 2026-11-18 by S4.9 ([ADR 0094](decisions/0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md)),
+which chose the registry: `janus-engine.wasm` holds HTTP's declarations as a kind with no transport,
+and records an HTTP observation as `janus-engine` does. The section is kept as written.*
+
 `janus-engine.wasm` registers no transports (ADR 0062, ADR 0092): it has no thread for an exchange
 loop. But `provider-shape-session/observe` reads an observation through what the transport for its
 kind declares (engine-protocol spec §8.5, ADR 0086 decision 3), and in the engine that is a lookup in

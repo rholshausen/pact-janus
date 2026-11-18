@@ -305,6 +305,236 @@ fn under_the_wasmtime_crate_it_decides_as_the_native_engine_does() {
   assert_eq!(lapsed["ok"]["report"]["decision"], json!("block"), "{lapsed}");
 }
 
+/// The sample provider's own tests, as S4.1 records them (`engine/kernel/tests/provider_shape_by_operation.rs`):
+/// set up an order, fetch it, and once fetch one that does not exist. Each answer is fetched through
+/// the HTTP transport's drive role, so it is the `response` part as the transport presents it
+/// (component-interfaces spec §5.9), without the `Date` header, which is the clock. The provider sets
+/// no cookie, so the 404 is given a `Set-Cookie`, as a session layer in front of it would add one: a
+/// credential the kind declares (ADR 0074), recorded only as present.
+fn the_sample_providers_answers() -> Vec<(&'static str, Value)> {
+  use pact_janus_component_http::HttpTransport;
+  use pact_janus_kernel::component::{Part, Send, SlotValue, Start, Stop, TransportComponent};
+  use pact_janus_sample_order_service::{Config, DEFAULT_TOKEN, start};
+
+  let provider = start(Config::default()).expect("an OS-assigned port always binds");
+  let transport = HttpTransport::new();
+  transport
+    .start(Start {
+      instance: "provider".to_string(),
+      kind: "http".to_string(),
+      role: "drive".to_string(),
+      options: Some(json!({ "base-url": provider.base_url() })),
+    })
+    .expect("a drive instance starts");
+  let slot = |content: Value, content_type: Option<&str>| SlotValue {
+    content,
+    encoded: None,
+    content_type: content_type.map(str::to_string),
+  };
+  let send = |method: &str, path: &str, body: Option<Value>| -> Value {
+    let mut request = Part::from([
+      ("method".to_string(), slot(json!(method), None)),
+      ("path".to_string(), slot(json!(path), None)),
+      (
+        "headers".to_string(),
+        slot(
+          json!({ "authorization": [format!("Bearer {DEFAULT_TOKEN}")] }),
+          None,
+        ),
+      ),
+    ]);
+    if let Some(body) = body {
+      request.insert(
+        "body".to_string(),
+        slot(json!(body.to_string()), Some("application/json")),
+      );
+    }
+    let reply = transport
+      .send(Send {
+        instance: "provider".to_string(),
+        parts: [("request".to_string(), request)].into(),
+        await_reply: true,
+        timeout_ms: Some(5_000),
+      })
+      .expect("the provider answers")
+      .reply
+      .expect("an HTTP request is answered");
+    let mut response = serde_json::to_value(&reply["response"]).expect("a part serializes");
+    response["headers"]["content"]
+      .as_object_mut()
+      .expect("headers by name")
+      .remove("date");
+    response
+  };
+
+  let mut answers = Vec::new();
+  for (status, shipped, items) in [
+    ("PENDING", false, 1),
+    ("SHIPPED", true, 2),
+    ("PENDING", false, 3),
+    ("CANCELLED", false, 0),
+    ("SHIPPED", true, 1),
+    ("PENDING", false, 2),
+  ] {
+    send(
+      "POST",
+      "/_pact/provider-states",
+      Some(json!({ "action": "setup", "state": "an order exists",
+                   "params": { "id": "66", "status": status, "shipped": shipped, "items": items } })),
+    );
+    answers.push(("/orders/66", send("GET", "/orders/66", None)));
+  }
+  send(
+    "POST",
+    "/_pact/provider-states",
+    Some(json!({ "action": "setup", "state": "no orders exist" })),
+  );
+  let mut missing = send("GET", "/orders/999", None);
+  missing["headers"]["content"]["set-cookie"] = json!(["session=s3cr3t; HttpOnly"]);
+  answers.push(("/orders/999", missing));
+  transport
+    .stop(Stop {
+      instance: "provider".to_string(),
+    })
+    .expect("the instance stops");
+  answers
+}
+
+/// A recording as a host that embeds the engine makes one (staged plan S4.9, ADR 0094): the handshake,
+/// a session for the provider, one observation per answer, each naming its operation as the sample
+/// provider's own tests do, with the request it answered, and the shape `finalise` answers.
+fn record_conversation(answers: &[(&str, Value)], mut send: impl FnMut(Value) -> Value) -> Vec<Value> {
+  let mut ids = 0;
+  let mut request = |op: &str, body: Value| {
+    ids += 1;
+    send(json!({ "type": "request", "id": format!("r-{ids}"), "op": op, "body": body }))
+  };
+  let mut frames = vec![request(
+    "engine/hello",
+    json!({ "protocol-versions": [1], "host": { "name": "a-recorder", "version": "0.0.0" }, "capabilities": {} }),
+  )];
+  let created = request(
+    "provider-shape-session/create",
+    json!({ "provider": { "name": "order-service" } }),
+  );
+  let session = created["ok"]["session"].clone();
+  frames.push(created);
+  for (path, response) in answers {
+    frames.push(request(
+      "provider-shape-session/observe",
+      json!({
+        "session": session,
+        "description": "GET /orders/{id}",
+        "operation": { "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "http:path", "template": "/orders/{id}", "example": "/orders/id" } } },
+        "parts": {
+          "request": { "method": { "content": "GET" }, "path": { "content": path },
+                       "headers": { "content": { "authorization": ["Bearer a-token"] } } },
+          "response": response,
+        },
+      }),
+    ));
+  }
+  frames.push(request(
+    "provider-shape-session/finalise",
+    json!({ "session": session }),
+  ));
+  frames
+}
+
+/// What `janus-engine` answers: the kernel in this process, with the HTTP component's transport and
+/// matchers and the JSON content component.
+fn native_engine() -> pact_janus_kernel::protocol::Engine {
+  use pact_janus_component_http::{HttpTransport, status};
+  use pact_janus_kernel::component::TransportComponent;
+  use std::sync::Arc;
+
+  let transports = std::collections::HashMap::from([(
+    "http".to_string(),
+    Arc::new(HttpTransport::new()) as Arc<dyn TransportComponent>,
+  )]);
+  let mut engine = pact_janus_kernel::protocol::Engine::with_components(
+    transports,
+    Some(Arc::new(pact_janus_component_json::JsonContent::new())),
+  );
+  engine.register_matcher(
+    status::NAME,
+    "1.0.0",
+    status::ACTIONS,
+    Arc::new(status::HttpMatcher::new()),
+  );
+  engine
+}
+
+/// The artifact registers no transport, but holds what the kind `http` declares (ADR 0094): the
+/// sample provider's answers recorded through it give the shape the native engine records from the
+/// same observations, frame for frame, its `Set-Cookie` recorded as present and nothing more.
+#[test]
+fn under_the_wasmtime_crate_it_records_a_provider_shape_as_the_native_engine_does() {
+  let answers = the_sample_providers_answers();
+  let mut guest = Guest::new();
+  let recorded = record_conversation(&answers, |frame| {
+    let (response,) = guest
+      .call
+      .call(&mut guest.store, (serde_json::to_vec(&frame).unwrap(),))
+      .expect("the guest does not trap");
+    serde_json::from_slice(&response).expect("the answer is a frame")
+  });
+  let mut engine = native_engine();
+  let native = record_conversation(&answers, |frame| {
+    serde_json::from_slice(&engine.dispatch(&serde_json::to_vec(&frame).unwrap())).expect("a frame")
+  });
+  assert_eq!(recorded, native);
+
+  // And the shape is what S4.1 records: the order and the error document apart, by status, the
+  // cookie a credential whose value went nowhere.
+  let shape = &recorded.last().expect("finalise answered")["ok"]["provider-shape"];
+  let entries = shape["interactions"].as_array().expect("entries");
+  let statuses: Vec<&Value> = entries
+    .iter()
+    .map(|entry| &entry["selector"]["response"]["status"]["example"])
+    .collect();
+  assert_eq!(statuses, vec![&json!(200), &json!(404)], "{shape:#}");
+  let missing = &entries[1]["parts"]["response"]["headers"]["members"]["set-cookie"];
+  assert_eq!(missing, &json!({ "shape": "any" }), "{shape:#}");
+  assert!(!shape.to_string().contains("s3cr3t"), "{shape:#}");
+  assert!(!recorded.iter().any(|frame| frame.to_string().contains("s3cr3t")));
+}
+
+/// What the engine records redacts what the kind `http` declares a credential (ADR 0094 decision
+/// 3), in the artifact as natively, though there it has no transport to ask: a pact upgraded there
+/// records its `Authorization` header as `[redacted]` (ADR 0074).
+#[test]
+fn under_the_wasmtime_crate_an_upgraded_pact_redacts_the_credentials_http_declares() {
+  let pact = json!({
+    "consumer": { "name": "web-app" },
+    "provider": { "name": "order-service" },
+    "interactions": [ {
+      "description": "an order",
+      "request": { "method": "GET", "path": "/orders/66", "headers": { "Authorization": "Bearer s3cr3t" } },
+      "response": { "status": 200, "headers": { "Set-Cookie": "session=s3cr3t" } }
+    } ],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  });
+  let mut guest = Guest::new();
+  guest.hello();
+  let upgraded = guest.send("upgrade/pact", json!({ "pact": pact }));
+  let mut engine = native_engine();
+  let mut native = |op: &str, body: Value| -> Value {
+    let frame = json!({ "type": "request", "id": "1", "op": op, "body": body });
+    serde_json::from_slice(&engine.dispatch(&serde_json::to_vec(&frame).unwrap())).expect("a frame")
+  };
+  native(
+    "engine/hello",
+    json!({ "protocol-versions": [1], "host": { "name": "janus-test", "version": "0.0.0" }, "capabilities": {} }),
+  );
+  assert_eq!(upgraded, native("upgrade/pact", json!({ "pact": pact })));
+  let contract = upgraded["ok"]["contract"].to_string();
+  assert!(contract.contains("[redacted]"), "{upgraded:#}");
+  assert!(!contract.contains("s3cr3t"), "{upgraded:#}");
+}
+
 /// Ruby's `wasmtime` gem is what the Ruby Pact Broker would host the component with — the one claim
 /// the broker notes (§3c) took on report. `engine/wasm/hosts/ruby/pipe.rb` is that host, given each
 /// frame as a line; it answers every frame exactly as the native engine does.

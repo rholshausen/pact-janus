@@ -567,6 +567,20 @@ admits a path that matches the whole template, compared exactly. A template with
 operator's invalid configuration. A provider-shape entry's selector writes an operation with it
 (subsumption-check spec §2.2), and a consumer's request may use it like any other operator.
 
+### 5.12 A kind's declarations, without its transport
+
+Exchange parts (§5.7), credential members (§5.8) and outcome slots (§5.10) describe what a kind's
+parts mean, and none of them is I/O. An embedding that cannot run a transport may still hold them for
+its kind
+([ADR 0094](../../decisions/0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md)),
+and the engine reads them wherever it would read the transport's without sending or receiving
+anything: recording a provider shape (engine-protocol spec §8.5) and redacting what it records and
+reports. A transport registered for the kind is what declares it, whatever the embedding holds. A
+kind held this way is not a transport: no requirement is satisfied by it, and starting one is
+`component-unavailable`. The engine's WASM component holds the built-in HTTP transport's
+declarations, from the code the transport answers from, so the two embeddings cannot declare
+differently.
+
 ## 6. The content interface
 
 Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).

@@ -14,8 +14,8 @@ use super::explain::{self, Explain, ExplainError};
 use super::frame::{EngineError, RequestFrame, ResponseFrame};
 use super::hello::{self, Hello};
 use super::provider_shape_session::{
-  Create as CreateRecording, DEFAULT_KIND as RECORDING_KIND, Declarations as RecordingDeclarations,
-  Evidence as RecordingEvidence, Finalise as FinaliseRecording, Observe, Session as RecordingSession,
+  Create as CreateRecording, DEFAULT_KIND as RECORDING_KIND, Evidence as RecordingEvidence,
+  Finalise as FinaliseRecording, Observe, Session as RecordingSession,
 };
 use super::scope::Scope;
 use super::session::{
@@ -27,8 +27,8 @@ use super::subsumption::{
 use super::verification::{self, Run, Target, Verify, VerifyError};
 use crate::broker::BrokerClient;
 use crate::component::{
-  ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, InTreeMatcher, MatcherComponent,
-  Start, Stop, TransportComponent,
+  ComponentLoader, ContentComponent, ContentRegistry, HookComponent, InTree, InTreeMatcher, KindDeclarations,
+  MatcherComponent, Start, Stop, TransportComponent,
 };
 use crate::contract::files::{self, ContractWriter};
 use crate::hooks::ConfigLoader;
@@ -64,6 +64,10 @@ pub struct Engine {
   /// design 2.6) — empty for a plain [`Engine::new`], which is a legitimate engine that simply
   /// answers `start-transport` with `component-unavailable`.
   transports: HashMap<String, Arc<dyn TransportComponent>>,
+  /// What a transport kind declares, for a kind no registered transport serves (ADR 0094): the
+  /// kernel's own `message`, and whatever [`Engine::register_kind`] adds, as the WASM engine adds
+  /// `http`. A transport registered for a kind is what declares it.
+  kinds: HashMap<String, KindDeclarations>,
   /// The content components compiled into this embedding, in precedence order. A session or run
   /// puts the components its project declared ahead of these ([`Scope`], plan task 8.1).
   content: ContentRegistry,
@@ -166,6 +170,7 @@ impl Engine {
       shut_down: false,
       sessions: SessionStore::default(),
       transports: HashMap::new(),
+      kinds: builtin_kinds(),
       content: ContentRegistry::new(),
       loaders: Vec::new(),
       in_tree: Vec::new(),
@@ -216,6 +221,7 @@ impl Engine {
       shut_down: false,
       sessions: SessionStore::default(),
       transports,
+      kinds: builtin_kinds(),
       content,
       loaders: Vec::new(),
       in_tree,
@@ -280,6 +286,24 @@ impl Engine {
       actions: actions.iter().map(|action| action.to_string()).collect(),
       matcher,
     });
+  }
+
+  /// Hold what a transport of `kind` declares, for an embedding with no transport for it (ADR 0094):
+  /// a recording reads an observation of the kind through it, and a session redacts what it names a
+  /// credential, as they would through the transport. It is not a transport: nothing is declared
+  /// in-tree, and `start-transport` for the kind is still `component-unavailable`. A transport
+  /// registered for the kind is what declares it, whatever is registered here.
+  pub fn register_kind(&mut self, kind: &str, declarations: KindDeclarations) {
+    self.kinds.insert(kind.to_string(), declarations);
+  }
+
+  /// What `kind` declares (ADR 0094 decision 2): the transport registered for it, else the kind
+  /// registered. `None` for a kind nothing declares.
+  fn kind_declarations(&self, kind: &str) -> Option<KindDeclarations> {
+    match self.transports.get(kind) {
+      Some(transport) => Some(KindDeclarations::of(transport.as_ref())),
+      None => self.kinds.get(kind).cloned(),
+    }
   }
 
   /// Load a scope's declared components (spec §10.3 steps 4–5).
@@ -529,16 +553,21 @@ impl Engine {
     ResponseFrame::ok(id, json!({ "session": session, "stream": stream_id }))
   }
 
-  /// What the engine redacts in `scope` (ADR 0074): each transport kind's declared credentials, a
-  /// transport the project declared ahead of the embedding's own, and a session's own choices.
+  /// What the engine redacts in `scope` (ADR 0074): the credentials each kind declares, a transport
+  /// the project declared ahead of the embedding's own and a kind with no transport included (ADR
+  /// 0094), and a session's own choices.
   fn redaction(&self, scope: Option<&Scope>, chosen: SessionRedaction) -> Redaction {
-    let mut kinds: Vec<&String> = self.transports.keys().collect();
-    kinds.sort();
+    let kinds: std::collections::BTreeSet<&String> =
+      self.transports.keys().chain(self.kinds.keys()).collect();
     kinds.into_iter().fold(Redaction::new(chosen), |redaction, kind| {
-      let transport = scope
-        .and_then(|scope| scope.transport(kind))
-        .unwrap_or_else(|| Arc::clone(&self.transports[kind]));
-      redaction.with_transport(kind, transport.as_ref())
+      let declared = match scope.and_then(|scope| scope.transport(kind)) {
+        Some(transport) => Some(KindDeclarations::of(transport.as_ref())),
+        None => self.kind_declarations(kind),
+      };
+      match declared {
+        Some(declared) => redaction.with_credentials(kind, &declared.credential_members),
+        None => redaction,
+      }
     })
   }
 
@@ -1143,15 +1172,15 @@ impl Engine {
   /// diagnostic channel: contract-file spec §8.1 requires the conversion to be honest rather than
   /// lossless, and a caller that ignored them would be reading only half of what it was told.
   /// `provider-shape-session/create` (spec §8.5): a recording session, which holds no transport,
-  /// runs nothing, and is released by `finalise`. It reads what the transport for its kind declares
-  /// (ADR 0086 decision 3), so a kind no transport serves is `component-unavailable`.
+  /// runs nothing, and is released by `finalise`. It reads what its kind declares (ADR 0086 decision
+  /// 3, ADR 0094), so a kind nothing declares is `component-unavailable`.
   fn handle_create_recording(&mut self, id: String, body: Value) -> ResponseFrame {
     let create: CreateRecording = match parse_body(body) {
       Ok(create) => create,
       Err(err) => return ResponseFrame::err(id, err),
     };
     let kind = create.kind.as_deref().unwrap_or(RECORDING_KIND).to_string();
-    if self.recording_declarations(&kind).is_none() {
+    if self.kind_declarations(&kind).is_none() {
       return ResponseFrame::err(id, EngineError::component_unavailable(&kind));
     }
     let policy = create
@@ -1166,17 +1195,6 @@ impl Engine {
       RecordingSession::new(create.provider, policy, kind),
     );
     ResponseFrame::ok(id, json!({ "session": session }))
-  }
-
-  /// What a recording of `kind` reads (ADR 0086 decision 3): what the transport for it declares,
-  /// else, for the kind `message`, what `produce-message` hooks produce (ADR 0090 decision 3).
-  /// `None` for a kind nothing serves.
-  fn recording_declarations(&self, kind: &str) -> Option<RecordingDeclarations> {
-    match self.transports.get(kind) {
-      Some(transport) => Some(RecordingDeclarations::of(transport.as_ref())),
-      None if kind == crate::hooks::points::PRODUCED_KIND => Some(RecordingDeclarations::produced_message()),
-      None => None,
-    }
   }
 
   /// `provider-shape-session/observe` (spec §8.5): one answer the provider produced, read as an
@@ -1194,7 +1212,7 @@ impl Engine {
     else {
       return ResponseFrame::err(id, EngineError::session_not_found(&req.session));
     };
-    let Some(declarations) = self.recording_declarations(&kind) else {
+    let Some(declarations) = self.kind_declarations(&kind) else {
       return ResponseFrame::err(id, EngineError::component_unavailable(&kind));
     };
     let Some(session) = self.recordings.get_mut(&req.session) else {
@@ -1623,6 +1641,15 @@ pub(super) fn verify_error(err: VerifyError) -> EngineError {
     VerifyError::NotAContract { index, found } => EngineError::not_a_contract(index, found.as_deref()),
     VerifyError::ContractInvalid { problems } => EngineError::document_invalid(&problems),
   }
+}
+
+/// The kinds every engine declares, whatever embeds it (ADR 0094 decision 2): `message`, as
+/// `produce-message` hooks produce one (ADR 0090 decision 3).
+fn builtin_kinds() -> HashMap<String, KindDeclarations> {
+  HashMap::from([(
+    crate::hooks::points::PRODUCED_KIND.to_string(),
+    super::provider_shape_session::produced_message(),
+  )])
 }
 
 /// The implementations every engine has, whatever embeds it: exactly one, `script`, and that is

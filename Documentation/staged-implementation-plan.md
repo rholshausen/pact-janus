@@ -2801,6 +2801,23 @@ once there are shapes to publish.
   *Exit:* the sample provider's answers recorded through `janus-engine.wasm` under the `wasmtime` crate,
   as `engine/component-host/tests/engine_wasm.rs` runs it, give the shape the native engine records from
   the same observations, byte for byte, credential members included.
+  *Done 2026-11-18* ([ADR 0094](decisions/0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md)):
+  - The kernel holds what a kind declares, its exchange parts, outcome slots and credential members,
+    as `KindDeclarations`, and an embedding with no transport for a kind registers them with
+    `Engine::register_kind`. A transport registered for the kind still declares it, and the kernel
+    registers `message` itself, so the built-in kind is no longer a special case. A registered kind
+    is not a transport: nothing is declared in-tree, `engine/hello` is unchanged, and
+    `start-transport` for it is still `component-unavailable`.
+  - `pact_janus_component_http::kind` is HTTP's declarations, built without the `transport` feature.
+    `HttpTransport` answers from it, and `janus-engine.wasm` registers it for `http`.
+  - `engine_wasm.rs`'s `under_the_wasmtime_crate_it_records_a_provider_shape_as_the_native_engine_does`
+    is the exit: the sample provider's answers, fetched through the HTTP transport's drive role with a
+    `Set-Cookie` added to the 404, recorded through the artifact and through the native engine, every
+    frame the same, `finalise`'s shape included, and no frame repeating the cookie.
+    `provider_shape_by_operation.rs` checks the registry natively.
+  - Not foreseen: redaction asked the registered transports too, so a v1–v4 pact upgraded in the
+    artifact kept its `Authorization` and `Set-Cookie` values, which `janus upgrade` redacts. It now
+    reads the registered kinds as well, and `engine_wasm.rs` upgrades one pact both ways.
 - **S4.10 A provider-shape plugin for Drift** — **M**, as S4.10a (HTTP) and S4.10b (messages). Added
   2026-11-16. Drift runs test cases against a provider from its OpenAPI or AsyncAPI document, and its
   plugins are WASM components. A Drift plugin that records each answer into a provider shape gives a

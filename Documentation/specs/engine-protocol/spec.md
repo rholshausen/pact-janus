@@ -928,9 +928,11 @@ settles it so a provider's own test suite can use it:
 - **An observation is an arrival.** `parts` are the transport's own, as it presents them
   (component-interfaces spec §5.9 for HTTP), a content slot carrying its octets tagged `base64` and
   labelled with its type. They are read as a verification reads what a provider answered: through
-  what the transport for the session's `kind` declares (`http` unless given; a kind no transport
-  serves is `component-unavailable`), and the engine's content components, so no host decodes a
-  body. Only the answering part is recorded. The kind `message`, which no transport serves yet, is
+  what the session's `kind` declares (`http` unless given), and the engine's content components, so
+  no host decodes a body. A kind's declarations are its transport's, or, in an embedding with no
+  transport for it, what the embedding holds for the kind: the WASM engine holds `http`'s, so it
+  records an HTTP provider's answers as `janus-engine` does ([ADR 0094](../../decisions/0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md)).
+  A kind nothing declares is `component-unavailable`. Only the answering part is recorded. The kind `message`, which no transport serves yet, is
   what `produce-message` hooks produce (lifecycle-hooks spec §3.4): a `message` part answering a
   synchronous message's `request`, with no outcome slots and no credential members, and a body
   with no label read by its metadata's `contentType`, else what its octets are detected as, as a

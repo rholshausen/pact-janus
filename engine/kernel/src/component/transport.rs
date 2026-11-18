@@ -105,6 +105,29 @@ pub struct ExchangeParts {
   pub answering: Option<String>,
 }
 
+/// What a transport kind declares that is not I/O (ADR 0094 decision 1): which part answers an
+/// exchange, which slots tell its outcomes apart, and which members carry credentials. What a
+/// recording reads an observation through (ADR 0086 decision 3) and what a session redacts (ADR
+/// 0074). An embedding with no transport for a kind may still hold its declarations
+/// (`Engine::register_kind`), as the WASM engine holds HTTP's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindDeclarations {
+  pub exchange_parts: ExchangeParts,
+  pub outcome_slots: OutcomeSlots,
+  pub credential_members: crate::redaction::CredentialMembers,
+}
+
+impl KindDeclarations {
+  /// What `transport` declares.
+  pub fn of(transport: &dyn TransportComponent) -> KindDeclarations {
+    KindDeclarations {
+      exchange_parts: transport.exchange_parts(),
+      outcome_slots: transport.outcome_slots(),
+      credential_members: transport.credential_members(),
+    }
+  }
+}
+
 /// Native binding (spec §9.1): one method per operation, taking that operation's request document
 /// and returning `Result<ResultDocument, ComponentError>` — the same documents a byte-pipe binding
 /// would carry, passed as in-memory values instead.

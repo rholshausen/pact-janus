@@ -17,11 +17,13 @@
 
 //!
 //! The transport is behind the default `transport` feature; without it the crate is the matcher half
-//! alone, which needs no runtime and builds for `wasm32-wasip2` (ADR 0092).
+//! and what the kind declares ([`kind`]), which need no runtime and build for `wasm32-wasip2`
+//! (ADR 0092, ADR 0094).
 
 mod compare;
 #[cfg(feature = "transport")]
 mod drive;
+pub mod kind;
 pub mod list;
 mod media_type;
 pub mod path;

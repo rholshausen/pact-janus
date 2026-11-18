@@ -11,8 +11,8 @@
 //! The engine makes no call of its own and holds no opinion about how the provider was called. An
 //! observation is an arrival (ADR 0086 decision 3): the transport's own parts, each slot wrapped as
 //! a contract wraps one, a content slot carrying its octets. They are read as a verification reads
-//! what a provider answered, through the declarations the transport for the session's kind makes
-//! (component-interfaces spec §5) and the session's content registry, so the kernel still does not
+//! what a provider answered, through what the session's kind declares (component-interfaces spec §5,
+//! ADR 0094) and the session's content registry, so the kernel still does not
 //! know what a response is. An observation names the operation it answered (decision 1), and the
 //! transport's outcome slots keep one operation's outcomes apart (decision 4).
 //!
@@ -20,7 +20,7 @@
 //! hooks produce one, and an observation names the kind it is of, so one session records a
 //! provider's HTTP answers and its messages into one shape (ADR 0090).
 
-use crate::component::{ContentComponent, ExchangeParts, OutcomeSlots, Parts, TransportComponent};
+use crate::component::{ContentComponent, ExchangeParts, KindDeclarations, OutcomeSlots, Parts};
 use crate::contract::Party;
 use crate::error::Problem;
 use crate::hooks::points::{PRODUCED_PART, PRODUCED_REQUEST_PART};
@@ -107,35 +107,18 @@ pub struct Write {
   pub source: String,
 }
 
-/// What a transport declares that a recording reads (component-interfaces spec §5).
-#[derive(Debug, Clone)]
-pub struct Declarations {
-  pub exchange_parts: ExchangeParts,
-  pub outcome_slots: OutcomeSlots,
-  pub credential_members: crate::redaction::CredentialMembers,
-}
-
-impl Declarations {
-  pub fn of(transport: &dyn TransportComponent) -> Declarations {
-    Declarations {
-      exchange_parts: transport.exchange_parts(),
-      outcome_slots: transport.outcome_slots(),
-      credential_members: transport.credential_members(),
-    }
-  }
-
-  /// What `produce-message` hooks produce, for the kind `message` when no transport serves it (ADR
-  /// 0090 decision 3): the `message` part answers a synchronous message's `request` (ADR 0067
-  /// decision 2), and nothing tells a message's outcomes apart or is a credential.
-  pub fn produced_message() -> Declarations {
-    Declarations {
-      exchange_parts: ExchangeParts {
-        initiating: PRODUCED_REQUEST_PART.to_string(),
-        answering: Some(PRODUCED_PART.to_string()),
-      },
-      outcome_slots: OutcomeSlots::new(),
-      credential_members: crate::redaction::CredentialMembers::new(),
-    }
+/// What `produce-message` hooks produce, the kind `message`'s declarations, which the kernel registers
+/// itself (ADR 0090 decision 3, ADR 0094 decision 2): the `message` part answers a synchronous
+/// message's `request` (ADR 0067 decision 2), and nothing tells a message's outcomes apart or is a
+/// credential.
+pub fn produced_message() -> KindDeclarations {
+  KindDeclarations {
+    exchange_parts: ExchangeParts {
+      initiating: PRODUCED_REQUEST_PART.to_string(),
+      answering: Some(PRODUCED_PART.to_string()),
+    },
+    outcome_slots: OutcomeSlots::new(),
+    credential_members: crate::redaction::CredentialMembers::new(),
   }
 }
 
@@ -168,7 +151,7 @@ impl Session {
   pub fn observe(
     &mut self,
     request: &Observe,
-    declarations: &Declarations,
+    declarations: &KindDeclarations,
     content: Option<&dyn ContentComponent>,
     actions: &dyn ActionApplier,
   ) -> Result<Vec<String>, EngineError> {

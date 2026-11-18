@@ -284,6 +284,10 @@ Three sources are the source of truth and take precedence over this file when th
 > `--provider-version` or `--provider-branch` and `--publish`. The broker half is S4.3d's
 > (`broker-pr-series.md` §8): until it exists, the client is tested against `tools/test-servers`'
 > `BrokerStandIn`, and the `janus` feature's pact is verified only when `JANUS_PACT_BROKER_JANUS` is set.
+> S4.9 (ADR 0094): what a transport kind declares (exchange parts, outcome slots, credential members)
+> is `KindDeclarations`, which an embedding with no transport for the kind registers
+> (`Engine::register_kind`); `janus-engine.wasm` registers HTTP's (`pact_janus_component_http::kind`),
+> so it records an HTTP provider's shape, and redacts an upgraded pact, as `janus-engine` does.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -308,7 +312,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  registered after component-form, which decodes each part through the built-in
                  JSON, XML, text and form components it holds itself;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
-                 ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32;
+                 ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32,
+                 holding the HTTP component's matchers and kind declarations but no transport (ADR 0094);
                  its hosts/ruby is the Ruby host a Pact Broker would write (ADR 0092, S4.3a)
 cli/             `janus` CLI (verify, explain, upgrade, check, derive)
 sdks/typescript/ TypeScript SDK prototype (DSL + Jest/Vitest integration); src/generated/ holds

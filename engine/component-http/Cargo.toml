@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_component_http"
-description = "The built-in HTTP transport component (component-interfaces spec §5): a real mock HTTP server in the serve role (plan task 4.2) and a real HTTP client in the drive role (plan task 5.1), both behind the transport interface, native binding; and its matchers (http:path, http:media-type, http:list, http:status-class), which build without the transport feature for the engine's WASM component."
+description = "The built-in HTTP transport component (component-interfaces spec §5): a real mock HTTP server in the serve role (plan task 4.2) and a real HTTP client in the drive role (plan task 5.1), both behind the transport interface, native binding; and its matchers (http:path, http:media-type, http:list, http:status-class) and what the kind declares (ADR 0094), which build without the transport feature for the engine's WASM component."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

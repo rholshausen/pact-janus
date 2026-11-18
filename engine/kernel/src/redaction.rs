@@ -229,15 +229,9 @@ impl Redaction {
     }
   }
 
-  /// What a transport of `kind` declares.
-  pub fn with_transport(
-    mut self,
-    kind: &str,
-    transport: &dyn crate::component::TransportComponent,
-  ) -> Redaction {
-    self
-      .defaults
-      .insert(kind.to_string(), members_of(&transport.credential_members()));
+  /// The credentials `kind` declares, by its transport or with none (ADR 0094).
+  pub fn with_credentials(mut self, kind: &str, credentials: &CredentialMembers) -> Redaction {
+    self.defaults.insert(kind.to_string(), members_of(credentials));
     self
   }
 

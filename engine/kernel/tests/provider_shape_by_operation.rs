@@ -308,6 +308,62 @@ fn a_kind_no_transport_serves_cannot_be_recorded() {
   assert_eq!(refused["error"]["details"]["component"], "grpc");
 }
 
+/// ADR 0094: an embedding with no transport for a kind may hold what the kind declares, as the
+/// engine's WASM component holds HTTP's. A recording reads it as it would the transport's, and it is
+/// not a transport: starting one of the kind is still refused.
+#[test]
+fn a_kind_declared_with_no_transport_records_as_its_transport_would() {
+  let record = |engine: &mut Engine| {
+    let session = create(engine);
+    for (status, cookie) in [(200, None), (404, Some("session=s3cr3t; HttpOnly"))] {
+      let mut headers = json!({ "content-type": ["application/json"] });
+      if let Some(cookie) = cookie {
+        headers["set-cookie"] = json!([cookie]);
+      }
+      let observed = observe(
+        engine,
+        &session,
+        "/orders/66",
+        response(status, headers, b"{\"id\":\"66\"}", Some("application/json")),
+      );
+      assert!(observed.get("ok").is_some(), "{observed:#}");
+    }
+    finalise(engine, &session)
+  };
+
+  let mut declared = Engine::with_components(HashMap::new(), Some(Arc::new(JsonContent::new())));
+  declared.register_matcher(
+    status::NAME,
+    "1.0.0",
+    status::ACTIONS,
+    Arc::new(status::HttpMatcher::new()),
+  );
+  declared.register_kind(
+    pact_janus_component_http::kind::KIND,
+    pact_janus_component_http::kind::declarations(),
+  );
+  send(
+    &mut declared,
+    "engine/hello",
+    json!({ "protocol-versions": [1], "host": { "name": "janus-test", "version": "0.0.0" } }),
+  );
+  let shape = record(&mut declared);
+  assert_eq!(shape, record(&mut engine(None)));
+  assert!(!shape.to_string().contains("s3cr3t"), "{shape:#}");
+
+  let created = send(
+    &mut declared,
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "web-app" }, "provider": { "name": "order-service" } } }),
+  );
+  let started = send(
+    &mut declared,
+    "consumer-session/start-transport",
+    json!({ "session": created["ok"]["session"], "transport": "http" }),
+  );
+  assert_eq!(started["error"]["code"], "component-unavailable", "{started:#}");
+}
+
 // --- the engine's host writes the shape, from every source's evidence ----------------------------
 
 fn write(engine: &mut Engine, session: &str, source: &str) -> Value {

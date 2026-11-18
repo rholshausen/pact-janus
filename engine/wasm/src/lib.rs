@@ -1,12 +1,14 @@
 //! The Janus engine as a WASM component: the embedding for offline operations (ADR 0023
 //! decision 2), for a host that wants Janus's answers without a native binary.
 //!
-//! It is `Engine::dispatch` behind the frozen pipe, with the in-tree content components and the HTTP
-//! component's matchers (ADR 0092), and it has no transports and registers no background work: a `wasm32-wasip2` guest has sockets, but no
-//! threads for the exchange loop or a run, and the HTTP transport was not built for the target
-//! (Phase 9 finding 3, ADR 0062). So it does what the kernel does without I/O (handshake, compile,
-//! variant enumeration, upgrade, subsumption), and `start-transport` and `verification/verify` fail
-//! by name, as `component-unavailable` naming `background`.
+//! It is `Engine::dispatch` behind the frozen pipe, with the in-tree content components, the HTTP
+//! component's matchers (ADR 0092) and what the kind `http` declares (ADR 0094), and it has no
+//! transports and registers no background work: a `wasm32-wasip2` guest has sockets, but no threads
+//! for the exchange loop or a run, and the HTTP transport was not built for the target (Phase 9
+//! finding 3, ADR 0062). So it does what the kernel does without I/O (handshake, compile, variant
+//! enumeration, upgrade, subsumption, recording a provider shape from the answers a host observed),
+//! and `start-transport` and `verification/verify` fail by name, as `component-unavailable` naming
+//! `background`.
 //!
 //! Plan task 9.1 built it to measure it, in `benchmarks/janus/`; staged plan S0.4 moved it here and
 //! ships it. The harness still measures it, through the `bench` feature's second world.
@@ -17,7 +19,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use pact_janus_component_form::FormContent;
-use pact_janus_component_http::status;
+use pact_janus_component_http::{kind, status};
 use pact_janus_component_json::JsonContent;
 use pact_janus_component_multipart::MultipartContent;
 use pact_janus_component_text::TextContent;
@@ -49,6 +51,10 @@ fn engine() -> Engine {
     status::ACTIONS,
     Arc::new(status::HttpMatcher::new()),
   );
+  // What the kind `http` declares, without its transport (ADR 0094): a host records an HTTP
+  // provider's answers through it, its `Set-Cookie` recorded only as present, and a consumer
+  // session's contract redacts HTTP's credentials, as `janus-engine` does.
+  engine.register_kind(kind::KIND, kind::declarations());
   // XML before text, which claims all of `text/*`, so `text/xml` reaches it (ADR 0039).
   engine.register_content(Arc::new(XmlContent::new()));
   engine.declare_in_tree("content", "xml", "1.0.0");
