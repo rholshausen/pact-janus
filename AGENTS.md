@@ -276,6 +276,14 @@ Three sources are the source of truth and take precedence over this file when th
 > open on the port (pact_broker-rs#23). Rows 2 and 3, a contract published as `specification: "janus"`
 > and read by its `$format` behind the brokers' `janus` feature, are pact_broker#1094 and
 > pact_broker-rs#24 (`broker-pr-series.md` §7).
+> S4.3b is built (ADR 0093): `broker/publish-provider-shape` publishes a provider shape and
+> `broker/check-contracts` checks contracts against the shapes their providers published, publishing
+> each report beside its shape when asked, each resource found by the link a broker's index
+> advertises. A Janus contract is sent as `janus` only to a broker that advertises
+> `pb:publish-janus-contracts`. `janus publish` takes shapes, and `janus check --broker-url` takes
+> `--provider-version` or `--provider-branch` and `--publish`. The broker half is S4.3d's
+> (`broker-pr-series.md` §8): until it exists, the client is tested against `tools/test-servers`'
+> `BrokerStandIn`, and the `janus` feature's pact is verified only when `JANUS_PACT_BROKER_JANUS` is set.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -358,7 +366,8 @@ tools/           Repo tooling (workspace members), e.g. tools/schema-compat — 
                  harness: today's verifier and janus verify over corpora/verifier/
                  tools/test-servers holds the servers tests that need a network share (S1.5): a
                  certificate authority made per test, a TLS provider that can demand a client
-                 certificate, and a forward proxy that records what it carried.
+                 certificate, a forward proxy that records what it carried, and a stand-in for a
+                 Pact Broker with the janus feature (ADR 0093), until one built from S4.3d exists.
 .changeset/      Change files: what each unreleased change means to someone who pins the engine,
                  and how big it is. `knope prepare-release` consumes them (ADR 0028); knope.toml
                  configures it and CHANGELOG.md is what it writes
@@ -553,12 +562,14 @@ janus verify --url <pact-url>... | --webhook-callback-url <pact-url>   # pacts b
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
             [--as-of <YYYY-MM-DD>] [--output text|json]
+            [--broker-url <url> (--provider-version <v> | --provider-branch <b>) [--publish]
+             [--broker-username <u> --broker-password <p> | --broker-token <t>]]   # shapes from a broker (S4.3b, ADR 0093)
 janus explain <document.json> [--index N | --description <text>] [--variant <id>] [--spec] [--plan] [--executed <values.json>]
               [--config verifier.janus.yaml]   # the components a run would load (S1.12, ADR 0050)
 janus upgrade <pact.json> [--write <file>] [--quiet] [--exclude-pending] [--output text|json]
 janus derive <openapi|asyncapi document> [--provider <name>] [--base-path <p>] [--assume-non-empty]
              [--write <file>] [--quiet] [--output text|json]   # a derived provider shape (S4.2, ADR 0088; S4.8, ADR 0091)
-janus publish <contract-or-pact>... --consumer-app-version <v> --broker-base-url <url>
+janus publish <contract-pact-or-shape>... [--consumer-app-version <v>] [--provider-app-version <v>] --broker-base-url <url>
               [--branch <b>] [--tag <t>]... [--build-url <url>]
               [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings
 janus component push <component.wasm> <reference> [--output text|json]

@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_test_servers"
-description = "Servers for tests that need a network (staged plan S1.5): a certificate authority made per test, a TLS provider that can demand a client certificate, and a forward proxy that records what it carried. Test-only: nothing that ships depends on it."
+description = "Servers for tests that need a network (staged plan S1.5): a certificate authority made per test, a TLS provider that can demand a client certificate, a forward proxy that records what it carried, and a stand-in for a Pact Broker with the janus feature (ADR 0093). Test-only: nothing that ships depends on it."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,6 +15,10 @@ rcgen = { version = "0.14.10", default-features = false, features = ["ring", "pe
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 # A certificate's validity, around today: rcgen's own date type.
 time = { version = "0.3", default-features = false, features = ["std"] }
+# The broker stand-in: a plain HTTP server, the documents it stores, and the base64 they arrive in.
+tiny_http = "0.12"
+serde_json = "1"
+base64 = "0.23"
 
 [lints]
 workspace = true

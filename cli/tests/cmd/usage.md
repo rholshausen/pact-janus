@@ -21,8 +21,8 @@ Commands:
                carry
   derive       Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the
                derivation could not carry
-  publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
-               consumer
+  publish      Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a
+               version of the consumer or provider they belong to
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
@@ -95,7 +95,7 @@ Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the d
 ```console
 $ janus publish
 ? 2
-Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
+Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a version of the
 ...
 ```
 
@@ -286,15 +286,29 @@ For more information, try '--help'.
 
 ```
 
-Publishing contracts needs the consumer version they belong to.
+Checking against a broker's shapes needs to say which of each provider's shapes: a version, or a
+branch.
 
 ```console
-$ janus publish pact.json --broker-base-url http://127.0.0.1:2
+$ janus check pact.json --broker-url http://127.0.0.1:2
 ? 2
 error: the following required arguments were not provided:
-  --consumer-app-version <VERSION>
+  <--provider-version <VERSION>|--provider-branch <BRANCH>>
 
-Usage: janus publish --consumer-app-version <VERSION> --broker-base-url <URL> <CONTRACT_OR_PACT>...
+Usage: janus check --broker-url <URL> <--provider-version <VERSION>|--provider-branch <BRANCH>> <CONTRACT_OR_PACT>...
+
+For more information, try '--help'.
+
+```
+
+And the shapes come from the broker or from files, not both.
+
+```console
+$ janus check pact.json --broker-url http://127.0.0.1:2 --provider-branch main --provider-shape shape.json
+? 2
+error: the argument '--broker-url <URL>' cannot be used with '--provider-shape <PATH>'
+
+Usage: janus check --broker-url <URL> <--provider-version <VERSION>|--provider-branch <BRANCH>> <CONTRACT_OR_PACT>...
 
 For more information, try '--help'.
 

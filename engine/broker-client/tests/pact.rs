@@ -18,12 +18,19 @@
 //! response is expected to hold is only what the client reads, matched by type, because what a
 //! client expects back is not evidence of what a broker sends; verification against the real one
 //! is.
+//!
+//! A second pact, the `janus` feature's, holds what the client asks of a broker built from the
+//! broker PR series (ADR 0093, staged plan S4.3d): provider shapes published and fetched, a report
+//! published, and a Janus contract published under its own word. No broker serves those yet, so
+//! it is written beside the first, in `pacts-janus/`, and verified only when
+//! `JANUS_PACT_BROKER_JANUS` names a broker with the feature on. S4.3d's pull requests carry it, and
+//! it is the broker half's specification until they merge.
 
 use pact_consumer::prelude::*;
 use pact_janus_broker_client::HalBrokerClient;
 use pact_janus_kernel::broker::{
   BrokerClient, BrokerDescriptor, ContractToPublish, ContractsToPublish, FetchRequest, InteractionResult,
-  PublishRequest,
+  PublishRequest, ReportToPublish, ShapeAt, ShapeRequest, ShapeToPublish,
 };
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -37,6 +44,9 @@ const BY_FEATURE: &str = "a pact between Condor and the Pricing Service exists w
 const PACT_EXISTS: &str = "a pact between Condor and the Pricing Service exists";
 const BOTH_EXIST: &str = "the 'Pricing Service' and 'Condor' already exist in the pact-broker";
 const ALREADY_PUBLISHED: &str = "the 'Pricing Service' and 'Condor' already exist in the pact-broker, and Condor already has a pact published for version 1.3.0";
+
+const SHAPE_PUBLISHED: &str =
+  "the Pricing Service has published a provider shape for version 4.1.0 on branch main";
 
 const ACCEPT: &str = "application/hal+json, application/json";
 
@@ -62,10 +72,35 @@ fn pact_dir() -> PathBuf {
   PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pacts")
 }
 
+/// Where the `janus` feature's pact is written: beside the first, under the same names, in a
+/// directory of its own, since each test starts by emptying its directory.
+fn janus_pact_dir() -> PathBuf {
+  PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pacts-janus")
+}
+
 fn builder() -> PactBuilder {
   let mut builder = PactBuilder::new(CONSUMER, PROVIDER);
   builder.with_output_dir(pact_dir());
   builder
+}
+
+fn janus_builder() -> PactBuilder {
+  let mut builder = PactBuilder::new(CONSUMER, PROVIDER);
+  builder.with_output_dir(janus_pact_dir());
+  builder
+}
+
+/// The shape the states publish for the Pricing Service 4.1.0.
+fn seeded_shape() -> Value {
+  json!({
+    "$format": "janus-provider-shape/1",
+    "provider": { "name": "Pricing Service" },
+    "provenance": "recorded",
+    "interactions": [{
+      "description": "a request for prices",
+      "parts": { "response": { "status": { "shape": "equality", "example": 200 } } }
+    }]
+  })
 }
 
 /// The index, as every scenario asks for it: the links the client follows from it, and nothing
@@ -318,6 +353,7 @@ fn condor_contract(status: u16) -> ContractToPublish {
   ContractToPublish {
     provider: "Pricing Service".to_string(),
     content: serde_json::to_vec(&pact).unwrap(),
+    janus: false,
   }
 }
 
@@ -421,6 +457,279 @@ fn publishing_changed_content_for_a_version() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// The janus feature's pact (ADR 0093)
+// ---------------------------------------------------------------------------------------------
+
+/// The index of a broker with the `janus` feature: the links the client follows from it.
+fn janus_index(builder: &mut PactBuilder) -> &mut PactBuilder {
+  builder.interaction("a request for the index resource of a broker with the janus feature", "", |mut i| {
+    i.request.get().path("/").header("Accept", ACCEPT);
+    i.response
+      .status(200)
+      .header("Content-Type", "application/hal+json")
+      .json_body(json_pattern!({
+        "_links": {
+          "pb:publish-contracts": { "href": like!("http://localhost:9292/contracts/publish") },
+          "pb:publish-janus-contracts": { "href": like!("http://localhost:9292/contracts/publish") },
+          "pb:publish-provider-shape": { "href": like!("http://localhost:9292/provider-shapes/publish") },
+          "pb:provider-shape": {
+            "href": like!("http://localhost:9292/pacticipants/{provider}/versions/{version}/provider-shape")
+          },
+          "pb:latest-branch-provider-shape": {
+            "href": like!("http://localhost:9292/pacticipants/{provider}/branches/{branch}/latest-version/provider-shape")
+          }
+        }
+      }));
+    i
+  })
+}
+
+/// The shape as a broker serves it: what the client reads of it.
+fn a_served_shape() -> JsonPattern {
+  json_pattern!({
+    "$format": "janus-provider-shape/1",
+    "provider": { "name": "Pricing Service" },
+    "interactions": each_like!({ "description": like!("a request for prices") }),
+    "_links": {
+      "pb:provider-version": {
+        "name": "4.1.0",
+        "href": like!("http://localhost:9292/pacticipants/Pricing%20Service/versions/4.1.0")
+      },
+      "pb:publish-subsumption-report": {
+        "href": like!("http://localhost:9292/provider-shapes/1/subsumption-reports")
+      }
+    }
+  })
+}
+
+fn janus_descriptor(url: &str) -> BrokerDescriptor {
+  descriptor(url)
+}
+
+/// The Pricing Service publishes its shape for 4.1.0 on main.
+fn publishing_a_provider_shape() {
+  use base64::Engine as _;
+  let content = serde_json::to_vec(&seeded_shape()).unwrap();
+  let mut builder = janus_builder();
+  janus_index(&mut builder);
+  builder.interaction("a request to publish a provider shape", "", |mut i| {
+    i.given(BOTH_EXIST);
+    i.request
+      .post()
+      .path("/provider-shapes/publish")
+      .header("Accept", ACCEPT)
+      .header("Content-Type", "application/json")
+      .json_body(json_pattern!({
+        "pacticipantName": "Pricing Service",
+        "pacticipantVersionNumber": "4.1.0",
+        "branch": "main",
+        "tags": ["prod"],
+        "buildUrl": "https://ci.example/builds/9",
+        "contentType": "application/json",
+        "content": base64::engine::general_purpose::STANDARD.encode(&content)
+      }));
+    i.response
+      .status(200)
+      .header("Content-Type", "application/hal+json")
+      .json_body(json_pattern!({
+        "notices": each_like!({ "text": like!("Provider shape published for Pricing Service version 4.1.0.") })
+      }));
+    i
+  });
+  let server = builder.start_mock_server(None, None);
+  let broker = janus_descriptor(server.url().as_str());
+  let published = HalBrokerClient::new()
+    .publish_provider_shape(&ShapeToPublish {
+      broker: &broker,
+      provider: "Pricing Service",
+      provider_version: "4.1.0",
+      branch: Some("main"),
+      tags: &["prod".to_string()],
+      build_url: Some("https://ci.example/builds/9"),
+      content: &content,
+    })
+    .expect("publishes");
+  assert!(!published.notices.is_empty());
+}
+
+/// A consumer's pipeline fetches the Pricing Service's shape by version, then by branch, and
+/// publishes its report about it to the shape's own link.
+fn fetching_a_provider_shape_and_publishing_a_report() {
+  let report = json!({
+    "$format": "janus-subsumption-report/1",
+    "consumer": { "name": "Condor" },
+    "provider": { "name": "Pricing Service" },
+    "interactions": [],
+    "summary": { "interactions": 1, "matched": 0, "findings": 0, "reviews": 0 }
+  });
+  let contract = serde_json::to_vec(&seeded_pact()).unwrap();
+  let mut builder = janus_builder();
+  janus_index(&mut builder);
+  builder
+    .interaction("a request for the provider shape of a version", "", |mut i| {
+      i.given(SHAPE_PUBLISHED);
+      i.request
+        .get()
+        .path("/pacticipants/Pricing%20Service/versions/4.1.0/provider-shape")
+        .header("Accept", ACCEPT);
+      i.response
+        .status(200)
+        .header("Content-Type", "application/hal+json")
+        .json_body(a_served_shape());
+      i
+    })
+    .interaction(
+      "a request for the latest provider shape of a branch",
+      "",
+      |mut i| {
+        i.given(SHAPE_PUBLISHED);
+        i.request
+          .get()
+          .path("/pacticipants/Pricing%20Service/branches/main/latest-version/provider-shape")
+          .header("Accept", ACCEPT);
+        i.response
+          .status(200)
+          .header("Content-Type", "application/hal+json")
+          .json_body(a_served_shape());
+        i
+      },
+    )
+    .interaction("a request to publish a subsumption report", "", |mut i| {
+      use base64::Engine as _;
+      i.given(SHAPE_PUBLISHED);
+      i.request
+        .post()
+        .path_from_provider_state("${reportPath}", "/provider-shapes/1/subsumption-reports")
+        .header("Accept", ACCEPT)
+        .header("Content-Type", "application/json")
+        .json_body(json_pattern!({
+          "engineVersion": like!(pact_janus_kernel::ENGINE_VERSION),
+          "contract": {
+            "contentType": "application/json",
+            "content": base64::engine::general_purpose::STANDARD.encode(&contract)
+          },
+          "report": report.clone()
+        }));
+      i.response.status(201);
+      i
+    });
+  let server = builder.start_mock_server(None, None);
+  let broker = janus_descriptor(server.url().as_str());
+  let client = HalBrokerClient::new();
+  let by_version = client
+    .fetch_provider_shape(&ShapeRequest {
+      broker: &broker,
+      provider: "Pricing Service",
+      at: &ShapeAt::Version("4.1.0".to_string()),
+    })
+    .expect("fetches")
+    .expect("a shape");
+  assert_eq!(by_version.provider_version.as_deref(), Some("4.1.0"));
+  let by_branch = client
+    .fetch_provider_shape(&ShapeRequest {
+      broker: &broker,
+      provider: "Pricing Service",
+      at: &ShapeAt::Branch("main".to_string()),
+    })
+    .expect("fetches")
+    .expect("a shape");
+  assert!(by_branch.reportable);
+  client
+    .publish_report(&ReportToPublish {
+      broker: &broker,
+      handle: &by_branch.handle,
+      contract: &contract,
+      report: &report,
+    })
+    .expect("publishes the report");
+}
+
+/// No shape was published for the version asked about.
+fn fetching_a_provider_shape_nobody_published() {
+  let mut builder = janus_builder();
+  janus_index(&mut builder);
+  builder.interaction(
+    "a request for the provider shape of a version that has none",
+    "",
+    |mut i| {
+      i.given(BOTH_EXIST);
+      i.request
+        .get()
+        .path("/pacticipants/Pricing%20Service/versions/4.1.0/provider-shape")
+        .header("Accept", ACCEPT);
+      i.response.status(404);
+      i
+    },
+  );
+  let server = builder.start_mock_server(None, None);
+  let broker = janus_descriptor(server.url().as_str());
+  let fetched = HalBrokerClient::new()
+    .fetch_provider_shape(&ShapeRequest {
+      broker: &broker,
+      provider: "Pricing Service",
+      at: &ShapeAt::Version("4.1.0".to_string()),
+    })
+    .expect("not an error");
+  assert!(fetched.is_none());
+}
+
+/// Condor publishes a Janus contract under its own word, to the link that says the broker takes it.
+fn publishing_a_janus_contract() {
+  use base64::Engine as _;
+  let contract = json!({
+    "$format": "janus-contract/1",
+    "consumer": { "name": "Condor" },
+    "provider": { "name": "Pricing Service" },
+    "interactions": []
+  });
+  let content = serde_json::to_vec(&contract).unwrap();
+  let mut builder = janus_builder();
+  janus_index(&mut builder);
+  builder.interaction("a request to publish a Janus contract", "", |mut i| {
+    i.given(BOTH_EXIST);
+    i.request
+      .post()
+      .path("/contracts/publish")
+      .header("Accept", ACCEPT)
+      .header("Content-Type", "application/json")
+      .json_body(json_pattern!({
+        "pacticipantName": "Condor",
+        "pacticipantVersionNumber": "1.3.0",
+        "branch": "main",
+        "tags": ["dev"],
+        "buildUrl": "https://ci.example/builds/2",
+        "contracts": [{
+          "consumerName": "Condor",
+          "providerName": "Pricing Service",
+          "specification": "janus",
+          "contentType": "application/json",
+          "content": base64::engine::general_purpose::STANDARD.encode(&content)
+        }]
+      }));
+    i.response
+      .status(200)
+      .header("Content-Type", "application/hal+json")
+      .json_body(json_pattern!({
+        "notices": each_like!({
+          "text": like!("Pact successfully published for Condor version 1.3.0 and provider Pricing Service.")
+        })
+      }));
+    i
+  });
+  let server = builder.start_mock_server(None, None);
+  let notices = publishing(
+    server.url().as_str(),
+    ContractToPublish {
+      provider: "Pricing Service".to_string(),
+      content,
+      janus: true,
+    },
+  )
+  .expect("publishes");
+  assert!(!notices.is_empty());
+}
+
+// ---------------------------------------------------------------------------------------------
 // Verifying the pact against the pinned broker
 // ---------------------------------------------------------------------------------------------
 
@@ -445,6 +754,20 @@ fn provider_states(broker: String) -> String {
         .unwrap();
       agent.run(request).map(|r| r.status().as_u16()).unwrap_or(0)
     };
+    let get = |path: &str| -> Value {
+      let request = ureq::http::Request::builder()
+        .method("GET")
+        .uri(format!("{broker}{path}"))
+        .header("accept", "application/hal+json")
+        .body(String::new())
+        .unwrap();
+      agent
+        .run(request)
+        .ok()
+        .and_then(|mut response| response.body_mut().read_to_string().ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+    };
     let publish = |branch: &str| {
       use base64::Engine as _;
       let content = base64::engine::general_purpose::STANDARD.encode(seeded_pact().to_string());
@@ -464,6 +787,8 @@ fn provider_states(broker: String) -> String {
       let change: Value = serde_json::from_str(&body).unwrap_or_default();
       let state = change["state"].as_str().unwrap_or_default();
       let mut statuses = Vec::new();
+      // Values the verifier puts into an interaction's request (`fromProviderState`).
+      let mut values = json!({});
       // The verifier calls with no state for an interaction that names none; it needs nothing.
       if change["action"] != json!("teardown") && !state.is_empty() {
         for name in ["Condor", "Pricing%20Service"] {
@@ -478,12 +803,37 @@ fn provider_states(broker: String) -> String {
               statuses.push(send("POST", "/pacticipants", Some(json!({ "name": name }))));
             }
           }
+          // A broker with the janus feature: the shape published as a client publishes it, and the
+          // report link it is served with handed to the verifier.
+          SHAPE_PUBLISHED => {
+            use base64::Engine as _;
+            let content = base64::engine::general_purpose::STANDARD.encode(seeded_shape().to_string());
+            statuses.push(publish("main"));
+            statuses.push(send(
+              "POST",
+              "/provider-shapes/publish",
+              Some(json!({
+                "pacticipantName": "Pricing Service", "pacticipantVersionNumber": "4.1.0", "branch": "main",
+                "contentType": "application/json", "content": content
+              })),
+            ));
+            let shape = get("/pacticipants/Pricing%20Service/versions/4.1.0/provider-shape");
+            if let Some(link) = shape["_links"]["pb:publish-subsumption-report"]["href"].as_str() {
+              let path = link
+                .split_once("://")
+                .map_or(link, |(_, rest)| rest.find('/').map_or("/", |at| &rest[at..]));
+              values["reportPath"] = json!(path);
+            }
+          }
           other => eprintln!("provider state '{other}' has no set-up"),
         }
       }
       let ok = statuses.iter().all(|status| matches!(status, 200..=299 | 404));
+      values["state"] = json!(state);
+      values["statuses"] = json!(statuses);
       let _ = request.respond(
-        tiny_http::Response::from_string(json!({ "state": state, "statuses": statuses }).to_string())
+        tiny_http::Response::from_string(values.to_string())
+          .with_header(tiny_http::Header::from_bytes("Content-Type", "application/json").unwrap())
           .with_status_code(if ok { 200 } else { 500 }),
       );
     }
@@ -538,6 +888,31 @@ fn the_client_keeps_to_its_pact_with_the_pact_broker_and_the_broker_honours_it()
     (Some(broker), Some(verifier)) => verify(&broker, &verifier, &pact),
     _ => eprintln!(
       "{} written and not verified: JANUS_PACT_BROKER and PACT_VERIFIER_CLI name no broker and no verifier",
+      pact.display()
+    ),
+  }
+}
+
+/// The `janus` feature's pact (ADR 0093): verified against a broker with the feature on when
+/// `JANUS_PACT_BROKER_JANUS` names one. Until a broker built from S4.3d exists, nothing does.
+#[test]
+fn the_client_keeps_to_its_pact_with_a_pact_broker_with_the_janus_feature() {
+  let _ = std::fs::remove_dir_all(janus_pact_dir());
+  publishing_a_provider_shape();
+  fetching_a_provider_shape_and_publishing_a_report();
+  fetching_a_provider_shape_nobody_published();
+  publishing_a_janus_contract();
+  let pact = janus_pact_dir().join(format!("{CONSUMER}-{PROVIDER}.json"));
+  assert!(pact.is_file(), "{} was not written", pact.display());
+
+  let broker = std::env::var("JANUS_PACT_BROKER_JANUS")
+    .ok()
+    .filter(|v| !v.is_empty());
+  let verifier = std::env::var("PACT_VERIFIER_CLI").ok().filter(|v| !v.is_empty());
+  match (broker, verifier) {
+    (Some(broker), Some(verifier)) => verify(&broker, &verifier, &pact),
+    _ => eprintln!(
+      "{} written and not verified: JANUS_PACT_BROKER_JANUS names no broker with the janus feature",
       pact.display()
     ),
   }

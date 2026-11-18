@@ -459,7 +459,7 @@ Capabilities defined in v1:
 | `components` | engine | Which component loaders this embedding has: `{ "loaders": ["in-tree", "wasm", …] }` (design 2.6 §10.1, ADR 0013). Always present; `["in-tree"]` alone means `config.components`/`target.components` can name nothing that is not compiled in. |
 | `config-loading` | engine | The engine's host can load a project configuration: `config/load` (§8.8, ADR 0055). Value `{}`. Only native embeddings register a loader; without it `config/load` answers `component-unavailable` naming `config-loader`. |
 | `contract-text` | both | A contract crosses the boundary as its text (§8.9, [ADR 0063](../../decisions/0063-carry-a-contract-across-the-engine-boundary-as-its-text-and-pin-how-numbers-are-written.md)). Value `{}`. Engine: wherever a request carries a contract or a v1–v4 pact, it may carry the document's text. Host: it wants an outbound contract as its canonical text, `contract-text` in place of `contract`. |
-| `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker publication ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and `broker/publish-contracts` answer `component-unavailable` naming `background`, after the request and its documents are checked. |
+| `background` | engine | The engine can run work beside the frame stream: a transport's exchange loop, a verification run, a broker session's work ([ADR 0062](../../decisions/0062-run-the-engines-background-work-on-threads-its-embedding-provides-and-serve-mocks-with-hyper.md)). Value `{}`. Only native embeddings provide it; without it `consumer-session/start-transport`, `verification/verify` and the `broker/*` operations answer `component-unavailable` naming `background`, after the request and its documents are checked. |
 | `contract-writing` | engine | The engine's host can write a contract file, merging into what it holds: `finalise`'s `write` (§8.2, [ADR 0065](../../decisions/0065-let-the-engines-host-write-and-merge-contract-files-in-identity-order.md)). Value `{}`. Only native embeddings register a writer; without it a `write` answers `component-unavailable` naming `contract-writer`. |
 | `test-verdicts` | both | The consumer's test verdict reaches the engine (§8.2, [ADR 0064](../../decisions/0064-report-each-variants-test-verdict-to-the-engine-and-answer-with-its-result.md)). Value `{}`. Engine: it has `consumer-session/report-variant`. Host: it reports every variant it runs, so in the sessions it creates an exercised variant with no report is `not-reported`, and an `add-interaction` the session refused withholds the contract. |
 
@@ -517,9 +517,9 @@ v1 defines four kinds:
 - **Provider-shape session** (§8.5): accumulates what a provider's own tests produced into a
   provider-shape document. Created by `provider-shape-session/create`, ended by its
   `finalise`. It holds no transport and runs nothing — it is a place to put evidence.
-- **Broker session** (§8.7): one publication to a Pact Broker. Created by
-  `broker/publish-contracts`, reports on its stream, ends itself at the terminal event, as a
-  verification session does.
+- **Broker session** (§8.7): one exchange with a Pact Broker. Created by
+  `broker/publish-contracts`, `broker/publish-provider-shape` or `broker/check-contracts`, reports
+  on its stream, ends itself at the terminal event, as a verification session does.
 
 New session kinds arrive as new operations plus capabilities, not as changes to existing
 ones: the provider-shape session is the worked example, behind the `provider-shape-recording`
@@ -1063,13 +1063,17 @@ exit 1, the code it uses for "the subject failed".
 Schema: [`schemas/v1/broker.schema.json`](schemas/v1/broker.schema.json). Decided by
 [ADR 0032](../../decisions/0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md):
 the broker client is the engine's, so no host speaks the broker's API, and it is a native host
-capability, so the kernel knows no HTTP. Behind the `broker` capability (§5.3). An engine without a
+capability, so the kernel knows no HTTP.
+[ADR 0093](../../decisions/0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md)
+adds provider shapes and subsumption reports. Behind the `broker` capability (§5.3). An engine without a
 client — the offline WASM artifact — knows these operations and answers each with
 `component-unavailable` naming `broker`, as it answers a `broker` source or a `publish` option.
 
 | Operation | Body → Result |
 |---|---|
 | `broker/publish-contracts` | `{ broker, consumer-version, contracts, branch?, tags?, build-url? }` → `{ session, stream }` |
+| `broker/publish-provider-shape` | `{ broker, provider-version, provider-shape, branch?, tags?, build-url? }` → `{ session, stream }` |
+| `broker/check-contracts` | `{ broker, contracts, provider-version? \| provider-branch?, publish-reports? }` → `{ session, stream }` |
 
 - **The broker descriptor** is what every broker-facing member takes: `url`, `auth` (`bearer` with
   a `token`, or `basic` with a `username` and `password`) and `client`, the HTTP client options the
@@ -1086,7 +1090,10 @@ client — the offline WASM artifact — knows these operations and answers each
   rules (§7.3) apply to everything it reports.
 - **`publish-contracts`** publishes Janus contracts or v1–v4 pacts, all for one consumer, for a
   consumer version, with its branch, tags and build URL; a contract is published as the broker's
-  `pact` specification (ADR 0011 decision 6). The engine reads every document as `verify` reads an
+  `pact` specification (ADR 0011 decision 6), except that a Janus contract is published as `janus`
+  to a broker whose index advertises `pb:publish-janus-contracts`, at that link
+  ([ADR 0093](../../decisions/0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md)
+  decision 5). The engine reads every document as `verify` reads an
   inline one before it publishes any, so a document that is neither is refused in the response
   (`contract-version-unsupported` or `contract-invalid`, with pointers under `/contracts`), as are
   documents naming two consumers (`malformed-frame`). What it publishes is the document as the host
@@ -1096,14 +1103,50 @@ client — the offline WASM artifact — knows these operations and answers each
   which ends the broker session (§7.3). The broker accepts or refuses a publication whole, so every
   contract shares its outcome. A refusal, or a broker that cannot be reached, is `failed` with
   `component-failed` naming `broker`, as a fetch that fails is (§8.3).
+- **`publish-provider-shape`** publishes one provider shape (design 2.8 §2) for a version of the
+  provider it names, with that version's branch, tags and build URL (ADR 0093). The engine reads the
+  shape as `subsumption/check` reads one before it publishes it, so a document that is not one is
+  refused in the response (`contract-invalid` or `contract-version-unsupported`, with pointers under
+  `/provider-shape`). What it publishes is the document as the host sent it, written as a contract
+  is. It reports on a stream: a terminal `broker/finished` carrying the outcome, `published` or
+  `failed`, which ends the broker session. A broker whose index has no `pb:publish-provider-shape`
+  link, which is every broker without the `janus` feature, fails it as `component-failed` naming
+  `broker`, carrying `broker-response-invalid`.
+- **`check-contracts`** checks Janus contracts or v1–v4 pacts against the shapes their providers
+  published to the broker, and returns the reports for the host to decide over with
+  `subsumption/decide` (ADR 0093 decisions 1 and 2). Exactly one of `provider-version` and
+  `provider-branch` says which shape: the shape published for that provider version, or the latest
+  one on that branch. `provider-version` is refused (`malformed-frame`) unless every contract names
+  the same provider. The engine reads the contracts before it fetches anything, as
+  `publish-contracts` does. It fetches each provider's shape once, runs `subsumption/check` on each
+  pair, and emits one `broker/checked` event per contract:
+  - `checked`, with the provider version the shape belongs to, the `report` and its `format`, as
+    `subsumption/check` answers them;
+  - `not-published`, when the broker has no shape there. The host passes the pair to `decide`
+    without a report, and `decide` answers it as `provider-shape-missing`;
+  - `failed`, with an `error`: the fetch failed, or the pair could not be checked (a fetched shape
+    that is not one, or is about another provider, carries `subsumption/check`'s own error).
+
+  With `publish-reports`, each `checked` report is published to the link the shape's own document
+  gave for it (`pb:publish-subsumption-report`), with the contract it is about, and the event says
+  how in `publication`: `published`, `failed` with an `error`, or `skipped` with a `reason`
+  (`not-supported`: the shape gave no link). A publication's outcome never changes the check's.
+  The terminal `broker/finished` carries every contract's result and `status`: `checked`, or
+  `failed` when any contract failed. A broker whose index has no `pb:provider-shape` link (no
+  `pb:latest-branch-provider-shape`, for a branch) does not store shapes: every contract is `failed`
+  with `component-failed` naming `broker`, carrying `broker-response-invalid`, never `not-published`,
+  which would read as replay-only.
+- **The broker resources the client uses** for the two operations above are ADR 0093 decision 3's,
+  advertised by the brokers' `janus` feature (staged plan S4.3d). A client finds each by the link the
+  broker's index advertises, as it finds `pb:publish-contracts`, never by a path it builds.
+  [`examples/broker-shapes.md`](examples/broker-shapes.md) is the worked example.
 - **Compression.** A client sends a publication gzipped only when the broker has said it reads
   one (RFC 7694: an `Accept-Encoding` naming `gzip` on a response), and sends it again uncompressed
   if the broker then answers 415. No broker says so today, and the Pact Broker reads a gzipped body
   as JSON and refuses it, so in practice publications go uncompressed (staged plan S1.3).
-- **Not defined yet**, each a new operation in this area when something needs it: publishing a
-  provider shape, which no broker resource accepts ([broker notes](../../prototype/broker-integration-notes.md)
-  §2; staged plan S4.3), and fetching contracts or shapes for a decision over a broker's matrix.
-  `can-i-deploy` stays the broker's own.
+- **Not defined**: fetching contracts or verification results from a broker for a decision over its
+  matrix. That decision is `can-i-deploy`'s, which stays the broker's own and gains subsumption
+  reasons from the broker PR series (ADR 0093 decision 9; staged plan S4.3e).
 
 ### 8.8 Project configuration — `config/*`
 
@@ -1241,7 +1284,8 @@ subject and its `values`.
 | `verification/published` | a pact's consumer, the provider version, and the outcome: `published`, `failed` with an `error`, or `skipped` with a `reason` (`filtered`: the run's filter narrowed it; `not-from-a-broker`: a `urls` source's pact no broker served) | one per pact, when `options.publish` asks (§8.3) |
 | `verification/finished` | the summary document | carries `last: true`; ends the session |
 | `broker/published` | a contract's consumer and provider, and the outcome: `published`, or `failed` with an `error` | one per contract (§8.7) |
-| `broker/finished` | the outcome: `status` (`published` or `failed`), the broker (its URL, without credentials), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed | carries `last: true`; ends the broker session |
+| `broker/checked` | a contract's consumer and provider, and the outcome: `checked` with `provider-version`, `report` and `format`; `not-published`; or `failed` with an `error`. With `publish-reports`, a checked contract's `publication`: `published`, `failed` with an `error`, or `skipped` with a `reason` | one per contract of `broker/check-contracts` (§8.7) |
+| `broker/finished` | the outcome and the broker (its URL, without credentials). For `publish-contracts`: `status` (`published` or `failed`), the consumer and its version, every contract's result, the broker's `notices` as text, and an `error` when it failed. For `publish-provider-shape`: `status`, the provider and its version, `notices` and `error` likewise. For `check-contracts`: `status` (`checked` or `failed`) and every contract's result, as its `broker/checked` event carried it | carries `last: true`; ends the broker session |
 | `consumer-session/exchange` | `transport`, the instance that received the request; `status`: `matched` (answered with its variant's reply), `mismatched` (rejected), `undelivered` (matched, but its reply could not be delivered) or `unmatched` (nothing was armed, so it was refused); and but for `unmatched`, the `handle` and `variant` it went to (§8.2, ADR 0069), with `mismatches` when it did not match or was not delivered, redacted as `report-variant`'s are | one per request a started transport receives, once its outcome is recorded, in a session whose `create` asked for `events` (staged plan S3.5). A host that reads them says what each was while the test runs, so the engine logs its own account of each only at `debug` |
 | `consumer-session/finished` | `{}` | carries `last: true`; `finalise` appends it, and an exchange still waiting for room in the stream is released, its event dropped, since `finalise` waits on no host |
 

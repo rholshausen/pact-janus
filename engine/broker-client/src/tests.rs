@@ -339,10 +339,12 @@ fn contracts() -> Vec<ContractToPublish> {
     ContractToPublish {
       provider: "order api".to_string(),
       content: br#"{"consumer":{"name":"web"},"interactions":[],"provider":{"name":"order api"}}"#.to_vec(),
+      janus: false,
     },
     ContractToPublish {
       provider: "stock api".to_string(),
       content: br#"{"$format":"janus-contract/1","consumer":{"name":"web"},"interactions":[],"provider":{"name":"stock api"}}"#.to_vec(),
+      janus: true,
     },
   ]
 }
@@ -757,4 +759,199 @@ fn client_options_the_client_cannot_act_on_are_named_by_member() {
     err.message
   );
   assert!(!err.message.contains("pass"), "{}", err.message);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Against a broker with the janus feature (ADR 0093), and one without it
+// ---------------------------------------------------------------------------------------------
+
+use pact_janus_kernel::broker::{FetchedShape, ReportToPublish, ShapeAt, ShapeRequest, ShapeToPublish};
+use pact_janus_test_servers::broker::BrokerStandIn;
+
+fn shape() -> Value {
+  json!({
+    "$format": "janus-provider-shape/1",
+    "provider": { "name": "order api" },
+    "provenance": "recorded",
+    "interactions": []
+  })
+}
+
+fn publish_shape(broker: &BrokerStandIn) -> Result<ContractsPublished, ComponentError> {
+  let descriptor = descriptor(&broker.url);
+  let content = serde_json::to_vec(&shape()).unwrap();
+  HalBrokerClient::new().publish_provider_shape(&ShapeToPublish {
+    broker: &descriptor,
+    provider: "order api",
+    provider_version: "4.1.0",
+    branch: Some("main"),
+    tags: &["prod".to_string()],
+    build_url: Some("https://ci.example/9"),
+    content: &content,
+  })
+}
+
+fn fetch_shape(broker: &BrokerStandIn, at: ShapeAt) -> Result<Option<FetchedShape>, ComponentError> {
+  let descriptor = descriptor(&broker.url);
+  HalBrokerClient::new().fetch_provider_shape(&ShapeRequest {
+    broker: &descriptor,
+    provider: "order api",
+    at: &at,
+  })
+}
+
+#[test]
+fn a_shape_is_published_with_its_version_branch_and_tags_in_one_request() {
+  let broker = BrokerStandIn::start(true);
+  let published = publish_shape(&broker).expect("publishes");
+  assert_eq!(
+    published.notices,
+    vec!["Provider shape published for order api version 4.1.0."]
+  );
+  let held = broker.held();
+  assert_eq!(held.requests, vec!["GET /", "POST /provider-shapes/publish"]);
+  assert_eq!(
+    held.shapes,
+    vec![json!({
+      "provider": "order api", "version": "4.1.0", "branch": "main", "tags": ["prod"],
+      "buildUrl": "https://ci.example/9", "content": shape(),
+    })]
+  );
+}
+
+#[test]
+fn a_shape_is_fetched_by_version_or_by_branch_with_its_version_and_report_link() {
+  let broker = BrokerStandIn::start(true);
+  broker.holds_shape("order api", "4.1.0", Some("main"), &shape());
+  for at in [
+    ShapeAt::Version("4.1.0".to_string()),
+    ShapeAt::Branch("main".to_string()),
+  ] {
+    let fetched = fetch_shape(&broker, at.clone())
+      .expect("fetches")
+      .expect("a shape");
+    assert_eq!(fetched.provider_version.as_deref(), Some("4.1.0"), "{at:?}");
+    assert!(fetched.reportable);
+    let mut document = fetched.document.clone();
+    document.as_object_mut().unwrap().remove("_links");
+    assert_eq!(document, shape());
+    assert!(fetched.handle["pb:publish-subsumption-report"]["href"].is_string());
+  }
+  assert_eq!(
+    broker.held().requests,
+    vec![
+      "GET /",
+      "GET /pacticipants/order%20api/versions/4.1.0/provider-shape",
+      "GET /",
+      "GET /pacticipants/order%20api/branches/main/latest-version/provider-shape",
+    ]
+  );
+}
+
+#[test]
+fn no_shape_published_there_is_none_and_not_an_error() {
+  let broker = BrokerStandIn::start(true);
+  assert!(
+    fetch_shape(&broker, ShapeAt::Branch("main".to_string()))
+      .unwrap()
+      .is_none()
+  );
+  assert!(
+    fetch_shape(&broker, ShapeAt::Version("9".to_string()))
+      .unwrap()
+      .is_none()
+  );
+}
+
+#[test]
+fn a_broker_without_the_janus_feature_stores_no_shapes_and_says_so_by_name() {
+  let broker = BrokerStandIn::start(false);
+  for (error, link) in [
+    (publish_shape(&broker).unwrap_err(), "pb:publish-provider-shape"),
+    (
+      fetch_shape(&broker, ShapeAt::Version("4.1.0".to_string())).unwrap_err(),
+      "pb:provider-shape",
+    ),
+    (
+      fetch_shape(&broker, ShapeAt::Branch("main".to_string())).unwrap_err(),
+      "pb:latest-branch-provider-shape",
+    ),
+  ] {
+    assert_eq!(error.code, "broker-response-invalid");
+    assert!(error.message.contains(link), "{}", error.message);
+    assert!(
+      error.message.contains("does not store provider shapes"),
+      "{}",
+      error.message
+    );
+  }
+  assert!(broker.held().requests.iter().all(|request| request == "GET /"));
+}
+
+#[test]
+fn a_report_goes_to_the_shapes_own_link_with_the_contract_and_the_engine_version() {
+  let broker = BrokerStandIn::start(true);
+  broker.holds_shape("order api", "4.1.0", Some("main"), &shape());
+  let fetched = fetch_shape(&broker, ShapeAt::Branch("main".to_string()))
+    .unwrap()
+    .unwrap();
+  let descriptor = descriptor(&broker.url);
+  let contract = br#"{"consumer":{"name":"web"},"provider":{"name":"order api"}}"#;
+  let report = json!({ "verdict": "yes" });
+  HalBrokerClient::new()
+    .publish_report(&ReportToPublish {
+      broker: &descriptor,
+      handle: &fetched.handle,
+      contract,
+      report: &report,
+    })
+    .expect("publishes");
+  let held = broker.held();
+  assert_eq!(
+    held.requests.last().unwrap(),
+    "POST /provider-shapes/0/subsumption-reports"
+  );
+  let body = &held.reports[0]["body"];
+  assert_eq!(body["engineVersion"], pact_janus_kernel::ENGINE_VERSION);
+  assert_eq!(body["contract"]["contentType"], "application/json");
+  assert_eq!(body["contract"]["content"], BASE64.encode(contract));
+  assert_eq!(body["report"], report);
+}
+
+fn janus_publication(janus_feature: bool) -> (Result<ContractsPublished, ComponentError>, Vec<Value>) {
+  let broker = BrokerStandIn::start(janus_feature);
+  let result = publish(&broker.url);
+  let contracts = broker.held().contracts.clone();
+  (result, contracts)
+}
+
+/// ADR 0093 decision 5: a Janus contract as `janus` where the broker advertises that it stores
+/// one, and a pact as `pact` beside it in the same publication.
+#[test]
+fn a_janus_contract_is_published_as_janus_where_the_broker_says_it_stores_one() {
+  let (result, contracts) = janus_publication(true);
+  result.expect("publishes");
+  let words: Vec<(&str, &str)> = contracts
+    .iter()
+    .map(|contract| {
+      (
+        contract["provider"].as_str().unwrap(),
+        contract["specification"].as_str().unwrap(),
+      )
+    })
+    .collect();
+  assert_eq!(words, vec![("order api", "pact"), ("stock api", "janus")]);
+}
+
+/// Gate B's default does not move: a broker that says nothing is sent what it is sent today.
+#[test]
+fn a_broker_that_does_not_say_it_stores_janus_contracts_is_sent_pact_as_today() {
+  let (result, contracts) = janus_publication(false);
+  result.expect("publishes");
+  assert!(
+    contracts
+      .iter()
+      .all(|contract| contract["specification"] == "pact"),
+    "{contracts:?}"
+  );
 }

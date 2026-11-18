@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pact.io/janus/protocol/v1/broker.schema.json",
   "title": "BrokerOps",
-  "description": "Request/result bodies for the broker/* operations, and the documents every broker-facing member shares (spec.md §8.7, ADR 0032). Behind the 'broker' capability: an engine with no broker client answers component-unavailable naming 'broker'.",
+  "description": "Request/result bodies for the broker/* operations, and the documents every broker-facing member shares (spec.md §8.7, ADR 0032, ADR 0093). Behind the 'broker' capability: an engine with no broker client answers component-unavailable naming 'broker'.",
   "$defs": {
     "BrokerDescriptor": {
       "title": "BrokerDescriptor",
@@ -46,7 +46,7 @@
     },
     "PublishContracts": {
       "title": "PublishContracts",
-      "description": "Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, published as the broker's 'pact' specification (ADR 0011 decision 6), all for the same consumer.",
+      "description": "Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, all for the same consumer, published as the broker's 'pact' specification (ADR 0011 decision 6), or a Janus contract as 'janus' where the broker advertises pb:publish-janus-contracts (ADR 0093 decision 5).",
       "type": "object",
       "required": ["broker", "consumer-version", "contracts"],
       "properties": {
@@ -79,6 +79,86 @@
     "PublishContractsResult": {
       "title": "PublishContractsResult",
       "description": "The publish has started, in a broker session; its outcome arrives as events on 'stream' (spec.md §9). The terminal event, 'broker/finished', carries the outcome and ends the session.",
+      "type": "object",
+      "required": ["session", "stream"],
+      "properties": {
+        "session": { "type": "string", "minLength": 1 },
+        "stream": { "type": "string", "minLength": 1 }
+      }
+    },
+    "PublishProviderShape": {
+      "title": "PublishProviderShape",
+      "description": "Publish one provider shape (subsumption-check spec §2) for a version of the provider it names, through the broker's pb:publish-provider-shape link (ADR 0093). The engine reads the shape before it publishes it.",
+      "type": "object",
+      "required": ["broker", "provider-version", "provider-shape"],
+      "properties": {
+        "broker": { "$ref": "#/$defs/BrokerDescriptor" },
+        "provider-version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provider's application version this shape belongs to."
+        },
+        "branch": {
+          "type": "string",
+          "description": "The provider version's branch."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "build-url": {
+          "type": "string",
+          "description": "The build that produced the shape."
+        },
+        "provider-shape": {
+          "type": ["object", "string"],
+          "description": "A provider shape, the document or its text."
+        }
+      }
+    },
+    "PublishProviderShapeResult": {
+      "title": "PublishProviderShapeResult",
+      "description": "The publish has started, in a broker session; its outcome arrives on 'stream' (spec.md §9), in the terminal 'broker/finished', which ends the session.",
+      "type": "object",
+      "required": ["session", "stream"],
+      "properties": {
+        "session": { "type": "string", "minLength": 1 },
+        "stream": { "type": "string", "minLength": 1 }
+      }
+    },
+    "CheckContracts": {
+      "title": "CheckContracts",
+      "description": "Check contracts against the shapes their providers published to the broker, returning one subsumption report per contract for the host to decide over (spec.md §8.7, ADR 0093). Exactly one of 'provider-version' and 'provider-branch' is given, and 'provider-version' only when every contract names the same provider.",
+      "type": "object",
+      "required": ["broker", "contracts"],
+      "properties": {
+        "broker": { "$ref": "#/$defs/BrokerDescriptor" },
+        "contracts": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).",
+          "items": { "type": ["object", "string"] }
+        },
+        "provider-version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Check against the shape published for this provider version."
+        },
+        "provider-branch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Check against the latest shape published on this provider branch."
+        },
+        "publish-reports": {
+          "type": "boolean",
+          "default": false,
+          "description": "Publish each report to the link the shape's document gives for it, with the contract it is about."
+        }
+      }
+    },
+    "CheckContractsResult": {
+      "title": "CheckContractsResult",
+      "description": "The check has started, in a broker session; one 'broker/checked' event per contract arrives on 'stream' (spec.md §9), then the terminal 'broker/finished', which ends the session.",
       "type": "object",
       "required": ["session", "stream"],
       "properties": {

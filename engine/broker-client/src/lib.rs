@@ -12,7 +12,22 @@
 //!   interaction, keyed by the broker's interaction ids;
 //! - **publish contracts**: the index's `pb:publish-contracts` link, with every contract in one
 //!   `POST`, each as the broker's `pact` specification (ADR 0011 decision 6), as Pact-JVM and the
-//!   Pact Broker client publish today.
+//!   Pact Broker client publish today. A broker that advertises `pb:publish-janus-contracts` is sent
+//!   a Janus contract as `janus`, at that link (ADR 0093 decision 5); one that does not is sent
+//!   exactly what it is sent today.
+//!
+//! And what no client did before, against the resources the brokers' `janus` feature serves
+//! (ADR 0093 decision 3), each found by the link the index advertises for it:
+//!
+//! - **publish a provider shape**: the index's `pb:publish-provider-shape` link, one `POST` carrying
+//!   the version, its branch, tags and build URL and the shape, as a contract publication does;
+//! - **fetch a provider shape**: `pb:provider-shape` for a version, `pb:latest-branch-provider-shape`
+//!   for a branch, a 404 being no shape published there;
+//! - **publish a subsumption report**: to the fetched shape's own `pb:publish-subsumption-report`
+//!   link, with the contract the report is about.
+//!
+//! A broker without one of those links does not store shapes, and is told so by name rather than
+//! read as one that has none (ADR 0093 decision 6).
 //!
 //! A publication is compressed only when the broker says it can read one so (RFC 7694: an
 //! `Accept-Encoding` naming `gzip` on the index's response), and sent again uncompressed if it then
@@ -38,10 +53,11 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_http_client::{Defaults, HttpClient};
 use pact_janus_kernel::broker::{
   BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
-  PublishRequest,
+  FetchedShape, PublishRequest, ReportToPublish, ShapeAt, ShapeRequest, ShapeToPublish,
 };
 use pact_janus_kernel::chain::{self, Layer};
 use pact_janus_kernel::component::ComponentError;
+use pact_janus_kernel::persisted::{BROKER_CONTRACTS_RELATION, BROKER_SPECIFICATION};
 use serde_json::{Map, Value, json};
 use std::time::Duration;
 
@@ -239,13 +255,25 @@ impl BrokerClient for HalBrokerClient {
     let broker = request.broker;
     let client = connect(broker)?;
     let index = self.exchange(&client, broker, "GET", &broker.url, None, false)?;
-    let link = href(&index.document, "pb:publish-contracts").ok_or_else(|| {
-      invalid(
-        broker,
-        "the broker's index has no 'pb:publish-contracts' link: publishing contracts needs Pact Broker 2.86.0 or later",
-      )
-    })?;
+    // A broker that stores a Janus contract under its own word says so with a link of its own, at
+    // which it is sent the word that goes with the link's spelling (ADR 0093 decision 5).
+    let janus = request.contracts.iter().any(|contract| contract.janus);
+    let stores_janus = BROKER_CONTRACTS_RELATION
+      .spellings()
+      .find_map(|relation| href(&index.document, relation).map(|link| (relation, link)))
+      .filter(|_| janus);
+    let link = match &stores_janus {
+      Some((_, link)) => link.clone(),
+      None => href(&index.document, "pb:publish-contracts").ok_or_else(|| {
+        invalid(
+          broker,
+          "the broker's index has no 'pb:publish-contracts' link: publishing contracts needs Pact Broker 2.86.0 or later",
+        )
+      })?,
+    };
     let url = absolute(broker, &link);
+    let janus_word =
+      stores_janus.map(|(relation, _)| BROKER_SPECIFICATION.matching(&BROKER_CONTRACTS_RELATION, relation));
 
     let mut body = Map::new();
     body.insert("pacticipantName".to_string(), json!(request.consumer));
@@ -269,7 +297,7 @@ impl BrokerClient for HalBrokerClient {
         json!({
           "consumerName": request.consumer,
           "providerName": contract.provider,
-          "specification": "pact",
+          "specification": janus_word.filter(|_| contract.janus).unwrap_or("pact"),
           "contentType": "application/json",
           "content": BASE64.encode(&contract.content),
         })
@@ -286,14 +314,132 @@ impl BrokerClient for HalBrokerClient {
       answer => answer?,
     };
     Ok(ContractsPublished {
-      notices: answer.document["notices"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|notice| notice["text"].as_str().map(str::to_string))
-        .collect(),
+      notices: notices(&answer.document),
     })
   }
+
+  fn publish_provider_shape(
+    &self,
+    request: &ShapeToPublish<'_>,
+  ) -> Result<ContractsPublished, ComponentError> {
+    let broker = request.broker;
+    let client = connect(broker)?;
+    let index = self.send(&client, broker, "GET", &broker.url, None)?;
+    let link = shape_link(broker, &index, "pb:publish-provider-shape")?;
+    let mut body = Map::new();
+    body.insert("pacticipantName".to_string(), json!(request.provider));
+    body.insert(
+      "pacticipantVersionNumber".to_string(),
+      json!(request.provider_version),
+    );
+    if let Some(branch) = request.branch {
+      body.insert("branch".to_string(), json!(branch));
+    }
+    if !request.tags.is_empty() {
+      body.insert("tags".to_string(), json!(request.tags));
+    }
+    if let Some(build_url) = request.build_url {
+      body.insert("buildUrl".to_string(), json!(build_url));
+    }
+    body.insert("contentType".to_string(), json!("application/json"));
+    body.insert("content".to_string(), json!(BASE64.encode(request.content)));
+    let answer = self.send(
+      &client,
+      broker,
+      "POST",
+      &absolute(broker, &link),
+      Some(&Value::Object(body)),
+    )?;
+    Ok(ContractsPublished {
+      notices: notices(&answer),
+    })
+  }
+
+  fn fetch_provider_shape(&self, request: &ShapeRequest<'_>) -> Result<Option<FetchedShape>, ComponentError> {
+    let broker = request.broker;
+    let client = connect(broker)?;
+    let index = self.send(&client, broker, "GET", &broker.url, None)?;
+    let url = match request.at {
+      ShapeAt::Version(version) => expand(
+        broker,
+        &shape_link(broker, &index, "pb:provider-shape")?,
+        &[("provider", request.provider), ("version", version)],
+      ),
+      ShapeAt::Branch(branch) => expand(
+        broker,
+        &shape_link(broker, &index, "pb:latest-branch-provider-shape")?,
+        &[("provider", request.provider), ("branch", branch)],
+      ),
+    };
+    let document = match self.send(&client, broker, "GET", &url, None) {
+      Ok(document) => document,
+      // Whatever the broker could not find, the pacticipant, the version, the branch or the shape,
+      // no shape was published there.
+      Err(error)
+        if error
+          .details
+          .as_ref()
+          .is_some_and(|details| details["status"] == 404) =>
+      {
+        return Ok(None);
+      }
+      Err(error) => return Err(error),
+    };
+    if !document.is_object() {
+      return Err(invalid(
+        broker,
+        &format!(
+          "GET {} answered something that is not a provider shape",
+          pact_janus_kernel::broker::without_userinfo(&url)
+        ),
+      ));
+    }
+    let handle = document["_links"].clone();
+    Ok(Some(FetchedShape {
+      provider_version: handle["pb:provider-version"]["name"].as_str().map(str::to_string),
+      reportable: handle["pb:publish-subsumption-report"]["href"].is_string(),
+      handle,
+      document,
+    }))
+  }
+
+  fn publish_report(&self, request: &ReportToPublish<'_>) -> Result<(), ComponentError> {
+    let broker = request.broker;
+    let client = connect(broker)?;
+    let link = request.handle["pb:publish-subsumption-report"]["href"]
+      .as_str()
+      .ok_or_else(|| invalid(broker, "the shape has no 'pb:publish-subsumption-report' link"))?;
+    let body = json!({
+      "engineVersion": pact_janus_kernel::ENGINE_VERSION,
+      "contract": { "contentType": "application/json", "content": BASE64.encode(request.contract) },
+      "report": request.report,
+    });
+    self.send(&client, broker, "POST", &absolute(broker, link), Some(&body))?;
+    Ok(())
+  }
+}
+
+/// A broker's `notices`, as text.
+fn notices(answer: &Value) -> Vec<String> {
+  answer["notices"]
+    .as_array()
+    .into_iter()
+    .flatten()
+    .filter_map(|notice| notice["text"].as_str().map(str::to_string))
+    .collect()
+}
+
+/// One of the provider-shape links the brokers' `janus` feature advertises (ADR 0093 decision 3).
+/// A broker without it stores no shapes, which is said by name (decision 6).
+fn shape_link(broker: &BrokerDescriptor, index: &Value, relation: &str) -> Result<String, ComponentError> {
+  href(index, relation).ok_or_else(|| {
+    invalid(
+      broker,
+      &format!(
+        "the broker's index has no '{relation}' link: it does not store provider shapes (they need the Pact Broker's janus feature)"
+      ),
+    )
+  })
 }
 
 /// A broker's answer: the document, and whether it said it reads gzipped request bodies.

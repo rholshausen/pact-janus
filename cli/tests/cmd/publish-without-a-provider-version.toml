@@ -1,0 +1,5 @@
+# Publishing a provider shape needs the provider version it belongs to (ADR 0093).
+bin.name = "janus"
+fs.cwd = "../../.."
+args = ["publish", "samples/order-service/shapes/order-service.provider-shape.json", "--consumer-app-version", "1.0.0", "--broker-base-url", "http://127.0.0.1:2"]
+status.code = 2

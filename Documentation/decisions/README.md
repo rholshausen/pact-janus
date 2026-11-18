@@ -109,6 +109,7 @@ superseding ADR instead.
 | [0090](0090-name-a-messages-operation-by-the-message-itself-and-record-it-as-produce-message-hooks-produce-it.md) | Name a message's operation by the message itself, and record it as `produce-message` hooks produce it | accepted |
 | [0091](0091-derive-a-message-producers-shape-from-asyncapi-selected-by-the-values-its-messages-fix.md) | Derive a message producer's shape from AsyncAPI, selected by the values its messages fix | accepted |
 | [0092](0092-decide-in-a-broker-through-the-engines-wasm-component-and-refuse-to-start-without-it.md) | Decide in a broker through the engine's WASM component, and refuse to start without it | accepted |
+| [0093](0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md) | Publish and fetch provider shapes and reports through the engine's broker client, found by the links a broker advertises | accepted |
 
 ## Decision backlog
 

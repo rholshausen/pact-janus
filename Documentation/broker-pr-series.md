@@ -19,6 +19,7 @@ unless they say otherwise.
 5. [The baseline: S1.3's checks against the port](#5-the-baseline-s13s-checks-against-the-port)
 6. [The outline for the maintainers](#6-the-outline-for-the-maintainers)
 7. [Rows 2 and 3: a Janus contract stored under its own word](#7-rows-2-and-3-a-janus-contract-stored-under-its-own-word)
+8. [What the client asks of rows 2, 4 and 6](#8-what-the-client-asks-of-rows-2-4-and-6)
 
 ## 1. The rows and their sites
 
@@ -241,7 +242,10 @@ opened on 2026-11-16. They decide the following, the same way in both.
   test in each broker shows a changed contract diffed.
 - **How a client learns the broker stores `janus` is S4.3b's.** Neither branch advertises it. The
   client finds each capability by the link the broker advertises (S4.3b), and S4.3b's ADR decides
-  that link; its broker half amends row 2 or lands with row 4.
+  that link; its broker half amends row 2 or lands with row 4. Decided since by
+  [ADR 0093](decisions/0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md)
+  decision 5: with the feature on, the index advertises `pb:publish-janus-contracts`, whose `href`
+  is the publication's (§8).
 - **The brokers read two persisted names.** `janus` and `janus-contract/1` are spelled once in each
   broker (`PactBroker::Janus`, `services::janus`). A rename of the codename
   ([codename.md](codename.md)) adds the new spellings there, beside the old, as `persisted.rs` does
@@ -254,3 +258,34 @@ when an interaction changes, diffed, and gives its states; a pact published as `
 With it off, `janus` is refused with today's message and nothing is created, and a contract published
 as `pact` is stored as it always was. Unit tests in each broker cover recognition, the SHA, the
 counts and the merger.
+
+## 8. What the client asks of rows 2, 4 and 6
+
+S4.3b built the Janus side first, so the broker half has a client to answer
+([ADR 0093](decisions/0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md)).
+What the client asks is in its own pact with the broker, in a second pact file, the `janus`
+feature's, written by `engine/broker-client/tests/pact.rs`. That file is these rows' specification
+from the client's side: S4.3d's pull requests carry it, and both brokers verify it with the feature
+on (`JANUS_PACT_BROKER_JANUS` names such a broker to the client's own test). In short, with the
+feature on and only then:
+
+| Index relation | Request | Answer | Row |
+|---|---|---|---|
+| `pb:publish-janus-contracts` | the publication's `href` (`/contracts/publish`); a Janus contract sent as `specification: "janus"` | as `pb:publish-contracts` | 2 |
+| `pb:publish-provider-shape` | `POST`, a body as `pb:publish-contracts`' is: `pacticipantName`, `pacticipantVersionNumber`, `branch`, `tags`, `buildUrl`, and the shape as `contentType` and base64 `content` | `notices` | 4 |
+| `pb:provider-shape`, templated `{provider}`, `{version}` | `GET /pacticipants/{provider}/versions/{version}/provider-shape` | the shape, or 404 | 4 |
+| `pb:latest-branch-provider-shape`, templated `{provider}`, `{branch}` | `GET /pacticipants/{provider}/branches/{branch}/latest-version/provider-shape` | the shape, or 404 | 4 |
+
+A shape is served as a pact is: the stored document with `_links` added. The client reads
+`pb:provider-version`'s `name`, the version the shape belongs to, and `pb:publish-subsumption-report`,
+where a report about this shape is published (row 6). A report's body is
+`{ engineVersion, contract: { contentType, content }, report }`. The broker keys it by the SHA it gives
+the contract (rows 2 and 3), the shape's SHA and `engineVersion`, as notes §3 asks, and answers 201.
+Whether it keeps a report about a contract no pact version holds is the broker's to decide.
+
+The notes (§2) sketched a `PUT` on the provider version. The publish-contracts pattern replaces it,
+so the version's branch and tags arrive with the shape and a `provider_shape_changed` webhook sees
+them (ADR 0093, alternatives).
+
+Until a broker built from S4.3d can be run, the client and the CLI are tested against a stand-in
+that serves this table, `tools/test-servers`' `BrokerStandIn`.

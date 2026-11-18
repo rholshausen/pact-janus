@@ -3,8 +3,8 @@
 //! additional rules" beyond the call pipe itself) — JSON bytes in, JSON bytes out — deliberately
 //! shaped so the subprocess and WASM pipes (§3.1–3.2) can wrap it later without changing it.
 
-use super::background::Background;
-use super::broker::{self as broker_ops, PublishContracts};
+use super::background::{Background, SpawnError};
+use super::broker::{self as broker_ops, CheckContracts, PublishContracts, PublishProviderShape};
 use super::consumer_session::{
   AddInteraction, AddPactInteraction, Create, Finalise, ReportVariant, ServeVariant, StartTransport, Variants,
 };
@@ -414,6 +414,8 @@ impl Engine {
       "consumer-session/finalise" => self.handle_finalise(id, body),
       "verification/verify" => self.handle_verify(id, body),
       "broker/publish-contracts" => self.handle_publish_contracts(id, body),
+      "broker/publish-provider-shape" => self.handle_publish_provider_shape(id, body),
+      "broker/check-contracts" => self.handle_check_contracts(id, body),
       "verification/explain" => self.handle_explain(id, body),
       "provider-shape-session/create" => self.handle_create_recording(id, body),
       "provider-shape-session/observe" => self.handle_observe(id, body),
@@ -981,13 +983,72 @@ impl Engine {
       Ok(publication) => publication,
       Err(err) => return ResponseFrame::err(id, err),
     };
+    self.start_broker_session(id, "publish contracts", |stream, background| {
+      broker_ops::start(client, publication, stream, background)
+    })
+  }
+
+  /// `broker/publish-provider-shape` (spec §8.7, ADR 0093): read the shape, start its publication
+  /// in a broker session, and answer with the session and its stream.
+  fn handle_publish_provider_shape(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: PublishProviderShape = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(client) = self.broker.clone() else {
+      return ResponseFrame::err(id, EngineError::broker_unavailable("publish a provider shape"));
+    };
+    let publication = match req.prepare() {
+      Ok(publication) => publication,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    self.start_broker_session(id, "publish a provider shape", |stream, background| {
+      broker_ops::start_shape(client, publication, stream, background)
+    })
+  }
+
+  /// `broker/check-contracts` (spec §8.7, ADR 0093): read the contracts, start the check in a
+  /// broker session, and answer with the session and its stream. The walk compares component
+  /// operators with what `subsumption/check` compares them with.
+  fn handle_check_contracts(&mut self, id: String, body: Value) -> ResponseFrame {
+    let req: CheckContracts = match parse_body(body) {
+      Ok(req) => req,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let Some(client) = self.broker.clone() else {
+      return ResponseFrame::err(
+        id,
+        EngineError::broker_unavailable("check contracts against a broker"),
+      );
+    };
+    let check = match req.prepare() {
+      Ok(check) => check,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    let comparers = broker_ops::Comparers {
+      matchers: self.matchers.clone(),
+      content: self.content.clone(),
+    };
+    self.start_broker_session(id, "check contracts against a broker", |stream, background| {
+      broker_ops::start_check(client, check, comparers, stream, background)
+    })
+  }
+
+  /// A broker session (spec §7.3): its work started in the background on a stream of its own, and
+  /// answered with the session and the stream.
+  fn start_broker_session(
+    &mut self,
+    id: String,
+    what: &str,
+    start: impl FnOnce(Arc<Stream>, &dyn Background) -> Result<Run, SpawnError>,
+  ) -> ResponseFrame {
     let Some(background) = self.background.clone() else {
-      return ResponseFrame::err(id, EngineError::background_unavailable("publish contracts"));
+      return ResponseFrame::err(id, EngineError::background_unavailable(what));
     };
     self.next_publication += 1;
     let session = format!("bs-{}", self.next_publication);
     let stream = self.open_stream();
-    let run = match broker_ops::start(client, publication, Arc::clone(&stream), background.as_ref()) {
+    let run = match start(Arc::clone(&stream), background.as_ref()) {
       Ok(run) => run,
       Err(err) => {
         self.streams.remove(stream.id());
@@ -1512,7 +1573,7 @@ fn contract_error(err: crate::contract::ContractError) -> EngineError {
 /// own table. Every arm is the `document` category: a subsumption check has no session, no
 /// component and no run, so the only thing that can be wrong is one of the documents it was
 /// handed — including the policy, which §8 puts under `contract-invalid` with positions.
-fn subsumption_error(err: SubsumptionError) -> EngineError {
+pub(super) fn subsumption_error(err: SubsumptionError) -> EngineError {
   match err {
     SubsumptionError::Document { member, error } => EngineError::document_error(member, &error),
     SubsumptionError::Check(CheckError::InteractionInvalid { problems }) => {

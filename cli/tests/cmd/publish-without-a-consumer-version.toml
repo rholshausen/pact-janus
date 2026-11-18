@@ -1,0 +1,6 @@
+# Publishing contracts needs the consumer version they belong to. The documents are read first, so
+# that a file of provider shapes alone needs no consumer version.
+bin.name = "janus"
+fs.cwd = "../../.."
+args = ["publish", "samples/order-service/pacts/web-app-order-service.json", "--broker-base-url", "http://127.0.0.1:2"]
+status.code = 2

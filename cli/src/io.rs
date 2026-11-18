@@ -21,10 +21,36 @@ pub fn read_documents(path: &Path) -> Result<Vec<(String, Value)>, String> {
 /// filtered, for the reasons [`read_documents`] gives.
 pub fn read_provider_shapes(path: &Path) -> Result<Vec<(String, Value)>, String> {
   read_identified(path, "a provider shape", |_, document| {
-    document["$format"]
-      .as_str()
-      .is_some_and(|format| pact_janus_kernel::persisted::PROVIDER_SHAPE_FORMAT.names_family(format))
+    is_provider_shape(document)
   })
+}
+
+/// Whether `document` says it is a provider shape (design 2.8 §2.4's `$format`), at any major.
+pub fn is_provider_shape(document: &Value) -> bool {
+  document["$format"]
+    .as_str()
+    .is_some_and(|format| pact_janus_kernel::persisted::PROVIDER_SHAPE_FORMAT.names_family(format))
+}
+
+/// Every document `janus publish` can publish at every path: contracts, pacts and provider shapes,
+/// a directory filtered as [`read_documents`] filters it, failing when there are none at all.
+pub fn read_all_publishable(paths: &[std::path::PathBuf]) -> Result<Vec<(String, Value)>, String> {
+  let mut documents = Vec::new();
+  for path in paths {
+    documents.extend(read_identified(
+      path,
+      "a contract, pact or provider shape",
+      |bytes, document| is_verifiable(bytes, document) || is_provider_shape(document),
+    )?);
+  }
+  if documents.is_empty() {
+    let names: Vec<String> = paths.iter().map(|path| path.display().to_string()).collect();
+    return Err(format!(
+      "no contracts, pacts or provider shapes found in {}",
+      names.join(", ")
+    ));
+  }
+  Ok(documents)
 }
 
 /// The file at `path`, or the `.json` files in the directory at `path` that `keep` accepts, in

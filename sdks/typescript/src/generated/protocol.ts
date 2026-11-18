@@ -40,7 +40,7 @@ export interface ConsumerVersionSelector {
 }
 
 /**
- * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, published as the broker's 'pact' specification (ADR 0011 decision 6), all for the same consumer.
+ * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, all for the same consumer, published as the broker's 'pact' specification (ADR 0011 decision 6), or a Janus contract as 'janus' where the broker advertises pb:publish-janus-contracts (ADR 0093 decision 5).
  */
 export interface PublishContracts {
   broker: BrokerDescriptor;
@@ -83,6 +83,92 @@ export interface PublishContracts {
  * The publish has started, in a broker session; its outcome arrives as events on 'stream' (spec.md §9). The terminal event, 'broker/finished', carries the outcome and ends the session.
  */
 export interface PublishContractsResult {
+  session: string;
+  stream: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Publish one provider shape (subsumption-check spec §2) for a version of the provider it names, through the broker's pb:publish-provider-shape link (ADR 0093). The engine reads the shape before it publishes it.
+ */
+export interface PublishProviderShape {
+  broker: BrokerDescriptor;
+  /**
+   * The provider's application version this shape belongs to.
+   */
+  "provider-version": string;
+  /**
+   * The provider version's branch.
+   */
+  branch?: string;
+  tags?: string[];
+  /**
+   * The build that produced the shape.
+   */
+  "build-url"?: string;
+  /**
+   * A provider shape, the document or its text.
+   */
+  "provider-shape":
+    | {
+        [k: string]: unknown;
+      }
+    | string;
+  [k: string]: unknown;
+}
+
+/**
+ * The publish has started, in a broker session; its outcome arrives on 'stream' (spec.md §9), in the terminal 'broker/finished', which ends the session.
+ */
+export interface PublishProviderShapeResult {
+  session: string;
+  stream: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Check contracts against the shapes their providers published to the broker, returning one subsumption report per contract for the host to decide over (spec.md §8.7, ADR 0093). Exactly one of 'provider-version' and 'provider-branch' is given, and 'provider-version' only when every contract names the same provider.
+ */
+export interface CheckContracts {
+  broker: BrokerDescriptor;
+  /**
+   * Janus contracts or v1–v4 pacts, each the document or its text, read as a file is (ADR 0063).
+   *
+   * @minItems 1
+   */
+  contracts: [
+    (
+      | {
+          [k: string]: unknown;
+        }
+      | string
+    ),
+    ...(
+      | {
+          [k: string]: unknown;
+        }
+      | string
+    )[]
+  ];
+  /**
+   * Check against the shape published for this provider version.
+   */
+  "provider-version"?: string;
+  /**
+   * Check against the latest shape published on this provider branch.
+   */
+  "provider-branch"?: string;
+  /**
+   * Publish each report to the link the shape's document gives for it, with the contract it is about.
+   */
+  "publish-reports"?: boolean;
+  [k: string]: unknown;
+}
+
+/**
+ * The check has started, in a broker session; one 'broker/checked' event per contract arrives on 'stream' (spec.md §9), then the terminal 'broker/finished', which ends the session.
+ */
+export interface CheckContractsResult {
   session: string;
   stream: string;
   [k: string]: unknown;

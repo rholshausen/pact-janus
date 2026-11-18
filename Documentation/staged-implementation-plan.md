@@ -2604,6 +2604,28 @@ once there are shapes to publish.
     it verifies its others.
     *Exit:* the operations are in the engine-protocol spec with schemas and examples, and the client's
     tests pass against a broker built from S4.3d.
+    *Built 2026-11-18* ([ADR 0093](decisions/0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md)).
+    Its exit's first half is met, and its second waits on S4.3d:
+    - `broker/publish-provider-shape` and `broker/check-contracts` are in engine-protocol spec §8.7,
+      with schemas and a worked example (`examples/broker-shapes.md`). `check-contracts` fetches each
+      provider's shape once, checks each pair, and, when asked, publishes each report to the link
+      the shape's own document gives, with the contract it is about. It returns reports and does
+      not decide: `janus check` asks `subsumption/decide`, as it does over files. A provider with no
+      shape there is `not-published`, replay-only. A broker that stores no shapes fails by name.
+    - The broker half the client expects is ADR 0093 decision 3, and
+      [`broker-pr-series.md`](broker-pr-series.md) §8 sets it out for S4.3d: `pb:publish-provider-shape`,
+      `pb:provider-shape` and `pb:latest-branch-provider-shape` on the index, and a shape's
+      `pb:publish-subsumption-report`. `pb:publish-janus-contracts` answers §7's open question.
+      With it, a Janus contract is sent as `janus`, and without it as `pact`, so no deployed
+      broker sees a change.
+    - `janus publish` publishes shapes beside contracts, a shape for `--provider-app-version`.
+      `janus check --broker-url` takes `--provider-version` or `--provider-branch`, and `--publish`.
+    - The client's pact with the broker has a second file, the `janus` feature's, verified when
+      `JANUS_PACT_BROKER_JANUS` names a broker with the feature on. Until one exists, the client and
+      the CLI are tested against `tools/test-servers`' `BrokerStandIn`, which serves what the ADR
+      says.
+    - Not foreseen: `broker/publish-contracts` published a contract sent as its text (ADR 0063) as
+      a JSON string. It now publishes the document the text holds.
   - **S4.3c Rows 1–3** — **S**. Row 1's Ruby half is merged (pact_broker#1093, `6298abd2`), and
     its pair in the port is pact_broker-rs#23. Rows 2 and 3 make a Janus contract a stored pact version under its own word, with a content
     SHA that reads its interactions. They are one pull request in each broker, pact_broker#1094 and

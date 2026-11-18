@@ -3,13 +3,15 @@
 //! The broker client is the engine's, so no host speaks the broker's API, and it is a native host
 //! capability, so the kernel knows no HTTP. This module is the seam between the two: a trait in the
 //! broker's own terms — fetch the pacts for verification for these selectors, publish this result
-//! for a pact that was fetched, publish these contracts — which a native crate implements over the
-//! broker's HAL API and the native embeddings register
+//! for a pact that was fetched, publish these contracts, publish this provider shape, fetch the
+//! shape a provider published, publish this subsumption report about a shape that was fetched
+//! (ADR 0093) — which a native crate implements over the broker's HAL API and the native
+//! embeddings register
 //! ([`crate::protocol::Engine::register_broker_client`]). An engine with none answers every
 //! broker-facing request with `component-unavailable` naming `broker`.
 //!
 //! What a client fetched comes back with a `handle`: whatever the client needs to find that pact
-//! again when the run publishes its result (its HAL links, for the native client). The kernel
+//! (or shape) again when the run publishes its result (its HAL links, for the native client). The kernel
 //! carries it from the fetch to the publish and never reads it, so nothing about the broker's API
 //! leaks into the run.
 
@@ -168,8 +170,12 @@ pub struct ContractsToPublish<'a> {
 pub struct ContractToPublish {
   pub provider: String,
   /// The document as UTF-8 JSON. A Janus contract and a v1–v4 pact alike: the client publishes
-  /// both as the broker's `pact` specification (ADR 0011 decision 6).
+  /// both as the broker's `pact` specification (ADR 0011 decision 6), but for a Janus contract to
+  /// a broker that says it stores one under its own word (ADR 0093 decision 5).
   pub content: Vec<u8>,
+  /// Whether the document is a Janus contract, rather than a v1–v4 pact: which word a broker that
+  /// stores both may be sent it under.
+  pub janus: bool,
 }
 
 /// What the broker said about a publication it accepted.
@@ -177,6 +183,65 @@ pub struct ContractToPublish {
 pub struct ContractsPublished {
   /// The broker's notices, as text: what it created, and what to do next.
   pub notices: Vec<String>,
+}
+
+/// A provider's shape, to publish for one of its versions (spec §8.7's
+/// `broker/publish-provider-shape`, ADR 0093).
+#[derive(Debug, Clone)]
+pub struct ShapeToPublish<'a> {
+  pub broker: &'a BrokerDescriptor,
+  /// The provider the shape names.
+  pub provider: &'a str,
+  pub provider_version: &'a str,
+  pub branch: Option<&'a str>,
+  pub tags: &'a [String],
+  pub build_url: Option<&'a str>,
+  /// The document as UTF-8 JSON, which the broker stores as it is.
+  pub content: &'a [u8],
+}
+
+/// Which of a provider's shapes (spec §8.7's `broker/check-contracts`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShapeAt {
+  /// The shape published for this provider version.
+  Version(String),
+  /// The latest shape published on this provider branch.
+  Branch(String),
+}
+
+/// A shape to fetch.
+#[derive(Debug, Clone)]
+pub struct ShapeRequest<'a> {
+  pub broker: &'a BrokerDescriptor,
+  pub provider: &'a str,
+  pub at: &'a ShapeAt,
+}
+
+/// A shape the broker served.
+#[derive(Debug, Clone)]
+pub struct FetchedShape {
+  /// The document as the broker served it, its links and all: a shape's reader ignores members it
+  /// does not know.
+  pub document: Value,
+  /// The provider version the shape belongs to, when the broker said.
+  pub provider_version: Option<String>,
+  /// The client's own way back to this shape, handed back to [`BrokerClient::publish_report`].
+  pub handle: Value,
+  /// Whether a report about it can be published: the broker gave a link for one.
+  pub reportable: bool,
+}
+
+/// A subsumption report, to publish about a shape that was fetched (ADR 0093 decision 4).
+#[derive(Debug, Clone)]
+pub struct ReportToPublish<'a> {
+  pub broker: &'a BrokerDescriptor,
+  /// The [`FetchedShape::handle`] of the shape the report is about.
+  pub handle: &'a Value,
+  /// The contract the report is about, as UTF-8 JSON written as a publication writes it, so the
+  /// broker keys the report by the SHA it gives the contract.
+  pub contract: &'a [u8],
+  /// The report, as `subsumption/check` answered it.
+  pub report: &'a Value,
 }
 
 /// The broker client a native embedding registers. Blocking: it is called from a run's own thread,
@@ -200,6 +265,20 @@ pub trait BrokerClient: Send + Sync {
   /// refuses them as one publication.
   fn publish_contracts(&self, request: &ContractsToPublish<'_>)
   -> Result<ContractsPublished, ComponentError>;
+
+  /// Publish a provider's shape for one of its versions, with the version's branch and tags.
+  fn publish_provider_shape(
+    &self,
+    request: &ShapeToPublish<'_>,
+  ) -> Result<ContractsPublished, ComponentError>;
+
+  /// The shape a provider published at a version, or the latest on a branch: `None` when the
+  /// broker has none there. A broker that stores no shapes at all is an error, not `None`
+  /// (ADR 0093 decision 6).
+  fn fetch_provider_shape(&self, request: &ShapeRequest<'_>) -> Result<Option<FetchedShape>, ComponentError>;
+
+  /// Publish a subsumption report to the link the shape it is about gave for one.
+  fn publish_report(&self, request: &ReportToPublish<'_>) -> Result<(), ComponentError>;
 }
 
 #[cfg(test)]

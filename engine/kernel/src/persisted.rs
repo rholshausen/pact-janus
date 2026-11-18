@@ -39,6 +39,22 @@ impl Persisted {
     found == self.writes || self.earlier.contains(&found)
   }
 
+  /// Every spelling: the one written, then the earlier ones in the order the renames recorded them.
+  pub fn spellings(&self) -> impl Iterator<Item = &'static str> {
+    std::iter::once(self.writes).chain(self.earlier.iter().copied())
+  }
+
+  /// The spelling of `self` that goes with `other`'s spelling `found`: the one at the same place in
+  /// the spellings, since one rename adds an earlier spelling to every identifier. Its written
+  /// spelling when `found` is none of `other`'s, or `self` has no spelling that old.
+  pub fn matching(&self, other: &Persisted, found: &str) -> &'static str {
+    other
+      .spellings()
+      .position(|spelling| spelling == found)
+      .and_then(|place| self.spellings().nth(place))
+      .unwrap_or(self.writes)
+  }
+
   /// For a versioned format, `<name>/<major>`: whether `found` names this format at any major and
   /// under any spelling — a document of this kind, though perhaps one this engine cannot read.
   pub fn names_family(&self, found: &str) -> bool {
@@ -84,8 +100,18 @@ pub const HOOK_SCRIPT_GLOBAL: Persisted = Persisted::new("janus", earlier::HOOK_
 /// a provider's `verifier.janus.yaml`.
 pub const HOOK_BODY_FORMAT: Persisted = Persisted::new("janus", earlier::HOOK_BODY_FORMAT);
 
+/// The link relation a Pact Broker advertises on its index when it stores Janus contracts under
+/// their own word (ADR 0093 decision 5): read from every broker the client publishes to.
+pub const BROKER_CONTRACTS_RELATION: Persisted =
+  Persisted::new("pb:publish-janus-contracts", earlier::BROKER_CONTRACTS_RELATION);
+/// The `specification` a Janus contract is published under to a broker that advertises
+/// [`BROKER_CONTRACTS_RELATION`] (ADR 0011 decision 6, ADR 0093 decision 5). The client sends the
+/// spelling at the same place in this identifier's spellings as the relation's it found
+/// ([`Persisted::matching`]), so a broker is sent the word it advertised.
+pub const BROKER_SPECIFICATION: Persisted = Persisted::new("janus", earlier::BROKER_SPECIFICATION);
+
 /// Every persisted identifier, by name, for whatever must visit them all.
-pub const ALL: [(&str, Persisted); 8] = [
+pub const ALL: [(&str, Persisted); 10] = [
   ("CONTRACT_FORMAT", CONTRACT_FORMAT),
   ("PROVIDER_SHAPE_FORMAT", PROVIDER_SHAPE_FORMAT),
   ("PROVIDER_SHAPE_EVIDENCE_FORMAT", PROVIDER_SHAPE_EVIDENCE_FORMAT),
@@ -94,6 +120,8 @@ pub const ALL: [(&str, Persisted); 8] = [
   ("COMPONENT_INTERFACE", COMPONENT_INTERFACE),
   ("HOOK_SCRIPT_GLOBAL", HOOK_SCRIPT_GLOBAL),
   ("HOOK_BODY_FORMAT", HOOK_BODY_FORMAT),
+  ("BROKER_CONTRACTS_RELATION", BROKER_CONTRACTS_RELATION),
+  ("BROKER_SPECIFICATION", BROKER_SPECIFICATION),
 ];
 
 #[cfg(test)]
@@ -116,6 +144,15 @@ mod tests {
     assert!(RENAMED.names_family("janus-contract/7"));
     assert!(!RENAMED.names_family("next-contracts/1"));
     assert!(!RENAMED.names_family("pact/4.0"));
+  }
+
+  #[test]
+  fn a_spelling_is_matched_by_its_place() {
+    const RELATION: Persisted = Persisted::new("pb:publish-next-contracts", &["pb:publish-janus-contracts"]);
+    const WORD: Persisted = Persisted::new("next", &["janus"]);
+    assert_eq!(WORD.matching(&RELATION, "pb:publish-next-contracts"), "next");
+    assert_eq!(WORD.matching(&RELATION, "pb:publish-janus-contracts"), "janus");
+    assert_eq!(WORD.matching(&RELATION, "pb:something-else"), "next");
   }
 
   #[test]

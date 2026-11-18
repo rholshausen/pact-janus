@@ -21,7 +21,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * PublishContracts
  * <p>
- * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, published as the broker's 'pact' specification (ADR 0011 decision 6), all for the same consumer.
+ * Publish contracts for a consumer version. Each document is a Janus contract or a v1–v4 pact, all for the same consumer, published as the broker's 'pact' specification (ADR 0011 decision 6), or a Janus contract as 'janus' where the broker advertises pb:publish-janus-contracts (ADR 0093 decision 5).
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

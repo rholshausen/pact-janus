@@ -1,0 +1,5 @@
+error: --consumer-app-version <VERSION> is required to publish contracts
+
+Usage: janus publish [OPTIONS] --broker-base-url <URL> <DOCUMENT>...
+
+For more information, try '--help'.

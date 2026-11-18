@@ -5,6 +5,12 @@
 //! a test observes bytes on a wire rather than the client's own view of them.
 //!
 //! Test-only: a server panics on anything a test did not set up, which is a failing test.
+//!
+//! [`broker::BrokerStandIn`] is the one server that is not about the wire: a Pact Broker with the
+//! `janus` feature, serving the resources ADR 0093 says a client finds, until a broker built from
+//! the broker PR series (staged plan S4.3d) can be run instead.
+
+pub mod broker;
 
 use rcgen::{
   BasicConstraints, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, Issuer, KeyPair,

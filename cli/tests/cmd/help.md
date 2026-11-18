@@ -19,8 +19,8 @@ Commands:
                carry
   derive       Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the
                derivation could not carry
-  publish      Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their
-               consumer
+  publish      Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a
+               version of the consumer or provider they belong to
   component    Publish a WASM component to an OCI registry, or fetch one and say what it is
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
@@ -208,6 +208,21 @@ Options:
                                document [default: text] [possible values: text, json]
   -h, --help                   Print help
 
+Pact Broker:
+  -b, --broker-url <URL>            Fetch each provider's shape from this Pact Broker instead of
+                                    from --provider-shape
+      --provider-version <VERSION>  Check against the shape the provider published for this version
+      --provider-branch <BRANCH>    Check against the latest shape the provider published on this
+                                    branch
+      --publish                     Publish each subsumption report to the broker, beside the shape
+                                    it is about
+  -u, --broker-username <USER>      The broker's username, for basic authentication [env:
+                                    PACT_BROKER_USERNAME]
+  -p, --broker-password <PASSWORD>  The broker's password, for basic authentication [env:
+                                    PACT_BROKER_PASSWORD]
+  -k, --broker-token <TOKEN>        A bearer token for the broker; used instead of --broker-username
+                                    when both are given [env: PACT_BROKER_TOKEN]
+
 Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
                            default is warn [possible values: off, error, warn, info, debug, trace]
@@ -220,6 +235,11 @@ could not run. Both severities default to warn.
 This command reads documents and decides; it never contacts the provider. Verify first (janus verify
 ... --output json > result.json) and pass the result with --verification: a pair with no
 verification result is reported as unverified, which is not a pass.
+
+With --broker-url, each provider's shape is fetched from a Pact Broker with the janus feature, at
+--provider-version or the latest on --provider-branch, in place of --provider-shape; a provider that
+published none there is reported as replay-only, and a broker that stores no shapes fails the
+command.
 
 ```
 
@@ -339,19 +359,20 @@ one janus derive reads.
 
 ```console
 $ janus publish --help
-Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
+Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a version of the
+consumer or provider they belong to
 
-Usage: janus publish [OPTIONS] --consumer-app-version <VERSION> --broker-base-url <URL> <CONTRACT_OR_PACT>...
+Usage: janus publish [OPTIONS] --broker-base-url <URL> <DOCUMENT>...
 
 Arguments:
-  <CONTRACT_OR_PACT>...  Janus contracts or v1-v4 pact files, or directories of them
+  <DOCUMENT>...  Janus contracts, v1-v4 pact files or provider shapes, or directories of them
 
 Options:
-  -a, --consumer-app-version <VERSION>  The version of the consumer these contracts belong to
-      --branch <BRANCH>                 The consumer version's branch
-  -t, --tag <TAG>                       A tag for the consumer version; repeatable, or
-                                        comma-separated
-      --build-url <URL>                 The build that produced the contracts
+  -a, --consumer-app-version <VERSION>  The version of the consumer the contracts belong to
+      --provider-app-version <VERSION>  The version of the provider the shapes belong to
+      --branch <BRANCH>                 The version's branch
+  -t, --tag <TAG>                       A tag for the version; repeatable, or comma-separated
+      --build-url <URL>                 The build that produced the documents
       --output <FORMAT>                 text prints what was published and the broker's notices;
                                         json prints one document [default: text] [possible values:
                                         text, json]
@@ -372,8 +393,10 @@ Global options:
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
       --error-chain        Print every cause of an error, not only what failed and its root cause
 
-Every contract is published as the broker's 'pact' specification, which every Pact Broker accepts.
-Contracts from several consumers are published one consumer at a time, each for the same version.
+Each document is identified by what it says it is. A Janus contract is published as the broker's
+'janus' specification where the broker says it stores one, and every other contract as 'pact', which
+every Pact Broker accepts. Contracts from several consumers are published one consumer at a time,
+each for the same version. A provider shape needs a broker with the janus feature.
 
 Exit status: 0 published; 2 something was not published (the broker refused it or could not be
 reached), or the command could not run.

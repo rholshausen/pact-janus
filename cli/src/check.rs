@@ -3,9 +3,17 @@
 //! **It decides, it does not test.** The two inputs are documents that already exist — the
 //! consumer contracts (or v1–v4 pacts) a provider has, the shapes that provider published, and
 //! the verification summaries `janus verify --output json` wrote — so this command needs no provider
-//! running, no network and no broker. That is what makes it a CI step rather than a second test
-//! run: `verify` produces evidence, `check` reads it, and a pipeline that has already verified
-//! does not verify again to find out whether it may deploy.
+//! running, and no network unless the shapes are in a broker. That is what makes it a CI step
+//! rather than a second test run: `verify` produces evidence, `check` reads it, and a pipeline that
+//! has already verified does not verify again to find out whether it may deploy.
+//!
+//! **The shapes may be in a Pact Broker** (S4.3b, ADR 0093). With `--broker-url`, the engine's
+//! broker client fetches each provider's shape at `--provider-version`, or the latest on
+//! `--provider-branch`, checks each pair and, with `--publish`, publishes each report beside its
+//! shape (`broker/check-contracts`), so a consumer's pipeline passes no file between pipelines. The
+//! decision is still `subsumption/decide`'s, over the reports that came back: a provider that
+//! published no shape there is a pair with no report, replay-only, as a provider with no
+//! `--provider-shape` file is.
 //!
 //! Three flags, three layers, in design 2.8 §7.1's own order: the specification's defaults live
 //! in the engine, `--policy` is the project's document, and `--on-finding`/`--on-review` are the
@@ -76,12 +84,22 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
       .find(|(_, shape)| &shape["provider"]["name"] == provider)
   };
   let mut pairs = Vec::new();
-  for (path, contract) in &contracts {
+  // What the broker said of each contract, in the order given, when the shapes came from one.
+  let mut from_broker = Vec::new();
+  if let Some(url) = &args.broker_url {
+    from_broker = broker_check(&mut engine, args, url, &contracts)?;
+  }
+  for (index, (path, contract)) in contracts.iter().enumerate() {
     let mut pair = json!({
       "consumer": { "name": contract["consumer"]["name"].as_str().unwrap_or_default() },
       "provider": { "name": contract["provider"]["name"].as_str().unwrap_or_default() },
     });
-    if let Some((shape_path, shape)) = shape_for(contract) {
+    if let Some(result) = from_broker.get(index) {
+      if result["outcome"] == json!("checked") {
+        pair["subsumption"] = result["report"].clone();
+        pair["format"] = result["format"].clone();
+      }
+    } else if let Some((shape_path, shape)) = shape_for(contract) {
       let result = engine::call(
         &mut engine,
         "subsumption/check",
@@ -112,13 +130,33 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
   // Which shapes were found, and which were not, is the CLI's half of the answer: the engine was
   // never told a shape file existed for a provider it has no document for. On stderr, so it is said
   // whichever form stdout is in.
-  for (path, contract) in &contracts {
-    if shape_for(contract).is_none() {
-      let provider = contract["provider"]["name"].as_str().unwrap_or_default();
-      errln!(
-        "{} no provider shape supplied for '{provider}' ({path})",
-        crate::style::paint(crate::style::WARN, "janus check:")
-      );
+  let warn = crate::style::paint(crate::style::WARN, "janus check:");
+  for (index, (path, contract)) in contracts.iter().enumerate() {
+    let provider = contract["provider"]["name"].as_str().unwrap_or_default();
+    match from_broker.get(index) {
+      Some(result) => {
+        if result["outcome"] == json!("not-published") {
+          errln!(
+            "{warn} no provider shape published for '{provider}' {} ({path})",
+            where_from(args)
+          );
+        }
+        let consumer = result["consumer"].as_str().unwrap_or_default();
+        match result["publication"]["outcome"].as_str() {
+          Some("failed") => errln!(
+            "{warn} the report for {consumer} -> {provider} was not published: {}",
+            engine::render_error(&result["publication"]["error"]).replace('\n', "\n  ")
+          ),
+          Some("skipped") => errln!(
+            "{warn} the report for {consumer} -> {provider} was not published: the broker gave no link to publish it to"
+          ),
+          _ => {}
+        }
+      }
+      None if shape_for(contract).is_none() => {
+        errln!("{warn} no provider shape supplied for '{provider}' ({path})");
+      }
+      None => {}
     }
   }
 
@@ -128,4 +166,54 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
     Some("block") => Outcome::SubjectFailed,
     _ => Outcome::Done,
   })
+}
+
+/// Which of each provider's shapes the command line asked for, as a person says it.
+fn where_from(args: &CheckArgs) -> String {
+  match (&args.provider_version, &args.provider_branch) {
+    (Some(version), _) => format!("for version {version}"),
+    (_, Some(branch)) => format!("on branch {branch}"),
+    _ => String::new(),
+  }
+}
+
+/// `broker/check-contracts` (spec §8.7) over every contract: each one's result, in the order given.
+/// A contract that could not be checked is the command failing to run, named by its file.
+fn broker_check(
+  engine: &mut pact_janus_kernel::protocol::Engine,
+  args: &CheckArgs,
+  url: &str,
+  contracts: &[(String, Value)],
+) -> Result<Vec<Value>, Error> {
+  let broker = crate::publish::descriptor(
+    url,
+    args.broker_token.as_deref(),
+    args.broker_username.as_deref(),
+    args.broker_password.as_deref(),
+  );
+  let mut body = json!({
+    "broker": broker,
+    "contracts": contracts.iter().map(|(_, contract)| contract).collect::<Vec<_>>(),
+    "publish-reports": args.publish,
+  });
+  if let Some(version) = &args.provider_version {
+    body["provider-version"] = json!(version);
+  }
+  if let Some(branch) = &args.provider_branch {
+    body["provider-branch"] = json!(branch);
+  }
+  let finished = crate::publish::session(engine, "broker/check-contracts", body, false)?;
+  let results = finished["results"].as_array().cloned().unwrap_or_default();
+  if let Some((index, failed)) = results
+    .iter()
+    .enumerate()
+    .find(|(_, result)| result["outcome"] == json!("failed"))
+  {
+    let path = contracts.get(index).map(|(path, _)| path.as_str()).unwrap_or("?");
+    return Err(Error::Failed(format!(
+      "{path}: {}",
+      engine::render_error(&failed["error"])
+    )));
+  }
+  Ok(results)
 }

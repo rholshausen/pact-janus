@@ -4,13 +4,16 @@
 //! side of that — pending, publishing, a fetch that fails, credentials kept out of every event —
 //! without a broker; the native client is tested against a real one by the differential harness.
 //! The same fake takes a consumer's contracts (`broker/publish-contracts`, spec §8.7), for the
-//! engine's side of that: what it checks before anything is published, and what it reports.
+//! engine's side of that: what it checks before anything is published, and what it reports. And it
+//! takes and serves provider shapes and takes subsumption reports (`broker/publish-provider-shape`
+//! and `broker/check-contracts`, ADR 0093): which shape is fetched for which contract, what a check
+//! reports, and what is published with a report.
 
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::broker::{
   BrokerClient, BrokerDescriptor, ContractsPublished, ContractsToPublish, FetchRequest, FetchedPact,
-  PublishRequest,
+  FetchedShape, PublishRequest, ReportToPublish, ShapeAt, ShapeRequest, ShapeToPublish,
 };
 use pact_janus_kernel::component::{ComponentError, TransportComponent};
 use pact_janus_kernel::protocol::Engine;
@@ -39,6 +42,16 @@ struct FakeBroker {
   published: Mutex<Vec<Value>>,
   /// Each publication of contracts, with every contract's content parsed back.
   publications: Mutex<Vec<Value>>,
+  /// The shape it serves for every provider, unless it serves none.
+  shape: Option<FetchedShape>,
+  fail_shapes: bool,
+  fail_reports: bool,
+  /// Each shape fetched: the provider and which of its shapes.
+  shapes_fetched: Mutex<Vec<(String, ShapeAt)>>,
+  /// Each shape published, its content parsed back.
+  shape_publications: Mutex<Vec<Value>>,
+  /// Each report published: the handle, the contract parsed back, and the report.
+  reports: Mutex<Vec<Value>>,
 }
 
 fn refused(message: &str) -> ComponentError {
@@ -107,6 +120,7 @@ impl BrokerClient for FakeBroker {
       "build-url": request.build_url,
       "contracts": request.contracts.iter().map(|contract| json!({
         "provider": contract.provider,
+        "janus": contract.janus,
         "content": serde_json::from_slice::<Value>(&contract.content).unwrap(),
         "starts": String::from_utf8_lossy(&contract.content[..11.min(contract.content.len())]),
       })).collect::<Vec<_>>(),
@@ -117,6 +131,51 @@ impl BrokerClient for FakeBroker {
     Ok(ContractsPublished {
       notices: vec!["published for web-app version 2.7.0".to_string()],
     })
+  }
+
+  fn publish_provider_shape(
+    &self,
+    request: &ShapeToPublish<'_>,
+  ) -> Result<ContractsPublished, ComponentError> {
+    self.shape_publications.lock().unwrap().push(json!({
+      "provider": request.provider,
+      "provider-version": request.provider_version,
+      "branch": request.branch,
+      "tags": request.tags,
+      "build-url": request.build_url,
+      "content": serde_json::from_slice::<Value>(request.content).unwrap(),
+    }));
+    if self.fail_shapes {
+      return Err(refused("the broker answered 401"));
+    }
+    Ok(ContractsPublished {
+      notices: vec![format!("published a shape for {}", request.provider)],
+    })
+  }
+
+  fn fetch_provider_shape(&self, request: &ShapeRequest<'_>) -> Result<Option<FetchedShape>, ComponentError> {
+    self
+      .shapes_fetched
+      .lock()
+      .unwrap()
+      .push((request.provider.to_string(), request.at.clone()));
+    if self.fail_shapes {
+      return Err(refused("the broker answered 401"));
+    }
+    Ok(self.shape.clone())
+  }
+
+  fn publish_report(&self, request: &ReportToPublish<'_>) -> Result<(), ComponentError> {
+    self.reports.lock().unwrap().push(json!({
+      "handle": request.handle,
+      "contract": serde_json::from_slice::<Value>(request.contract).unwrap(),
+      "contract-ends-in-a-line-break": request.contract.ends_with(b"\n"),
+      "report": request.report,
+    }));
+    if self.fail_reports {
+      return Err(refused("the broker answered 500"));
+    }
+    Ok(())
   }
 }
 
@@ -877,4 +936,411 @@ fn a_urls_source_needs_a_url_and_a_pact_that_cannot_be_fetched_ends_the_run() {
   let summary = &events.last().unwrap()["payload"];
   assert_eq!(summary["status"], "failed");
   assert_eq!(summary["error"]["code"], "component-failed", "{summary}");
+}
+
+#[test]
+fn a_contract_is_marked_as_one_and_its_text_is_published_as_the_document() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let pact = json!({
+    "consumer": { "name": "web-app" }, "provider": { "name": "order-api" },
+    "interactions": [{ "description": "a request", "request": { "method": "GET", "path": "/" },
+                       "response": { "status": 200 } }],
+    "metadata": { "pactSpecification": { "version": "3.0.0" } }
+  });
+  let text = serde_json::to_string_pretty(&janus_contract()).unwrap();
+  let (_, events) = publish_contracts(&mut engine, vec![pact, json!(text)]);
+  assert_eq!(events.last().unwrap()["payload"]["status"], "published");
+  let publications = broker.publications.lock().unwrap();
+  let contracts = &publications[0]["contracts"];
+  assert_eq!(contracts[0]["janus"], false);
+  assert_eq!(contracts[1]["janus"], true);
+  // The contract the text holds, not the text as a JSON string.
+  assert_eq!(contracts[1]["content"], janus_contract());
+  assert_eq!(contracts[1]["starts"], r#"{"$format":"#);
+}
+
+// ---------------------------------------------------------------------------------------------
+// broker/publish-provider-shape and broker/check-contracts (ADR 0093)
+// ---------------------------------------------------------------------------------------------
+
+fn sample(path: &str) -> Value {
+  let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("../..")
+    .join(path);
+  serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+}
+
+/// The sample provider's v3 pact, from `web-app`.
+fn order_pact() -> Value {
+  sample("samples/order-service/pacts/web-app-order-service.json")
+}
+
+/// The shape the sample provider's own tests recorded.
+fn order_shape() -> Value {
+  sample("samples/order-service/shapes/order-service.provider-shape.json")
+}
+
+/// The shape as a broker serves it: the document with its links added, as a pact is served.
+fn served_shape(reportable: bool) -> FetchedShape {
+  let mut document = order_shape();
+  let links = json!({
+    "pb:provider-version": { "name": "4.1.0", "href": "/pacticipants/order-service/versions/4.1.0" },
+    "pb:publish-subsumption-report": { "href": "/provider-shapes/abc/subsumption-reports" },
+  });
+  document["_links"] = links.clone();
+  FetchedShape {
+    document,
+    provider_version: Some("4.1.0".to_string()),
+    handle: links,
+    reportable,
+  }
+}
+
+const BROKER: &str = "https://user:hunter2@broker.example";
+
+/// Start `op` with `body` (its broker added) and drain its stream: the response, then its events.
+fn broker_session(engine: &mut Engine, op: &str, mut body: Value) -> (Value, Vec<Value>) {
+  body["broker"] = json!({ "url": BROKER, "auth": { "kind": "bearer", "token": "s3cret-token" } });
+  let started = send(engine, "b-1", op, body);
+  let Some(stream) = started["ok"]["stream"].as_str().map(str::to_string) else {
+    return (started, vec![]);
+  };
+  let mut events = Vec::new();
+  for attempt in 0..100 {
+    let polled = send(
+      engine,
+      &format!("p-{attempt}"),
+      "events/poll",
+      json!({ "streams": [stream], "wait-ms": 200 }),
+    );
+    let batch = polled["ok"]["events"].as_array().cloned().unwrap_or_default();
+    let done = batch.iter().any(|event| event["last"] == json!(true));
+    events.extend(batch);
+    if done {
+      break;
+    }
+  }
+  (started, events)
+}
+
+fn no_credential_in(events: &[Value]) {
+  let everything = serde_json::to_string(events).unwrap();
+  assert!(
+    !everything.contains("s3cret-token") && !everything.contains("hunter2"),
+    "{everything}"
+  );
+}
+
+#[test]
+fn a_shape_is_published_for_the_provider_it_names_as_the_host_sent_it() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let (started, events) = broker_session(
+    &mut engine,
+    "broker/publish-provider-shape",
+    json!({
+      "provider-version": "4.1.0", "branch": "main", "tags": ["prod"],
+      "build-url": "https://ci.example/9", "provider-shape": order_shape().to_string(),
+    }),
+  );
+  assert!(
+    started["ok"]["session"].as_str().unwrap().starts_with("bs-"),
+    "{started}"
+  );
+  let published = broker.shape_publications.lock().unwrap();
+  assert_eq!(published.len(), 1);
+  assert_eq!(published[0]["provider"], "order-service");
+  assert_eq!(published[0]["provider-version"], "4.1.0");
+  assert_eq!(published[0]["branch"], "main");
+  assert_eq!(published[0]["tags"], json!(["prod"]));
+  assert_eq!(published[0]["build-url"], "https://ci.example/9");
+  assert_eq!(published[0]["content"], order_shape());
+
+  assert_eq!(events.len(), 1, "{events:?}");
+  assert_eq!(events[0]["kind"], "broker/finished");
+  assert_eq!(events[0]["last"], true);
+  assert_eq!(
+    events[0]["payload"],
+    json!({
+      "status": "published", "broker": "https://broker.example", "provider": "order-service",
+      "provider-version": "4.1.0", "notices": ["published a shape for order-service"],
+    })
+  );
+}
+
+#[test]
+fn a_shape_the_broker_refuses_fails_the_session_naming_the_broker_and_never_a_credential() {
+  let broker = Arc::new(FakeBroker {
+    fail_shapes: true,
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(broker));
+  let (_, events) = broker_session(
+    &mut engine,
+    "broker/publish-provider-shape",
+    json!({ "provider-version": "4.1.0", "provider-shape": order_shape() }),
+  );
+  let finished = &events.last().unwrap()["payload"];
+  assert_eq!(finished["status"], "failed");
+  assert_eq!(finished["error"]["code"], "component-failed");
+  assert_eq!(finished["error"]["details"]["component"], "broker");
+  no_credential_in(&events);
+}
+
+#[test]
+fn a_document_that_is_not_a_shape_is_refused_before_anything_is_published() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let (refused, events) = broker_session(
+    &mut engine,
+    "broker/publish-provider-shape",
+    json!({ "provider-version": "4.1.0", "provider-shape": janus_contract() }),
+  );
+  assert_eq!(refused["error"]["code"], "contract-invalid", "{refused}");
+  assert!(
+    refused["error"]["message"]
+      .as_str()
+      .unwrap()
+      .contains("provider-shape"),
+    "{refused}"
+  );
+  assert!(events.is_empty());
+
+  let (refused, _) = broker_session(
+    &mut engine,
+    "broker/publish-provider-shape",
+    json!({ "provider-version": " ", "provider-shape": order_shape() }),
+  );
+  assert_eq!(refused["error"]["code"], "malformed-frame", "{refused}");
+  assert!(broker.shape_publications.lock().unwrap().is_empty());
+}
+
+#[test]
+fn an_engine_with_no_broker_client_names_it_for_each_new_operation() {
+  let mut engine = engine(None);
+  for (op, body) in [
+    (
+      "broker/publish-provider-shape",
+      json!({ "provider-version": "1", "provider-shape": order_shape() }),
+    ),
+    (
+      "broker/check-contracts",
+      json!({ "provider-branch": "main", "contracts": [order_pact()] }),
+    ),
+  ] {
+    let (refused, _) = broker_session(&mut engine, op, body);
+    assert_eq!(
+      refused["error"]["code"], "component-unavailable",
+      "{op}: {refused}"
+    );
+    assert_eq!(
+      refused["error"]["details"],
+      json!({ "component": "broker" }),
+      "{op}"
+    );
+  }
+}
+
+/// The sample provider's pact against the shape its tests recorded, fetched from the broker: the
+/// report `subsumption/check` gives for the same two documents, and the version the shape belongs to.
+#[test]
+fn a_contract_is_checked_against_the_shape_its_provider_published_at_a_branch() {
+  let broker = Arc::new(FakeBroker {
+    shape: Some(served_shape(true)),
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let (started, events) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-branch": "main", "contracts": [order_pact()] }),
+  );
+  assert!(
+    started["ok"]["session"].as_str().unwrap().starts_with("bs-"),
+    "{started}"
+  );
+  assert_eq!(
+    *broker.shapes_fetched.lock().unwrap(),
+    vec![("order-service".to_string(), ShapeAt::Branch("main".to_string()))]
+  );
+  let direct = send(
+    &mut engine,
+    "c-1",
+    "subsumption/check",
+    json!({ "contract": order_pact(), "provider-shape": order_shape() }),
+  );
+
+  let kinds: Vec<&str> = events.iter().map(|e| e["kind"].as_str().unwrap()).collect();
+  assert_eq!(kinds, vec!["broker/checked", "broker/finished"]);
+  let checked = &events[0]["payload"];
+  assert_eq!(checked["consumer"], "web-app");
+  assert_eq!(checked["provider"], "order-service");
+  assert_eq!(checked["outcome"], "checked");
+  assert_eq!(checked["provider-version"], "4.1.0");
+  assert_eq!(checked["format"], direct["ok"]["format"]);
+  assert_eq!(checked["report"], direct["ok"]["report"]);
+  assert!(checked.get("publication").is_none(), "{checked}");
+  let finished = &events[1]["payload"];
+  assert_eq!(finished["status"], "checked");
+  assert_eq!(finished["broker"], "https://broker.example");
+  assert_eq!(finished["results"], json!([checked]));
+  assert!(
+    broker.reports.lock().unwrap().is_empty(),
+    "nothing published unasked"
+  );
+}
+
+#[test]
+fn a_report_is_published_to_the_shapes_link_with_the_contract_it_is_about() {
+  let broker = Arc::new(FakeBroker {
+    shape: Some(served_shape(true)),
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let text = serde_json::to_string_pretty(&order_pact()).unwrap();
+  let (_, events) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-version": "4.1.0", "contracts": [text], "publish-reports": true }),
+  );
+  assert_eq!(
+    broker.shapes_fetched.lock().unwrap()[0].1,
+    ShapeAt::Version("4.1.0".to_string())
+  );
+  let checked = &events[0]["payload"];
+  assert_eq!(checked["publication"], json!({ "outcome": "published" }));
+  let reports = broker.reports.lock().unwrap();
+  assert_eq!(reports.len(), 1);
+  assert_eq!(reports[0]["handle"], served_shape(true).handle);
+  assert_eq!(reports[0]["contract"], order_pact());
+  assert_eq!(reports[0]["contract-ends-in-a-line-break"], true);
+  assert_eq!(reports[0]["report"], checked["report"]);
+}
+
+#[test]
+fn a_report_the_broker_cannot_take_is_skipped_or_failed_and_the_check_still_stands() {
+  for (shape, fail_reports, publication) in [
+    (
+      served_shape(false),
+      false,
+      json!({ "outcome": "skipped", "reason": "not-supported" }),
+    ),
+    (served_shape(true), true, json!("failed")),
+  ] {
+    let broker = Arc::new(FakeBroker {
+      shape: Some(shape),
+      fail_reports,
+      ..FakeBroker::default()
+    });
+    let mut engine = engine(Some(Arc::clone(&broker)));
+    let (_, events) = broker_session(
+      &mut engine,
+      "broker/check-contracts",
+      json!({ "provider-branch": "main", "contracts": [order_pact()], "publish-reports": true }),
+    );
+    let checked = &events[0]["payload"];
+    assert_eq!(checked["outcome"], "checked");
+    if publication.is_string() {
+      assert_eq!(checked["publication"]["outcome"], publication);
+      assert_eq!(checked["publication"]["error"]["details"]["component"], "broker");
+    } else {
+      assert_eq!(checked["publication"], publication);
+      assert!(broker.reports.lock().unwrap().is_empty());
+    }
+    assert_eq!(events[1]["payload"]["status"], "checked");
+    no_credential_in(&events);
+  }
+}
+
+/// A provider with no shape there is `not-published`, which the host decides as replay-only; and
+/// a provider's shape is fetched once however many of its consumers' contracts are checked.
+#[test]
+fn a_provider_that_published_no_shape_is_not_published_and_is_asked_once() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  let mut mobile = order_pact();
+  mobile["consumer"]["name"] = json!("mobile-app");
+  let (_, events) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-branch": "main", "contracts": [order_pact(), mobile] }),
+  );
+  assert_eq!(broker.shapes_fetched.lock().unwrap().len(), 1);
+  let checked = of_kind(&events, "broker/checked");
+  assert_eq!(
+    checked,
+    vec![
+      &json!({ "consumer": "web-app", "provider": "order-service", "outcome": "not-published" }),
+      &json!({ "consumer": "mobile-app", "provider": "order-service", "outcome": "not-published" }),
+    ]
+  );
+  assert_eq!(events.last().unwrap()["payload"]["status"], "checked");
+}
+
+#[test]
+fn a_fetch_that_fails_fails_each_contract_and_the_session_and_never_shows_a_credential() {
+  let broker = Arc::new(FakeBroker {
+    fail_shapes: true,
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(broker));
+  let (_, events) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-branch": "main", "contracts": [order_pact()] }),
+  );
+  let checked = &events[0]["payload"];
+  assert_eq!(checked["outcome"], "failed");
+  assert_eq!(checked["error"]["code"], "component-failed");
+  assert_eq!(checked["error"]["details"]["error"]["code"], "broker-refused");
+  assert_eq!(events[1]["payload"]["status"], "failed");
+  no_credential_in(&events);
+}
+
+#[test]
+fn a_served_shape_about_another_provider_fails_that_contract_as_check_would() {
+  let mut shape = served_shape(true);
+  shape.document["provider"]["name"] = json!("billing-service");
+  let broker = Arc::new(FakeBroker {
+    shape: Some(shape),
+    ..FakeBroker::default()
+  });
+  let mut engine = engine(Some(broker));
+  let (_, events) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-branch": "main", "contracts": [order_pact()], "publish-reports": true }),
+  );
+  let checked = &events[0]["payload"];
+  assert_eq!(checked["outcome"], "failed");
+  assert_eq!(checked["error"]["code"], "document-mismatched", "{checked}");
+  assert!(checked.get("publication").is_none());
+  assert_eq!(events[1]["payload"]["status"], "failed");
+}
+
+#[test]
+fn which_shape_is_said_once_and_a_version_belongs_to_one_provider() {
+  let broker = Arc::new(FakeBroker::default());
+  let mut engine = engine(Some(Arc::clone(&broker)));
+  for body in [
+    json!({ "contracts": [order_pact()] }),
+    json!({ "provider-version": "1", "provider-branch": "main", "contracts": [order_pact()] }),
+    json!({ "provider-branch": "main", "contracts": [] }),
+    json!({ "provider-version": "1", "contracts": [order_pact(), janus_contract()] }),
+  ] {
+    let (refused, events) = broker_session(&mut engine, "broker/check-contracts", body.clone());
+    assert_eq!(refused["error"]["code"], "malformed-frame", "{body}: {refused}");
+    assert!(events.is_empty());
+  }
+  let (refused, _) = broker_session(
+    &mut engine,
+    "broker/check-contracts",
+    json!({ "provider-branch": "main", "contracts": [order_pact(), { "hello": "world" }] }),
+  );
+  assert_eq!(
+    refused["error"]["code"], "contract-version-unsupported",
+    "{refused}"
+  );
+  assert!(broker.shapes_fetched.lock().unwrap().is_empty());
 }

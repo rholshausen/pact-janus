@@ -174,6 +174,20 @@ fn example_transcripts_validate_against_the_schemas() {
       ),
     ),
     (
+      "broker/publish-provider-shape",
+      (
+        Some("broker.schema.json#/$defs/PublishProviderShape"),
+        Some("broker.schema.json#/$defs/PublishProviderShapeResult"),
+      ),
+    ),
+    (
+      "broker/check-contracts",
+      (
+        Some("broker.schema.json#/$defs/CheckContracts"),
+        Some("broker.schema.json#/$defs/CheckContractsResult"),
+      ),
+    ),
+    (
       "config/load",
       (
         Some("config.schema.json#/$defs/Load"),

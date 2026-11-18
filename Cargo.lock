@@ -2271,6 +2271,7 @@ dependencies = [
  "pact_consumer",
  "pact_janus_http_client",
  "pact_janus_kernel",
+ "pact_janus_test_servers",
  "pact_models",
  "pretty_assertions",
  "regex",
@@ -2592,9 +2593,12 @@ dependencies = [
 name = "pact_janus_test_servers"
 version = "0.7.0"
 dependencies = [
+ "base64 0.23.1",
  "rcgen",
  "rustls",
+ "serde_json",
  "time",
+ "tiny_http",
 ]
 
 [[package]]

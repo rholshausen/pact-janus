@@ -11,3 +11,5 @@ pub const COMPONENT_CONFIG_MEDIA_TYPE: &[&str] = &[];
 pub const COMPONENT_INTERFACE: &[&str] = &[];
 pub const HOOK_SCRIPT_GLOBAL: &[&str] = &[];
 pub const HOOK_BODY_FORMAT: &[&str] = &[];
+pub const BROKER_CONTRACTS_RELATION: &[&str] = &[];
+pub const BROKER_SPECIFICATION: &[&str] = &[];

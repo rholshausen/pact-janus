@@ -1,0 +1,5 @@
+error: --provider-app-version <VERSION> is required to publish provider shapes
+
+Usage: janus publish [OPTIONS] --broker-base-url <URL> <DOCUMENT>...
+
+For more information, try '--help'.

@@ -65,7 +65,8 @@ pub enum Command {
   /// Derive a provider shape from an OpenAPI or AsyncAPI document, and say what the derivation
   /// could not carry
   Derive(DeriveArgs),
-  /// Publish Janus contracts or v1-v4 pacts to a Pact Broker, for a version of their consumer
+  /// Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a version of the
+  /// consumer or provider they belong to
   Publish(PublishArgs),
   /// Publish a WASM component to an OCI registry, or fetch one and say what it is
   #[command(subcommand)]
@@ -701,7 +702,12 @@ pub struct VerifyArgs {
                         to warn.\n\nThis command reads documents and decides; it never contacts \
                         the provider. Verify first (janus verify ... --output json > result.json) \
                         and pass the result with --verification: a pair with no verification \
-                        result is reported as unverified, which is not a pass.",
+                        result is reported as unverified, which is not a pass.\n\nWith \
+                        --broker-url, each provider's shape is fetched from a Pact Broker with the \
+                        janus feature, at --provider-version or the latest on --provider-branch, in \
+                        place of --provider-shape; a provider that published none there is \
+                        reported as replay-only, and a broker that stores no shapes fails the \
+                        command.",
   arg_required_else_help = true
 )]
 pub struct CheckArgs {
@@ -710,7 +716,7 @@ pub struct CheckArgs {
   pub sources: Vec<PathBuf>,
 
   /// A provider shape document, or a directory of them; repeatable
-  #[arg(long = "provider-shape", value_name = "PATH")]
+  #[arg(long = "provider-shape", value_name = "PATH", conflicts_with = "broker_url")]
   pub provider_shapes: Vec<PathBuf>,
 
   /// A run summary written by `janus verify --output json`; repeatable
@@ -736,6 +742,77 @@ pub struct CheckArgs {
   /// text prints the report as prose; json prints the compatibility report document
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,
+
+  // The broker's URL is not read from PACT_BROKER_BASE_URL, which a CI environment often sets for
+  // every step: that would turn a check over files into one over a broker unasked. The credentials
+  // are read as `janus publish` reads them, and only used with --broker-url.
+  /// Fetch each provider's shape from this Pact Broker instead of from --provider-shape
+  #[arg(
+    long,
+    short = 'b',
+    alias = "broker-base-url",
+    value_name = "URL", value_parser = absolute_url,
+    requires = "shape_at",
+    help_heading = "Pact Broker"
+  )]
+  pub broker_url: Option<String>,
+
+  /// Check against the shape the provider published for this version
+  #[arg(
+    long,
+    value_name = "VERSION",
+    group = "shape_at",
+    requires = "broker_url",
+    help_heading = "Pact Broker"
+  )]
+  pub provider_version: Option<String>,
+
+  /// Check against the latest shape the provider published on this branch
+  #[arg(
+    long,
+    value_name = "BRANCH",
+    group = "shape_at",
+    requires = "broker_url",
+    help_heading = "Pact Broker"
+  )]
+  pub provider_branch: Option<String>,
+
+  /// Publish each subsumption report to the broker, beside the shape it is about
+  #[arg(long, requires = "broker_url", help_heading = "Pact Broker")]
+  pub publish: bool,
+
+  /// The broker's username, for basic authentication
+  #[arg(
+    short = 'u',
+    long,
+    value_name = "USER",
+    env = "PACT_BROKER_USERNAME",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_username: Option<String>,
+
+  /// The broker's password, for basic authentication
+  #[arg(
+    short = 'p',
+    long,
+    value_name = "PASSWORD",
+    env = "PACT_BROKER_PASSWORD",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_password: Option<String>,
+
+  /// A bearer token for the broker; used instead of --broker-username when both are given
+  #[arg(
+    short = 'k',
+    long,
+    value_name = "TOKEN",
+    env = "PACT_BROKER_TOKEN",
+    hide_env_values = true,
+    help_heading = "Pact Broker"
+  )]
+  pub broker_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -887,34 +964,42 @@ pub struct DeriveArgs {
 // spells them, short forms included, so a consumer's CI script moves by changing the command's
 // name. Its `-h` for --branch is clap's help here, so --branch has no short form. Not carried:
 // --auto-detect-version-properties and --tag-with-git-branch, which read git and CI variables,
-// and --merge, which the protocol has no member for.
+// and --merge, which the protocol has no member for. A provider shape's version is
+// --provider-app-version, as PactFlow's `publish-provider-contract` spells it (ADR 0093).
 #[derive(Debug, Args)]
 #[command(
-  after_help = "Every contract is published as the broker's 'pact' specification, which every \
-                        Pact Broker accepts. Contracts from several consumers are published one \
-                        consumer at a time, each for the same version.\n\nExit status: 0 \
-                        published; 2 something was not published (the broker refused it or could \
-                        not be reached), or the command could not run.",
+  after_help = "Each document is identified by what it says it is. A Janus contract is \
+                        published as the broker's 'janus' specification where the broker says it \
+                        stores one, and every other contract as 'pact', which every Pact Broker \
+                        accepts. Contracts from several consumers are published one consumer at a \
+                        time, each for the same version. A provider shape needs a broker with the \
+                        janus feature.\n\nExit status: 0 published; 2 something was not published \
+                        (the broker refused it or could not be reached), or the command could not \
+                        run.",
   arg_required_else_help = true
 )]
 pub struct PublishArgs {
-  /// Janus contracts or v1-v4 pact files, or directories of them
-  #[arg(required = true, value_name = "CONTRACT_OR_PACT")]
+  /// Janus contracts, v1-v4 pact files or provider shapes, or directories of them
+  #[arg(required = true, value_name = "DOCUMENT")]
   pub sources: Vec<PathBuf>,
 
-  /// The version of the consumer these contracts belong to
+  /// The version of the consumer the contracts belong to
   #[arg(short = 'a', long, value_name = "VERSION")]
-  pub consumer_app_version: String,
+  pub consumer_app_version: Option<String>,
 
-  /// The consumer version's branch
+  /// The version of the provider the shapes belong to
+  #[arg(long, value_name = "VERSION")]
+  pub provider_app_version: Option<String>,
+
+  /// The version's branch
   #[arg(long, value_name = "BRANCH")]
   pub branch: Option<String>,
 
-  /// A tag for the consumer version; repeatable, or comma-separated
+  /// A tag for the version; repeatable, or comma-separated
   #[arg(short = 't', long = "tag", value_name = "TAG", value_delimiter = ',')]
   pub tags: Vec<String>,
 
-  /// The build that produced the contracts
+  /// The build that produced the documents
   #[arg(long, value_name = "URL")]
   pub build_url: Option<String>,
 

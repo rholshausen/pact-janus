@@ -2237,6 +2237,182 @@ fn check_without_a_provider_shape_says_which_provider_published_nothing() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Provider shapes and reports in a Pact Broker (S4.3b, ADR 0093), against a stand-in for a broker
+// with the janus feature until one built from S4.3d can be run
+// ---------------------------------------------------------------------------------------------
+
+use pact_janus_test_servers::broker::BrokerStandIn;
+
+fn sample_shape() -> Value {
+  serde_json::from_str(
+    &std::fs::read_to_string(repo(
+      "samples/order-service/shapes/order-service.provider-shape.json",
+    ))
+    .expect("the sample shape"),
+  )
+  .expect("JSON")
+}
+
+/// A provider publishes its shape and a consumer its contract in one command: the shape for the
+/// provider version, the contract for the consumer version, the contract under its own word.
+#[test]
+fn publish_sends_a_shape_for_the_provider_version_and_a_contract_under_its_own_word() {
+  let broker = BrokerStandIn::start(true);
+  let output = janus(&[
+    "publish",
+    &order_consumer_contract(),
+    &repo("samples/order-service/shapes/order-service.provider-shape.json"),
+    "--consumer-app-version",
+    "2.7.0",
+    "--provider-app-version",
+    "4.1.0",
+    "--branch",
+    "main",
+    "--broker-base-url",
+    &broker.url,
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "{text}{}", stderr(&output));
+  assert!(
+    text.contains("Publishing 1 contract for web-app version 2.7.0"),
+    "{text}"
+  );
+  assert!(
+    text.contains("Publishing the provider shape for order-service version 4.1.0"),
+    "{text}"
+  );
+  assert!(
+    text.contains("Provider shape published for order-service version 4.1.0."),
+    "{text}"
+  );
+  let held = broker.held();
+  assert_eq!(held.shapes.len(), 1);
+  assert_eq!(held.shapes[0]["provider"], "order-service");
+  assert_eq!(held.shapes[0]["version"], "4.1.0");
+  assert_eq!(held.shapes[0]["branch"], "main");
+  assert_eq!(held.shapes[0]["content"], sample_shape());
+  assert_eq!(held.contracts.len(), 1);
+  assert_eq!(held.contracts[0]["specification"], "janus");
+  assert_eq!(held.contracts[0]["version"], "2.7.0");
+}
+
+/// A broker that has not caught up stores the contract as it always did, as `pact`, and the shape
+/// fails by name.
+#[test]
+fn publish_to_a_broker_without_the_janus_feature_stores_the_contract_and_names_why_the_shape_failed() {
+  let broker = BrokerStandIn::start(false);
+  let output = janus(&[
+    "publish",
+    &order_consumer_contract(),
+    &repo("samples/order-service/shapes/order-service.provider-shape.json"),
+    "--consumer-app-version",
+    "2.7.0",
+    "--provider-app-version",
+    "4.1.0",
+    "--broker-base-url",
+    &broker.url,
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 2, "{text}");
+  assert!(text.contains("does not store provider shapes"), "{text}");
+  assert!(
+    stderr(&output).contains("janus publish: the provider shape for order-service was not published"),
+    "{}",
+    stderr(&output)
+  );
+  let held = broker.held();
+  assert_eq!(held.contracts[0]["specification"], "pact");
+  assert!(held.shapes.is_empty());
+}
+
+/// The same decision from the broker's shape as from the file it was published from, and with
+/// `--publish` the report goes back beside the shape, with the contract it is about.
+#[test]
+fn check_against_a_brokers_shape_decides_as_the_file_does_and_publishes_the_report() {
+  let broker = BrokerStandIn::start(true);
+  broker.holds_shape("order-service", "4.1.0", Some("main"), &sample_shape());
+  let from_file = janus(&[
+    "check",
+    &order_consumer_contract(),
+    "--provider-shape",
+    &order_shapes(),
+    "--as-of",
+    "2026-11-18",
+    "--output",
+    "json",
+  ]);
+  for at in [["--provider-branch", "main"], ["--provider-version", "4.1.0"]] {
+    let from_broker = janus(&[
+      "check",
+      &order_consumer_contract(),
+      "--broker-url",
+      &broker.url,
+      at[0],
+      at[1],
+      "--publish",
+      "--as-of",
+      "2026-11-18",
+      "--output",
+      "json",
+    ]);
+    assert_eq!(code(&from_broker), code(&from_file), "{}", stderr(&from_broker));
+    assert_eq!(stdout(&from_broker), stdout(&from_file), "{at:?}");
+    assert!(stderr(&from_broker).is_empty(), "{}", stderr(&from_broker));
+  }
+  let held = broker.held();
+  assert_eq!(held.reports.len(), 2);
+  let contract: Value =
+    serde_json::from_str(&std::fs::read_to_string(order_consumer_contract()).unwrap()).unwrap();
+  assert_eq!(held.reports[0]["body"]["contract"]["decoded"], contract);
+  assert_eq!(held.reports[0]["body"]["report"]["consumer"]["name"], "web-app");
+  assert!(held.reports[0]["body"]["engineVersion"].is_string());
+}
+
+#[test]
+fn check_against_a_broker_with_no_shape_there_is_replay_only_and_says_so() {
+  let broker = BrokerStandIn::start(true);
+  let output = janus(&[
+    "check",
+    &order_pact(),
+    "--broker-url",
+    &broker.url,
+    "--provider-branch",
+    "main",
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "replay-only semantics is a pass: {text}");
+  assert!(
+    text.contains("no published shape matched any interaction"),
+    "{text}"
+  );
+  assert!(
+    stderr(&output).contains("no provider shape published for 'order-service' on branch main"),
+    "{}",
+    stderr(&output)
+  );
+  assert!(broker.held().reports.is_empty(), "nothing published unasked");
+}
+
+/// ADR 0093 decision 6: a broker that stores no shapes fails the command; it is never read as a
+/// fleet of providers that published none.
+#[test]
+fn check_against_a_broker_that_stores_no_shapes_cannot_run() {
+  let broker = BrokerStandIn::start(false);
+  let output = janus(&[
+    "check",
+    &order_pact(),
+    "--broker-url",
+    &broker.url,
+    "--provider-version",
+    "4.1.0",
+  ]);
+  assert_eq!(code(&output), 2, "{}", stdout(&output));
+  let said = stderr(&output);
+  assert!(said.contains("web-app-order-service.json"), "{said}");
+  assert!(said.contains("does not store provider shapes"), "{said}");
+}
+
+// ---------------------------------------------------------------------------------------------
 // components (plan task 8.1)
 // ---------------------------------------------------------------------------------------------
 

@@ -146,6 +146,7 @@ fn publish(
   let contracts = [ContractToPublish {
     provider: PROVIDER.to_string(),
     content: serde_json::to_vec(&document).unwrap(),
+    janus: document.get("$format").is_some(),
   }];
   concluded(
     client.publish_contracts(&ContractsToPublish {
