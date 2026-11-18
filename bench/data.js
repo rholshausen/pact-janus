@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794983827708,
+  "lastUpdate": 1794983829678,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -58508,6 +58508,66 @@ window.BENCHMARK_DATA = {
             "value": 18391,
             "unit": "requests per second",
             "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "b8172f4b1512b29c799ed0ebde2279988e1ec351",
+          "message": "feat: S4.5, a broker's recompute measured, and selectors compiled once per check (ADR 0095)\n\nbenchmarks/janus/src/fleet.rs generates a fleet: one provider of 40\noperations whose shape at each of 10 versions the engine records, and 50\nconsumers' v3 pacts of 5 to 100 interactions, every interaction with\nfindings. It answers one pair as a broker does (a fresh instance, check,\ndecide) at 5, 50 and 500 interactions and against a 400-entry shape,\ndecides a stored report, recomputes a new shape's 50 reports, and all 500\npairs on one thread and on four, in the WASM embedding and linked\nnatively. The trend chart plots them, and benchmarks/results/ holds a full\nrun of this machine.\n\nWASM costs 1.2 to 1.3 times native, the cost is linear in interactions,\nand the cross-product is linear in pairs and divides across threads.\nADR 0095 confirms the broker notes' §3c: both brokers keep the WASM\nartifact, compute a missing report for the pair a decision needs within a\ntime budget (past it the pair is unanswered and computed off the request),\nand never recompute a fleet at once. S4.3e's exit now includes a pair\nwhose report no CI run published.\n\nNot foreseen: subsumption/check compiled every entry's selector again for\nevery interaction. Each is now compiled once per check, the first time an\ninteraction needs it: a large pair is 40% faster and the cross-product\n30%, no verdict changes, and an invalid selector is reported once.\nSelection still tries every entry for every interaction, 60% of a walk\nover 80 entries; that is the new S4.11.\n\nAlso: S4.10 waits on Drift publishing its plugin interfaces and SDK, after\nwhich the plugin is built in this repository as a third-party plugin.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T17:26:14+11:00",
+          "tree_id": "dbd85cf239f8cc6dfac6295931acb784f2814568",
+          "url": "https://github.com/rholshausen/pact-janus/commit/b8172f4b1512b29c799ed0ebde2279988e1ec351"
+        },
+        "date": 1794983829273,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 20447,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 18138,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 24.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 17,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 57.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 38.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
         ]
       }
