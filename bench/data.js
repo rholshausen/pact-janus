@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795046250394,
+  "lastUpdate": 1795046252574,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -59574,6 +59574,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 123,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "22819b35bf7faf7f28504fe257bc0bcc0f81f9a5",
+          "message": "feat: S5.1a, contracts and summaries name the components that were loaded (ADR 0097)\n\nA consumer session that declared components writes them into its contract as\n`metadata.components`, and a verification run lists them in its summary as\n`components`: each one's handshake name and version, and its source by the\ndigest a declaration would pin (a registry's resolved manifest digest, a\nfile's own SHA-256), never a file's path. With none declared, a contract's\nbytes do not change. The engine's own version is not recorded. A merged\ncontract lists what each writer loaded. Closes Phase 9 finding 15.\n\nThe staged plan splits S5.1 into S5.1a-d, the GA declaration after S5.4 and\nS5.3, which still change the component interface.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T10:50:12+11:00",
+          "tree_id": "c73799bb004feb9931c33040657ab161422182f4",
+          "url": "https://github.com/rholshausen/pact-janus/commit/22819b35bf7faf7f28504fe257bc0bcc0f81f9a5"
+        },
+        "date": 1795046252009,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 37774,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27342,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 58.2,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 40.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 143,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 100.1,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
