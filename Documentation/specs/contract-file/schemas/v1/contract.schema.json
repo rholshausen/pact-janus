@@ -277,7 +277,34 @@
           "format": "date-time",
           "description": "RFC 3339. Volatile by nature: a writer producing reproducible output omits it (spec.md §3.2)."
         },
-        "build-url": { "type": "string" }
+        "build-url": { "type": "string" },
+        "components": {
+          "type": "array",
+          "description": "Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md §3.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.",
+          "items": { "$ref": "#/$defs/RecordedComponent" }
+        }
+      }
+    },
+    "RecordedComponent": {
+      "title": "RecordedComponent",
+      "description": "A declared component a session or run loaded: who its handshake said it is, and where its bytes came from (ADR 0097). A verification summary's 'components' lists the same.",
+      "type": "object",
+      "required": ["name", "version", "source"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1, "description": "The version the component's handshake declared." },
+        "source": { "$ref": "#/$defs/RecordedSource" }
+      }
+    },
+    "RecordedSource": {
+      "title": "RecordedSource",
+      "description": "Where a recorded component's bytes came from. Never a 'file' source's path, which differs between machines, and never a credential.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "description": "The declaration's source kind: an open vocabulary, 'oci' and 'file' among it (component-interfaces spec §10.2)." },
+        "reference": { "type": "string", "description": "An 'oci' source's reference, its registry, repository and tag, without the digest." },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say." }
       }
     }
   }

@@ -83,7 +83,12 @@ describe("a CSV consumer, through a third-party content component", () => {
 
     const contract = JSON.parse(await readFile(contractFile as string, "utf8")) as {
       interactions: { "content-types": unknown; selection: { variants: { parts: { response: { body: unknown } } }[] } }[];
+      metadata?: { components?: unknown[] };
     };
+    // The engine records which bytes decoded the body (ADR 0097): by digest, never by path.
+    expect(contract.metadata?.components).toEqual([
+      { name: "csv", version: "1.0.0", source: { kind: "file", digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/) } },
+    ]);
     const interaction = contract.interactions[0];
     if (!interaction) {
       throw new Error("the contract records no interaction");

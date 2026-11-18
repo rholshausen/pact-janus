@@ -270,6 +270,42 @@ export interface Metadata {
    */
   created?: string;
   "build-url"?: string;
+  /**
+   * Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md §3.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.
+   */
+  components?: RecordedComponent[];
+  [k: string]: unknown;
+}
+
+/**
+ * A declared component a session or run loaded: who its handshake said it is, and where its bytes came from (ADR 0097). A verification summary's 'components' lists the same.
+ */
+export interface RecordedComponent {
+  name: string;
+  /**
+   * The version the component's handshake declared.
+   */
+  version: string;
+  source: RecordedSource;
+  [k: string]: unknown;
+}
+
+/**
+ * Where a recorded component's bytes came from. Never a 'file' source's path, which differs between machines, and never a credential.
+ */
+export interface RecordedSource {
+  /**
+   * The declaration's source kind: an open vocabulary, 'oci' and 'file' among it (component-interfaces spec §10.2).
+   */
+  kind: string;
+  /**
+   * An 'oci' source's reference, its registry, repository and tag, without the digest.
+   */
+  reference?: string;
+  /**
+   * The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say.
+   */
+  digest?: string;
   [k: string]: unknown;
 }
 

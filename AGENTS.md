@@ -295,6 +295,11 @@ Three sources are the source of truth and take precedence over this file when th
 > constraints rule out (an `equality`'s value, a prefix a component declares through the optional
 > `matcher/prefix`, `http:path`'s text before its first parameter) before running its plan, so
 > selection no longer grows with a shape's entries; the plans still decide which entry is selected.
+> Stage 5 has started, S5.1 split into four (a: recording, b: `wkg`, c: signing, d: generally
+> available, after S5.4 and S5.3). S5.1a (ADR 0097): a contract's `metadata.components` and a
+> verification summary's `components` name each declared component loaded, by its handshake's name
+> and version and the digest a declaration would pin (`Loaded::fetched`); never a file's path, nor
+> the engine's own version.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

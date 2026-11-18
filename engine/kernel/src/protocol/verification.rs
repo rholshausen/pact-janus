@@ -53,7 +53,7 @@ use crate::component::{
   ContentComponent, ExchangeParts, PactGenerators, Parts, Send as SendRequest, Stop, TransportComponent,
   Unavailable,
 };
-use crate::contract::{self, Contract};
+use crate::contract::{self, Contract, RecordedComponent};
 use crate::error::Problem;
 use crate::hooks::points::PRODUCED_PART;
 use crate::hooks::{ExchangeScratch, HookRunner, Occurrence, PointOutcome};
@@ -503,7 +503,7 @@ pub enum VerifyError {
 /// One document a run verifies. Both arms are first-class: a contract this engine wrote, and a
 /// v1–v4 pact some other SDK wrote years ago (plan task 5.4).
 pub(crate) enum Source {
-  Janus(Contract),
+  Janus(Box<Contract>),
   Legacy(Box<LegacyPact>),
 }
 
@@ -674,7 +674,7 @@ pub(crate) fn read_document(index: usize, doc: &Value) -> Result<Source, VerifyE
   let doc = doc.as_ref();
   match doc.get("$format").and_then(Value::as_str) {
     Some(format) if crate::persisted::CONTRACT_FORMAT.reads(format) => {
-      Ok(Source::Janus(read_contract(index, doc)?))
+      Ok(Source::Janus(Box::new(read_contract(index, doc)?)))
     }
     // A `$format` this engine does not know is never guessed at, even when the document also
     // looks pact-shaped: the member exists precisely to stop a reader guessing.
@@ -783,6 +783,8 @@ pub(crate) struct RunComponents {
   pub contributions: Arc<Contributions>,
   /// What nothing the run reports repeats (ADR 0074 decision 7): each transport's credentials.
   pub redaction: Redaction,
+  /// The declared components the run loaded, which its summary lists (ADR 0097).
+  pub recorded: Vec<RecordedComponent>,
 }
 
 /// What a run verifies: documents already read, or a broker to fetch them from inside the run
@@ -1044,6 +1046,7 @@ fn run(
     content,
     contributions,
     redaction,
+    recorded,
   } = components;
   let interactions: usize = sources.iter().map(Source::interactions).sum();
   let variants: usize = sources.iter().map(Source::variants).sum();
@@ -1167,6 +1170,7 @@ fn run(
       .map(|broker| broker.fetched.iter().map(|fetched| fetched.pending).collect()),
     publication: &publication,
     ran: &ran,
+    components: &recorded,
   };
 
   if (aborted.is_some() || stopped)
@@ -1454,6 +1458,8 @@ struct Report<'a> {
   publication: &'a [Value],
   /// Per source the run reached, its part of it.
   ran: &'a [SourceRun],
+  /// The declared components the run loaded (ADR 0097).
+  components: &'a [RecordedComponent],
 }
 
 /// The run summary (protocol spec §9.6): the document the terminal event carries, the one
@@ -1518,6 +1524,10 @@ fn summary(report: &Report<'_>) -> Value {
   }
   if !report.publication.is_empty() {
     map.insert("publication".to_string(), json!(report.publication));
+  }
+  // Which bytes took part (spec §9.6, ADR 0097): absent when the run declared none.
+  if !report.components.is_empty() {
+    map.insert("components".to_string(), json!(report.components));
   }
   // Positionally beside `consumers` (ADR 0033, Phase 9 finding 10): each source's own counts,
   // which a pair's report and a broker's matrix row are about.

@@ -14,6 +14,7 @@ use super::error::ComponentError;
 use super::matcher::MatcherComponent;
 use super::transport::TransportComponent;
 use crate::common::Requirement;
+use crate::contract::{RecordedComponent, RecordedSource};
 use crate::plan::RESERVED_NAMESPACES;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -141,6 +142,18 @@ pub struct Loaded {
   /// The matcher interface's `apply`, bound, when the component declared `matcher` (plan task 8.4:
   /// what runs the component's own actions when a fragment it contributed reaches them).
   pub matcher: Option<Arc<dyn MatcherComponent>>,
+  /// Where the loader found the bytes (ADR 0097), which a contract and a verification summary
+  /// record. `None` when the loader cannot say; the record then names the source's kind alone.
+  pub fetched: Option<Fetched>,
+}
+
+/// Where a loader found a component's bytes (ADR 0097 decision 4): an `oci` source's reference,
+/// without its digest, and the digest a declaration would pin — the manifest's for a registry, the
+/// file's own SHA-256 for a `file` source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fetched {
+  pub reference: Option<String>,
+  pub digest: String,
 }
 
 /// A way of loading components, which an embedding registers (ADR 0013: hosting is a capability of
@@ -170,6 +183,19 @@ pub struct Resolved {
   /// The namespaced actions its handshake contributed (spec §3.3's `contributes.actions`): the only
   /// component actions a fragment it contributes may use (plan task 8.4).
   pub actions: Vec<String>,
+  /// Where its bytes came from, as a contract and a verification summary record it (ADR 0097).
+  pub source: RecordedSource,
+}
+
+impl Resolved {
+  /// This component as a contract's `metadata.components` and a run's summary list it (ADR 0097).
+  pub fn recorded(&self) -> RecordedComponent {
+    RecordedComponent {
+      name: self.name.clone(),
+      version: self.version.clone(),
+      source: self.source.clone(),
+    }
+  }
 }
 
 /// A component compiled into the embedding, named so requirements and conflicts can see it. Only
@@ -363,6 +389,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   } else {
     None
   };
+  let fetched = loaded.fetched;
   Ok(Resolved {
     name: declared.clone(),
     version: version.to_string(),
@@ -372,6 +399,11 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     transport_kinds,
     matcher,
     actions,
+    source: RecordedSource {
+      kind: declaration.source.kind.clone(),
+      reference: fetched.as_ref().and_then(|f| f.reference.clone()),
+      digest: fetched.map(|f| f.digest),
+    },
   })
 }
 

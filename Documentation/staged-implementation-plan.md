@@ -2906,7 +2906,41 @@ The component model, opened to the ecosystem.
   distribution, and **signing and verification** of component artifacts, which the prototype never
   did. First decide findings 15 (recording which components took part, with their digests), 16
   (registry credentials, which 2.7 says a run must not take from the environment) and 17 (artifacts
-  published with `wkg`).
+  published with `wkg`). Split 2026-11-19 into four. Finding 16 was closed by S1.27 (ADR 0052), and
+  the loader's in-process grants, deadlines and digest pinning (X.5's first half) were built in tasks
+  8.1 and 8.2. "Generally available" invites third parties to depend on the component interface,
+  which S5.4 and S5.3 still change, so the declaration comes after them:
+  - **S5.1a Recording the components that took part** — **S**: finding 15. A contract and a
+    verification summary name each declared component a session or run loaded: its name, its version
+    and where its bytes came from, by the digest a declaration would pin. *Exit:* the CSV consumer's
+    contract and a verification run with the CSV component both name it with its digest, and a
+    contract merged from two test files names what each loaded.
+    *Done 2026-11-19* ([ADR 0097](decisions/0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md)):
+    - A contract's `metadata.components` and a summary's `components` list each declared component
+      loaded, not only the ones called, since what a session loaded follows from its configuration.
+      Each gives its handshake's name and version and its `source`: the kind, an `oci` reference
+      without its digest, and the digest a declaration would pin, a file's own SHA-256 included. A
+      file's path is never written. With no components declared, a contract's bytes do not change.
+    - The engine's own version is not written: every release would change every contract's bytes.
+    - A loader says where it found the bytes (`Loaded::fetched`); the WASM loader does for both of
+      its sources. A merged contract lists what each writer loaded, two builds of one component both.
+    - `csv_component.rs` checks the CSV consumer's contract and a verification's summary,
+      `oci.rs` a run's record of a component pinned in a registry, and `merge.rs` the merge.
+  - **S5.1b Components published with `wkg`** — **S**: finding 17, ADR 0021's tripwire. The loader
+    accepts the CNCF Wasm OCI layout as well as Janus's own, refusing a non-Janus artifact from its
+    config's WIT exports before fetching its layer where the config lists them. *Exit:* the CSV
+    component pushed with `wkg oci push` loads, pinned by digest, and a CNCF artifact of another
+    component is refused as `not-a-component` before its layer is fetched.
+  - **S5.1c Signed components** — **M**: X.6. Sigstore signatures, attached to an artifact through
+    OCI referrers. A declaration names the identity it trusts, the loader verifies it at pull and at
+    load, and the record S5.1a writes carries the identity it verified. The ADR decides the verifier,
+    where the trust root comes from offline, and what an unsigned component does by default.
+    *Exit:* a component signed keylessly in CI loads under a declaration naming that workflow's
+    identity, and is refused under any other, or with its signature removed.
+  - **S5.1d Generally available** — **S**, after S5.4 and S5.3: the component interfaces declared
+    stable, spec §10.3's "signature verification is not specified in v1" replaced, and a guide for a
+    component author. *Exit:* a component written from the guide alone is published with `wkg`,
+    signed, declared, and recorded in a contract and a verification summary.
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
   user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
   spec §9). This closes S1.8's refusal. With it, S4.2's protobuf half: `janus derive` reads a `.proto`
@@ -3165,7 +3199,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
-| S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
+| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |

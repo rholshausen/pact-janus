@@ -8,6 +8,7 @@ package io.pact.janus.bindings.contract.v1;
 
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -28,7 +29,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "writer",
     "created",
-    "build-url"
+    "build-url",
+    "components"
 })
 public class Metadata {
 
@@ -48,6 +50,13 @@ public class Metadata {
     private Date created;
     @JsonProperty("build-url")
     private java.lang.String buildUrl;
+    /**
+     * Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md §3.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md \u00a73.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.")
+    private List<RecordedComponent> components;
     @JsonIgnore
     private Map<java.lang.String, Object> additionalProperties = new LinkedHashMap<java.lang.String, Object>();
 
@@ -97,6 +106,24 @@ public class Metadata {
         this.buildUrl = buildUrl;
     }
 
+    /**
+     * Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md §3.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.
+     * 
+     */
+    @JsonProperty("components")
+    public List<RecordedComponent> getComponents() {
+        return components;
+    }
+
+    /**
+     * Each declared component the writing session loaded, sorted by name, then version, then the canonical bytes of its source (spec.md §3.2, ADR 0097). Absent when the session declared none. The embedding's own in-tree components are not listed.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<RecordedComponent> components) {
+        this.components = components;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -123,6 +150,10 @@ public class Metadata {
         sb.append('=');
         sb.append(((this.buildUrl == null)?"<null>":this.buildUrl));
         sb.append(',');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -139,6 +170,7 @@ public class Metadata {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.buildUrl == null)? 0 :this.buildUrl.hashCode()));
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.writer == null)? 0 :this.writer.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.created == null)? 0 :this.created.hashCode()));
@@ -154,7 +186,7 @@ public class Metadata {
             return false;
         }
         Metadata rhs = ((Metadata) other);
-        return (((((this.buildUrl == rhs.buildUrl)||((this.buildUrl!= null)&&this.buildUrl.equals(rhs.buildUrl)))&&((this.writer == rhs.writer)||((this.writer!= null)&&this.writer.equals(rhs.writer))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.created == rhs.created)||((this.created!= null)&&this.created.equals(rhs.created))));
+        return ((((((this.buildUrl == rhs.buildUrl)||((this.buildUrl!= null)&&this.buildUrl.equals(rhs.buildUrl)))&&((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components))))&&((this.writer == rhs.writer)||((this.writer!= null)&&this.writer.equals(rhs.writer))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.created == rhs.created)||((this.created!= null)&&this.created.equals(rhs.created))));
     }
 
 }

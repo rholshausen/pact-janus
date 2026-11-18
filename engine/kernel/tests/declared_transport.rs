@@ -133,6 +133,7 @@ impl ComponentLoader for StubLoader {
       content: None,
       transport: Some(self.transport.clone()),
       matcher: None,
+      fetched: None,
     })
   }
 }
@@ -228,6 +229,13 @@ fn a_declared_transport_of_another_kind_serves_a_passive_interaction() {
     json!({ "session": session }),
   );
   assert_eq!(finalised["ok"]["results"][0]["status"], "verified", "{finalised}");
+  // ADR 0097: the contract names the declared component its session loaded. This loader cannot say
+  // where its bytes came from, so the source is its kind alone.
+  assert_eq!(
+    finalised["ok"]["contract"]["metadata"],
+    json!({ "components": [ { "name": "line", "version": "1.0.0", "source": { "kind": "stub" } } ] }),
+    "{finalised}"
+  );
 }
 
 /// An arrival that does not match is the transport's to refuse in its own way (kernel-boundary
@@ -328,6 +336,11 @@ fn a_declared_transport_drives_a_verification() {
       })
       .expect("the run finishes");
     assert_eq!(summary["status"], status, "{answer}: {summary}");
+    assert_eq!(
+      summary["components"],
+      json!([ { "name": "line", "version": "1.0.0", "source": { "kind": "stub" } } ]),
+      "{summary}"
+    );
   }
 }
 

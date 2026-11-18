@@ -941,9 +941,23 @@ impl ConsumerSession {
       consumer: self.consumer.clone(),
       provider: self.provider.clone(),
       interactions,
-      metadata: None,
+      metadata: metadata(self.scope.recorded()),
     }))
   }
+}
+
+/// A contract's metadata: the declared components its session loaded (ADR 0097), or none at all, so a
+/// contract written with no components has the bytes it always had.
+fn metadata(components: Vec<contract::RecordedComponent>) -> Option<contract::Metadata> {
+  if components.is_empty() {
+    return None;
+  }
+  Some(contract::Metadata {
+    writer: None,
+    created: None,
+    build_url: None,
+    components: Some(components),
+  })
 }
 
 /// What a reply's generators read for a variant (ADR 0048): its resolved state parameters.

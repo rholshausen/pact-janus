@@ -2,9 +2,9 @@
 //! §2.4, §4.2; ADR 0065). Several test files record one consumer and provider into one file: an
 //! interaction is its description with its states, two recorded the same are one, and two recorded
 //! differently are a conflict. Interactions are sorted by that identity, so a merged file's bytes do
-//! not depend on which writer came first.
+//! not depend on which writer came first. The components each writer loaded are joined too (ADR 0097).
 
-use super::model::{Contract, Interaction};
+use super::model::{Contract, Interaction, Metadata, RecordedComponent};
 use std::cmp::Ordering;
 
 /// Why two contracts cannot be merged.
@@ -67,13 +67,38 @@ pub fn merge(existing: Contract, new: Contract) -> Result<Contract, Conflict> {
     return Err(Conflict::Interactions(conflicts));
   }
   sort(&mut interactions);
-  Ok(Contract { interactions, ..new })
+  let metadata = merge_metadata(existing.metadata, new.metadata.clone());
+  Ok(Contract {
+    interactions,
+    metadata,
+    ..new
+  })
+}
+
+/// `new`'s metadata, listing every component either writer loaded (ADR 0097 decision 6): the file
+/// holds interactions recorded by each, so two builds of one component both stay.
+fn merge_metadata(existing: Option<Metadata>, new: Option<Metadata>) -> Option<Metadata> {
+  let kept = existing.and_then(|m| m.components).unwrap_or_default();
+  if kept.is_empty() {
+    return new;
+  }
+  let mut metadata = new.unwrap_or(Metadata {
+    writer: None,
+    created: None,
+    build_url: None,
+    components: None,
+  });
+  let mut components = metadata.components.take().unwrap_or_default();
+  components.extend(kept);
+  RecordedComponent::normalise(&mut components);
+  metadata.components = Some(components);
+  Some(metadata)
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::contract::{Party, RecordedSelection, State, write_canonical};
+  use crate::contract::{Party, RecordedSelection, RecordedSource, State, write_canonical};
   use pretty_assertions::assert_eq;
   use serde_json::json;
   use std::collections::BTreeMap;
@@ -207,6 +232,78 @@ mod tests {
         .collect::<Vec<_>>(),
       vec!["get"]
     );
+  }
+
+  fn with_components(mut contract: Contract, components: &[(&str, &str)]) -> Contract {
+    contract.metadata = Some(Metadata {
+      writer: None,
+      created: None,
+      build_url: None,
+      components: Some(
+        components
+          .iter()
+          .map(|(name, digest)| RecordedComponent {
+            name: name.to_string(),
+            version: "1.0.0".to_string(),
+            source: RecordedSource {
+              kind: "file".to_string(),
+              reference: None,
+              digest: Some(digest.to_string()),
+            },
+          })
+          .collect(),
+      ),
+    });
+    contract
+  }
+
+  fn listed(contract: &Contract) -> Vec<(String, String)> {
+    contract
+      .metadata
+      .iter()
+      .flat_map(|m| m.components.iter().flatten())
+      .map(|c| (c.name.clone(), c.source.digest.clone().unwrap_or_default()))
+      .collect()
+  }
+
+  #[test]
+  fn merging_lists_every_component_either_writer_loaded_once() {
+    let a = with_components(
+      contract("web", vec![interaction("get", None, 200)]),
+      &[("csv", "sha256:bb"), ("xml2", "sha256:cc")],
+    );
+    let b = with_components(
+      contract("web", vec![interaction("put", None, 201)]),
+      &[("csv", "sha256:aa"), ("xml2", "sha256:cc")],
+    );
+    let one = merge(a.clone(), b.clone()).unwrap();
+    // Two builds of `csv` both took part, so both stay; `xml2`'s one build is listed once.
+    assert_eq!(
+      listed(&one),
+      vec![
+        ("csv".into(), "sha256:aa".into()),
+        ("csv".into(), "sha256:bb".into()),
+        ("xml2".into(), "sha256:cc".into()),
+      ]
+    );
+    assert_eq!(
+      write_canonical(&one).unwrap(),
+      write_canonical(&merge(b, a).unwrap()).unwrap()
+    );
+  }
+
+  #[test]
+  fn merging_into_a_contract_with_no_components_keeps_the_ones_it_had() {
+    let a = with_components(
+      contract("web", vec![interaction("get", None, 200)]),
+      &[("csv", "sha256:aa")],
+    );
+    let b = contract("web", vec![interaction("put", None, 201)]);
+    assert_eq!(
+      listed(&merge(a, b.clone()).unwrap()),
+      vec![("csv".into(), "sha256:aa".into())]
+    );
+    assert_eq!(merge(b.clone(), b).unwrap().metadata, None);
   }
 
   #[test]

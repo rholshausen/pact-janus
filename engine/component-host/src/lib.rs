@@ -27,7 +27,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
   Apply, ApplyResult, Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader,
-  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Grants, Label,
+  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Fetched, Grants, Label,
   LabelResult, Loaded, MatcherComponent, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::persisted::Persisted;
@@ -149,7 +149,7 @@ impl WasmLoader {
   fn fetch(
     &self,
     declaration: &ComponentDeclaration,
-  ) -> Result<(Vec<u8>, String, Option<oci::Pulled>), ComponentError> {
+  ) -> Result<(Vec<u8>, String, Fetched, Option<oci::Pulled>), ComponentError> {
     let Some(reference) = declaration.source.reference.as_deref() else {
       return Err(load_error(&format!(
         "a '{}' source needs a 'reference'",
@@ -180,7 +180,16 @@ impl WasmLoader {
         })?;
       tracing::info!(component = %declaration.name, reference = %parsed, digest = %pulled.digest, "component resolved");
       let bytes = std::mem::take(&mut pulled.wasm);
-      return Ok((bytes, format!("{parsed} ({})", pulled.digest), Some(pulled)));
+      let fetched = Fetched {
+        reference: Some(parsed.without_digest().to_string()),
+        digest: pulled.digest.clone(),
+      };
+      return Ok((
+        bytes,
+        format!("{parsed} ({})", pulled.digest),
+        fetched,
+        Some(pulled),
+      ));
     }
 
     if declaration.source.auth.is_some() {
@@ -192,21 +201,26 @@ impl WasmLoader {
     let path = reference;
     let bytes = std::fs::read(path).map_err(|err| load_error(&format!("could not read '{path}': {err}")))?;
     // Spec §10.3 step 2: a declared digest is checked before any bytes are instantiated — or even
-    // compiled, since compiling is where a malicious binary gets its first chance.
-    if let Some(expected) = &declaration.source.digest {
-      let actual = oci::sha256(&bytes);
-      if !actual.eq_ignore_ascii_case(expected) {
-        return Err(ComponentError {
-          code: "digest-mismatch".to_string(),
-          category: "component".to_string(),
-          message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
-          source: Some("engine".into()),
-          details: Some(Box::new(json!({ "expected": expected, "actual": actual }))),
-          chain: None,
-        });
-      }
+    // compiled, since compiling is where a malicious binary gets its first chance. Computed whether
+    // or not one is declared, since it is what the run records (ADR 0097 decision 3).
+    let actual = oci::sha256(&bytes);
+    if let Some(expected) = &declaration.source.digest
+      && !actual.eq_ignore_ascii_case(expected)
+    {
+      return Err(ComponentError {
+        code: "digest-mismatch".to_string(),
+        category: "component".to_string(),
+        message: format!("'{path}' has digest {actual}, and the declaration pins {expected}"),
+        source: Some("engine".into()),
+        details: Some(Box::new(json!({ "expected": expected, "actual": actual }))),
+        chain: None,
+      });
     }
-    Ok((bytes, format!("'{path}'"), None))
+    let fetched = Fetched {
+      reference: None,
+      digest: actual,
+    };
+    Ok((bytes, format!("'{path}'"), fetched, None))
   }
 
   /// Compile and link a component's bytes, ready to instantiate per call.
@@ -311,7 +325,7 @@ impl ComponentLoader for WasmLoader {
   }
 
   fn load(&self, declaration: &ComponentDeclaration) -> Result<Loaded, ComponentError> {
-    let (bytes, what, pulled) = self.fetch(declaration)?;
+    let (bytes, what, fetched, pulled) = self.fetch(declaration)?;
     let mut wasm = self.bind(
       &what,
       &declaration.name,
@@ -353,6 +367,7 @@ impl ComponentLoader for WasmLoader {
       content: declares_content.then(|| Arc::clone(&wasm) as Arc<dyn ContentComponent>),
       transport: None,
       matcher: declares_matcher.then_some(wasm as Arc<dyn MatcherComponent>),
+      fetched: Some(fetched),
     })
   }
 }

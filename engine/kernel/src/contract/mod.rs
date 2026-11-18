@@ -14,8 +14,8 @@ pub use crate::common::{Requirement, State, Transport};
 pub use error::{ContractError, Problem};
 pub use identify::{IdentifyMode, identify, identify_strict, identify_tolerant};
 pub use model::{
-  Contract, FORMAT, Interaction, Metadata, Party, RecordedSelection, RecordedVariant, ResolvedState,
-  ShapePart, SlotValue, ValuePart,
+  Contract, FORMAT, Interaction, Metadata, Party, RecordedComponent, RecordedSelection, RecordedSource,
+  RecordedVariant, ResolvedState, ShapePart, SlotValue, ValuePart,
 };
 pub use write::write_canonical;
 

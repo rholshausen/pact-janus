@@ -113,6 +113,7 @@ superseding ADR instead.
 | [0094](0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md) | Hold what a transport kind declares apart from the transport, so an embedding with none can record it | accepted |
 | [0095](0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md) | Recompute a missing report for the pair a broker is asked about, in its WASM engine, and never a whole fleet at once | accepted |
 | [0096](0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md) | Narrow the entries a check tries by what each selector fixes, and a prefix an operator declares | accepted |
+| [0097](0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md) | Record each declared component a session or run loaded, by the digest a declaration would pin | accepted |
 
 ## Decision backlog
 

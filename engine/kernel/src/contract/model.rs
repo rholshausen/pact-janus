@@ -167,4 +167,46 @@ pub struct Metadata {
   pub created: Option<String>,
   #[serde(rename = "build-url", skip_serializing_if = "Option::is_none")]
   pub build_url: Option<String>,
+  /// The declared components the writer loaded (ADR 0097), in name order, then by source.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub components: Option<Vec<RecordedComponent>>,
+}
+
+/// A declared component a session or run loaded (ADR 0097): who its handshake said it is, and where
+/// its bytes came from. A contract's `metadata.components` and a verification summary's `components`
+/// both list these.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordedComponent {
+  pub name: String,
+  pub version: String,
+  pub source: RecordedSource,
+}
+
+/// Where a recorded component's bytes came from: the declaration's `kind`, an `oci` source's
+/// reference without its digest, and the digest a declaration would pin. Never a `file` source's
+/// path, which differs between machines, and never a credential.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordedSource {
+  pub kind: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub reference: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub digest: Option<String>,
+}
+
+impl RecordedComponent {
+  /// Sorts and deduplicates a list of recorded components: by name, then by the canonical bytes of
+  /// the source, so a merged contract's list does not depend on which writer came first.
+  pub fn normalise(components: &mut Vec<RecordedComponent>) {
+    components.sort_by(|a, b| {
+      a.name
+        .cmp(&b.name)
+        .then_with(|| a.version.cmp(&b.version))
+        .then_with(|| {
+          let bytes = |c: &RecordedComponent| serde_json::to_vec(&c.source).unwrap_or_default();
+          bytes(a).cmp(&bytes(b))
+        })
+    });
+    components.dedup();
+  }
 }

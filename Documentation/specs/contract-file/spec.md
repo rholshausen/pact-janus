@@ -261,9 +261,29 @@ hashes only the material affecting verification will not see a metadata change, 
 consumer build produces no new contract version and triggers no provider verification**. Putting a
 timestamp where it churned a version on every CI run would be a design error, not a convenience.
 
-`metadata` names `writer` (a map of component name to version), `created` (RFC 3339) and `build-url`,
-and is open beyond them. A writer aiming for reproducible output — contracts committed to a repository,
-say — SHOULD omit `created`, since a per-run timestamp defeats §2.4 for no reader's benefit.
+`metadata` names `writer` (a map of component name to version), `created` (RFC 3339), `build-url` and
+`components`, and is open beyond them. A writer aiming for reproducible output — contracts committed to
+a repository, say — SHOULD omit `created`, since a per-run timestamp defeats §2.4 for no reader's benefit.
+
+`components` lists each declared component the writing session loaded (component-interfaces spec
+§10.3, [ADR 0097](../../decisions/0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md)):
+its `name` and `version`, as its handshake gave them, and its `source` — the declaration's `kind`, an
+`oci` source's `reference` without its digest, and the `digest` a declaration would pin, which for a
+`file` source is the SHA-256 of its bytes. A `file` source's path is never written, since it differs
+between machines, and nor is a credential. The embedding's own in-tree components are not listed, and
+the member is absent when the session declared none. Entries are sorted by `name`, then `version`,
+then the canonical bytes of `source`. A contract merged from several test files (§2.4) lists every
+entry any of them wrote, once each, so two builds of one component may both appear.
+
+```json sketch
+{ "metadata": { "components": [
+    { "name": "csv", "version": "1.2.0",
+      "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-csv:1.2.0", "digest": "sha256:9f2c…" } } ] } }
+```
+
+The engine does not write its own version. Every release would change every contract's bytes, which a
+broker hashing the whole file would see as a new contract version, exactly the churn this section rules
+out.
 
 A contract **MUST NOT** carry `metadata.pactSpecification`. It would be untrue: a Janus contract
 conforms to no pact specification version. Its absence is safe on today's brokers, which read it

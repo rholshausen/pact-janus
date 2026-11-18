@@ -1310,7 +1310,10 @@ otherwise. `filtered` is not a pass: it says what was replayed passed, and that 
 does `verification/started`'s. A
 run from a `broker` source also says, positionally beside `consumers`, which
 sources were `pending`, so a reader can tell a pending pact's failures from the ones that fail the
-run, and, when it published, a `publication` entry per pact (§8.3). A run that `stop-on-first-failure`
+run, and, when it published, a `publication` entry per pact (§8.3). A run that declared components lists
+each one it loaded as `components`, as a contract's `metadata.components` does (contract-file spec
+§3.2, [ADR 0097](../../decisions/0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md)),
+so a reader can tell which bytes decoded the provider's bodies. A run that `stop-on-first-failure`
 ended says `stopped: "first-failure"`; its `variants` count what it reached, and `variants.not-run`
 the recorded variants it did not reach, which no other tally counts. A run a hook aborted carries
 `not-run` too.

@@ -132,6 +132,17 @@ impl Reference {
   }
 }
 
+impl Reference {
+  /// The reference as a run records it (ADR 0097): its registry, repository and tag, the digest
+  /// being recorded beside it.
+  pub fn without_digest(&self) -> Reference {
+    Reference {
+      digest: None,
+      ..self.clone()
+    }
+  }
+}
+
 impl fmt::Display for Reference {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}/{}", self.registry, self.repository)?;

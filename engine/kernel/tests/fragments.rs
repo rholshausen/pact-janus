@@ -96,6 +96,7 @@ impl ComponentLoader for StubLoader {
       content: Some(self.stub.clone()),
       transport: None,
       matcher: Some(self.stub.clone()),
+      fetched: None,
     })
   }
 }

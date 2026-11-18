@@ -12,7 +12,7 @@ use crate::component::{
   self, Compile, ComponentLoader, ContentComponent, ContentRegistry, InTree, InTreeMatcher, Resolved,
   TransportComponent, Unavailable, check_requirements,
 };
-use crate::contract::ShapePart;
+use crate::contract::{RecordedComponent, ShapePart};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -87,15 +87,12 @@ impl Scope {
       .and_then(|component| component.transport.clone())
   }
 
-  /// The components that took part, as a contract's `metadata.writer` or a run's report names them
-  /// (spec §10.3: "the engine records the resolved name and version of every component").
-  #[allow(dead_code)]
-  pub fn components(&self) -> Vec<Value> {
-    self
-      .resolved
-      .iter()
-      .map(|c| json!({ "name": c.name, "version": c.version, "interfaces": c.interfaces }))
-      .collect()
+  /// The declared components this scope loaded, as a contract's `metadata.components` and a run's
+  /// summary record them (spec §10.3, ADR 0097): in name order, and none of the embedding's own.
+  pub fn recorded(&self) -> Vec<RecordedComponent> {
+    let mut recorded: Vec<RecordedComponent> = self.resolved.iter().map(Resolved::recorded).collect();
+    RecordedComponent::normalise(&mut recorded);
+    recorded
   }
 
   /// Everything an interaction needs before it can run (spec §2.3): its requirements, a content

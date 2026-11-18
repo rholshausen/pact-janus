@@ -959,6 +959,7 @@ impl Engine {
       content: scope.content(),
       contributions: scope.contributions(),
       redaction: self.redaction(Some(&scope), SessionRedaction::default()),
+      recorded: scope.recorded(),
     };
     let sources = match (fetch, client) {
       (Some(fetch), Some(client)) => verification::Sources::Broker(Box::new(verification::BrokerFetch {

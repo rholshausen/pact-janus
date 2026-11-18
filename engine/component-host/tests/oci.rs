@@ -484,6 +484,44 @@ fn a_consumer_session_resolves_an_oci_component_through_the_protocol() {
   );
   assert!(added["ok"]["handle"].is_string(), "{added}");
 
+  // A run records what it loaded from the registry (ADR 0097): the reference without its digest,
+  // and the manifest digest a declaration pins — here, the one it was pinned by.
+  let verify = send(
+    &mut engine,
+    "verification/verify",
+    json!({ "source": { "kind": "inline", "contracts": [ { "$format": "janus-contract/1",
+              "consumer": { "name": "reporting" }, "provider": { "name": "order-service" }, "interactions": [] } ] },
+            "target": { "transports": [ { "transport": "http", "options": { "base-url": "http://127.0.0.1:9" } } ],
+                        "components": [ { "name": "csv",
+                                          "source": { "kind": "oci",
+                                                      "reference": format!("{}/janus-csv:1.0.0", registry.host),
+                                                      "digest": digest } } ] } }),
+  );
+  let stream = verify["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify: {verify}"))
+    .to_string();
+  let summary = (0..100)
+    .find_map(|_| {
+      let polled = send(
+        &mut engine,
+        "events/poll",
+        json!({ "streams": [stream], "wait-ms": 5_000 }),
+      );
+      polled["ok"]["events"]
+        .as_array()?
+        .iter()
+        .find(|event| event["last"] == json!(true))
+        .map(|event| event["payload"].clone())
+    })
+    .expect("the run finishes");
+  assert_eq!(
+    summary["components"],
+    json!([ { "name": "csv", "version": "1.0.0",
+              "source": { "kind": "oci", "reference": format!("{}/janus-csv:1.0.0", registry.host), "digest": digest } } ]),
+    "{summary}"
+  );
+
   // A pin that is not what the registry holds fails the session, before an interaction is added.
   let tampered = send(
     &mut engine,

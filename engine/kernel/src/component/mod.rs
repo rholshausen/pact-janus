@@ -32,7 +32,7 @@ pub use error::ComponentError;
 pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators};
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
-  ComponentDeclaration, ComponentLoader, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
+  ComponentDeclaration, ComponentLoader, Fetched, FsGrant, Grants, InTree, Limits, Loaded, Resolved, Source,
   SourceAuth, Unavailable, check_requirements, resolve,
 };
 pub use matcher::{

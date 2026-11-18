@@ -28,6 +28,14 @@ fn declaration() -> Value {
   json!({ "name": "csv", "source": { "kind": "file", "reference": csv_wasm() } })
 }
 
+/// The CSV component as a contract and a verification summary record it (ADR 0097): its handshake's
+/// name and version, and the digest of the file it was loaded from, never the file's path.
+fn recorded() -> Value {
+  let bytes = std::fs::read(csv_wasm()).expect("the component was built");
+  json!([ { "name": "csv", "version": "1.0.0",
+            "source": { "kind": "file", "digest": pact_janus_component_host::oci::sha256(&bytes) } } ])
+}
+
 fn send(engine: &mut Engine, op: &str, body: Value) -> Value {
   let request = json!({ "type": "request", "id": "1", "op": op, "body": body });
   serde_json::from_slice(&engine.dispatch(&serde_json::to_vec(&request).unwrap())).unwrap()
@@ -236,6 +244,13 @@ fn a_consumer_test_serves_csv_and_records_a_contract_that_says_so() {
     ["id", "status", "items"],
     "the contract records the columns in the order the consumer declared them"
   );
+  // Which bytes decoded the body (ADR 0097, S5.1a's exit).
+  assert_eq!(
+    contract["metadata"]["components"],
+    recorded(),
+    "{}",
+    contract["metadata"]
+  );
 }
 
 #[test]
@@ -267,6 +282,7 @@ fn the_same_component_verifies_the_contract_against_a_real_provider() {
     summary["variants"]["verified"].as_u64().unwrap() >= 1,
     "{summary}"
   );
+  assert_eq!(summary["components"], recorded(), "{summary}");
 }
 
 #[test]

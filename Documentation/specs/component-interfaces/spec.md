@@ -1188,8 +1188,14 @@ layout's `blobs/sha256/<hex>`. A load failure the loader produced carries `sourc
 `digest-mismatch`, `not-a-component`, `artifact-mismatch`, `not-found`, `unauthorized` or `unavailable`
 as its code, inside the `component-unavailable` of §11.3.
 
-The engine records the resolved name and version of every component that took part in a run; a
-contract's `metadata.writer` map (contract spec §3) is where that lands for the consumer side.
+The engine records each declared component a consumer session or verification run loaded: its name
+and version, as its handshake gave them, and where its bytes came from, by the digest a declaration
+would pin — an `oci` source's resolved manifest digest, a tag's included, or the SHA-256 of a `file`
+source's bytes
+([ADR 0097](../../decisions/0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md)).
+A contract lists them as `metadata.components` (contract-file spec §3.2) and a verification summary as
+`components` (engine-protocol spec §9.6). A loader says where it found the bytes, and a loader that
+cannot is recorded by its source's kind alone.
 
 Signature verification is not specified in v1. It belongs on top of digest pinning rather than instead
 of it, and the prototype has no evidence about which scheme the ecosystem would adopt; adding it later
