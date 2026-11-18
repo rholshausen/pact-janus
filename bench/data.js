@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794978756775,
+  "lastUpdate": 1794978758710,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -57666,6 +57666,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "mock-server-throughput-4engines (subprocess)",
             "value": 47184,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": false,
+          "id": "4dca85d65ae2b7b544ed9f4b61153ac7ffd047c1",
+          "message": "feat: S4.3b, provider shapes and subsumption reports through the broker client (ADR 0093)\n\nbroker/publish-provider-shape publishes a provider shape for a provider\nversion, and broker/check-contracts checks contracts against the shape each\nprovider published at a version or the latest on a branch, publishing each\nreport beside its shape when asked. Each resource is found by the HAL link the\nbroker's index advertises; a broker that stores no shapes fails by name rather\nthan reading as replay-only. A Janus contract is sent as specification \"janus\"\nonly to a broker that advertises pb:publish-janus-contracts (both names in\npersisted.rs); gate B's default does not move.\n\njanus publish takes provider shapes (--provider-app-version), and janus check\n--broker-url takes --provider-version or --provider-branch and --publish.\n\nThe client's pact with the broker gains a second file for the janus feature,\nverified when JANUS_PACT_BROKER_JANUS names a broker with it on; until S4.3d's\nbroker exists, tools/test-servers' BrokerStandIn serves what the ADR says.\nbroker-pr-series.md §8 is the broker half's specification.\n\nAlso fixes broker/publish-contracts publishing a contract sent as text as a\nJSON string literal rather than the document the text holds.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T16:04:38+11:00",
+          "tree_id": "babbd9db113d5e0df896a4f7acb93e2c9d8fa012",
+          "url": "https://github.com/rholshausen/pact-janus/commit/4dca85d65ae2b7b544ed9f4b61153ac7ffd047c1"
+        },
+        "date": 1794978758287,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 21251,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20416,
             "unit": "requests per second",
             "extra": "engines 4"
           }
