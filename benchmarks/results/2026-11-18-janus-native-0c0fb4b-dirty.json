@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "date": "2026-11-18",
+  "stack": "janus-native-0c0fb4b-dirty",
+  "os": "linux",
+  "arch": "x86_64",
+  "scenarios": {
+    "cold-start": {
+      "iterations": 20,
+      "median_us": 7.1,
+      "p95_us": 9.3,
+      "min_us": 6.8
+    },
+    "mock-server-startup-cycle": {
+      "iterations": 20,
+      "median_us": 136.8,
+      "p95_us": 343.7,
+      "min_us": 122.8
+    },
+    "mock-server-latency-small": {
+      "iterations": 5000,
+      "median_us": 29.2,
+      "p95_us": 39.7,
+      "min_us": 26.6,
+      "arm_median_us": 4.9
+    },
+    "mock-server-latency-100k": {
+      "iterations": 500,
+      "median_us": 9934.8,
+      "p95_us": 10736.4,
+      "min_us": 9000.4,
+      "arm_median_us": 33.9
+    },
+    "mock-server-latency-mismatch": {
+      "iterations": 500,
+      "median_us": 32.7,
+      "p95_us": 71.6,
+      "min_us": 30.0,
+      "arm_median_us": 5.6
+    },
+    "mock-server-throughput-4engines": {
+      "engines": 4,
+      "seconds": 2,
+      "requests": 209321,
+      "rps": 104661.0
+    },
+    "verify-corpus-small": {
+      "pacts": 10,
+      "interactions": 50,
+      "runs": 5,
+      "median_total_ms": 11.4,
+      "median_ms_per_interaction": 0.23
+    },
+    "verify-corpus-100k": {
+      "pacts": 1,
+      "interactions": 5,
+      "runs": 3,
+      "median_total_ms": 116.9,
+      "median_ms_per_interaction": 23.37
+    },
+    "verify-corpus-small-upgraded": {
+      "pacts": 10,
+      "interactions": 50,
+      "runs": 5,
+      "median_total_ms": 14.9,
+      "median_ms_per_interaction": 0.3
+    },
+    "variants-consumer-rfc-order": {
+      "variants": 8,
+      "runs": 20,
+      "median_ms_finalise": 0.23,
+      "median_ms_all_variants": 1.4,
+      "median_ms_base_only": 0.65,
+      "median_ms_per_extra_variant": 0.106
+    },
+    "variants-provider-order-service": {
+      "variants": 6,
+      "runs": 10,
+      "median_ms_all_variants": 5.25,
+      "median_ms_one_variant": 3.37,
+      "median_ms_per_extra_variant": 0.376
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 365.7,
+      "p95_us": 377.3,
+      "min_us": 349.2
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 30205.8,
+      "p95_us": 30927.8,
+      "min_us": 29369.2
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 31621.5,
+      "p95_us": 32094.9,
+      "min_us": 31114.6
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 208.6,
+      "p95_us": 221.3,
+      "min_us": 197.6,
+      "variants": 8
+    },
+    "match-small": {
+      "iterations": 5000,
+      "median_us": 13.8,
+      "p95_us": 14.3,
+      "min_us": 13.3
+    },
+    "match-100k": {
+      "iterations": 500,
+      "median_us": 14106.5,
+      "p95_us": 14430.3,
+      "min_us": 13498.2
+    },
+    "subsumption-pair-5": {
+      "iterations": 200,
+      "median_us": 8370.6,
+      "p95_us": 8545.0,
+      "min_us": 8109.2,
+      "interactions": 5,
+      "check_median_us": 7959.5,
+      "decide_median_us": 304.2,
+      "instance_median_us": 7.6,
+      "report_bytes": 5092
+    },
+    "subsumption-pair-50": {
+      "iterations": 40,
+      "median_us": 30749.3,
+      "p95_us": 31184.4,
+      "min_us": 30088.2,
+      "interactions": 50,
+      "check_median_us": 28756.0,
+      "decide_median_us": 2309.3,
+      "instance_median_us": 7.6,
+      "report_bytes": 48950
+    },
+    "subsumption-pair-500": {
+      "iterations": 10,
+      "median_us": 256016.5,
+      "p95_us": 258983.5,
+      "min_us": 254295.6,
+      "interactions": 500,
+      "check_median_us": 233405.7,
+      "decide_median_us": 22007.7,
+      "instance_median_us": 10.2,
+      "report_bytes": 487993
+    },
+    "subsumption-pair-50-wide-shape": {
+      "iterations": 40,
+      "median_us": 104622.1,
+      "p95_us": 106187.3,
+      "min_us": 101157.5,
+      "interactions": 50,
+      "entries": 400
+    },
+    "subsumption-decide-stored-50": {
+      "iterations": 200,
+      "median_us": 2276.1,
+      "p95_us": 2314.6,
+      "min_us": 2213.2
+    },
+    "subsumption-fleet-new-shape": {
+      "runs": 5,
+      "pairs": 50,
+      "interactions": 1850,
+      "median_ms": 1222.5,
+      "median_ms_per_pair": 24.45
+    },
+    "subsumption-fleet-all-pairs-1threads": {
+      "runs": 3,
+      "pairs": 500,
+      "threads": 1,
+      "interactions": 18500,
+      "median_ms": 12223.1,
+      "pairs_per_second": 40.9
+    },
+    "subsumption-fleet-all-pairs-4threads": {
+      "runs": 3,
+      "pairs": 500,
+      "threads": 4,
+      "interactions": 18500,
+      "median_ms": 3133.9,
+      "pairs_per_second": 159.5
+    }
+  }
+}

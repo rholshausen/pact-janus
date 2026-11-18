@@ -22,6 +22,10 @@ It was written on 2026-11-16 against Janus `6a658cb` and Drift `b5683c4`.
 
 ## 1. Where it lives
 
+*Changed on 2026-11-18: the plugin will live in this repository, written as any third party writes
+a Drift plugin, once Drift publishes its plugin interfaces and an SDK for user-provided plugins
+(staged plan S4.10). The section is kept as written.*
+
 In the Drift repository, as `Plugins/provider-shape-plugin`, beside the plugin it is modelled on,
 `Plugins/reports-plugin`. Not in `third-party/`:
 

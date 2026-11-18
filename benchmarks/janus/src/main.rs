@@ -25,6 +25,7 @@
 mod util;
 
 mod embed;
+mod fleet;
 mod trend;
 mod workloads;
 
@@ -789,8 +790,13 @@ fn main() {
     return;
   }
   let root = repo_root();
-  let wanted: Vec<String> = std::env::args().skip(1).collect();
-  let wants = |stack: &str| wanted.is_empty() || wanted.iter().any(|w| w == stack);
+  let mut wanted: Vec<String> = std::env::args().skip(1).collect();
+  // `subsumption` runs the broker's scenarios alone (S4.5), in whichever embeddings are named.
+  let only_subsumption = wanted.iter().any(|w| w == "subsumption");
+  wanted.retain(|w| w != "subsumption");
+  let wants = |stack: &str| {
+    (wanted.is_empty() && (!only_subsumption || stack != "subprocess")) || wanted.iter().any(|w| w == stack)
+  };
   let date = stdout_of(&root, "date", &["+%F"]);
   let commit = stdout_of(
     &root,
@@ -838,6 +844,8 @@ fn main() {
   );
   let guest = root.join("target/wasm32-wasip2/release/pact_janus_engine_wasm.wasm");
   let env = Env { engine_binary };
+  // One provider's shapes and its consumers' pacts, recorded once and decided in each embedding.
+  let fleet = fleet::Fleet::generate(&mut Client::new(Box::new(Native::new())));
 
   for (kind, stack) in [(Kind::Native, "native"), (Kind::Subprocess, "subprocess")] {
     if !wants(stack) {
@@ -846,6 +854,17 @@ fn main() {
     let stack = format!("janus-{stack}-{commit}");
     println!("pact-bench-janus — stack {stack} — {date}");
     let mut results = RunResults::new(&stack);
+    if only_subsumption {
+      if kind == Kind::Native {
+        println!("subsumption scenarios:");
+        fleet::scenarios(&mut results, &fleet, &|| Box::new(Native::new()) as Box<dyn Pipe>);
+      }
+      println!(
+        "results written to {}",
+        results.write_in(&results_dir, &date).unwrap()
+      );
+      continue;
+    }
     cold_start(&mut results, &env, kind);
     println!("mock server scenarios:");
     mock_scenarios(&mut results, &env, kind);
@@ -864,6 +883,8 @@ fn main() {
         let mut matcher = Matcher::Native(plan::from_json(&plan_document).unwrap());
         match_scenario(&mut results, name, &mut matcher, &values, iterations);
       }
+      println!("subsumption scenarios:");
+      fleet::scenarios(&mut results, &fleet, &|| Box::new(Native::new()) as Box<dyn Pipe>);
     }
     println!(
       "results written to {}",
@@ -888,6 +909,18 @@ fn main() {
     metrics["compile_median_ms"] = json!(round(median(compile), 1));
     metrics["component_bytes"] = json!(bytes.len());
     results.record("cold-start", metrics);
+
+    println!("subsumption scenarios:");
+    fleet::scenarios(&mut results, &fleet, &|| {
+      Box::new(runtime.instantiate()) as Box<dyn Pipe>
+    });
+    if only_subsumption {
+      println!(
+        "results written to {}",
+        results.write_in(&results_dir, &date).unwrap()
+      );
+      return;
+    }
 
     println!("offline scenarios:");
     let mut client = Client::new(Box::new(runtime.instantiate()));

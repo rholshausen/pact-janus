@@ -288,6 +288,10 @@ Three sources are the source of truth and take precedence over this file when th
 > is `KindDeclarations`, which an embedding with no transport for the kind registers
 > (`Engine::register_kind`); `janus-engine.wasm` registers HTTP's (`pact_janus_component_http::kind`),
 > so it records an HTTP provider's shape, and redacts an upgraded pact, as `janus-engine` does.
+> S4.5 (ADR 0095): `benchmarks/janus` measures a broker's recompute over a generated fleet in the WASM
+> embedding and linked natively (`src/fleet.rs`); a broker keeps the WASM artifact and computes a
+> missing report for the pair a decision needs, within a time budget, never a fleet at once. A check
+> compiles each selector once; selection is still interactions × entries, which is S4.11.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

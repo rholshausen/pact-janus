@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "date": "2026-11-18",
+  "stack": "janus-subprocess-0c0fb4b-dirty",
+  "os": "linux",
+  "arch": "x86_64",
+  "scenarios": {
+    "cold-start": {
+      "iterations": 20,
+      "median_us": 1741.2,
+      "p95_us": 1993.0,
+      "min_us": 1385.3
+    },
+    "mock-server-startup-cycle": {
+      "iterations": 20,
+      "median_us": 160.9,
+      "p95_us": 230.3,
+      "min_us": 145.5
+    },
+    "mock-server-latency-small": {
+      "iterations": 5000,
+      "median_us": 34.8,
+      "p95_us": 45.6,
+      "min_us": 31.4,
+      "arm_median_us": 10.4
+    },
+    "mock-server-latency-100k": {
+      "iterations": 500,
+      "median_us": 9793.8,
+      "p95_us": 10298.5,
+      "min_us": 9118.0,
+      "arm_median_us": 52.8
+    },
+    "mock-server-latency-mismatch": {
+      "iterations": 500,
+      "median_us": 44.6,
+      "p95_us": 68.4,
+      "min_us": 34.3,
+      "arm_median_us": 9.8
+    },
+    "mock-server-throughput-4engines": {
+      "engines": 4,
+      "seconds": 2,
+      "requests": 159224,
+      "rps": 79612.0
+    },
+    "verify-corpus-small": {
+      "pacts": 10,
+      "interactions": 50,
+      "runs": 5,
+      "median_total_ms": 9.7,
+      "median_ms_per_interaction": 0.19
+    },
+    "verify-corpus-100k": {
+      "pacts": 1,
+      "interactions": 5,
+      "runs": 3,
+      "median_total_ms": 115.1,
+      "median_ms_per_interaction": 23.03
+    },
+    "verify-corpus-small-upgraded": {
+      "pacts": 10,
+      "interactions": 50,
+      "runs": 5,
+      "median_total_ms": 16.8,
+      "median_ms_per_interaction": 0.34
+    },
+    "variants-consumer-rfc-order": {
+      "variants": 8,
+      "runs": 20,
+      "median_ms_finalise": 0.23,
+      "median_ms_all_variants": 1.32,
+      "median_ms_base_only": 0.57,
+      "median_ms_per_extra_variant": 0.106
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 345.9,
+      "p95_us": 407.9,
+      "min_us": 324.1
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 31594.8,
+      "p95_us": 33105.4,
+      "min_us": 30458.4
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 33100.1,
+      "p95_us": 35211.2,
+      "min_us": 32274.7
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 231.7,
+      "p95_us": 242.1,
+      "min_us": 220.5,
+      "variants": 8
+    }
+  }
+}

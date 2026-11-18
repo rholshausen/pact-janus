@@ -968,3 +968,46 @@ fn a_provider_with_an_open_tag_is_still_undecidable_against_a_union() {
   assert_eq!(verdict, Verdict::Unknown);
   assert_eq!(finding_at(&findings, "response.body").kind, "unreviewable");
 }
+
+#[test]
+fn a_selector_that_is_not_a_shape_document_is_one_problem_however_many_interactions_read_it() {
+  // Spec §8. Each entry's selector is compiled once per check (staged plan S4.5), so two interactions
+  // that both try it find one problem, where each used to add its own copy.
+  let contract = read_contract(
+    contract_document(json!([
+      { "description": "place an order",
+        "parts": { "response": { "body": consumer_shape() } },
+        "selection": { "variants": [], "report": { } } },
+      { "description": "cancel an order",
+        "parts": { "response": { "body": consumer_shape() } },
+        "selection": { "variants": [], "report": { } } }
+    ]))
+    .to_string()
+    .as_bytes(),
+    IdentifyMode::Tolerant,
+  )
+  .expect("a well-formed contract");
+  let shape = read_provider_shape(
+    json!({ "$format": "janus-provider-shape/1",
+      "provider": { "name": "orders-api" },
+      "provenance": "recorded",
+      "interactions": [
+        { "description": "POST /orders",
+          "selector": { "request": { "method": { "shape": "regex" } } },
+          "parts": { "response": { "body": published_shape() } } } ] })
+    .to_string()
+    .as_bytes(),
+  )
+  .expect("a well-formed provider shape");
+  let Err(pact_janus_kernel::subsumption::CheckError::InteractionInvalid { problems }) =
+    check(&contract, &shape)
+  else {
+    panic!("an invalid selector fails the check")
+  };
+  let pointers: Vec<&str> = problems.iter().map(|problem| problem.pointer.as_str()).collect();
+  assert_eq!(pointers.len(), 1, "{problems:?}");
+  assert!(
+    pointers[0].starts_with("/interactions/0/selector"),
+    "{problems:?}"
+  );
+}

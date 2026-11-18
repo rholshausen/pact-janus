@@ -17,6 +17,8 @@ pact_janus_component_json = { path = "../../engine/component-json" }
 pact_janus_hooks_host = { path = "../../engine/hooks-host" }
 pact_janus_sample_order_service = { path = "../../samples/order-service" }
 serde_json = "1"
+# The fleet's recorded answers carry their bodies as base64 octets (src/fleet.rs), as a transport presents them.
+base64 = "0.23"
 # The host for the WASM embedding: the same runtime and version the engine's own component loader
 # uses (engine/component-host), and the runtime spike 1.2 found no slower than V8 at document scale.
 wasmtime = "50"

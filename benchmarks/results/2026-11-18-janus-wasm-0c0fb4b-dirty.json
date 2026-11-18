@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "date": "2026-11-18",
+  "stack": "janus-wasm-0c0fb4b-dirty",
+  "os": "linux",
+  "arch": "x86_64",
+  "scenarios": {
+    "cold-start": {
+      "iterations": 20,
+      "median_us": 52.5,
+      "p95_us": 64.4,
+      "min_us": 48.6,
+      "compile_median_ms": 437.4,
+      "component_bytes": 9943620
+    },
+    "subsumption-pair-5": {
+      "iterations": 200,
+      "median_us": 11043.9,
+      "p95_us": 11463.7,
+      "min_us": 10627.7,
+      "interactions": 5,
+      "check_median_us": 9131.6,
+      "decide_median_us": 284.3,
+      "instance_median_us": 47.5,
+      "report_bytes": 5092
+    },
+    "subsumption-pair-50": {
+      "iterations": 40,
+      "median_us": 40343.2,
+      "p95_us": 41284.4,
+      "min_us": 39705.1,
+      "interactions": 50,
+      "check_median_us": 35952.4,
+      "decide_median_us": 2188.1,
+      "instance_median_us": 48.7,
+      "report_bytes": 48950
+    },
+    "subsumption-pair-500": {
+      "iterations": 10,
+      "median_us": 328239.1,
+      "p95_us": 334290.4,
+      "min_us": 326895.0,
+      "interactions": 500,
+      "check_median_us": 309660.9,
+      "decide_median_us": 21591.5,
+      "instance_median_us": 53.4,
+      "report_bytes": 487993
+    },
+    "subsumption-pair-50-wide-shape": {
+      "iterations": 40,
+      "median_us": 137108.3,
+      "p95_us": 144022.6,
+      "min_us": 135841.2,
+      "interactions": 50,
+      "entries": 400
+    },
+    "subsumption-decide-stored-50": {
+      "iterations": 200,
+      "median_us": 2709.3,
+      "p95_us": 2834.0,
+      "min_us": 2633.8
+    },
+    "subsumption-fleet-new-shape": {
+      "runs": 5,
+      "pairs": 50,
+      "interactions": 1850,
+      "median_ms": 1586.5,
+      "median_ms_per_pair": 31.73
+    },
+    "subsumption-fleet-all-pairs-1threads": {
+      "runs": 3,
+      "pairs": 500,
+      "threads": 1,
+      "interactions": 18500,
+      "median_ms": 15946.6,
+      "pairs_per_second": 31.4
+    },
+    "subsumption-fleet-all-pairs-4threads": {
+      "runs": 3,
+      "pairs": 500,
+      "threads": 4,
+      "interactions": 18500,
+      "median_ms": 4070.0,
+      "pairs_per_second": 122.8
+    },
+    "explain-pact-small": {
+      "iterations": 2000,
+      "median_us": 400.1,
+      "p95_us": 410.6,
+      "min_us": 374.8
+    },
+    "explain-pact-100k": {
+      "iterations": 200,
+      "median_us": 30950.0,
+      "p95_us": 31364.1,
+      "min_us": 30295.2
+    },
+    "upgrade-pact-100k": {
+      "iterations": 200,
+      "median_us": 33150.2,
+      "p95_us": 33826.6,
+      "min_us": 32505.2
+    },
+    "variant-space-rfc-order": {
+      "iterations": 200,
+      "median_us": 289.3,
+      "p95_us": 311.0,
+      "min_us": 276.2,
+      "variants": 8
+    },
+    "match-small": {
+      "iterations": 5000,
+      "median_us": 17.1,
+      "p95_us": 17.8,
+      "min_us": 16.5
+    },
+    "match-100k": {
+      "iterations": 500,
+      "median_us": 13708.9,
+      "p95_us": 14007.0,
+      "min_us": 13067.6
+    },
+    "unsupported": {
+      "consumer-session/start-transport": {
+        "code": "component-unavailable",
+        "category": "component",
+        "message": "this engine cannot run work in the background, so it cannot serve a transport",
+        "details": {
+          "component": "background"
+        }
+      },
+      "verification/verify": {
+        "code": "component-unavailable",
+        "category": "component",
+        "message": "this engine cannot run work in the background, so it cannot run a verification",
+        "details": {
+          "component": "background"
+        }
+      }
+    }
+  }
+}

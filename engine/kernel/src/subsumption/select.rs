@@ -12,7 +12,7 @@ use super::provider_shape::{ProviderInteraction, ProviderShape};
 use crate::contract::Interaction;
 use crate::error::Problem;
 use crate::interaction_spec;
-use crate::plan::{ActionApplier, Assignment, CapturedValues, Status, compile, execute_with, outcome};
+use crate::plan::{ActionApplier, Assignment, CapturedValues, Plan, Status, compile, execute_with, outcome};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -33,12 +33,59 @@ pub enum Selection<'a> {
 pub const BY_DESCRIPTION: &str = "description";
 pub const BY_SELECTOR: &str = "selector";
 
+/// Each entry's selector as a plan, compiled the first time an interaction needs it and kept for the
+/// rest of the check (staged plan S4.5). Without it, every interaction compiled every entry's
+/// selector again, and a check cost interactions × entries compiles.
+pub struct Selectors {
+  plans: Vec<std::cell::OnceCell<Option<Plan>>>,
+}
+
+impl Selectors {
+  /// None compiled yet, for `provider_shape`'s entries.
+  pub fn new(provider_shape: &ProviderShape) -> Selectors {
+    Selectors {
+      plans: provider_shape
+        .interactions
+        .iter()
+        .map(|_| std::cell::OnceCell::new())
+        .collect(),
+    }
+  }
+
+  /// Entry `index`'s selector as a plan, or `None` when it is not a valid shape document, which is
+  /// a problem at `/interactions/<index>/selector`, reported the first time it is read.
+  fn plan(
+    &self,
+    index: usize,
+    selector: &BTreeMap<String, BTreeMap<String, Value>>,
+    problems: &mut Vec<Problem>,
+  ) -> Option<&Plan> {
+    self.plans[index]
+      .get_or_init(|| {
+        let document = json!({ "description": "selector", "parts": selector });
+        match interaction_spec::parse(&document) {
+          Ok(spec) => Some(compile(&spec, &Assignment::new(), None)),
+          Err(err) => {
+            let prefix = format!("/interactions/{index}/selector");
+            problems.extend(err.problems.into_iter().map(|problem| Problem {
+              pointer: format!("{prefix}{}", problem.pointer.trim_start_matches("/parts")),
+              message: problem.message,
+            }));
+            None
+          }
+        }
+      })
+      .as_ref()
+  }
+}
+
 /// Find the entry `interaction` is checked against. A selector that is not a valid shape
 /// document is a problem at `/interactions/<n>/selector`, reported as `interaction-invalid` with
 /// everything else the walk finds (spec §8). `actions` runs a component operator a selector uses,
-/// such as `http:path` (ADR 0086 decision 2).
+/// such as `http:path` (ADR 0086 decision 2). `selectors` holds the plans compiled so far.
 pub fn select<'a>(
   provider_shape: &'a ProviderShape,
+  selectors: &Selectors,
   interaction: &Interaction,
   states: &[String],
   components: Option<&dyn super::OperatorComparer>,
@@ -58,7 +105,10 @@ pub fn select<'a>(
     if entry.states.is_some() && entry.state_names() != states {
       continue;
     }
-    if admits_every_example(selector, interaction, index, components, problems) {
+    let Some(plan) = selectors.plan(index, selector, problems) else {
+      continue;
+    };
+    if admits_every_example(plan, selector, interaction, components) {
       selected.push(entry);
     }
   }
@@ -75,27 +125,13 @@ pub fn select<'a>(
 }
 
 fn admits_every_example(
+  plan: &Plan,
   selector: &BTreeMap<String, BTreeMap<String, Value>>,
   interaction: &Interaction,
-  index: usize,
   components: Option<&dyn super::OperatorComparer>,
-  problems: &mut Vec<Problem>,
 ) -> bool {
   let actions = components.map(|components| components as &dyn ActionApplier);
   let content = components.and_then(|components| components.content());
-  let document = json!({ "description": "selector", "parts": selector });
-  let spec = match interaction_spec::parse(&document) {
-    Ok(spec) => spec,
-    Err(err) => {
-      let prefix = format!("/interactions/{index}/selector");
-      problems.extend(err.problems.into_iter().map(|problem| Problem {
-        pointer: format!("{prefix}{}", problem.pointer.trim_start_matches("/parts")),
-        message: problem.message,
-      }));
-      return false;
-    }
-  };
-  let plan = compile(&spec, &Assignment::new(), None);
 
   // A contract always records at least its base variant; one that recorded none has no example
   // to select by, and is selected by nothing. A content slot is matched as the document its
@@ -115,6 +151,6 @@ fn admits_every_example(
           }
         }
       }
-      outcome(&execute_with(&plan, &resolver, None, actions)).0 == Status::Matched
+      outcome(&execute_with(plan, &resolver, None, actions)).0 == Status::Matched
     })
 }

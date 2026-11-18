@@ -2647,8 +2647,11 @@ once there are shapes to publish.
     the severities notes §5 gives them, an exempted finding kept and marked as `IgnoredReason` keeps
     one. Policy is a resource on the integration, one more layer and passed unmerged, with the
     exemptions page, and the pair view renders the report's own text (notes §7).
+    A report the broker does not hold is computed when a decision needs it, for that pair, within a
+    time budget, and stored (ADR 0095).
     *Exit:* both brokers give the same decision and reasons `janus check` gives for the same documents,
-    policy and date, including an exemption that lapsed with no document changing.
+    policy and date, including an exemption that lapsed with no document changing, and a pair whose
+    report no CI run published.
   - **S4.3f The demonstration** — **M**. `demo/run.sh` takes a broker, and CI runs it against a Ruby
     broker and the port, each built from the series with the feature on. It includes a message-only
     provider (S4.6).
@@ -2687,6 +2690,22 @@ once there are shapes to publish.
   *Exit:* `benchmarks/janus` measures the walk over N consumers and M provider versions in the WASM
   embedding and linked natively, and an ADR confirms or replaces the broker notes' §3c recommendation
   on those numbers (§12's open question).
+  *Done 2026-11-18* ([ADR 0095](decisions/0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md)):
+  - `benchmarks/janus/src/fleet.rs` generates a fleet: one provider of 40 operations whose shape at
+    each of 10 versions the engine records, and 50 consumers' v3 pacts of 5 to 100 interactions,
+    every interaction with findings. It answers one pair as ADR 0092 decision 5 does (5, 50 and 500
+    interactions, and 50 against a 400-entry shape), a stored report decided again, a new shape's 50
+    reports, and all 500 pairs on one thread and on four, in the WASM embedding and linked natively.
+    The numbers are on the trend chart, and `benchmarks/results/` holds this machine's.
+  - WASM costs 1.2 to 1.3 times native; the cost is linear in interactions, about 0.6 ms each in
+    WASM, and a fleet's cross-product in pairs, which threads divide. ADR 0095 confirms the notes'
+    §3c: both brokers recompute through the WASM artifact, a missing report for the pair a decision
+    needs and no other, within a time budget past which the pair is unanswered and computed off the
+    request. Nothing recomputes a fleet at once. S4.3d and S4.3e build it.
+  - Not foreseen: every interaction compiled every entry's selector again. Each is now compiled once
+    per check, which made a large pair 40% faster and the cross-product 30%, with no verdict changed,
+    and an invalid selector is reported once. Selection is still interactions × entries, 60% of a walk
+    over 80 entries: that is S4.11.
 - **S4.6 Message interactions in the check and the broker view** — **S**. The walk is
   direction-agnostic, but `janus check` has never run on a contract with messages (S2.12), and a
   message-only provider's shape and decision page are untested (broker notes §12). Recording a
@@ -2823,13 +2842,16 @@ once there are shapes to publish.
   plugins are WASM components. A Drift plugin that records each answer into a provider shape gives a
   Drift user a `recorded` shape with no SDK provider test, and is the offline artifact's first host
   that is not a broker (ADR 0023 decision 2). [`provider-shape-plugin.md`](provider-shape-plugin.md) is
-  the proposal: the plugin lives in the Drift repository (`Plugins/provider-shape-plugin`, after
-  `reports-plugin`), takes `janus-engine.wasm` as a release pinned by digest, and is composed with it at
-  build time (`wac plug`), since a WASM guest cannot host WASM (ADR 0013). Drift's events carry what
+  the proposal: the plugin takes `janus-engine.wasm` as a release pinned by digest, and is composed
+  with it at build time (`wac plug`), since a WASM guest cannot host WASM (ADR 0013). Drift's events carry what
   the recorder needs: each operation's method and path template (`file:loaded`), each test's target
   (`testcase:loaded`), and the answer (`operation:invoked`). So a Drift test names no operation, and the
-  selector comes from the OpenAPI document, as `janus derive`'s does. The code is Drift's; the item is
-  here so the work has an exit. It is like S6.7's adapters, a recorder fed by a framework that knows
+  selector comes from the OpenAPI document, as `janus derive`'s does.
+  *Where it lives, changed 2026-11-18:* in this repository, written as any third party writes a Drift
+  plugin, not in Drift's `Plugins/` as the proposal's §1 says. Drift's plugin interfaces and an SDK
+  for user-provided plugins (`drift-plugin-sdk`) are being prepared for publishing; until they are
+  released there is nothing a third party can build against, so S4.10 waits on that release, and
+  the proposal's §1 and §2 are checked again against what is published. It is like S6.7's adapters, a recorder fed by a framework that knows
   the operation, but it embeds the engine rather than reaching it through an SDK.
   - **S4.10a HTTP**, on S4.9. *Exit:* Drift test cases against `samples/order-service/openapi.yaml`,
     exercising the answers the sample provider's own tests exercise, record a shape through the plugin,
@@ -2842,6 +2864,17 @@ once there are shapes to publish.
   - Open, in the proposal's §8: Drift has no event that ends a run, so where `finalise` is called; and
     whether shapes from several runs are merged, which natively is the engine's host's job and the
     WASM engine has no host for.
+- **S4.11 Selecting a provider-shape entry without trying every one** — **S**. Added 2026-11-18, by
+  S4.5. A check tries every entry's selector against every interaction (ADR 0025), so its cost is
+  interactions × entries: over an 80-entry shape selection is 60% of the walk, and five times the
+  entries made a 50-interaction check 3.4 times slower (ADR 0095). A large provider's shape against a
+  large contract would take seconds a pair, which a broker computing on read cannot wait for. The
+  kernel can narrow the candidates without knowing HTTP: an entry's selector slots that are
+  `equality` (a method, an outcome slot's status) are literals it can index by, and a component
+  operator could offer a key of its own (`http:path`'s literal prefix), which is a component-interfaces
+  change and needs its ADR. Which entries an interaction selects must not change.
+  *Exit:* `subsumption-pair-50-wide-shape` costs within 1.5 times `subsumption-pair-50` in both
+  embeddings, and every subsumption test and corpus case gives the same report.
 
 **Done when** the demo's loop runs against each broker built from S4.3's series, the Ruby Pact Broker
 and its Rust port, with a provider shape recorded from a provider's own test suite (S4.1).
@@ -3107,9 +3140,11 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.4 | A `provenance` selector on exemptions | finding 9B |
 | S4.1, S4.2 | Provider-shape recording in provider test frameworks; importers that emit selectors | tasks 7.2, 7.3; ADR 0025 |
 | S4.1 | Recording names an interaction by the consumer's words and takes decoded values, so no provider's own suite can use it | spike 7.3 §2; found reviewing stage 4 |
-| S4.5, S4.6 | Whether N×M recomputation scales; message-only providers in the broker view (`check` on a message contract is built, ADR 0090) | broker notes §12 |
+| S4.5, S4.6 | Whether N×M recomputation scales (measured: ADR 0095, on read and per pair); message-only providers in the broker view (`check` on a message contract is built, ADR 0090) | broker notes §12 |
 | S4.7 | Every component operator is opaque to the walk, built-in ones included; `matcher/compare` is specified and not built | component-interfaces spec §7.5; found reviewing stage 4 |
 | S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector (both built: ADR 0090, ADR 0091) | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
+| S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
+| S4.11 | A check tries every provider-shape entry for every interaction | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
 | S5.1 | Recording the components that took part; registry credentials; `wkg` artifacts; signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |

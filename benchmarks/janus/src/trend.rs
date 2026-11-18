@@ -44,6 +44,10 @@ const METRICS: &[(&str, &str, &str, Better)] = &[
   ("compile_median_ms", " · compile", "ms", Better::Smaller),
   ("component_bytes", " · component size", "bytes", Better::Smaller),
   ("rps", "", "requests per second", Better::Bigger),
+  // A broker's recompute (staged plan S4.5): one pair's walk, a sweep over a fleet, and its rate.
+  ("check_median_us", " · check", "µs", Better::Smaller),
+  ("median_ms", "", "ms", Better::Smaller),
+  ("pairs_per_second", "", "pairs per second", Better::Bigger),
 ];
 
 /// One point on one chart.
@@ -75,7 +79,16 @@ fn extra(metrics: &Value) -> String {
       parts.push(format!("{label} {value} µs"));
     }
   }
-  for key in ["iterations", "runs", "interactions", "variants", "engines"] {
+  for key in [
+    "iterations",
+    "runs",
+    "interactions",
+    "variants",
+    "engines",
+    "pairs",
+    "threads",
+    "entries",
+  ] {
     if let Some(value) = metrics.get(key).and_then(Value::as_u64) {
       parts.push(format!("{key} {value}"));
     }

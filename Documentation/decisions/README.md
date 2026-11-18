@@ -111,6 +111,7 @@ superseding ADR instead.
 | [0092](0092-decide-in-a-broker-through-the-engines-wasm-component-and-refuse-to-start-without-it.md) | Decide in a broker through the engine's WASM component, and refuse to start without it | accepted |
 | [0093](0093-publish-and-fetch-provider-shapes-and-reports-through-the-engines-broker-client-found-by-the-links-a-broker-advertises.md) | Publish and fetch provider shapes and reports through the engine's broker client, found by the links a broker advertises | accepted |
 | [0094](0094-hold-what-a-transport-kind-declares-apart-from-the-transport-so-an-embedding-with-none-can-record-it.md) | Hold what a transport kind declares apart from the transport, so an embedding with none can record it | accepted |
+| [0095](0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md) | Recompute a missing report for the pair a broker is asked about, in its WASM engine, and never a whole fleet at once | accepted |
 
 ## Decision backlog
 

@@ -127,3 +127,4 @@ do the same thing, the scenario has a new name:
 | `explain-*`, `upgrade-*`, `variant-space-*` | offline protocol operations, in all three embeddings |
 | `match-*` | the interpreter against captured values: native calls the kernel, WASM calls the `bench` export |
 | `unsupported` | WASM only: what the engine answers `start-transport` and `verify` with |
+| `subsumption-*` | native and WASM only: a broker's recompute (staged plan S4.5, ADR 0095), over a generated fleet in `janus/src/fleet.rs`. `subsumption-pair-<n>` answers one pair of `n` interactions as a broker does, a fresh instance, `check` and `decide`, with each step's share; `-50-wide-shape` against a shape of 400 entries; `-decide-stored-50` decides a report already held; `-fleet-new-shape` recomputes 50 consumers' reports; `-fleet-all-pairs-<t>threads` all 500 pairs. `cargo run --release -- subsumption` runs these alone |

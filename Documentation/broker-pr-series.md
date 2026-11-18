@@ -33,7 +33,7 @@ unless they say otherwise.
 | 6 | stored subsumption reports | a table keyed (contract SHA, shape SHA, engine version), in row 4's migration | the same, in row 4's migrations | S4.3d |
 | 7 | subsumption reasons in the decision | `matrix/reason.rb` (`Reason` at `:4-22`, `IgnoredReason` at `:24-39`, `Warning` at `:106-112`); `matrix/deployment_status_summary.rb` (`counts` at `:20-27`, `deployable?` at `:29-34`); `api/resources/can_i_deploy.rb`; `api/decorators/reason_decorator.rb` | `matrix_reasons.rs:282` (`Reason`), `can_i_deploy.rs`, `matrix/mod.rs:1020-1025` (`deployable`) | S4.3e |
 | 8 | stored policy, and the exemptions page | `integrations/` (`integration.rb`, `repository.rb`, `service.rb`) | `integrations.rs`, the templates under `templates/` | S4.3e |
-| 9 | recompute a report on a cache miss | the embedding (§3) | the embedding (§3) | S4.5 |
+| 9 | recompute a report on a cache miss, for the pair asked about ([ADR 0095](decisions/0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md)) | the embedding (§3) | the embedding (§3) | S4.5, built in S4.3e |
 | 10 | a Janus contract renderer | `api/renderers/html_pact_renderer.rb:181-189` (`markdown`'s fallback) | `pacts/html.rs:148-155` | S6.10 |
 
 Row 1's Ruby half merged on 2026-11-15, after the check above, as pact_broker#1093 (`6298abd2`). It
@@ -95,6 +95,14 @@ What it found:
   A 1,500-interaction contract takes 575 ms to check, about 1.3 times native.
 
 With the feature on, a broker that cannot load the artifact refuses to start (ADR 0092 decision 6).
+
+S4.5 measured recomputing over a fleet
+([ADR 0095](decisions/0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md)).
+A pair costs tens of milliseconds for typical contracts, linear in interactions, and linking the
+kernel natively would save about a quarter of it. So both brokers keep the artifact. A report
+the broker does not hold is computed when a decision needs it, for that pair, within a time budget
+past which the pair is unanswered and computed off the request. Nothing recomputes a whole fleet
+when a shape is published or the engine pin moves.
 
 ## 4. The `janus` feature
 
