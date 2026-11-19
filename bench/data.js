@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795069755901,
+  "lastUpdate": 1795069758423,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -61176,6 +61176,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 100,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "f74080529d1195c93bd3a09135870129e62d5d3a",
+          "message": "feat: S5.4, a content component says what a value operator means for its type, and the engine compiles every slot (ADR 0100)\n\nGate F fired on finding 21: a plan fragment is compiled without the\nvariant, so a pinned variant checked against one could pass where the\nengine's own plan fails. ADR 0100 adopts ADR 0022's tripwire,\noperator-level substitution, and withdraws fragments.\n\n- A content-types handshake entry may carry substitutions, a value\n  operator to the component's own action. In a slot the component\n  decodes, the engine compiles the shape itself, pinning included, and\n  emits that action where the operator's core one would go. The loader\n  refuses a substitution it cannot honour as component-invalid.\n- content/compile only lets a component refuse a shape (compile-failed);\n  matcher/compile is withdrawn and component/hello no longer sends\n  plan-grammar-versions. The schema members stay, deprecated.\n- An action gets the value under test and config.arguments, normatively\n  (finding 24). Decoding is not a plan step; a substituted slot is\n  annotated with what decodes it (finding 22).\n- janus-csv's fragment compiler becomes a table of four actions, with\n  csv:equality new; its three-row variant now fails against a provider\n  with one row.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T17:20:30+11:00",
+          "tree_id": "77fb08843340d3ea42de5c155cc21639ac92b261",
+          "url": "https://github.com/rholshausen/pact-janus/commit/f74080529d1195c93bd3a09135870129e62d5d3a"
+        },
+        "date": 1795069757670,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28640,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21409,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 44.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 31.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 112,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 78.6,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
