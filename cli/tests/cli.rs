@@ -2519,11 +2519,11 @@ fn pathdiff(target: &str, base: &std::path::Path) -> String {
 }
 
 /// Staged plan S1.12, ADR 0050: `explain --config` loads the components a run would, so the plan it
-/// prints carries the CSV component's fragment, and `--executed` runs captured values through the
-/// engine, the fragment's `csv:integer` applied by the component. Without the component the
-/// interaction is refused, as `verify` refuses it.
+/// prints carries the action the CSV component substitutes for `integer` (ADR 0100), and `--executed`
+/// runs captured values through the engine, `csv:integer` applied by the component. Without the
+/// component the interaction is refused, as `verify` refuses it.
 #[test]
-fn explain_executed_prints_a_components_fragment_and_runs_its_action() {
+fn explain_executed_prints_a_components_substitution_and_runs_its_action() {
   let mut contract: Value =
     serde_json::from_str(&std::fs::read_to_string(csv_contract()).expect("the contract")).expect("JSON");
   contract["interactions"][0]["parts"]["response"]["body"]["items"]["members"]["items"] =
@@ -2563,7 +2563,7 @@ fn explain_executed_prints_a_components_fragment_and_runs_its_action() {
     stderr(&output)
   );
   let text = stdout(&output);
-  assert!(text.contains(":\"text/csv\""), "{text}");
+  assert!(text.contains("decoded as text/csv by csv"), "{text}");
   assert!(text.contains("%csv:integer"), "{text}");
   assert!(
     text.contains("expected text that spells an integer, got \"x\""),

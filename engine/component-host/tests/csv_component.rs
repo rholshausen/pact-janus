@@ -444,7 +444,7 @@ fn drain(engine: &mut Engine, stream: &str) -> Value {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Plan fragments (plan task 8.4)
+// Substitutions (staged plan S5.4, ADR 0100)
 // ---------------------------------------------------------------------------------------------
 
 /// Orders as CSV, with `items` and `channel` as given and up to `max` rows.
@@ -498,81 +498,59 @@ fn verify_against_sample(engine: &mut Engine, contract: &Value) -> (Value, Strin
   panic!("the run never finished");
 }
 
-/// What 8.1 could not write: `items: integer` of a CSV column. The generic plan says
-/// `match:integer`, and CSV's `"1"` is a string; the component's fragment says `csv:integer` —
-/// text that spells an integer — and the contract verifies against a real provider.
+/// What 8.1 could not write: `items: integer` of a CSV column. The engine's plan says
+/// `match:integer`, and CSV's `"1"` is a string; the component's handshake says that under `text/csv`,
+/// `integer` is `csv:integer`, text that spells an integer, and the contract verifies against a real
+/// provider. So does `equality` of a number, which a CSV field holds as the text that spells it.
 #[test]
 fn a_consumer_can_say_integer_of_a_csv_column_because_the_component_says_what_it_means() {
   let mut engine = engine();
-  let contract = consumer_run_with(
-    &mut engine,
-    orders_with(
-      json!({ "shape": "integer", "example": 1 }),
-      json!({ "shape": "string", "example": "web" }),
-      1,
-    ),
+  let mut interaction = orders_with(
+    json!({ "shape": "integer", "example": 1 }),
+    json!({ "shape": "string", "example": "web" }),
+    1,
   );
+  interaction["parts"]["response"]["body"]["items"]["members"]["id"] =
+    json!({ "shape": "equality", "example": 66 });
+  let contract = consumer_run_with(&mut engine, interaction);
   let (summary, events) = verify_against_sample(&mut engine, &contract);
   assert_eq!(summary["status"], "verified", "{summary}\n{events}");
   assert!(
-    events.contains("csv:integer"),
-    "the executed plan is the component's: {events}"
+    events.contains("csv:integer") && events.contains("csv:equality"),
+    "the component's actions check the operators whose meaning CSV changes: {events}"
   );
   assert!(!events.contains("match:integer"), "{events}");
-  // The component was built against plan grammar v0 and has not been rebuilt: its fragment says
-  // `for-each`. This engine's grammar is v1, it read the fragment by ADR 0026's one-to-one mapping,
-  // and what it shows is v1's name for the same action.
   assert!(
-    events.contains("flow:for-each"),
-    "a v0 fragment is shown in v1 names: {events}"
+    events.contains("match:string"),
+    "an operator CSV does not change is the engine's: {events}"
   );
-  assert!(!events.contains("\"for-each\""), "{events}");
+  assert!(
+    events.contains("decoded as text/csv by csv"),
+    "the plan says why: {events}"
+  );
 }
 
-/// Plan task 8.4's sharpest finding, demonstrated. `content/compile` is handed the slot's shape and
-/// not the variant, so a fragment checks every variant against the unpinned range — `expect:size 1..3`
-/// — where the engine's own plan pins each variant to the size it demonstrated (`expect:count 3`).
-/// Against a provider with one order, the variant that demonstrated three rows fails under the
-/// generic plan, as it should, and *passes* under the fragment: the variant proved nothing
-/// (variant-semantics spec §5.2), and the run says verified. The two contracts differ only in
-/// `channel`: `type`, which this component declines to compile (so the generic plan), or `string`,
-/// which it compiles (so its fragment). Neither adds a variant.
+/// Phase 9 finding 21, closed. The engine compiles a CSV body as it compiles any other, pinning each
+/// variant's cardinality to the size it demonstrated (`expect:count 3`), and only the value
+/// operators' checks are the component's. Against a provider with one order, the variant that
+/// demonstrated three rows fails, as it does where nothing substitutes an operator. Under ADR 0022's
+/// fragments it passed, because the fragment checked every variant against the unpinned range.
 #[test]
-fn a_fragment_compiled_without_the_variant_widens_a_pinned_variant() {
-  let items = json!({ "shape": "regex", "pattern": "^[0-9]+$", "example": "1" });
+fn a_csv_body_is_pinned_to_its_variant() {
+  let items = json!({ "shape": "integer", "example": 1 });
   let mut engine = engine();
-  let generic = consumer_run_with(
-    &mut engine,
-    orders_with(items.clone(), json!({ "shape": "type", "example": "web" }), 3),
-  );
-  let fragment = consumer_run_with(
+  let contract = consumer_run_with(
     &mut engine,
     orders_with(items, json!({ "shape": "string", "example": "web" }), 3),
   );
-  let variants = |contract: &Value| {
-    contract["interactions"][0]["selection"]["variants"]
-      .as_array()
-      .unwrap()
-      .len()
-  };
-  assert_eq!(
-    variants(&generic),
-    variants(&fragment),
-    "the same variants either way"
-  );
-  assert!(
-    variants(&generic) >= 2,
-    "a cardinality range has more than one variant"
-  );
+  let variants = contract["interactions"][0]["selection"]["variants"]
+    .as_array()
+    .unwrap()
+    .len();
+  assert!(variants >= 2, "a cardinality range has more than one variant");
 
-  let (generic, generic_events) = verify_against_sample(&mut engine, &generic);
-  assert_eq!(generic["status"], "failed", "{generic}");
-  assert!(generic_events.contains("expect:count"), "{generic_events}");
-
-  let (widened, widened_events) = verify_against_sample(&mut engine, &fragment);
-  assert_eq!(
-    widened["status"], "verified",
-    "if this fails, content/compile has learnt the variant — update Phase 9 finding 21: {widened}"
-  );
-  assert!(!widened_events.contains("expect:count"), "{widened_events}");
+  let (summary, events) = verify_against_sample(&mut engine, &contract);
+  assert_eq!(summary["status"], "failed", "{summary}");
+  assert!(events.contains("expect:count"), "{events}");
+  assert!(events.contains("csv:integer"), "{events}");
 }

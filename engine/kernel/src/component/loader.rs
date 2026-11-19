@@ -15,7 +15,8 @@ use super::matcher::MatcherComponent;
 use super::transport::TransportComponent;
 use crate::common::Requirement;
 use crate::contract::{RecordedComponent, RecordedSource};
-use crate::plan::RESERVED_NAMESPACES;
+use crate::plan::{RESERVED_NAMESPACES, SUBSTITUTABLE_OPERATORS};
+use crate::shape::CORE_OPERATORS;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -160,8 +161,8 @@ pub struct Loaded {
   /// The transport interface, bound, when the component declared it (plan task 8.3: the
   /// subprocess binding's first client, and the reason a declared component may contribute one).
   pub transport: Option<Arc<dyn TransportComponent>>,
-  /// The matcher interface's `apply`, bound, when the component declared `matcher` (plan task 8.4:
-  /// what runs the component's own actions when a fragment it contributed reaches them).
+  /// The matcher interface's `apply`, bound, when the component declared `matcher`: what runs the
+  /// component's own actions when a plan reaches one.
   pub matcher: Option<Arc<dyn MatcherComponent>>,
   /// Where the loader found the bytes (ADR 0097), which a contract and a verification summary
   /// record. `None` when the loader cannot say; the record then names the source's kind alone.
@@ -211,9 +212,12 @@ pub struct Resolved {
   pub transport: Option<Arc<dyn TransportComponent>>,
   pub transport_kinds: Vec<String>,
   pub matcher: Option<Arc<dyn MatcherComponent>>,
-  /// The namespaced actions its handshake contributed (spec §3.3's `contributes.actions`): the only
-  /// component actions a fragment it contributes may use (plan task 8.4).
+  /// The namespaced actions its handshake contributed (spec §3.3's `contributes.actions`): what its
+  /// matcher runs when a plan reaches one.
   pub actions: Vec<String>,
+  /// What its actions stand for under each content type it declares (spec §6.3, ADR 0100), in the
+  /// order its handshake lists the types.
+  pub substitutions: Vec<ContentSubstitutions>,
   /// Where its bytes came from, as a contract and a verification summary record it (ADR 0097).
   pub source: RecordedSource,
 }
@@ -227,6 +231,14 @@ impl Resolved {
       source: self.source.clone(),
     }
   }
+}
+
+/// One `content-types` entry's `substitutions` (spec §6.3, ADR 0100): for slots of `media_type` (a
+/// media type or a `type/*` pattern), the component's action for each value operator it names.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContentSubstitutions {
+  pub media_type: String,
+  pub operators: BTreeMap<String, String>,
 }
 
 /// A component compiled into the embedding, named so requirements and conflicts can see it. Only
@@ -420,6 +432,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
   } else {
     None
   };
+  let substitutions = substitutions(declared, hello, &actions, matcher.is_some()).map_err(invalid)?;
   let fetched = loaded.fetched;
   Ok(Resolved {
     name: declared.clone(),
@@ -430,6 +443,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     transport_kinds,
     matcher,
     actions,
+    substitutions,
     source: RecordedSource {
       kind: declaration.source.kind.clone(),
       reference: fetched.as_ref().and_then(|f| f.reference.clone()),
@@ -437,6 +451,67 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
       digest: fetched.map(|f| f.digest),
     },
   })
+}
+
+/// Each `content-types` entry's `substitutions`, checked (ADR 0100 decision 3): every one names an
+/// action the component contributes, which its matcher runs, for a value operator. An operator name
+/// the shape language does not have is passed over, so a component can name one a newer shape
+/// language adds; a structure, a modifier or `content-type` is refused, since the engine would not
+/// honour it.
+fn substitutions(
+  declared: &str,
+  hello: &Value,
+  actions: &[String],
+  has_matcher: bool,
+) -> Result<Vec<ContentSubstitutions>, String> {
+  let mut all = Vec::new();
+  for entry in hello
+    .pointer("/contributes/content-types")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+  {
+    let (Some(media_type), Some(table)) = (
+      entry.get("media-type").and_then(Value::as_str),
+      entry.get("substitutions").and_then(Value::as_object),
+    ) else {
+      continue;
+    };
+    let mut operators = BTreeMap::new();
+    for (operator, action) in table {
+      if !SUBSTITUTABLE_OPERATORS.contains(&operator.as_str()) {
+        if CORE_OPERATORS.contains(&operator.as_str()) {
+          return Err(format!(
+            "component '{declared}' substitutes an action for '{operator}' under '{media_type}'; only a value operator can be substituted ({})",
+            SUBSTITUTABLE_OPERATORS.join(", ")
+          ));
+        }
+        tracing::debug!(component = %declared, %operator, %media_type, "substitution for an operator this engine does not have; passed over");
+        continue;
+      }
+      let Some(action) = action.as_str() else {
+        return Err(format!(
+          "component '{declared}' substitutes {action} for '{operator}' under '{media_type}'; a substitution names one of its actions"
+        ));
+      };
+      if !actions.iter().any(|contributed| contributed == action) {
+        return Err(format!(
+          "component '{declared}' substitutes '{action}' for '{operator}' under '{media_type}', and does not contribute that action"
+        ));
+      }
+      if !has_matcher {
+        return Err(format!(
+          "component '{declared}' substitutes '{action}' for '{operator}' under '{media_type}', and does not implement 'matcher', which would run it"
+        ));
+      }
+      operators.insert(operator.clone(), action.to_string());
+    }
+    all.push(ContentSubstitutions {
+      media_type: media_type.to_string(),
+      operators,
+    });
+  }
+  Ok(all)
 }
 
 /// Spec §2.3: collect the union of requirements and fail the unsatisfiable ones before anything

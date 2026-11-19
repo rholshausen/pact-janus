@@ -17,8 +17,9 @@
 //! operation takes, as it checks `--index` itself: which interaction of a file was meant is the
 //! command line's question, answered before the engine is asked.
 //!
-//! `--config` names the verifier configuration whose `components` a run would load, so a plan a
-//! declared component contributes a fragment to is explained as a run compiles it.
+//! `--config` names the verifier configuration whose `components` a run would load, so a slot whose
+//! declared content component substitutes its own actions for value operators (ADR 0100) is explained
+//! as a run compiles it.
 
 use crate::Outcome;
 use crate::args::ExplainArgs;

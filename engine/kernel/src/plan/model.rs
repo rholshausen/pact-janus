@@ -336,13 +336,10 @@ pub fn from_json(document: &Value) -> Result<Plan, String> {
     .get("grammar")
     .and_then(Value::as_str)
     .ok_or("a plan needs a 'grammar'")?;
-  super::fragment::readable(Some(grammar)).map_err(|skew| match skew {
-    super::fragment::FragmentError::Skew { message, .. }
-    | super::fragment::FragmentError::Invalid(message) => message.replace("the fragment", "the plan"),
-  })?;
+  super::versions::readable(grammar)?;
   let mut root = node_from_json(document.get("root").ok_or("a plan needs a 'root'")?)?;
   if super::actions::Grammar::of(grammar) == Some(super::actions::Grammar::V0) {
-    super::fragment::rename_from_v0(&mut root);
+    super::versions::rename_from_v0(&mut root);
   }
   Ok(Plan {
     grammar: GRAMMAR_VERSION,

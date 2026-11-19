@@ -1,8 +1,8 @@
 // Staged plan S1.12, ADR 0050: `verification/explain` compiles what a run would compile, and runs
 // it against captured values, over the protocol alone. The CSV component (third-party/janus-csv) is
-// declared in the request exactly as a run declares it, so the plan carries its fragment, and the
-// fragment's own action, `csv:integer`, is applied by the component when the values run. Where there
-// is no Rust toolchain, JANUS_CSV_COMPONENT names a janus_csv.wasm built elsewhere.
+// declared in the request exactly as a run declares it, so the plan carries the action it substitutes
+// for `integer` (ADR 0100), `csv:integer`, which the component applies when the values run. Where
+// there is no Rust toolchain, JANUS_CSV_COMPONENT names a janus_csv.wasm built elsewhere.
 
 import { beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -73,7 +73,7 @@ describe("janus-engine subprocess: verification/explain with components and valu
     csv = { name: "csv", source: { kind: "file", reference: path.resolve(built) } };
   }, 300_000);
 
-  it("compiles the component's fragment and runs captured values through its action", async () => {
+  it("compiles the component's substitution and runs captured values through its action", async () => {
     const engine = new EngineClient(binaryPath);
     try {
       await engine.send("engine/hello", {

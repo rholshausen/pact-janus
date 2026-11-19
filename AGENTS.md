@@ -308,6 +308,10 @@ Three sources are the source of truth and take precedence over this file when th
 > carries or a declared `trusted-root`, and fails as `signature-missing` or `signature-untrusted`. The
 > record names the `signer`, and `janus component pull` takes cosign's flags. `tests/signature.rs`
 > signs with a Sigstore made per test, and keylessly with `cosign` when `JANUS_COSIGN` names one (CI).
+> S5.4 (ADR 0100, gate F): a content component says what a value operator means for its type, as
+> `substitutions` in its handshake's `content-types` entry, and the engine compiles every slot itself,
+> pinning included, so a variant is checked at its point whatever decodes the slot (finding 21 closed).
+> Plan fragments are withdrawn; an action gets the value and `config.arguments`, normatively.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -637,12 +641,13 @@ registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subproc
 spawned over the protocol's stdio framing — specified (design 2.6 §9.3) but loaded by nothing:
 spike 8.3's loader proved the binding and was deleted with the rest of the spike code (S0.12), and a
 real one is S5.5. A declared component may contribute a transport,
-looked up by the `kind`s its handshake names. A declared content component may contribute a **plan
-fragment** for a slot (plan task 8.4, ADR 0022): it replaces the slot's generic plan, must declare a
-plan grammar the engine lists in `component/hello` (`plan-grammar-versions`: `v1`, and `v0`, read by ADR 0026's
-one-to-one renaming), may use only core actions
-and its own contributed ones — run through `matcher/apply` — and is checked when the interaction arrives,
-failing as `component-unavailable` with `reason: grammar-skew` or `fragment-invalid`. `janus`
+looked up by the `kind`s its handshake names. A declared content component may say what a value
+operator means for its content type (ADR 0100): its handshake's `content-types` entry has
+`substitutions` (`"integer": "csv:integer"`), and in a slot it decodes the engine compiles the shape
+itself, pinning included, emitting the component's action, run through `matcher/apply`, where the
+operator's core one would be. The loader refuses a substitution it cannot honour as `component-invalid`.
+A component writes no plan: plan fragments (ADR 0022) are withdrawn, and `content/compile` only lets a
+component refuse a shape, as `compile-failed`. `janus`
 and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
 so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
 one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked
@@ -723,8 +728,7 @@ anything they print.
   returns structured errors. An error's causes are its `chain`, layer by layer (ADR 0054), never
   joined into a string where it is produced: lift a library's `source()` chain with
   `chain::layers_of`, and give an error causes with `caused_by`. Sessions are the only resource — no per-object cleanup calls. A plan node
-  the engine's own compilers did not build — a component's fragment, a plan document read back — is
-  not trusted: the interpreter reads an action's children by position, so every core action has a
+  the engine's own compilers did not build — a plan document read back — is not trusted: the interpreter reads an action's children by position, so every core action has a
   least child count in `engine/kernel/src/plan/actions.rs`, and a new action is added there first.
 - **SDKs are thin.** No matching logic, no orchestration beyond the protocol operations, in any SDK.
   Generated protocol bindings are never hand-edited — regenerate them via the binding pipeline.

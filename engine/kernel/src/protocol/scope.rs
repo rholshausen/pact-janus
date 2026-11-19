@@ -19,9 +19,10 @@ use std::sync::Arc;
 
 pub(crate) struct Scope {
   resolved: Vec<Resolved>,
-  /// What the declared components contribute to plans: fragments and the actions they use (plan
-  /// task 8.4), and the actions the embedding's own matchers run (ADR 0057). Shared, because a verification run and an exchange loop outlive the call that
-  /// built the scope.
+  /// What the declared components contribute to plans: the actions a content component substitutes
+  /// for value operators (ADR 0100), and the actions they and the embedding's own matchers run (ADR
+  /// 0057). Shared, because a verification run and an exchange loop outlive the call that built the
+  /// scope.
   contributions: Arc<Contributions>,
   in_tree: Vec<InTree>,
   loaders: Vec<Arc<dyn ComponentLoader>>,
@@ -97,8 +98,7 @@ impl Scope {
 
   /// Everything an interaction needs before it can run (spec §2.3): its requirements, a content
   /// component for every content type it declares (contract-file spec §5.5) that can carry the
-  /// slot's shape, and every plan fragment a declared component contributes for its slots (plan
-  /// task 8.4). Checked when the interaction arrives, never when its first body does.
+  /// slot's shape. Checked when the interaction arrives, never when its first body does.
   ///
   /// An in-tree component is asked to `compile` the slot's shape here (spec §6.3), as a declared one
   /// is by [`Contributions::check`], so one that claims a whole family of types can refuse a shape

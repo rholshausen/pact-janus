@@ -87,7 +87,7 @@ pub enum Grammar {
 impl Grammar {
   /// The grammar a declared version (`v0`, `v0.1`, `v1`) names, when this engine reads its major.
   pub fn of(version: &str) -> Option<Grammar> {
-    match super::fragment::parse_version(version)?.0 {
+    match super::versions::parse_version(version)?.0 {
       0 => Some(Grammar::V0),
       1 => Some(Grammar::V1),
       _ => None,

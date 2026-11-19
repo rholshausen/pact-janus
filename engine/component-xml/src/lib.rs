@@ -390,14 +390,11 @@ impl ContentComponent for XmlContent {
     })
   }
 
-  /// Nothing to contribute (spec §6.3): an XML document is objects, arrays and strings, which the
-  /// generic plan handles.
+  /// Nothing to refuse (spec §6.3): an XML document is objects, arrays and strings, all of which
+  /// any shape can describe.
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
     require_xml(&req.content_type)?;
-    Ok(CompileResult {
-      fragment: None,
-      grammar_version: None,
-    })
+    Ok(CompileResult {})
   }
 
   /// Not implemented (spec §6.5): an XML body is recognised by its declared type, as a form is.

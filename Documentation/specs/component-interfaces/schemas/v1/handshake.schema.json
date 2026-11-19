@@ -17,7 +17,8 @@
         },
         "plan-grammar-versions": {
           "type": "array",
-          "description": "The plan-grammar versions this engine reads (plan-grammar spec §7.1), so a component that contributes fragments can write one the engine can read — or contribute none — rather than guess and learn at a refusal (spec.md §12.3). Absent means the engine said nothing, and a component should contribute no fragment.",
+          "deprecated": true,
+          "description": "Deprecated: a component writes no plan (ADR 0100), so an engine sends no grammar and a component must not depend on one. It named the plan-grammar versions an engine read, so a component that contributed fragments could write one the engine read.",
           "items": { "type": "string", "x-known-values": ["v0", "v1"] }
         },
         "engine": { "$ref": "#/$defs/Party" },
@@ -166,6 +167,11 @@
           "type": "array",
           "description": "Distinctions this content type cannot express, declared rather than pretended (shape spec §4.2, spec.md §6.4).",
           "items": { "$ref": "#/$defs/Degradation" }
+        },
+        "substitutions": {
+          "type": "object",
+          "description": "What a value operator means under this content type: a shape operator's name to one of this component's contributed actions, which the engine compiles where it would compile the operator's core action, with the same children, in a slot of this type this component decodes. Only value operators can be substituted: any, equality, type, string, number, integer, decimal, boolean, null, regex, datetime, date, time, include, semver, not-empty and any-of. A substitution for a structure, a modifier or content-type, or of an action the component does not contribute, or by a component that does not implement matcher, fails its load as component-invalid; an operator name the engine does not have is ignored (spec.md §6.3, ADR 0100).",
+          "additionalProperties": { "type": "string" }
         }
       }
     },

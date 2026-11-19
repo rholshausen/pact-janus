@@ -95,9 +95,9 @@ impl ContentComponent for TextContent {
     })
   }
 
-  /// Nothing to contribute (spec §6.3): a text body is one string, which the generic plan handles.
-  /// A shape that admits no string at all, such as rows of a `text/csv` body, is refused: this
-  /// component cannot write it, and the slot needs a component for its type (ADR 0036).
+  /// Spec §6.3: a text body is one string, so a shape that admits no string at all, such as rows of
+  /// a `text/csv` body, is refused: this component cannot write it, and the slot needs a component
+  /// for its type (ADR 0036).
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
     require_text(&req.content_type)?;
     if !admits_a_string(&req.shape) {
@@ -109,10 +109,7 @@ impl ContentComponent for TextContent {
         ),
       ));
     }
-    Ok(CompileResult {
-      fragment: None,
-      grammar_version: None,
-    })
+    Ok(CompileResult {})
   }
 
   /// Any UTF-8 is plausibly text, so recognising it would claim every body: detection is left to

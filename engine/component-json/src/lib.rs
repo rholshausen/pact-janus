@@ -108,12 +108,8 @@ impl ContentComponent for JsonContent {
   }
 
   fn compile(&self, _req: Compile) -> Result<CompileResult, ComponentError> {
-    // Legitimate per spec §6.3: the kernel compiles the slot generically and calls `decode` at
-    // execution time. Nothing in this task needs a plan-fragment contribution.
-    Ok(CompileResult {
-      fragment: None,
-      grammar_version: None,
-    })
+    // Spec §6.3: JSON can carry any shape, so there is nothing to refuse.
+    Ok(CompileResult {})
   }
 
   fn detect(&self, req: Detect) -> Result<DetectResult, ComponentError> {

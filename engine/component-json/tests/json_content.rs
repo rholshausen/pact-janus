@@ -101,18 +101,17 @@ fn encode_produces_base64_octets_with_the_declared_content_type() {
 }
 
 #[test]
-fn compile_returns_no_fragment() {
+fn compile_refuses_no_shape() {
   let component = JsonContent::new();
-  let result = component
-    .compile(Compile {
-      content_type: "application/json".to_string(),
-      shape: json!({ "shape": "object", "members": {} }),
-      path: "$.response.body".to_string(),
-    })
-    .unwrap();
   assert!(
-    result.fragment.is_none(),
-    "the kernel compiles the slot generically (spec §6.3)"
+    component
+      .compile(Compile {
+        content_type: "application/json".to_string(),
+        shape: json!({ "shape": "object", "members": {} }),
+        path: "$.response.body".to_string(),
+      })
+      .is_ok(),
+    "JSON carries any shape (spec §6.3)"
   );
 }
 

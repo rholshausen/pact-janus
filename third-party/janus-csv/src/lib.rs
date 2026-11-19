@@ -2,8 +2,8 @@
 //!
 //! Written against the published component interfaces (component-interfaces spec v1, the WIT world in
 //! `wit/component.wit`) and nothing else. It implements the `content` interface: `decode`, `encode`,
-//! `compile` and `detect` (which it declines); and, since plan task 8.4, the `matcher` interface's
-//! `apply`, for the actions its plan fragments use ([`fragment`]).
+//! `compile` and `detect` (which it declines); and the `matcher` interface's `apply`, for the actions
+//! its handshake substitutes for the value operators whose meaning CSV changes ([`actions`]).
 //!
 //! CSV is lossy, and this component says so instead of pretending (spec §6.4). Every field decodes as a
 //! string: CSV has no numeric type, no boolean and no null, so `12.50`, `true` and an empty field are
@@ -15,7 +15,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Map, Value, json};
 
-mod fragment;
+mod actions;
 
 pub const NAME: &str = "csv";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -27,9 +27,6 @@ const PROTOCOL_VERSION: u64 = 1;
 #[derive(Default)]
 pub struct Component {
   greeted: bool,
-  /// Whether the engine said it reads the plan grammar this component writes fragments in. An engine
-  /// that did not say gets no fragments: the generic plan is always safe, a guessed grammar is not.
-  reads_our_grammar: bool,
 }
 
 type OpResult = Result<Value, Value>;
@@ -97,7 +94,7 @@ impl Component {
       "component/shutdown" => Ok(json!({})),
       "content/decode" => decode(body),
       "content/encode" => encode(body),
-      "content/compile" => self.compile(body),
+      "content/compile" => compile(body),
       "matcher/apply" => apply(body),
       _ => Err(error(
         "operation-unsupported",
@@ -123,18 +120,15 @@ impl Component {
       ));
     }
     self.greeted = true;
-    self.reads_our_grammar = body
-      .get("plan-grammar-versions")
-      .and_then(Value::as_array)
-      .is_some_and(|versions| versions.iter().any(|v| v == fragment::GRAMMAR));
     Ok(json!({
       "component-protocol-version": PROTOCOL_VERSION,
       "component": { "name": NAME, "version": VERSION },
       "interfaces": ["content", "matcher"],
       "contributes": {
-        "actions": fragment::ACTIONS.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>(),
+        "actions": actions::ACTIONS.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>(),
         "content-types": [ {
           "media-type": MEDIA_TYPE,
+          "substitutions": actions::substitutions(),
           "degradations": [
             { "code": "string-only",
               "message": "CSV carries no types: every field decodes as a string, so integers, decimals and booleans are the text that spells them." },
@@ -145,27 +139,19 @@ impl Component {
   }
 }
 
-impl Component {
-  /// `content/compile` (spec §6.3): a fragment for the body shapes CSV changes the meaning of, in the
-  /// grammar the engine said it reads — or nothing, and the engine's generic plan.
-  fn compile(&self, body: &Value) -> OpResult {
-    content_type(body)?;
-    let path = body.get("path").and_then(Value::as_str).unwrap_or("$");
-    match body
-      .get("shape")
-      .filter(|_| self.reads_our_grammar)
-      .and_then(|shape| fragment::compile(shape, path))
-    {
-      Some(fragment) => Ok(json!({ "fragment": fragment, "grammar-version": fragment::GRAMMAR })),
-      None => Ok(json!({})),
-    }
-  }
+/// `content/compile` (spec §6.3): whether this component can carry the slot's shape as CSV. It can
+/// carry any shape a CSV document could be decoded to, and the engine compiles the plan, so it
+/// refuses only a content type that is not its own.
+fn compile(body: &Value) -> OpResult {
+  content_type(body)?;
+  Ok(json!({}))
 }
 
-/// `matcher/apply` (spec §7.1): each value, through the named action.
+/// `matcher/apply` (spec §7.2): each value, through the named action, with the core action's
+/// arguments from `config.arguments`.
 fn apply(body: &Value) -> OpResult {
   let action = body.get("action").and_then(Value::as_str).unwrap_or_default();
-  if !fragment::ACTIONS.contains(&action) {
+  if !actions::ACTIONS.contains(&action) {
     return Err(error(
       "unknown-action",
       "document",
@@ -178,10 +164,16 @@ fn apply(body: &Value) -> OpResult {
     .and_then(Value::as_array)
     .cloned()
     .unwrap_or_default();
+  let arguments = body
+    .pointer("/config/arguments")
+    .and_then(Value::as_array)
+    .cloned()
+    .unwrap_or_default();
   // Each value is a `MatchValue` (matcher schema): the value itself is its `content`.
-  Ok(
-    json!({ "results": values.iter().map(|value| fragment::apply(action, &value["content"])).collect::<Vec<_>>() }),
-  )
+  Ok(json!({ "results": values
+    .iter()
+    .map(|value| actions::apply(action, &value["content"], &arguments))
+    .collect::<Vec<_>>() }))
 }
 
 /// `content/decode`: octets to document (spec §6.1).

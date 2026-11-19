@@ -6,7 +6,8 @@
   "$defs": {
     "Compile": {
       "title": "Compile",
-      "description": "Turn one shape node carrying this component's operator into a plan fragment. A contributed operator is compiled and executed exactly as a core one is; nothing about it is special-cased in the interpreter (plan grammar §4.6).",
+      "deprecated": true,
+      "description": "Withdrawn (ADR 0100): an engine never asks it. A component operator compiles to its own action, applied with the value and the operator's members (spec.md §7.1). It asked a component to turn one shape node carrying its operator into a plan fragment.",
       "type": "object",
       "required": ["operator", "node", "path"],
       "properties": {
@@ -25,7 +26,8 @@
       "properties": {
         "fragment": {
           "type": "object",
-          "description": "A plan fragment in design 2.4's grammar. A fragment that uses only core actions needs no apply at all — the cheapest kind of component operator, and fully visible in explain (spec.md §7.1)."
+          "deprecated": true,
+          "description": "Withdrawn with matcher/compile (ADR 0100). It was a plan fragment in design 2.4's grammar."
         },
         "grammar-version": {
           "type": "string",
@@ -42,7 +44,7 @@
         "action": { "type": "string" },
         "config": {
           "type": "object",
-          "description": "The action's configuration, as the compiled plan node carries it."
+          "description": "The action's configuration: 'arguments', the values of the action node's children after the first, in order. A substituted action's are its core action's (an equality's example, a regex's pattern), and a component operator's action has one, the operator's members as an object (spec.md §7.2, ADR 0100)."
         },
         "values": {
           "type": "array",

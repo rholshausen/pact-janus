@@ -338,8 +338,7 @@ impl ConsumerSession {
     let mut spec = interaction_spec::parse(interaction)?;
     // Component-interfaces spec §2.3: what an interaction cannot run without is checked when it
     // arrives, while the author is looking at it — not when its first body does.
-    // So is any plan fragment a declared component contributes for its slots (plan task 8.4): one
-    // written against a grammar this engine cannot read fails here, naming the skew.
+    // So is a content component's refusal of a slot's shape (spec §6.3, `compile-failed`).
     let raw_parts = raw_parts(interaction);
     self
       .scope
@@ -388,7 +387,7 @@ impl ConsumerSession {
       }
     }
     let contributions = self.scope.contributions();
-    let compiled = contributions.compile(&spec, &raw_parts, &Assignment::new(), None);
+    let compiled = contributions.compile(&spec, &Assignment::new(), None);
     let handle = format!("i-{}", self.next_handle);
     self.next_handle += 1;
     let fresh = raw_parts
@@ -652,9 +651,9 @@ impl ConsumerSession {
           Some(converted) => Arc::clone(&converted.served),
           None => Arc::new(generate::interaction(&entry.spec, &assignment)),
         },
-        request_plan: passive_kind.is_some().then(|| {
-          Arc::new(contributions.compile(&entry.spec, &entry.raw_parts, &assignment, Some(variant_id)))
-        }),
+        request_plan: passive_kind
+          .is_some()
+          .then(|| Arc::new(contributions.compile(&entry.spec, &assignment, Some(variant_id)))),
         provider_state: Arc::new(provider_state(&entry.spec, &assignment)),
       };
       entry.armings.insert(variant_id.to_string(), arming);

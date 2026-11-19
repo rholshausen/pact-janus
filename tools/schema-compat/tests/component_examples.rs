@@ -3,15 +3,15 @@
 //! `matcher-apply-result`, …); this test validates each against the schema that
 //! owns it. An unmarked block fails rather than silently skipping.
 //!
-//! Four checks do a job a schema cannot, and all four are the same job: this
-//! design hands documents to other designs and must not describe them in terms
-//! their owners would not recognise. A contributed plan fragment is design
-//! 2.4's node, a component's mismatch is design 2.4's result, a contributed
-//! dimension is design 2.2's dimension — each is validated against the owning
-//! schema as well. The fifth check is design 2.6's own: every contributed name
-//! is namespaced with the component's own name (spec §2.4), which is the rule
-//! the engine enforces at load and the one a component author is most likely to
-//! want to break.
+//! Further checks do a job a schema cannot. Two are the same job: this design
+//! hands documents to other designs and must not describe them in terms their
+//! owners would not recognise. A component's mismatch is design 2.4's result,
+//! and a contributed dimension is design 2.2's dimension, each validated
+//! against the owning schema as well. Two are design 2.6's own: every
+//! contributed name is namespaced with the component's own name (spec §2.4),
+//! and every substitution names one of the component's actions for a value
+//! operator (spec §6.3) — the rules the engine enforces at load, and the ones a
+//! component author is most likely to want to break.
 
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -270,24 +270,66 @@ fn contributed_names_are_namespaced_with_the_components_own_name() {
   );
 }
 
-/// Spec §6.3 and §12.3: a contributed plan fragment is a plan document in
-/// design 2.4's grammar — not a look-alike. If the two designs ever disagree
-/// about what a node is, this is where it surfaces.
+/// Spec §6.3, ADR 0100: a substitution names an action the component contributes, for a value
+/// operator, and `compile` answers with no plan.
 #[test]
-fn contributed_fragments_are_plan_nodes() {
-  let schemas = load_schemas();
-  let node = validator_for(&format!("{PLAN}/plan.schema.json#/$defs/Node"), &schemas);
+fn substitutions_name_the_components_own_actions_for_value_operators() {
+  const VALUE_OPERATORS: &[&str] = &[
+    "any",
+    "equality",
+    "type",
+    "string",
+    "number",
+    "integer",
+    "decimal",
+    "boolean",
+    "null",
+    "regex",
+    "datetime",
+    "date",
+    "time",
+    "include",
+    "semver",
+    "not-empty",
+    "any-of",
+  ];
   let mut checked = 0;
   for (context, marker, value) in blocks() {
-    if marker != "compile-result" {
-      continue;
-    }
-    if let Some(fragment) = value.get("fragment") {
-      check(&node, fragment, &format!("{context} fragment"));
-      checked += 1;
+    match marker.as_str() {
+      "compile-result" => assert!(
+        value.get("fragment").is_none(),
+        "{context}: a component contributes no plan (ADR 0100)"
+      ),
+      "component-hello-result" => {
+        let actions: Vec<&str> = value["contributes"]["actions"]
+          .as_array()
+          .into_iter()
+          .flatten()
+          .filter_map(|action| action["name"].as_str())
+          .collect();
+        for entry in value["contributes"]["content-types"]
+          .as_array()
+          .into_iter()
+          .flatten()
+        {
+          for (operator, action) in entry["substitutions"].as_object().into_iter().flatten() {
+            assert!(
+              VALUE_OPERATORS.contains(&operator.as_str()),
+              "{context}: '{operator}' is not a value operator"
+            );
+            let action = action.as_str().expect("an action name");
+            assert!(
+              actions.contains(&action),
+              "{context}: '{action}' for '{operator}' is not among the actions the component contributes"
+            );
+            checked += 1;
+          }
+        }
+      }
+      _ => {}
     }
   }
-  assert!(checked >= 1, "expected a contributed fragment, found {checked}");
+  assert!(checked >= 2, "expected substitutions to check, found {checked}");
 }
 
 /// Spec §7.2: a component's mismatch is a mismatch in the plan grammar's own

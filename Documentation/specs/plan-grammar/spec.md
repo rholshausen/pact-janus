@@ -20,7 +20,7 @@ follow the Engine Protocol's open-world authoring rules
 ([protocol spec §2.2](../engine-protocol/spec.md#22-open-world-authoring-rules)).
 
 **Why this is v1, and what v0 was.** The prototype's grammar was `v0`: a real compatibility surface —
-plugins author fragments against it — that had had no external consumer, so calling it v1 would have
+plugins authored fragments against it — that had had no external consumer, so calling it v1 would have
 claimed a stability nobody had tested. Plan task 8.4 was the test. A third-party component contributed
 fragments and actions, the versioning policy held, and one thing did not: v0 named its actions three
 different ways, and a reader of `explain` could not tell a core action from a component's (ADR 0026).
@@ -56,8 +56,9 @@ Conformance roles:
   (matching rules) into a plan.
 - An **interpreter** executes a plan against resolved values and annotates it with results.
 - A **renderer** prints a plan, executed or not, in the text forms of §3.
-- A **component** contributes actions and plan fragments under its own namespace (design [2.6](../component-interfaces/spec.md) owns the
-  interface; this document owns what an action *is*).
+- A **component** contributes actions under its own namespace, and a content component may say which
+  of them stands for a value operator under its content type (design [2.6](../component-interfaces/spec.md) owns the
+  interface; this document owns what an action *is*, and §5.4 where a compiler emits one).
 
 In scope: the node grammar, the value model, the core action set, the text forms, the shape→plan
 compilation obligation, the corpus format, and versioning.
@@ -69,7 +70,7 @@ Out of scope, with owners:
 | the shapes a plan is compiled from, and `admits` | design [2.2](../shape-language/spec.md) |
 | which variant a plan is compiled under, and how variants are selected | design [2.3](../variant-semantics/spec.md) |
 | how a plan document crosses the engine boundary | design [2.1](../engine-protocol/spec.md) |
-| how a component ships an action or a fragment | design [2.6](../component-interfaces/spec.md) |
+| how a component ships an action, and declares what it substitutes one for | design [2.6](../component-interfaces/spec.md) |
 | the v1–v4 cascading and precedence semantics the legacy compiler implements | design 3.5 |
 | generators — producing a value rather than matching one | designs [2.6](../component-interfaces/spec.md), 4.3 |
 | what the CLI prints and which flags select it | design 5.5 |
@@ -334,8 +335,8 @@ set is these six, so a namespace outside it is a component's to take and stays t
 | 4 | `legacy:min-max-type` |
 
 The first child is the value under test wherever there is one. The engine's own compilers never emit a
-short node, so this is a rule about documents somebody else wrote: an engine MUST refuse a fragment
-that contains one (component-interfaces spec §6.3), and an interpreter that meets one anyway MUST give
+short node, so this is a rule about documents somebody else wrote, such as a plan handed back to be
+executed, and an interpreter that meets one MUST give
 the node an `error` result naming the action and the count (§8). It MUST NOT fail in any other way —
 the protocol's errors-are-values rule (protocol spec §10.1) holds for a malformed plan as it does for a
 mismatch.
@@ -458,9 +459,13 @@ merely intended. A guarantee that depends on nobody writing the wrong line is no
 
 ### 4.6 Component actions
 
-Everything content- or transport-specific is in a component's namespace and contributed: `json:parse`,
-`xml:parse`, `header:parse`, `form:parse`, `multipart:parse`. None of them is core, and the kernel
-resolves none of them itself.
+Everything content- or transport-specific is in a component's namespace and contributed: a component
+operator's action (`http:status-class`, `http:list`), and an action a content component substitutes
+for a value operator under its type (`csv:integer`, §5.4). None of them is core, and the kernel
+resolves none of them itself. Decoding is not an action: the component that handles a slot's declared
+type decodes it before the plan runs, and the plan resolves the document
+([ADR 0100](../../decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md)
+decision 6).
 
 This is the largest single change from the forked engine (§9), and it is not a stylistic preference:
 it is the architecture rule that the kernel knows nothing about HTTP or JSON, applied to the one place
@@ -487,15 +492,15 @@ mapping**, one name to one name:
 | every other `expect:*`, `check:*` and `match:*` action | the same name |
 | `<component>:<name>` | the same name |
 
-A document is read under the grammar it declares and no other (§7.1): a v0 fragment that says
-`flow:if` is naming a component called `flow`, and a v1 fragment that says `if` is naming nothing. What
-an engine *shows* is always v1 — a v0 fragment's nodes are printed by `explain` under their v1 names, so
-a plan has one vocabulary whoever wrote its parts. v0 also reserved a `convert` family that never had an
+A document is read under the grammar it declares and no other (§7.1): a v0 plan that says
+`flow:if` is naming a component called `flow`, and a v1 plan that says `if` is naming nothing. What
+an engine *shows* is always v1 — a v0 plan's nodes are printed by `explain` under their v1 names, so
+a plan has one vocabulary whoever wrote it. v0 also reserved a `convert` family that never had an
 action; v1 does not reserve it.
 
 This is what [ADR 0022](../../decisions/0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md)
-designed for, an older fragment read by a newer engine by rule, and it is why a component built against
-v0 keeps working without a rebuild.
+designed for, an older document read by a newer engine by rule. It was written for components' plan
+fragments, which ADR 0100 withdrew; it still governs every plan document an engine reads.
 
 ## 5. Compiling shapes to plans
 
@@ -525,6 +530,7 @@ are two plans.
 | `one-of` | nested `flow:if` on `check:equals` of the discriminator, one branch per alternative, `flow:error` on no match naming the value read |
 | `any-of` | `match:any-of` with the options as `value` children |
 | `contains` | `expect:array`, then `match:contains` — opaque, per shape spec §4.1 |
+| a component operator | the action of the same name, with two children: the resolved value and the operator's members as an object `value` (shape spec §3.5) |
 
 Every structural operator leads with the kind it admits (shape spec §4.3: "`object` admits objects",
 "`each-like` admits arrays whose length is in `[min, max]`"). Emitting it is not belt-and-braces: the
@@ -549,6 +555,38 @@ reached from outside the compiler's own table, with whatever arguments the shape
 The shape language refuses such an operator before anything is compiled (shape spec §3.7), which is
 what makes "the shape compiler emits a core action only where §5.2 says so" true of every shape and not
 only of well-meant ones. Corpus case `shapes/reserved-namespace-operator` is the evidence.
+
+### 5.4 A content component's substitutions
+
+A content component may say which of its actions stands for a value operator under its content type
+(component-interfaces spec §6.3,
+[ADR 0100](../../decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md)):
+CSV has no types, so its `integer` is text that spells one, `csv:integer`. In a slot that component
+decodes, the shape compiler emits the component's action wherever §5.2 gives a substituted operator's
+action, with the same children, and compiles everything else as §5.2 says, including every variant's
+narrowing (§5.1; shape spec §7.1). A narrowed form takes the substitution of the operator
+whose action it is: an `any-of` pinned to one literal is `equality`'s `match:equality`, and a
+`nullable` pinned to null is `null`'s `match:null`. Only value operators are substituted. The slot's
+container begins with an `annotation` naming the content type, the component and each operator's
+action, so the plan says why a component's action is where a core one would be:
+
+```text
+:body (
+  #{'decoded as text/csv by csv: integer is csv:integer'},
+  %expect:array ( $.response.body ),
+  %expect:count ( $.response.body, 3 ),
+  %flow:for-each (
+    ** ( $.response.body ),
+    :"$[*]" (
+      %expect:object ( ~> ),
+      :"$[*].items" ( %csv:integer ( ~>.items ) )
+    )
+  )
+)
+```
+
+§5.1's obligation stays the compiler's. The component says what one value operator means for its type
+and never sees structure, so it cannot widen what a variant demonstrated.
 
 ## 6. Golden corpora
 
@@ -619,10 +657,11 @@ records one:
 | CI logs and failure artifacts | archived | in text, by a human |
 | AI diagnosis traces (design 2.10) | within a run | no |
 | golden corpora | checked into this repo | no — regenerated with the engine |
-| **component-contributed fragments** (task 8.4) | **shipped separately from the engine** | **yes** |
 
-Only the last crosses a version boundary, and it is not a recorded plan — it is an *authored*
-plan-shaped document. **No pact file contains a plan**, and none ever should: it would freeze a
+None of these crosses a version boundary. A component's plan fragment did, an *authored* plan-shaped
+document shipped separately from the engine, until ADR 0100 withdrew fragments: a component now says
+what a value operator means for its type, and the engine compiles every plan (§5.4). **No pact file
+contains a plan**, and none ever should: it would freeze a
 compiler's output into a contract, so improving the compiler would break pacts nobody can re-run, and
 it would put a second source of truth beside the shape that the verifier actually matches against
 (shape spec §7.3).
@@ -633,11 +672,12 @@ So:
   (protocol spec §11.2) and enforced by the same CI checker. A version is `v<major>` or
   `v<major>.<minor>` (`v1` is `v1.0`); an additive change is a new minor, anything else a new major, and
   a reader reads its own major at any minor no newer than its own (component-interfaces spec §12.3, ADR
-  0022). Node kinds, the value model, action naming and result kinds are what a fragment author writes
-  against. A reader MAY read another major where a rule says how, and never by guessing: v1's rule for
-  v0 is §4.7, and an engine lists every grammar it reads so a component can tell.
-- **An action's semantics are frozen once published.** A component emitting `match:regex` breaks if an
-  engine redefines it. New behaviour is a new action name — ADR 0007's commitment, for the same
+  0022). Node kinds, the value model, action naming and result kinds are what a reader of a plan
+  document relies on. A reader MAY read another major where a rule says how, and never by guessing:
+  v1's rule for v0 is §4.7.
+- **An action's semantics are frozen once published.** A component whose action stands for a value
+  operator (§5.4) is written against what that operator's core action does, and a plan a user read
+  yesterday must mean the same today. New behaviour is a new action name — ADR 0007's commitment, for the same
   reason.
 - **The plan produced for a given input is not stable across engine versions, and nothing may depend
   on it being so.** A newer engine may compile a better plan for the same shape. Corpora record plans
@@ -661,8 +701,8 @@ Codes are the Engine Protocol's (protocol spec §10.2). This specification const
 | `internal` | `internal` | an action in a reserved namespace that the engine does not implement, or a compiler emitting an action §4.5 forbids it — both are engine bugs, not user errors |
 
 A node with fewer children than its action takes (§4.2) is none of these codes when an interpreter
-meets it: it is an `error` result on that node, like a mismatch, and the run carries on. Refusing it
-earlier is the fragment check's job (`fragment-invalid`, component-interfaces spec §6.3).
+meets it: it is an `error` result on that node, like a mismatch, and the run carries on. The engine's
+own compilers never emit one, so it reaches an interpreter only in a plan document someone else wrote.
 
 A mismatch is **not** an error in this sense. It is an `error` *result* on a node (§2.3), carried in
 the executed plan and reported through the plan's result form — which is what design 2.1 means by

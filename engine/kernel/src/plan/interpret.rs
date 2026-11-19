@@ -134,8 +134,8 @@ pub fn execute_with_content(
 }
 
 /// Execute with everything a plan can reach outside the kernel: a content detector for
-/// `match:content-type`, and the components whose actions a contributed fragment uses (plan task
-/// 8.4).
+/// `match:content-type`, and the components whose actions a plan names: a component operator's, a
+/// content component's substitution for a value operator (ADR 0100), an embedding's own matcher's.
 pub fn execute_with(
   plan: &Plan,
   resolver: &dyn Resolver,
@@ -420,7 +420,7 @@ fn run_pipeline(children: &[Node], ctx: &mut Ctx) -> Executed {
 
 fn run_action(name: &str, children: &[Node], ctx: &mut Ctx) -> Executed {
   // Everything below reads an action's children by position. The engine's own compilers always
-  // give an action what it takes; a fragment, or a plan document handed back in, might not — and
+  // give an action what it takes; a plan document handed back in might not — and
   // that is an `error` on the node (spec §4.2, §8), never an index out of bounds.
   if let Some(least) = super::actions::least_children(name)
     && children.len() < least
@@ -776,7 +776,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
     },
     "flow:apply" | "flow:tee" => {
       // Neither has a worked example anywhere in the specs; this is a documented placeholder
-      // pending a real use (a component fragment, or design 3.5's legacy compiler) rather than a
+      // pending a real use (design 3.5's legacy compiler, say) rather than a
       // guess dressed up as a decision.
       children
         .last()

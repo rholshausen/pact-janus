@@ -6,16 +6,19 @@
 
 pub mod actions;
 mod compile;
-pub mod fragment;
 mod interpret;
 mod model;
 mod render;
 mod resolve;
 mod tokens;
 mod value;
+pub mod versions;
 
 pub use actions::{RESERVED_NAMESPACES, is_component_action};
-pub use compile::{Assignment, compile, variant_space};
+pub use compile::{
+  Assignment, SUBSTITUTABLE_OPERATORS, SlotSubstitutions, Substitution, compile, compile_substituted,
+  variant_space,
+};
 pub use interpret::{
   ActionApplier, Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, execute_with,
   execute_with_content, outcome,

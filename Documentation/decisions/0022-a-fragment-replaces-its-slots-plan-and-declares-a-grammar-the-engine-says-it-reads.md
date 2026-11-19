@@ -1,6 +1,6 @@
 # 0022 — A plan fragment replaces its slot's plan, declares a grammar the engine says it reads, and is checked before anything runs
 
-- **Status**: accepted
+- **Status**: accepted; decisions 1, 3, 4 and 6 superseded by [ADR 0100](0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md), which adopts operator-level substitution, this ADR's tripwire, and withdraws fragments
 - **Date**: 2026-09-23
 - **Plan tasks**: 8.4
 - **Evidence**: [plan-fragment stress test](../prototype/plan-fragment-stress-test.md);

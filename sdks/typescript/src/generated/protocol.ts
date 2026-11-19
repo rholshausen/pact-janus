@@ -1538,7 +1538,7 @@ export interface TransportBinding {
 export interface Explain {
   interaction: ExplainSubject;
   /**
-   * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements, declared content types and contributed fragments are checked against them as a run checks them, so the plan is the one a run compiles.
+   * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0050). The subject's requirements and declared content types are checked against them as a run checks them, and a content component's substitutions are compiled in (ADR 0100), so the plan is the one a run compiles.
    */
   components?: {
     [k: string]: unknown;

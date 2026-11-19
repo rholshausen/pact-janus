@@ -670,11 +670,7 @@ impl WasmComponent {
 fn hello_body(grants: &Grants) -> Value {
   json!({
     "component-protocol-versions": COMPONENT_PROTOCOL_VERSIONS,
-    // The plan grammars this engine reads (plan task 8.4): without them a component contributing
-    // fragments can only guess which grammar to write, and learn it guessed wrong at a refusal.
-    // v1 is the engine's own; v0 is read by rule (ADR 0026), so a component built before the
-    // rename still finds its grammar here.
-    "plan-grammar-versions": pact_janus_kernel::plan::fragment::READABLE_GRAMMAR_VERSIONS,
+    // No `plan-grammar-versions`: a component writes no plan (ADR 0100 decision 5).
     "engine": { "name": "janus-engine", "version": pact_janus_kernel::ENGINE_VERSION },
     "grants": grants,
     "capabilities": {},
@@ -797,13 +793,12 @@ impl ContentComponent for WasmComponent {
       "content/compile",
       json!({ "content-type": req.content_type, "shape": req.shape, "path": req.path }),
     )?;
-    Ok(CompileResult {
-      fragment: result.get("fragment").cloned(),
-      grammar_version: result
-        .get("grammar-version")
-        .and_then(Value::as_str)
-        .map(str::to_string),
-    })
+    // Success is the whole answer (spec §6.3). A fragment, which a component built before ADR 0100
+    // may still return, is not read: say so where someone debugging that component will look.
+    if result.get("fragment").is_some() {
+      tracing::warn!(component = %self.name, path = %req.path, "the component returned a plan fragment, which this engine does not read (ADR 0100); declare substitutions instead");
+    }
+    Ok(CompileResult::default())
   }
 
   fn detect(&self, req: Detect) -> Result<DetectResult, ComponentError> {
@@ -861,16 +856,11 @@ mod tests {
   use super::*;
   use pretty_assertions::assert_eq;
 
-  /// Staged plan S0.1: the engine's grammar is v1, and it still reads v0 (ADR 0026 decision 4) —
-  /// so a component is told both, and one built against v0 finds its grammar in the list.
+  /// ADR 0100 decision 5: a component writes no plan, so it is told no grammar.
   #[test]
-  fn component_hello_lists_plan_grammar_v1_and_v0() {
+  fn component_hello_names_no_plan_grammar() {
     let hello = hello_body(&Grants::default());
-    assert_eq!(hello["plan-grammar-versions"], json!(["v0", "v1"]));
-    assert_eq!(
-      pact_janus_kernel::plan::GRAMMAR_VERSION,
-      "v1",
-      "what the engine itself writes"
-    );
+    assert_eq!(hello.get("plan-grammar-versions"), None, "{hello}");
+    assert_eq!(hello["component-protocol-versions"], json!([1]));
   }
 }

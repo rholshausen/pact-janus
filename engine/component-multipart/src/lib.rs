@@ -485,14 +485,11 @@ impl ContentComponent for MultipartContent {
     })
   }
 
-  /// Nothing to contribute (spec §6.3): a multipart document is objects, arrays and its parts'
-  /// documents, which the generic plan handles.
+  /// Nothing to refuse (spec §6.3): a multipart document is objects, arrays and its parts'
+  /// documents, all of which any shape can describe.
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
     require_multipart(&req.content_type)?;
-    Ok(CompileResult {
-      fragment: None,
-      grammar_version: None,
-    })
+    Ok(CompileResult {})
   }
 
   /// A multipart body is recognised by its declared type and boundary, not its octets (spec §6.5).

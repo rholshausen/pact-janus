@@ -12,6 +12,12 @@
 //! as an error: validating that an assignment names real dimensions and points is design 2.3's
 //! business (the layer that actually enumerates them), not this compiler's, and a lenient
 //! fallback here means a bad variant id degrades to "compiled unpinned" instead of a panic.
+//!
+//! **Substitution** (component-interfaces spec §6.3, ADR 0100). A content component may say which of
+//! its actions stands for a value operator under its content type: CSV's `integer` is text that spells
+//! one, `csv:integer`. In a slot that component decodes, the compiler emits that action where it would
+//! have emitted the operator's core one, with the same children, and compiles everything else, every
+//! structure and every pinned dimension, exactly as it does for any slot.
 
 use super::model::{Literal, Node};
 use super::value::member_path;
@@ -27,6 +33,61 @@ use std::collections::BTreeMap;
 /// minimal slice the compiler needs to narrow a shape (plan-grammar spec §5.1).
 pub type Assignment = BTreeMap<String, String>;
 
+/// The value operators a content component may substitute an action for (ADR 0100 decision 2): the
+/// operators that check one value and contain no other shape. A structure is how variants are
+/// pinned, a modifier decides whether a value is there at all, and `content-type` reads the arrival's
+/// octets rather than the decoded document (ADR 0049), so none of those can be.
+pub const SUBSTITUTABLE_OPERATORS: &[&str] = &[
+  "any",
+  "equality",
+  "type",
+  "string",
+  "number",
+  "integer",
+  "decimal",
+  "boolean",
+  "null",
+  "regex",
+  "datetime",
+  "date",
+  "time",
+  "include",
+  "semver",
+  "not-empty",
+  "any-of",
+];
+
+/// What one slot's content component substitutes (ADR 0100): the component, the slot's declared type,
+/// and each value operator's action under it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Substitution {
+  pub component: String,
+  pub content_type: String,
+  /// Shape operator name -> the component's action, for [`SUBSTITUTABLE_OPERATORS`] only.
+  pub operators: BTreeMap<String, String>,
+}
+
+impl Substitution {
+  /// What `explain` shows at the top of the slot, so a reader sees why `csv:integer` is where
+  /// `match:integer` would be.
+  fn annotation(&self) -> Node {
+    let stands_for: Vec<String> = self
+      .operators
+      .iter()
+      .map(|(operator, action)| format!("{operator} is {action}"))
+      .collect();
+    Node::annotation(format!(
+      "decoded as {} by {}: {}",
+      self.content_type,
+      self.component,
+      stands_for.join(", ")
+    ))
+  }
+}
+
+/// Each slot's substitution, by (part, slot).
+pub type SlotSubstitutions = BTreeMap<(String, String), Substitution>;
+
 /// Compile a whole interaction specification to a plan (plan-grammar spec §5), optionally under a
 /// variant assignment. `variant_id` is stamped onto the result verbatim (design 2.3 names it);
 /// pass `None` to compile the shape unpinned.
@@ -35,18 +96,34 @@ pub fn compile(
   assignment: &Assignment,
   variant_id: Option<&str>,
 ) -> super::model::Plan {
+  compile_substituted(spec, assignment, variant_id, &SlotSubstitutions::new())
+}
+
+/// [`compile`], with the actions each slot's content component substitutes for value operators
+/// (ADR 0100). A slot with a substitution begins with an annotation saying so.
+pub fn compile_substituted(
+  spec: &InteractionSpec,
+  assignment: &Assignment,
+  variant_id: Option<&str>,
+  substitutions: &SlotSubstitutions,
+) -> super::model::Plan {
   let mut part_nodes = Vec::new();
   for (part_name, part) in &spec.parts {
     let mut slot_nodes = Vec::new();
     for (slot_name, shape) in part {
       let root = path::root(part_name, slot_name);
+      let substitution = substitutions
+        .get(&(part_name.clone(), slot_name.clone()))
+        .filter(|substitution| !substitution.operators.is_empty());
       let ctx = Ctx {
         cursor: Cursor::Absolute(format!("$.{root}")),
         labelled: root.clone(),
         at: root,
         assignment,
+        substitution,
       };
-      let children = compile_shape(shape, &ctx);
+      let mut children: Vec<Node> = substitution.map(Substitution::annotation).into_iter().collect();
+      children.extend(compile_shape(shape, &ctx));
       slot_nodes.push(Node::container(Some(slot_name.clone()), children));
     }
     part_nodes.push(Node::container(Some(part_name.clone()), slot_nodes));
@@ -119,6 +196,8 @@ struct Ctx<'a> {
   /// `at` itself cannot change: it is the dimension ids' syntax, and variant ids are recorded.
   labelled: String,
   assignment: &'a Assignment,
+  /// The slot's content component's substitutions, when it has any (ADR 0100).
+  substitution: Option<&'a Substitution>,
 }
 
 impl<'a> Ctx<'a> {
@@ -128,6 +207,7 @@ impl<'a> Ctx<'a> {
       at: path::member(&self.at, name),
       labelled: member_path(&self.labelled, name),
       assignment: self.assignment,
+      substitution: self.substitution,
     }
   }
 
@@ -137,6 +217,7 @@ impl<'a> Ctx<'a> {
       at: path::array_index(&self.at, index),
       labelled: path::array_index(&self.labelled, index),
       assignment: self.assignment,
+      substitution: self.substitution,
     }
   }
 
@@ -150,6 +231,7 @@ impl<'a> Ctx<'a> {
       at: step(&self.at),
       labelled: step(&self.labelled),
       assignment: self.assignment,
+      substitution: self.substitution,
     }
   }
 
@@ -159,11 +241,24 @@ impl<'a> Ctx<'a> {
       at: path::alternative(&self.at, name),
       labelled: path::alternative(&self.labelled, name),
       assignment: self.assignment,
+      substitution: self.substitution,
     }
   }
 
   fn resolve(&self) -> Node {
     self.cursor.resolve()
+  }
+
+  /// The action a value operator compiles to here: the slot's content component's, when it
+  /// substitutes one for `operator`, else the core action `core`. The children are the same either
+  /// way (ADR 0100 decision 4).
+  fn value_action(&self, operator: &str, core: &str, children: Vec<Node>) -> Node {
+    let name = self
+      .substitution
+      .and_then(|substitution| substitution.operators.get(operator))
+      .map(String::as_str)
+      .unwrap_or(core);
+    Node::action(name, children)
   }
 
   fn dim_id(&self, facet: &str) -> String {
@@ -188,21 +283,25 @@ fn compile_shape(shape: &ShapeNode, ctx: &Ctx) -> Vec<Node> {
 
 fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<Node> {
   match core {
-    CoreShape::Any => vec![Node::action("match:any", vec![ctx.resolve()])],
-    CoreShape::Equality => vec![Node::action(
+    CoreShape::Any => vec![ctx.value_action("any", "match:any", vec![ctx.resolve()])],
+    CoreShape::Equality => vec![ctx.value_action(
+      "equality",
       "match:equality",
       vec![ctx.resolve(), Node::value(example_literal(example))],
     )],
-    CoreShape::Type => vec![Node::action(
+    CoreShape::Type => vec![ctx.value_action(
+      "type",
       "match:type",
       vec![ctx.resolve(), Node::value(example_literal(example))],
     )],
-    CoreShape::Kind(kind) => vec![Node::action(
-      format!("match:{}", kind.operator_name()),
+    CoreShape::Kind(kind) => vec![ctx.value_action(
+      kind.operator_name(),
+      &format!("match:{}", kind.operator_name()),
       vec![ctx.resolve()],
     )],
-    CoreShape::NotEmpty => vec![Node::action("expect:not-empty", vec![ctx.resolve()])],
-    CoreShape::Regex { pattern } => vec![Node::action(
+    CoreShape::NotEmpty => vec![ctx.value_action("not-empty", "expect:not-empty", vec![ctx.resolve()])],
+    CoreShape::Regex { pattern } => vec![ctx.value_action(
+      "regex",
       "match:regex",
       vec![ctx.resolve(), Node::value(Literal::string(pattern))],
     )],
@@ -211,9 +310,14 @@ fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<N
       if let Some(format) = format {
         children.push(Node::value(Literal::string(format)));
       }
-      vec![Node::action(format!("match:{}", kind.operator_name()), children)]
+      vec![ctx.value_action(
+        kind.operator_name(),
+        &format!("match:{}", kind.operator_name()),
+        children,
+      )]
     }
-    CoreShape::Include { substring } => vec![Node::action(
+    CoreShape::Include { substring } => vec![ctx.value_action(
+      "include",
       "match:include",
       vec![ctx.resolve(), Node::value(Literal::string(substring))],
     )],
@@ -221,7 +325,7 @@ fn compile_core(core: &CoreShape, example: Option<&Example>, ctx: &Ctx) -> Vec<N
       "match:content-type",
       vec![ctx.resolve(), Node::value(Literal::string(content_type))],
     )],
-    CoreShape::Semver => vec![Node::action("match:semver", vec![ctx.resolve()])],
+    CoreShape::Semver => vec![ctx.value_action("semver", "match:semver", vec![ctx.resolve()])],
     CoreShape::Object { members } => compile_object(members, ctx),
     CoreShape::Array { entries } => compile_array(entries, ctx),
     CoreShape::EachLike { items, min, max } => compile_each_like(items, *min, *max, ctx),
@@ -411,7 +515,8 @@ fn compile_optional(of: &ShapeNode, ctx: &Ctx) -> Node {
 fn compile_nullable(of: &ShapeNode, ctx: &Ctx) -> Node {
   let dim_id = ctx.dim_id("nullability");
   match ctx.assignment.get(&dim_id).map(String::as_str) {
-    Some("null") => Node::action("match:null", vec![ctx.resolve()]),
+    // Pinned to null, it is the `null` operator's check, substituted as `null` is (ADR 0100).
+    Some("null") => ctx.value_action("null", "match:null", vec![ctx.resolve()]),
     Some("non-null") => as_single_unlabeled(compile_shape(of, ctx)),
     _ => Node::action(
       "flow:if",
@@ -425,7 +530,7 @@ fn compile_nullable(of: &ShapeNode, ctx: &Ctx) -> Node {
 }
 
 /// `any-of` (spec §5.2): `match:any-of` over the literal options; pinned, it narrows to the
-/// selected literal's `match:equality`.
+/// selected literal's `match:equality`, substituted as `equality` is (ADR 0100).
 fn compile_any_of(options: &[Value], ctx: &Ctx) -> Node {
   let dim_id = ctx.dim_id("value");
   let pinned = ctx
@@ -433,14 +538,15 @@ fn compile_any_of(options: &[Value], ctx: &Ctx) -> Node {
     .get(&dim_id)
     .and_then(|point_name| options.iter().find(|o| canonical_point_name(o) == *point_name));
   if let Some(pinned) = pinned {
-    return Node::action(
+    return ctx.value_action(
+      "equality",
       "match:equality",
       vec![ctx.resolve(), Node::value(Literal::from_json(pinned))],
     );
   }
   let mut children = vec![ctx.resolve()];
   children.extend(options.iter().map(|o| Node::value(Literal::from_json(o))));
-  Node::action("match:any-of", children)
+  ctx.value_action("any-of", "match:any-of", children)
 }
 
 /// `one-of` (spec §5.2): nested `flow:if`/`check:equals` (or `flow:or` of them, when an alternative's

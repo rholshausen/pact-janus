@@ -47,14 +47,12 @@ pub struct Compile {
   pub path: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct CompileResult {
-  /// A plan fragment (design 2.4's grammar) spliced at `Compile::path`. `None` is legitimate —
-  /// spec §6.3: "the kernel then compiles the slot generically and calls decode at execution
-  /// time."
-  pub fragment: Option<Value>,
-  pub grammar_version: Option<String>,
-}
+/// `content/compile` answers whether the component can carry the slot's shape under its content
+/// type, and nothing more (spec §6.3): failing is how it refuses one, as `compile-failed`. A component
+/// contributes no plan (ADR 0100); what a value operator means for its type is the `substitutions` its
+/// handshake declares.
+#[derive(Debug, Clone, Default)]
+pub struct CompileResult {}
 
 #[derive(Debug, Clone)]
 pub struct Detect {

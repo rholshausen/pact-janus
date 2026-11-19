@@ -6,8 +6,8 @@
 //!
 //! Out of scope here, deliberately: the WASM and subprocess bindings themselves, which need a
 //! runtime this crate cannot depend on and which an embedding registers as a [`ComponentLoader`]
-//! (plan task 8.1; `engine/component-host` is the WASM one). Of the matcher interface only `apply`
-//! is here ([`matcher`], plan task 8.4): it is what executes a fragment's component actions. What
+//! (plan task 8.1; `engine/component-host` is the WASM one). Of the matcher interface, what the engine
+//! calls is here ([`matcher`]): `apply` runs a component's actions where a plan names one. What
 //! *is* here is everything around a load that must not differ by binding:
 //! resolution, the handshake checks, requirements ([`loader`]) and routing by media type
 //! ([`registry`]). The hook interface ([`hook`]) does, as of plan task 5.3: the hook *system*
@@ -32,8 +32,8 @@ pub use error::ComponentError;
 pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators};
 pub use hook::{HookComponent, Invoke};
 pub use loader::{
-  ComponentDeclaration, ComponentLoader, Fetched, FsGrant, Grants, InTree, Limits, Loaded, Resolved,
-  SignatureTrust, Signer, Source, SourceAuth, Unavailable, check_requirements, resolve,
+  ComponentDeclaration, ComponentLoader, ContentSubstitutions, Fetched, FsGrant, Grants, InTree, Limits,
+  Loaded, Resolved, SignatureTrust, Signer, Source, SourceAuth, Unavailable, check_requirements, resolve,
 };
 pub use matcher::{
   Apply, ApplyResult, Comparability, Compare, CompareResult, InTreeMatcher, MatcherComponent, Prefix,

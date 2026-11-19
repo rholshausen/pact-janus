@@ -45,7 +45,7 @@ it), [1.1](../../../spikes/1.1-idl-bakeoff/FINDINGS.md) (why the surface is docu
 13. [Where full symmetry hurts](#13-where-full-symmetry-hurts)
 
 Worked examples — the built-in HTTP transport driven through both bindings, and a third-party CSV
-content component from handshake to plan fragment — live under [`examples/`](examples/), validated
+content component from handshake to the actions it substitutes — live under [`examples/`](examples/), validated
 against these schemas by `cargo test -p pact_janus_schema_compat`.
 
 ---
@@ -72,7 +72,7 @@ Out of scope, with owners:
 |---|---|
 | the shape operators a component operator sits beside, and `admits` | design [2.2](../shape-language/spec.md) |
 | the variant space a contributed dimension joins, and how variants are selected | design [2.3](../variant-semantics/spec.md) |
-| the plan node grammar a contributed fragment is written in, and the action vocabulary | design [2.4](../plan-grammar/spec.md) |
+| the plan node grammar, the action vocabulary, and the action each shape operator compiles to | design [2.4](../plan-grammar/spec.md) |
 | what a contract records about components it required | design [2.5](../contract-file/spec.md) |
 | the frames between host and engine | design [2.1](../engine-protocol/spec.md) |
 | **which** hook points exist, their ordering, config schema and secret handling | design 2.7 |
@@ -195,7 +195,6 @@ Request (`ComponentHello`), engine → component:
 ```json component-hello
 {
   "component-protocol-versions": [1],
-  "plan-grammar-versions": ["v0", "v1"],
   "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "fs": [], "network": false },
   "capabilities": { }
@@ -211,11 +210,13 @@ Result (`ComponentHelloResult`), component → engine:
   "interfaces": ["content", "matcher"],
   "contributes": {
     "content-types": [
-      { "media-type": "text/csv", "degradations": [
+      { "media-type": "text/csv",
+        "substitutions": { "integer": "csv:integer", "decimal": "csv:number" },
+        "degradations": [
         { "code": "numeric-lexical",
           "message": "CSV carries no numeric type; decimal and integer are indistinguishable." } ] }
     ],
-    "actions": [ { "name": "csv:parse" } ],
+    "actions": [ { "name": "csv:integer" }, { "name": "csv:number" } ],
     "operators": [
       { "name": "csv:column", "comparability": "exact" }
     ]
@@ -227,9 +228,9 @@ Result (`ComponentHelloResult`), component → engine:
 - The component picks the first version in `component-protocol-versions` it supports; if it supports
   none it MUST answer `protocol-version-unsupported` with `details.supported`, and the engine reports
   it as a load failure rather than continuing.
-- `plan-grammar-versions` names the plan grammars the engine reads (§12.3). A component that contributes
-  plan fragments writes one in a grammar listed here, or contributes none; an engine that sends no list
-  gets no fragments.
+- A component writes no plan, so the engine names no plan grammar here (§12.3). The request's
+  `plan-grammar-versions` member is deprecated: an engine before ADR 0100 sent it, and a component
+  must not depend on it.
 - `grants` tells the component what it was given, so it can fail its own handshake usefully rather than
   failing at first use — a component that needs the network and was granted none SHOULD say so here.
 - `capabilities` on both sides is the protocol's open capability mechanism (protocol §5.3), used for
@@ -248,7 +249,7 @@ sense of, and the engine ignores members it does not know.
 | Member | Declared by | Each entry carries |
 |---|---|---|
 | `transports` | `transport` | `kind` (the open transport vocabulary: `http`, `message`, …), `roles` (`serve`, `drive`) |
-| `content-types` | `content` | `media-type` (a media type or a `type/*` pattern), optional `degradations` (§6.4) |
+| `content-types` | `content` | `media-type` (a media type or a `type/*` pattern), optional `substitutions` (§6.3) and `degradations` (§6.4) |
 | `actions` | `matcher`, `content` | `name` (namespaced), optional `lazy` (plan grammar §2.4) |
 | `operators` | `matcher`, `content` | `name` (namespaced), `comparability` (§7.5), `variant-facet` (§7.4) |
 | `generators` | `matcher` | `name` (namespaced), optional `produces` |
@@ -589,7 +590,7 @@ Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).
 |---|---|
 | `content/decode` | `{ content-type, value, options? }` → `{ document, degradations? }` |
 | `content/encode` | `{ content-type, document, options? }` → `{ value }` |
-| `content/compile` | `{ content-type, shape, path }` → `{ fragment? }` |
+| `content/compile` | `{ content-type, shape, path }` → `{}` |
 | `content/detect` | `{ value, hint? }` → `{ media-type?, confidence? }` |
 | `content/label` | `{ content-type, value, at }` → `{ media-type? }` |
 
@@ -674,49 +675,56 @@ for every document the component's own `decode` can produce. Round-tripping is n
 a contract records both the shape and a produced example, and a component whose two halves disagree
 records an example its own matcher would reject.
 
-### 6.3 Contributing plan fragments
+### 6.3 Saying what a value operator means
 
-`compile` is asked for a content slot's shape and MAY return a **plan fragment**: a plan node in
-design 2.4's grammar that **replaces** the engine's generic plan for that slot. Returning nothing is
-legitimate and always safe: the kernel then compiles the slot generically and calls `decode` at
-execution time.
+A content type can change what a shape operator *means* for it. CSV has no types, so every field
+decodes as a string, and `integer` of a CSV column means text that spells an integer. The engine's
+plan checks `match:integer`, which no string passes. So a content component may say, for each content
+type it declares, which of its own actions stands for a value operator: the `substitutions` of its
+`content-types` entry (§3.2), an object from a shape operator's name to an action it contributes.
 
-A fragment replaces rather than joins because of why a component contributes one at all. A content
-type can change what a shape operator *means* for it — CSV has no types, so `integer` of a CSV column is
-text that spells an integer — and the generic plan's `match:integer`, left beside the component's own
-check, would still fail every such body. So a fragment is the whole plan for its slot, and a component
-that contributes one takes on the kernel's obligation for it (plan grammar §5.1): it must accept exactly
-what the slot's shape admits, *under this content type*. In practice that means a component compiles
-the shapes it can express and declines the rest, and the worked CSV component (`third-party/janus-csv`)
-does exactly that.
+In a slot whose declared type a component decodes, the engine compiles the shape as it compiles any
+other, every structure and every variant's pinning included (plan grammar §5.4). Where it would emit
+the action a substituted operator compiles to, it emits the component's action instead, with the same
+children, and the component's `apply` runs it (§7.2). The component never sees structure, and plan
+grammar §5.1's obligation to accept exactly what the shape admits stays the engine's
+([ADR 0100](../../decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md)):
 
-The fragment is constrained, and the engine checks each rule before anything runs — when the
-interaction arrives, beside its requirements (§2.3), and before a verification starts — failing as
-`component-unavailable` with a `reason`:
+- **Only value operators can be substituted**: `any`, `equality`, `type`, `string`, `number`,
+  `integer`, `decimal`, `boolean`, `null`, `regex`, `datetime`, `date`, `time`, `include`, `semver`,
+  `not-empty` and `any-of`. A structure is how the engine pins variants, a modifier decides whether a
+  value is there at all, and `content-type` reads the arrival's octets, not the decoded document
+  (§6.5), so none of those can be.
+- **A narrowed form takes its own operator's substitution.** A variant that pins an `any-of` to one
+  literal checks it as `equality`, and one that pins a `nullable` to null checks it as `null`, so
+  those are the substitutions that apply.
+- **Substitutions are checked when the component loads.** Each names an action the component
+  contributes (§3.3), and the component implements `matcher`. A substitution for a structure, a
+  modifier or `content-type` is refused too. Any of these fails the load as `component-invalid`. An
+  operator name the engine does not have is ignored, so a component can name one a newer shape
+  language adds.
+- **The plan says so.** A slot with substitutions begins with an annotation naming its content type,
+  the component and the operators it stands for, so `explain` shows why `csv:integer` is where
+  `match:integer` would be.
 
-- it declares its `grammar-version`, and the engine reads that grammar (§12.3) — else `grammar-skew`;
-- it is a node of that grammar, and uses **core actions of that grammar and the component's own
-  contributed actions** (§3.3's `contributes.actions`) and nothing else — else `fragment-invalid`;
-- every core action in it has at least the children that action takes (plan grammar §4.2) — else
-  `fragment-invalid`, naming the action and the count;
-- every `resolve` in it addresses the slot it was compiled for, or a path inside it — else
-  `fragment-invalid`. A content component's authority is its slot.
+The component that decodes a slot is the first in the scope that handles its declared type (§6.1),
+and its first `content-types` entry matching that type is the one whose substitutions apply.
 
-The component's actions are executed through `matcher/apply` (§7), so a component that contributes a
-fragment using its own actions implements `matcher` as well as `content`.
-
-`compile` MAY instead fail, when the component cannot carry the slot's shape under this content type at
-all. The engine asks the component that handles each declared slot, in-tree or declared, at the same
-moments, and a failure is `component-unavailable` with `reason: compile-failed`, carrying the
+`compile` is asked for each declared slot's shape when the interaction arrives, and before a
+verification starts, of the component that handles the slot, in-tree or declared. Success is its
+whole answer. It MAY fail when the component cannot carry the shape under this content type at all,
+and the engine reports `component-unavailable` with `reason: compile-failed`, carrying the
 component's error. This lets a component that claims a family of types decline the members it cannot
 write: the built-in `text` component claims `text/*` and refuses a shape that admits no string, so a
-`text/csv` body of rows still needs a CSV component (ADR 0036).
+`text/csv` body of rows still needs a CSV component
+([ADR 0036](../../decisions/0036-read-text-bodies-through-a-text-component-and-unclaimed-bodies-as-bytes.md)).
 
-Two limits, found by task 8.4 and recorded rather than resolved (Phase 9 findings 21 and 22): `compile`
-is given the slot's shape and **not the variant**, so a fragment cannot pin a dimensional operator the
-way the engine's own compiler does for each variant; and the value a fragment resolves is the
-**decoded** document, because the engine decodes a declared slot before the plan runs — a fragment
-cannot show the component's own decoding as a plan step.
+**A component contributes no plan.** Until ADR 0100, `compile` could return a plan fragment that
+replaced the slot's whole plan. That made its author a shape compiler, and a fragment, given no
+variant, checked every variant against the unpinned shape, so a variant could pass where the engine's
+own plan failed it (Phase 9 finding 21). `compile`'s `fragment` and `grammar-version` are deprecated,
+and an engine ignores them. Decoding is not a plan step either: the component decodes a slot before
+the plan runs, and the plan resolves the document.
 
 ### 6.4 Declaring degradations
 
@@ -764,7 +772,7 @@ Schema: [`schemas/v1/matcher.schema.json`](schemas/v1/matcher.schema.json).
 
 | Operation | Body → Result |
 |---|---|
-| `matcher/compile` | `{ operator, node, path }` → `{ fragment }` |
+| `matcher/compile` | withdrawn (ADR 0100): no engine asks it |
 | `matcher/apply` | `{ action, config?, values }` → `{ results }` |
 | `matcher/variant-space` | `{ operator, node, path }` → `{ dimensions }` |
 | `matcher/compare` | `{ operator, provider, consumer }` → `{ verdict, reason? }` |
@@ -776,25 +784,31 @@ what the call *is*, and an interface says who implements it. They are one interf
 gives — a generator's output must be admitted by the shape it generates for, and one declared authority
 is what lets the engine check that.
 
-### 7.1 Two stages, mirroring the kernel's own
+### 7.1 A component operator compiles to its own action
 
-A contributed operator behaves exactly as a core one does: it is **compiled** into plan nodes, and the
-nodes are **executed**. `compile` turns one shape node into a fragment; `apply` executes one of the
-component's actions against values at run time. Nothing about a component operator is special-cased in
-the interpreter — that is the whole point of plan grammar §4.6, and it is why `json:parse` is a
-component action in a spec that has no JSON in the kernel.
+A contributed operator is compiled and executed as a core one is: the engine compiles it into plan
+nodes, and the interpreter executes them. A component operator in a shape compiles to the action of
+the same name, with two children: the value under test and the operator's members as an object
+(plan grammar §5.2). The component's `apply` runs it (§7.2). Nothing about a component operator is
+special-cased in the interpreter, and an action a content component substitutes for a value operator
+(§6.3) is run the same way.
 
-An operator whose `compile` returns a fragment using only core actions needs no `apply` at all. That is
-the cheapest kind of component operator and worth preferring: it costs nothing at match time and its
-behaviour is fully visible in `explain`.
+`matcher/compile`, which asked a component to compile its operator into a plan fragment, is
+withdrawn: no engine ever asked it, and a component writes no plan (ADR 0100). Its schema stays,
+deprecated.
 
 ### 7.2 Batching
 
 `values` is an array of `MatchValue`s and `results` is an array of the same length, in the same order.
 A plan's action node becomes an application like this: its **first** child's value is the value under
 test, wrapped as a `MatchValue` (`content`, `encoded: base64` for bytes, and the `path` it was resolved
-from); any **further** children's values travel as `config.arguments`, because the plan grammar gives an
-action node no `config` of its own. The second half is provisional (Phase 9 finding 24). This is in the
+from); any **further** children's values travel as `config.arguments`, in order, because the plan
+grammar gives an action node no `config` of its own. A substituted action's arguments are its core
+action's (§6.3): `equality`'s and `type`'s example, `regex`'s pattern, a temporal operator's format when
+it has one, `any-of`'s literals, and none for the rest. A component operator's action has one argument,
+the operator's members (§7.1). This is normative
+([ADR 0100](../../decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md)
+decision 4). Batching is in the
 interface from day one because spike 1.4 measured the pipe binding at 1.4 µs per call: fine per value at
 test scale, and the obvious lever if it ever is not. A component MAY declare the `batch-apply`
 capability to accept more than one value per call; without it the engine sends one, and the arrays are
@@ -1328,7 +1342,7 @@ result (§7.2) and travels as a mismatch, exactly as a kernel action's would.
 |---|---|---|
 | the **component protocol** version | the frames and operations of this document | never, within v1; additively per protocol §11.2 |
 | a **component's** version | one component's own releases | its author says so; majors are what contracts pin (§2.3) |
-| the **plan grammar** version | the node grammar a fragment is written in | design 2.4 owns it |
+| the **plan grammar** version | the node grammar a plan document is written in | design 2.4 owns it |
 
 Conflating any two of these is how a plugin ecosystem seizes up: an engine upgrade that forces every
 component to re-release, or a component release that silently changes what a recorded contract means.
@@ -1346,36 +1360,21 @@ authors* rather than this project:
 - **Contributions may be added**, and a component's declared list growing is not breaking.
 - **A contribution may be deprecated but not removed** within a major version.
 
-### 12.3 Fragments and grammar skew
+### 12.3 Components and the plan grammar
 
-A contributed plan fragment is authored against a plan-grammar version and shipped separately from the
-engine — the one place a plan document crosses a version boundary (plan grammar §7.1). The rules, tested
-by task 8.4 (ADR 0022):
+A component writes no plan, so no plan document crosses a version boundary from a component (ADR
+0100). What a component names in a plan is its own actions, and what it names them for is shape
+operators, whose names the shape language freezes (shape spec §9). Neither depends on the plan
+grammar's version, so a component works on every engine that reads its component protocol, whatever
+grammar the engine writes.
 
-- **A fragment declares its grammar.** A grammar version is `v<major>` or `v<major>.<minor>`; `v1` is
-  `v1.0`. A fragment without one cannot be checked for skew, and is refused rather than guessed at.
-- **An engine reads a fragment written against the same major and a minor no newer than its own.** The
-  grammar grows additively within a major (plan grammar §7.1), so a `v1` fragment on a `v1.1` engine is
-  the designed-for case; a `v1.1` fragment on a `v1` engine may use what `v1` never had; another major
-  is another grammar.
-- **An engine may read more than one major, each by rule.** Plan grammar v1 is v0 renamed and nothing
-  else, so an engine whose grammar is v1 also reads a `v0` fragment, by the one-to-one mapping of plan
-  grammar §4.7 (ADR 0026), and lists both. The fragment is held to the grammar it declared — a v0
-  fragment may use v0's names and not v1's — and is shown by `explain` in v1's names. A component built
-  against v0 therefore keeps working without a rebuild.
-- **The engine says what it reads**, as `plan-grammar-versions` in `component/hello` (§3.2), so a
-  component can write a fragment the engine reads, fall back to an older grammar it also writes, or
-  contribute none. Without the list, the first a component learns of skew is a refusal.
-- **Skew fails by name, before anything runs** — `component-unavailable`, `reason: grammar-skew`,
-  naming the version declared and the versions read. It MUST NOT silently reinterpret a fragment
-  written against another grammar, and a plan document of any origin is read under the grammar it
-  declares or not at all.
+A plan document an engine reads back is still read under the grammar it declares and no other (plan grammar §7.1, [ADR 0022](../../decisions/0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md)
+decision 2). Its actions in a component's namespace are that component's, and the core namespaces stay
+reserved (§2.4), so a grammar that adds a core action never collides with a component's.
 
-What the rules deliberately leave to the component: a component that wants a core action a newer
-grammar adds uses its own contributed action until the engines it targets read that grammar, then
-switches — the same fragment, two grammars, chosen from the handshake. Its own action keeps working
-throughout, because contributed semantics are frozen (§12.2) and namespaced names never collide with
-core ones (§2.4).
+Until ADR 0100, a component could contribute a plan fragment, written against a grammar version the
+engine listed in `component/hello` and refused as `grammar-skew` when it could not read it. Fragments
+are withdrawn, and with them the list and that refusal.
 
 ## 13. Where full symmetry hurts
 

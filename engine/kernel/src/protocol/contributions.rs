@@ -1,26 +1,26 @@
-//! What a scope's declared components contribute to a plan beyond decoding (plan task 8.4): a
-//! fragment for each content slot they handle, compiled by `content/compile` (component-interfaces
-//! spec §6.3), and the component actions those fragments use, run by `matcher/apply` (§7.1).
+//! What a scope's components contribute to a plan beyond decoding: the actions a content component
+//! substitutes for value operators under its content type (component-interfaces spec §6.3, ADR 0100),
+//! and the component actions plans name, run by `matcher/apply` (§7.1).
 //!
-//! Fragments are asked for, and checked, when an interaction arrives ([`Contributions::check`]) —
-//! the same moment its requirements are — so a component whose fragment is written against a grammar
-//! this engine cannot read fails the interaction by name, not the fortieth variant of a run. Plans are
-//! then spliced wherever they are compiled ([`Contributions::compile`]).
+//! A slot's substitution comes from the declared component that decodes it, from the handshake it
+//! loaded with, so it was checked when the component loaded. The engine compiles every slot itself,
+//! pinning included, and only the value operators' actions are the component's. When an interaction
+//! arrives, that component is asked `content/compile` for its slots, which lets it refuse a shape it
+//! cannot carry (`compile-failed`). An in-tree component is asked the same by the scope.
 //!
-//! Only declared components are asked for fragments. The in-tree JSON component contributes no
-//! fragment, so asking it would change nothing; a built-in that did contribute one would need asking
-//! too, and would be the first time "no privileged path" (spec §9.1) cut the other way. An in-tree
-//! matcher's actions are run as a declared one's are (ADR 0057): the built-in HTTP component's
-//! `http:status-class` is one.
+//! An in-tree matcher's actions are run as a declared one's are (ADR 0057): the built-in HTTP
+//! component's `http:status-class` is one.
 
 use crate::common::ContentTypes;
 use crate::component::{
-  Apply, Compile, ContentComponent, InTreeMatcher, MatcherComponent, Resolved, Unavailable,
+  Apply, Compile, ContentComponent, ContentSubstitutions, InTreeMatcher, MatcherComponent, Resolved,
+  Unavailable, media_type_matches,
 };
 use crate::contract::ShapePart;
 use crate::interaction_spec::InteractionSpec;
-use crate::plan::fragment::{self, FragmentError, READABLE_GRAMMAR_VERSIONS};
-use crate::plan::{self, ActionApplier, Assignment, Node, NodeResult, Plan, RuntimeValue};
+use crate::plan::{
+  self, ActionApplier, Assignment, NodeResult, Plan, RuntimeValue, SlotSubstitutions, Substitution,
+};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -30,18 +30,12 @@ struct Contributor {
   content: Option<Arc<dyn ContentComponent>>,
   matcher: Option<Arc<dyn MatcherComponent>>,
   actions: Vec<String>,
+  substitutions: Vec<ContentSubstitutions>,
 }
 
 #[derive(Default)]
 pub(crate) struct Contributions {
   contributors: Vec<Contributor>,
-}
-
-/// One validated fragment, and where it goes.
-struct Fragment {
-  part: String,
-  slot: String,
-  node: Node,
 }
 
 impl Contributions {
@@ -53,134 +47,110 @@ impl Contributions {
       content: component.content.clone(),
       matcher: component.matcher.clone(),
       actions: component.actions.clone(),
+      substitutions: component.substitutions.clone(),
     });
     let in_tree = in_tree.iter().map(|component| Contributor {
       name: component.name.clone(),
       content: None,
       matcher: Some(Arc::clone(&component.matcher)),
       actions: component.actions.clone(),
+      substitutions: Vec::new(),
     });
     Contributions {
       contributors: declared.chain(in_tree).collect(),
     }
   }
 
-  /// Every fragment an interaction's declared content slots get, checked — or the first reason one
-  /// cannot be used, as `component-unavailable` naming the component (spec §12.3: "fails the load
-  /// naming the skew").
-  fn fragments(
-    &self,
-    content_types: Option<&ContentTypes>,
-    parts: &BTreeMap<String, ShapePart>,
-  ) -> Result<Vec<Fragment>, Unavailable> {
-    let mut fragments = Vec::new();
-    for (part, slots) in content_types.into_iter().flatten() {
-      for (slot, media_type) in slots {
-        let Some(contributor) = self.contributors.iter().find(|c| {
-          c.content
-            .as_ref()
-            .is_some_and(|content| content.handles(media_type))
-        }) else {
-          continue;
-        };
-        let Some(shape) = parts.get(part).and_then(|slots| slots.get(slot)) else {
-          continue;
-        };
-        let path = format!("$.{part}.{slot}");
-        let content = contributor.content.as_ref().expect("found by its content");
-        let compiled = content
-          .compile(Compile {
-            content_type: media_type.clone(),
-            shape: shape.clone(),
-            path: path.clone(),
-          })
-          .map_err(|error| Unavailable {
-            component: contributor.name.clone(),
-            message: format!(
-              "component '{}' could not compile '{part}.{slot}': {}",
-              contributor.name, error.message
-            ),
-            details: json!({ "component": contributor.name, "reason": "compile-failed", "error": error }),
-          })?;
-        let Some(document) = compiled.fragment else {
-          continue;
-        };
-        let node = fragment::validate(
-          &document,
-          compiled.grammar_version.as_deref(),
-          &contributor.name,
-          &contributor.actions,
-          &path,
-        )
-        .map_err(|error| refused(&contributor.name, part, slot, error))?;
-        tracing::debug!(component = %contributor.name, %part, %slot, "plan fragment contributed");
-        fragments.push(Fragment {
-          part: part.clone(),
-          slot: slot.clone(),
-          node,
-        });
-      }
-    }
-    Ok(fragments)
-  }
-
-  /// Whether a declared component claims `media_type`, and so is asked to compile its slots here.
-  pub fn claims(&self, media_type: &str) -> bool {
-    self.contributors.iter().any(|c| {
+  /// The declared component that decodes `media_type`: the first that handles it, as the scope's
+  /// registry routes it.
+  fn decoder(&self, media_type: &str) -> Option<&Contributor> {
+    self.contributors.iter().find(|c| {
       c.content
         .as_ref()
         .is_some_and(|content| content.handles(media_type))
     })
   }
 
-  /// Checked when an interaction arrives, beside its requirements.
+  /// Whether a declared component decodes `media_type`, and so is asked to compile its slots here.
+  pub fn claims(&self, media_type: &str) -> bool {
+    self.decoder(media_type).is_some()
+  }
+
+  /// Checked when an interaction arrives, beside its requirements: each declared slot a declared
+  /// component decodes is offered to it with its shape, and a refusal is `component-unavailable`
+  /// with `reason: compile-failed`, naming the component (spec §6.3).
   pub fn check(
     &self,
     content_types: Option<&ContentTypes>,
     parts: &BTreeMap<String, ShapePart>,
   ) -> Result<(), Unavailable> {
-    self.fragments(content_types, parts).map(|_| ())
-  }
-
-  /// The plan for `spec` under `assignment`, with every contributed fragment spliced in. A fragment
-  /// that stopped being usable since [`Self::check`] — a component answering differently the second
-  /// time — leaves the generic plan, loudly.
-  pub fn compile(
-    &self,
-    spec: &InteractionSpec,
-    parts: &BTreeMap<String, ShapePart>,
-    assignment: &Assignment,
-    variant: Option<&str>,
-  ) -> Plan {
-    let mut compiled = plan::compile(spec, assignment, variant);
-    match self.fragments(spec.content_types.as_ref(), parts) {
-      Ok(fragments) => {
-        for fragment in fragments {
-          if !fragment::splice(&mut compiled.root, &fragment.part, &fragment.slot, fragment.node) {
-            tracing::warn!(part = %fragment.part, slot = %fragment.slot, "no slot container to splice a fragment into");
-          }
-        }
-      }
-      Err(unavailable) => {
-        tracing::warn!(component = %unavailable.component, message = %unavailable.message, "fragment refused at compile; using the generic plan");
+    for (part, slots) in content_types.into_iter().flatten() {
+      for (slot, media_type) in slots {
+        let Some(contributor) = self.decoder(media_type) else {
+          continue;
+        };
+        let Some(shape) = parts.get(part).and_then(|slots| slots.get(slot)) else {
+          continue;
+        };
+        let content = contributor.content.as_ref().expect("found by its content");
+        content
+          .compile(Compile {
+            content_type: media_type.clone(),
+            shape: shape.clone(),
+            path: format!("$.{part}.{slot}"),
+          })
+          .map_err(|error| Unavailable {
+            component: contributor.name.clone(),
+            message: format!(
+              "component '{}' cannot carry the shape of '{part}.{slot}' as '{media_type}': {}",
+              contributor.name, error.message
+            ),
+            details: json!({ "component": contributor.name, "reason": "compile-failed",
+                             "slot": format!("{part}.{slot}"), "error": error }),
+          })?;
       }
     }
-    compiled
+    Ok(())
   }
-}
 
-fn refused(component: &str, part: &str, slot: &str, error: FragmentError) -> Unavailable {
-  let (reason, message, declared) = match error {
-    FragmentError::Skew { declared, message } => ("grammar-skew", message, declared),
-    FragmentError::Invalid(message) => ("fragment-invalid", message, None),
-  };
-  Unavailable {
-    component: component.to_string(),
-    message: format!(
-      "component '{component}' contributed a plan fragment for '{part}.{slot}' this engine cannot use: {message}"
-    ),
-    details: json!({ "component": component, "reason": reason, "slot": format!("{part}.{slot}"),
-                     "declared": declared, "readable": READABLE_GRAMMAR_VERSIONS }),
+  /// Each declared slot's substitution (ADR 0100): what its decoding component's first
+  /// `content-types` entry that matches the slot's type substitutes.
+  fn substitutions(&self, content_types: Option<&ContentTypes>) -> SlotSubstitutions {
+    let mut substitutions = SlotSubstitutions::new();
+    for (part, slots) in content_types.into_iter().flatten() {
+      for (slot, media_type) in slots {
+        let Some(contributor) = self.decoder(media_type) else {
+          continue;
+        };
+        let Some(entry) = contributor
+          .substitutions
+          .iter()
+          .find(|entry| media_type_matches(&entry.media_type, media_type))
+        else {
+          continue;
+        };
+        substitutions.insert(
+          (part.clone(), slot.clone()),
+          Substitution {
+            component: contributor.name.clone(),
+            content_type: media_type.clone(),
+            operators: entry.operators.clone(),
+          },
+        );
+      }
+    }
+    substitutions
+  }
+
+  /// The plan for `spec` under `assignment`, each declared slot's value operators compiled to its
+  /// content component's actions where it substitutes them.
+  pub fn compile(&self, spec: &InteractionSpec, assignment: &Assignment, variant: Option<&str>) -> Plan {
+    plan::compile_substituted(
+      spec,
+      assignment,
+      variant,
+      &self.substitutions(spec.content_types.as_ref()),
+    )
   }
 }
 
@@ -297,7 +267,7 @@ impl Contributions {
   }
 }
 
-/// `matcher/apply` for a fragment's component actions (spec §7.1).
+/// `matcher/apply` for the component actions a plan names (spec §7.1, §7.2).
 impl ActionApplier for Contributions {
   fn apply(&self, action: &str, arguments: &[RuntimeValue], path: Option<&str>) -> Option<NodeResult> {
     let (namespace, _) = action.split_once(':')?;
@@ -316,9 +286,8 @@ impl ActionApplier for Contributions {
       });
     };
     // One application. Its first argument is the value under test, wrapped as a `MatchValue` —
-    // `content`, tagged `base64` when it is bytes, and the path it came from. The grammar gives an
-    // action no `config`, so any further arguments travel as `config.arguments`: the one place
-    // Apply's `config` can come from (plan task 8.4, Phase 9 finding 24).
+    // `content`, tagged `base64` when it is bytes, and the path it came from. Any further arguments
+    // travel as `config.arguments`, in order (spec §7.2, ADR 0100 decision 4).
     let (first, rest) = match arguments.split_first() {
       Some((first, rest)) => (Some(first), rest),
       None => (None, &[][..]),

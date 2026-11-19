@@ -132,7 +132,7 @@ fn compile(shape: Value) -> Result<(), String> {
       shape,
       path: "$.response.body".to_string(),
     })
-    .map(|result| assert!(result.fragment.is_none()))
+    .map(|_| ())
     .map_err(|error| error.code)
 }
 

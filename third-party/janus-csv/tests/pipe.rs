@@ -39,10 +39,17 @@ fn hello_declares_the_content_type_and_its_degradations() {
   assert_eq!(ok["interfaces"], json!(["content", "matcher"]));
   assert_eq!(
     ok["contributes"]["actions"],
-    json!([ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" } ])
+    json!([ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" },
+            { "name": "csv:equality" } ])
   );
   let content_types = ok["contributes"]["content-types"].as_array().unwrap();
   assert_eq!(content_types[0]["media-type"], "text/csv");
+  assert_eq!(
+    content_types[0]["substitutions"],
+    json!({ "integer": "csv:integer", "number": "csv:number", "decimal": "csv:number",
+            "boolean": "csv:boolean", "equality": "csv:equality" }),
+    "the value operators whose meaning CSV changes"
+  );
   let codes: Vec<&str> = content_types[0]["degradations"]
     .as_array()
     .unwrap()
@@ -285,68 +292,27 @@ fn encode_refuses_what_csv_cannot_hold() {
   assert_eq!(not_rows["error"]["code"], "encode-failed");
 }
 
-fn orders() -> Value {
-  json!({ "shape": "each-like", "min": 1, "items": { "shape": "object", "members": {
-    "id": { "shape": "string", "example": "66" },
-    "items": { "shape": "integer", "example": 1 },
-    "paid": { "shape": "boolean", "example": true } } } })
-}
-
-fn greeted_reading(grammars: Value) -> Component {
-  let mut component = Component::default();
-  call(
+#[test]
+fn compile_carries_any_shape_and_refuses_another_content_type() {
+  let mut component = greeted();
+  let rows = json!({ "shape": "each-like", "min": 1, "items": { "shape": "object", "members": {
+    "items": { "shape": "integer", "example": 1 } } } });
+  let compiled = call(
     &mut component,
-    "component/hello",
-    json!({ "component-protocol-versions": [1], "plan-grammar-versions": grammars }),
-  );
-  component
-}
-
-fn compile(component: &mut Component, shape: Value) -> Value {
-  call(
-    component,
     "content/compile",
-    json!({ "content-type": "text/csv", "shape": shape, "path": "$.response.body" }),
-  )
-}
-
-#[test]
-fn compile_contributes_a_fragment_that_reads_typed_operators_as_text() {
-  let mut component = greeted_reading(json!(["v0"]));
-  let result = compile(&mut component, orders());
-  assert_eq!(result["ok"]["grammar-version"], "v0");
-  let text = result["ok"]["fragment"].to_string();
-  for expected in [
-    r#""name":"match:string""#,
-    r#""name":"csv:integer""#,
-    r#""name":"csv:boolean""#,
-    r#""path":"~>.items""#,
-    r#""label":"$.response.body[*].paid""#,
-  ] {
-    assert!(text.contains(expected), "{expected} in {text}");
-  }
-  assert!(!text.contains("match:integer"), "{text}");
-}
-
-#[test]
-fn compile_declines_what_it_does_not_cover_and_what_the_engine_does_not_read() {
-  let mut component = greeted_reading(json!(["v0"]));
-  let optional_member = json!({ "shape": "each-like", "items": { "shape": "object", "members": {
-    "note": { "shape": "optional", "of": { "shape": "string" } } } } });
-  assert_eq!(compile(&mut component, optional_member)["ok"], json!({}));
-  assert_eq!(
-    compile(&mut component, json!({ "shape": "string" }))["ok"],
-    json!({})
+    json!({ "content-type": "text/csv", "shape": rows, "path": "$.response.body" }),
   );
-
-  // An engine that says nothing about grammars, or reads only one this component does not write,
-  // gets the generic plan: correct for every operator but the typed ones, and never a skew.
-  for grammars in [Value::Null, json!(["v1"])] {
-    let mut component = greeted_reading(grammars);
-    assert_eq!(compile(&mut component, orders())["ok"], json!({}));
-  }
-  let mut silent = greeted();
-  assert_eq!(compile(&mut silent, orders())["ok"], json!({}));
+  assert_eq!(
+    compiled["ok"],
+    json!({}),
+    "the engine compiles the plan: {compiled}"
+  );
+  let other = call(
+    &mut component,
+    "content/compile",
+    json!({ "content-type": "application/json", "shape": rows, "path": "$.response.body" }),
+  );
+  assert!(other.get("error").is_some(), "{other}");
 }
 
 #[test]
@@ -369,6 +335,21 @@ fn apply_reads_text_as_the_type_it_spells() {
   assert_eq!(apply(&mut component, "csv:number", json!("NaN")), "error");
   assert_eq!(apply(&mut component, "csv:boolean", json!("true")), "ok");
   assert_eq!(apply(&mut component, "csv:boolean", json!("yes")), "error");
+  // `equality`'s example arrives as its argument, and is compared as the text a field holds.
+  let equals = |component: &mut Component, value: Value, example: Value| {
+    call(
+      component,
+      "matcher/apply",
+      json!({ "action": "csv:equality", "config": { "arguments": [example] },
+              "values": [ { "content": value } ] }),
+    )["ok"]["results"][0]["status"]
+      .clone()
+  };
+  assert_eq!(equals(&mut component, json!("1"), json!(1)), "ok");
+  assert_eq!(equals(&mut component, json!("true"), json!(true)), "ok");
+  assert_eq!(equals(&mut component, json!("PENDING"), json!("PENDING")), "ok");
+  assert_eq!(equals(&mut component, json!("2"), json!(1)), "error");
+  assert_eq!(equals(&mut component, json!(""), json!(null)), "error");
   let unknown = call(
     &mut component,
     "matcher/apply",

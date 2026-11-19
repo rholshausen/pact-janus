@@ -139,14 +139,11 @@ impl ContentComponent for FormContent {
     })
   }
 
-  /// Nothing to contribute (spec §6.3): a form document is an object of string lists, which the
-  /// generic plan handles.
+  /// Nothing to refuse (spec §6.3): a form document is an object of string lists, which any shape
+  /// can describe.
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
     require_form(&req.content_type)?;
-    Ok(CompileResult {
-      fragment: None,
-      grammar_version: None,
-    })
+    Ok(CompileResult {})
   }
 
   /// A form body has no signature to recognise (spec §6.5).

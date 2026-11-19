@@ -2984,6 +2984,29 @@ The component model, opened to the ecosystem.
 - **S5.4 Plan fragments versus operator-level substitution** — decision, gate F, before any third
   party depends on either; with it, a fragment's access to octets (finding 22) and where action
   configuration lives in the grammar (finding 24, ADR 0022 decision 6's provisional mapping).
+  *Done 2026-11-19* ([ADR 0100](decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md),
+  superseding ADR 0022 decisions 1, 3, 4 and 6). Gate F fired on finding 21, which task 8.4 demonstrated:
+  - Operator-level substitution. A `content-types` entry in the handshake may carry `substitutions`,
+    from a value operator's name to one of the component's actions. In a slot that component decodes,
+    the engine compiles the shape itself, every structure and every variant's pinning included, and
+    emits the component's action where the operator's core one would be, with the same children. A
+    slot with substitutions begins with an annotation saying so, which `explain` prints. Finding 21 is
+    closed: `csv_component.rs`'s three-row variant now fails against a provider with one row.
+  - Only value operators can be substituted, and a narrowed form takes its own operator's (a pinned
+    `any-of` is an `equality`). The loader refuses a substitution of an action the component does not
+    contribute, by a component with no `matcher`, or for a structure, a modifier or `content-type`, as
+    `component-invalid`, and passes over an operator name it does not know.
+  - Fragments are withdrawn: `content/compile` answers success or `compile-failed` and nothing more,
+    `matcher/compile` is withdrawn, and `component/hello` no longer sends `plan-grammar-versions`. The
+    schema members stay, deprecated. `grammar-skew` and `fragment-invalid` go with them.
+  - Finding 24: an action is applied with the value under test and its further children's values as
+    `config.arguments`, now normative. A substituted action gets its core action's arguments, and a
+    component operator's action its members as one. Finding 22: decoding is not a plan step, and the
+    plan grammar stops promising `json:parse`. Where a decode failure shows is S5.3's.
+  - `third-party/janus-csv`'s 150-line fragment compiler is a five-entry table, `csv:equality` among
+    them, and it now covers any structure a CSV body has. `engine/kernel/tests/substitutions.rs`
+    replaces `fragments.rs`. The grammar-version rules still govern every plan document the engine
+    reads (`plan/versions.rs`).
 - **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **M**: the
   containment rules of findings 18 and 20 (recreation in a shared process; what a `subprocess`
   source's command is).
@@ -3157,7 +3180,7 @@ ADRs.
 | Gate | Trigger | What to do | What it can change |
 |---|---|---|---|
 | **W: the WASM embedding** (ADR 0023) | `wasm32-wasip3` becomes a supported Rust target (it is being promoted to tier 2), and wasmtime plus one SDK-relevant host (jco for Node, or a JVM runtime) run p3 components | Re-run task 9.1's WASM scenarios, including a served mock and a driven verification. A served mock needs an embedding that provides `background` there: WASI threads if they have arrived, else a driver that runs the exchange step from async tasks (ADR 0062 decision 7). Check `wasi:http`'s p3 server story too | If it works, WASM becomes a candidate primary embedding again, and S0.4's per-OS binary distribution becomes the fallback. S1.5's client is async behind an executor seam. S2.1's engine keeps its threads behind the `background` capability, so passing this gate costs that driver and a serve half for the target, not a redesign of the kernel (ADR 0062) |
-| **F: plan fragments** (ADR 0022) | A second content component needs a fragment, or finding 21 (a fragment compiled without the variant, which widened a pinned variant) bites a real user | Adopt operator-level substitution: the engine compiles the slot, and a component says only what one value operator means | S5.4, stage 5's component interface |
+| **F: plan fragments** (ADR 0022) | A second content component needs a fragment, or finding 21 (a fragment compiled without the variant, which widened a pinned variant) bites a real user | Adopt operator-level substitution: the engine compiles the slot, and a component says only what one value operator means. Fired 2026-11-19 on finding 21: S5.4, ADR 0100 | S5.4, stage 5's component interface |
 | **E: frame encoding** (ADR 0006) | S0.3's trend shows base64 or frame size on a hot path | Negotiate CBOR, which the protocol already allows for | The protocol's second encoding |
 | **C: contract packaging** (ADR 0011) | A realistic contract passes 5 MB, or base64 bodies pass 25% of its bytes | The exploded projection, or a container form | The contract file |
 | **D: DSL defaults** (findings 2, 35) | S3.1 | Decide the empty-array default and exclusions before the DSL freezes | Stage 3 |
@@ -3235,7 +3258,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099) | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
-| S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
+| S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
 | S5.7 | A declared component's operators are opaque to `janus check`, which loads none | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |
 | S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |

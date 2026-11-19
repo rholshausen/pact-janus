@@ -4,8 +4,8 @@ Companion to [`../spec.md`](../spec.md). Where the
 [HTTP transport example](http-transport-both-bindings.md) tests the in-tree half of
 [ADR 0012](../../../decisions/0012-one-interface-two-bindings.md), this one walks the out-of-tree half:
 a component nobody in this repo wrote, declared in a project's config, fetched by digest, sandboxed,
-and contributing a content type, an action, an operator, a variant dimension and a comparability
-procedure. It is deliberately the shape of plan task 8.1, so that task starts from a document rather
+and contributing a content type, what value operators mean for it, an operator, a variant dimension
+and a comparability procedure. It is deliberately the shape of plan task 8.1, so that task starts from a document rather
 than from a conversation.
 
 CSV is a good subject precisely because it is *lossy*: it has no numeric type, no null, no nesting.
@@ -35,7 +35,6 @@ names a body that would not parse.
 ```json component-hello
 {
   "component-protocol-versions": [1],
-  "plan-grammar-versions": ["v0", "v1"],
   "engine": { "name": "janus-engine", "version": "0.1.0" },
   "grants": { "env": [], "network": false },
   "capabilities": { }
@@ -50,12 +49,15 @@ names a body that would not parse.
   "contributes": {
     "content-types": [
       { "media-type": "text/csv",
+        "substitutions": { "integer": "csv:integer", "number": "csv:number", "decimal": "csv:number",
+                           "boolean": "csv:boolean", "equality": "csv:equality" },
         "degradations": [
           { "code": "numeric-lexical",
             "message": "CSV carries no types: every field decodes as a string, so integer, decimal and boolean are indistinguishable from the text that spells them." },
           { "code": "no-null",
             "message": "An empty field decodes as the empty string; CSV cannot distinguish it from an absent value." } ] } ],
-    "actions": [ { "name": "csv:parse" } ],
+    "actions": [ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" },
+                 { "name": "csv:equality" } ],
     "operators": [
       { "name": "csv:columns", "comparability": "exact" },
       { "name": "csv:header-style", "comparability": "exact", "variant-facet": "header-style" } ],
@@ -69,13 +71,13 @@ Every contributed name is namespaced `csv:` — the component's own name, checke
 component declaring `column` unnamespaced, or `xml:column`, fails to load here and not later; the
 namespace is a partition the engine enforces, not a convention authors are asked to respect.
 
-The two degradations are the honest part. `numeric-lexical` is the case shape spec §4.2 names, and
-declaring it is what lets `explain` tell a user why `{ "shape": "integer" }` over a CSV column
-rejects every value: the column decodes to strings (§3 below), and `integer` admits numbers. What
-CSV can offer is the *spelling* of an integer — `{ "shape": "regex", "pattern": "^[0-9]+$" }` — and
-that is what a consumer of a CSV body writes. (Plan task 8.1 built this component from this page,
-and found the earlier wording promised a coercion nothing performs:
-[third-party component report](../../../prototype/third-party-component-report.md), finding 4.)
+The two degradations are the honest part. `numeric-lexical` is the case shape spec §4.2 names: the
+column decodes to strings (§3 below), so an integer and the text that spells one cannot be told
+apart. The `substitutions` are what the component does about it: under `text/csv`, `integer` is
+`csv:integer`, text that spells an integer, and so on for the other operators whose meaning CSV
+changes (§4 below). Without them `{ "shape": "integer" }` over a CSV column would reject every value,
+as it did when plan task 8.1 first built this component from this page
+([third-party component report](../../../prototype/third-party-component-report.md), finding 4).
 
 ## 3. Decoding
 
@@ -101,67 +103,61 @@ static one says the type is lossy, this one says where the loss actually bit.
 decodes `"0.00"` to a string but encodes numbers back as `0` would record contract examples its own
 matcher rejects.
 
-## 4. The plan fragment it contributes
+## 4. What a value operator means for CSV
 
 CSV has no types, so a CSV body decodes to strings: `items` is `"1"`, never `1`. A consumer who writes
-the shape they mean — `items: integer` — would get the engine's generic `match:integer`, and a string is
-not an integer. So `content/compile`, offered the body slot's shape, returns a fragment that **replaces**
-the slot's generic plan and says what `integer` means for this content type (§6.3):
-
-```json compile-result
-{ "grammar-version": "v0",
-  "fragment": {
-    "kind": "container", "label": "text/csv",
-    "children": [
-      { "kind": "action", "name": "expect:array", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
-      { "kind": "action", "name": "for-each", "children": [
-        { "kind": "splat", "children": [ { "kind": "resolve", "path": "$.response.body" } ] },
-        { "kind": "container", "label": "$.response.body[*]", "children": [
-          { "kind": "action", "name": "match:string",
-            "children": [ { "kind": "resolve-current", "path": "~>.id" } ] },
-          { "kind": "action", "name": "csv:integer",
-            "children": [ { "kind": "resolve-current", "path": "~>.items" } ] } ] } ] } ] } }
-```
-
-This component was written against plan grammar `v0`, where the loop is `for-each`, and has not been
-rebuilt since. The engine's grammar is `v1`; it lists `v0` in `plan-grammar-versions` because it reads
-it, by the one-to-one renaming of plan grammar §4.7, and it shows the fragment in v1's names. A
-component written today declares `v1` and says `flow:for-each` itself. Either way the plan renders as:
+the shape they mean — `items: integer` — would get the engine's `match:integer`, and a string is not an
+integer. So the handshake's `substitutions` say what `integer` means for this content type (§6.3):
+`csv:integer`, run by `matcher/apply`. The engine compiles the body slot as it compiles any other,
+every structure and every variant's pinning its own, and emits `csv:integer` where it would emit
+`match:integer`. The maximal variant of an `each-like` of 1–3 orders renders as:
 
 ```text
-:"text/csv" (
+:body (
+  #{'decoded as text/csv by csv: boolean is csv:boolean, decimal is csv:number, equality is csv:equality, integer is csv:integer, number is csv:number'},
   %expect:array ( $.response.body ),
+  %expect:count ( $.response.body, 3 ),
   %flow:for-each (
     ** ( $.response.body ),
     :"$.response.body[*]" (
-      %match:string ( ~>.id ),
-      %csv:integer ( ~>.items )
+      %expect:object ( ~> ),
+      :"$.response.body[*].id" ( %match:string ( ~>.id ) ),
+      :"$.response.body[*].items" ( %csv:integer ( ~>.items ) )
     )
   )
 )
 ```
 
-Everything CSV does not change is the core action the engine would have used; only the typed operator
-becomes the component's own, `csv:integer`, run by `matcher/apply`. The fragment declares the grammar it
-targets and is written only when the engine's `component/hello` lists it (§12.3), and it addresses its
-own slot and nothing else. A shape the component cannot express — an `optional` member, a nested object
-— gets no fragment and the generic plan, which is always a safe answer.
+Every operator CSV does not change is the core action the engine would have used anyway, `match:string`
+here. The annotation says why `csv:integer` is where `match:integer` would be. `csv:equality` is given
+`equality`'s example as its argument and compares it as the text a field holds, so `66` matches `"66"`
+(§7.2).
 
-An earlier draft of this example had the fragment *decode* — a `csv:parse` step in the plan — so the
-component's decoding would show in `explain`. Task 8.4 found that cannot work as the engine stands: a
-declared slot is decoded before the plan runs, so a fragment only ever sees the document (Phase 9
-finding 22).
+`content/compile` is still asked for the slot's shape when the interaction arrives. This component can
+carry any shape a CSV document decodes to, so it answers with success, which is all an answer can be:
+
+```json compile-result
+{ }
+```
+
+A component that cannot carry a shape answers with an error instead, as the built-in `text` component
+does for rows of objects, and the interaction is refused as `compile-failed`.
+
+An earlier version of this example had the component return a **plan fragment** that replaced the
+slot's plan. That made the component a shape compiler, and since it was given no variant, its
+`expect:size 1..3` checked every variant, so the three-row one passed against a provider with one row
+(Phase 9 finding 21). Fragments are withdrawn
+([ADR 0100](../../../decisions/0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md)).
 
 ## 5. The operator, compiled and executed
 
-```json matcher-compile
-{ "operator": "csv:columns", "path": "$.response.body",
-  "node": { "shape": "csv:columns", "columns": ["id", "status", "total"], "example": "id,status,total" } }
-```
+A shape that uses the component's operator, `{ "shape": "csv:columns", "columns": ["id", "status",
+"total"] }`, compiles to the action of the same name, with the value and the operator's members as
+its two children (§7.1). The members arrive as the action's one argument:
 
 ```json matcher-apply
 { "action": "csv:columns",
-  "config": { "columns": ["id", "status", "total"] },
+  "config": { "arguments": [ { "columns": ["id", "status", "total"] } ] },
   "values": [ { "content": ["id", "status", "total"], "path": "$.response.body" },
               { "content": ["id", "status"], "path": "$.response.body" } ] }
 ```

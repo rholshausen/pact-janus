@@ -30,7 +30,8 @@ every field as a string, so the engine's generic `match:integer` fails every CSV
 wrote `integer`. That is why 8.1's own test had to use a regex. The component is still written from the
 docs: it follows plan grammar §2, §4 and §5.2 and the plan schema, and mirrors the engine's plan
 structure so `explain` reads the same either way. Its fragment compiler is
-[`src/fragment.rs`](../../third-party/janus-csv/src/fragment.rs), about 150 lines.
+`src/fragment.rs`, about 150 lines (deleted when ADR 0100 withdrew fragments; `git show
+2a56a6b:third-party/janus-csv/src/fragment.rs` reads it).
 
 **Skew is exercised with a stub.** The real engine reads `v0` only, so a `v0.1` engine cannot be run.
 The version rule is unit-tested over synthetic versions (`plan/fragment.rs`). The end-to-end refusals

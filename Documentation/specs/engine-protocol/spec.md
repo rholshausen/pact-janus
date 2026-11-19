@@ -859,9 +859,10 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   which) and returns the plan's pretty text form, optionally the structured plan document
   (design 2.4). It is a kernel operation precisely so no SDK builds its own (RFC). It compiles what
   a run compiles ([ADR 0050](../../decisions/0050-explain-compiles-what-a-run-compiles-and-runs-captured-values.md)):
-  `components` are resolved as `verify`'s `target.components` are, and the subject's requirements,
-  declared content types and contributed fragments are checked against them, so an interaction a run
-  would refuse is refused here too, as `component-unavailable`. Given `values`, captured values by
+  `components` are resolved as `verify`'s `target.components` are, the subject's requirements and
+  declared content types are checked against them, and a content component's substitutions are
+  compiled in (ADR 0100), so an interaction a run would refuse is refused here too, as
+  `component-unavailable`. Given `values`, captured values by
   path, with `encoded` tagging any that are octets, it also runs the plan against them, with the run's
   content detection and its components' contributed actions, and returns `executed`: the verdict,
   each mismatch, and the executed text form. That is how a host matches captured values offline. A

@@ -8,7 +8,7 @@
   "properties": {
     "grammar": {
       "type": "string",
-      "description": "The grammar version this plan is written against — the compatibility surface a component-contributed fragment targets (spec.md §7.1).",
+      "description": "The grammar version this plan is written against, which a reader reads it under or not at all (spec.md §7.1).",
       "x-known-values": ["v1"]
     },
     "root": { "$ref": "#/$defs/Node" },

@@ -14,8 +14,8 @@
 //!
 //! **It compiles what a run would compile** (staged plan S1.12, ADR 0050): the request may declare
 //! `components`, resolved exactly as `verify` resolves `target.components`, and a contract's or a
-//! specification's requirements are checked against them, so a component's plan fragment is in the
-//! plan it prints. And it may carry `values`, captured values it runs the plan against, as a golden
+//! specification's requirements are checked against them, so the actions a component substitutes
+//! for value operators (ADR 0100) are in the plan it prints. And it may carry `values`, captured values it runs the plan against, as a golden
 //! corpus case does, with the run's content detection and contributed actions: matching captured
 //! values offline is an engine operation, not something a host does with the kernel's own API. A run's
 //! executed plans still arrive on its event stream (spec §9.6's `verification/executed-plan`).
@@ -91,7 +91,7 @@ pub enum ExplainError {
   /// A v1–v4 interaction that needs these pact plugins (staged plan S1.8): `verify` refuses it, so
   /// there is no plan to explain.
   NeedsPlugins(Vec<String>),
-  /// A component the interaction needs, or a fragment one contributes, that the scope cannot
+  /// A component the interaction needs, or one that refuses a slot's shape, that the scope cannot
   /// provide: `verify` would refuse it before anything ran.
   Unavailable(Unavailable),
   /// A value `encoded` tags as a representation this engine does not read, or that is not one.
@@ -106,11 +106,7 @@ pub fn compile(subject: &Subject, scope: &Scope) -> Result<Plan, ExplainError> {
       let spec = interaction_spec::parse(document).map_err(|err| ExplainError::Invalid(err.problems))?;
       let parts = super::session::raw_parts(document);
       checked(scope, &spec, &parts)?;
-      Ok(
-        scope
-          .contributions()
-          .compile(&spec, &parts, &Assignment::new(), None),
-      )
+      Ok(scope.contributions().compile(&spec, &Assignment::new(), None))
     }
     "contract-interaction" => {
       let document = subject
@@ -172,7 +168,7 @@ fn janus(document: &Value, index: usize, variant: Option<&str>, scope: &Scope) -
   let contributions = scope.contributions();
 
   let Some(wanted) = variant else {
-    return Ok(contributions.compile(&spec, &interaction.parts, &Assignment::new(), None));
+    return Ok(contributions.compile(&spec, &Assignment::new(), None));
   };
   let recorded = interaction
     .selection
@@ -197,7 +193,7 @@ fn janus(document: &Value, index: usize, variant: Option<&str>, scope: &Scope) -
       assignment.insert(dimension.to_string(), point.to_string());
     }
   }
-  Ok(contributions.compile(&spec, &interaction.parts, &assignment, Some(&recorded.id)))
+  Ok(contributions.compile(&spec, &assignment, Some(&recorded.id)))
 }
 
 /// The secrets an explanation never repeats (ADR 0074 decision 7): the strings under a redacted member
@@ -278,7 +274,7 @@ pub fn secrets(subject: &Subject, values: Option<&Map<String, Value>>, redaction
 }
 
 /// What `verify` checks before a run starts (component-interfaces spec §2.3): every requirement, and
-/// every declared content type and the fragment its component contributes.
+/// every declared content type, with a component that can carry its slot's shape.
 fn checked(
   scope: &Scope,
   spec: &interaction_spec::InteractionSpec,

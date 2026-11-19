@@ -622,7 +622,7 @@ impl Source {
   pub(crate) fn check(&self, scope: &Scope) -> Result<(), Unavailable> {
     match self {
       Source::Janus(contract) => contract.interactions.iter().try_for_each(|interaction| {
-        // Plan task 8.4: a fragment this engine cannot use fails the run before it starts, too.
+        // A content component that refuses a slot's shape fails the run before it starts, too.
         scope.check(
           interaction.requires.iter().flatten(),
           interaction.content_types.as_ref(),
@@ -1571,7 +1571,8 @@ fn summary(report: &Report<'_>) -> Value {
 struct RunContext<'a> {
   targets: &'a [Target],
   content: Option<&'a dyn ContentComponent>,
-  /// Runs a contributed fragment's component actions (plan task 8.4).
+  /// Runs the component actions a plan names: a component operator's, a content component's
+  /// substitution (ADR 0100), an embedding's own matcher's (ADR 0057).
   actions: &'a dyn ActionApplier,
   filter: &'a Filter,
   executed_plans: Reporting,
@@ -1806,7 +1807,7 @@ fn prepare_janus(
         // `optional` pinned to `absent` admits only absence, an `any-of` pinned to `SHIPPED` only
         // that. Matching against the unpinned shape would accept `PENDING` where the consumer
         // demonstrated `SHIPPED`, and the variant would have proved nothing.
-        plan: contributions.compile(&spec, &interaction.parts, &assignment, Some(&variant.id)),
+        plan: contributions.compile(&spec, &assignment, Some(&variant.id)),
         resolve: if emissive {
           produced_resolver
         } else {
