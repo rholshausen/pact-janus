@@ -2817,6 +2817,43 @@ fn a_registry_credential_is_declared_reaches_the_registry_and_appears_nowhere_el
   );
 }
 
+/// ADR 0098: a component published with `wkg`, in the CNCF Wasm layout, whose config names no
+/// component. `pull` says which it is from its handshake, and prints a declaration that loads it.
+#[test]
+fn component_pull_names_a_component_published_in_the_cncf_wasm_layout_by_its_handshake() {
+  use pact_janus_component_host::oci::{WASM_CONFIG_MEDIA_TYPE, sha256};
+  let registry = registry::Registry::start();
+  let layer = std::fs::read(csv_component()).expect("the CSV component");
+  let config = serde_json::to_vec(&json!({
+    "architecture": "wasm", "os": "wasip2", "layerDigests": [sha256(&layer)],
+    "component": { "exports": ["pact:janus-component/pipe@1.0.0"], "imports": [] } }))
+  .unwrap();
+  let manifest = serde_json::to_vec(&json!({
+    "schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "config": { "mediaType": WASM_CONFIG_MEDIA_TYPE, "digest": sha256(&config), "size": config.len() },
+    "layers": [ { "mediaType": "application/wasm", "digest": sha256(&layer), "size": layer.len() } ] }))
+  .unwrap();
+  let digest = registry.put("janus-csv", "1.0.0", &manifest, &[&config, &layer]);
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+
+  let cache = temp("oci-pull-cncf-cache");
+  let _ = std::fs::remove_dir_all(&cache);
+  let pulled = janus_cached(&cache, &["component", "pull", &reference]);
+  let text = stdout(&pulled);
+  assert_eq!(code(&pulled), 0, "{}", stderr(&pulled));
+  assert!(text.contains("csv 1.0.0 (content, matcher)"), "{text}");
+  assert!(text.contains("- name: csv\n"), "{text}");
+  assert!(
+    text.contains(&format!(
+      "source: {{ kind: oci, reference: \"{reference}\", digest: \"{digest}\" }}"
+    )),
+    "{text}"
+  );
+  let json = janus_cached(&cache, &["component", "pull", &reference, "--output", "json"]);
+  let answer: Value = serde_json::from_slice(&json.stdout).expect("JSON");
+  assert_eq!(answer["component"], json!({ "name": "csv", "version": "1.0.0" }));
+}
+
 #[test]
 fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
   let registry = registry::Registry::start();

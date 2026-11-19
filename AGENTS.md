@@ -299,7 +299,9 @@ Three sources are the source of truth and take precedence over this file when th
 > available, after S5.4 and S5.3). S5.1a (ADR 0097): a contract's `metadata.components` and a
 > verification summary's `components` name each declared component loaded, by its handshake's name
 > and version and the digest a declaration would pin (`Loaded::fetched`); never a file's path, nor
-> the engine's own version.
+> the engine's own version. S5.1b (ADR 0098): the loader also accepts the CNCF Wasm OCI layout `wkg oci
+> push` writes, a Janus component's when its config's `component.exports` names the pipe, checked
+> before the layer is fetched; the handshake alone names it (`tests/oci.rs` pushes with `JANUS_WKG`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -675,7 +677,9 @@ A run's registry credential is its declaration's `source.auth`, `${VAR}`-interpo
 read `JANUS_OCI_USERNAME`/`JANUS_OCI_PASSWORD`. The cache is `JANUS_COMPONENT_CACHE`
 (default: the user cache directory's `pact-janus/components`). The OCI tests run against an in-process
 registry that tampers on request, and against a real one when `JANUS_OCI_REGISTRY` names it
-(`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this).
+(`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this), and
+push with the Bytecode Alliance's `wkg` when `JANUS_WKG` names one (`cargo install wkg --locked --version
+0.16.2`; CI does this too), since the loader reads the CNCF Wasm layout `wkg` publishes (ADR 0098).
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0023, every SDK's primary embedding): built by the
 normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`

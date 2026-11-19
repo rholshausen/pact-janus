@@ -138,6 +138,21 @@ impl Registry {
                 &format!("/v2/{repository}/blobs/uploads/{id}?state=opaque"),
               ))
             }
+            // A chunk of an upload (distribution spec, "Pushing a blob in chunks"), which `wkg`
+            // sends where `janus component push` sends the blob whole with the closing `PUT`.
+            Method::Patch => match state.uploads.get_mut(id) {
+              Some(bytes) => {
+                bytes.extend(&body);
+                let end = bytes.len().saturating_sub(1);
+                status(202)
+                  .with_header(header(
+                    "location",
+                    &format!("/v2/{repository}/blobs/uploads/{id}?state=opaque"),
+                  ))
+                  .with_header(header("range", &format!("0-{end}")))
+              }
+              None => status(404),
+            },
             Method::Put => {
               let digest = query
                 .split('&')
@@ -149,8 +164,8 @@ impl Registry {
               if sha256(&bytes) != digest {
                 status(400)
               } else {
-                state.blobs.insert(digest, bytes);
-                status(201)
+                state.blobs.insert(digest.clone(), bytes);
+                status(201).with_header(header("location", &format!("/v2/{repository}/blobs/{digest}")))
               }
             }
             _ => status(405),
@@ -183,7 +198,12 @@ impl Registry {
                 (content_type.clone(), body.clone()),
               );
               state.manifests.insert(key, (content_type, body));
-              status(201).with_header(header("docker-content-digest", &digest))
+              status(201)
+                .with_header(header("docker-content-digest", &digest))
+                .with_header(header(
+                  "location",
+                  &format!("/v2/{repository}/manifests/{digest}"),
+                ))
             }
             _ => match state.manifests.get(&key) {
               Some((content_type, bytes)) => {

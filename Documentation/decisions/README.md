@@ -37,7 +37,7 @@ superseding ADR instead.
 | [0018](0018-canonical-contract-bytes-are-compact-not-pretty-printed.md) | Write Janus contracts as compact JSON; canonical form carries no formatting promise, and a reader must not assume one of its input | accepted |
 | [0019](0019-an-sdk-refuses-what-it-cannot-spell-and-stops-when-the-engine-does.md) | Refuse at the call what an SDK cannot spell the same way in every language, write what it can, and fail a run at once when the engine errors | accepted |
 | [0020](0020-a-content-slots-type-is-declared-on-the-interaction.md) | Declare a content slot's type on the interaction, beside its parts, not inside them | accepted |
-| [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted; amended by 0052 |
+| [0021](0021-a-component-artifact-is-its-own-type-and-a-pin-is-fetched-by-digest.md) | Distribute a component as its own OCI artifact type, described by its handshake, and fetch a pin by digest alone | accepted; amended by 0052 (decision 1 superseded by 0098) |
 | [0022](0022-a-fragment-replaces-its-slots-plan-and-declares-a-grammar-the-engine-says-it-reads.md) | A plan fragment replaces its slot's plan, declares a grammar the engine says it reads, and is checked before anything runs | accepted |
 | [0023](0023-the-subprocess-is-the-primary-embedding-and-wasm-serves-offline-operations.md) | Make the subprocess every SDK's primary embedding, and WASM the embedding for offline operations | accepted (decision 5 extended by 0062) |
 | [0024](0024-request-dimensions-stay-pinned-and-a-cardinality-point-matches-a-region.md) | Keep request dimensions pinned, and match a cardinality point as a region | accepted |
@@ -114,6 +114,7 @@ superseding ADR instead.
 | [0095](0095-recompute-a-missing-report-for-the-pair-a-broker-is-asked-about-in-its-wasm-engine-and-never-a-whole-fleet-at-once.md) | Recompute a missing report for the pair a broker is asked about, in its WASM engine, and never a whole fleet at once | accepted |
 | [0096](0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md) | Narrow the entries a check tries by what each selector fixes, and a prefix an operator declares | accepted |
 | [0097](0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md) | Record each declared component a session or run loaded, by the digest a declaration would pin | accepted |
+| [0098](0098-accept-a-component-published-in-the-cncf-wasm-layout-recognised-by-the-pipe-its-config-says-it-exports.md) | Accept a component published in the CNCF Wasm layout, recognised by the pipe its config says it exports | accepted |
 
 ## Decision backlog
 

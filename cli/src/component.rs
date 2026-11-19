@@ -75,13 +75,16 @@ fn pull(loader: &WasmLoader, args: &PullArgs, credentials: Option<&Credentials>)
     Ok(pulled) => pulled,
     Err(err) => return refused(err, credentials.is_some()),
   };
+  // Who answers, from the handshake: a Janus artifact's config says the same (the loader checked),
+  // and one in the CNCF Wasm layout, as `wkg` publishes, says no name at all (ADR 0098).
+  let identity = json!({ "name": hello["component"]["name"], "version": hello["component"]["version"] });
   match args.output {
     Output::Json => outln!(
       "{}",
       crate::output::pretty(&json!({
         "reference": pulled.reference.to_string(),
         "digest": pulled.digest,
-        "component": pulled.config,
+        "component": identity,
         "interfaces": hello.get("interfaces").cloned().unwrap_or(Value::Null),
         "contributes": hello.get("contributes").cloned().unwrap_or(Value::Null),
       }))
@@ -103,11 +106,9 @@ fn pull(loader: &WasmLoader, args: &PullArgs, credentials: Option<&Credentials>)
           .collect();
         outln!("{} {}", paint(style::DIM, "content types:"), types.join(", "));
       }
-      let mut unpinned = pulled.reference.clone();
-      unpinned.digest = None;
       declaration(
-        &pulled.config,
-        &unpinned.to_string(),
+        &identity,
+        &pulled.reference.without_digest().to_string(),
         &pulled.digest,
         credentials.is_some(),
       );

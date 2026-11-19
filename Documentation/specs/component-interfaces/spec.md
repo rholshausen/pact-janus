@@ -1127,15 +1127,28 @@ Concretely, an OCI image manifest (`application/vnd.oci.image.manifest.v1+json`)
 | the layer | exactly one with `mediaType` `application/wasm`; other layers are ignored |
 
 A manifest is a Janus component's when its config media type is the one above and its `artifactType`,
-if present, agrees. Anything else — a container image, an image index, a manifest with no `application/wasm`
-layer or with two — fails the load as `not-a-component`, naming what it is, before any blob is fetched.
+if present, agrees.
+
+A loader also accepts the [CNCF Wasm OCI artifact layout](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/),
+which `wkg oci push` publishes
+([ADR 0098](../../decisions/0098-accept-a-component-published-in-the-cncf-wasm-layout-recognised-by-the-pipe-its-config-says-it-exports.md)):
+config media type `application/vnd.wasm.config.v0+json` and exactly one `application/wasm` layer.
+Such an artifact is a Janus component's when its config's `component.exports` names the pipe
+(`pact:janus-component/pipe@1.0.0`, §9.2). The loader reads the config before it fetches the layer, and
+refuses as `not-a-component` a config with no `component` (a module), or one whose exports do not
+include the pipe, naming what it exports. The CNCF layout defines no `artifactType`, and its config
+carries no name or version, so the handshake alone says which component it is.
+
+Anything else — a container image, an image index, a manifest with no `application/wasm` layer or with
+two — fails the load as `not-a-component`, naming what it is, before any blob is fetched.
 
 The config blob says which component the artifact is so that a registry, a broker or a person can know
 without running it. It is **not** a second source of truth: the handshake remains the only one (§2.3,
 ADR 0012), and a publisher SHOULD write the config from the handshake rather than by hand
 (`janus component push` does). A loader MUST compare the config's `name` and `version` with what the
 handshake declares, and fail the load as `artifact-mismatch` when they differ — an artifact that
-describes itself falsely has misinformed everyone who read the description.
+describes itself falsely has misinformed everyone who read the description. An artifact in the CNCF
+layout says neither, so there is nothing to compare.
 
 Resolution is:
 

@@ -3,7 +3,10 @@
 //! A component travels as an OCI artifact: an image manifest whose `artifactType` — and, for
 //! registries and tools that predate OCI 1.1, whose config media type — says "Janus component", a
 //! config blob carrying the name and version the component's own handshake declared, and one
-//! `application/wasm` layer carrying the component.
+//! `application/wasm` layer carrying the component. Or it travels in the CNCF Wasm OCI artifact
+//! layout, as `wkg oci push` writes it, whose config names the component's WIT exports, and is a
+//! Janus component's when one of them is the pipe (ADR 0098). Either is refused before its layer is
+//! fetched if it is not a Janus component.
 //!
 //! This is a deliberately small client for the distribution API: resolve a manifest, fetch two
 //! blobs, and — for `janus component push` — upload two blobs and a manifest. Anonymous access, the
@@ -46,6 +49,9 @@ pub const CONFIG_MEDIA_TYPE: &str = persisted::COMPONENT_CONFIG_MEDIA_TYPE.write
 /// The layer carrying the component: the registered media type for WebAssembly, so any wasm-aware
 /// registry UI recognises it.
 pub const WASM_MEDIA_TYPE: &str = "application/wasm";
+/// The CNCF Wasm OCI artifact layout's config media type, which `wkg oci push` writes (ADR 0098). Not
+/// a name of ours, so not a persisted one: the CNCF's, which a rename does not touch.
+pub const WASM_CONFIG_MEDIA_TYPE: &str = "application/vnd.wasm.config.v0+json";
 const MANIFEST_MEDIA_TYPE: &str = "application/vnd.oci.image.manifest.v1+json";
 const INDEX_MEDIA_TYPE: &str = "application/vnd.oci.image.index.v1+json";
 const ACCEPT_MANIFESTS: &str =
@@ -182,13 +188,25 @@ pub fn sha256(bytes: &[u8]) -> String {
   format!("sha256:{hex}")
 }
 
-/// What a pull produced: the manifest digest it resolved to — the value to pin — the config blob,
-/// and the component's bytes, every one of them checked.
+/// What a pull produced: the manifest digest it resolved to — the value to pin — the layout it was
+/// published in, the config blob, and the component's bytes, every one of them checked.
 pub struct Pulled {
   pub reference: Reference,
   pub digest: String,
+  pub layout: Layout,
   pub config: Value,
   pub wasm: Vec<u8>,
+}
+
+/// How an artifact says it is a Janus component (ADR 0098).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Layout {
+  /// Janus's own (ADR 0021): a config carrying the name and version the handshake declared, which
+  /// the loader checks against the handshake.
+  Janus,
+  /// The CNCF Wasm OCI artifact layout, as `wkg oci push` writes it: a config naming the component's
+  /// WIT exports, the pipe among them, and no name or version to check.
+  Wasm,
 }
 
 /// A registry credential (ADR 0052). A run's comes from its component's declaration, `source.auth`,
@@ -348,7 +366,7 @@ impl Oci {
       }
     };
 
-    let (config, layer) = parse_manifest(&manifest, reference, &digest)?;
+    let (layout, config, layer) = parse_manifest(&manifest, reference, &digest)?;
     let config_bytes = self.content(reference, auth, &config.digest, "blobs", config.size)?;
     check_size(reference, &config, &config_bytes)?;
     let config: Value = serde_json::from_slice(&config_bytes).map_err(|err| {
@@ -358,11 +376,17 @@ impl Oci {
         json!({ "reference": reference.to_string() }),
       )
     })?;
+    // ADR 0098 decision 2: an artifact in the CNCF layout says what it exports, so one that is not a
+    // Janus component is refused here, before a byte of its layer is fetched.
+    if layout == Layout::Wasm {
+      check_exports(&config, reference, &digest)?;
+    }
     let wasm = self.content(reference, auth, &layer.digest, "blobs", layer.size)?;
     check_size(reference, &layer, &wasm)?;
     Ok(Pulled {
       reference: reference.clone(),
       digest,
+      layout,
       config,
       wasm,
     })
@@ -735,21 +759,16 @@ struct Descriptor {
 }
 
 /// A manifest is a Janus component's when it says so: `artifactType`, or — for a reader that
-/// predates OCI 1.1 — its config media type. Exactly one layer is the component; any others are
-/// someone else's business (open world), and an image index is a question this engine does not
-/// ask, because a WASM component has one platform.
+/// predates OCI 1.1 — its config media type. Or it is in the CNCF Wasm layout, whose config says what
+/// the component exports, which [`check_exports`] reads (ADR 0098). Exactly one layer is the
+/// component; any others are someone else's business (open world), and an image index is a question
+/// this engine does not ask, because a WASM component has one platform.
 fn parse_manifest(
   bytes: &[u8],
   reference: &Reference,
   digest: &str,
-) -> Result<(Descriptor, Descriptor), ComponentError> {
-  let not_a_component = |why: String| {
-    failure(
-      "not-a-component",
-      format!("'{reference}' ({digest}) is not a Janus component: {why}"),
-      json!({ "reference": reference.to_string(), "digest": digest }),
-    )
-  };
+) -> Result<(Layout, Descriptor, Descriptor), ComponentError> {
+  let not_a_component = |why: String| not_a_component(reference, digest, why);
   let manifest: Value = serde_json::from_slice(bytes)
     .map_err(|err| not_a_component(format!("its manifest is not JSON ({err})")))?;
   match manifest.get("mediaType").and_then(Value::as_str) {
@@ -770,15 +789,19 @@ fn parse_manifest(
     .unwrap_or_default();
   let artifact_type = manifest.get("artifactType").and_then(Value::as_str);
   // Every spelling either has had (staged plan S0.5): an artifact pushed before a rename stays
-  // pullable after it.
-  if !persisted::COMPONENT_CONFIG_MEDIA_TYPE.reads(config_type)
-    || artifact_type.is_some_and(|t| !persisted::COMPONENT_ARTIFACT_TYPE.reads(t))
+  // pullable after it. The CNCF layout defines no `artifactType`, so its exports decide (ADR 0098).
+  let layout = if config_type == WASM_CONFIG_MEDIA_TYPE {
+    Layout::Wasm
+  } else if persisted::COMPONENT_CONFIG_MEDIA_TYPE.reads(config_type)
+    && artifact_type.is_none_or(|t| persisted::COMPONENT_ARTIFACT_TYPE.reads(t))
   {
+    Layout::Janus
+  } else {
     return Err(not_a_component(format!(
       "its artifact type is '{}'",
       artifact_type.unwrap_or(config_type)
     )));
-  }
+  };
   let config =
     descriptor(config).ok_or_else(|| not_a_component("its config descriptor is malformed".to_string()))?;
   let wasm: Vec<&Value> = manifest
@@ -796,7 +819,54 @@ fn parse_manifest(
   };
   let layer =
     descriptor(layer).ok_or_else(|| not_a_component("its layer descriptor is malformed".to_string()))?;
-  Ok((config, layer))
+  Ok((layout, config, layer))
+}
+
+/// A CNCF Wasm config is a Janus component's when its `component.exports` names the pipe, in any
+/// spelling it has had (ADR 0098 decision 2). A config with no `component` describes a module, which
+/// cannot be one.
+fn check_exports(config: &Value, reference: &Reference, digest: &str) -> Result<(), ComponentError> {
+  let Some(component) = config.get("component").filter(|c| c.is_object()) else {
+    return Err(not_a_component(
+      reference,
+      digest,
+      "its config describes a WebAssembly module, not a component".to_string(),
+    ));
+  };
+  let exports: Vec<&str> = component
+    .get("exports")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+    .filter_map(Value::as_str)
+    .collect();
+  if exports
+    .iter()
+    .any(|export| persisted::COMPONENT_INTERFACE.reads(export))
+  {
+    return Ok(());
+  }
+  let exported = if exports.is_empty() {
+    "nothing".to_string()
+  } else {
+    exports.join(", ")
+  };
+  Err(not_a_component(
+    reference,
+    digest,
+    format!(
+      "it exports {exported}, and not {}",
+      persisted::COMPONENT_INTERFACE.writes()
+    ),
+  ))
+}
+
+fn not_a_component(reference: &Reference, digest: &str, why: String) -> ComponentError {
+  failure(
+    "not-a-component",
+    format!("'{reference}' ({digest}) is not a Janus component: {why}"),
+    json!({ "reference": reference.to_string(), "digest": digest }),
+  )
 }
 
 fn check_size(reference: &Reference, descriptor: &Descriptor, bytes: &[u8]) -> Result<(), ComponentError> {
@@ -976,16 +1046,60 @@ mod tests {
   }
 
   #[test]
+  fn a_cncf_config_is_a_janus_components_when_it_exports_the_pipe() {
+    let r = reference("localhost:5000", "c", Some("1"), None);
+    let pipe = persisted::COMPONENT_INTERFACE.writes();
+    let check = |config: Value| check_exports(&config, &r, D);
+    assert!(
+      check(json!({ "os": "wasip2", "component": { "exports": ["wasi:cli/run@0.2.0", pipe] } })).is_ok()
+    );
+    for spelling in persisted::COMPONENT_INTERFACE.earlier() {
+      assert!(
+        check(json!({ "component": { "exports": [spelling] } })).is_ok(),
+        "{spelling}"
+      );
+    }
+
+    let other =
+      check(json!({ "component": { "exports": ["wasi:http/incoming-handler@0.2.0"] } })).unwrap_err();
+    assert_eq!(other.code, "not-a-component");
+    assert!(
+      other.message.contains(&format!(
+        "it exports wasi:http/incoming-handler@0.2.0, and not {pipe}"
+      )),
+      "{}",
+      other.message
+    );
+    let nothing = check(json!({ "component": {} })).unwrap_err();
+    assert!(
+      nothing.message.contains("it exports nothing"),
+      "{}",
+      nothing.message
+    );
+    let module = check(json!({ "architecture": "wasm", "os": "wasip1" })).unwrap_err();
+    assert!(
+      module.message.contains("a WebAssembly module"),
+      "{}",
+      module.message
+    );
+  }
+
+  #[test]
   fn only_a_janus_component_manifest_is_a_component() {
     let r = reference("localhost:5000", "c", Some("1"), None);
     let config = json!({ "mediaType": CONFIG_MEDIA_TYPE, "digest": D, "size": 2 });
     let layer = json!({ "mediaType": WASM_MEDIA_TYPE, "digest": D, "size": 3 });
     let parse = |manifest: Value| parse_manifest(&serde_json::to_vec(&manifest).unwrap(), &r, D);
 
-    let (c, l) = parse(json!({ "schemaVersion": 2, "mediaType": MANIFEST_MEDIA_TYPE, "artifactType": ARTIFACT_TYPE,
+    let (layout, c, l) = parse(json!({ "schemaVersion": 2, "mediaType": MANIFEST_MEDIA_TYPE, "artifactType": ARTIFACT_TYPE,
                                "config": config, "layers": [ { "mediaType": "text/markdown", "digest": D, "size": 9 }, layer ] }))
     .unwrap();
-    assert_eq!((c.size, l.size), (2, 3));
+    assert_eq!((layout, c.size, l.size), (Layout::Janus, 2, 3));
+    // ADR 0098: the CNCF Wasm layout, which `wkg oci push` writes, whose exports decide.
+    let (layout, ..) = parse(json!({ "schemaVersion": 2, "mediaType": MANIFEST_MEDIA_TYPE,
+      "config": { "mediaType": WASM_CONFIG_MEDIA_TYPE, "digest": D, "size": 2 }, "layers": [layer] }))
+    .unwrap();
+    assert_eq!(layout, Layout::Wasm);
     // Pre-1.1: the config media type is the artifact type.
     assert!(parse(json!({ "schemaVersion": 2, "config": config, "layers": [layer] })).is_ok());
 

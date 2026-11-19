@@ -284,7 +284,13 @@ fn artifact_config(hello: &Value) -> Value {
 /// An artifact whose config names a different component than the one that answers is lying about
 /// one of them. The handshake is the source of truth (spec §2.3), so the config is the one that is
 /// wrong — but a registry, a broker or a person read the config, and they were told something false.
+///
+/// An artifact in the CNCF Wasm layout says no name or version, so there is nothing to disagree with
+/// and the handshake alone says which component it is (ADR 0098 decision 3).
 fn check_artifact_config(pulled: &oci::Pulled, hello: &Value) -> Result<(), ComponentError> {
+  if pulled.layout == oci::Layout::Wasm {
+    return Ok(());
+  }
   let says = artifact_config(hello);
   for member in ["name", "version"] {
     if pulled.config.get(member) != says.get(member) {

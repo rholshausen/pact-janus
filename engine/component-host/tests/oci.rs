@@ -564,3 +564,106 @@ fn against_a_real_registry() {
   let by_digest = format!("{host}/janus-csv@{}", pushed.digest);
   load_and_decode(&loader, &declaration(&by_digest, None));
 }
+
+/// The CSV component as `wkg oci push` publishes it (ADR 0098): the CNCF Wasm OCI artifact layout,
+/// a config naming the component's WIT exports and no name or version, and one `application/wasm`
+/// layer. `exports` is what the config says the component exports. Returns the manifest's digest.
+fn put_cncf(registry: &Registry, repository: &str, exports: &[&str]) -> String {
+  let layer = csv_bytes();
+  let config = serde_json::to_vec(&json!({
+    "created": "2026-11-19T00:12:33.271264184Z", "author": null, "architecture": "wasm", "os": "wasip2",
+    "layerDigests": [oci::sha256(&layer)],
+    "component": { "exports": exports, "imports": ["wasi:io/poll@0.2.12"], "target": null },
+  }))
+  .unwrap();
+  let manifest = serde_json::to_vec(&json!({
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "config": { "mediaType": oci::WASM_CONFIG_MEDIA_TYPE, "digest": oci::sha256(&config), "size": config.len() },
+    "layers": [ { "mediaType": "application/wasm", "digest": oci::sha256(&layer), "size": layer.len(),
+                  "annotations": { "org.opencontainers.image.title": "janus_csv.wasm" } } ],
+  }))
+  .unwrap();
+  registry.put(repository, "1.0.0", &manifest, &[&config, &layer])
+}
+
+#[test]
+fn a_component_published_in_the_cncf_wasm_layout_loads_pinned_by_its_digest() {
+  let registry = Registry::start();
+  let digest = put_cncf(&registry, "janus-csv", &["pact:janus-component/pipe@1.0.0"]);
+  let loader = WasmLoader::with_cache(fresh_cache("cncf")).unwrap();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+
+  let decoded = load_and_decode(&loader, &declaration(&reference, Some(&digest)));
+  assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
+  // With no name in the config, the handshake alone says which component it is.
+  let (pulled, hello) = loader.pull(&reference, None, None).unwrap();
+  assert_eq!(
+    (pulled.layout, pulled.digest.as_str()),
+    (oci::Layout::Wasm, digest.as_str())
+  );
+  assert_eq!(hello["component"], json!({ "name": "csv", "version": "1.0.0" }));
+}
+
+#[test]
+fn a_cncf_artifact_of_another_component_is_refused_before_its_layer_is_fetched() {
+  let registry = Registry::start();
+  put_cncf(&registry, "a-proxy", &["wasi:http/incoming-handler@0.2.0"]);
+  let loader = WasmLoader::with_cache(fresh_cache("cncf-other")).unwrap();
+
+  let err = refused(
+    &loader,
+    &declaration(&format!("{}/a-proxy:1.0.0", registry.host), None),
+  );
+  assert_eq!(err.code, "not-a-component", "{err:?}");
+  assert!(
+    err
+      .message
+      .contains("it exports wasi:http/incoming-handler@0.2.0, and not pact:janus-component/pipe@1.0.0"),
+    "{}",
+    err.message
+  );
+  // The manifest and its config, and not a byte of the layer.
+  let blobs: Vec<String> = registry
+    .take_log()
+    .into_iter()
+    .filter(|line| line.contains("/blobs/"))
+    .collect();
+  assert_eq!(blobs.len(), 1, "only the config was fetched: {blobs:#?}");
+}
+
+/// The exit S5.1b names: the CSV component pushed with `wkg oci push` itself, the Bytecode
+/// Alliance's tool, to the registry in this process, and loaded pinned by the digest it answered
+/// with. `JANUS_WKG` names the `wkg` to run (CI installs one); without it this test says so and
+/// passes, since the layout `wkg` writes is pinned above.
+#[test]
+fn a_component_pushed_with_wkg_loads() {
+  let Ok(wkg) = std::env::var("JANUS_WKG") else {
+    eprintln!("JANUS_WKG is not set; skipping the push with wkg");
+    return;
+  };
+  let registry = Registry::start();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let pushed = std::process::Command::new(wkg)
+    .args(["oci", "push", "--insecure", &registry.host, &reference])
+    .arg(csv_wasm())
+    .output()
+    .expect("wkg runs");
+  let stdout = String::from_utf8_lossy(&pushed.stdout);
+  assert!(
+    pushed.status.success(),
+    "wkg oci push failed: {stdout}{}",
+    String::from_utf8_lossy(&pushed.stderr)
+  );
+  let digest = stdout
+    .lines()
+    .find_map(|line| line.trim().strip_prefix("digest: "))
+    .unwrap_or_else(|| panic!("wkg printed no digest: {stdout}"))
+    .to_string();
+
+  let loader = WasmLoader::with_cache(fresh_cache("wkg")).unwrap();
+  let decoded = load_and_decode(&loader, &declaration(&reference, Some(&digest)));
+  assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
+  let (pulled, _) = loader.pull(&reference, Some(&digest), None).unwrap();
+  assert_eq!(pulled.layout, oci::Layout::Wasm);
+}

@@ -117,6 +117,14 @@ jobs:
           done
           curl -fsS http://localhost:5000/v2/ >/dev/null
           echo "JANUS_OCI_REGISTRY=localhost:5000" >> "$GITHUB_ENV"
+      # ADR 0098: a component published with the Bytecode Alliance's `wkg oci push`, in the CNCF Wasm
+      # layout, loads. tests/oci.rs pushes the CSV component with it when JANUS_WKG names one. Pinned,
+      # and cached with the toolchain's binaries; Linux only, as the registry above is.
+      - name: wkg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo install wkg --locked --version 0.16.2
+          echo "JANUS_WKG=$(command -v wkg)" >> "$GITHUB_ENV"
       # ADR 0092: a Pact Broker hosts the engine's WASM component, the Ruby broker with the wasmtime
       # gem. engine/component-host/tests/engine_wasm.rs holds that host (engine/wasm/hosts/ruby) to
       # the native engine when JANUS_RUBY names a Ruby with its gems. Linux only, as the broker's

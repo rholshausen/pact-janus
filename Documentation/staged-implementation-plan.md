@@ -2931,6 +2931,18 @@ The component model, opened to the ecosystem.
     config's WIT exports before fetching its layer where the config lists them. *Exit:* the CSV
     component pushed with `wkg oci push` loads, pinned by digest, and a CNCF artifact of another
     component is refused as `not-a-component` before its layer is fetched.
+    *Done 2026-11-19* ([ADR 0098](decisions/0098-accept-a-component-published-in-the-cncf-wasm-layout-recognised-by-the-pipe-its-config-says-it-exports.md),
+    superseding ADR 0021 decision 1):
+    - `wkg` 0.16.2 writes the pipe's name, `pact:janus-component/pipe@1.0.0`, into its config's
+      `component.exports`, so the early refusal ADR 0021 wanted holds for the CNCF layout too, at the
+      cost of fetching the config. A config with no `component` is a module. The CNCF config has no
+      name or version, so the handshake alone says which component an artifact is, and
+      `janus component pull` names it from the handshake for either layout.
+    - `tests/oci.rs` pins the layout `wkg` writes and pushes with `wkg` itself when `JANUS_WKG` names
+      one, which CI's Linux job installs, pinned. The pull also works against `registry:2`. The test
+      registry learned chunked uploads (`PATCH`), which `wkg` sends.
+    - Not foreseen: `wkg` writes a timestamp into the config, so every push of the same bytes is a
+      new digest to pin, where `janus component push` gives one.
   - **S5.1c Signed components** — **M**: X.6. Sigstore signatures, attached to an artifact through
     OCI referrers. A declaration names the identity it trusts, the loader verifies it at pull and at
     load, and the record S5.1a writes carries the identity it verified. The ADR decides the verifier,
@@ -3199,7 +3211,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
-| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts; signing | findings 15–17 |
+| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
