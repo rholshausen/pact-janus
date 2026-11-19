@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795064375882,
+  "lastUpdate": 1795064378358,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -60642,6 +60642,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 100.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2a56a6b076f0958a6cf0040590a0fbb20f45bc19",
+          "message": "feat: S5.1c, a component's Sigstore signature is verified against the signer its declaration names (ADR 0099)\n\nAn `oci` source takes a `signature`: an `issuer`, and an exact `identity` or\na whole-match `identity-pattern`, with an optional `trusted-root`. The\nloader finds the Sigstore bundles `cosign sign` attaches as OCI referrers,\nthrough the referrers API or the referrers tag schema's index, and verifies\nthem offline with `sigstore-verify` on `ring`, against the public-good\ntrusted root it carries or the declared one. A bundle counts when it is a\nDSSE statement about the manifest digest with cosign's sign predicate or\nSLSA provenance. Verification runs after the digest check and before\nanything is compiled, at load and at `janus component pull`; a load with no\ntrusted signature fails as `signature-missing` or `signature-untrusted`.\nA pin that verified once loads again from the cache with no request, its\nbundles verified again each time.\n\nA recorded component's source names the `signer` it verified, and `janus\ncomponent pull` takes cosign's flags, reports who signed and prints a\ndeclaration naming them. Unsigned stays the default.\n\ntests/signature.rs signs with a Sigstore made per test, verified with\nnothing relaxed, and keylessly with `cosign` 3.1.4 as the running GitHub\nworkflow when JANUS_COSIGN names one, which CI's Linux job now installs\n(the rust job gains `id-token: write`). Spec §10.3's \"not specified in v1\"\nis replaced with the specification.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T15:51:13+11:00",
+          "tree_id": "71d7235b52e99dc30c397b050d6d54cd2063a2e6",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2a56a6b076f0958a6cf0040590a0fbb20f45bc19"
+        },
+        "date": 1795064377931,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 33361,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27472,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 54.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 40.2,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 136.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 100,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
