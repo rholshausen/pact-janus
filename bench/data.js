@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795049526662,
+  "lastUpdate": 1795049528897,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -60108,6 +60108,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 100.1,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3da1d7c328849be403a60a20976c8d541af5a905",
+          "message": "feat: S5.1b, a component published with wkg oci push loads (ADR 0098)\n\nThe loader accepts the CNCF Wasm OCI artifact layout, which the Bytecode\nAlliance's `wkg oci push` publishes, beside Janus's own. Such an artifact is\na Janus component's when its config's `component.exports` names the pipe,\nchecked before the layer is fetched, so another component or a module is\nstill refused as `not-a-component` without fetching it. Its config names no\ncomponent, so the handshake alone says which it is, and `janus component\npull` names a component from its handshake for either layout.\n\ntests/oci.rs pushes with `wkg` itself when JANUS_WKG names one, which CI's\nLinux job installs (0.16.2, pinned); the test registry learned chunked\nuploads, which `wkg` sends. Supersedes ADR 0021 decision 1 and closes Phase\n9 finding 17.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T11:45:05+11:00",
+          "tree_id": "acaa51b340ef8894e6a4df7189cc51a52de270da",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3da1d7c328849be403a60a20976c8d541af5a905"
+        },
+        "date": 1795049528499,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 37469,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27804,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 57.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 40.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 144.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 100.5,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
